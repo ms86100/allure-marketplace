@@ -13,6 +13,7 @@ export interface Profile {
   name: string;
   flat_number: string;
   block: string;
+  phase: string | null;
   avatar_url: string | null;
   verification_status: VerificationStatus;
   created_at: string;

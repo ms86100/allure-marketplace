@@ -413,6 +413,7 @@ export type Database = {
           flat_number: string
           id: string
           name: string
+          phase: string | null
           phone: string
           updated_at: string | null
           verification_status:
@@ -426,6 +427,7 @@ export type Database = {
           flat_number: string
           id: string
           name: string
+          phase?: string | null
           phone: string
           updated_at?: string | null
           verification_status?:
@@ -439,6 +441,7 @@ export type Database = {
           flat_number?: string
           id?: string
           name?: string
+          phase?: string | null
           phone?: string
           updated_at?: string | null
           verification_status?:

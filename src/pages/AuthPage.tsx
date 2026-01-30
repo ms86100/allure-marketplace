@@ -7,22 +7,23 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Mail, ArrowRight, Loader2, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { Mail, ArrowRight, Loader2, ShieldCheck, Eye, EyeOff, CheckCircle2, User } from 'lucide-react';
 import heroBanner from '@/assets/hero-banner.jpg';
 
-type AuthStep = 'auth' | 'profile';
+type SignupStep = 'credentials' | 'profile' | 'verification';
 
 interface ProfileData {
   name: string;
   flat_number: string;
   block: string;
+  phase: string;
   phone: string;
 }
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<AuthStep>('auth');
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [signupStep, setSignupStep] = useState<SignupStep>('credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +32,7 @@ export default function AuthPage() {
     name: '',
     flat_number: '',
     block: '',
+    phase: '',
     phone: '',
   });
 
@@ -68,12 +70,16 @@ export default function AuthPage() {
         toast.success('Welcome back!');
         navigate('/');
       } else {
-        setStep('profile');
+        // User logged in but has no profile - show profile form
+        setAuthMode('signup');
+        setSignupStep('profile');
       }
     } catch (error: any) {
       console.error('Login error:', error);
       if (error.message.includes('Invalid login')) {
         toast.error('Invalid email or password');
+      } else if (error.message.includes('Email not confirmed')) {
+        toast.error('Please verify your email address first. Check your inbox.');
       } else {
         toast.error(error.message || 'Failed to login');
       }
@@ -82,7 +88,8 @@ export default function AuthPage() {
     }
   };
 
-  const handleSignup = async () => {
+  // Step 1: Collect email and password, then move to profile
+  const handleCredentialsNext = () => {
     if (!validateEmail(email)) {
       toast.error('Please enter a valid email address');
       return;
@@ -91,47 +98,12 @@ export default function AuthPage() {
       toast.error('Password must be at least 6 characters');
       return;
     }
-
-    setIsLoading(true);
-    try {
-      const redirectUrl = `${window.location.origin}/`;
-      
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data.user) {
-        // Check if user needs email confirmation
-        if (data.user.identities?.length === 0) {
-          toast.error('This email is already registered. Please login instead.');
-          setAuthMode('login');
-          return;
-        }
-
-        toast.success('Account created! Please complete your profile.');
-        setStep('profile');
-      }
-    } catch (error: any) {
-      console.error('Signup error:', error);
-      if (error.message.includes('already registered')) {
-        toast.error('This email is already registered. Please login instead.');
-        setAuthMode('login');
-      } else {
-        toast.error(error.message || 'Failed to create account');
-      }
-    } finally {
-      setIsLoading(false);
-    }
+    setSignupStep('profile');
   };
 
-  const handleCreateProfile = async () => {
-    if (!profileData.name || !profileData.flat_number || !profileData.block || !profileData.phone) {
+  // Step 2: Collect profile data, then create account
+  const handleSignupComplete = async () => {
+    if (!profileData.name || !profileData.flat_number || !profileData.block || !profileData.phase || !profileData.phone) {
       toast.error('Please fill in all fields');
       return;
     }
@@ -143,38 +115,75 @@ export default function AuthPage() {
 
     setIsLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const redirectUrl = `${window.location.origin}/auth`;
       
-      if (!user) throw new Error('Not authenticated');
+      // Create the user account
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            name: profileData.name,
+            phone: `+91${profileData.phone}`,
+            flat_number: profileData.flat_number,
+            block: profileData.block,
+            phase: profileData.phase,
+          }
+        },
+      });
 
-      // Create profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: user.id,
-          phone: `+91${profileData.phone}`,
-          name: profileData.name,
-          flat_number: profileData.flat_number,
-          block: profileData.block,
-        });
+      if (error) throw error;
 
-      if (profileError) throw profileError;
+      if (data.user) {
+        // Check if user needs email confirmation
+        if (data.user.identities?.length === 0) {
+          toast.error('This email is already registered. Please login instead.');
+          setAuthMode('login');
+          setSignupStep('credentials');
+          return;
+        }
 
-      // Create default buyer role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: user.id,
-          role: 'buyer',
-        });
+        // Try to create profile immediately (will work if email confirmation is disabled)
+        try {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: data.user.id,
+              phone: `+91${profileData.phone}`,
+              name: profileData.name,
+              flat_number: profileData.flat_number,
+              block: profileData.block,
+              phase: profileData.phase,
+            });
 
-      if (roleError) throw roleError;
+          if (!profileError) {
+            // Create default buyer role
+            await supabase
+              .from('user_roles')
+              .insert({
+                user_id: data.user.id,
+                role: 'buyer',
+              });
+          }
+        } catch (e) {
+          // Profile creation might fail if email needs verification - that's ok
+          console.log('Profile will be created after email verification');
+        }
 
-      toast.success('Profile created! Awaiting community verification.');
-      navigate('/');
+        // Show verification step
+        setSignupStep('verification');
+        toast.success('Please check your email to verify your account');
+      }
     } catch (error: any) {
-      console.error('Error creating profile:', error);
-      toast.error(error.message || 'Failed to create profile');
+      console.error('Signup error:', error);
+      if (error.message.includes('already registered')) {
+        toast.error('This email is already registered. Please login instead.');
+        setAuthMode('login');
+        setSignupStep('credentials');
+      } else {
+        toast.error(error.message || 'Failed to create account');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -186,6 +195,20 @@ export default function AuthPage() {
   };
 
   const blocks = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+  const phases = ['Phase 1', 'Phase 2'];
+
+  const resetSignup = () => {
+    setSignupStep('credentials');
+    setEmail('');
+    setPassword('');
+    setProfileData({
+      name: '',
+      flat_number: '',
+      block: '',
+      phase: '',
+      phone: '',
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -219,135 +242,169 @@ export default function AuthPage() {
       <div className="px-4 -mt-4 relative z-10">
         <Card className="shadow-elevated">
           <CardHeader className="text-center pb-2">
-            {step === 'auth' && (
+            {authMode === 'login' && (
               <>
                 <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
                   <Mail className="text-primary" size={24} />
                 </div>
-                <CardTitle>Welcome to BlockEats</CardTitle>
-                <CardDescription>
-                  {authMode === 'login' ? 'Login to your account' : 'Create a new account'}
-                </CardDescription>
+                <CardTitle>Welcome Back</CardTitle>
+                <CardDescription>Login to your account</CardDescription>
               </>
             )}
-            {step === 'profile' && (
+            {authMode === 'signup' && signupStep === 'credentials' && (
+              <>
+                <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                  <Mail className="text-primary" size={24} />
+                </div>
+                <CardTitle>Create Account</CardTitle>
+                <CardDescription>Step 1 of 3: Enter your email</CardDescription>
+              </>
+            )}
+            {authMode === 'signup' && signupStep === 'profile' && (
               <>
                 <div className="mx-auto w-12 h-12 rounded-full bg-success/10 flex items-center justify-center mb-2">
-                  <ShieldCheck className="text-success" size={24} />
+                  <User className="text-success" size={24} />
                 </div>
-                <CardTitle>Complete Your Profile</CardTitle>
-                <CardDescription>
-                  Help us verify you're a Greenfield resident
-                </CardDescription>
+                <CardTitle>Your Details</CardTitle>
+                <CardDescription>Step 2 of 3: Tell us about yourself</CardDescription>
+              </>
+            )}
+            {authMode === 'signup' && signupStep === 'verification' && (
+              <>
+                <div className="mx-auto w-12 h-12 rounded-full bg-success/10 flex items-center justify-center mb-2">
+                  <CheckCircle2 className="text-success" size={24} />
+                </div>
+                <CardTitle>Verify Your Email</CardTitle>
+                <CardDescription>Step 3 of 3: Check your inbox</CardDescription>
               </>
             )}
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {step === 'auth' && (
+            {/* Login Form */}
+            {authMode === 'login' && (
               <>
-                <Tabs value={authMode} onValueChange={(v) => setAuthMode(v as 'login' | 'signup')}>
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="login">Login</TabsTrigger>
-                    <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="login" className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="login-email">Email</Label>
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="your@email.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="login-password">Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="login-password"
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="Enter your password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                        >
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={handleLogin}
-                      disabled={!email || !password || isLoading}
-                      className="w-full"
+                <div className="space-y-2">
+                  <Label htmlFor="login-email">Email</Label>
+                  <Input
+                    id="login-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                     >
-                      {isLoading ? (
-                        <Loader2 className="animate-spin mr-2" size={18} />
-                      ) : (
-                        <ArrowRight className="mr-2" size={18} />
-                      )}
-                      Login
-                    </Button>
-                  </TabsContent>
-
-                  <TabsContent value="signup" className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-email">Email</Label>
-                      <Input
-                        id="signup-email"
-                        type="email"
-                        placeholder="your@email.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-password">Password</Label>
-                      <div className="relative">
-                        <Input
-                          id="signup-password"
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="Create a password (min 6 chars)"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                        >
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        At least 6 characters
-                      </p>
-                    </div>
-                    <Button
-                      onClick={handleSignup}
-                      disabled={!email || password.length < 6 || isLoading}
-                      className="w-full"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="animate-spin mr-2" size={18} />
-                      ) : (
-                        <ArrowRight className="mr-2" size={18} />
-                      )}
-                      Create Account
-                    </Button>
-                  </TabsContent>
-                </Tabs>
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleLogin}
+                  disabled={!email || !password || isLoading}
+                  className="w-full"
+                >
+                  {isLoading ? (
+                    <Loader2 className="animate-spin mr-2" size={18} />
+                  ) : (
+                    <ArrowRight className="mr-2" size={18} />
+                  )}
+                  Login
+                </Button>
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('signup');
+                      resetSignup();
+                    }}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Don't have an account? Sign up
+                  </button>
+                </div>
               </>
             )}
 
-            {step === 'profile' && (
+            {/* Signup Step 1: Credentials */}
+            {authMode === 'signup' && signupStep === 'credentials' && (
               <>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email</Label>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="signup-password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Create a password (min 6 chars)"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    At least 6 characters
+                  </p>
+                </div>
+                <Button
+                  onClick={handleCredentialsNext}
+                  disabled={!email || password.length < 6}
+                  className="w-full"
+                >
+                  <ArrowRight className="mr-2" size={18} />
+                  Continue
+                </Button>
+                <div className="text-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('login')}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Already have an account? Login
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Signup Step 2: Profile Details */}
+            {authMode === 'signup' && signupStep === 'profile' && (
+              <>
+                {/* Progress indicator */}
+                <div className="flex items-center justify-center gap-2 pb-2">
+                  <div className="w-8 h-1 rounded-full bg-primary" />
+                  <div className="w-8 h-1 rounded-full bg-primary" />
+                  <div className="w-8 h-1 rounded-full bg-muted" />
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name</Label>
                   <Input
@@ -378,6 +435,25 @@ export default function AuthPage() {
                       className="flex-1"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phase">Phase</Label>
+                  <select
+                    id="phase"
+                    value={profileData.phase}
+                    onChange={(e) =>
+                      setProfileData({ ...profileData, phase: e.target.value })
+                    }
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                  >
+                    <option value="">Select Phase</option>
+                    {phases.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -412,22 +488,87 @@ export default function AuthPage() {
                   </div>
                 </div>
 
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setSignupStep('credentials')}
+                    className="flex-1"
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleSignupComplete}
+                    disabled={
+                      !profileData.name ||
+                      !profileData.flat_number ||
+                      !profileData.block ||
+                      !profileData.phase ||
+                      profileData.phone.length !== 10 ||
+                      isLoading
+                    }
+                    className="flex-1"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="animate-spin mr-2" size={18} />
+                    ) : null}
+                    Create Account
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {/* Signup Step 3: Email Verification */}
+            {authMode === 'signup' && signupStep === 'verification' && (
+              <>
+                {/* Progress indicator */}
+                <div className="flex items-center justify-center gap-2 pb-2">
+                  <div className="w-8 h-1 rounded-full bg-primary" />
+                  <div className="w-8 h-1 rounded-full bg-primary" />
+                  <div className="w-8 h-1 rounded-full bg-primary" />
+                </div>
+
+                <div className="text-center py-4 space-y-4">
+                  <div className="mx-auto w-16 h-16 rounded-full bg-success/10 flex items-center justify-center">
+                    <Mail className="text-success" size={32} />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="font-medium">Check your email</p>
+                    <p className="text-sm text-muted-foreground">
+                      We've sent a verification link to:
+                    </p>
+                    <p className="text-sm font-medium text-primary">{email}</p>
+                  </div>
+                  <div className="bg-muted/50 rounded-lg p-4 text-left text-sm space-y-2">
+                    <p className="font-medium">What happens next?</p>
+                    <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                      <li>Click the link in your email</li>
+                      <li>You'll be redirected back here</li>
+                      <li>Login with your credentials</li>
+                      <li>Admin will verify your residency</li>
+                    </ol>
+                  </div>
+                </div>
+
                 <Button
-                  onClick={handleCreateProfile}
-                  disabled={
-                    !profileData.name ||
-                    !profileData.flat_number ||
-                    !profileData.block ||
-                    profileData.phone.length !== 10 ||
-                    isLoading
-                  }
+                  onClick={() => {
+                    setAuthMode('login');
+                    resetSignup();
+                  }}
                   className="w-full"
                 >
-                  {isLoading ? (
-                    <Loader2 className="animate-spin mr-2" size={18} />
-                  ) : null}
-                  Complete Registration
+                  Go to Login
                 </Button>
+
+                <p className="text-xs text-center text-muted-foreground">
+                  Didn't receive the email?{' '}
+                  <button
+                    type="button"
+                    onClick={() => toast.info('Please check your spam folder or try signing up again.')}
+                    className="text-primary hover:underline"
+                  >
+                    Get help
+                  </button>
+                </p>
               </>
             )}
           </CardContent>
