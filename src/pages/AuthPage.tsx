@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,31 @@ interface ProfileData {
   phone: string;
 }
 
+// ============================================
+// INTENTIONAL TIMEOUT ERROR CODE - FOR INVESTIGATION
+// This simulates a network timeout scenario
+// ============================================
+const simulateNetworkTimeout = async () => {
+  const controller = new AbortController();
+  
+  // Set a very short timeout (100ms) that will always fail
+  const timeoutId = setTimeout(() => controller.abort(), 100);
+  
+  try {
+    // Try to fetch from a slow endpoint that will timeout
+    await fetch('https://httpstat.us/200?sleep=5000', {
+      signal: controller.signal
+    });
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Network timeout: Request took too long to complete');
+    }
+    throw error;
+  }
+};
+// ============================================
+
 export default function AuthPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<AuthStep>('auth');
@@ -33,6 +58,21 @@ export default function AuthPage() {
     block: '',
     phone: '',
   });
+
+  // This useEffect triggers the timeout error on page load
+  useEffect(() => {
+    const triggerTimeoutError = async () => {
+      try {
+        await simulateNetworkTimeout();
+      } catch (error: any) {
+        console.error('TIMEOUT ERROR:', error.message);
+        // This will show as an error in console and potentially trigger error boundaries
+        throw error; // Re-throw to trigger uncaught error
+      }
+    };
+    
+    triggerTimeoutError();
+  }, []);
 
   const validateEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
