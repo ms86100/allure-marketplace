@@ -450,6 +450,11 @@ export default function AdminPage() {
               </CardContent></Card>
             ))}
           </TabsContent>
+
+          <TabsContent value="settings" className="space-y-4 mt-4">
+            <ApiKeySettings />
+            <CategoryManager />
+          </TabsContent>
         </Tabs>
 
         {/* Hide Review Dialog */}
@@ -589,11 +594,6 @@ export default function AdminPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Settings Tab Content - add inside Tabs */}
-          <TabsContent value="settings" className="space-y-4 mt-4">
-            <ApiKeySettings />
-            <CategoryManager />
-          </TabsContent>
       </div>
     </AppLayout>
   );
