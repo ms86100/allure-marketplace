@@ -1,0 +1,32 @@
+import { Capacitor } from '@capacitor/core';
+import { SplashScreen } from '@capacitor/splash-screen';
+import { StatusBar, Style } from '@capacitor/status-bar';
+
+export async function initializeCapacitorPlugins() {
+  if (!Capacitor.isNativePlatform()) {
+    return;
+  }
+
+  try {
+    // Configure status bar
+    await StatusBar.setStyle({ style: Style.Light });
+    await StatusBar.setBackgroundColor({ color: '#F97316' });
+  } catch (error) {
+    console.error('Error configuring status bar:', error);
+  }
+
+  try {
+    // Hide splash screen after a brief delay to ensure app is ready
+    await SplashScreen.hide();
+  } catch (error) {
+    console.error('Error hiding splash screen:', error);
+  }
+}
+
+export function isNativePlatform(): boolean {
+  return Capacitor.isNativePlatform();
+}
+
+export function getPlatform(): 'ios' | 'android' | 'web' {
+  return Capacitor.getPlatform() as 'ios' | 'android' | 'web';
+}
