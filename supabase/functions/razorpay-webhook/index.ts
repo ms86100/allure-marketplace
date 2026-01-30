@@ -7,14 +7,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-razorpay-signature',
 };
 
-const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET')!;
+async function getRazorpaySecret(supabase: any): Promise<string | null> {
+  // First try to get from admin_settings table
+  const { data: setting } = await supabase
+    .from('admin_settings')
+    .select('value, is_active')
+    .eq('key', 'razorpay_key_secret')
+    .single();
 
-async function verifySignature(body: string, signature: string): Promise<boolean> {
+  if (setting?.value && setting.is_active) {
+    return setting.value;
+  }
+
+  // Fallback to environment variable
+  return Deno.env.get('RAZORPAY_KEY_SECRET') || null;
+}
+
+async function verifySignature(body: string, signature: string, secret: string): Promise<boolean> {
   try {
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',
-      encoder.encode(RAZORPAY_KEY_SECRET),
+      encoder.encode(secret),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['sign']
@@ -51,9 +65,19 @@ serve(async (req) => {
     const body = await req.text();
     const signature = req.headers.get('x-razorpay-signature');
 
+    // Get Razorpay secret
+    const razorpaySecret = await getRazorpaySecret(supabase);
+    if (!razorpaySecret) {
+      console.error('Razorpay secret not configured');
+      return new Response(
+        JSON.stringify({ error: 'Payment gateway not configured' }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Verify webhook signature
     if (signature) {
-      const isValid = await verifySignature(body, signature);
+      const isValid = await verifySignature(body, signature, razorpaySecret);
       if (!isValid) {
         console.error('Invalid webhook signature');
         return new Response(

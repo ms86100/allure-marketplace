@@ -18,6 +18,18 @@ interface ApiKeySetting {
 
 const API_KEY_CONFIGS = [
   {
+    key: 'razorpay_key_id',
+    label: 'Razorpay Key ID',
+    description: 'Public key for UPI/card payments via Razorpay',
+    placeholder: 'rzp_live_...',
+  },
+  {
+    key: 'razorpay_key_secret',
+    label: 'Razorpay Key Secret',
+    description: 'Secret key for payment verification (keep private)',
+    placeholder: 'Your secret key',
+  },
+  {
     key: 'google_maps_api_key',
     label: 'Google Maps API Key',
     description: 'Required for location features and address autocomplete',
