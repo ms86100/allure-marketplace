@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CartProvider } from "@/hooks/useCart";
 import { OfflineBanner } from "@/components/network/OfflineBanner";
 import { PushNotificationProvider } from "@/components/notifications/PushNotificationProvider";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Pages
 import AuthPage from "./pages/AuthPage";
@@ -94,22 +95,24 @@ function AppRoutes() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <OfflineBanner />
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <CartProvider>
-            <PushNotificationProvider>
-              <AppRoutes />
-            </PushNotificationProvider>
-          </CartProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <OfflineBanner />
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <CartProvider>
+              <PushNotificationProvider>
+                <AppRoutes />
+              </PushNotificationProvider>
+            </CartProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
