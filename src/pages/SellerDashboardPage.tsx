@@ -7,13 +7,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
+import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
 import { SellerProfile, Order, ORDER_STATUS_LABELS } from '@/types/database';
 import { Package, Plus, Settings, DollarSign, Clock, ChevronRight, TrendingUp, Calendar, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, startOfDay, startOfWeek, isAfter, parseISO } from 'date-fns';
 
 export default function SellerDashboardPage() {
-  const { user } = useAuth();
+  const { user, sellerProfiles, currentSellerId } = useAuth();
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,25 +28,32 @@ export default function SellerDashboardPage() {
     todayOrders: 0,
   });
 
+  // Fetch data when user or currentSellerId changes
   useEffect(() => {
-    if (user) {
-      fetchSellerData();
+    if (user && currentSellerId) {
+      fetchSellerData(currentSellerId);
+    } else if (user && sellerProfiles.length > 0) {
+      fetchSellerData(sellerProfiles[0].id);
+    } else {
+      setIsLoading(false);
     }
-  }, [user]);
+  }, [user, currentSellerId, sellerProfiles]);
 
-  const fetchSellerData = async () => {
+  const fetchSellerData = async (sellerId: string) => {
     if (!user) return;
+    setIsLoading(true);
 
     try {
-      // Fetch seller profile
+      // Fetch specific seller profile by ID
       const { data: profile } = await supabase
         .from('seller_profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('id', sellerId)
         .single();
 
       if (!profile) {
         setIsLoading(false);
+        setSellerProfile(null);
         return;
       }
 
@@ -172,6 +180,13 @@ export default function SellerDashboardPage() {
   return (
     <AppLayout headerTitle="Seller Dashboard" showLocation={false}>
       <div className="p-4 space-y-4">
+        {/* Business Switcher for Multi-Seller Users */}
+        {sellerProfiles.length > 1 && (
+          <div className="flex items-center justify-between">
+            <SellerSwitcher />
+          </div>
+        )}
+
         {/* Store Status */}
         {isPending ? (
           <div className="bg-warning/10 border border-warning/20 rounded-xl p-4">

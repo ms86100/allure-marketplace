@@ -1,19 +1,22 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { Profile, UserRole } from '@/types/database';
+import { Profile, UserRole, SellerProfile } from '@/types/database';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
   roles: UserRole[];
+  sellerProfiles: SellerProfile[];
+  currentSellerId: string | null;
   isLoading: boolean;
   isApproved: boolean;
   isSeller: boolean;
   isAdmin: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  setCurrentSellerId: (id: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,6 +26,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<UserRole[]>([]);
+  const [sellerProfiles, setSellerProfiles] = useState<SellerProfile[]>([]);
+  const [currentSellerId, setCurrentSellerId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
@@ -41,6 +46,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('user_id', userId);
       
       setRoles((rolesData?.map(r => r.role) as UserRole[]) || []);
+
+      // Fetch all seller profiles for the user (multi-seller support)
+      const { data: sellersData } = await supabase
+        .from('seller_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
+      
+      const sellers = (sellersData as SellerProfile[]) || [];
+      setSellerProfiles(sellers);
+      
+      // Set current seller to first one if not already set
+      if (sellers.length > 0 && !currentSellerId) {
+        setCurrentSellerId(sellers[0].id);
+      } else if (sellers.length === 0) {
+        setCurrentSellerId(null);
+      }
     } catch (error) {
       console.error('Error fetching profile:', error);
     }
@@ -67,6 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setProfile(null);
           setRoles([]);
+          setSellerProfiles([]);
+          setCurrentSellerId(null);
         }
         setIsLoading(false);
       }
@@ -92,10 +116,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     setProfile(null);
     setRoles([]);
+    setSellerProfiles([]);
+    setCurrentSellerId(null);
   };
 
   const isApproved = profile?.verification_status === 'approved';
-  const isSeller = roles.includes('seller');
+  const isSeller = roles.includes('seller') || sellerProfiles.length > 0;
   const isAdmin = roles.includes('admin');
 
   return (
@@ -105,12 +131,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         profile,
         roles,
+        sellerProfiles,
+        currentSellerId,
         isLoading,
         isApproved,
         isSeller,
         isAdmin,
         signOut,
         refreshProfile,
+        setCurrentSellerId,
       }}
     >
       {children}

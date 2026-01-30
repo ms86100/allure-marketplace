@@ -1,17 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { SellerCard } from '@/components/seller/SellerCard';
+import { ProductCard } from '@/components/product/ProductCard';
 import { SearchFilters, FilterState, defaultFilters } from '@/components/search/SearchFilters';
 import { FilterPresets } from '@/components/search/FilterPresets';
 import { Skeleton } from '@/components/ui/skeleton';
-import { SellerProfile, CATEGORIES } from '@/types/database';
+import { SellerProfile, CATEGORIES, Product } from '@/types/database';
 import { ArrowLeft, Search as SearchIcon, X } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 
 // Persist last filters in localStorage
 const FILTER_STORAGE_KEY = 'greenfield_search_filters';
+
+interface SearchResult {
+  seller_id: string;
+  business_name: string;
+  description: string | null;
+  cover_image_url: string | null;
+  profile_image_url: string | null;
+  rating: number;
+  total_reviews: number;
+  categories: string[];
+  primary_group: string | null;
+  is_available: boolean;
+  is_featured: boolean;
+  availability_start: string | null;
+  availability_end: string | null;
+  user_id: string;
+  matching_products: Product[] | null;
+}
 
 const loadSavedFilters = (): FilterState => {
   try {
@@ -29,12 +48,30 @@ const saveFilters = (filters: FilterState) => {
   localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
 };
 
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 export default function SearchPage() {
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebounce(query, 300);
   const [filters, setFilters] = useState<FilterState>(loadSavedFilters);
   const [activePreset, setActivePreset] = useState<string | null>(null);
-  const [sellers, setSellers] = useState<SellerProfile[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -47,19 +84,19 @@ export default function SearchPage() {
       handlePresetSelect('top_rated', { minRating: 4, sortBy: 'rating' });
     } else if (filter === 'open') {
       // For "open now", we'll just search all and show available ones first
-      searchSellers();
+      searchMarketplace('');
     }
   }, []);
 
   useEffect(() => {
-    if (query.length >= 2 || hasActiveFilters()) {
-      searchSellers();
+    if (debouncedQuery.length >= 1 || hasActiveFilters()) {
+      searchMarketplace(debouncedQuery);
       saveFilters(filters);
-    } else if (query.length === 0 && !hasActiveFilters()) {
-      setSellers([]);
+    } else if (debouncedQuery.length === 0 && !hasActiveFilters()) {
+      setSearchResults([]);
       setHasSearched(false);
     }
-  }, [query, filters]);
+  }, [debouncedQuery, filters]);
 
   const hasActiveFilters = () => {
     return (
@@ -73,60 +110,97 @@ export default function SearchPage() {
     );
   };
 
-  const searchSellers = async () => {
+  const searchMarketplace = async (searchTerm: string) => {
     setIsLoading(true);
     setHasSearched(true);
 
     try {
-      let queryBuilder = supabase
-        .from('seller_profiles')
-        .select(`
-          *,
-          profile:profiles!seller_profiles_user_id_fkey(name, block)
-        `)
-        .eq('verification_status', 'approved');
+      // Use the new search_marketplace function for keyword search
+      if (searchTerm.length >= 1) {
+        const { data, error } = await supabase.rpc('search_marketplace', {
+          search_term: searchTerm
+        });
 
-      // Text search
-      if (query.length >= 2) {
-        queryBuilder = queryBuilder.ilike('business_name', `%${query}%`);
+        if (error) throw error;
+
+        let results = ((data as any[]) || []).map(item => ({
+          ...item,
+          matching_products: item.matching_products as any[] | null
+        })) as SearchResult[];
+
+        // Apply additional filters
+        if (filters.minRating > 0) {
+          results = results.filter(s => s.rating >= filters.minRating);
+        }
+
+        if (filters.categories.length > 0) {
+          results = results.filter(s => 
+            s.categories.some(c => filters.categories.includes(c))
+          );
+        }
+
+        // Sort results
+        if (filters.sortBy === 'rating') {
+          results.sort((a, b) => b.rating - a.rating);
+        } else if (filters.sortBy === 'newest') {
+          // Already sorted by created_at in function, skip
+        }
+
+        setSearchResults(results);
+      } else {
+        // Fallback to regular query without search term
+        let queryBuilder = supabase
+          .from('seller_profiles')
+          .select('*')
+          .eq('verification_status', 'approved');
+
+        // Category filter
+        if (filters.categories.length > 0) {
+          queryBuilder = queryBuilder.overlaps('categories', filters.categories);
+        }
+
+        // Rating filter
+        if (filters.minRating > 0) {
+          queryBuilder = queryBuilder.gte('rating', filters.minRating);
+        }
+
+        // Sorting
+        switch (filters.sortBy) {
+          case 'rating':
+            queryBuilder = queryBuilder.order('rating', { ascending: false });
+            break;
+          case 'newest':
+            queryBuilder = queryBuilder.order('created_at', { ascending: false });
+            break;
+          default:
+            queryBuilder = queryBuilder.order('rating', { ascending: false });
+        }
+
+        const { data, error } = await queryBuilder.limit(30);
+
+        if (error) throw error;
+
+        // Transform to SearchResult format
+        const results: SearchResult[] = ((data as any[]) || []).map(seller => ({
+          seller_id: seller.id,
+          business_name: seller.business_name,
+          description: seller.description,
+          cover_image_url: seller.cover_image_url,
+          profile_image_url: seller.profile_image_url,
+          rating: seller.rating,
+          total_reviews: seller.total_reviews,
+          categories: seller.categories,
+          primary_group: seller.primary_group,
+          is_available: seller.is_available,
+          is_featured: seller.is_featured,
+          availability_start: seller.availability_start,
+          availability_end: seller.availability_end,
+          user_id: seller.user_id,
+          matching_products: null
+        }));
+
+        setSearchResults(results);
       }
-
-      // Category filter
-      if (filters.categories.length > 0) {
-        queryBuilder = queryBuilder.overlaps('categories', filters.categories);
-      }
-
-      // Rating filter
-      if (filters.minRating > 0) {
-        queryBuilder = queryBuilder.gte('rating', filters.minRating);
-      }
-
-      // Sorting
-      switch (filters.sortBy) {
-        case 'rating':
-          queryBuilder = queryBuilder.order('rating', { ascending: false });
-          break;
-        case 'newest':
-          queryBuilder = queryBuilder.order('created_at', { ascending: false });
-          break;
-        default:
-          queryBuilder = queryBuilder.order('rating', { ascending: false });
-      }
-
-      const { data, error } = await queryBuilder.limit(30);
-
-      if (error) throw error;
-
-      let results = (data as any) || [];
-
-      // Client-side filtering for block (join table)
-      if (filters.block) {
-        results = results.filter(
-          (s: any) => s.profile?.block === filters.block
-        );
-      }
-
-      setSellers(results);
     } catch (error) {
       console.error('Error searching:', error);
     } finally {
@@ -138,7 +212,7 @@ export default function SearchPage() {
     setQuery('');
     setFilters(defaultFilters);
     setActivePreset(null);
-    setSellers([]);
+    setSearchResults([]);
     setHasSearched(false);
     localStorage.removeItem(FILTER_STORAGE_KEY);
   };
@@ -249,13 +323,61 @@ export default function SearchPage() {
             ))}
           </div>
         ) : hasSearched ? (
-          sellers.length > 0 ? (
-            <div className="space-y-3">
+          searchResults.length > 0 ? (
+            <div className="space-y-4">
               <p className="text-sm text-muted-foreground mb-2">
-                {sellers.length} seller{sellers.length !== 1 ? 's' : ''} found
+                {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found
               </p>
-              {sellers.map((seller) => (
-                <SellerCard key={seller.id} seller={seller as any} />
+              {searchResults.map((result) => (
+                <div key={result.seller_id} className="space-y-2">
+                  <SellerCard 
+                    seller={{
+                      id: result.seller_id,
+                      business_name: result.business_name,
+                      description: result.description,
+                      cover_image_url: result.cover_image_url,
+                      profile_image_url: result.profile_image_url,
+                      rating: result.rating,
+                      total_reviews: result.total_reviews,
+                      categories: result.categories,
+                      primary_group: result.primary_group,
+                      is_available: result.is_available,
+                      is_featured: result.is_featured,
+                      availability_start: result.availability_start,
+                      availability_end: result.availability_end,
+                      user_id: result.user_id,
+                    } as any} 
+                  />
+                  {/* Show matching products if any */}
+                  {result.matching_products && result.matching_products.length > 0 && (
+                    <div className="pl-4 border-l-2 border-primary/20 ml-2">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Matching products:
+                      </p>
+                      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+                        {result.matching_products.slice(0, 3).map((product: any) => (
+                          <Link 
+                            key={product.id} 
+                            to={`/seller/${result.seller_id}`}
+                            className="flex-shrink-0 w-32"
+                          >
+                            <div className="bg-muted rounded-lg p-2">
+                              {product.image_url && (
+                                <img 
+                                  src={product.image_url} 
+                                  alt={product.name}
+                                  className="w-full h-20 object-cover rounded mb-1"
+                                />
+                              )}
+                              <p className="text-xs font-medium truncate">{product.name}</p>
+                              <p className="text-xs text-primary">₹{product.price}</p>
+                            </div>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           ) : (

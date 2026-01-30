@@ -31,7 +31,7 @@ export default function BecomeSellerPage() {
     accepts_cod: true,
   });
 
-  // Check if user is already a seller
+  // Check if user already has a seller profile in the selected group
   useEffect(() => {
     const checkExistingSeller = async () => {
       if (!user) {
@@ -40,16 +40,19 @@ export default function BecomeSellerPage() {
       }
 
       try {
+        // Fetch all seller profiles for this user
         const { data, error } = await supabase
           .from('seller_profiles')
-          .select('id, business_name')
-          .eq('user_id', user.id)
-          .maybeSingle();
+          .select('id, business_name, primary_group')
+          .eq('user_id', user.id);
 
         if (error) throw error;
 
-        if (data) {
-          setExistingSeller(data);
+        // Store all existing profiles to check against selected group later
+        if (data && data.length > 0) {
+          // Only block if they have a profile in the same group as selected
+          // This check happens when selectedGroup changes
+          setExistingSeller(null); // Don't block initially
         }
       } catch (error) {
         console.error('Error checking existing seller:', error);
@@ -60,6 +63,28 @@ export default function BecomeSellerPage() {
 
     checkExistingSeller();
   }, [user]);
+
+  // Check if user has existing profile in selected group
+  useEffect(() => {
+    const checkGroupConflict = async () => {
+      if (!user || !selectedGroup) return;
+
+      const { data } = await supabase
+        .from('seller_profiles')
+        .select('id, business_name')
+        .eq('user_id', user.id)
+        .eq('primary_group', selectedGroup)
+        .maybeSingle();
+
+      if (data) {
+        setExistingSeller(data);
+      } else {
+        setExistingSeller(null);
+      }
+    };
+
+    checkGroupConflict();
+  }, [user, selectedGroup]);
 
   const handleCategoryChange = (category: ServiceCategory, checked: boolean) => {
     if (checked) {
@@ -126,8 +151,8 @@ export default function BecomeSellerPage() {
     );
   }
 
-  // Show already registered message
-  if (existingSeller) {
+  // Show already registered in this group message
+  if (existingSeller && selectedGroup) {
     return (
       <AppLayout showHeader={false} showNav={false}>
         <div className="p-4">
@@ -140,12 +165,12 @@ export default function BecomeSellerPage() {
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-success/20 flex items-center justify-center">
               <Store className="text-success" size={32} />
             </div>
-            <h1 className="text-2xl font-bold mb-2">You're Already a Seller!</h1>
+            <h1 className="text-2xl font-bold mb-2">Already Registered!</h1>
             <p className="text-muted-foreground mb-6">
-              You're registered as <strong>{existingSeller.business_name}</strong>
+              You already have a business in this category: <strong>{existingSeller.business_name}</strong>
             </p>
             <p className="text-sm text-muted-foreground mb-8">
-              To add more categories or update your business details, go to your seller settings.
+              You can add more categories to your existing business or choose a different category group.
             </p>
             
             <div className="space-y-3">
@@ -155,14 +180,18 @@ export default function BecomeSellerPage() {
                 onClick={() => navigate('/seller/settings')}
               >
                 <Settings size={18} className="mr-2" />
-                Go to Seller Settings
+                Edit {existingSeller.business_name}
               </Button>
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => navigate('/seller')}
+                onClick={() => {
+                  setSelectedGroup(null);
+                  setExistingSeller(null);
+                  setStep(1);
+                }}
               >
-                View Seller Dashboard
+                Choose Different Category
               </Button>
             </div>
           </div>

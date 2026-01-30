@@ -31,6 +31,7 @@ export interface SellerProfile {
   business_name: string;
   description: string | null;
   categories: ProductCategory[];
+  primary_group: string | null;
   cover_image_url: string | null;
   profile_image_url: string | null;
   is_available: boolean;
