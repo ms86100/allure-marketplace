@@ -1,0 +1,83 @@
+import { Hono } from "https://deno.land/x/hono@v4.3.11/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const app = new Hono();
+
+// Handle CORS preflight
+app.options("*", (c) => {
+  return c.json({}, 200, corsHeaders);
+});
+
+// Auto-cancel expired urgent orders
+app.post("/", async (c) => {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Find orders that have passed their auto_cancel_at time and are still in 'placed' status
+    const now = new Date().toISOString();
+
+    const { data: expiredOrders, error: fetchError } = await supabase
+      .from("orders")
+      .select("id, buyer_id, seller_id, total_amount")
+      .eq("status", "placed")
+      .not("auto_cancel_at", "is", null)
+      .lt("auto_cancel_at", now);
+
+    if (fetchError) {
+      console.error("Error fetching expired orders:", fetchError);
+      return c.json({ error: fetchError.message }, 500, corsHeaders);
+    }
+
+    if (!expiredOrders || expiredOrders.length === 0) {
+      console.log("No expired orders to cancel");
+      return c.json({ message: "No expired orders", cancelled: 0 }, 200, corsHeaders);
+    }
+
+    console.log(`Found ${expiredOrders.length} expired orders to cancel`);
+
+    // Cancel each expired order
+    const results = [];
+    for (const order of expiredOrders) {
+      const { error: updateError } = await supabase
+        .from("orders")
+        .update({
+          status: "cancelled",
+          rejection_reason: "Order automatically cancelled - seller did not respond within the time limit",
+          updated_at: now,
+        })
+        .eq("id", order.id);
+
+      if (updateError) {
+        console.error(`Error cancelling order ${order.id}:`, updateError);
+        results.push({ id: order.id, success: false, error: updateError.message });
+      } else {
+        console.log(`Order ${order.id} auto-cancelled`);
+        results.push({ id: order.id, success: true });
+      }
+    }
+
+    const successCount = results.filter((r) => r.success).length;
+    return c.json(
+      {
+        message: `Processed ${expiredOrders.length} orders`,
+        cancelled: successCount,
+        results,
+      },
+      200,
+      corsHeaders
+    );
+  } catch (error) {
+    console.error("Error in auto-cancel function:", error);
+    return c.json({ error: String(error) }, 500, corsHeaders);
+  }
+});
+
+Deno.serve(app.fetch);

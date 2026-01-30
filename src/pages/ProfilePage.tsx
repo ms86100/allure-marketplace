@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { ImageUpload } from '@/components/ui/image-upload';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   User,
@@ -19,14 +21,17 @@ import {
   Bell,
   Type,
   FileText,
+  Camera,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { profile, isSeller, isAdmin, signOut } = useAuth();
+  const { user, profile, isSeller, isAdmin, signOut, refreshProfile } = useAuth();
   const [largeFont, setLargeFont] = useState(() => {
     return localStorage.getItem('greenfield_large_font') === 'true';
   });
+  const [isEditingAvatar, setIsEditingAvatar] = useState(false);
 
   useEffect(() => {
     if (largeFont) {
@@ -40,6 +45,26 @@ export default function ProfilePage() {
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
+  };
+
+  const handleAvatarChange = async (url: string | null) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: url })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      
+      await refreshProfile();
+      toast.success('Profile photo updated');
+      setIsEditingAvatar(false);
+    } catch (error: any) {
+      console.error('Error updating avatar:', error);
+      toast.error('Failed to update profile photo');
+    }
   };
 
   const menuItems = [
@@ -63,15 +88,52 @@ export default function ProfilePage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="text-primary" size={32} />
+              <div className="relative">
+                {isEditingAvatar && user ? (
+                  <div className="w-20">
+                    <ImageUpload
+                      value={profile?.avatar_url}
+                      onChange={handleAvatarChange}
+                      folder="profiles"
+                      userId={user.id}
+                      aspectRatio="square"
+                      placeholder="Upload"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full mt-1 text-xs"
+                      onClick={() => setIsEditingAvatar(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsEditingAvatar(true)}
+                    className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center relative overflow-hidden group"
+                  >
+                    {profile?.avatar_url ? (
+                      <img
+                        src={profile.avatar_url}
+                        alt={profile.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="text-primary" size={32} />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Camera className="text-white" size={20} />
+                    </div>
+                  </button>
+                )}
               </div>
               <div className="flex-1">
                 <h2 className="text-lg font-bold">{profile?.name}</h2>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                   <MapPin size={14} />
                   <span>
-                    Block {profile?.block}, {profile?.flat_number}
+                    {profile?.phase && `${profile.phase}, `}Block {profile?.block}, {profile?.flat_number}
                   </span>
                 </div>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">

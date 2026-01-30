@@ -24,9 +24,10 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { Badge } from '@/components/ui/badge';
+import { ImageUpload } from '@/components/ui/image-upload';
 import { useAuth } from '@/contexts/AuthContext';
 import { Product, CATEGORIES, ProductCategory, SellerProfile } from '@/types/database';
-import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SellerProductsPage() {
@@ -46,6 +47,8 @@ export default function SellerProductsPage() {
     is_available: true,
     is_bestseller: false,
     is_recommended: false,
+    is_urgent: false,
+    image_url: null as string | null,
   });
 
   useEffect(() => {
@@ -78,7 +81,7 @@ export default function SellerProductsPage() {
         .order('is_bestseller', { ascending: false })
         .order('created_at', { ascending: false });
 
-      setProducts(productData || []);
+      setProducts((productData || []) as Product[]);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -96,6 +99,8 @@ export default function SellerProductsPage() {
       is_available: true,
       is_bestseller: false,
       is_recommended: false,
+      is_urgent: false,
+      image_url: null,
     });
     setEditingProduct(null);
   };
@@ -111,12 +116,14 @@ export default function SellerProductsPage() {
       is_available: product.is_available,
       is_bestseller: product.is_bestseller,
       is_recommended: product.is_recommended,
+      is_urgent: product.is_urgent || false,
+      image_url: product.image_url,
     });
     setIsDialogOpen(true);
   };
 
   const handleSave = async () => {
-    if (!sellerProfile) return;
+    if (!sellerProfile || !user) return;
 
     if (!formData.name.trim() || !formData.price || !formData.category) {
       toast.error('Please fill in all required fields');
@@ -141,6 +148,8 @@ export default function SellerProductsPage() {
         is_available: formData.is_available,
         is_bestseller: formData.is_bestseller,
         is_recommended: formData.is_recommended,
+        is_urgent: formData.is_urgent,
+        image_url: formData.image_url,
       };
 
       if (editingProduct) {
@@ -241,6 +250,21 @@ export default function SellerProductsPage() {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 mt-4">
+                {/* Product Image Upload */}
+                <div className="space-y-2">
+                  <Label>Product Image</Label>
+                  {user && (
+                    <ImageUpload
+                      value={formData.image_url}
+                      onChange={(url) => setFormData({ ...formData, image_url: url })}
+                      folder="products"
+                      userId={user.id}
+                      aspectRatio="video"
+                      placeholder="Upload product photo"
+                    />
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="name">Product Name *</Label>
                   <Input
@@ -342,6 +366,25 @@ export default function SellerProductsPage() {
                   />
                 </div>
 
+                {/* Urgent Order Toggle */}
+                <div className="flex items-center justify-between p-3 bg-warning/10 border border-warning/30 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Bell size={16} className="text-warning" />
+                    <div>
+                      <span className="text-sm font-medium block">Urgent Order Alert</span>
+                      <span className="text-xs text-muted-foreground">
+                        3-min timer, auto-cancel if not responded
+                      </span>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={formData.is_urgent}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, is_urgent: checked })
+                    }
+                  />
+                </div>
+
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <span className="text-sm font-medium">Available for order</span>
                   <Switch
@@ -412,6 +455,12 @@ export default function SellerProductsPage() {
                           {product.is_recommended && (
                             <Badge className="bg-success/20 text-success text-[10px] px-1">
                               Recommended
+                            </Badge>
+                          )}
+                          {product.is_urgent && (
+                            <Badge className="bg-destructive/20 text-destructive text-[10px] px-1">
+                              <Bell size={10} className="mr-0.5" />
+                              Urgent
                             </Badge>
                           )}
                         </div>

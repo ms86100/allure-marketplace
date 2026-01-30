@@ -58,6 +58,7 @@ export interface Product {
   is_available: boolean;
   is_bestseller: boolean;
   is_recommended: boolean;
+  is_urgent: boolean;
   created_at: string;
   updated_at: string;
   // Joined data
@@ -74,6 +75,8 @@ export interface Order {
   payment_status: PaymentStatus;
   delivery_address: string | null;
   notes: string | null;
+  rejection_reason: string | null;
+  auto_cancel_at: string | null;
   created_at: string;
   updated_at: string;
   // Joined data

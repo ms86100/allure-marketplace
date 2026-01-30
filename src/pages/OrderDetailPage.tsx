@@ -7,9 +7,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ReviewForm } from '@/components/review/ReviewForm';
 import { OrderChat } from '@/components/chat/OrderChat';
 import { ReorderButton } from '@/components/order/ReorderButton';
+import { UrgentOrderTimer } from '@/components/order/UrgentOrderTimer';
+import { OrderRejectionDialog } from '@/components/order/OrderRejectionDialog';
+import { useUrgentOrderSound } from '@/hooks/useUrgentOrderSound';
 import { useAuth } from '@/contexts/AuthContext';
 import { Order, OrderItem, ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS, OrderStatus, PaymentStatus } from '@/types/database';
-import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard } from 'lucide-react';
+import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, AlertTriangle, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -22,12 +25,47 @@ export default function OrderDetailPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [isRejectionDialogOpen, setIsRejectionDialogOpen] = useState(false);
+
+  // Determine if this is an urgent order that needs sound notification
+  const seller = (order as any)?.seller;
+  const isSellerView = isSeller && seller?.user_id === user?.id;
+  const isUrgentOrder = order?.auto_cancel_at && order.status === 'placed' && isSellerView;
+  
+  // Play urgent sound for sellers when they have an urgent pending order
+  useUrgentOrderSound(!!isUrgentOrder);
 
   useEffect(() => {
     if (id) {
       fetchOrder();
       fetchUnreadCount();
     }
+  }, [id]);
+
+  // Set up real-time subscription for order updates
+  useEffect(() => {
+    if (!id) return;
+
+    const channel = supabase
+      .channel(`order-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `id=eq.${id}`,
+        },
+        (payload) => {
+          console.log('Order updated:', payload);
+          setOrder((prev) => prev ? { ...prev, ...payload.new } as Order : null);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [id]);
 
   const fetchOrder = async () => {
@@ -79,19 +117,28 @@ export default function OrderDetailPage() {
     setUnreadMessages(count || 0);
   };
 
-  const updateOrderStatus = async (newStatus: OrderStatus) => {
+  const updateOrderStatus = async (newStatus: OrderStatus, rejectionReason?: string) => {
     if (!order) return;
 
     setIsUpdating(true);
     try {
+      const updateData: any = { 
+        status: newStatus,
+        auto_cancel_at: null, // Clear the auto-cancel timer when order is acted upon
+      };
+      
+      if (rejectionReason) {
+        updateData.rejection_reason = rejectionReason;
+      }
+
       const { error } = await supabase
         .from('orders')
-        .update({ status: newStatus })
+        .update(updateData)
         .eq('id', order.id);
 
       if (error) throw error;
       
-      setOrder({ ...order, status: newStatus });
+      setOrder({ ...order, ...updateData });
       toast.success(`Order ${ORDER_STATUS_LABELS[newStatus].label.toLowerCase()}`);
     } catch (error: any) {
       console.error('Error updating order:', error);
@@ -99,6 +146,17 @@ export default function OrderDetailPage() {
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  const handleReject = async (reason: string) => {
+    await updateOrderStatus('cancelled', reason);
+  };
+
+  const handleTimeout = () => {
+    // Order will be auto-cancelled by the edge function
+    // Just refresh the order data
+    fetchOrder();
+    toast.error('Order was auto-cancelled due to timeout');
   };
 
   if (isLoading) {
@@ -126,13 +184,11 @@ export default function OrderDetailPage() {
     );
   }
 
-  const seller = (order as any).seller;
   const sellerProfile = seller?.profile;
   const buyer = (order as any).buyer;
   const items = (order as any).items || [];
   const statusInfo = ORDER_STATUS_LABELS[order.status];
   const paymentStatusInfo = PAYMENT_STATUS_LABELS[(order.payment_status as PaymentStatus) || 'pending'];
-  const isSellerView = isSeller && seller?.user_id === user?.id;
   const isBuyerView = order.buyer_id === user?.id;
 
   const statusOrder: OrderStatus[] = ['placed', 'accepted', 'preparing', 'ready', 'picked_up', 'delivered', 'completed'];
@@ -185,6 +241,29 @@ export default function OrderDetailPage() {
             </Button>
           )}
         </div>
+
+        {/* Urgent Order Timer for Sellers */}
+        {isUrgentOrder && order.auto_cancel_at && (
+          <div className="mb-4">
+            <UrgentOrderTimer
+              autoCancelAt={order.auto_cancel_at}
+              onTimeout={handleTimeout}
+            />
+          </div>
+        )}
+
+        {/* Rejection Reason Display for Buyers */}
+        {order.status === 'cancelled' && order.rejection_reason && isBuyerView && (
+          <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <XCircle className="text-destructive shrink-0 mt-0.5" size={20} />
+              <div>
+                <p className="font-semibold text-destructive">Order Cancelled</p>
+                <p className="text-sm text-muted-foreground mt-1">{order.rejection_reason}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Order Status */}
         <div className="bg-card rounded-xl p-4 shadow-sm mb-4">
@@ -354,10 +433,11 @@ export default function OrderDetailPage() {
             {order.status === 'placed' && (
               <Button
                 variant="outline"
-                className="flex-1"
-                onClick={() => updateOrderStatus('cancelled')}
+                className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                onClick={() => setIsRejectionDialogOpen(true)}
                 disabled={isUpdating}
               >
+                <XCircle size={16} className="mr-2" />
                 Reject
               </Button>
             )}
@@ -373,6 +453,14 @@ export default function OrderDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Rejection Dialog */}
+      <OrderRejectionDialog
+        open={isRejectionDialogOpen}
+        onOpenChange={setIsRejectionDialogOpen}
+        onReject={handleReject}
+        orderNumber={order.id}
+      />
 
       {/* Chat Component */}
       {chatRecipientId && (

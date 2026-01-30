@@ -234,6 +234,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          auto_cancel_at: string | null
           buyer_id: string | null
           created_at: string | null
           delivery_address: string | null
@@ -241,12 +242,14 @@ export type Database = {
           notes: string | null
           payment_status: string | null
           payment_type: string | null
+          rejection_reason: string | null
           seller_id: string | null
           status: Database["public"]["Enums"]["order_status"] | null
           total_amount: number
           updated_at: string | null
         }
         Insert: {
+          auto_cancel_at?: string | null
           buyer_id?: string | null
           created_at?: string | null
           delivery_address?: string | null
@@ -254,12 +257,14 @@ export type Database = {
           notes?: string | null
           payment_status?: string | null
           payment_type?: string | null
+          rejection_reason?: string | null
           seller_id?: string | null
           status?: Database["public"]["Enums"]["order_status"] | null
           total_amount: number
           updated_at?: string | null
         }
         Update: {
+          auto_cancel_at?: string | null
           buyer_id?: string | null
           created_at?: string | null
           delivery_address?: string | null
@@ -267,6 +272,7 @@ export type Database = {
           notes?: string | null
           payment_status?: string | null
           payment_type?: string | null
+          rejection_reason?: string | null
           seller_id?: string | null
           status?: Database["public"]["Enums"]["order_status"] | null
           total_amount?: number
@@ -359,6 +365,7 @@ export type Database = {
           is_available: boolean | null
           is_bestseller: boolean | null
           is_recommended: boolean | null
+          is_urgent: boolean | null
           is_veg: boolean | null
           name: string
           price: number
@@ -374,6 +381,7 @@ export type Database = {
           is_available?: boolean | null
           is_bestseller?: boolean | null
           is_recommended?: boolean | null
+          is_urgent?: boolean | null
           is_veg?: boolean | null
           name: string
           price: number
@@ -389,6 +397,7 @@ export type Database = {
           is_available?: boolean | null
           is_bestseller?: boolean | null
           is_recommended?: boolean | null
+          is_urgent?: boolean | null
           is_veg?: boolean | null
           name?: string
           price?: number

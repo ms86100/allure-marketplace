@@ -10,9 +10,10 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
+import { ImageUpload } from '@/components/ui/image-upload';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile, CATEGORIES, ProductCategory, DAYS_OF_WEEK } from '@/types/database';
-import { ArrowLeft, Loader2, Camera, PauseCircle, PlayCircle, Clock, Smartphone, Banknote } from 'lucide-react';
+import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SellerSettingsPage() {
@@ -31,6 +32,8 @@ export default function SellerSettingsPage() {
     accepts_upi: false,
     upi_id: '',
     is_available: true,
+    cover_image_url: null as string | null,
+    profile_image_url: null as string | null,
   });
 
   useEffect(() => {
@@ -63,6 +66,8 @@ export default function SellerSettingsPage() {
           accepts_upi: profile.accepts_upi ?? false,
           upi_id: profile.upi_id || '',
           is_available: profile.is_available ?? true,
+          cover_image_url: profile.cover_image_url || null,
+          profile_image_url: profile.profile_image_url || null,
         });
       }
     } catch (error) {
@@ -153,6 +158,8 @@ export default function SellerSettingsPage() {
           accepts_upi: formData.accepts_upi,
           upi_id: formData.accepts_upi ? formData.upi_id.trim() : null,
           is_available: formData.is_available,
+          cover_image_url: formData.cover_image_url,
+          profile_image_url: formData.profile_image_url,
         })
         .eq('id', sellerProfile.id);
 
@@ -237,39 +244,34 @@ export default function SellerSettingsPage() {
           {/* Cover & Profile Images */}
           <div className="bg-card rounded-xl p-4 shadow-sm">
             <h3 className="font-semibold mb-3">Store Images</h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-4">
               <div>
-                <Label className="text-xs text-muted-foreground">Cover Image</Label>
-                <div className="mt-1 aspect-video bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
-                  {sellerProfile.cover_image_url ? (
-                    <img
-                      src={sellerProfile.cover_image_url}
-                      alt="Cover"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <Camera className="text-muted-foreground" size={24} />
-                  )}
-                </div>
+                <Label className="text-xs text-muted-foreground mb-2 block">Cover Image</Label>
+                {user && (
+                  <ImageUpload
+                    value={formData.cover_image_url}
+                    onChange={(url) => setFormData({ ...formData, cover_image_url: url })}
+                    folder="sellers"
+                    userId={user.id}
+                    aspectRatio="video"
+                    placeholder="Upload cover photo"
+                  />
+                )}
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Profile Photo</Label>
-                <div className="mt-1 aspect-square bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
-                  {sellerProfile.profile_image_url ? (
-                    <img
-                      src={sellerProfile.profile_image_url}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <Camera className="text-muted-foreground" size={24} />
-                  )}
-                </div>
+                <Label className="text-xs text-muted-foreground mb-2 block">Profile Photo</Label>
+                {user && (
+                  <ImageUpload
+                    value={formData.profile_image_url}
+                    onChange={(url) => setFormData({ ...formData, profile_image_url: url })}
+                    folder="sellers"
+                    userId={user.id}
+                    aspectRatio="square"
+                    placeholder="Upload profile photo"
+                  />
+                )}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Image upload coming soon
-            </p>
           </div>
 
           <div className="space-y-2">

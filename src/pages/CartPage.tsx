@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2, Minus, Plus } from 'lucide-react';
+import { ArrowLeft, Trash2, Minus, Plus, AlertTriangle, Bell } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { VegBadge } from '@/components/ui/veg-badge';
@@ -27,8 +27,16 @@ export default function CartPage() {
   const acceptsCod = seller?.accepts_cod ?? true;
   const acceptsUpi = !!(seller as any)?.accepts_upi && !!(seller as any)?.upi_id;
 
+  // Check if any item has urgent notification enabled
+  const hasUrgentItem = items.some((item) => (item.product as any)?.is_urgent);
+
   const createOrder = async (paymentStatus: 'pending' | 'paid', transactionRef?: string) => {
     if (!user || !profile || !currentSellerId) return null;
+
+    // Calculate auto_cancel_at if any item is urgent (3 minutes from now)
+    const autoCancelAt = hasUrgentItem 
+      ? new Date(Date.now() + 3 * 60 * 1000).toISOString() 
+      : null;
 
     const { data: order, error: orderError } = await supabase
       .from('orders')
@@ -40,6 +48,7 @@ export default function CartPage() {
         payment_status: paymentStatus,
         delivery_address: `Block ${profile.block}, Flat ${profile.flat_number}`,
         notes: notes || null,
+        auto_cancel_at: autoCancelAt,
       })
       .select()
       .single();
@@ -184,6 +193,19 @@ export default function CartPage() {
             <p className="text-sm text-muted-foreground">
               {items.length} item{items.length > 1 ? 's' : ''}
             </p>
+          </div>
+        )}
+
+        {/* Urgent Item Warning */}
+        {hasUrgentItem && (
+          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-4 flex items-start gap-3">
+            <Bell className="text-warning shrink-0 mt-0.5" size={18} />
+            <div className="text-sm">
+              <p className="font-medium text-warning-foreground">Time-sensitive order</p>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                Seller must respond within 3 minutes or order will be auto-cancelled
+              </p>
+            </div>
           </div>
         )}
 
