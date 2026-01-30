@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-export function SellerSwitcher() {
+export function SellerSwitcher({ compact = false }: { compact?: boolean }) {
   const { sellerProfiles, currentSellerId, setCurrentSellerId } = useAuth();
 
   if (sellerProfiles.length === 0) {
@@ -23,6 +23,7 @@ export function SellerSwitcher() {
 
   // If only one seller, just show the name without dropdown
   if (sellerProfiles.length === 1) {
+    if (compact) return null;
     return (
       <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
         <Store size={16} className="text-muted-foreground" />

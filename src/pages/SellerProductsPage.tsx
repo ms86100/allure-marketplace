@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -29,12 +29,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Product, CATEGORIES, ProductCategory, SellerProfile } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { ParentGroup } from '@/types/categories';
-import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle } from 'lucide-react';
+import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
+import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle, Store } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SellerProductsPage() {
-  const { user } = useAuth();
-  const { groupedConfigs } = useCategoryConfigs();
+  const { user, sellerProfiles, currentSellerId } = useAuth();
+  const { groupedConfigs, configs } = useCategoryConfigs();
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [primaryGroup, setPrimaryGroup] = useState<ParentGroup | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -55,24 +56,41 @@ export default function SellerProductsPage() {
     image_url: null as string | null,
   });
 
-  useEffect(() => {
-    if (user) {
-      fetchData();
-    }
-  }, [user]);
+  // Determine if current category is food-related (show veg/non-veg toggle)
+  const isFoodCategory = useMemo(() => {
+    if (!formData.category) return primaryGroup === 'food';
+    const config = configs.find(c => c.category === formData.category);
+    return config?.parentGroup === 'food';
+  }, [formData.category, configs, primaryGroup]);
 
-  const fetchData = async () => {
+  // Get only categories that belong to the seller's primary group
+  const allowedCategories = useMemo(() => {
+    if (!primaryGroup || !groupedConfigs[primaryGroup]) return [];
+    return groupedConfigs[primaryGroup];
+  }, [primaryGroup, groupedConfigs]);
+
+  useEffect(() => {
+    if (user && currentSellerId) {
+      fetchData(currentSellerId);
+    } else if (user && sellerProfiles.length > 0) {
+      fetchData(sellerProfiles[0].id);
+    }
+  }, [user, currentSellerId, sellerProfiles]);
+
+  const fetchData = async (sellerId: string) => {
     if (!user) return;
+    setIsLoading(true);
 
     try {
       const { data: profile } = await supabase
         .from('seller_profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('id', sellerId)
         .single();
 
       if (!profile) {
         setIsLoading(false);
+        setSellerProfile(null);
         return;
       }
 
@@ -175,7 +193,7 @@ export default function SellerProductsPage() {
 
       setIsDialogOpen(false);
       resetForm();
-      fetchData();
+      if (sellerProfile) fetchData(sellerProfile.id);
     } catch (error: any) {
       console.error('Error saving product:', error);
       toast.error(error.message || 'Failed to save product');
@@ -195,7 +213,7 @@ export default function SellerProductsPage() {
 
       if (error) throw error;
       toast.success('Product deleted');
-      fetchData();
+      if (sellerProfile) fetchData(sellerProfile.id);
     } catch (error) {
       console.error('Error deleting product:', error);
       toast.error('Failed to delete product');
@@ -210,7 +228,7 @@ export default function SellerProductsPage() {
         .eq('id', product.id);
 
       if (error) throw error;
-      fetchData();
+      if (sellerProfile) fetchData(sellerProfile.id);
     } catch (error) {
       console.error('Error updating availability:', error);
       toast.error('Failed to update');
@@ -254,6 +272,15 @@ export default function SellerProductsPage() {
                 <DialogTitle>
                   {editingProduct ? 'Edit Product' : 'Add New Product'}
                 </DialogTitle>
+                {/* Business Context Indicator */}
+                {sellerProfile && (
+                  <div className="flex items-center gap-2 mt-2 p-2 bg-primary/5 border border-primary/20 rounded-lg">
+                    <Store size={14} className="text-primary" />
+                    <span className="text-xs text-primary font-medium">
+                      Adding to: {sellerProfile.business_name}
+                    </span>
+                  </div>
+                )}
               </DialogHeader>
               <div className="space-y-4 mt-4">
                 {/* Product Image Upload */}
@@ -321,8 +348,8 @@ export default function SellerProductsPage() {
                         <SelectValue placeholder="Select" />
                       </SelectTrigger>
                       <SelectContent>
-                        {/* Show only categories from seller's primary group */}
-                        {(primaryGroup ? groupedConfigs[primaryGroup] || [] : CATEGORIES.map(c => ({ category: c.value, displayName: c.label, icon: c.icon }))).map((config) => (
+                        {/* Show only categories from seller's approved primary group */}
+                        {allowedCategories.map((config) => (
                           <SelectItem key={config.category} value={config.category}>
                             {config.icon} {config.displayName}
                           </SelectItem>
@@ -332,20 +359,23 @@ export default function SellerProductsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <VegBadge isVeg={formData.is_veg} />
-                    <span className="text-sm font-medium">
-                      {formData.is_veg ? 'Vegetarian' : 'Non-Vegetarian'}
-                    </span>
+                {/* Veg/Non-Veg Toggle - Only show for food categories */}
+                {isFoodCategory && (
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <VegBadge isVeg={formData.is_veg} />
+                      <span className="text-sm font-medium">
+                        {formData.is_veg ? 'Vegetarian' : 'Non-Vegetarian'}
+                      </span>
+                    </div>
+                    <Switch
+                      checked={formData.is_veg}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, is_veg: checked })
+                      }
+                    />
                   </div>
-                  <Switch
-                    checked={formData.is_veg}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, is_veg: checked })
-                    }
-                  />
-                </div>
+                )}
 
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div className="flex items-center gap-2">
@@ -417,6 +447,28 @@ export default function SellerProductsPage() {
           </Dialog>
         </div>
 
+        {/* Active Business Context - Always visible */}
+        {sellerProfile && (
+          <div className="mb-4 p-3 bg-card rounded-xl shadow-sm border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Store size={18} className="text-primary" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-sm">{sellerProfile.business_name}</h2>
+                  <p className="text-xs text-muted-foreground capitalize">
+                    {primaryGroup?.replace('_', ' ')} • {products.length} products
+                  </p>
+                </div>
+              </div>
+              {sellerProfiles.length > 1 && (
+                <SellerSwitcher />
+              )}
+            </div>
+          </div>
+        )}
+
         <h1 className="text-xl font-bold mb-4">Your Products ({products.length})</h1>
 
         {products.length > 0 ? (
@@ -449,7 +501,8 @@ export default function SellerProductsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start gap-2 flex-wrap">
-                      <VegBadge isVeg={product.is_veg} size="sm" />
+                      {/* Only show VegBadge for food category products */}
+                      {primaryGroup === 'food' && <VegBadge isVeg={product.is_veg} size="sm" />}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-medium truncate">{product.name}</h3>
