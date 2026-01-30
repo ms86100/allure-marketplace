@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -19,11 +19,6 @@ interface ProfileData {
   phone: string;
 }
 
-// ============================================
-// INTENTIONAL ERROR CODE - FOR INVESTIGATION
-// This triggers the "Internal Error Occurred" popup
-// ============================================
-
 export default function AuthPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<AuthStep>('auth');
@@ -32,26 +27,12 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [shouldError, setShouldError] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData>({
     name: '',
     flat_number: '',
     block: '',
     phone: '',
   });
-
-  // Trigger the error after component mounts
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShouldError(true);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // This throws during render - which triggers React Error Boundary
-  if (shouldError) {
-    throw new Error('Network timeout: Request took too long to complete');
-  }
 
   const validateEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);

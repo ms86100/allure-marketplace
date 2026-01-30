@@ -86,8 +86,8 @@ export default function AdminPage() {
         supabase.from('reviews').select('*, buyer:profiles!reviews_buyer_id_fkey(name), seller:seller_profiles(business_name)').order('created_at', { ascending: false }).limit(50),
         supabase.from('seller_profiles').select('*, profile:profiles(name, block)').eq('verification_status', 'approved'),
         supabase.from('payment_records').select('*, seller:seller_profiles(business_name), order:orders(buyer:profiles!orders_buyer_id_fkey(name))').order('created_at', { ascending: false }).limit(100),
-        supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(50),
-        supabase.from('warnings').select('*').order('created_at', { ascending: false }).limit(50),
+        supabase.from('reports').select('*, reporter:profiles!reports_reporter_id_fkey(name), reported_seller:seller_profiles(business_name)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('warnings').select('*, user:profiles!warnings_user_id_fkey(name)').order('created_at', { ascending: false }).limit(50),
         Promise.all([
           supabase.from('profiles').select('id', { count: 'exact', head: true }),
           supabase.from('seller_profiles').select('id', { count: 'exact', head: true }).eq('verification_status', 'approved'),
@@ -342,6 +342,14 @@ export default function AdminPage() {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
+                        Reported by: <span className="font-medium">{report.reporter?.name || 'Unknown'}</span>
+                      </p>
+                      {report.reported_seller && (
+                        <p className="text-xs text-muted-foreground">
+                          Against seller: <span className="font-medium text-destructive">{report.reported_seller.business_name}</span>
+                        </p>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-1">
                         {format(new Date(report.created_at), 'MMM d, h:mm a')}
                       </p>
                       {report.description && <p className="text-sm mt-1 line-clamp-2">{report.description}</p>}
