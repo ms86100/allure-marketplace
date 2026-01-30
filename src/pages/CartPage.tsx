@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { PaymentMethodSelector } from '@/components/payment/PaymentMethodSelector';
-import { UpiPaymentSheet } from '@/components/payment/UpiPaymentSheet';
+import { RazorpayCheckout } from '@/components/payment/RazorpayCheckout';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,7 +20,7 @@ export default function CartPage() {
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [showUpiSheet, setShowUpiSheet] = useState(false);
+  const [showRazorpayCheckout, setShowRazorpayCheckout] = useState(false);
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
 
   const seller = items[0]?.product?.seller;
@@ -98,7 +98,19 @@ export default function CartPage() {
         toast.error('UPI payment not available for this seller');
         return;
       }
-      setShowUpiSheet(true);
+      // Create order first, then open Razorpay
+      setIsPlacingOrder(true);
+      try {
+        const order = await createOrder('pending');
+        if (!order) throw new Error('Failed to create order');
+        setPendingOrderId(order.id);
+        setShowRazorpayCheckout(true);
+      } catch (error: any) {
+        console.error('Error creating order:', error);
+        toast.error(error.message || 'Failed to create order');
+      } finally {
+        setIsPlacingOrder(false);
+      }
       return;
     }
 
@@ -119,27 +131,44 @@ export default function CartPage() {
     }
   };
 
-  const handleUpiSuccess = async (transactionRef: string) => {
-    setShowUpiSheet(false);
-    setIsPlacingOrder(true);
+  const handleRazorpaySuccess = async (paymentId: string) => {
+    setShowRazorpayCheckout(false);
     
-    try {
-      const order = await createOrder('paid', transactionRef);
-      if (!order) throw new Error('Failed to create order');
-      
-      await clearCart();
-      toast.success('Payment successful! Order placed.');
-      navigate(`/orders/${order.id}`);
-    } catch (error: any) {
-      console.error('Error placing order:', error);
-      toast.error(error.message || 'Failed to place order');
-    } finally {
-      setIsPlacingOrder(false);
+    // Update order with payment details
+    if (pendingOrderId) {
+      await supabase
+        .from('orders')
+        .update({
+          payment_status: 'paid',
+          razorpay_payment_id: paymentId,
+        } as any)
+        .eq('id', pendingOrderId);
+
+      await supabase
+        .from('payment_records')
+        .update({
+          payment_status: 'paid',
+          transaction_reference: paymentId,
+        })
+        .eq('order_id', pendingOrderId);
     }
+    
+    await clearCart();
+    toast.success('Payment successful! Order placed.');
+    navigate(`/orders/${pendingOrderId}`);
+    setPendingOrderId(null);
   };
 
-  const handleUpiFailed = () => {
-    setShowUpiSheet(false);
+  const handleRazorpayFailed = () => {
+    setShowRazorpayCheckout(false);
+    // Cancel the pending order
+    if (pendingOrderId) {
+      supabase
+        .from('orders')
+        .update({ status: 'cancelled', payment_status: 'failed' })
+        .eq('id', pendingOrderId);
+    }
+    setPendingOrderId(null);
     toast.error('Payment failed. Please try again.');
   };
 
@@ -347,16 +376,25 @@ export default function CartPage() {
         </Button>
       </div>
 
-      {/* UPI Payment Sheet */}
-      <UpiPaymentSheet
-        isOpen={showUpiSheet}
-        onClose={() => setShowUpiSheet(false)}
-        amount={totalAmount}
-        sellerUpiId={(seller as any)?.upi_id || null}
-        sellerName={seller?.business_name || 'Seller'}
-        onPaymentSuccess={handleUpiSuccess}
-        onPaymentFailed={handleUpiFailed}
-      />
+      {/* Razorpay Checkout */}
+      {pendingOrderId && (
+        <RazorpayCheckout
+          isOpen={showRazorpayCheckout}
+          onClose={() => {
+            setShowRazorpayCheckout(false);
+            handleRazorpayFailed();
+          }}
+          orderId={pendingOrderId}
+          amount={totalAmount}
+          sellerId={currentSellerId || ''}
+          sellerName={seller?.business_name || 'Seller'}
+          customerName={profile?.name || ''}
+          customerEmail={user?.email || ''}
+          customerPhone={profile?.phone || ''}
+          onPaymentSuccess={handleRazorpaySuccess}
+          onPaymentFailed={handleRazorpayFailed}
+        />
+      )}
     </AppLayout>
   );
 }

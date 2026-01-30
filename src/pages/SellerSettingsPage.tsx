@@ -15,7 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile, CATEGORIES, ProductCategory, DAYS_OF_WEEK } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { PARENT_GROUPS, ParentGroup, ServiceCategory } from '@/types/categories';
-import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -39,6 +39,10 @@ export default function SellerSettingsPage() {
     is_available: true,
     cover_image_url: null as string | null,
     profile_image_url: null as string | null,
+    // Bank account details for Razorpay payouts
+    bank_account_number: '',
+    bank_ifsc_code: '',
+    bank_account_holder: '',
   });
 
   useEffect(() => {
@@ -78,6 +82,9 @@ export default function SellerSettingsPage() {
           is_available: profile.is_available ?? true,
           cover_image_url: profile.cover_image_url || null,
           profile_image_url: profile.profile_image_url || null,
+          bank_account_number: profile.bank_account_number || '',
+          bank_ifsc_code: profile.bank_ifsc_code || '',
+          bank_account_holder: profile.bank_account_holder || '',
         });
       }
     } catch (error) {
@@ -184,6 +191,9 @@ export default function SellerSettingsPage() {
           is_available: formData.is_available,
           cover_image_url: formData.cover_image_url,
           profile_image_url: formData.profile_image_url,
+          bank_account_number: formData.bank_account_number.trim() || null,
+          bank_ifsc_code: formData.bank_ifsc_code.trim() || null,
+          bank_account_holder: formData.bank_account_holder.trim() || null,
         } as any)
         .eq('id', sellerProfile.id);
 
@@ -487,6 +497,57 @@ export default function SellerSettingsPage() {
               )}
             </div>
           </div>
+
+          {/* Bank Account Details for UPI Payouts */}
+          {formData.accepts_upi && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Building2 size={16} className="text-muted-foreground" />
+                <Label>Bank Account for Payouts</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Payments received via UPI will be settled to this bank account
+              </p>
+              
+              <div className="space-y-3 bg-muted rounded-lg p-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bank_account_holder" className="text-xs">Account Holder Name</Label>
+                  <Input
+                    id="bank_account_holder"
+                    placeholder="As per bank records"
+                    value={formData.bank_account_holder}
+                    onChange={(e) =>
+                      setFormData({ ...formData, bank_account_holder: e.target.value })
+                    }
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="bank_account_number" className="text-xs">Account Number</Label>
+                  <Input
+                    id="bank_account_number"
+                    placeholder="Enter bank account number"
+                    value={formData.bank_account_number}
+                    onChange={(e) =>
+                      setFormData({ ...formData, bank_account_number: e.target.value })
+                    }
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="bank_ifsc_code" className="text-xs">IFSC Code</Label>
+                  <Input
+                    id="bank_ifsc_code"
+                    placeholder="e.g., SBIN0001234"
+                    value={formData.bank_ifsc_code}
+                    onChange={(e) =>
+                      setFormData({ ...formData, bank_ifsc_code: e.target.value.toUpperCase() })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

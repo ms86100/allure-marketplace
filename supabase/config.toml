@@ -1,1 +1,10 @@
 project_id = "rvvctaikytfeyzkwoqxg"
+
+[functions.auto-cancel-orders]
+verify_jwt = false
+
+[functions.create-razorpay-order]
+verify_jwt = false
+
+[functions.razorpay-webhook]
+verify_jwt = false

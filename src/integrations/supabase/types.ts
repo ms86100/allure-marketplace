@@ -344,6 +344,8 @@ export type Database = {
           order_type: string | null
           payment_status: string | null
           payment_type: string | null
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
           rejection_reason: string | null
           rental_end_date: string | null
           rental_start_date: string | null
@@ -367,6 +369,8 @@ export type Database = {
           order_type?: string | null
           payment_status?: string | null
           payment_type?: string | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
           rejection_reason?: string | null
           rental_end_date?: string | null
           rental_start_date?: string | null
@@ -390,6 +394,8 @@ export type Database = {
           order_type?: string | null
           payment_status?: string | null
           payment_type?: string | null
+          razorpay_order_id?: string | null
+          razorpay_payment_id?: string | null
           rejection_reason?: string | null
           rental_end_date?: string | null
           rental_start_date?: string | null
@@ -723,6 +729,9 @@ export type Database = {
           accepts_upi: boolean | null
           availability_end: string | null
           availability_start: string | null
+          bank_account_holder: string | null
+          bank_account_number: string | null
+          bank_ifsc_code: string | null
           business_name: string
           categories: string[]
           cover_image_url: string | null
@@ -735,6 +744,8 @@ export type Database = {
           primary_group: string | null
           profile_image_url: string | null
           rating: number | null
+          razorpay_account_id: string | null
+          razorpay_onboarding_status: string | null
           total_reviews: number | null
           updated_at: string | null
           upi_id: string | null
@@ -748,6 +759,9 @@ export type Database = {
           accepts_upi?: boolean | null
           availability_end?: string | null
           availability_start?: string | null
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_ifsc_code?: string | null
           business_name: string
           categories?: string[]
           cover_image_url?: string | null
@@ -760,6 +774,8 @@ export type Database = {
           primary_group?: string | null
           profile_image_url?: string | null
           rating?: number | null
+          razorpay_account_id?: string | null
+          razorpay_onboarding_status?: string | null
           total_reviews?: number | null
           updated_at?: string | null
           upi_id?: string | null
@@ -773,6 +789,9 @@ export type Database = {
           accepts_upi?: boolean | null
           availability_end?: string | null
           availability_start?: string | null
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_ifsc_code?: string | null
           business_name?: string
           categories?: string[]
           cover_image_url?: string | null
@@ -785,6 +804,8 @@ export type Database = {
           primary_group?: string | null
           profile_image_url?: string | null
           rating?: number | null
+          razorpay_account_id?: string | null
+          razorpay_onboarding_status?: string | null
           total_reviews?: number | null
           updated_at?: string | null
           upi_id?: string | null
