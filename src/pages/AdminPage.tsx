@@ -146,10 +146,35 @@ export default function AdminPage() {
 
   const updateSellerStatus = async (id: string, status: VerificationStatus) => {
     try {
+      // First get the seller's user_id
+      const { data: seller } = await supabase
+        .from('seller_profiles')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+
+      if (!seller) throw new Error('Seller not found');
+
+      // Update seller status
       await supabase.from('seller_profiles').update({ verification_status: status }).eq('id', id);
+
+      if (status === 'approved') {
+        // Grant seller role when approved
+        await supabase.from('user_roles').insert({
+          user_id: seller.user_id,
+          role: 'seller',
+        });
+      } else if (status === 'rejected' || status === 'suspended') {
+        // Remove seller role when rejected or suspended
+        await supabase.from('user_roles').delete()
+          .eq('user_id', seller.user_id)
+          .eq('role', 'seller');
+      }
+
       toast.success(`Seller ${status}`);
       fetchData();
     } catch (error) {
+      console.error('Error updating seller status:', error);
       toast.error('Failed to update');
     }
   };

@@ -66,15 +66,9 @@ export default function BecomeSellerPage() {
 
       if (error) throw error;
 
-      // Add seller role
-      await supabase.from('user_roles').insert({
-        user_id: user.id,
-        role: 'seller',
-      });
-
-      await refreshProfile();
+      // Note: Seller role is assigned by admin after approval
       toast.success('Application submitted! Awaiting admin approval.');
-      navigate('/seller');
+      navigate('/profile');
     } catch (error: any) {
       console.error('Error submitting application:', error);
       toast.error(error.message || 'Failed to submit application');
