@@ -20,28 +20,8 @@ interface ProfileData {
 }
 
 // ============================================
-// INTENTIONAL TIMEOUT ERROR CODE - FOR INVESTIGATION
-// This simulates a network timeout scenario
-// ============================================
-const simulateNetworkTimeout = async () => {
-  const controller = new AbortController();
-  
-  // Set a very short timeout (100ms) that will always fail
-  const timeoutId = setTimeout(() => controller.abort(), 100);
-  
-  try {
-    // Try to fetch from a slow endpoint that will timeout
-    await fetch('https://httpstat.us/200?sleep=5000', {
-      signal: controller.signal
-    });
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Network timeout: Request took too long to complete');
-    }
-    throw error;
-  }
-};
+// INTENTIONAL ERROR CODE - FOR INVESTIGATION
+// This triggers the "Internal Error Occurred" popup
 // ============================================
 
 export default function AuthPage() {
@@ -52,6 +32,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [shouldError, setShouldError] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData>({
     name: '',
     flat_number: '',
@@ -59,20 +40,18 @@ export default function AuthPage() {
     phone: '',
   });
 
-  // This useEffect triggers the timeout error on page load
+  // Trigger the error after component mounts
   useEffect(() => {
-    const triggerTimeoutError = async () => {
-      try {
-        await simulateNetworkTimeout();
-      } catch (error: any) {
-        console.error('TIMEOUT ERROR:', error.message);
-        // This will show as an error in console and potentially trigger error boundaries
-        throw error; // Re-throw to trigger uncaught error
-      }
-    };
-    
-    triggerTimeoutError();
+    const timer = setTimeout(() => {
+      setShouldError(true);
+    }, 500);
+    return () => clearTimeout(timer);
   }, []);
+
+  // This throws during render - which triggers React Error Boundary
+  if (shouldError) {
+    throw new Error('Network timeout: Request took too long to complete');
+  }
 
   const validateEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
