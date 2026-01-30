@@ -16,6 +16,15 @@ export async function initializeCapacitorPlugins() {
   }
 
   try {
+    // Configure keyboard behavior (Android)
+    const { Keyboard } = await import('@capacitor/keyboard');
+    await Keyboard.setResizeMode({ mode: 'body' as any });
+    await Keyboard.setScroll({ isDisabled: false });
+  } catch (error) {
+    console.error('Error configuring keyboard:', error);
+  }
+
+  try {
     // Hide splash screen after a brief delay to ensure app is ready
     await SplashScreen.hide();
   } catch (error) {

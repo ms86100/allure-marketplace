@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { ImageUpload } from '@/components/ui/image-upload';
+import { DeleteAccountDialog } from '@/components/profile/DeleteAccountDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   User,
@@ -196,6 +197,11 @@ export default function ProfilePage() {
           <LogOut size={18} className="mr-2" />
           Sign Out
         </Button>
+
+        {/* Delete Account - Required for App Store compliance */}
+        <div className="mt-4">
+          <DeleteAccountDialog />
+        </div>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
           BlockEats v1.4.0 • Shriram Greenfield
