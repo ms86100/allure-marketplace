@@ -6,9 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const RAZORPAY_KEY_ID = Deno.env.get('RAZORPAY_KEY_ID')!;
-const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET')!;
-
 interface CreateOrderRequest {
   orderId: string;
   amount: number;
@@ -16,6 +13,39 @@ interface CreateOrderRequest {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+}
+
+async function getRazorpayKeys(supabase: any): Promise<{ keyId: string; keySecret: string } | null> {
+  // First try to get from admin_settings table
+  const { data: settings } = await supabase
+    .from('admin_settings')
+    .select('key, value, is_active')
+    .in('key', ['razorpay_key_id', 'razorpay_key_secret']);
+
+  if (settings && settings.length === 2) {
+    const keyIdSetting = settings.find((s: any) => s.key === 'razorpay_key_id');
+    const keySecretSetting = settings.find((s: any) => s.key === 'razorpay_key_secret');
+
+    if (keyIdSetting?.value && keySecretSetting?.value && keyIdSetting.is_active && keySecretSetting.is_active) {
+      return {
+        keyId: keyIdSetting.value,
+        keySecret: keySecretSetting.value,
+      };
+    }
+  }
+
+  // Fallback to environment variables
+  const envKeyId = Deno.env.get('RAZORPAY_KEY_ID');
+  const envKeySecret = Deno.env.get('RAZORPAY_KEY_SECRET');
+
+  if (envKeyId && envKeySecret) {
+    return {
+      keyId: envKeyId,
+      keySecret: envKeySecret,
+    };
+  }
+
+  return null;
 }
 
 serve(async (req) => {
@@ -28,6 +58,16 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get Razorpay keys
+    const razorpayKeys = await getRazorpayKeys(supabase);
+    if (!razorpayKeys) {
+      console.error('Razorpay keys not configured');
+      return new Response(
+        JSON.stringify({ error: 'Payment gateway not configured. Please contact admin.' }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Get auth user
     const authHeader = req.headers.get('Authorization');
@@ -77,7 +117,7 @@ serve(async (req) => {
       .single();
 
     // Create Razorpay order
-    const razorpayAuth = btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
+    const razorpayAuth = btoa(`${razorpayKeys.keyId}:${razorpayKeys.keySecret}`);
     
     const orderPayload: any = {
       amount: Math.round(amount * 100), // Amount in paise
@@ -138,7 +178,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         razorpay_order_id: razorpayOrder.id,
-        razorpay_key_id: RAZORPAY_KEY_ID,
+        razorpay_key_id: razorpayKeys.keyId,
         amount: razorpayOrder.amount,
         currency: razorpayOrder.currency,
         prefill: {
