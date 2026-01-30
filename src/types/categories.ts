@@ -1,6 +1,12 @@
 // Service Category Types for Society Super-App
+// Now using TEXT type in database for dynamic category management
 
-export type ServiceCategory =
+// ServiceCategory is now a flexible string type to support dynamic categories
+// The predefined values below are for IDE autocomplete and common use cases
+export type ServiceCategory = string;
+
+// Common predefined categories for type hints (not exhaustive)
+export type PredefinedCategory =
   // Food & Consumption
   | 'home_food' | 'bakery' | 'snacks' | 'groceries' | 'beverages'
   // Child Services

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
 import { CategoryGroupGrid } from '@/components/category/CategoryGroupGrid';
 import { PARENT_GROUPS, ParentGroup, ServiceCategory } from '@/types/categories';
-import { ArrowLeft, Store, Loader2, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Store, Loader2, ChevronRight, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +18,8 @@ export default function BecomeSellerPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingExisting, setIsCheckingExisting] = useState(true);
+  const [existingSeller, setExistingSeller] = useState<{ id: string; business_name: string } | null>(null);
   const [step, setStep] = useState(1);
   const [selectedGroup, setSelectedGroup] = useState<ParentGroup | null>(null);
   const [formData, setFormData] = useState({
@@ -28,6 +30,36 @@ export default function BecomeSellerPage() {
     availability_end: '21:00',
     accepts_cod: true,
   });
+
+  // Check if user is already a seller
+  useEffect(() => {
+    const checkExistingSeller = async () => {
+      if (!user) {
+        setIsCheckingExisting(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('seller_profiles')
+          .select('id, business_name')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+          setExistingSeller(data);
+        }
+      } catch (error) {
+        console.error('Error checking existing seller:', error);
+      } finally {
+        setIsCheckingExisting(false);
+      }
+    };
+
+    checkExistingSeller();
+  }, [user]);
 
   const handleCategoryChange = (category: ServiceCategory, checked: boolean) => {
     if (checked) {
@@ -58,17 +90,16 @@ export default function BecomeSellerPage() {
 
     setIsLoading(true);
     try {
-      // Cast categories to any to handle the extended category types
       const { error } = await supabase.from('seller_profiles').insert({
         user_id: user.id,
         business_name: formData.business_name.trim(),
         description: formData.description.trim() || null,
-        categories: formData.categories as any,
-        primary_group: selectedGroup, // Store the primary group for proper filtering
+        categories: formData.categories,
+        primary_group: selectedGroup,
         availability_start: formData.availability_start,
         availability_end: formData.availability_end,
         accepts_cod: formData.accepts_cod,
-      } as any);
+      });
 
       if (error) throw error;
 
@@ -83,6 +114,62 @@ export default function BecomeSellerPage() {
   };
 
   const selectedGroupInfo = PARENT_GROUPS.find((g) => g.value === selectedGroup);
+
+  // Show loading state while checking
+  if (isCheckingExisting) {
+    return (
+      <AppLayout showHeader={false} showNav={false}>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="animate-spin" size={32} />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // Show already registered message
+  if (existingSeller) {
+    return (
+      <AppLayout showHeader={false} showNav={false}>
+        <div className="p-4">
+          <Link to="/" className="flex items-center gap-2 text-muted-foreground mb-6">
+            <ArrowLeft size={20} />
+            <span>Back</span>
+          </Link>
+
+          <div className="text-center py-12">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-success/20 flex items-center justify-center">
+              <Store className="text-success" size={32} />
+            </div>
+            <h1 className="text-2xl font-bold mb-2">You're Already a Seller!</h1>
+            <p className="text-muted-foreground mb-6">
+              You're registered as <strong>{existingSeller.business_name}</strong>
+            </p>
+            <p className="text-sm text-muted-foreground mb-8">
+              To add more categories or update your business details, go to your seller settings.
+            </p>
+            
+            <div className="space-y-3">
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => navigate('/seller/settings')}
+              >
+                <Settings size={18} className="mr-2" />
+                Go to Seller Settings
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => navigate('/seller')}
+              >
+                View Seller Dashboard
+              </Button>
+            </div>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout showHeader={false} showNav={false}>

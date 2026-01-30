@@ -78,7 +78,7 @@ export type Database = {
       }
       category_config: {
         Row: {
-          category: Database["public"]["Enums"]["service_category"]
+          category: string
           color: string
           created_at: string | null
           display_name: string
@@ -100,7 +100,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          category: Database["public"]["Enums"]["service_category"]
+          category: string
           color: string
           created_at?: string | null
           display_name: string
@@ -122,7 +122,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          category?: Database["public"]["Enums"]["service_category"]
+          category?: string
           color?: string
           created_at?: string | null
           display_name?: string
@@ -481,7 +481,7 @@ export type Database = {
       products: {
         Row: {
           available_slots: Json | null
-          category: Database["public"]["Enums"]["service_category"]
+          category: string
           condition: string | null
           created_at: string | null
           deposit_amount: number | null
@@ -507,7 +507,7 @@ export type Database = {
         }
         Insert: {
           available_slots?: Json | null
-          category: Database["public"]["Enums"]["service_category"]
+          category: string
           condition?: string | null
           created_at?: string | null
           deposit_amount?: number | null
@@ -533,7 +533,7 @@ export type Database = {
         }
         Update: {
           available_slots?: Json | null
-          category?: Database["public"]["Enums"]["service_category"]
+          category?: string
           condition?: string | null
           created_at?: string | null
           deposit_amount?: number | null
@@ -724,7 +724,7 @@ export type Database = {
           availability_end: string | null
           availability_start: string | null
           business_name: string
-          categories: Database["public"]["Enums"]["service_category"][]
+          categories: string[]
           cover_image_url: string | null
           created_at: string | null
           description: string | null
@@ -749,7 +749,7 @@ export type Database = {
           availability_end?: string | null
           availability_start?: string | null
           business_name: string
-          categories?: Database["public"]["Enums"]["service_category"][]
+          categories?: string[]
           cover_image_url?: string | null
           created_at?: string | null
           description?: string | null
@@ -774,7 +774,7 @@ export type Database = {
           availability_end?: string | null
           availability_start?: string | null
           business_name?: string
-          categories?: Database["public"]["Enums"]["service_category"][]
+          categories?: string[]
           cover_image_url?: string | null
           created_at?: string | null
           description?: string | null
