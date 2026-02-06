@@ -12,6 +12,7 @@ interface CategoryGroupGridProps {
   onCategorySelect?: (category: ServiceCategory, selected: boolean) => void;
   selectedGroup?: ParentGroup | null;
   onGroupSelect?: (group: ParentGroup) => void;
+  excludeGroups?: ParentGroup[];
 }
 
 export function CategoryGroupGrid({
@@ -20,9 +21,13 @@ export function CategoryGroupGrid({
   onCategorySelect,
   selectedGroup,
   onGroupSelect,
+  excludeGroups = [],
 }: CategoryGroupGridProps) {
   const { groupedConfigs, isLoading } = useCategoryConfigs();
   const [expandedGroup, setExpandedGroup] = useState<ParentGroup | null>(null);
+
+  // Filter out excluded groups
+  const filteredGroups = PARENT_GROUPS.filter(g => !excludeGroups.includes(g.value));
 
   if (isLoading) {
     return (
@@ -40,7 +45,7 @@ export function CategoryGroupGrid({
       <div className="space-y-4">
         {/* Parent Groups */}
         <div className="flex gap-3 overflow-x-auto scrollbar-hide py-2 -mx-4 px-4">
-          {PARENT_GROUPS.filter(g => groupedConfigs[g.value]?.length > 0).map(({ value, label, icon, color }) => (
+          {filteredGroups.filter(g => groupedConfigs[g.value]?.length > 0).map(({ value, label, icon, color }) => (
             <Link
               key={value}
               to={`/category/${value}`}
@@ -66,7 +71,7 @@ export function CategoryGroupGrid({
   if (variant === 'expanded') {
     return (
       <div className="space-y-6">
-        {PARENT_GROUPS.filter(g => groupedConfigs[g.value]?.length > 0).map(({ value, label, icon, color, description }) => (
+        {filteredGroups.filter(g => groupedConfigs[g.value]?.length > 0).map(({ value, label, icon, color, description }) => (
           <div key={value} className="space-y-3">
             <button
               onClick={() => setExpandedGroup(expandedGroup === value ? null : value)}
@@ -114,7 +119,7 @@ export function CategoryGroupGrid({
       <div className="space-y-4">
         {/* Group Selection */}
         <div className="grid grid-cols-2 gap-3">
-          {PARENT_GROUPS.filter(g => groupedConfigs[g.value]?.length > 0).map(({ value, label, icon, color }) => (
+          {filteredGroups.filter(g => groupedConfigs[g.value]?.length > 0).map(({ value, label, icon, color }) => (
             <button
               key={value}
               onClick={() => onGroupSelect?.(value)}

@@ -171,7 +171,7 @@ export default function HomePage() {
         {/* Categories */}
         <div className="mt-6 px-4">
           <h3 className="font-semibold mb-3">What are you looking for?</h3>
-          <CategoryGroupGrid variant="compact" />
+          <CategoryGroupGrid variant="compact" excludeGroups={['services']} />
         </div>
 
         {/* Open Now Section */}
