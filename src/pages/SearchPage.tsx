@@ -36,10 +36,13 @@ const loadSavedFilters = (): FilterState => {
   try {
     const saved = localStorage.getItem(FILTER_STORAGE_KEY);
     if (saved) {
-      return { ...defaultFilters, ...JSON.parse(saved) };
+      const parsed = JSON.parse(saved);
+      return { ...defaultFilters, ...parsed };
     }
-  } catch {
-    // Ignore parse errors
+  } catch (error) {
+    // Clear corrupted data and return defaults
+    console.warn('[Search] Failed to parse saved filters, clearing cache:', error);
+    localStorage.removeItem(FILTER_STORAGE_KEY);
   }
   return defaultFilters;
 };

@@ -26,9 +26,16 @@ export default function NotificationsPage() {
   const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPreferences);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setPreferences(JSON.parse(saved));
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setPreferences({ ...defaultPreferences, ...parsed });
+      }
+    } catch (error) {
+      // Clear corrupted data and use defaults
+      console.warn('[Notifications] Failed to parse saved preferences, clearing cache:', error);
+      localStorage.removeItem(STORAGE_KEY);
     }
   }, []);
 
