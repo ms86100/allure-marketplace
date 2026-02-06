@@ -30,9 +30,9 @@ const features = [
     color: 'bg-blue-500/10 text-blue-500',
   },
   {
-    icon: Wrench,
-    title: 'Home Services',
-    description: 'Electricians, plumbers & repair services at your doorstep',
+    icon: Sparkles,
+    title: 'Creative Arts',
+    description: 'Handmade crafts, paintings & custom artwork from local artists',
     color: 'bg-green-500/10 text-green-500',
   },
   {
