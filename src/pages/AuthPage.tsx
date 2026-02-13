@@ -11,7 +11,6 @@ import authHero from '@/assets/auth-hero.jpg';
 import { Society } from '@/types/database';
 import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
 import { useAutocomplete, PlaceDetails } from '@/hooks/useGoogleMaps';
-import { GoogleMapConfirm } from '@/components/auth/GoogleMapConfirm';
 
 type SignupStep = 'credentials' | 'society' | 'profile' | 'verification';
 type SocietySubStep = 'search' | 'map-confirm' | 'request-form';
@@ -120,8 +119,21 @@ export default function AuthPage() {
       setSelectedSociety(match);
       toast.info('Found matching society in our system!');
     } else {
-      // Show map confirmation for new place
-      setSocietySubStep('map-confirm');
+      // Directly register the place as a pending society (no map pin step)
+      const name = details.name;
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now();
+      setPendingNewSociety({
+        name,
+        slug,
+        address: details.formattedAddress,
+        city: details.city,
+        state: details.state,
+        pincode: details.pincode,
+        latitude: details.latitude,
+        longitude: details.longitude,
+      });
+      setSelectedSociety({ id: 'pending', name, slug, is_active: false, is_verified: false, created_at: '', updated_at: '' } as Society);
+      toast.success('Location selected! Continue to complete signup.');
     }
   };
 
@@ -130,28 +142,6 @@ export default function AuthPage() {
     name: string; slug: string; address: string; city: string; state: string;
     pincode: string; latitude: number; longitude: number;
   } | null>(null);
-
-  const handleMapConfirm = (lat: number, lng: number, updatedName?: string) => {
-    if (!selectedPlace) return;
-    setAdjustedCoords({ lat, lng });
-    const name = updatedName || selectedPlace.name;
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const pending = {
-      name,
-      slug: slug + '-' + Date.now(),
-      address: selectedPlace.formattedAddress,
-      city: selectedPlace.city,
-      state: selectedPlace.state,
-      pincode: selectedPlace.pincode,
-      latitude: lat,
-      longitude: lng,
-    };
-    setPendingNewSociety(pending);
-    // Create a temporary local society object so the user can proceed
-    setSelectedSociety({ id: 'pending', name, slug: pending.slug, is_active: false, is_verified: false, created_at: '', updated_at: '' } as Society);
-    toast.success('Location confirmed! Complete signup to register your society.');
-    setSocietySubStep('search');
-  };
 
   const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -496,18 +486,6 @@ export default function AuthPage() {
               {authMode === 'signup' && signupStep === 'society' && (
                 <motion.div key="signup-society" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25, ease: 'easeInOut' }} className="space-y-4">
                   <AnimatePresence mode="wait">
-                    {/* Sub-step: Map Confirmation */}
-                    {societySubStep === 'map-confirm' && selectedPlace && (
-                      <motion.div key="map-confirm" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-                        <GoogleMapConfirm
-                          latitude={selectedPlace.latitude}
-                          longitude={selectedPlace.longitude}
-                          name={selectedPlace.name}
-                          onConfirm={handleMapConfirm}
-                          onBack={() => { setSocietySubStep('search'); setSelectedPlace(null); setSocietySearch(''); }}
-                        />
-                      </motion.div>
-                    )}
 
                     {/* Sub-step: Request Form */}
                     {societySubStep === 'request-form' && (
