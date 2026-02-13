@@ -1,17 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Mail, ArrowRight, Loader2, Eye, EyeOff, CheckCircle2, User, Search, MapPin, Building2, Plus, Navigation, Key, ShieldCheck, Sparkles, Home, ArrowLeft } from 'lucide-react';
+import { Mail, ArrowRight, Loader2, Eye, EyeOff, CheckCircle2, User, Search, MapPin, Building2, Plus, Navigation, Key, ShieldCheck, Sparkles, Home, ArrowLeft, Phone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import authHero from '@/assets/auth-hero.jpg';
 import { Society } from '@/types/database';
 import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
+import { useAutocomplete, PlaceDetails } from '@/hooks/useGoogleMaps';
+import { GoogleMapConfirm } from '@/components/auth/GoogleMapConfirm';
 
 type SignupStep = 'credentials' | 'society' | 'profile' | 'verification';
+type SocietySubStep = 'search' | 'map-confirm' | 'request-form';
 
 interface ProfileData {
   name: string;
@@ -25,27 +28,32 @@ export default function AuthPage() {
   const navigate = useNavigate();
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [signupStep, setSignupStep] = useState<SignupStep>('credentials');
+  const [societySubStep, setSocietySubStep] = useState<SocietySubStep>('search');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [profileData, setProfileData] = useState<ProfileData>({
-    name: '',
-    flat_number: '',
-    block: '',
-    phase: '',
-    phone: '',
+    name: '', flat_number: '', block: '', phase: '', phone: '',
   });
 
+  // Society selection state
   const [societies, setSocieties] = useState<Society[]>([]);
   const [societySearch, setSocietySearch] = useState('');
   const [selectedSociety, setSelectedSociety] = useState<Society | null>(null);
   const [isLoadingSocieties, setIsLoadingSocieties] = useState(false);
-  const [showRequestForm, setShowRequestForm] = useState(false);
-  const [newSocietyData, setNewSocietyData] = useState({ name: '', address: '', city: '', pincode: '' });
   const [inviteCode, setInviteCode] = useState('');
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'verified' | 'failed' | 'unavailable'>('idle');
   const [gpsDistance, setGpsDistance] = useState<number | null>(null);
+
+  // Google Places autocomplete state
+  const { predictions, isSearching, searchPlaces, getPlaceDetails, clearPredictions, isLoaded: mapsLoaded } = useAutocomplete();
+  const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
+  const [adjustedCoords, setAdjustedCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Request form
+  const [newSocietyData, setNewSocietyData] = useState({ name: '', address: '', city: '', pincode: '', landmark: '', contact: '' });
 
   useEffect(() => {
     fetchSocieties();
@@ -63,13 +71,94 @@ export default function AuthPage() {
     setIsLoadingSocieties(false);
   };
 
+  // Filter DB societies by search term (fallback when Google Maps not available or for existing societies)
   const filteredSocieties = societies.filter(s =>
-    s.name.toLowerCase().includes(societySearch.toLowerCase()) ||
-    s.pincode?.includes(societySearch) ||
-    s.city?.toLowerCase().includes(societySearch.toLowerCase())
+    societySearch.length >= 2 && (
+      s.name.toLowerCase().includes(societySearch.toLowerCase()) ||
+      s.pincode?.includes(societySearch) ||
+      s.city?.toLowerCase().includes(societySearch.toLowerCase()) ||
+      s.address?.toLowerCase().includes(societySearch.toLowerCase())
+    )
   );
 
-  const validateEmail = (email: string) => /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);
+  // Debounced Google search
+  const handleSearchChange = useCallback((value: string) => {
+    setSocietySearch(value);
+    setSelectedSociety(null);
+    setSelectedPlace(null);
+    setAdjustedCoords(null);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (value.length >= 3 && mapsLoaded) {
+      debounceRef.current = setTimeout(() => searchPlaces(value), 300);
+    } else {
+      clearPredictions();
+    }
+  }, [mapsLoaded, searchPlaces, clearPredictions]);
+
+  const handleSelectDbSociety = (society: Society) => {
+    setSelectedSociety(society);
+    setSocietySearch(society.name);
+    clearPredictions();
+  };
+
+  const handleSelectGooglePlace = async (placeId: string) => {
+    const details = await getPlaceDetails(placeId);
+    if (!details) { toast.error('Could not load address details'); return; }
+    setSelectedPlace(details);
+    clearPredictions();
+    setSocietySearch(details.name);
+
+    // Check if this society already exists in DB by name similarity
+    const match = societies.find(s =>
+      s.name.toLowerCase() === details.name.toLowerCase() ||
+      s.name.toLowerCase().includes(details.name.toLowerCase()) ||
+      details.name.toLowerCase().includes(s.name.toLowerCase())
+    );
+
+    if (match) {
+      setSelectedSociety(match);
+      toast.info('Found matching society in our system!');
+    } else {
+      // Show map confirmation for new place
+      setSocietySubStep('map-confirm');
+    }
+  };
+
+  const handleMapConfirm = async (lat: number, lng: number) => {
+    if (!selectedPlace) return;
+    setAdjustedCoords({ lat, lng });
+    setIsLoading(true);
+    try {
+      // Create new society from Google Place
+      const slug = selectedPlace.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const { data, error } = await supabase.from('societies').insert({
+        name: selectedPlace.name,
+        slug: slug + '-' + Date.now(),
+        address: selectedPlace.formattedAddress,
+        city: selectedPlace.city,
+        state: selectedPlace.state,
+        pincode: selectedPlace.pincode,
+        latitude: lat,
+        longitude: lng,
+        is_verified: false,
+        is_active: false,
+      }).select().single();
+
+      if (error) throw error;
+
+      toast.success('Society registered! It will be activated after admin approval.');
+      // Set as selected (even though not verified yet, user can complete signup)
+      setSelectedSociety(data as Society);
+      setSocietySubStep('search');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to register society');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const handleLogin = async () => {
     const trimmedEmail = email.trim();
@@ -78,7 +167,7 @@ export default function AuthPage() {
     if (password.length < 6) { toast.error('Password must be at least 6 characters'); return; }
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password });
       if (error) throw error;
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user?.id).single();
       if (profile) { toast.success('Welcome back!'); navigate('/'); }
@@ -133,21 +222,22 @@ export default function AuthPage() {
   };
 
   const handleRequestNewSociety = async () => {
-    if (!newSocietyData.name || !newSocietyData.city || !newSocietyData.pincode) {
-      toast.error('Please fill in society name, city and pincode'); return;
+    if (!newSocietyData.name || !newSocietyData.city || !newSocietyData.pincode || !newSocietyData.contact) {
+      toast.error('Please fill in all required fields'); return;
     }
     setIsLoading(true);
     try {
       const slug = newSocietyData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       const { error } = await supabase.from('societies').insert({
         name: newSocietyData.name, slug: slug + '-' + Date.now(),
-        address: newSocietyData.address || null, city: newSocietyData.city,
+        address: [newSocietyData.address, newSocietyData.landmark].filter(Boolean).join(', ') || null,
+        city: newSocietyData.city,
         pincode: newSocietyData.pincode, is_verified: false, is_active: false,
       }).select().single();
       if (error) throw error;
       toast.success("Society request submitted! You'll be notified once approved.");
-      setShowRequestForm(false);
-      setNewSocietyData({ name: '', address: '', city: '', pincode: '' });
+      setSocietySubStep('search');
+      setNewSocietyData({ name: '', address: '', city: '', pincode: '', landmark: '', contact: '' });
     } catch (error: any) { toast.error(error.message || 'Failed to submit request'); }
     finally { setIsLoading(false); }
   };
@@ -198,15 +288,20 @@ export default function AuthPage() {
   const formatPhone = (value: string) => value.replace(/\D/g, '').slice(0, 10);
 
   const resetSignup = () => {
-    setSignupStep('credentials'); setEmail(''); setPassword('');
-    setSelectedSociety(null); setInviteCode(''); setGpsStatus('idle'); setGpsDistance(null);
+    setSignupStep('credentials'); setSocietySubStep('search');
+    setEmail(''); setPassword('');
+    setSelectedSociety(null); setSelectedPlace(null); setAdjustedCoords(null);
+    setInviteCode(''); setGpsStatus('idle'); setGpsDistance(null);
+    setSocietySearch('');
     setProfileData({ name: '', flat_number: '', block: '', phase: '', phone: '' });
   };
 
   const totalSteps = 4;
   const currentStepNum = signupStep === 'credentials' ? 1 : signupStep === 'society' ? 2 : signupStep === 'profile' ? 3 : 4;
-
   const stepLabels = ['Account', 'Society', 'Profile', 'Verify'];
+
+  const showDbResults = societySearch.length >= 2 && filteredSocieties.length > 0;
+  const showGoogleResults = societySearch.length >= 3 && predictions.length > 0 && !selectedSociety;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
@@ -240,7 +335,6 @@ export default function AuthPage() {
         <div className="bg-card rounded-2xl border border-border shadow-lg overflow-hidden">
           {/* Step Header */}
           <div className="p-6 pb-4">
-            {/* Step Progress (signup only) */}
             {authMode === 'signup' && (
               <div className="flex items-center gap-1 mb-5">
                 {stepLabels.map((label, i) => (
@@ -252,7 +346,6 @@ export default function AuthPage() {
               </div>
             )}
 
-            {/* Step Icon + Title */}
             <div className="text-center">
               {authMode === 'login' && (
                 <>
@@ -275,16 +368,20 @@ export default function AuthPage() {
               {authMode === 'signup' && signupStep === 'society' && (
                 <>
                   <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-3">
-                    <Building2 className="text-primary" size={26} />
+                    <MapPin className="text-primary" size={26} />
                   </div>
-                  <h2 className="text-xl font-bold">Find Your Society</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Connect with your community</p>
+                  <h2 className="text-xl font-bold">
+                    {societySubStep === 'map-confirm' ? 'Confirm Location' : societySubStep === 'request-form' ? 'Request Society' : 'Find Your Society'}
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {societySubStep === 'map-confirm' ? 'Verify the pin on the map' : societySubStep === 'request-form' ? 'Submit details for admin review' : 'Search by name, area, or pincode'}
+                  </p>
                 </>
               )}
               {authMode === 'signup' && signupStep === 'profile' && (
                 <>
-                  <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-success/20 to-success/5 flex items-center justify-center mb-3">
-                    <User className="text-success" size={26} />
+                  <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-3">
+                    <User className="text-primary" size={26} />
                   </div>
                   <h2 className="text-xl font-bold">Your Details</h2>
                   <p className="text-sm text-muted-foreground mt-1">Almost there!</p>
@@ -292,8 +389,8 @@ export default function AuthPage() {
               )}
               {authMode === 'signup' && signupStep === 'verification' && (
                 <>
-                  <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-success/20 to-success/5 flex items-center justify-center mb-3">
-                    <CheckCircle2 className="text-success" size={26} />
+                  <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-3">
+                    <CheckCircle2 className="text-primary" size={26} />
                   </div>
                   <h2 className="text-xl font-bold">Check Your Email</h2>
                   <p className="text-sm text-muted-foreground mt-1">Verification sent</p>
@@ -307,14 +404,7 @@ export default function AuthPage() {
             <AnimatePresence mode="wait">
               {/* Login Form */}
               {authMode === 'login' && (
-                <motion.div
-                  key="login"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                  className="space-y-4"
-                >
+                <motion.div key="login" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25, ease: 'easeInOut' }} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="login-email">Email</Label>
                     <Input id="login-email" type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 rounded-xl" />
@@ -342,14 +432,7 @@ export default function AuthPage() {
 
               {/* Signup Step 1: Credentials */}
               {authMode === 'signup' && signupStep === 'credentials' && (
-                <motion.div
-                  key="signup-credentials"
-                  initial={{ opacity: 0, x: 30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                  className="space-y-4"
-                >
+                <motion.div key="signup-credentials" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25, ease: 'easeInOut' }} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
                     <Input id="signup-email" type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 rounded-xl" />
@@ -377,93 +460,35 @@ export default function AuthPage() {
 
               {/* Signup Step 2: Society Selection */}
               {authMode === 'signup' && signupStep === 'society' && (
-                <motion.div
-                  key="signup-society"
-                  initial={{ opacity: 0, x: 30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                  className="space-y-4"
-                >
-                  {!showRequestForm ? (
-                    <>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                        <Input placeholder="Search by name, city or pincode..." value={societySearch} onChange={(e) => setSocietySearch(e.target.value)} className="pl-9 h-12 rounded-xl" />
-                      </div>
+                <motion.div key="signup-society" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25, ease: 'easeInOut' }} className="space-y-4">
+                  <AnimatePresence mode="wait">
+                    {/* Sub-step: Map Confirmation */}
+                    {societySubStep === 'map-confirm' && selectedPlace && (
+                      <motion.div key="map-confirm" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+                        <GoogleMapConfirm
+                          latitude={selectedPlace.latitude}
+                          longitude={selectedPlace.longitude}
+                          name={selectedPlace.name}
+                          onConfirm={handleMapConfirm}
+                          onBack={() => { setSocietySubStep('search'); setSelectedPlace(null); setSocietySearch(''); }}
+                        />
+                      </motion.div>
+                    )}
 
-                      <div className="max-h-48 overflow-y-auto space-y-2 scrollbar-thin">
-                        {isLoadingSocieties ? (
-                          <p className="text-center text-sm text-muted-foreground py-4">Loading...</p>
-                        ) : filteredSocieties.length > 0 ? (
-                          filteredSocieties.map((s) => (
-                            <button key={s.id} onClick={() => setSelectedSociety(s)} className={`w-full text-left p-3 rounded-xl border-2 transition-all ${selectedSociety?.id === s.id ? 'border-primary bg-primary/5 shadow-sm' : 'border-border hover:border-primary/30'}`}>
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                                  <Building2 size={18} className="text-primary" />
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="font-medium text-sm truncate">{s.name}</p>
-                                  <p className="text-xs text-muted-foreground truncate">{[s.city, s.state, s.pincode].filter(Boolean).join(', ')}</p>
-                                </div>
-                                {selectedSociety?.id === s.id && <CheckCircle2 size={18} className="text-primary shrink-0 ml-auto" />}
-                              </div>
-                            </button>
-                          ))
-                        ) : (
-                          <p className="text-center text-sm text-muted-foreground py-4">No societies found matching "{societySearch}"</p>
-                        )}
-                      </div>
-
-                      <button onClick={() => setShowRequestForm(true)} className="w-full flex items-center gap-2 p-3 rounded-xl border-2 border-dashed border-muted-foreground/30 text-sm text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors">
-                        <Plus size={16} /> Can't find your society? Request to add it
-                      </button>
-
-                      {selectedSociety?.invite_code && (
-                        <div className="space-y-2">
-                          <Label htmlFor="invite_code" className="flex items-center gap-1"><Key size={14} /> Invite Code *</Label>
-                          <Input id="invite_code" placeholder="Enter society invite code" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} className="h-12 rounded-xl" />
-                          <p className="text-[10px] text-muted-foreground">Ask your society admin for the invite code</p>
-                        </div>
-                      )}
-
-                      {selectedSociety && (
-                        <div className="space-y-2">
-                          <button onClick={verifyGpsLocation} disabled={gpsStatus === 'loading'} className={`w-full flex items-center gap-2 p-3 rounded-xl border text-sm transition-colors ${
-                            gpsStatus === 'verified' ? 'border-green-300 bg-green-50 text-green-700' :
-                            gpsStatus === 'failed' ? 'border-orange-300 bg-orange-50 text-orange-700' :
-                            'border-border hover:border-primary/30 text-muted-foreground hover:text-foreground'
-                          }`}>
-                            <Navigation size={16} className={gpsStatus === 'loading' ? 'animate-spin' : ''} />
-                            {gpsStatus === 'idle' && 'Verify your location (optional)'}
-                            {gpsStatus === 'loading' && 'Checking location...'}
-                            {gpsStatus === 'verified' && `✓ Location verified (${gpsDistance}m away)`}
-                            {gpsStatus === 'failed' && `Location check failed${gpsDistance ? ` (${gpsDistance}m away)` : ''}`}
-                            {gpsStatus === 'unavailable' && 'GPS not available for this society'}
-                          </button>
-                          <p className="text-[10px] text-muted-foreground text-center">Location verification helps speed up admin approval</p>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => setSignupStep('credentials')} className="flex-1 h-12 rounded-xl">
-                          <ArrowLeft size={16} className="mr-1" /> Back
-                        </Button>
-                        <Button onClick={handleSocietyNext} disabled={!selectedSociety || (selectedSociety.invite_code ? !inviteCode.trim() : false)} className="flex-1 h-12 rounded-xl font-semibold">
-                          Continue
-                        </Button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="space-y-3">
+                    {/* Sub-step: Request Form */}
+                    {societySubStep === 'request-form' && (
+                      <motion.div key="request-form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-3">
                         <div className="space-y-2">
                           <Label>Society Name *</Label>
                           <Input placeholder="e.g., Prestige Lakeside Habitat" value={newSocietyData.name} onChange={(e) => setNewSocietyData({ ...newSocietyData, name: e.target.value })} className="h-12 rounded-xl" />
                         </div>
                         <div className="space-y-2">
-                          <Label>Address</Label>
-                          <Input placeholder="Full address" value={newSocietyData.address} onChange={(e) => setNewSocietyData({ ...newSocietyData, address: e.target.value })} className="h-12 rounded-xl" />
+                          <Label>Full Address</Label>
+                          <Input placeholder="Street, area, locality" value={newSocietyData.address} onChange={(e) => setNewSocietyData({ ...newSocietyData, address: e.target.value })} className="h-12 rounded-xl" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Landmark</Label>
+                          <Input placeholder="Near park, temple, mall..." value={newSocietyData.landmark} onChange={(e) => setNewSocietyData({ ...newSocietyData, landmark: e.target.value })} className="h-12 rounded-xl" />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-2">
@@ -472,40 +497,165 @@ export default function AuthPage() {
                           </div>
                           <div className="space-y-2">
                             <Label>Pincode *</Label>
-                            <Input placeholder="PIN code" value={newSocietyData.pincode} onChange={(e) => setNewSocietyData({ ...newSocietyData, pincode: e.target.value })} className="h-12 rounded-xl" />
+                            <Input placeholder="PIN code" value={newSocietyData.pincode} onChange={(e) => setNewSocietyData({ ...newSocietyData, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} className="h-12 rounded-xl" />
                           </div>
                         </div>
-                      </div>
-                      <div className="bg-muted/50 rounded-xl p-3 text-xs text-muted-foreground">
-                        Your request will be reviewed by our team. You'll be notified once approved.
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => setShowRequestForm(false)} className="flex-1 h-12 rounded-xl">Back</Button>
-                        <Button onClick={handleRequestNewSociety} disabled={isLoading} className="flex-1 h-12 rounded-xl font-semibold">
-                          {isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
-                          Submit Request
-                        </Button>
-                      </div>
-                    </>
-                  )}
+                        <div className="space-y-2">
+                          <Label>Contact Number *</Label>
+                          <div className="flex gap-2">
+                            <div className="flex items-center px-3 bg-muted rounded-xl border border-input text-sm font-medium h-12">+91</div>
+                            <Input placeholder="Your phone number" value={newSocietyData.contact} onChange={(e) => setNewSocietyData({ ...newSocietyData, contact: e.target.value.replace(/\D/g, '').slice(0, 10) })} maxLength={10} className="flex-1 h-12 rounded-xl" />
+                          </div>
+                        </div>
+                        <div className="bg-muted/50 rounded-xl p-3 text-xs text-muted-foreground">
+                          Your request will be reviewed by our team. We'll contact you once the society is approved and activated.
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" onClick={() => setSocietySubStep('search')} className="flex-1 h-12 rounded-xl">Back</Button>
+                          <Button onClick={handleRequestNewSociety} disabled={isLoading || !newSocietyData.name || !newSocietyData.city || !newSocietyData.pincode || newSocietyData.contact.length !== 10} className="flex-1 h-12 rounded-xl font-semibold">
+                            {isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : null}
+                            Submit Request
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* Sub-step: Search */}
+                    {societySubStep === 'search' && (
+                      <motion.div key="search" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-4">
+                        {/* Search bar */}
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                          <Input
+                            placeholder="Search society, area, landmark, pincode..."
+                            value={societySearch}
+                            onChange={(e) => handleSearchChange(e.target.value)}
+                            className="pl-9 h-12 rounded-xl"
+                            autoFocus
+                          />
+                          {(isSearching || isLoadingSocieties) && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" size={16} />
+                          )}
+                        </div>
+
+                        {/* Results */}
+                        {(showDbResults || showGoogleResults) && (
+                          <div className="max-h-56 overflow-y-auto space-y-1.5 scrollbar-thin">
+                            {/* DB societies first */}
+                            {showDbResults && (
+                              <>
+                                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1">Registered Societies</p>
+                                {filteredSocieties.map((s) => (
+                                  <button key={s.id} onClick={() => handleSelectDbSociety(s)} className={`w-full text-left p-3 rounded-xl border-2 transition-all ${selectedSociety?.id === s.id ? 'border-primary bg-primary/5 shadow-sm' : 'border-border hover:border-primary/30'}`}>
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                                        <Building2 size={18} className="text-primary" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="font-medium text-sm truncate">{s.name}</p>
+                                        <p className="text-xs text-muted-foreground truncate">{[s.city, s.state, s.pincode].filter(Boolean).join(', ')}</p>
+                                      </div>
+                                      {selectedSociety?.id === s.id && <CheckCircle2 size={18} className="text-primary shrink-0 ml-auto" />}
+                                    </div>
+                                  </button>
+                                ))}
+                              </>
+                            )}
+
+                            {/* Google Places results */}
+                            {showGoogleResults && (
+                              <>
+                                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-1 mt-2">Google Maps Results</p>
+                                {predictions.map((p) => (
+                                  <button key={p.placeId} onClick={() => handleSelectGooglePlace(p.placeId)} className="w-full text-left p-3 rounded-xl border-2 border-border hover:border-primary/30 transition-all">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+                                        <MapPin size={18} className="text-accent" />
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="font-medium text-sm truncate">{p.mainText}</p>
+                                        <p className="text-xs text-muted-foreground truncate">{p.secondaryText}</p>
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Empty state */}
+                        {societySearch.length >= 3 && !showDbResults && !showGoogleResults && !isSearching && (
+                          <p className="text-center text-sm text-muted-foreground py-4">No results found for "{societySearch}"</p>
+                        )}
+
+                        {/* Initial hint */}
+                        {societySearch.length < 2 && !selectedSociety && (
+                          <div className="text-center py-6 space-y-2">
+                            <div className="mx-auto w-12 h-12 rounded-2xl bg-muted flex items-center justify-center">
+                              <Search size={20} className="text-muted-foreground" />
+                            </div>
+                            <p className="text-sm text-muted-foreground">Start typing to search for your society</p>
+                            <p className="text-xs text-muted-foreground/70">Search by society name, area, landmark, or pincode</p>
+                          </div>
+                        )}
+
+                        {/* Request society button */}
+                        <button onClick={() => setSocietySubStep('request-form')} className="w-full flex items-center gap-2 p-3 rounded-xl border-2 border-dashed border-muted-foreground/30 text-sm text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors">
+                          <Plus size={16} /> Can't find your society? Request to add it
+                        </button>
+
+                        {/* Invite code */}
+                        {selectedSociety?.invite_code && (
+                          <div className="space-y-2">
+                            <Label htmlFor="invite_code" className="flex items-center gap-1"><Key size={14} /> Invite Code *</Label>
+                            <Input id="invite_code" placeholder="Enter society invite code" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} className="h-12 rounded-xl" />
+                            <p className="text-[10px] text-muted-foreground">Ask your society admin for the invite code</p>
+                          </div>
+                        )}
+
+                        {/* GPS verification */}
+                        {selectedSociety && (
+                          <div className="space-y-2">
+                            <button onClick={verifyGpsLocation} disabled={gpsStatus === 'loading'} className={`w-full flex items-center gap-2 p-3 rounded-xl border text-sm transition-colors ${
+                              gpsStatus === 'verified' ? 'border-green-300 bg-green-50 text-green-700' :
+                              gpsStatus === 'failed' ? 'border-orange-300 bg-orange-50 text-orange-700' :
+                              'border-border hover:border-primary/30 text-muted-foreground hover:text-foreground'
+                            }`}>
+                              <Navigation size={16} className={gpsStatus === 'loading' ? 'animate-spin' : ''} />
+                              {gpsStatus === 'idle' && 'Verify your location (optional)'}
+                              {gpsStatus === 'loading' && 'Checking location...'}
+                              {gpsStatus === 'verified' && `✓ Location verified (${gpsDistance}m away)`}
+                              {gpsStatus === 'failed' && `Location check failed${gpsDistance ? ` (${gpsDistance}m away)` : ''}`}
+                              {gpsStatus === 'unavailable' && 'GPS not available for this society'}
+                            </button>
+                            <p className="text-[10px] text-muted-foreground text-center">Location verification helps speed up admin approval</p>
+                          </div>
+                        )}
+
+                        {/* Navigation buttons */}
+                        <div className="flex gap-2">
+                          <Button variant="outline" onClick={() => setSignupStep('credentials')} className="flex-1 h-12 rounded-xl">
+                            <ArrowLeft size={16} className="mr-1" /> Back
+                          </Button>
+                          <Button onClick={handleSocietyNext} disabled={!selectedSociety || (selectedSociety.invite_code ? !inviteCode.trim() : false)} className="flex-1 h-12 rounded-xl font-semibold">
+                            Continue
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               )}
 
               {/* Signup Step 3: Profile Details */}
               {authMode === 'signup' && signupStep === 'profile' && (
-                <motion.div
-                  key="signup-profile"
-                  initial={{ opacity: 0, x: 30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                  className="space-y-4"
-                >
+                <motion.div key="signup-profile" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25, ease: 'easeInOut' }} className="space-y-4">
                   {selectedSociety && (
                     <div className="flex items-center gap-2 p-2.5 bg-primary/5 rounded-xl border border-primary/20">
                       <Building2 size={14} className="text-primary" />
-                      <span className="text-sm font-medium">{selectedSociety.name}</span>
-                      <button onClick={() => setSignupStep('society')} className="ml-auto text-xs text-primary hover:underline">Change</button>
+                      <span className="text-sm font-medium truncate">{selectedSociety.name}</span>
+                      <button onClick={() => setSignupStep('society')} className="ml-auto text-xs text-primary hover:underline shrink-0">Change</button>
                     </div>
                   )}
 
@@ -552,17 +702,10 @@ export default function AuthPage() {
 
               {/* Signup Step 4: Email Verification */}
               {authMode === 'signup' && signupStep === 'verification' && (
-                <motion.div
-                  key="signup-verification"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.3, ease: 'easeOut' }}
-                  className="space-y-4"
-                >
+                <motion.div key="signup-verification" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.3, ease: 'easeOut' }} className="space-y-4">
                   <div className="text-center py-4 space-y-4">
-                    <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-success/20 to-success/5 flex items-center justify-center">
-                      <Mail className="text-success" size={32} />
+                    <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                      <Mail className="text-primary" size={32} />
                     </div>
                     <div className="space-y-2">
                       <p className="font-semibold">Check your email</p>
@@ -608,4 +751,3 @@ export default function AuthPage() {
     </div>
   );
 }
-
