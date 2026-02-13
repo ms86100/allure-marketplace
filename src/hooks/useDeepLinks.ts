@@ -7,13 +7,13 @@ import { App, URLOpenListenerEvent } from '@capacitor/app';
  * Hook to handle deep links in Capacitor native apps
  * 
  * Supports:
- * - Custom URL scheme: greenfield://orders/123
- * - Universal Links (iOS): https://block-eats.lovable.app/#/orders/123
- * - App Links (Android): https://block-eats.lovable.app/#/orders/123
+ * - Custom URL scheme: sociva://orders/123
+ * - Universal Links (iOS): https://sociva.app/#/orders/123
+ * - App Links (Android): https://sociva.app/#/orders/123
  * 
  * Since the app uses HashRouter, deep link paths are extracted from:
  * 1. The hash fragment (e.g., /#/orders/123 -> /orders/123)
- * 2. The pathname for custom schemes (e.g., greenfield://orders/123 -> /orders/123)
+ * 2. The pathname for custom schemes (e.g., sociva://orders/123 -> /orders/123)
  */
 export function useDeepLinks() {
   const navigate = useNavigate();
@@ -34,11 +34,9 @@ export function useDeepLinks() {
         if (url.hash && url.hash.startsWith('#/')) {
           // Extract path from hash: https://domain.com/#/orders/123 -> /orders/123
           path = url.hash.substring(1); // Remove the leading #
-        } else if (url.protocol === 'greenfield:' || url.protocol === 'greenfieldcommunity:') {
-          // Custom URL scheme: greenfield://orders/123
-          // pathname will be /orders/123 or orders/123
+        } else if (url.protocol === 'sociva:') {
+          // Custom URL scheme: sociva://orders/123
           path = url.pathname.startsWith('/') ? url.pathname : `/${url.pathname}`;
-          // Include query params if any
           if (url.search) {
             path += url.search;
           }

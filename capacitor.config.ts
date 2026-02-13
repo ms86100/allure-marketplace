@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 /**
- * Capacitor Configuration for Greenfield Community App
+ * Capacitor Configuration for Sociva App
  * 
  * IMPORTANT: Build Configuration
  * 
@@ -25,7 +25,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
  */
 
 const config: CapacitorConfig = {
-  appId: 'app.greenfield.community',
+  appId: 'app.sociva.community',
   appName: 'Sociva',
   webDir: 'dist',
   
@@ -34,8 +34,7 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://b3f6efce-9b8e-4071-b39d-b038b9b1adf4.lovableproject.com?forceHideBadge=true',
     cleartext: true,
-    // Allow deep linking to your domain
-    hostname: 'block-eats.lovable.app',
+    hostname: 'sociva.app',
   },
   
   plugins: {
@@ -62,7 +61,7 @@ const config: CapacitorConfig = {
   
   // iOS-specific configuration
   ios: {
-    scheme: 'greenfieldcommunity',
+    scheme: 'sociva',
     contentInset: 'automatic',
   },
   
@@ -70,7 +69,7 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: false, // Set to true for debugging
+    webContentsDebuggingEnabled: false,
   },
 };
 

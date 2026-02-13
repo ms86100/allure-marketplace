@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 /**
- * PRODUCTION Capacitor Configuration for Greenfield Community App
+ * PRODUCTION Capacitor Configuration for Sociva App
  * 
  * USAGE:
  * 1. Rename this file to capacitor.config.ts before building for app stores
@@ -13,7 +13,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
  */
 
 const config: CapacitorConfig = {
-  appId: 'app.greenfield.community',
+  appId: 'app.sociva.community',
   appName: 'Sociva',
   webDir: 'dist',
   
@@ -43,15 +43,15 @@ const config: CapacitorConfig = {
   
   // iOS-specific configuration
   ios: {
-    scheme: 'greenfieldcommunity',
+    scheme: 'sociva',
     contentInset: 'automatic',
   },
   
   // Android-specific configuration
   android: {
-    allowMixedContent: false, // Disabled for production security
+    allowMixedContent: false,
     captureInput: true,
-    webContentsDebuggingEnabled: false, // Disabled for production
+    webContentsDebuggingEnabled: false,
   },
 };
 
