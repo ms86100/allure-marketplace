@@ -6,7 +6,8 @@ import { SellerCard } from '@/components/seller/SellerCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
-import { PARENT_GROUPS, ParentGroup, ServiceCategory } from '@/types/categories';
+import { useParentGroups } from '@/hooks/useParentGroups';
+import { ServiceCategory } from '@/types/categories';
 import { SellerProfile } from '@/types/database';
 import { ArrowLeft, Search, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,13 +18,13 @@ export default function CategoryGroupPage() {
   const subCategory = searchParams.get('sub') as ServiceCategory | null;
   
   const { groupedConfigs, isLoading: configsLoading } = useCategoryConfigs();
+  const { getGroupBySlug, isLoading: groupsLoading } = useParentGroups();
   const [sellers, setSellers] = useState<SellerProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeSubCategory, setActiveSubCategory] = useState<ServiceCategory | null>(subCategory);
 
-  // Get parent group info
-  const parentGroup = PARENT_GROUPS.find((g) => g.value === category);
-  const subCategories = category ? groupedConfigs[category as ParentGroup] || [] : [];
+  const parentGroup = category ? getGroupBySlug(category) : undefined;
+  const subCategories = category ? groupedConfigs[category] || [] : [];
 
   useEffect(() => {
     if (category) {
@@ -40,12 +41,10 @@ export default function CategoryGroupPage() {
         .eq('verification_status', 'approved')
         .order('rating', { ascending: false });
 
-      // Filter by primary_group to prevent cross-category leakage
       if (category) {
         query = query.eq('primary_group', category);
       }
 
-      // Further filter by specific sub-category if selected
       if (activeSubCategory) {
         query = query.contains('categories', [activeSubCategory]);
       }
@@ -70,6 +69,21 @@ export default function CategoryGroupPage() {
     }
   };
 
+  if (groupsLoading || configsLoading) {
+    return (
+      <AppLayout showHeader={false}>
+        <div className="p-4">
+          <Skeleton className="h-20 w-full rounded-xl mb-4" />
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-48 w-full rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
   if (!parentGroup) {
     return (
       <AppLayout showHeader={false}>
@@ -85,13 +99,9 @@ export default function CategoryGroupPage() {
 
   return (
     <AppLayout showHeader={false}>
-      {/* Header */}
       <div className={cn('p-4 pb-2', parentGroup.color.split(' ')[0])}>
         <div className="flex items-center gap-3 mb-4">
-          <Link
-            to="/"
-            className="w-10 h-10 rounded-full bg-background/90 flex items-center justify-center shadow-sm"
-          >
+          <Link to="/" className="w-10 h-10 rounded-full bg-background/90 flex items-center justify-center shadow-sm">
             <ArrowLeft size={20} />
           </Link>
           <div>
@@ -103,16 +113,13 @@ export default function CategoryGroupPage() {
           </div>
         </div>
 
-        {/* Sub-category filters */}
         {subCategories.length > 0 && (
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
             <button
               onClick={() => handleSubCategorySelect(null)}
               className={cn(
                 'px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
-                !activeSubCategory
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-background text-foreground'
+                !activeSubCategory ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground'
               )}
             >
               All
@@ -123,9 +130,7 @@ export default function CategoryGroupPage() {
                 onClick={() => handleSubCategorySelect(config.category)}
                 className={cn(
                   'px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1',
-                  activeSubCategory === config.category
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-background text-foreground'
+                  activeSubCategory === config.category ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground'
                 )}
               >
                 <span>{config.icon}</span>
@@ -136,9 +141,7 @@ export default function CategoryGroupPage() {
         )}
       </div>
 
-      {/* Results */}
       <div className="p-4">
-        {/* Result count */}
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm text-muted-foreground">
             {isLoading ? 'Loading...' : `${sellers.length} seller${sellers.length !== 1 ? 's' : ''} found`}
@@ -149,7 +152,6 @@ export default function CategoryGroupPage() {
           </Button>
         </div>
 
-        {/* Seller list */}
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (

@@ -4,15 +4,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SellerCard } from '@/components/seller/SellerCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { SellerProfile, ProductCategory, CATEGORIES } from '@/types/database';
+import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
+import { SellerProfile, ProductCategory } from '@/types/database';
 import { ArrowLeft } from 'lucide-react';
 
 export default function CategoryPage() {
   const { category } = useParams<{ category: ProductCategory }>();
+  const { configs } = useCategoryConfigs();
   const [sellers, setSellers] = useState<SellerProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const categoryInfo = CATEGORIES.find((c) => c.value === category);
+  const categoryInfo = configs.find((c) => c.category === category);
 
   useEffect(() => {
     if (category) {
@@ -24,10 +26,7 @@ export default function CategoryPage() {
     try {
       const { data, error } = await supabase
         .from('seller_profiles')
-        .select(`
-          *,
-          profile:profiles!seller_profiles_user_id_fkey(name, block)
-        `)
+        .select(`*, profile:profiles!seller_profiles_user_id_fkey(name, block)`)
         .eq('verification_status', 'approved')
         .contains('categories', [category])
         .order('rating', { ascending: false });
@@ -50,7 +49,7 @@ export default function CategoryPage() {
           </Link>
           <div className="flex items-center gap-2">
             <span className="text-2xl">{categoryInfo?.icon}</span>
-            <h1 className="text-xl font-bold">{categoryInfo?.label}</h1>
+            <h1 className="text-xl font-bold">{categoryInfo?.displayName || category}</h1>
           </div>
         </div>
 
@@ -69,9 +68,7 @@ export default function CategoryPage() {
         ) : (
           <div className="text-center py-12">
             <span className="text-5xl mb-4 block">{categoryInfo?.icon}</span>
-            <p className="text-muted-foreground">
-              No sellers in this category yet
-            </p>
+            <p className="text-muted-foreground">No sellers in this category yet</p>
             <Link to="/become-seller" className="text-primary text-sm mt-2 block">
               Be the first to sell here!
             </Link>

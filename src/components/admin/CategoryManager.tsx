@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -32,7 +33,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Loader2, Grid3X3, GripVertical, Edit2, Save, X, Plus, Trash2 } from 'lucide-react';
-import { PARENT_GROUPS, ParentGroup } from '@/types/categories';
+import { useParentGroups, ParentGroupRow } from '@/hooks/useParentGroups';
 import { cn } from '@/lib/utils';
 
 interface CategoryConfigRow {
@@ -62,14 +63,15 @@ const COLOR_PRESETS = [
 ];
 
 export function CategoryManager() {
+  const { groups, parentGroupInfos, isLoading: groupsLoading, refresh: refreshGroups } = useParentGroups();
   const [categories, setCategories] = useState<CategoryConfigRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedGroup, setSelectedGroup] = useState<ParentGroup | null>(null);
+  const [selectedGroupSlug, setSelectedGroupSlug] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<CategoryConfigRow | null>(null);
   const [editForm, setEditForm] = useState({ display_name: '', icon: '', color: '' });
   const [isSaving, setIsSaving] = useState(false);
 
-  // Add category state
+  // Add subcategory state
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
   const [addForm, setAddForm] = useState({
@@ -79,9 +81,16 @@ export function CategoryManager() {
     parent_group: '',
   });
 
-  // Delete confirmation state
+  // Delete subcategory confirmation state
   const [deleteCategory, setDeleteCategory] = useState<CategoryConfigRow | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Parent group CRUD state
+  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<ParentGroupRow | null>(null);
+  const [groupForm, setGroupForm] = useState({ name: '', icon: '', color: 'bg-blue-100 text-blue-600', description: '' });
+  const [deleteGroup, setDeleteGroup] = useState<ParentGroupRow | null>(null);
+  const [isDeletingGroup, setIsDeletingGroup] = useState(false);
 
   useEffect(() => {
     fetchCategories();
@@ -104,6 +113,8 @@ export function CategoryManager() {
     }
   };
 
+  // === Subcategory CRUD ===
+
   const toggleCategory = async (id: string, isActive: boolean) => {
     try {
       const { error } = await supabase
@@ -113,38 +124,11 @@ export function CategoryManager() {
 
       if (error) throw error;
 
-      setCategories(
-        categories.map((c) => (c.id === id ? { ...c, is_active: isActive } : c))
-      );
+      setCategories(categories.map((c) => (c.id === id ? { ...c, is_active: isActive } : c)));
       toast.success(isActive ? 'Category enabled' : 'Category disabled');
     } catch (error) {
       console.error('Error updating category:', error);
       toast.error('Failed to update category');
-    }
-  };
-
-  const toggleGroupCategories = async (groupValue: string, enable: boolean) => {
-    const groupCats = categories.filter((c) => c.parent_group === groupValue);
-    if (groupCats.length === 0) return;
-
-    try {
-      const ids = groupCats.map((c) => c.id);
-      const { error } = await supabase
-        .from('category_config')
-        .update({ is_active: enable })
-        .in('id', ids);
-
-      if (error) throw error;
-
-      setCategories(
-        categories.map((c) =>
-          c.parent_group === groupValue ? { ...c, is_active: enable } : c
-        )
-      );
-      toast.success(enable ? `${groupValue} group enabled` : `${groupValue} group disabled`);
-    } catch (error) {
-      console.error('Error toggling group:', error);
-      toast.error('Failed to update group');
     }
   };
 
@@ -159,7 +143,6 @@ export function CategoryManager() {
 
   const saveEditedCategory = async () => {
     if (!editingCategory) return;
-
     if (!editForm.display_name.trim()) {
       toast.error('Display name is required');
       return;
@@ -195,7 +178,6 @@ export function CategoryManager() {
     }
   };
 
-  // Generate category key from display name
   const generateCategoryKey = (displayName: string): string => {
     return displayName
       .toLowerCase()
@@ -204,14 +186,13 @@ export function CategoryManager() {
       .replace(/\s+/g, '_');
   };
 
-  // Add new category
-  const openAddDialog = (groupValue: string) => {
-    setAddingToGroup(groupValue);
+  const openAddDialog = (groupSlug: string) => {
+    setAddingToGroup(groupSlug);
     setAddForm({
       display_name: '',
       icon: '',
       color: 'bg-blue-100 text-blue-600',
-      parent_group: groupValue,
+      parent_group: groupSlug,
     });
     setIsAddDialogOpen(true);
   };
@@ -221,15 +202,12 @@ export function CategoryManager() {
       toast.error('Display name is required');
       return;
     }
-
     if (!addForm.icon.trim()) {
       toast.error('Icon is required');
       return;
     }
 
     const categoryKey = generateCategoryKey(addForm.display_name);
-    
-    // Check if category key already exists
     if (categories.some(c => c.category === categoryKey)) {
       toast.error('A category with this key already exists');
       return;
@@ -237,7 +215,6 @@ export function CategoryManager() {
 
     setIsSaving(true);
     try {
-      // Get max display order for this group
       const groupCats = categories.filter(c => c.parent_group === addForm.parent_group);
       const maxOrder = groupCats.length > 0 ? Math.max(...groupCats.map(c => c.display_order)) : 0;
 
@@ -268,13 +245,11 @@ export function CategoryManager() {
     }
   };
 
-  // Delete category
   const confirmDeleteCategory = async () => {
     if (!deleteCategory) return;
 
     setIsDeleting(true);
     try {
-      // Check if any sellers are using this category
       const { data: sellers } = await supabase
         .from('seller_profiles')
         .select('id')
@@ -282,7 +257,6 @@ export function CategoryManager() {
         .limit(1);
 
       if (sellers && sellers.length > 0) {
-        // Soft delete - just disable the category
         const { error } = await supabase
           .from('category_config')
           .update({ is_active: false })
@@ -297,7 +271,6 @@ export function CategoryManager() {
         );
         toast.info('Category disabled (sellers are using it)');
       } else {
-        // Hard delete - no sellers are using it
         const { error } = await supabase
           .from('category_config')
           .delete()
@@ -308,13 +281,177 @@ export function CategoryManager() {
         setCategories(categories.filter((c) => c.id !== deleteCategory.id));
         toast.success('Category deleted');
       }
-      
+
       setDeleteCategory(null);
     } catch (error) {
       console.error('Error deleting category:', error);
       toast.error('Failed to delete category');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // === Parent Group CRUD ===
+
+  const toggleGroup = async (group: ParentGroupRow, enable: boolean) => {
+    try {
+      // Update group is_active
+      const { error: groupError } = await supabase
+        .from('parent_groups')
+        .update({ is_active: enable })
+        .eq('id', group.id);
+
+      if (groupError) throw groupError;
+
+      // If disabling, cascade disable all subcategories
+      if (!enable) {
+        const groupCats = categories.filter((c) => c.parent_group === group.slug);
+        if (groupCats.length > 0) {
+          const ids = groupCats.map((c) => c.id);
+          const { error: catError } = await supabase
+            .from('category_config')
+            .update({ is_active: false })
+            .in('id', ids);
+
+          if (catError) throw catError;
+
+          setCategories(
+            categories.map((c) =>
+              c.parent_group === group.slug ? { ...c, is_active: false } : c
+            )
+          );
+        }
+      }
+
+      await refreshGroups();
+      toast.success(enable ? `${group.name} enabled` : `${group.name} disabled (subcategories also disabled)`);
+    } catch (error) {
+      console.error('Error toggling group:', error);
+      toast.error('Failed to update group');
+    }
+  };
+
+  const openGroupDialog = (group?: ParentGroupRow) => {
+    if (group) {
+      setEditingGroup(group);
+      setGroupForm({ name: group.name, icon: group.icon, color: group.color, description: group.description });
+    } else {
+      setEditingGroup(null);
+      setGroupForm({ name: '', icon: '', color: 'bg-blue-100 text-blue-600', description: '' });
+    }
+    setIsGroupDialogOpen(true);
+  };
+
+  const generateSlug = (name: string): string => {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, '_');
+  };
+
+  const saveGroup = async () => {
+    if (!groupForm.name.trim()) {
+      toast.error('Name is required');
+      return;
+    }
+    if (!groupForm.icon.trim()) {
+      toast.error('Icon is required');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      if (editingGroup) {
+        // Update existing group
+        const { error } = await supabase
+          .from('parent_groups')
+          .update({
+            name: groupForm.name.trim(),
+            icon: groupForm.icon.trim(),
+            color: groupForm.color,
+            description: groupForm.description.trim(),
+          })
+          .eq('id', editingGroup.id);
+
+        if (error) throw error;
+        toast.success('Category group updated');
+      } else {
+        // Create new group
+        const slug = generateSlug(groupForm.name);
+        const maxOrder = groups.length > 0 ? Math.max(...groups.map(g => g.sort_order)) : 0;
+
+        const { error } = await supabase
+          .from('parent_groups')
+          .insert({
+            slug,
+            name: groupForm.name.trim(),
+            icon: groupForm.icon.trim(),
+            color: groupForm.color,
+            description: groupForm.description.trim(),
+            sort_order: maxOrder + 1,
+          });
+
+        if (error) throw error;
+        toast.success('Category group created');
+      }
+
+      await refreshGroups();
+      setIsGroupDialogOpen(false);
+    } catch (error: any) {
+      console.error('Error saving group:', error);
+      toast.error(error.message || 'Failed to save group');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const confirmDeleteGroup = async () => {
+    if (!deleteGroup) return;
+
+    setIsDeletingGroup(true);
+    try {
+      // Check if any subcategories exist
+      const groupCats = categories.filter(c => c.parent_group === deleteGroup.slug);
+      
+      if (groupCats.length > 0) {
+        // Check if any active sellers use subcategories in this group
+        const catKeys = groupCats.map(c => c.category);
+        const { data: sellers } = await supabase
+          .from('seller_profiles')
+          .select('id')
+          .eq('primary_group', deleteGroup.slug)
+          .limit(1);
+
+        if (sellers && sellers.length > 0) {
+          // Soft delete - just disable the group and its subcategories
+          await supabase.from('parent_groups').update({ is_active: false }).eq('id', deleteGroup.id);
+          await supabase.from('category_config').update({ is_active: false }).in('id', groupCats.map(c => c.id));
+          
+          setCategories(categories.map(c => c.parent_group === deleteGroup.slug ? { ...c, is_active: false } : c));
+          toast.info('Group disabled (sellers are using it). Subcategories also disabled.');
+        } else {
+          // Delete subcategories first, then group
+          await supabase.from('category_config').delete().in('id', groupCats.map(c => c.id));
+          await supabase.from('parent_groups').delete().eq('id', deleteGroup.id);
+          
+          setCategories(categories.filter(c => c.parent_group !== deleteGroup.slug));
+          toast.success('Group and its subcategories deleted');
+        }
+      } else {
+        // No subcategories, safe to delete
+        const { error } = await supabase.from('parent_groups').delete().eq('id', deleteGroup.id);
+        if (error) throw error;
+        toast.success('Group deleted');
+      }
+
+      await refreshGroups();
+      setDeleteGroup(null);
+    } catch (error) {
+      console.error('Error deleting group:', error);
+      toast.error('Failed to delete group');
+    } finally {
+      setIsDeletingGroup(false);
     }
   };
 
@@ -326,18 +463,7 @@ export function CategoryManager() {
     return acc;
   }, {} as Record<string, CategoryConfigRow[]>);
 
-  const isGroupFullyActive = (groupValue: string) => {
-    const groupCats = groupedCategories[groupValue] || [];
-    return groupCats.length > 0 && groupCats.every((c) => c.is_active);
-  };
-
-  const isGroupPartiallyActive = (groupValue: string) => {
-    const groupCats = groupedCategories[groupValue] || [];
-    const activeCount = groupCats.filter((c) => c.is_active).length;
-    return activeCount > 0 && activeCount < groupCats.length;
-  };
-
-  if (isLoading) {
+  if (isLoading || groupsLoading) {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="animate-spin" size={24} />
@@ -349,30 +475,38 @@ export function CategoryManager() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Grid3X3 size={20} />
-            Category Management
-          </CardTitle>
-          <CardDescription>
-            Add, edit, enable or disable categories. Disabled categories won't appear to users.
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Grid3X3 size={20} />
+                Category Management
+              </CardTitle>
+              <CardDescription>
+                Manage parent categories and subcategories. Disabled items won't appear to users.
+              </CardDescription>
+            </div>
+            <Button onClick={() => openGroupDialog()} size="sm">
+              <Plus size={14} className="mr-1" />
+              Add Group
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Group filters */}
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
             <Button
-              variant={selectedGroup === null ? 'default' : 'outline'}
+              variant={selectedGroupSlug === null ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setSelectedGroup(null)}
+              onClick={() => setSelectedGroupSlug(null)}
             >
               All
             </Button>
-            {PARENT_GROUPS.map((group) => (
+            {parentGroupInfos.map((group) => (
               <Button
                 key={group.value}
-                variant={selectedGroup === group.value ? 'default' : 'outline'}
+                variant={selectedGroupSlug === group.value ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setSelectedGroup(group.value)}
+                onClick={() => setSelectedGroupSlug(group.value)}
               >
                 <span className="mr-1">{group.icon}</span>
                 {group.label.split(' ')[0]}
@@ -382,112 +516,119 @@ export function CategoryManager() {
 
           <ScrollArea className="h-[500px]">
             <div className="space-y-6 pr-4">
-              {PARENT_GROUPS.filter(
-                (g) => !selectedGroup || g.value === selectedGroup
-              ).map((group) => {
-                const groupCats = groupedCategories[group.value] || [];
-                const activeCount = groupCats.filter((c) => c.is_active).length;
-                const isFullyActive = isGroupFullyActive(group.value);
-                const isPartiallyActive = isGroupPartiallyActive(group.value);
+              {groups
+                .filter((g) => !selectedGroupSlug || g.slug === selectedGroupSlug)
+                .map((group) => {
+                  const groupCats = groupedCategories[group.slug] || [];
+                  const activeCount = groupCats.filter((c) => c.is_active).length;
 
-                return (
-                  <div key={group.value} className="space-y-3">
-                    {/* Group Header with Toggle */}
-                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
-                      <div className="flex items-center gap-3">
-                        <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center text-xl', group.color)}>
-                          {group.icon}
+                  return (
+                    <div key={group.id} className="space-y-3">
+                      {/* Group Header */}
+                      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
+                        <div className="flex items-center gap-3">
+                          <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center text-xl', group.color)}>
+                            {group.icon}
+                          </div>
+                          <div>
+                            <h4 className="font-semibold">{group.name}</h4>
+                            <p className="text-xs text-muted-foreground">
+                              {activeCount}/{groupCats.length} categories active
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-semibold">{group.label}</h4>
-                          <p className="text-xs text-muted-foreground">
-                            {activeCount}/{groupCats.length} categories active
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => openGroupDialog(group)}
+                          >
+                            <Edit2 size={14} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteGroup(group)}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openAddDialog(group.slug)}
+                          >
+                            <Plus size={14} className="mr-1" />
+                            Add
+                          </Button>
+                          <Switch
+                            checked={group.is_active}
+                            onCheckedChange={(checked) => toggleGroup(group, checked)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Subcategories */}
+                      <div className="space-y-1 ml-2">
+                        {groupCats.length === 0 && (
+                          <p className="text-sm text-muted-foreground py-2 px-3">
+                            No categories yet. Click "Add" to create one.
                           </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openAddDialog(group.value)}
-                        >
-                          <Plus size={14} className="mr-1" />
-                          Add
-                        </Button>
-                        <span className={cn(
-                          'text-xs px-2 py-0.5 rounded-full',
-                          isFullyActive ? 'bg-success/20 text-success' :
-                          isPartiallyActive ? 'bg-warning/20 text-warning' :
-                          'bg-muted text-muted-foreground'
-                        )}>
-                          {isFullyActive ? 'All On' : isPartiallyActive ? 'Partial' : 'All Off'}
-                        </span>
-                        <Switch
-                          checked={isFullyActive}
-                          onCheckedChange={(checked) => toggleGroupCategories(group.value, checked)}
-                        />
+                        )}
+                        {groupCats.map((cat) => (
+                          <div
+                            key={cat.id}
+                            className={cn(
+                              'flex items-center justify-between p-2.5 rounded-lg transition-colors group',
+                              cat.is_active ? 'bg-card border' : 'bg-muted/30 opacity-60'
+                            )}
+                          >
+                            <div className="flex items-center gap-2">
+                              <GripVertical size={14} className="text-muted-foreground cursor-move opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <span className="text-lg">{cat.icon}</span>
+                              <span className={cn('text-sm', !cat.is_active && 'text-muted-foreground')}>
+                                {cat.display_name}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                ({cat.category})
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => openEditDialog(cat)}
+                              >
+                                <Edit2 size={14} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                                onClick={() => setDeleteCategory(cat)}
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                              <Switch
+                                checked={cat.is_active}
+                                onCheckedChange={(checked) => toggleCategory(cat.id, checked)}
+                                disabled={!group.is_active}
+                              />
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-
-                    {/* Subcategories */}
-                    <div className="space-y-1 ml-2">
-                      {groupCats.length === 0 && (
-                        <p className="text-sm text-muted-foreground py-2 px-3">
-                          No categories yet. Click "Add" to create one.
-                        </p>
-                      )}
-                      {groupCats.map((cat) => (
-                        <div
-                          key={cat.id}
-                          className={cn(
-                            'flex items-center justify-between p-2.5 rounded-lg transition-colors group',
-                            cat.is_active ? 'bg-card border' : 'bg-muted/30 opacity-60'
-                          )}
-                        >
-                          <div className="flex items-center gap-2">
-                            <GripVertical size={14} className="text-muted-foreground cursor-move opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <span className="text-lg">{cat.icon}</span>
-                            <span className={cn('text-sm', !cat.is_active && 'text-muted-foreground')}>
-                              {cat.display_name}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground font-mono">
-                              ({cat.category})
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={() => openEditDialog(cat)}
-                            >
-                              <Edit2 size={14} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                              onClick={() => setDeleteCategory(cat)}
-                            >
-                              <Trash2 size={14} />
-                            </Button>
-                            <Switch
-                              checked={cat.is_active}
-                              onCheckedChange={(checked) => toggleCategory(cat.id, checked)}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </ScrollArea>
 
           <div className="pt-4 border-t space-y-2">
             <p className="text-xs text-muted-foreground">
-              💡 <strong>Tip:</strong> Use the group toggle to enable/disable all categories in a group at once.
+              💡 <strong>Tip:</strong> Disabling a parent group will also disable all its subcategories.
             </p>
             <p className="text-xs text-muted-foreground">
               ⚠️ Disabled categories won't be visible to users, but existing sellers can still operate.
@@ -496,7 +637,7 @@ export function CategoryManager() {
         </CardContent>
       </Card>
 
-      {/* Edit Category Dialog */}
+      {/* Edit Subcategory Dialog */}
       <Dialog open={!!editingCategory} onOpenChange={(open) => !open && setEditingCategory(null)}>
         <DialogContent>
           <DialogHeader>
@@ -521,16 +662,10 @@ export function CategoryManager() {
                 placeholder="e.g., 🍲"
                 className="text-2xl"
               />
-              <p className="text-xs text-muted-foreground">
-                Paste an emoji to use as the category icon
-              </p>
             </div>
             <div className="space-y-2">
               <Label>Color</Label>
-              <Select
-                value={editForm.color}
-                onValueChange={(value) => setEditForm({ ...editForm, color: value })}
-              >
+              <Select value={editForm.color} onValueChange={(value) => setEditForm({ ...editForm, color: value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a color" />
                 </SelectTrigger>
@@ -546,8 +681,6 @@ export function CategoryManager() {
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Preview */}
             <div className="p-4 bg-muted rounded-lg">
               <Label className="text-xs text-muted-foreground mb-2 block">Preview</Label>
               <div className="flex items-center gap-3">
@@ -571,11 +704,11 @@ export function CategoryManager() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Category Dialog */}
+      {/* Add Subcategory Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New Category</DialogTitle>
+            <DialogTitle>Add New Subcategory</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -604,10 +737,7 @@ export function CategoryManager() {
             </div>
             <div className="space-y-2">
               <Label>Color</Label>
-              <Select
-                value={addForm.color}
-                onValueChange={(value) => setAddForm({ ...addForm, color: value })}
-              >
+              <Select value={addForm.color} onValueChange={(value) => setAddForm({ ...addForm, color: value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a color" />
                 </SelectTrigger>
@@ -625,15 +755,12 @@ export function CategoryManager() {
             </div>
             <div className="space-y-2">
               <Label>Parent Group</Label>
-              <Select
-                value={addForm.parent_group}
-                onValueChange={(value) => setAddForm({ ...addForm, parent_group: value })}
-              >
+              <Select value={addForm.parent_group} onValueChange={(value) => setAddForm({ ...addForm, parent_group: value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a group" />
                 </SelectTrigger>
                 <SelectContent>
-                  {PARENT_GROUPS.map((group) => (
+                  {parentGroupInfos.map((group) => (
                     <SelectItem key={group.value} value={group.value}>
                       <div className="flex items-center gap-2">
                         <span>{group.icon}</span>
@@ -644,8 +771,6 @@ export function CategoryManager() {
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Preview */}
             <div className="p-4 bg-muted rounded-lg">
               <Label className="text-xs text-muted-foreground mb-2 block">Preview</Label>
               <div className="flex items-center gap-3">
@@ -669,13 +794,13 @@ export function CategoryManager() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Subcategory Confirmation */}
       <AlertDialog open={!!deleteCategory} onOpenChange={(open) => !open && setDeleteCategory(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Category</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deleteCategory?.display_name}"? 
+              Are you sure you want to delete "{deleteCategory?.display_name}"?
               {deleteCategory && (
                 <span className="block mt-2 text-sm">
                   If sellers are using this category, it will be disabled instead of deleted.
@@ -692,6 +817,115 @@ export function CategoryManager() {
             >
               {isDeleting ? <Loader2 className="animate-spin mr-1" size={16} /> : <Trash2 size={16} className="mr-1" />}
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Parent Group Dialog (Create/Edit) */}
+      <Dialog open={isGroupDialogOpen} onOpenChange={setIsGroupDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingGroup ? 'Edit Category Group' : 'Add New Category Group'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Name *</Label>
+              <Input
+                value={groupForm.name}
+                onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
+                placeholder="e.g., Food & Groceries"
+              />
+              {!editingGroup && groupForm.name && (
+                <p className="text-xs text-muted-foreground">
+                  Slug: <code className="bg-muted px-1 rounded">{generateSlug(groupForm.name)}</code>
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Icon (Emoji) *</Label>
+              <Input
+                value={groupForm.icon}
+                onChange={(e) => setGroupForm({ ...groupForm, icon: e.target.value })}
+                placeholder="e.g., 🍲"
+                className="text-2xl"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Color</Label>
+              <Select value={groupForm.color} onValueChange={(value) => setGroupForm({ ...groupForm, color: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COLOR_PRESETS.map((color) => (
+                    <SelectItem key={color.value} value={color.value}>
+                      <div className="flex items-center gap-2">
+                        <div className={cn('w-4 h-4 rounded', color.value)} />
+                        {color.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={groupForm.description}
+                onChange={(e) => setGroupForm({ ...groupForm, description: e.target.value })}
+                placeholder="Short description of this category group"
+                rows={2}
+              />
+            </div>
+            <div className="p-4 bg-muted rounded-lg">
+              <Label className="text-xs text-muted-foreground mb-2 block">Preview</Label>
+              <div className="flex items-center gap-3">
+                <div className={cn('w-12 h-12 rounded-lg flex items-center justify-center text-2xl', groupForm.color)}>
+                  {groupForm.icon || '❓'}
+                </div>
+                <div>
+                  <span className="font-medium block">{groupForm.name || 'Group Name'}</span>
+                  <span className="text-xs text-muted-foreground">{groupForm.description || 'Description'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsGroupDialogOpen(false)}>
+              <X size={16} className="mr-1" />
+              Cancel
+            </Button>
+            <Button onClick={saveGroup} disabled={isSaving}>
+              {isSaving ? <Loader2 className="animate-spin mr-1" size={16} /> : <Save size={16} className="mr-1" />}
+              {editingGroup ? 'Save Changes' : 'Create Group'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Group Confirmation */}
+      <AlertDialog open={!!deleteGroup} onOpenChange={(open) => !open && setDeleteGroup(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Category Group</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the "{deleteGroup?.name}" group?
+              <span className="block mt-2 text-sm">
+                If sellers are using categories in this group, the group will be disabled instead.
+                Otherwise, all subcategories will also be deleted.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteGroup}
+              disabled={isDeletingGroup}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeletingGroup ? <Loader2 className="animate-spin mr-1" size={16} /> : <Trash2 size={16} className="mr-1" />}
+              Delete Group
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

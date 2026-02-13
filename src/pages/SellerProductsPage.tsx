@@ -26,7 +26,7 @@ import { VegBadge } from '@/components/ui/veg-badge';
 import { Badge } from '@/components/ui/badge';
 import { ImageUpload } from '@/components/ui/image-upload';
 import { useAuth } from '@/contexts/AuthContext';
-import { Product, CATEGORIES, ProductCategory, SellerProfile } from '@/types/database';
+import { Product, ProductCategory, SellerProfile } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { ParentGroup } from '@/types/categories';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';

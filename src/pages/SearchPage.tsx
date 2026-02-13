@@ -8,7 +8,8 @@ import { ProductCard } from '@/components/product/ProductCard';
 import { SearchFilters, FilterState, defaultFilters } from '@/components/search/SearchFilters';
 import { FilterPresets } from '@/components/search/FilterPresets';
 import { Skeleton } from '@/components/ui/skeleton';
-import { SellerProfile, CATEGORIES, Product } from '@/types/database';
+import { SellerProfile, Product } from '@/types/database';
+import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { ArrowLeft, Search as SearchIcon, X } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 
@@ -248,7 +249,7 @@ export default function SearchPage() {
   if (filters.isVeg === false) activeFilterLabels.push('Non-veg');
   if (filters.categories.length > 0) {
     activeFilterLabels.push(
-      ...filters.categories.map((c) => CATEGORIES.find((cat) => cat.value === c)?.label || c)
+      ...filters.categories.map((c) => c)
     );
   }
   if (filters.block) activeFilterLabels.push(`Block ${filters.block}`);

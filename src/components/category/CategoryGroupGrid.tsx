@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
-import { PARENT_GROUPS, ParentGroup, ServiceCategory } from '@/types/categories';
+import { useParentGroups } from '@/hooks/useParentGroups';
+import { ServiceCategory } from '@/types/categories';
 import { cn } from '@/lib/utils';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,9 +11,9 @@ interface CategoryGroupGridProps {
   variant?: 'compact' | 'expanded' | 'selection';
   selectedCategories?: ServiceCategory[];
   onCategorySelect?: (category: ServiceCategory, selected: boolean) => void;
-  selectedGroup?: ParentGroup | null;
-  onGroupSelect?: (group: ParentGroup) => void;
-  excludeGroups?: ParentGroup[];
+  selectedGroup?: string | null;
+  onGroupSelect?: (group: string) => void;
+  excludeGroups?: string[];
 }
 
 export function CategoryGroupGrid({
@@ -23,11 +24,14 @@ export function CategoryGroupGrid({
   onGroupSelect,
   excludeGroups = [],
 }: CategoryGroupGridProps) {
-  const { groupedConfigs, isLoading } = useCategoryConfigs();
-  const [expandedGroup, setExpandedGroup] = useState<ParentGroup | null>(null);
+  const { groupedConfigs, isLoading: configsLoading } = useCategoryConfigs();
+  const { parentGroupInfos, isLoading: groupsLoading } = useParentGroups();
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+
+  const isLoading = configsLoading || groupsLoading;
 
   // Filter out excluded groups
-  const filteredGroups = PARENT_GROUPS.filter(g => !excludeGroups.includes(g.value));
+  const filteredGroups = parentGroupInfos.filter(g => !excludeGroups.includes(g.value));
 
   if (isLoading) {
     return (
@@ -43,7 +47,6 @@ export function CategoryGroupGrid({
   if (variant === 'compact') {
     return (
       <div className="space-y-4">
-        {/* Parent Groups */}
         <div className="flex gap-3 overflow-x-auto scrollbar-hide py-2 -mx-4 px-4">
           {filteredGroups.filter(g => groupedConfigs[g.value]?.length > 0).map(({ value, label, icon, color }) => (
             <Link
@@ -95,7 +98,7 @@ export function CategoryGroupGrid({
 
             {expandedGroup === value && (
               <div className="grid grid-cols-3 gap-2 pl-13">
-                {groupedConfigs[value].map((config) => (
+                {groupedConfigs[value]?.map((config) => (
                   <Link
                     key={config.category}
                     to={`/category/${value}?sub=${config.category}`}
@@ -117,7 +120,6 @@ export function CategoryGroupGrid({
   if (variant === 'selection') {
     return (
       <div className="space-y-4">
-        {/* Group Selection */}
         <div className="grid grid-cols-2 gap-3">
           {filteredGroups.filter(g => groupedConfigs[g.value]?.length > 0).map(({ value, label, icon, color }) => (
             <button
@@ -138,7 +140,6 @@ export function CategoryGroupGrid({
           ))}
         </div>
 
-        {/* Sub-category selection when a group is selected */}
         {selectedGroup && groupedConfigs[selectedGroup] && (
           <div className="space-y-2">
             <p className="text-sm font-medium text-muted-foreground">Select your categories:</p>

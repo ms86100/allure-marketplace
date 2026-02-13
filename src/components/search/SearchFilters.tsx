@@ -7,7 +7,8 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ProductCategory, CATEGORIES } from '@/types/database';
+import { ProductCategory } from '@/types/database';
+import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 
 export interface FilterState {
   priceRange: [number, number];
@@ -40,6 +41,7 @@ export function SearchFilters({
   blocks = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'],
   showPriceFilter = true,
 }: SearchFiltersProps) {
+  const { configs: allCategories } = useCategoryConfigs();
   const [isOpen, setIsOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState(filters);
 
@@ -192,18 +194,18 @@ export function SearchFilters({
           <div>
             <Label className="text-sm font-semibold">Categories</Label>
             <div className="flex flex-wrap gap-2 mt-2">
-              {CATEGORIES.map(({ value, label, icon }) => (
+              {allCategories.map((config) => (
                 <button
-                  key={value}
-                  onClick={() => toggleCategory(value)}
+                  key={config.category}
+                  onClick={() => toggleCategory(config.category)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm transition-colors ${
-                    localFilters.categories.includes(value)
+                    localFilters.categories.includes(config.category)
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground'
                   }`}
                 >
-                  <span>{icon}</span>
-                  {label}
+                  <span>{config.icon}</span>
+                  {config.displayName}
                 </button>
               ))}
             </div>

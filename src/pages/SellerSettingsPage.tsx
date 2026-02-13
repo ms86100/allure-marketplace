@@ -12,9 +12,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { ImageUpload } from '@/components/ui/image-upload';
 import { useAuth } from '@/contexts/AuthContext';
-import { SellerProfile, CATEGORIES, ProductCategory, DAYS_OF_WEEK } from '@/types/database';
+import { SellerProfile, ProductCategory, DAYS_OF_WEEK } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
-import { PARENT_GROUPS, ParentGroup, ServiceCategory } from '@/types/categories';
+import { useParentGroups } from '@/hooks/useParentGroups';
+import { ParentGroup, ServiceCategory } from '@/types/categories';
 import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,7 @@ import { cn } from '@/lib/utils';
 export default function SellerSettingsPage() {
   const { user, currentSellerId, sellerProfiles } = useAuth();
   const { groupedConfigs } = useCategoryConfigs();
+  const { getGroupBySlug } = useParentGroups();
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [primaryGroup, setPrimaryGroup] = useState<ParentGroup | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -338,13 +340,13 @@ export default function SellerSettingsPage() {
               <div className="flex items-center gap-3">
                 <div className={cn(
                   'w-12 h-12 rounded-xl flex items-center justify-center text-2xl',
-                  PARENT_GROUPS.find(g => g.value === primaryGroup)?.color
+                  getGroupBySlug(primaryGroup)?.color
                 )}>
-                  {PARENT_GROUPS.find(g => g.value === primaryGroup)?.icon}
+                  {getGroupBySlug(primaryGroup)?.icon}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Your seller category</p>
-                  <p className="font-semibold">{PARENT_GROUPS.find(g => g.value === primaryGroup)?.label}</p>
+                  <p className="font-semibold">{getGroupBySlug(primaryGroup)?.label}</p>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
@@ -355,9 +357,9 @@ export default function SellerSettingsPage() {
           )}
 
           <div className="space-y-3">
-            <Label>Categories * {primaryGroup && <span className="text-muted-foreground font-normal">(within {PARENT_GROUPS.find(g => g.value === primaryGroup)?.label})</span>}</Label>
+            <Label>Categories * {primaryGroup && <span className="text-muted-foreground font-normal">(within {getGroupBySlug(primaryGroup)?.label})</span>}</Label>
             <div className="grid grid-cols-2 gap-3">
-              {(primaryGroup ? groupedConfigs[primaryGroup] || [] : CATEGORIES.map(c => ({ category: c.value, displayName: c.label, icon: c.icon }))).map((config) => (
+              {(primaryGroup ? groupedConfigs[primaryGroup] || [] : []).map((config) => (
                 <label
                   key={config.category}
                   className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${

@@ -74,25 +74,7 @@ export interface CategoryConfig {
   isActive: boolean;
 }
 
-// Parent group display info
-export const PARENT_GROUPS: { 
-  value: ParentGroup; 
-  label: string; 
-  icon: string; 
-  color: string;
-  description: string;
-}[] = [
-  { value: 'food', label: 'Food & Groceries', icon: '🍲', color: 'bg-orange-100 text-orange-600', description: 'Homemade food, snacks & daily essentials' },
-  { value: 'classes', label: 'Classes & Learning', icon: '📚', color: 'bg-indigo-100 text-indigo-600', description: 'Yoga, dance, music, tuition & more' },
-  { value: 'services', label: 'Home Services', icon: '🛠️', color: 'bg-blue-100 text-blue-600', description: 'Electrician, plumber, repairs & help' },
-  { value: 'personal', label: 'Personal Care', icon: '💇', color: 'bg-pink-100 text-pink-600', description: 'Beauty, salon, tailoring & laundry' },
-  { value: 'professional', label: 'Professional Help', icon: '💼', color: 'bg-emerald-100 text-emerald-600', description: 'Tax, IT support & consultations' },
-  { value: 'rentals', label: 'Rentals', icon: '🚲', color: 'bg-teal-100 text-teal-600', description: 'Equipment, party supplies & more' },
-  { value: 'resale', label: 'Buy & Sell', icon: '📦', color: 'bg-amber-100 text-amber-600', description: 'Pre-owned furniture, electronics & items' },
-  { value: 'events', label: 'Events', icon: '🎉', color: 'bg-violet-100 text-violet-600', description: 'Catering, decoration & photography' },
-  { value: 'pets', label: 'Pet Services', icon: '🐕', color: 'bg-lime-100 text-lime-600', description: 'Pet food, grooming & sitting' },
-  { value: 'property', label: 'Property', icon: '🏢', color: 'bg-slate-100 text-slate-600', description: 'Flats for rent, roommates & parking' },
-];
+// PARENT_GROUPS constant removed - now fetched from database via useParentGroups hook
 
 // Default behavior flags for each parent group
 export const DEFAULT_GROUP_BEHAVIORS: Record<ParentGroup, CategoryBehavior> = {

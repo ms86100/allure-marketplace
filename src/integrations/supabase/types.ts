@@ -143,7 +143,15 @@ export type Database = {
           supports_cart?: boolean | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_category_config_parent_group"
+            columns: ["parent_group"]
+            isOneToOne: false
+            referencedRelation: "parent_groups"
+            referencedColumns: ["slug"]
+          },
+        ]
       }
       chat_messages: {
         Row: {
@@ -429,6 +437,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      parent_groups: {
+        Row: {
+          color: string
+          created_at: string
+          description: string
+          icon: string
+          id: string
+          is_active: boolean
+          name: string
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          slug: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          description?: string
+          icon?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       payment_records: {
         Row: {

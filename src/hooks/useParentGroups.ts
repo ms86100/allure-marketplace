@@ -1,0 +1,74 @@
+import { useState, useEffect, useMemo } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+
+export interface ParentGroupRow {
+  id: string;
+  slug: string;
+  name: string;
+  icon: string;
+  color: string;
+  description: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Convenience type matching the old PARENT_GROUPS constant shape
+export interface ParentGroupInfo {
+  value: string;
+  label: string;
+  icon: string;
+  color: string;
+  description: string;
+}
+
+export function useParentGroups() {
+  const [groups, setGroups] = useState<ParentGroupRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchGroups();
+  }, []);
+
+  const fetchGroups = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('parent_groups')
+        .select('*')
+        .order('sort_order');
+
+      if (error) throw error;
+      setGroups((data as ParentGroupRow[]) || []);
+    } catch (error) {
+      console.error('Error fetching parent groups:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Map to the same shape as the old PARENT_GROUPS constant for easy migration
+  const parentGroupInfos: ParentGroupInfo[] = useMemo(() => {
+    return groups.map((g) => ({
+      value: g.slug,
+      label: g.name,
+      icon: g.icon,
+      color: g.color,
+      description: g.description,
+    }));
+  }, [groups]);
+
+  // Find a single group by slug
+  const getGroupBySlug = (slug: string | null): ParentGroupInfo | undefined => {
+    if (!slug) return undefined;
+    return parentGroupInfos.find((g) => g.value === slug);
+  };
+
+  return {
+    groups,
+    parentGroupInfos,
+    isLoading,
+    refresh: fetchGroups,
+    getGroupBySlug,
+  };
+}

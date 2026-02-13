@@ -26,13 +26,15 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
-import { SellerProfile, Product, CATEGORIES, DAYS_OF_WEEK } from '@/types/database';
+import { SellerProfile, Product, DAYS_OF_WEEK } from '@/types/database';
+import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { ArrowLeft, Clock, MapPin, Phone, ShoppingCart, Star, Calendar, Flag } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SellerDetailPage() {
   const { id } = useParams();
   const { user } = useAuth();
+  const { configs: allCategoryConfigs } = useCategoryConfigs();
   const { items, totalAmount } = useCart();
   const [seller, setSeller] = useState<SellerProfile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -305,13 +307,13 @@ export default function SellerDetailPage() {
           {seller.categories.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3">
               {seller.categories.map((cat) => {
-                const categoryInfo = CATEGORIES.find((c) => c.value === cat);
+                const categoryInfo = allCategoryConfigs.find((c) => c.category === cat);
                 return (
                   <span
                     key={cat}
                     className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground"
                   >
-                    {categoryInfo?.icon} {categoryInfo?.label || cat}
+                    {categoryInfo?.icon} {categoryInfo?.displayName || cat}
                   </span>
                 );
               })}
@@ -334,7 +336,7 @@ export default function SellerDetailPage() {
             {categories.length > 2 && (
               <div className="flex gap-2 overflow-x-auto scrollbar-hide mb-4 -mx-4 px-4">
                 {categories.map((cat) => {
-                  const categoryInfo = CATEGORIES.find((c) => c.value === cat);
+                  const categoryInfo = allCategoryConfigs.find((c) => c.category === cat);
                   return (
                     <button
                       key={cat}
@@ -345,7 +347,7 @@ export default function SellerDetailPage() {
                           : 'bg-muted text-muted-foreground'
                       }`}
                     >
-                      {cat === 'all' ? 'All' : categoryInfo?.label || cat}
+                      {cat === 'all' ? 'All' : categoryInfo?.displayName || cat}
                     </button>
                   );
                 })}
