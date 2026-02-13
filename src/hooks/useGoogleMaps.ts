@@ -1,7 +1,7 @@
 /// <reference types="@types/google.maps" />
 import { useState, useEffect, useCallback } from 'react';
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyD0jI5Bm3ETEDxO42nDSMaKHltM1inw8vU';
+const GOOGLE_MAPS_API_KEY = 'AIzaSyC96Rzpof_eGJc-QycAw1aHXZ6rMx4bRvU';
 const SCRIPT_ID = 'google-maps-script';
 
 let loadPromise: Promise<void> | null = null;
