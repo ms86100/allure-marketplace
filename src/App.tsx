@@ -55,6 +55,9 @@ const BuilderDashboardPage = lazy(() => import("./pages/BuilderDashboardPage"));
 const VisitorManagementPage = lazy(() => import("./pages/VisitorManagementPage"));
 const PaymentMilestonesPage = lazy(() => import("./pages/PaymentMilestonesPage"));
 const InspectionChecklistPage = lazy(() => import("./pages/InspectionChecklistPage"));
+const DomesticHelpPage = lazy(() => import("./pages/DomesticHelpPage"));
+const ParcelManagementPage = lazy(() => import("./pages/ParcelManagementPage"));
+const GuardKioskPage = lazy(() => import("./pages/GuardKioskPage"));
 
 const queryClient = new QueryClient();
 
@@ -153,6 +156,9 @@ function AppRoutes() {
         <Route path="/visitors" element={<ProtectedRoute><VisitorManagementPage /></ProtectedRoute>} />
         <Route path="/payment-milestones" element={<ProtectedRoute><PaymentMilestonesPage /></ProtectedRoute>} />
         <Route path="/inspection" element={<ProtectedRoute><InspectionChecklistPage /></ProtectedRoute>} />
+        <Route path="/domestic-help" element={<ProtectedRoute><DomesticHelpPage /></ProtectedRoute>} />
+        <Route path="/parcels" element={<ProtectedRoute><ParcelManagementPage /></ProtectedRoute>} />
+        <Route path="/guard-kiosk" element={<ProtectedRoute><GuardKioskPage /></ProtectedRoute>} />
         <Route path="/become-seller" element={<ProtectedRoute><BecomeSellerPage /></ProtectedRoute>} />
         <Route path="/seller" element={<ProtectedRoute><SellerDashboardPage /></ProtectedRoute>} />
         <Route path="/seller/products" element={<ProtectedRoute><SellerProductsPage /></ProtectedRoute>} />

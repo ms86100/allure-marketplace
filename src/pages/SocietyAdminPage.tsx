@@ -26,6 +26,13 @@ const FEATURE_LABELS: Record<FeatureKey, { label: string; description: string }>
   construction_progress: { label: 'Construction Progress', description: 'Builder updates & milestones' },
   snag_management: { label: 'Snag Management', description: 'Report construction defects' },
   help_requests: { label: 'Help Requests', description: 'Community help board' },
+  visitor_management: { label: 'Visitor Management', description: 'Gate entry with OTP verification' },
+  domestic_help: { label: 'Domestic Help', description: 'Maid/cook/driver attendance tracking' },
+  parcel_management: { label: 'Parcel Management', description: 'Delivery logging & collection' },
+  inspection: { label: 'Pre-Handover Inspection', description: 'Digital inspection checklist' },
+  payment_milestones: { label: 'Payment Milestones', description: 'Construction-linked payment tracker' },
+  maintenance: { label: 'Maintenance Dues', description: 'Monthly maintenance payment tracking' },
+  guard_kiosk: { label: 'Guard Kiosk', description: 'Gate security OTP verification panel' },
 };
 
 export default function SocietyAdminPage() {

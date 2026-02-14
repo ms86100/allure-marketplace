@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { 
   IndianRupee, Building2, Bug, ShieldAlert, FileText, 
   MessageCircle, Radio, ChevronRight, CreditCard, Clock, BarChart3, Shield,
-  Users, ClipboardCheck, Landmark
+  Users, ClipboardCheck, Landmark, Package, UserCheck, ShieldCheck
 } from 'lucide-react';
 
 interface DashboardStat {
@@ -96,6 +96,8 @@ export default function SocietyDashboardPage() {
 
   const cards: DashboardStat[] = [
     { icon: Users, label: 'Visitors', to: '/visitors', stat: 'Gate Management', color: 'text-primary' },
+    { icon: UserCheck, label: 'Domestic Help', to: '/domestic-help', stat: 'Attendance tracking', color: 'text-primary' },
+    { icon: Package, label: 'Parcels', to: '/parcels', stat: 'Delivery tracking', color: 'text-warning' },
     { icon: IndianRupee, label: 'Finances', to: '/society/finances', stat: `${stats.recentExpenses} this month`, color: 'text-warning' },
     { icon: Landmark, label: 'Payment Schedule', to: '/payment-milestones', stat: 'Track milestones', color: 'text-info' },
     { icon: Building2, label: 'Construction', to: '/society/progress', stat: `${stats.recentMilestones} updates this week`, color: 'text-primary' },
@@ -105,7 +107,10 @@ export default function SocietyDashboardPage() {
     { icon: FileText, label: 'Documents', to: '/society/progress', stat: `${stats.documents} uploaded`, color: 'text-info' },
     { icon: MessageCircle, label: 'Q&A', to: '/society/progress', stat: `${stats.unansweredQs} unanswered`, color: 'text-primary' },
     { icon: CreditCard, label: 'Maintenance', to: '/maintenance', stat: stats.pendingDues > 0 ? `${stats.pendingDues} pending` : 'All clear', color: 'text-success' },
-    ...(isSocietyAdmin ? [{ icon: Shield, label: 'Society Admin', to: '/society/admin', stat: 'Manage society', color: 'text-info' } as DashboardStat] : []),
+    ...(isSocietyAdmin ? [
+      { icon: ShieldCheck, label: 'Guard Kiosk', to: '/guard-kiosk', stat: 'Verify visitor OTPs', color: 'text-success' } as DashboardStat,
+      { icon: Shield, label: 'Society Admin', to: '/society/admin', stat: 'Manage society', color: 'text-info' } as DashboardStat,
+    ] : []),
     ...(isAdmin ? [{ icon: Radio, label: 'Platform Admin', to: '/admin', stat: 'Global admin', color: 'text-destructive', adminOnly: true } as DashboardStat] : []),
   ];
 

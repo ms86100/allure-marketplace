@@ -9,7 +9,14 @@ export type FeatureKey =
   | 'finances'
   | 'construction_progress'
   | 'snag_management'
-  | 'help_requests';
+  | 'help_requests'
+  | 'visitor_management'
+  | 'domestic_help'
+  | 'parcel_management'
+  | 'inspection'
+  | 'payment_milestones'
+  | 'maintenance'
+  | 'guard_kiosk';
 
 interface SocietyFeature {
   id: string;

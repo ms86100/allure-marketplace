@@ -945,6 +945,118 @@ export type Database = {
           },
         ]
       }
+      domestic_help_attendance: {
+        Row: {
+          check_in_at: string
+          check_out_at: string | null
+          created_at: string
+          date: string
+          help_entry_id: string
+          id: string
+          marked_by: string
+          society_id: string
+        }
+        Insert: {
+          check_in_at?: string
+          check_out_at?: string | null
+          created_at?: string
+          date?: string
+          help_entry_id: string
+          id?: string
+          marked_by: string
+          society_id: string
+        }
+        Update: {
+          check_in_at?: string
+          check_out_at?: string | null
+          created_at?: string
+          date?: string
+          help_entry_id?: string
+          id?: string
+          marked_by?: string
+          society_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "domestic_help_attendance_help_entry_id_fkey"
+            columns: ["help_entry_id"]
+            isOneToOne: false
+            referencedRelation: "domestic_help_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "domestic_help_attendance_marked_by_fkey"
+            columns: ["marked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "domestic_help_attendance_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      domestic_help_entries: {
+        Row: {
+          created_at: string
+          flat_number: string | null
+          help_name: string
+          help_phone: string | null
+          help_type: string
+          id: string
+          is_active: boolean
+          photo_url: string | null
+          resident_id: string
+          society_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          flat_number?: string | null
+          help_name: string
+          help_phone?: string | null
+          help_type?: string
+          id?: string
+          is_active?: boolean
+          photo_url?: string | null
+          resident_id: string
+          society_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          flat_number?: string | null
+          help_name?: string
+          help_phone?: string | null
+          help_type?: string
+          id?: string
+          is_active?: boolean
+          photo_url?: string | null
+          resident_id?: string
+          society_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "domestic_help_entries_resident_id_fkey"
+            columns: ["resident_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "domestic_help_entries_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       emergency_broadcasts: {
         Row: {
           body: string
@@ -1759,6 +1871,75 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      parcel_entries: {
+        Row: {
+          collected_at: string | null
+          collected_by: string | null
+          courier_name: string | null
+          created_at: string
+          description: string | null
+          flat_number: string | null
+          id: string
+          notified_at: string | null
+          photo_url: string | null
+          received_at: string
+          resident_id: string
+          society_id: string
+          status: string
+          tracking_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          collected_at?: string | null
+          collected_by?: string | null
+          courier_name?: string | null
+          created_at?: string
+          description?: string | null
+          flat_number?: string | null
+          id?: string
+          notified_at?: string | null
+          photo_url?: string | null
+          received_at?: string
+          resident_id: string
+          society_id: string
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          collected_at?: string | null
+          collected_by?: string | null
+          courier_name?: string | null
+          created_at?: string
+          description?: string | null
+          flat_number?: string | null
+          id?: string
+          notified_at?: string | null
+          photo_url?: string | null
+          received_at?: string
+          resident_id?: string
+          society_id?: string
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parcel_entries_resident_id_fkey"
+            columns: ["resident_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parcel_entries_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       parent_groups: {
         Row: {
