@@ -39,6 +39,8 @@ import HelpPage from "./pages/HelpPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import CommunityRulesPage from "./pages/CommunityRulesPage";
 import BulletinPage from "./pages/BulletinPage";
+import MySubscriptionsPage from "./pages/MySubscriptionsPage";
+import TrustDirectoryPage from "./pages/TrustDirectoryPage";
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -109,6 +111,8 @@ function AppRoutes() {
       <Route path="/orders/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
+      <Route path="/subscriptions" element={<ProtectedRoute><MySubscriptionsPage /></ProtectedRoute>} />
+      <Route path="/directory" element={<ProtectedRoute><TrustDirectoryPage /></ProtectedRoute>} />
       <Route path="/become-seller" element={<ProtectedRoute><BecomeSellerPage /></ProtectedRoute>} />
       <Route path="/seller" element={<ProtectedRoute><SellerDashboardPage /></ProtectedRoute>} />
       <Route path="/seller/products" element={<ProtectedRoute><SellerProductsPage /></ProtectedRoute>} />

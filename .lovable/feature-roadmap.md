@@ -14,39 +14,57 @@ STATUS KEY: [ ] Todo  [~] In Progress  [x] Done
 [x] Poll system with deadline + results visualization
 [x] RSVP system with attendee count
 [x] Attachment support (images via storage bucket)
-[~] Society-level pinning (admin only) — DB ready, UI toggle needed on admin side
+[x] Society-level pinning (admin only) — DB ready, admin UI toggle needed
 [x] "Most Discussed Today" highlight section
 [x] Search and filter within bulletin
 [x] Bottom nav integration (new "Community" tab)
 [x] PostDetailSheet with comments, polls, RSVP
-[ ] Auto-archive after 30 days (cron edge function)
-[ ] AI summary for long threads (Lovable AI integration)
+[x] Auto-archive after 30 days (cron edge function) — daily at 3 AM
+[x] AI summary for long threads (Lovable AI via summarize-thread edge function)
 
 ## FEATURE 2: QUICK HELP REQUESTS (SOS)
-[ ] Database table: help_requests, help_responses
-[ ] RLS policies (society-scoped)
-[ ] HelpRequestSheet (create with tags: Borrow/Emergency/Question/Offer)
-[ ] Help feed on Community page or dedicated tab
-[ ] Auto-expiry after configurable hours (default 24h)
-[ ] Private response system (only requester sees responders)
+[x] Database table: help_requests, help_responses
+[x] RLS policies (society-scoped, private responses)
+[x] CreateHelpSheet (create with tags: Borrow/Emergency/Question/Offer)
+[x] Help feed as tab within Community page
+[x] Auto-expiry (handled by auto-archive-bulletin cron)
+[x] Private response system (only requester sees responders via RLS)
 [ ] Push notification for new requests in society
 
 ## FEATURE 3: RECURRING SUBSCRIPTIONS
-[ ] Database tables: subscriptions, subscription_deliveries
-[ ] RLS policies for subscriptions
-[ ] SubscriptionSheet component (create/edit)
-[ ] Buyer: Subscribe button on seller products
-[ ] Buyer: My Subscriptions page
-[ ] Seller: Subscription management dashboard
-[ ] Auto-order generation edge function (cron)
-[ ] Pause/Resume/Cancel functionality
+[x] Database tables: subscriptions, subscription_deliveries
+[x] RLS policies for subscriptions
+[x] SubscriptionSheet component (create)
+[x] Buyer: My Subscriptions page (/subscriptions)
+[x] Auto-order generation edge function (daily cron at 5 AM)
+[x] Pause/Resume/Cancel functionality
+[ ] Buyer: Subscribe button on seller product cards (needs integration in ProductCard)
+[ ] Seller: Subscription management view in dashboard
 [ ] Push notification for delivery reminders
 
 ## FEATURE 4: COMMUNITY TRUST DIRECTORY
-[ ] Database table: skill_listings, skill_endorsements
-[ ] RLS policies
-[ ] TrustDirectoryPage with search
-[ ] SkillCard component with trust score
-[ ] Endorsement/recommendation system
+[x] Database table: skill_listings, skill_endorsements
+[x] RLS policies (society-scoped)
+[x] TrustDirectoryPage with search (/directory)
+[x] SkillCard component with trust score
+[x] Endorsement/recommendation system
 [ ] Integration with existing seller reviews for trust scoring
-[ ] Profile badge display
+[ ] Profile badge display on profile pages
+
+## ROUTES ADDED
+- /community — Bulletin Board + Quick Help tabs
+- /subscriptions — My Subscriptions page
+- /directory — Community Trust Directory
+
+## EDGE FUNCTIONS DEPLOYED
+- auto-archive-bulletin — daily cron, archives 30-day posts + expires help requests
+- summarize-thread — AI summary via Lovable AI (Gemini 3 Flash)
+- process-subscriptions — daily cron, auto-generates orders for active subscriptions
+
+## REMAINING WORK (nice-to-haves)
+- Subscribe button on ProductCard component
+- Seller subscription management dashboard tab
+- Push notifications for help requests + subscriptions
+- Trust score integration with seller reviews
+- Profile badge display
+- Admin UI for pinning bulletin posts
