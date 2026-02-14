@@ -3,40 +3,51 @@ import type { CapacitorConfig } from '@capacitor/cli';
 /**
  * Capacitor Configuration for Sociva App
  * 
- * IMPORTANT: Build Configuration
+ * Environment-aware: automatically switches between dev and production modes.
  * 
- * For DEVELOPMENT (live reload from Lovable):
- * - Keep the `server` block as-is below
- * - This enables hot-reload directly from the sandbox
+ * DEVELOPMENT (default in Lovable / local dev):
+ *   - Live reload from sandbox URL
+ *   - Mixed content allowed for local testing
  * 
- * For PRODUCTION (App Store / Play Store submission):
- * 1. Comment out or remove the entire `server` block
- * 2. Run `npm run build` to generate the dist folder
- * 3. Run `npx cap sync` to copy web assets to native projects
- * 4. Build the native apps in Xcode/Android Studio
+ * PRODUCTION (set CAPACITOR_ENV=production before `npx cap sync`):
+ *   - Loads from bundled local assets (no server block)
+ *   - Mixed content blocked
+ *   - WebView debugging disabled
  * 
- * The app will use local assets from the `dist` folder when
- * the server block is removed.
- * 
- * DEEP LINKING SETUP:
- * - iOS: Replace TEAM_ID in public/.well-known/apple-app-site-association with your Apple Team ID
- * - Android: Replace SHA256_FINGERPRINT_PLACEHOLDER in public/.well-known/assetlinks.json
- *   with your app's signing certificate SHA256 fingerprint
+ * DEEP LINKING:
+ *   - iOS: Replace TEAM_ID in public/.well-known/apple-app-site-association
+ *   - Android: Replace SHA256_FINGERPRINT_PLACEHOLDER in public/.well-known/assetlinks.json
  */
+
+const isProduction = process.env.CAPACITOR_ENV === 'production';
 
 const config: CapacitorConfig = {
   appId: 'app.sociva.community',
   appName: 'Sociva',
   webDir: 'dist',
-  
-  // DEVELOPMENT: Live reload from Lovable sandbox
-  // PRODUCTION: Comment out this entire server block before building for app stores
-  server: {
-    url: 'https://b3f6efce-9b8e-4071-b39d-b038b9b1adf4.lovableproject.com?forceHideBadge=true',
-    cleartext: true,
-    hostname: 'sociva.app',
-  },
-  
+
+  // Development: live reload from Lovable sandbox
+  // Production: omitted — loads from bundled assets
+  ...(!isProduction && {
+    server: {
+      url: 'https://b3f6efce-9b8e-4071-b39d-b038b9b1adf4.lovableproject.com?forceHideBadge=true',
+      cleartext: true,
+      hostname: 'sociva.app',
+      androidScheme: 'https',
+    },
+  }),
+
+  // Restrict WebView navigation in production
+  ...(isProduction && {
+    server: {
+      androidScheme: 'https',
+      allowNavigation: [
+        'rvvctaikytfeyzkwoqxg.supabase.co',
+        'block-eats.lovable.app',
+      ],
+    },
+  }),
+
   plugins: {
     SplashScreen: {
       launchShowDuration: 2000,
@@ -58,18 +69,19 @@ const config: CapacitorConfig = {
       resizeOnFullScreen: true,
     },
   },
-  
+
   // iOS-specific configuration
   ios: {
     scheme: 'sociva',
     contentInset: 'automatic',
+    preferredContentMode: 'mobile',
   },
-  
+
   // Android-specific configuration
   android: {
-    allowMixedContent: true,
+    allowMixedContent: !isProduction,
     captureInput: true,
-    webContentsDebuggingEnabled: false,
+    webContentsDebuggingEnabled: !isProduction,
   },
 };
 

@@ -55,8 +55,8 @@ If you don't have one, create it:
 
 ```bash
 keytool -genkey -v \
-  -keystore greenfield-release.keystore \
-  -alias greenfield \
+  -keystore sociva-release.keystore \
+  -alias sociva \
   -keyalg RSA \
   -keysize 2048 \
   -validity 10000
@@ -66,7 +66,7 @@ keytool -genkey -v \
 
 1. Go to **Teams** → **Code signing identities** → **Android keystores**
 2. Click **Add keystore**
-3. Reference name: `greenfield_keystore`
+3. Reference name: `sociva_keystore`
 4. Upload your `.keystore` file
 5. Enter keystore password, key alias, and key password
 
@@ -127,7 +127,7 @@ triggering:
 - [ ] GitHub repo connected to Codemagic
 - [ ] App Store Connect API key added
 - [ ] iOS code signing configured (or automatic enabled)
-- [ ] Android keystore uploaded as `greenfield_keystore`
+- [ ] Android keystore uploaded as `sociva_keystore`
 - [ ] Google Play service account JSON added
 - [ ] Firebase config files added (GoogleService-Info.plist, google-services.json)
 
@@ -159,7 +159,7 @@ A typical full release build uses ~30 minutes = ~$1.14
 → Enable automatic code signing in Codemagic, or manually add profiles
 
 ### "Keystore not found"
-→ Check the reference name matches `greenfield_keystore` exactly
+→ Check the reference name matches `sociva_keystore` exactly
 
 ### "Google Play upload failed"
 → Ensure the service account has permission to manage your app in Play Console

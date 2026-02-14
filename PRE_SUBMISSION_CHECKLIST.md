@@ -1,6 +1,6 @@
 # Pre-Submission Checklist
 
-**Bundle ID:** `app.greenfield.community`
+**Bundle ID:** `app.sociva.community`
 
 All code work is complete. Follow these steps to submit to app stores.
 
@@ -10,12 +10,14 @@ All code work is complete. Follow these steps to submit to app stores.
 
 - [x] Push notification backend (FCM HTTP v1)
 - [x] `FIREBASE_SERVICE_ACCOUNT` secret configured
-- [x] Deep linking handler
+- [x] Deep linking handler (`sociva://` custom scheme)
 - [x] App icons (1024x1024 iOS, 512x512 Android)
 - [x] Feature graphic (1024x500)
-- [x] Demo account for reviewers (`demo@blockeats.app` / `DemoReview2026!`)
 - [x] Privacy Policy & Terms pages
 - [x] Account deletion feature
+- [x] Safe area CSS for notch devices
+- [x] Production build optimizations (minify, tree-shake, console strip)
+- [x] Environment-aware Capacitor config (single file)
 
 ---
 
@@ -28,6 +30,10 @@ All code work is complete. Follow these steps to submit to app stores.
 git clone <your-repo-url>
 cd <project-folder>
 npm install
+
+# Set production mode for Capacitor
+export CAPACITOR_ENV=production
+
 npx cap add ios
 npx cap add android
 npm run build
@@ -76,10 +82,10 @@ Download platform config files from your Firebase project:
 
 ```bash
 # Create keystore (first time only)
-keytool -genkey -v -keystore greenfield-release.keystore -alias greenfield -keyalg RSA -keysize 2048 -validity 10000
+keytool -genkey -v -keystore sociva-release.keystore -alias sociva -keyalg RSA -keysize 2048 -validity 10000
 
 # Get SHA-256 fingerprint
-keytool -list -v -keystore greenfield-release.keystore -alias greenfield
+keytool -list -v -keystore sociva-release.keystore -alias sociva
 ```
 
 Copy the SHA-256 fingerprint and replace `SHA256_FINGERPRINT_PLACEHOLDER` in:
@@ -106,10 +112,10 @@ npx cap open android
 ## 📱 Test Before Submitting
 
 - [ ] App launches without crash
-- [ ] Login with demo account works
+- [ ] Login works
 - [ ] Push notification received on device
 - [ ] Tapping notification opens correct screen
-- [ ] Deep link opens app (`greenfield://orders`)
+- [ ] Deep link opens app (`sociva://orders`)
 
 ---
 

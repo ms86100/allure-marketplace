@@ -1,4 +1,4 @@
-# Codemagic CI/CD Configuration for Greenfield Community
+# Codemagic CI/CD Configuration for Sociva
 # Builds iOS and Android apps in the cloud - no Mac required!
 #
 # Setup Instructions:
@@ -13,27 +13,26 @@ workflows:
     instance_type: mac_mini_m2
     
     integrations:
-      app_store_connect: Greenfield App Store Connect
+      app_store_connect: Sociva App Store Connect
     
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: app.greenfield.community
+        bundle_identifier: app.sociva.community
       vars:
-        BUNDLE_ID: "app.greenfield.community"
-        APP_NAME: "Greenfield Community"
+        BUNDLE_ID: "app.sociva.community"
+        APP_NAME: "Sociva"
+        CAPACITOR_ENV: "production"
       node: 18
       xcode: latest
       cocoapods: default
     
     scripts:
       - name: Install dependencies
-        script: |
-          npm install
+        script: npm install
           
       - name: Build web app
-        script: |
-          npm run build
+        script: npm run build
           
       - name: Add iOS platform
         script: |
@@ -46,13 +45,10 @@ workflows:
           sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = .*;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" App.xcodeproj/project.pbxproj
           
       - name: Install CocoaPods dependencies
-        script: |
-          cd ios/App
-          pod install
+        script: cd ios/App && pod install
           
       - name: Set up code signing
-        script: |
-          xcode-project use-profiles
+        script: xcode-project use-profiles
           
       - name: Build iOS app
         script: |
@@ -80,23 +76,22 @@ workflows:
     
     environment:
       android_signing:
-        - greenfield_keystore
+        - sociva_keystore
       groups:
         - google_play
       vars:
-        BUNDLE_ID: "app.greenfield.community"
-        APP_NAME: "Greenfield Community"
+        BUNDLE_ID: "app.sociva.community"
+        APP_NAME: "Sociva"
+        CAPACITOR_ENV: "production"
       node: 18
       java: 17
     
     scripts:
       - name: Install dependencies
-        script: |
-          npm install
+        script: npm install
           
       - name: Build web app
-        script: |
-          npm run build
+        script: npm run build
           
       - name: Add Android platform
         script: |
@@ -104,13 +99,10 @@ workflows:
           npx cap sync android
           
       - name: Set Android SDK location
-        script: |
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
+        script: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           
       - name: Build Android release bundle
-        script: |
-          cd android
-          ./gradlew bundleRelease
+        script: cd android && ./gradlew bundleRelease
     
     artifacts:
       - android/app/build/outputs/**/*.aab
@@ -122,26 +114,26 @@ workflows:
         track: internal
         submit_as_draft: true
 
-  # Combined workflow for both platforms
   release-all:
     name: Release All Platforms
     max_build_duration: 90
     instance_type: mac_mini_m2
     
     integrations:
-      app_store_connect: Greenfield App Store Connect
+      app_store_connect: Sociva App Store Connect
     
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: app.greenfield.community
+        bundle_identifier: app.sociva.community
       android_signing:
-        - greenfield_keystore
+        - sociva_keystore
       groups:
         - google_play
       vars:
-        BUNDLE_ID: "app.greenfield.community"
-        APP_NAME: "Greenfield Community"
+        BUNDLE_ID: "app.sociva.community"
+        APP_NAME: "Sociva"
+        CAPACITOR_ENV: "production"
       node: 18
       xcode: latest
       cocoapods: default
@@ -149,12 +141,10 @@ workflows:
     
     scripts:
       - name: Install dependencies
-        script: |
-          npm install
+        script: npm install
           
       - name: Build web app
-        script: |
-          npm run build
+        script: npm run build
           
       - name: Add iOS platform
         script: |
@@ -162,12 +152,10 @@ workflows:
           npx cap sync ios
           
       - name: Install CocoaPods
-        script: |
-          cd ios/App && pod install
+        script: cd ios/App && pod install
           
       - name: Set up iOS code signing
-        script: |
-          xcode-project use-profiles
+        script: xcode-project use-profiles
           
       - name: Build iOS IPA
         script: |
@@ -176,19 +164,17 @@ workflows:
             --workspace "App.xcworkspace" \
             --scheme "App" \
             --config "Release"
-            
+             
       - name: Add Android platform
         script: |
           npx cap add android || true
           npx cap sync android
           
       - name: Set Android SDK
-        script: |
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
+        script: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           
       - name: Build Android AAB
-        script: |
-          cd android && ./gradlew bundleRelease
+        script: cd android && ./gradlew bundleRelease
     
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
