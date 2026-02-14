@@ -291,6 +291,10 @@ Deno.serve(async (req) => {
         }).select('id').single();
 
         if (entryError) {
+          // UNIQUE constraint on nonce catches race condition
+          if (entryError.code === '23505' && payload.nonce) {
+            return new Response(JSON.stringify({ valid: false, error: 'Token already used' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
           console.error('Entry insert error:', entryError);
           return new Response(JSON.stringify({ valid: false, error: 'Failed to create entry' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
@@ -321,7 +325,7 @@ Deno.serve(async (req) => {
 
       } else {
         // Basic mode: immediate validation
-        await serviceClient.from('gate_entries').insert({
+        const { error: basicErr } = await serviceClient.from('gate_entries').insert({
           user_id: payload.uid,
           society_id: payload.sid,
           entry_type: 'qr_verified',
@@ -331,6 +335,10 @@ Deno.serve(async (req) => {
           confirmation_status: 'not_required',
           notes: payload.nonce ? `nonce:${payload.nonce}` : null,
         });
+
+        if (basicErr?.code === '23505' && payload.nonce) {
+          return new Response(JSON.stringify({ valid: false, error: 'Token already used' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
 
         return new Response(JSON.stringify({
           valid: true,
