@@ -163,6 +163,26 @@ export default function SecurityVerifyPage() {
     if (!flatInput.trim() || !nameInput.trim() || !effectiveSocietyId) return;
 
     try {
+      // GA BLOCKER 3: Rate limit manual entry via edge function
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error('Please log in'); return; }
+
+      const rlResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gate-token?action=rate_check_manual`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        }
+      );
+      if (rlResponse.status === 429) {
+        toast.error('Too many requests. Please wait before trying again.');
+        return;
+      }
+
       const { data: resident } = await supabase
         .from('profiles')
         .select('id, name')

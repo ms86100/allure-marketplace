@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,28 @@ export function ResidentConfirmation() {
   const { profile, effectiveSocietyId } = useAuth();
   const [pending, setPending] = useState<PendingConfirmation[]>([]);
   const [timeLeftMap, setTimeLeftMap] = useState<Record<string, number>>({});
+  const fetchingRef = useRef(false);
 
+  const fetchPending = async () => {
+    if (!profile?.id || fetchingRef.current) return;
+    fetchingRef.current = true;
+    try {
+      const { data } = await supabase
+        .from('gate_entries')
+        .select('id, entry_time, confirmation_expires_at, confirmation_status')
+        .eq('user_id', profile.id)
+        .eq('awaiting_confirmation', true)
+        .eq('confirmation_status', 'pending')
+        .gt('confirmation_expires_at', new Date().toISOString())
+        .order('entry_time', { ascending: false })
+        .limit(5);
+      setPending((data as PendingConfirmation[]) || []);
+    } finally {
+      fetchingRef.current = false;
+    }
+  };
+
+  // Realtime subscription
   useEffect(() => {
     if (!profile?.id || !effectiveSocietyId) return;
     fetchPending();
@@ -40,6 +61,17 @@ export function ResidentConfirmation() {
     return () => { supabase.removeChannel(channel); };
   }, [profile?.id, effectiveSocietyId]);
 
+  // GA BLOCKER 1: Fallback polling every 5 seconds while pending entries exist
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const pollInterval = setInterval(() => {
+      fetchPending();
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
+  }, [profile?.id]);
+
   // Countdown timer for all pending entries
   useEffect(() => {
     if (pending.length === 0) return;
@@ -59,20 +91,6 @@ export function ResidentConfirmation() {
     return () => clearInterval(interval);
   }, [pending]);
 
-  const fetchPending = async () => {
-    if (!profile?.id) return;
-    const { data } = await supabase
-      .from('gate_entries')
-      .select('id, entry_time, confirmation_expires_at, confirmation_status')
-      .eq('user_id', profile.id)
-      .eq('awaiting_confirmation', true)
-      .eq('confirmation_status', 'pending')
-      .gt('confirmation_expires_at', new Date().toISOString())
-      .order('entry_time', { ascending: false })
-      .limit(5);
-    setPending((data as PendingConfirmation[]) || []);
-  };
-
   const respond = async (entryId: string, approved: boolean) => {
     const now = new Date().toISOString();
     const { error } = await supabase
@@ -88,7 +106,13 @@ export function ResidentConfirmation() {
       .eq('user_id', profile?.id);
 
     if (error) {
-      toast.error('Failed to respond');
+      // RLS blocks updates after expiry — inform user
+      if (error.code === '42501' || error.message?.includes('row-level security')) {
+        toast.error('This entry has expired and can no longer be confirmed.');
+      } else {
+        toast.error('Failed to respond');
+      }
+      fetchPending();
       return;
     }
 

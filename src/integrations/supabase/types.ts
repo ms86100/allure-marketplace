@@ -1827,9 +1827,12 @@ export type Database = {
           body: string
           created_at: string
           id: string
+          last_error: string | null
+          next_retry_at: string | null
           payload: Json | null
           processed_at: string | null
           reference_path: string | null
+          retry_count: number
           status: string
           title: string
           type: string
@@ -1839,9 +1842,12 @@ export type Database = {
           body: string
           created_at?: string
           id?: string
+          last_error?: string | null
+          next_retry_at?: string | null
           payload?: Json | null
           processed_at?: string | null
           reference_path?: string | null
+          retry_count?: number
           status?: string
           title: string
           type?: string
@@ -1851,9 +1857,12 @@ export type Database = {
           body?: string
           created_at?: string
           id?: string
+          last_error?: string | null
+          next_retry_at?: string | null
           payload?: Json | null
           processed_at?: string | null
           reference_path?: string | null
+          retry_count?: number
           status?: string
           title?: string
           type?: string

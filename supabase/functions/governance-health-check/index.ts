@@ -157,6 +157,69 @@ Deno.serve(async (req) => {
       details: spikes,
     });
 
+    // GA BLOCKER 6: Security anomaly detection
+    const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+    const fiveMinAgo = new Date(Date.now() - 300000).toISOString();
+
+    // Check 5: High gate denial rate (>20% in last hour)
+    const { data: gateEntries1h } = await adminClient
+      .from("gate_entries")
+      .select("confirmation_status")
+      .gte("entry_time", oneHourAgo);
+
+    const totalEntries1h = (gateEntries1h || []).length;
+    const deniedEntries1h = (gateEntries1h || []).filter((e: any) => e.confirmation_status === 'denied').length;
+    const denialRate = totalEntries1h > 0 ? deniedEntries1h / totalEntries1h : 0;
+
+    report.checks.push({
+      name: "high_gate_denial_rate",
+      status: denialRate > 0.2 && totalEntries1h >= 5 ? "alert" : "pass",
+      threshold: "> 20% denial rate (min 5 entries)",
+      total_entries: totalEntries1h,
+      denied: deniedEntries1h,
+      denial_rate: Math.round(denialRate * 100) + "%",
+    });
+
+    // Check 6: Manual entry spam (>5 by same officer in 5 min)
+    const { data: manualEntries5m } = await adminClient
+      .from("manual_entry_requests")
+      .select("requested_by")
+      .gte("created_at", fiveMinAgo);
+
+    const manualCounts: Record<string, number> = {};
+    for (const row of manualEntries5m || []) {
+      if (row.requested_by) {
+        manualCounts[row.requested_by] = (manualCounts[row.requested_by] || 0) + 1;
+      }
+    }
+    const manualSpammers = Object.entries(manualCounts)
+      .filter(([, count]) => count > 5)
+      .map(([officerId, count]) => ({ officer_id: officerId, count }));
+
+    report.checks.push({
+      name: "manual_entry_spam",
+      status: manualSpammers.length > 0 ? "alert" : "pass",
+      threshold: "> 5 manual entries by same officer in 5 min",
+      count: manualSpammers.length,
+      details: manualSpammers,
+    });
+
+    // Check 7: Replay attempts (>3 in 5 min)
+    const { data: replayAttempts } = await adminClient
+      .from("audit_log")
+      .select("id")
+      .eq("action", "gate_token_replay_blocked")
+      .gte("created_at", fiveMinAgo);
+
+    const replayCount = (replayAttempts || []).length;
+
+    report.checks.push({
+      name: "qr_replay_attempts",
+      status: replayCount > 3 ? "alert" : "pass",
+      threshold: "> 3 replay attempts in 5 min",
+      count: replayCount,
+    });
+
     // Overall status
     report.overall = report.checks.every((c: any) => c.status === "pass") ? "healthy" : "alerts_found";
 

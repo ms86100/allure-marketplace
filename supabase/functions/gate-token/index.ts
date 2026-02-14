@@ -354,6 +354,14 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
+    } else if (action === 'rate_check_manual') {
+      // GA BLOCKER 3: Rate limit for manual entry — 20/min per user
+      const { allowed: manualAllowed } = await checkRateLimit(`manual-entry:${userId}`, 20, 60);
+      if (!manualAllowed) {
+        return rateLimitResponse(corsHeaders);
+      }
+      return new Response(JSON.stringify({ allowed: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
     } else {
       return new Response(JSON.stringify({ error: 'Invalid action' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }

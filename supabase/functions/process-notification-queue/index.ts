@@ -5,6 +5,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const MAX_RETRIES = 3;
+
+// Exponential backoff: 30s, 2min, 8min
+function getNextRetryAt(retryCount: number): string {
+  const delayMs = Math.pow(4, retryCount) * 30000;
+  return new Date(Date.now() + delayMs).toISOString();
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -15,11 +23,12 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch pending notifications (batch of 50)
+    // Fetch pending + retryable notifications (batch of 50)
+    const now = new Date().toISOString();
     const { data: pending, error: fetchError } = await supabase
       .from("notification_queue")
       .select("*")
-      .eq("status", "pending")
+      .or(`status.eq.pending,and(status.eq.retrying,next_retry_at.lte.${now})`)
       .order("created_at", { ascending: true })
       .limit(50);
 
@@ -32,7 +41,7 @@ Deno.serve(async (req) => {
     }
 
     if (!pending || pending.length === 0) {
-      return new Response(JSON.stringify({ processed: 0 }), {
+      return new Response(JSON.stringify({ processed: 0, retried: 0, dead_lettered: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -40,7 +49,8 @@ Deno.serve(async (req) => {
     console.log(`Processing ${pending.length} queued notifications`);
 
     let processed = 0;
-    let failed = 0;
+    let retried = 0;
+    let deadLettered = 0;
 
     for (const item of pending) {
       try {
@@ -56,9 +66,7 @@ Deno.serve(async (req) => {
           });
 
         if (insertError) {
-          console.error(`Failed to insert notification for ${item.id}:`, insertError);
-          failed++;
-          continue;
+          throw new Error(`DB insert failed: ${insertError.message}`);
         }
 
         // Try to send push notification
@@ -83,19 +91,42 @@ Deno.serve(async (req) => {
           .eq("id", item.id);
 
         processed++;
-      } catch (err) {
-        console.error(`Error processing notification ${item.id}:`, err);
-        // Mark as failed
-        await supabase
-          .from("notification_queue")
-          .update({ status: "failed", processed_at: new Date().toISOString() })
-          .eq("id", item.id);
-        failed++;
+      } catch (err: any) {
+        const currentRetry = (item.retry_count || 0) + 1;
+        const errorMsg = err?.message || String(err);
+
+        if (currentRetry >= MAX_RETRIES) {
+          // Dead-letter: max retries exceeded
+          await supabase
+            .from("notification_queue")
+            .update({
+              status: "failed",
+              processed_at: new Date().toISOString(),
+              retry_count: currentRetry,
+              last_error: errorMsg,
+            })
+            .eq("id", item.id);
+          deadLettered++;
+          console.error(`Dead-lettered notification ${item.id} after ${MAX_RETRIES} retries: ${errorMsg}`);
+        } else {
+          // Schedule retry with exponential backoff
+          await supabase
+            .from("notification_queue")
+            .update({
+              status: "retrying",
+              retry_count: currentRetry,
+              last_error: errorMsg,
+              next_retry_at: getNextRetryAt(currentRetry),
+            })
+            .eq("id", item.id);
+          retried++;
+          console.warn(`Scheduled retry ${currentRetry}/${MAX_RETRIES} for ${item.id}: ${errorMsg}`);
+        }
       }
     }
 
     return new Response(
-      JSON.stringify({ processed, failed, total: pending.length }),
+      JSON.stringify({ processed, retried, dead_lettered: deadLettered, total: pending.length }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
