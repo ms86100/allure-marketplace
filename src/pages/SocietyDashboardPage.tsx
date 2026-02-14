@@ -7,7 +7,8 @@ import { SocietyTrustBadge } from '@/components/trust/SocietyTrustBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   IndianRupee, Building2, Bug, ShieldAlert, FileText, 
-  MessageCircle, Radio, ChevronRight, CreditCard, Clock, BarChart3, Shield
+  MessageCircle, Radio, ChevronRight, CreditCard, Clock, BarChart3, Shield,
+  Users, ClipboardCheck, Landmark
 } from 'lucide-react';
 
 interface DashboardStat {
@@ -94,9 +95,12 @@ export default function SocietyDashboardPage() {
   };
 
   const cards: DashboardStat[] = [
+    { icon: Users, label: 'Visitors', to: '/visitors', stat: 'Gate Management', color: 'text-primary' },
     { icon: IndianRupee, label: 'Finances', to: '/society/finances', stat: `${stats.recentExpenses} this month`, color: 'text-warning' },
+    { icon: Landmark, label: 'Payment Schedule', to: '/payment-milestones', stat: 'Track milestones', color: 'text-info' },
     { icon: Building2, label: 'Construction', to: '/society/progress', stat: `${stats.recentMilestones} updates this week`, color: 'text-primary' },
     { icon: Bug, label: 'Snag Reports', to: '/society/snags', stat: `${stats.openSnags} open`, color: 'text-destructive' },
+    { icon: ClipboardCheck, label: 'Inspection', to: '/inspection', stat: 'Pre-handover check', color: 'text-success' },
     { icon: ShieldAlert, label: 'Disputes', to: '/disputes', stat: `${stats.openDisputes} open`, color: 'text-destructive' },
     { icon: FileText, label: 'Documents', to: '/society/progress', stat: `${stats.documents} uploaded`, color: 'text-info' },
     { icon: MessageCircle, label: 'Q&A', to: '/society/progress', stat: `${stats.unansweredQs} unanswered`, color: 'text-primary' },

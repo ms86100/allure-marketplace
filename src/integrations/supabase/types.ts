@@ -1236,6 +1236,138 @@ export type Database = {
           },
         ]
       }
+      inspection_checklists: {
+        Row: {
+          builder_acknowledged_at: string | null
+          created_at: string
+          failed_items: number
+          flat_number: string
+          id: string
+          inspection_date: string | null
+          notes: string | null
+          overall_score: number | null
+          passed_items: number
+          resident_id: string
+          society_id: string
+          status: string
+          submitted_at: string | null
+          total_items: number
+          tower_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          builder_acknowledged_at?: string | null
+          created_at?: string
+          failed_items?: number
+          flat_number: string
+          id?: string
+          inspection_date?: string | null
+          notes?: string | null
+          overall_score?: number | null
+          passed_items?: number
+          resident_id: string
+          society_id: string
+          status?: string
+          submitted_at?: string | null
+          total_items?: number
+          tower_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          builder_acknowledged_at?: string | null
+          created_at?: string
+          failed_items?: number
+          flat_number?: string
+          id?: string
+          inspection_date?: string | null
+          notes?: string | null
+          overall_score?: number | null
+          passed_items?: number
+          resident_id?: string
+          society_id?: string
+          status?: string
+          submitted_at?: string | null
+          total_items?: number
+          tower_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_checklists_resident_id_fkey"
+            columns: ["resident_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_checklists_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_checklists_tower_id_fkey"
+            columns: ["tower_id"]
+            isOneToOne: false
+            referencedRelation: "project_towers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inspection_items: {
+        Row: {
+          category: string
+          checklist_id: string
+          created_at: string
+          description: string | null
+          display_order: number | null
+          id: string
+          item_name: string
+          notes: string | null
+          photo_urls: string[] | null
+          severity: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          checklist_id: string
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          item_name: string
+          notes?: string | null
+          photo_urls?: string[] | null
+          severity?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          checklist_id?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          item_name?: string
+          notes?: string | null
+          photo_urls?: string[] | null
+          severity?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_items_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "inspection_checklists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       maintenance_dues: {
         Row: {
           amount: number
@@ -1678,6 +1810,83 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      payment_milestones: {
+        Row: {
+          amount_percentage: number
+          created_at: string
+          created_by: string
+          description: string | null
+          due_date: string | null
+          id: string
+          linked_milestone_id: string | null
+          milestone_stage: string
+          society_id: string
+          status: string
+          title: string
+          tower_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount_percentage?: number
+          created_at?: string
+          created_by: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          linked_milestone_id?: string | null
+          milestone_stage?: string
+          society_id: string
+          status?: string
+          title: string
+          tower_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount_percentage?: number
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          linked_milestone_id?: string | null
+          milestone_stage?: string
+          society_id?: string
+          status?: string
+          title?: string
+          tower_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_milestones_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_milestones_linked_milestone_id_fkey"
+            columns: ["linked_milestone_id"]
+            isOneToOne: false
+            referencedRelation: "construction_milestones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_milestones_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_milestones_tower_id_fkey"
+            columns: ["tower_id"]
+            isOneToOne: false
+            referencedRelation: "project_towers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payment_records: {
         Row: {
@@ -2155,6 +2364,73 @@ export type Database = {
             columns: ["reporter_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resident_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          milestone_id: string
+          notes: string | null
+          paid_at: string | null
+          payment_status: string
+          receipt_url: string | null
+          resident_id: string
+          society_id: string
+          transaction_reference: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          milestone_id: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_status?: string
+          receipt_url?: string | null
+          resident_id: string
+          society_id: string
+          transaction_reference?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          milestone_id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_status?: string
+          receipt_url?: string | null
+          resident_id?: string
+          society_id?: string
+          transaction_reference?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resident_payments_milestone_id_fkey"
+            columns: ["milestone_id"]
+            isOneToOne: false
+            referencedRelation: "payment_milestones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resident_payments_resident_id_fkey"
+            columns: ["resident_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resident_payments_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
             referencedColumns: ["id"]
           },
         ]
@@ -3195,6 +3471,99 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      visitor_entries: {
+        Row: {
+          checked_in_at: string | null
+          checked_out_at: string | null
+          created_at: string
+          expected_date: string | null
+          expected_time: string | null
+          flat_number: string | null
+          guard_notes: string | null
+          id: string
+          is_preapproved: boolean
+          is_recurring: boolean
+          otp_code: string | null
+          otp_expires_at: string | null
+          photo_url: string | null
+          purpose: string | null
+          recurring_days: string[] | null
+          resident_id: string
+          society_id: string
+          status: string
+          updated_at: string
+          vehicle_number: string | null
+          visitor_name: string
+          visitor_phone: string | null
+          visitor_type: string
+        }
+        Insert: {
+          checked_in_at?: string | null
+          checked_out_at?: string | null
+          created_at?: string
+          expected_date?: string | null
+          expected_time?: string | null
+          flat_number?: string | null
+          guard_notes?: string | null
+          id?: string
+          is_preapproved?: boolean
+          is_recurring?: boolean
+          otp_code?: string | null
+          otp_expires_at?: string | null
+          photo_url?: string | null
+          purpose?: string | null
+          recurring_days?: string[] | null
+          resident_id: string
+          society_id: string
+          status?: string
+          updated_at?: string
+          vehicle_number?: string | null
+          visitor_name: string
+          visitor_phone?: string | null
+          visitor_type?: string
+        }
+        Update: {
+          checked_in_at?: string | null
+          checked_out_at?: string | null
+          created_at?: string
+          expected_date?: string | null
+          expected_time?: string | null
+          flat_number?: string | null
+          guard_notes?: string | null
+          id?: string
+          is_preapproved?: boolean
+          is_recurring?: boolean
+          otp_code?: string | null
+          otp_expires_at?: string | null
+          photo_url?: string | null
+          purpose?: string | null
+          recurring_days?: string[] | null
+          resident_id?: string
+          society_id?: string
+          status?: string
+          updated_at?: string
+          vehicle_number?: string | null
+          visitor_name?: string
+          visitor_phone?: string | null
+          visitor_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visitor_entries_resident_id_fkey"
+            columns: ["resident_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visitor_entries_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       warnings: {
         Row: {

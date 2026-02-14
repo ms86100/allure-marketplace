@@ -309,6 +309,66 @@ Repositioning Sociva from a community marketplace app to **the default trust and
 
 ---
 
+## Phase 7: Visitor Management System
+
+**Status: Implemented**
+
+### Required Changes
+- New table: `visitor_entries` with society-scoped RLS
+- Features: pre-approved guests with OTP, check-in/check-out tracking, vehicle logging, visitor type classification
+- Page: `/visitors` — today/upcoming/history tabs
+- Integrated into Society Dashboard grid
+
+### RLS Impact
+- 4 policies: SELECT (own + society admin), INSERT (own), UPDATE (own + admin), DELETE (own)
+- Composite indexes on `(society_id, status)`, `(resident_id, status)`, partial index on `otp_code`
+
+### Scalability Risk: LOW
+- Queries scoped to resident_id — O(index scan)
+
+---
+
+## Phase 8: Payment Milestone Tracker
+
+**Status: Implemented**
+
+### Required Changes
+- New tables: `payment_milestones` (society-wide schedule), `resident_payments` (per-resident tracking)
+- Timeline view grouped by construction stage (booking → possession)
+- Progress bar showing paid vs total percentage
+- Linked to construction milestones
+- Page: `/payment-milestones`
+
+### RLS Impact
+- `payment_milestones`: SELECT (society members), INSERT/UPDATE/DELETE (admins)
+- `resident_payments`: SELECT (own + admin), INSERT (admin + own), UPDATE (own + admin)
+
+### Scalability Risk: LOW
+- Small dataset per society (6-10 milestones max)
+
+---
+
+## Phase 9: Pre-Handover Inspection Checklist
+
+**Status: Implemented**
+
+### Required Changes
+- New tables: `inspection_checklists` (per-flat), `inspection_items` (70+ items with pass/fail/na status)
+- 8 categories: electrical, plumbing, civil, painting, doors/windows, kitchen, bathroom, flooring
+- Pre-populated with 70+ standard Indian real estate inspection items
+- Severity tracking (minor/major/critical), notes for failed items
+- Submit to builder workflow
+- Page: `/inspection`
+
+### RLS Impact
+- Checklists: SELECT (own + admin), INSERT (own), UPDATE (own + admin)
+- Items: all operations gated through parent checklist ownership
+
+### Scalability Risk: LOW
+- One checklist per flat per possession cycle
+
+---
+
 ## Final Readiness Score
 
 | Category | Score | Notes |
