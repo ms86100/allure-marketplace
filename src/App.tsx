@@ -11,6 +11,7 @@ import { PushNotificationProvider } from "@/components/notifications/PushNotific
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { initializeMedianBridge } from "@/lib/median";
 import { useDeepLinks } from "@/hooks/useDeepLinks";
+import { useSecurityOfficer } from "@/hooks/useSecurityOfficer";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Lazy-loaded pages for code splitting
@@ -113,20 +114,21 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 // Defense-in-depth: router-level guard for security pages
 function SecurityRoute({ children }: { children: React.ReactNode }) {
-  const { isSocietyAdmin, isAdmin, isLoading } = useAuth();
-  // Inline check — useSecurityOfficer is called inside the guarded pages too
-  // This wrapper ensures unauthenticated/non-security users are blocked at the router level
-  if (isLoading) {
+  const { isSocietyAdmin, isAdmin, isLoading: authLoading } = useAuth();
+  const { isSecurityOfficer, isLoading: officerLoading } = useSecurityOfficer();
+
+  if (authLoading || officerLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-primary text-xl font-bold">Loading...</div>
       </div>
     );
   }
-  // Allow through if society admin or platform admin; security officers pass here
-  // and get their own in-page check via useSecurityOfficer
-  // We can't call useSecurityOfficer here (async RPC) so we let authenticated users through
-  // and rely on in-page guards for the officer-specific check
+
+  if (!isSocietyAdmin && !isAdmin && !isSecurityOfficer) {
+    return <Navigate to="/" replace />;
+  }
+
   return <>{children}</>;
 }
 

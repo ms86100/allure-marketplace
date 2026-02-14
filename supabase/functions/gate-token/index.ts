@@ -119,11 +119,14 @@ Deno.serve(async (req) => {
       const expiresAt = now + 60; // 60 seconds
 
       // Token payload contains ONLY IDs + timing — NO PII
+      // Include nonce for deduplication
+      const nonce = crypto.randomUUID();
       const payload = JSON.stringify({
         uid: profile.id,
         sid: profile.society_id,
         iat: now,
         exp: expiresAt,
+        nonce,
       });
 
       // Encrypt the payload, then sign the encrypted blob
@@ -157,12 +160,25 @@ Deno.serve(async (req) => {
       // Verify signature first
       const isValidSig = await verifySignature(encryptedPayload, signature, signingSecret);
       if (!isValidSig) {
+        // Log failed validation attempt
+        await serviceClient.from('audit_log').insert({
+          actor_id: userId,
+          action: 'gate_token_invalid_signature',
+          target_type: 'gate_token',
+          metadata: { reason: 'signature_mismatch' },
+        }).then(() => {}, () => {});
         return new Response(JSON.stringify({ valid: false, error: 'Invalid signature' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       // Decrypt payload
       const decrypted = await decryptPayload(encryptedPayload, encryptionSecret);
       if (!decrypted) {
+        await serviceClient.from('audit_log').insert({
+          actor_id: userId,
+          action: 'gate_token_decryption_failed',
+          target_type: 'gate_token',
+          metadata: { reason: 'corrupted_payload' },
+        }).then(() => {}, () => {});
         return new Response(JSON.stringify({ valid: false, error: 'Corrupted token' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
@@ -176,7 +192,38 @@ Deno.serve(async (req) => {
       // Check expiry
       const now = Math.floor(Date.now() / 1000);
       if (payload.exp < now) {
+        await serviceClient.from('audit_log').insert({
+          actor_id: userId,
+          action: 'gate_token_expired',
+          target_type: 'gate_token',
+          target_id: payload.uid,
+          society_id: payload.sid,
+          metadata: { expired_at: payload.exp, checked_at: now },
+        }).then(() => {}, () => {});
         return new Response(JSON.stringify({ valid: false, error: 'Token expired', expired: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Deduplication: check if this nonce was already used
+      if (payload.nonce) {
+        const { data: existingEntry } = await serviceClient
+          .from('gate_entries')
+          .select('id')
+          .eq('user_id', payload.uid)
+          .eq('society_id', payload.sid)
+          .eq('notes', `nonce:${payload.nonce}`)
+          .maybeSingle();
+
+        if (existingEntry) {
+          await serviceClient.from('audit_log').insert({
+            actor_id: userId,
+            action: 'gate_token_replay_blocked',
+            target_type: 'gate_token',
+            target_id: payload.uid,
+            society_id: payload.sid,
+            metadata: { nonce: payload.nonce },
+          }).then(() => {}, () => {});
+          return new Response(JSON.stringify({ valid: false, error: 'Token already used' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
       }
 
       // Verify security officer belongs to same society
@@ -193,6 +240,14 @@ Deno.serve(async (req) => {
       const { data: adminCheck } = await serviceClient.rpc('is_society_admin', { _user_id: userId, _society_id: payload.sid });
       
       if (!isOfficer && !adminCheck) {
+        await serviceClient.from('audit_log').insert({
+          actor_id: userId,
+          action: 'gate_token_unauthorized_validator',
+          target_type: 'gate_token',
+          target_id: payload.uid,
+          society_id: payload.sid,
+          metadata: { reason: 'not_officer_or_admin' },
+        }).then(() => {}, () => {});
         return new Response(JSON.stringify({ valid: false, error: 'Not authorized for this society' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
@@ -232,6 +287,7 @@ Deno.serve(async (req) => {
           confirmation_status: 'pending',
           awaiting_confirmation: true,
           confirmation_expires_at: expiresAt,
+          notes: payload.nonce ? `nonce:${payload.nonce}` : null,
         }).select('id').single();
 
         if (entryError) {
@@ -273,6 +329,7 @@ Deno.serve(async (req) => {
           flat_number: resident.flat_number,
           resident_name: resident.name,
           confirmation_status: 'not_required',
+          notes: payload.nonce ? `nonce:${payload.nonce}` : null,
         });
 
         return new Response(JSON.stringify({
