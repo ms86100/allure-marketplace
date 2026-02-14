@@ -1,255 +1,211 @@
 
 
-# Scalability Completion + Multi-Tenant Product Verification
+# Multi-Tenant SaaS Product Readiness -- Implementation Plan
 
-## Part 1: Remaining Scalability Items
+## Overview
 
-### 1A. HomePage Targeted Queries (Replace Bulk Download)
+This plan addresses the three critical gaps preventing the platform from being a true SaaS product: (1) society context switching for platform admins and builders, (2) builder operational power, and (3) society-level feature autonomy. These are UX and product-layer changes -- not database changes.
 
-**Current problem:** `HomePage.tsx` fetches ALL approved sellers (line 40-50), then filters client-side into 4 sections: open now, nearby block, top rated, featured. At 500 sellers per society, this downloads 500 rows to display ~20.
+---
 
-**Change:** Replace single bulk query with 4 targeted queries, each with `LIMIT`:
+## Priority 1: Society Context Switching System
 
-| Section | Query | Limit |
+### Problem
+Platform admins and builders are locked to their own `profile.society_id`. They cannot "view as" or operate within another society. At 100 societies, this makes admin operations impossible.
+
+### Solution
+Add `viewAsSocietyId` state to `AuthContext` that overrides the default `profile.society_id` for UI rendering only. RLS remains untouched -- admins already have cross-society SELECT access via `is_admin()` policies.
+
+### Changes
+
+**AuthContext.tsx**
+- Add `viewAsSocietyId: string | null` state
+- Add `setViewAsSociety(id: string | null)` function
+- Add computed `effectiveSocietyId` that returns `viewAsSocietyId || profile?.society_id`
+- Add `effectiveSociety: Society | null` that fetches the viewed society's data when switching
+- Expose all three in the context value
+
+**New component: `src/components/admin/SocietySwitcher.tsx`**
+- Dropdown component that lists all societies (fetched via admin-accessible query)
+- Shows current society name with a badge indicating "viewing as"
+- "Reset to my society" option to clear override
+- Only renders for platform admins and builder members
+
+**Header.tsx**
+- When `viewAsSocietyId` is set and user is admin/builder, show a colored banner below header: "Viewing: [Society Name]" with a dismiss button
+- Replace `society?.name` with `effectiveSociety?.name` in location display
+
+**AdminPage.tsx**
+- Add `SocietySwitcher` at the top of the page
+- Filter pending users, pending sellers, and all data by `effectiveSocietyId` when set (currently shows all globally -- add optional filter)
+
+**SocietyAdminPage.tsx**
+- Replace hardcoded `profile?.society_id` with `effectiveSocietyId`
+- Platform admins can now enter any society's admin panel via context switch
+- All queries already use `societyId` variable -- just change the source
+
+**SocietyDashboardPage.tsx, SocietyFinancesPage.tsx, SnagListPage.tsx, DisputesPage.tsx**
+- Replace `profile?.society_id` references with `effectiveSocietyId` from auth context
+- No query changes needed -- RLS allows admin access already
+
+### Security Note
+No RLS changes required. Platform admins already have `is_admin(auth.uid())` access across all societies. This change only affects which society's data the UI displays -- the database still enforces access rules independently.
+
+---
+
+## Priority 2: Builder Operational Dashboard
+
+### Problem
+Builder dashboard (`BuilderDashboardPage.tsx`) is view-only. Clicking a society links to `/society` which shows the builder's own society, not the clicked one.
+
+### Solution
+Make society cards actionable by integrating with the context switcher, and add inline operational capabilities.
+
+### Changes
+
+**BuilderDashboardPage.tsx**
+- On society card click: call `setViewAsSociety(society.id)` then navigate to `/society`
+- This makes the entire society ecosystem (dashboard, admin, finances, snags, disputes) work in the context of the clicked society
+- Add quick-action buttons per society card:
+  - "Pending Users" count as clickable badge -> navigates to `/society/admin` in that society context
+  - "Open Disputes" count as clickable badge -> navigates to `/disputes` in that society context
+- Add "View All" button per society that navigates to `/society` with context set
+
+**New: Builder-level aggregate metrics section**
+- Total revenue across all managed societies (query `orders` table filtered by society_ids in `builder_societies`)
+- Combined pending approval count
+- Combined dispute SLA status (breached vs on-track)
+- Uses a new React Query hook: `src/hooks/queries/useBuilderStats.ts`
+
+---
+
+## Priority 3: Society Feature Autonomy
+
+### Problem
+There is no per-society feature configuration. All societies share the same global `category_config` and `parent_groups`. `featured_items` now has `society_id` but there is no UI to manage society-scoped featured items.
+
+### Solution
+
+**Database migration: `society_features` table**
+
+| Column | Type | Default |
 |---|---|---|
-| Open Now | `.eq('is_available', true).limit(6)` | 6 |
-| Nearby Block | `.eq('block', profile.block).limit(5)` via join | 5 |
-| Top Rated | `.gte('rating', 4).order('rating', desc).limit(5)` | 5 |
-| Featured | `.eq('is_featured', true).limit(5)` | 5 |
+| id | uuid | gen_random_uuid() |
+| society_id | uuid (FK societies) | NOT NULL |
+| feature_key | text | NOT NULL |
+| is_enabled | boolean | true |
+| config | jsonb | '{}' |
+| created_at | timestamptz | now() |
 
-Each query also wrapped in a React Query hook for caching. Favorites query already has `.limit(5)` -- no change needed.
+Unique constraint on `(society_id, feature_key)`. RLS: society admins can manage their own society's features, platform admins can manage all.
 
-**Files modified:** `src/pages/HomePage.tsx`
+**Feature keys (initial set):**
+- `marketplace` -- enable/disable marketplace for society
+- `bulletin` -- enable/disable community bulletin
+- `disputes` -- enable/disable dispute system
+- `finances` -- enable/disable society finances
+- `construction_progress` -- enable/disable builder progress tracking
+- `snag_management` -- enable/disable snag tickets
+- `help_requests` -- enable/disable help request board
 
----
+**SocietyAdminPage.tsx -- new "Features" tab**
+- Toggle switches for each feature
+- Society admins can enable/disable features for their society
+- When a feature is disabled, the corresponding nav items and pages show a "Not available in your society" message
 
-### 1B. React Query Migration (All Major Pages)
-
-**Current problem:** Every page uses raw `useState` + `useEffect` + `supabase.from()`. This means:
-- No caching between navigations (re-fetches on every page visit)
-- No deduplication of identical requests
-- No background refetching
-- No stale-while-revalidate
-
-**Change:** Create custom hooks wrapping React Query for each data domain:
-
-| Hook | Data | staleTime | Used By |
-|---|---|---|---|
-| `useHomeSellers()` | 4 seller sections | 30s | HomePage |
-| `useSellerOrders(sellerId)` | Seller's orders | 0 (always fresh) | SellerDashboardPage |
-| `useBuyerOrders(userId)` | Buyer's orders | 0 | OrdersPage |
-| `useBulletinPosts(societyId)` | Bulletin posts | 30s | BulletinPage |
-| `useNotifications(userId)` | Notifications | 0 | NotificationInboxPage |
-| `useSocietyStats(societyId)` | Dashboard counts | 60s | SocietyDashboardPage |
-| `useCategoryConfig()` | Category config | 5min | Multiple |
-| `useParentGroups()` | Parent groups | 5min | Already exists |
-
-**New directory:** `src/hooks/queries/`
-
-**Files modified:** HomePage, SellerDashboardPage, BulletinPage, NotificationInboxPage, SocietyDashboardPage, SearchPage
+**BottomNav.tsx and page-level guards**
+- Check `society_features` for the current society
+- If a feature is disabled, either hide the nav item or show a disabled state
+- Create a shared hook: `src/hooks/useSocietyFeatures.ts` that queries `society_features` for `effectiveSocietyId` with React Query caching (5 min staleTime)
 
 ---
 
-### 1C. SellerDashboardPage Pagination
+## Priority 4: Notification Society Labeling
 
-**Current problem:** `SellerDashboardPage.tsx` (line 84-92) fetches ALL orders for the seller with no limit. At 10K orders this will collapse.
+### Problem
+Notifications do not show which society they originate from. At 100 societies, platform admins cannot triage.
 
-**Change:** Paginate with cursor-based loading (same pattern as OrdersPage which already has it). Only load first 20 orders, with "Load More" button. Stats calculation moves to a separate count-only query instead of downloading all rows.
+### Changes
 
-**Files modified:** `src/pages/SellerDashboardPage.tsx`
+**Database: Add `society_id` column to `user_notifications`**
+- Nullable UUID column (backward compatible with existing notifications)
+- No FK constraint needed (already have society_id pattern)
 
----
+**NotificationInboxPage.tsx**
+- When `society_id` is present on a notification, show a small badge with the society name
+- For platform admins: add a filter dropdown to filter notifications by society
+- Fetch society names via a lightweight join or separate lookup
 
-### 1D. Notification Queue (Background Processing)
-
-**Current problem:** Notifications are dispatched synchronously during user actions.
-
-**Change:**
-1. Create `notification_queue` table (id, user_id, title, body, type, reference_path, payload, status, created_at, processed_at)
-2. Create edge function `process-notification-queue` that:
-   - Reads unprocessed entries
-   - Inserts into `user_notifications`
-   - Calls `send-push-notification` for each
-   - Marks as processed
-3. Schedule via pg_cron every minute
-4. Update `src/lib/notifications.ts` to insert into queue instead of direct notification
-
-**New files:** `supabase/functions/process-notification-queue/index.ts`
-**Migration:** Create `notification_queue` table with RLS
+**Notification creation points (`src/lib/notifications.ts`)**
+- Include `society_id` when creating notifications that are society-scoped
+- General platform notifications leave `society_id` null
 
 ---
 
-### 1E. Data Archiving Jobs
+## Priority 5: Featured Items Society Scoping UI
 
-**Change:** Create edge function `archive-old-data` that:
-- Moves completed orders older than 90 days to `orders_archive`
-- Deletes read notifications older than 60 days
-- Moves audit_log entries older than 1 year to `audit_log_archive`
+### Problem
+`featured_items` table now has `society_id` column but the admin UI does not use it.
 
-Schedule via pg_cron weekly.
+### Changes
 
-**Migration:** Create `orders_archive` and `audit_log_archive` tables
-**New files:** `supabase/functions/archive-old-data/index.ts`
-
----
-
-### 1F. Rate Limiting
-
-**Change:** Create a reusable rate limiter in edge functions:
-- `rate_limits` table (key, count, window_start)
-- Helper function `checkRateLimit(key, maxRequests, windowSeconds)` shared across edge functions
-- Apply to: `create-razorpay-order` (10/min per user), `send-push-notification` (100/min per society), `validate-society` (5/min per user)
-
-**Migration:** Create `rate_limits` table
-**New file:** `supabase/functions/_shared/rate-limiter.ts`
-
----
-
-### 1G. Idempotency Keys
-
-**Change:**
-- Add `idempotency_key` column (unique, nullable) to `orders` table
-- Frontend generates UUID before order submission, sends as idempotency_key
-- If duplicate key, return existing order instead of creating new one
-- Payment records already have `razorpay_order_id` for partial idempotency -- add explicit `idempotency_key` column
-
-**Migration:** Add columns + unique constraints
-**Files modified:** Cart checkout flow
-
----
-
-## Part 2: Multi-Tenant Product Verification
-
-### 2.1 Governance Features Added
-
-| Feature | Why Required | UX Change | Problem Solved |
-|---|---|---|---|
-| Society-level admin delegation (`society_admins` table) | Platform admin cannot manage 100+ societies alone | Society admins approve users/sellers within their own society | Eliminates centralized bottleneck |
-| Builder entity (`builders` table) | Real estate developers manage multiple societies | Builder dashboard shows aggregate stats across all managed societies | Enables B2B relationship management |
-| Builder-to-society mapping (`builder_societies`) | One builder owns many societies | Builder sees all societies in one view with pending counts | Prevents builder from needing separate logins |
-| Admin role hierarchy (platform > builder > society_admin > moderator) | Different authority levels needed | Each role sees only their permitted actions | Prevents unauthorized access at scale |
-| Auto-approval per society (`auto_approve_residents` flag) | High-volume societies cannot manually approve every resident | Toggle in society settings, residents join instantly | Removes onboarding friction for large societies |
-| Admin limits (`max_society_admins` + trigger) | Prevents admin inflation | Error shown when limit reached | Controls governance sprawl |
-| Last-admin protection (trigger) | Prevents orphaned societies | Cannot remove last active admin | Ensures governance continuity |
-| Audit logging (`audit_log` table + `logAudit()`) | Accountability for all admin actions | No visible UX change, backend trail | Enables compliance and dispute resolution |
-
-### 2.2 Role Hierarchy
-
-| Role | Scope | Can Manage | Authority Boundary |
-|---|---|---|---|
-| `platform_admin` | Global | All societies, all builders, all users | `is_admin()` check, `user_roles` table |
-| `builder_member` | Builder org | View societies assigned to their builder | `is_builder_member()` check, `builder_members` table |
-| `society_admin` | Single society | Users, sellers, settings within their society only | `is_society_admin()` with `deactivated_at IS NULL` |
-| `moderator` | Single society | Limited moderation (stored in `society_admins.role`) | Same table as society_admin, different role value |
-| `seller` | Own store | Own products, own orders | `seller_profiles.user_id = auth.uid()` |
-| `buyer` | Own data | Own orders, cart, reviews | `user_id = auth.uid()` |
-
-**Separation enforcement:** Each SECURITY DEFINER function checks only its scope. `is_society_admin()` cannot see other societies. `is_builder_member()` cannot see other builders. No function grants cross-scope access.
-
-### 2.3 Context-Aware Dashboards
-
-| Dashboard | Society-Aware | What Changed |
-|---|---|---|
-| Society Admin (`SocietyAdminPage`) | Yes -- scoped to `profile.society_id` | Added admin appointment, removal, auto-approve toggle, approval method selector |
-| Builder Dashboard (`BuilderDashboardPage`) | Yes -- shows all societies for builder | New page. Shows aggregate stats (members, pending, disputes) across managed societies |
-| Society Dashboard (`SocietyDashboardPage`) | Yes -- all queries use `society_id` | Shows snags, disputes, expenses, milestones, documents, Q&A all scoped |
-| Platform Admin (`AdminPage`) | Cross-society (platform admin only) | Manages all users, sellers, reviews, reports, warnings globally |
-
-**Can a user manage multiple societies?** No. A user belongs to exactly one society (`profiles.society_id`). They can be a society_admin for that one society only.
-
-**Is context switching implemented?** No. There is no society switcher dropdown. A user is locked to their society.
-
-**Builder multi-society management?** Yes, but view-only aggregation. The builder dashboard shows all assigned societies with stats. Clicking a society links to `/society` which shows their own society context -- NOT the clicked society. This is a limitation.
-
-### 2.4 Commerce Isolation
-
-| Feature | Original (Single-Society) | Current (Multi-Society) |
-|---|---|---|
-| Marketplace listing | All approved sellers visible | Only sellers in user's society visible (RLS on `products` via `seller_profiles.society_id`) |
-| Orders | No society scoping | `society_id` auto-populated via trigger `trg_set_order_society_id` |
-| Reviews | Global visibility | Scoped to user's society via `seller_profiles.society_id` join |
-| Coupons | No scoping | `society_id` column, visible only within same society |
-| Featured items | Global | Still global (known gap -- `featured_items` has no `society_id`) |
-
-### 2.5 Operational Controls
-
-| Feature | Multi-Tenant Purpose |
-|---|---|
-| Auto-approval toggle | Each society controls its own onboarding speed |
-| Governance health checks (edge function) | Detects orphaned societies, admin limit breaches, abuse spikes across ALL societies |
-| Admin limit enforcement (trigger) | Prevents any single society from having too many admins |
-| Audit trail | Society-scoped accountability for every admin action |
-| Trigger error monitoring | Ensures activity logging works across all societies |
-
-### 2.6 Remaining Single-Society Behaviors
-
-| Limitation | Impact | Fix Effort |
-|---|---|---|
-| User belongs to exactly 1 society | Cannot be a member of 2 societies | Schema change (junction table) -- HIGH |
-| No society context switcher | Admins cannot switch to manage another society | UI + auth context change -- MEDIUM |
-| Builder dashboard view-only | Builder cannot take action on a specific society from their dashboard | Needs society impersonation -- HIGH |
-| Notifications not society-labeled | User cannot tell which society a notification is from | Add `society_id` to display -- LOW |
-| Analytics not society-scoped | No per-society usage analytics | Needs analytics infrastructure -- MEDIUM |
-| `featured_items` not scoped | Featured items visible across societies | Add `society_id` column -- LOW |
-| `cart_items` not society-scoped | Theoretically cross-society cart possible | Add society check on insert -- LOW |
-
-### 2.7 Multi-Tenant Maturity Score
-
-| Dimension | Score | Explanation |
-|---|---|---|
-| Governance scalability | 8 | Full delegation chain works. Limited by no society switcher for platform admins managing 100+ societies. |
-| Role separation | 9 | 6-tier hierarchy enforced at database level. Clean SECURITY DEFINER boundaries. |
-| Builder support | 6 | View-only dashboard. Cannot take actions on managed societies. No builder-level analytics. |
-| Society-level autonomy | 8 | Each society controls approval, admins, settings. Missing: custom branding, custom categories per society. |
-| Context switching UX | 3 | No context switcher exists. User is locked to one society. Builder dashboard links go to own society, not target society. |
-| Operational automation | 7 | Health checks, trigger monitoring, audit logging exist. Missing: alerting, scheduled reports, automated escalation. |
-| Global readiness | 7 | RLS isolation is solid. Missing: timezone handling, localization, currency formatting per society. |
-
-**Overall: 6.9/10**
-
-### 2.8 Final Assessment
-
-At 20 builders, 100 societies, 500K users:
-
-**Clean and isolated?** Yes at the data level. RLS enforces strict society boundaries. No cross-society data leakage is possible.
-
-**Operationally messy?** Yes for platform admins and builders. Managing 100 societies without a context switcher means platform admins have no way to view a specific society's admin panel. Builder dashboard is read-only with no actionable capabilities.
-
-### What Still Needs Refinement
-
-1. **Society context switcher for platform admins** -- ability to "view as" a specific society
-2. **Builder actionable dashboard** -- approve users, view disputes for their societies
-3. **Society-scoped `featured_items`** -- add `society_id` column
-4. **Notification queue** (Part 1D above) -- currently synchronous
-5. **Per-society analytics** -- no usage tracking per society exists
+**AdminPage.tsx -- Featured tab**
+- When `viewAsSocietyId` is set, filter featured items by that society
+- When creating featured items, auto-set `society_id` to `effectiveSocietyId`
+- Add a "Global" vs "This Society" toggle when creating featured items
 
 ---
 
 ## Implementation Sequence
 
-```text
-Phase 1 (Week 1): Database migrations
-  - notification_queue table
-  - orders_archive + audit_log_archive tables
-  - rate_limits table
-  - idempotency_key columns on orders + payment_records
-  - featured_items add society_id column
+### Phase 1: Context Switching Foundation (highest impact)
+1. Update `AuthContext.tsx` with `viewAsSocietyId` + `effectiveSocietyId` + `effectiveSociety`
+2. Create `SocietySwitcher` component
+3. Update `Header.tsx` with "Viewing as" banner
+4. Update `SocietyAdminPage.tsx` to use `effectiveSocietyId`
+5. Update `BuilderDashboardPage.tsx` with context-aware navigation
 
-Phase 2 (Week 1-2): React Query migration
-  - Create src/hooks/queries/ directory
-  - Migrate HomePage to targeted queries
-  - Migrate SellerDashboardPage to paginated + React Query
-  - Migrate BulletinPage, NotificationInboxPage, SocietyDashboardPage
+### Phase 2: Society Features Table
+6. Database migration for `society_features` table
+7. Create `useSocietyFeatures` hook
+8. Add "Features" tab to `SocietyAdminPage.tsx`
 
-Phase 3 (Week 2): Edge functions
-  - process-notification-queue
-  - archive-old-data
-  - _shared/rate-limiter.ts + apply to existing functions
+### Phase 3: Notification Labeling
+9. Database migration to add `society_id` to `user_notifications`
+10. Update `NotificationInboxPage.tsx` with society badges and filter
+11. Update notification creation to include `society_id`
 
-Phase 4 (Week 3): Frontend idempotency
-  - Generate idempotency_key in cart checkout
-  - Handle duplicate key responses gracefully
-```
+### Phase 4: Builder Dashboard Enhancement
+12. Create `useBuilderStats` hook
+13. Update `BuilderDashboardPage.tsx` with actionable cards and aggregate metrics
+
+### Phase 5: Featured Items Scoping
+14. Update AdminPage featured tab with society filtering
+
+---
+
+## Files Modified
+
+| File | Change Type |
+|---|---|
+| `src/contexts/AuthContext.tsx` | Add context switching state |
+| `src/components/admin/SocietySwitcher.tsx` | New component |
+| `src/components/layout/Header.tsx` | Add "viewing as" banner |
+| `src/pages/AdminPage.tsx` | Add society switcher + featured filtering |
+| `src/pages/SocietyAdminPage.tsx` | Use effectiveSocietyId + features tab |
+| `src/pages/BuilderDashboardPage.tsx` | Actionable cards + context navigation |
+| `src/pages/SocietyDashboardPage.tsx` | Use effectiveSocietyId |
+| `src/pages/NotificationInboxPage.tsx` | Society badges + filter |
+| `src/hooks/useSocietyFeatures.ts` | New hook |
+| `src/hooks/queries/useBuilderStats.ts` | New hook |
+| `src/lib/notifications.ts` | Add society_id to creation |
+
+## Database Migrations
+
+| Migration | Tables |
+|---|---|
+| Create society_features | New table with RLS |
+| Add society_id to user_notifications | ALTER TABLE add column |
 
 ---
 
@@ -257,9 +213,20 @@ Phase 4 (Week 3): Frontend idempotency
 
 | Change | Risk | Mitigation |
 |---|---|---|
-| React Query migration | MEDIUM -- touching all major pages | Migrate one page at a time, keep raw queries as fallback |
-| Notification queue | LOW -- new table, no existing code broken | Queue is additive; direct notifications still work during transition |
-| Archiving | LOW -- moves old data, no active queries affected | Archive tables have same schema, reversible |
-| Rate limiting | LOW -- new middleware, does not affect existing logic | Conservative limits, easy to tune |
-| Idempotency keys | LOW -- nullable column, backward compatible | Old orders without key still work |
+| Context switching in AuthContext | MEDIUM -- affects all society-scoped views | `effectiveSocietyId` is a simple fallback chain; all existing behavior preserved when null |
+| society_features table | LOW -- new table, additive | Default all features to enabled; no feature breaks if table is empty |
+| Notification society_id | LOW -- nullable column | Existing notifications unaffected |
+| Builder dashboard actions | LOW -- uses existing context switcher | No new permissions needed |
+
+---
+
+## Expected Maturity Score After Implementation
+
+| Dimension | Before | After |
+|---|---|---|
+| Context switching UX | 3 | 8 |
+| Builder support | 6 | 8 |
+| Society-level autonomy | 8 | 9 |
+| Operational automation | 7 | 8 |
+| Overall | 6.9 | 8.2 |
 
