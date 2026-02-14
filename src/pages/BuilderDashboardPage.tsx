@@ -4,13 +4,28 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
-import { Society, Builder } from '@/types/database';
-import { Building2, Users, Shield, ChevronRight } from 'lucide-react';
+import { Builder } from '@/types/database';
+import { Building2, Users, Shield, Store, AlertTriangle, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-interface BuilderSociety extends Society {
-  pendingUsers?: number;
-  totalMembers?: number;
+interface BuilderSociety {
+  id: string;
+  name: string;
+  slug: string;
+  city: string | null;
+  state: string | null;
+  is_active: boolean;
+  is_verified: boolean;
+  is_under_construction: boolean;
+  trust_score: number;
+  member_count: number | null;
+  created_at: string;
+  pending_users: number;
+  total_members: number;
+  pending_sellers: number;
+  active_sellers: number;
+  open_disputes: number;
+  open_snags: number;
 }
 
 export default function BuilderDashboardPage() {
@@ -27,38 +42,19 @@ export default function BuilderDashboardPage() {
   const fetchBuilderData = async () => {
     try {
       if (managedBuilderIds.length > 0) {
-        const { data: builderData } = await supabase
-          .from('builders')
-          .select('*')
-          .eq('id', managedBuilderIds[0])
-          .single();
-        setBuilder(builderData as Builder | null);
+        // Single aggregated call replaces N+1 pattern
+        const { data, error } = await supabase.rpc('get_builder_dashboard', {
+          _builder_id: managedBuilderIds[0],
+        });
 
-        // Get societies for this builder
-        const { data: bSocieties } = await supabase
-          .from('builder_societies')
-          .select('society_id')
-          .eq('builder_id', managedBuilderIds[0]);
-
-        if (bSocieties && bSocieties.length > 0) {
-          const societyIds = bSocieties.map(bs => bs.society_id);
-          const { data: societiesData } = await supabase
-            .from('societies')
-            .select('*')
-            .in('id', societyIds);
-
-          // Get member counts per society
-          const enriched = await Promise.all(
-            ((societiesData as Society[]) || []).map(async (s) => {
-              const [pending, total] = await Promise.all([
-                supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('society_id', s.id).eq('verification_status', 'pending'),
-                supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('society_id', s.id).eq('verification_status', 'approved'),
-              ]);
-              return { ...s, pendingUsers: pending.count || 0, totalMembers: total.count || 0 };
-            })
-          );
-          setSocieties(enriched);
+        if (error) {
+          console.error('Builder dashboard error:', error);
+          return;
         }
+
+        const ctx = data as any;
+        setBuilder(ctx.builder as Builder | null);
+        setSocieties((ctx.societies as BuilderSociety[]) || []);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -89,25 +85,35 @@ export default function BuilderDashboardPage() {
     );
   }
 
+  const totalMembers = societies.reduce((sum, s) => sum + s.total_members, 0);
+  const totalPending = societies.reduce((sum, s) => sum + s.pending_users, 0);
+  const totalDisputes = societies.reduce((sum, s) => sum + s.open_disputes, 0);
+  const totalPendingSellers = societies.reduce((sum, s) => sum + s.pending_sellers, 0);
+
   return (
     <AppLayout headerTitle={builder?.name || 'Builder Dashboard'} showLocation={false}>
       <div className="p-4 space-y-4">
         {/* Aggregate Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <Card><CardContent className="p-3 text-center">
             <Building2 className="mx-auto text-primary mb-1" size={18} />
             <p className="text-lg font-bold">{societies.length}</p>
             <p className="text-[10px] text-muted-foreground">Societies</p>
           </CardContent></Card>
           <Card><CardContent className="p-3 text-center">
-            <Users className="mx-auto text-success mb-1" size={18} />
-            <p className="text-lg font-bold">{societies.reduce((sum, s) => sum + (s.totalMembers || 0), 0)}</p>
+            <Users className="mx-auto text-primary mb-1" size={18} />
+            <p className="text-lg font-bold">{totalMembers}</p>
             <p className="text-[10px] text-muted-foreground">Total Members</p>
           </CardContent></Card>
           <Card><CardContent className="p-3 text-center">
             <Shield className="mx-auto text-warning mb-1" size={18} />
-            <p className="text-lg font-bold">{societies.reduce((sum, s) => sum + (s.pendingUsers || 0), 0)}</p>
-            <p className="text-[10px] text-muted-foreground">Pending</p>
+            <p className="text-lg font-bold">{totalPending + totalPendingSellers}</p>
+            <p className="text-[10px] text-muted-foreground">Pending Approvals</p>
+          </CardContent></Card>
+          <Card><CardContent className="p-3 text-center">
+            <AlertTriangle className="mx-auto text-destructive mb-1" size={18} />
+            <p className="text-lg font-bold">{totalDisputes}</p>
+            <p className="text-[10px] text-muted-foreground">Open Issues</p>
           </CardContent></Card>
         </div>
 
@@ -124,11 +130,13 @@ export default function BuilderDashboardPage() {
                   <div className="flex-1">
                     <p className="font-semibold text-sm">{s.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {s.totalMembers} members • {s.pendingUsers! > 0 ? `${s.pendingUsers} pending` : 'No pending'}
+                      {s.total_members} members • {s.active_sellers} sellers
                     </p>
-                    <div className="flex gap-2 mt-1">
-                      {s.is_verified && <span className="text-[10px] bg-success/10 text-success px-1.5 py-0.5 rounded">Verified</span>}
-                      {s.is_active && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">Active</span>}
+                    <div className="flex gap-2 mt-1 flex-wrap">
+                      {s.is_verified && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">Verified</span>}
+                      {s.pending_users > 0 && <span className="text-[10px] bg-warning/10 text-warning px-1.5 py-0.5 rounded">{s.pending_users} pending</span>}
+                      {s.open_disputes > 0 && <span className="text-[10px] bg-destructive/10 text-destructive px-1.5 py-0.5 rounded">{s.open_disputes} disputes</span>}
+                      {s.open_snags > 0 && <span className="text-[10px] bg-destructive/10 text-destructive px-1.5 py-0.5 rounded">{s.open_snags} snags</span>}
                     </div>
                   </div>
                   <ChevronRight size={16} className="text-muted-foreground" />

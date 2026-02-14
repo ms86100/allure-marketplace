@@ -30,6 +30,7 @@ export interface BuilderMember {
   builder_id: string;
   user_id: string;
   role: 'member' | 'admin';
+  deactivated_at: string | null;
   created_at: string;
 }
 export type VerificationStatus = 'pending' | 'approved' | 'rejected' | 'suspended';

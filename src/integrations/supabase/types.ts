@@ -96,6 +96,7 @@ export type Database = {
         Row: {
           builder_id: string
           created_at: string
+          deactivated_at: string | null
           id: string
           role: string
           user_id: string
@@ -103,6 +104,7 @@ export type Database = {
         Insert: {
           builder_id: string
           created_at?: string
+          deactivated_at?: string | null
           id?: string
           role?: string
           user_id: string
@@ -110,6 +112,7 @@ export type Database = {
         Update: {
           builder_id?: string
           created_at?: string
+          deactivated_at?: string | null
           id?: string
           role?: string
           user_id?: string
@@ -2881,6 +2884,7 @@ export type Database = {
         Args: { _society_id: string; _user_id: string }
         Returns: boolean
       }
+      get_builder_dashboard: { Args: { _builder_id: string }; Returns: Json }
       get_category_parent_group: { Args: { cat: string }; Returns: string }
       get_user_auth_context: { Args: { _user_id: string }; Returns: Json }
       get_user_society_id: { Args: { _user_id: string }; Returns: string }
