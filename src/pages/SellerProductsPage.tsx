@@ -30,7 +30,7 @@ import { Product, ProductCategory, SellerProfile } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { ParentGroup } from '@/types/categories';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
-import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle, Store } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle, Store, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SellerProductsPage() {
@@ -43,6 +43,8 @@ export default function SellerProductsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [licenseBlocked, setLicenseBlocked] = useState<{ blocked: boolean; status: string; licenseName: string } | null>(null);
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -106,6 +108,35 @@ export default function SellerProductsPage() {
         .order('created_at', { ascending: false });
 
       setProducts((productData || []) as Product[]);
+
+      // Check license status for mandatory groups
+      if ((profile as any).primary_group) {
+        const { data: groupData } = await supabase
+          .from('parent_groups')
+          .select('id, requires_license, license_mandatory, license_type_name')
+          .eq('slug', (profile as any).primary_group)
+          .eq('requires_license', true)
+          .eq('license_mandatory', true)
+          .maybeSingle();
+
+        if (groupData) {
+          const { data: licenseData } = await supabase
+            .from('seller_licenses')
+            .select('status')
+            .eq('seller_id', profile.id)
+            .eq('group_id', groupData.id)
+            .maybeSingle();
+
+          const status = licenseData?.status || 'none';
+          if (status !== 'approved') {
+            setLicenseBlocked({ blocked: true, status, licenseName: groupData.license_type_name || 'License' });
+          } else {
+            setLicenseBlocked(null);
+          }
+        } else {
+          setLicenseBlocked(null);
+        }
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -477,6 +508,33 @@ export default function SellerProductsPage() {
               {sellerProfiles.length > 1 && (
                 <SellerSwitcher />
               )}
+            </div>
+          </div>
+        )}
+
+        {/* License Status Banner */}
+        {licenseBlocked?.blocked && (
+          <div className={`mb-4 p-3 rounded-xl border flex items-start gap-3 ${
+            licenseBlocked.status === 'rejected'
+              ? 'bg-destructive/10 border-destructive/30'
+              : 'bg-warning/10 border-warning/30'
+          }`}>
+            <ShieldAlert size={20} className={licenseBlocked.status === 'rejected' ? 'text-destructive mt-0.5' : 'text-warning mt-0.5'} />
+            <div>
+              <p className={`text-sm font-semibold ${licenseBlocked.status === 'rejected' ? 'text-destructive' : 'text-warning'}`}>
+                {licenseBlocked.status === 'rejected'
+                  ? `${licenseBlocked.licenseName} Rejected`
+                  : licenseBlocked.status === 'pending'
+                    ? `${licenseBlocked.licenseName} Pending Verification`
+                    : `${licenseBlocked.licenseName} Required`}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {licenseBlocked.status === 'rejected'
+                  ? 'Your license was rejected. Please re-upload from Seller Settings. Products cannot be saved until approved.'
+                  : licenseBlocked.status === 'pending'
+                    ? 'Your license is being reviewed. Products cannot be saved until it is approved.'
+                    : 'You need to upload your license from Seller Settings before you can add or edit products.'}
+              </p>
             </div>
           </div>
         )}

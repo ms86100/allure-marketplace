@@ -226,18 +226,32 @@ export function LicenseManager() {
                     <Eye size={14} />
                   </Button>
                 )}
-                {sub.status === 'pending' && (
-                  <>
-                    <Button size="sm" variant="outline" className="text-destructive h-8 w-8 p-0" onClick={() => updateLicenseStatus(sub.id, 'rejected')}>
-                      <X size={14} />
-                    </Button>
-                    <Button size="sm" className="h-8 w-8 p-0" onClick={() => updateLicenseStatus(sub.id, 'approved')}>
-                      <Check size={14} />
-                    </Button>
-                  </>
-                )}
               </div>
             </div>
+            {sub.status === 'pending' && (
+              <div className="mt-3 space-y-2 pt-2 border-t">
+                <Textarea
+                  placeholder="Admin notes (optional) — feedback for seller"
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  rows={2}
+                  className="text-xs"
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="text-destructive flex-1" onClick={() => updateLicenseStatus(sub.id, 'rejected')}>
+                    <X size={14} className="mr-1" /> Reject
+                  </Button>
+                  <Button size="sm" className="flex-1" onClick={() => updateLicenseStatus(sub.id, 'approved')}>
+                    <Check size={14} className="mr-1" /> Approve
+                  </Button>
+                </div>
+              </div>
+            )}
+            {sub.admin_notes && sub.status !== 'pending' && (
+              <p className="text-[10px] text-muted-foreground mt-2 pt-2 border-t">
+                Admin note: {sub.admin_notes}
+              </p>
+            )}
           </CardContent>
         </Card>
       )) : (
