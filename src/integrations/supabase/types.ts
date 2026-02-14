@@ -629,6 +629,51 @@ export type Database = {
           },
         ]
       }
+      expense_flags: {
+        Row: {
+          admin_response: string | null
+          created_at: string
+          expense_id: string
+          flagged_by: string
+          id: string
+          reason: string
+          status: string
+        }
+        Insert: {
+          admin_response?: string | null
+          created_at?: string
+          expense_id: string
+          flagged_by: string
+          id?: string
+          reason: string
+          status?: string
+        }
+        Update: {
+          admin_response?: string | null
+          created_at?: string
+          expense_id?: string
+          flagged_by?: string
+          id?: string
+          reason?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_flags_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "society_expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_flags_flagged_by_fkey"
+            columns: ["flagged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       favorites: {
         Row: {
           created_at: string | null
@@ -1651,6 +1696,108 @@ export type Database = {
             columns: ["admin_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      society_expenses: {
+        Row: {
+          added_by: string
+          amount: number
+          category: string
+          created_at: string
+          expense_date: string
+          id: string
+          invoice_url: string | null
+          society_id: string
+          title: string
+          vendor_name: string | null
+        }
+        Insert: {
+          added_by: string
+          amount: number
+          category?: string
+          created_at?: string
+          expense_date?: string
+          id?: string
+          invoice_url?: string | null
+          society_id: string
+          title: string
+          vendor_name?: string | null
+        }
+        Update: {
+          added_by?: string
+          amount?: number
+          category?: string
+          created_at?: string
+          expense_date?: string
+          id?: string
+          invoice_url?: string | null
+          society_id?: string
+          title?: string
+          vendor_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "society_expenses_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "society_expenses_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      society_income: {
+        Row: {
+          added_by: string
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          income_date: string
+          society_id: string
+          source: string
+        }
+        Insert: {
+          added_by: string
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          income_date?: string
+          society_id: string
+          source?: string
+        }
+        Update: {
+          added_by?: string
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          income_date?: string
+          society_id?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "society_income_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "society_income_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
             referencedColumns: ["id"]
           },
         ]
