@@ -52,9 +52,12 @@ workflows:
           keychain add-certificates
           xcode-project use-profiles
           
-      - name: Increment build number
+      - name: Set export compliance & increment build number
         script: |
           cd ios/App
+          # Ensure export compliance flag is in Info.plist so App Store Connect auto-clears it
+          /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" App/Info.plist || \
+            /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" App/Info.plist
           BUILD_NUMBER=$(date +%s)
           echo "Setting build number to $BUILD_NUMBER"
           agvtool new-version -all $BUILD_NUMBER
@@ -75,6 +78,7 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+          contact_phone: "+910000000000"
 
   android-release:
     name: Android Release
@@ -171,9 +175,11 @@ workflows:
           keychain add-certificates
           xcode-project use-profiles
           
-      - name: Increment build number
+      - name: Set export compliance & increment build number
         script: |
           cd ios/App
+          /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" App/Info.plist || \
+            /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" App/Info.plist
           BUILD_NUMBER=$(date +%s)
           echo "Setting build number to $BUILD_NUMBER"
           agvtool new-version -all $BUILD_NUMBER
