@@ -691,6 +691,7 @@ function ProductGridByCategory({
                   product={toProductWithSeller(p)}
                   behavior={config?.behavior || null}
                   onTap={handleGridProductTap}
+                  viewOnly
                 />
               ))}
             </div>

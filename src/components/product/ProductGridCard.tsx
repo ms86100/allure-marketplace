@@ -23,6 +23,8 @@ interface ProductGridCardProps {
   behavior?: CategoryBehavior | null;
   onTap?: (product: ProductWithSeller) => void;
   className?: string;
+  /** When true, shows "View" button that navigates to seller page instead of ADD */
+  viewOnly?: boolean;
 }
 
 const ACTION_CONFIG: Record<ProductActionType, { label: string; icon: typeof Plus; isCart: boolean }> = {
@@ -36,7 +38,7 @@ const ACTION_CONFIG: Record<ProductActionType, { label: string; icon: typeof Plu
   make_offer: { label: 'Offer', icon: Handshake, isCart: false },
 };
 
-export function ProductGridCard({ product, behavior, onTap, className }: ProductGridCardProps) {
+export function ProductGridCard({ product, behavior, onTap, className, viewOnly = false }: ProductGridCardProps) {
   const navigate = useNavigate();
   const { items, addItem, updateQuantity } = useCart();
   const [contactOpen, setContactOpen] = useState(false);
@@ -161,9 +163,16 @@ export function ProductGridCard({ product, behavior, onTap, className }: Product
               )}
             </div>
 
-            {/* Action area — only show ADD for cart items, otherwise subtle view prompt */}
+            {/* Action area */}
             <div className="shrink-0">
-              {isCartAction && product.is_available ? (
+              {viewOnly ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); navigate(`/seller/${product.seller_id}`); }}
+                  className="border border-primary text-primary font-bold text-xs px-3 py-1 rounded-md hover:bg-primary hover:text-primary-foreground transition-colors"
+                >
+                  View
+                </button>
+              ) : isCartAction && product.is_available ? (
                 quantity === 0 ? (
                   <button
                     onClick={handleAdd}

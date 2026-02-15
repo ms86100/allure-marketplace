@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile } from '@/types/database';
 
-const SELLER_SELECT = `*, profile:profiles!seller_profiles_user_id_fkey(name, block)`;
+const SELLER_SELECT = `*, profile:profiles!seller_profiles_user_id_fkey(name, block), products(price)`;
 
 export function useOpenNowSellers() {
   const { profile, isApproved, effectiveSocietyId } = useAuth();

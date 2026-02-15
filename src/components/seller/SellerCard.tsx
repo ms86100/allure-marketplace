@@ -8,7 +8,7 @@ import { Clock, MapPin, Award, Zap, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SellerCardProps {
-  seller: SellerProfile & { profile?: { name: string; block: string } };
+  seller: SellerProfile & { profile?: { name: string; block: string }; products?: { price: number }[] };
   featuredProduct?: Product;
   showFavorite?: boolean;
 }
@@ -17,6 +17,9 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
   const isOpen = seller.is_available;
   const profile = seller.profile;
   const isNewSeller = !seller.rating || seller.rating === 0 || seller.total_reviews === 0;
+  const minPrice = (seller as any).products?.length
+    ? Math.min(...(seller as any).products.map((p: any) => p.price))
+    : null;
 
   return (
     <Link to={`/seller/${seller.id}`}>
@@ -73,6 +76,11 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
               {seller.description && (
                 <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
                   {seller.description}
+                </p>
+              )}
+              {minPrice !== null && (
+                <p className="text-xs font-semibold text-success mt-0.5">
+                  Starting from ₹{minPrice}
                 </p>
               )}
             </div>
