@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2, Minus, Plus, AlertTriangle, Bell } from 'lucide-react';
+import { ArrowLeft, Trash2, Minus, Plus, Bell, Store } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { VegBadge } from '@/components/ui/veg-badge';
@@ -18,129 +18,129 @@ import { toast } from 'sonner';
 export default function CartPage() {
   const navigate = useNavigate();
   const { user, profile, society } = useAuth();
-  const { items, totalAmount, updateQuantity, removeItem, clearCart, currentSellerId } = useCart();
+  const { items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart } = useCart();
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [showRazorpayCheckout, setShowRazorpayCheckout] = useState(false);
-  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
+  const [pendingOrderIds, setPendingOrderIds] = useState<string[]>([]);
   const [appliedCoupon, setAppliedCoupon] = useState<{ id: string; code: string; discountAmount: number } | null>(null);
 
   const finalAmount = appliedCoupon ? Math.max(0, totalAmount - appliedCoupon.discountAmount) : totalAmount;
 
-  const seller = items[0]?.product?.seller;
-  const acceptsCod = seller?.accepts_cod ?? true;
-  const acceptsUpi = !!(seller as any)?.accepts_upi && !!(seller as any)?.upi_id;
+  // For single-seller cart, use first seller's payment preferences
+  const firstSeller = sellerGroups[0]?.items[0]?.product?.seller;
+  const acceptsCod = firstSeller?.accepts_cod ?? true;
+  const acceptsUpi = !!(firstSeller as any)?.accepts_upi && !!(firstSeller as any)?.upi_id;
 
-  // Check if any item has urgent notification enabled
   const hasUrgentItem = items.some((item) => (item.product as any)?.is_urgent);
 
-  const createOrder = async (paymentStatus: 'pending' | 'paid', transactionRef?: string) => {
-    if (!user || !profile || !currentSellerId) return null;
+  const createOrdersForAllSellers = async (paymentStatus: 'pending' | 'paid', transactionRef?: string) => {
+    if (!user || !profile || sellerGroups.length === 0) return [];
 
-    // Generate idempotency key to prevent duplicate orders
-    const idempotencyKey = crypto.randomUUID();
-
-    // Calculate auto_cancel_at if any item is urgent (3 minutes from now)
-    const autoCancelAt = hasUrgentItem 
-      ? new Date(Date.now() + 3 * 60 * 1000).toISOString() 
+    const autoCancelAt = hasUrgentItem
+      ? new Date(Date.now() + 3 * 60 * 1000).toISOString()
       : null;
 
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        buyer_id: user.id,
-        seller_id: currentSellerId,
-        total_amount: finalAmount,
-        coupon_id: appliedCoupon?.id || null,
-        discount_amount: appliedCoupon?.discountAmount || 0,
-        payment_type: paymentMethod,
-        payment_status: paymentStatus,
-        delivery_address: `Block ${profile.block}, Flat ${profile.flat_number}`,
-        notes: notes || null,
-        auto_cancel_at: autoCancelAt,
-        idempotency_key: idempotencyKey,
-      } as any)
-      .select()
-      .single();
+    const createdOrderIds: string[] = [];
 
-    if (orderError) throw orderError;
+    // Distribute coupon discount proportionally across sellers
+    const couponTotal = appliedCoupon?.discountAmount || 0;
 
-    // Create order items
-    const orderItems = items.map((item) => ({
-      order_id: order.id,
-      product_id: item.product_id,
-      product_name: item.product?.name || 'Unknown',
-      quantity: item.quantity,
-      unit_price: item.product?.price || 0,
-    }));
+    for (const group of sellerGroups) {
+      const proportionalDiscount = totalAmount > 0
+        ? Math.round((group.subtotal / totalAmount) * couponTotal)
+        : 0;
+      const sellerFinalAmount = Math.max(0, group.subtotal - proportionalDiscount);
 
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(orderItems);
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          buyer_id: user.id,
+          seller_id: group.sellerId,
+          total_amount: sellerFinalAmount,
+          coupon_id: appliedCoupon?.id || null,
+          discount_amount: proportionalDiscount,
+          payment_type: paymentMethod,
+          payment_status: paymentStatus,
+          delivery_address: `Block ${profile.block}, Flat ${profile.flat_number}`,
+          notes: notes || null,
+          auto_cancel_at: autoCancelAt,
+          idempotency_key: crypto.randomUUID(),
+        } as any)
+        .select()
+        .single();
 
-    if (itemsError) throw itemsError;
+      if (orderError) throw orderError;
+      createdOrderIds.push(order.id);
 
-    // Create payment record
-    const { error: paymentError } = await supabase
-      .from('payment_records')
-      .insert({
+      // Create order items for this seller
+      const orderItems = group.items.map((item) => ({
+        order_id: order.id,
+        product_id: item.product_id,
+        product_name: item.product?.name || 'Unknown',
+        quantity: item.quantity,
+        unit_price: item.product?.price || 0,
+      }));
+
+      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+      if (itemsError) throw itemsError;
+
+      // Create payment record per seller
+      const { error: paymentError } = await supabase.from('payment_records').insert({
         order_id: order.id,
         buyer_id: user.id,
-        seller_id: currentSellerId,
-        amount: finalAmount,
+        seller_id: group.sellerId,
+        amount: sellerFinalAmount,
         payment_method: paymentMethod,
         payment_status: paymentStatus,
         transaction_reference: transactionRef || null,
         platform_fee: 0,
-        net_amount: finalAmount,
+        net_amount: sellerFinalAmount,
       });
+      if (paymentError) throw paymentError;
 
-    if (paymentError) throw paymentError;
+      // Notify each seller
+      const sellerProfile = group.items[0]?.product?.seller;
+      if (sellerProfile?.user_id) {
+        sendOrderStatusNotification(
+          order.id, 'placed', user.id, group.sellerId,
+          sellerProfile.user_id,
+          sellerProfile.business_name || 'Seller',
+          profile.name
+        );
+      }
 
-    // Send push notification to seller about new order
-    if (seller?.user_id) {
-      sendOrderStatusNotification(
-        order.id,
-        'placed',
-        user.id,
-        currentSellerId,
-        seller.user_id,
-        seller.business_name || 'Seller',
-        profile.name
-      );
+      // Record coupon redemption for first order only
+      if (appliedCoupon && createdOrderIds.length === 1) {
+        await supabase.from('coupon_redemptions').insert({
+          coupon_id: appliedCoupon.id,
+          user_id: user.id,
+          order_id: order.id,
+          discount_applied: appliedCoupon.discountAmount,
+        });
+      }
     }
 
-    // Record coupon redemption
-    if (appliedCoupon) {
-      await supabase.from('coupon_redemptions').insert({
-        coupon_id: appliedCoupon.id,
-        user_id: user.id,
-        order_id: order.id,
-        discount_applied: appliedCoupon.discountAmount,
-      });
-    }
-
-    return order;
+    return createdOrderIds;
   };
 
   const handlePlaceOrder = async () => {
-    if (!user || !profile || !currentSellerId) return;
+    if (!user || !profile || sellerGroups.length === 0) return;
 
     if (paymentMethod === 'upi') {
       if (!acceptsUpi) {
         toast.error('UPI payment not available for this seller');
         return;
       }
-      // Create order first, then open Razorpay
       setIsPlacingOrder(true);
       try {
-        const order = await createOrder('pending');
-        if (!order) throw new Error('Failed to create order');
-        setPendingOrderId(order.id);
+        const orderIds = await createOrdersForAllSellers('pending');
+        if (orderIds.length === 0) throw new Error('Failed to create orders');
+        setPendingOrderIds(orderIds);
         setShowRazorpayCheckout(true);
       } catch (error: any) {
-        console.error('Error creating order:', error);
+        console.error('Error creating orders:', error);
         toast.error(error.message || 'Failed to create order');
       } finally {
         setIsPlacingOrder(false);
@@ -151,12 +151,17 @@ export default function CartPage() {
     // COD flow
     setIsPlacingOrder(true);
     try {
-      const order = await createOrder('pending');
-      if (!order) throw new Error('Failed to create order');
-      
+      const orderIds = await createOrdersForAllSellers('pending');
+      if (orderIds.length === 0) throw new Error('Failed to create orders');
+
       await clearCart();
-      toast.success('Order placed successfully!');
-      navigate(`/orders/${order.id}`);
+      if (orderIds.length === 1) {
+        toast.success('Order placed successfully!');
+        navigate(`/orders/${orderIds[0]}`);
+      } else {
+        toast.success(`${orderIds.length} orders placed successfully!`);
+        navigate('/orders');
+      }
     } catch (error: any) {
       console.error('Error placing order:', error);
       toast.error(error.message || 'Failed to place order');
@@ -167,42 +172,24 @@ export default function CartPage() {
 
   const handleRazorpaySuccess = async (paymentId: string) => {
     setShowRazorpayCheckout(false);
-    
-    // Update order with payment details
-    if (pendingOrderId) {
-      await supabase
-        .from('orders')
-        .update({
-          payment_status: 'paid',
-          razorpay_payment_id: paymentId,
-        } as any)
-        .eq('id', pendingOrderId);
 
-      await supabase
-        .from('payment_records')
-        .update({
-          payment_status: 'paid',
-          transaction_reference: paymentId,
-        })
-        .eq('order_id', pendingOrderId);
+    for (const orderId of pendingOrderIds) {
+      await supabase.from('orders').update({ payment_status: 'paid', razorpay_payment_id: paymentId } as any).eq('id', orderId);
+      await supabase.from('payment_records').update({ payment_status: 'paid', transaction_reference: paymentId }).eq('order_id', orderId);
     }
-    
+
     await clearCart();
     toast.success('Payment successful! Order placed.');
-    navigate(`/orders/${pendingOrderId}`);
-    setPendingOrderId(null);
+    navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
+    setPendingOrderIds([]);
   };
 
   const handleRazorpayFailed = () => {
     setShowRazorpayCheckout(false);
-    // Cancel the pending order
-    if (pendingOrderId) {
-      supabase
-        .from('orders')
-        .update({ status: 'cancelled', payment_status: 'failed' })
-        .eq('id', pendingOrderId);
+    for (const orderId of pendingOrderIds) {
+      supabase.from('orders').update({ status: 'cancelled', payment_status: 'failed' }).eq('id', orderId);
     }
-    setPendingOrderId(null);
+    setPendingOrderIds([]);
     toast.error('Payment failed. Please try again.');
   };
 
@@ -219,12 +206,8 @@ export default function CartPage() {
               <span className="text-5xl">🛒</span>
             </div>
             <h2 className="text-xl font-bold mb-2">Your cart is empty</h2>
-            <p className="text-muted-foreground mb-6">
-              Add items from your favorite sellers
-            </p>
-            <Link to="/">
-              <Button>Browse Sellers</Button>
-            </Link>
+            <p className="text-muted-foreground mb-6">Add items from your favorite sellers</p>
+            <Link to="/"><Button>Browse Sellers</Button></Link>
           </div>
         </div>
       </AppLayout>
@@ -239,25 +222,10 @@ export default function CartPage() {
             <ArrowLeft size={20} />
             <span>Back</span>
           </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive"
-            onClick={clearCart}
-          >
+          <Button variant="ghost" size="sm" className="text-destructive" onClick={clearCart}>
             Clear Cart
           </Button>
         </div>
-
-        {/* Seller Info */}
-        {seller && (
-          <div className="bg-muted rounded-lg p-3 mb-4">
-            <h3 className="font-semibold">{seller.business_name}</h3>
-            <p className="text-sm text-muted-foreground">
-              {items.length} item{items.length > 1 ? 's' : ''}
-            </p>
-          </div>
-        )}
 
         {/* Urgent Item Warning */}
         {hasUrgentItem && (
@@ -272,122 +240,98 @@ export default function CartPage() {
           </div>
         )}
 
-        {/* Cart Items */}
-        <div className="space-y-3">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center gap-3 bg-card rounded-lg p-3 shadow-sm"
-            >
-              <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0">
-                {item.product?.image_url ? (
-                  <img
-                    src={item.product.image_url}
-                    alt={item.product.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center">
-                    <span className="text-xl">🍽️</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start gap-2">
-                  <VegBadge isVeg={item.product?.is_veg || true} size="sm" />
-                  <div className="min-w-0">
-                    <h4 className="font-medium text-sm truncate">
-                      {item.product?.name}
-                    </h4>
-                    <p className="text-sm font-semibold mt-0.5">
-                      ₹{item.product?.price}
-                    </p>
-                  </div>
+        {/* Cart Items Grouped by Seller */}
+        <div className="space-y-4">
+          {sellerGroups.map((group) => (
+            <div key={group.sellerId} className="space-y-3">
+              {/* Seller Header */}
+              <div className="bg-muted rounded-lg p-3 flex items-center gap-2">
+                <Store size={16} className="text-primary" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-sm">{group.sellerName}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {group.items.length} item{group.items.length > 1 ? 's' : ''} • ₹{group.subtotal.toFixed(0)}
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center border rounded-md">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0"
-                    onClick={() =>
-                      updateQuantity(item.product_id, item.quantity - 1)
-                    }
-                  >
-                    <Minus size={14} />
-                  </Button>
-                  <span className="w-6 text-center text-sm font-medium">
-                    {item.quantity}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0"
-                    onClick={() =>
-                      updateQuantity(item.product_id, item.quantity + 1)
-                    }
-                  >
-                    <Plus size={14} />
-                  </Button>
+
+              {/* Items for this seller */}
+              {group.items.map((item) => (
+                <div key={item.id} className="flex items-center gap-3 bg-card rounded-lg p-3 shadow-sm">
+                  <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0">
+                    {item.product?.image_url ? (
+                      <img src={item.product.image_url} alt={item.product.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                        <span className="text-xl">🍽️</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2">
+                      <VegBadge isVeg={item.product?.is_veg || true} size="sm" />
+                      <div className="min-w-0">
+                        <h4 className="font-medium text-sm truncate">{item.product?.name}</h4>
+                        <p className="text-sm font-semibold mt-0.5">₹{item.product?.price}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center border rounded-md">
+                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => updateQuantity(item.product_id, item.quantity - 1)}>
+                        <Minus size={14} />
+                      </Button>
+                      <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => updateQuantity(item.product_id, item.quantity + 1)}>
+                        <Plus size={14} />
+                      </Button>
+                    </div>
+                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => removeItem(item.product_id)}>
+                      <Trash2 size={18} />
+                    </Button>
+                  </div>
                 </div>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="text-destructive"
-                  onClick={() => removeItem(item.product_id)}
-                >
-                  <Trash2 size={18} />
-                </Button>
-              </div>
+              ))}
             </div>
           ))}
         </div>
 
         {/* Notes */}
         <div className="mt-6">
-          <label className="text-sm font-medium mb-2 block">
-            Add cooking instructions or notes
-          </label>
-          <Textarea
-            placeholder="e.g., Less spicy, no onions..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={2}
-          />
+          <label className="text-sm font-medium mb-2 block">Add cooking instructions or notes</label>
+          <Textarea placeholder="e.g., Less spicy, no onions..." value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
         </div>
 
         {/* Payment Method */}
         <div className="mt-6">
           <h3 className="font-semibold mb-3">Payment Method</h3>
-          <PaymentMethodSelector
-            acceptsCod={acceptsCod}
-            acceptsUpi={acceptsUpi}
-            selectedMethod={paymentMethod}
-            onSelect={setPaymentMethod}
-          />
+          <PaymentMethodSelector acceptsCod={acceptsCod} acceptsUpi={acceptsUpi} selectedMethod={paymentMethod} onSelect={setPaymentMethod} />
         </div>
 
-        {/* Coupon */}
-        <div className="mt-6">
-          <h3 className="font-semibold mb-3">Apply Coupon</h3>
-          <CouponInput
-            sellerId={currentSellerId || ''}
-            totalAmount={totalAmount}
-            onApply={setAppliedCoupon}
-            onRemove={() => setAppliedCoupon(null)}
-            appliedCoupon={appliedCoupon}
-          />
-        </div>
+        {/* Coupon - only show for single-seller carts */}
+        {sellerGroups.length === 1 && (
+          <div className="mt-6">
+            <h3 className="font-semibold mb-3">Apply Coupon</h3>
+            <CouponInput
+              sellerId={sellerGroups[0].sellerId}
+              totalAmount={totalAmount}
+              onApply={setAppliedCoupon}
+              onRemove={() => setAppliedCoupon(null)}
+              appliedCoupon={appliedCoupon}
+            />
+          </div>
+        )}
 
         {/* Bill Details */}
         <div className="mt-6 bg-muted rounded-lg p-4">
           <h3 className="font-semibold mb-3">Bill Details</h3>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Item Total</span>
-              <span>₹{totalAmount.toFixed(0)}</span>
-            </div>
+            {sellerGroups.map((group) => (
+              <div key={group.sellerId} className="flex justify-between">
+                <span className="text-muted-foreground truncate mr-2">{group.sellerName}</span>
+                <span>₹{group.subtotal.toFixed(0)}</span>
+              </div>
+            ))}
             {appliedCoupon && (
               <div className="flex justify-between text-primary">
                 <span>Coupon Discount ({appliedCoupon.code})</span>
@@ -414,32 +358,30 @@ export default function CartPage() {
             {society?.name || 'Your Society'}
           </p>
         </div>
+
+        {sellerGroups.length > 1 && (
+          <p className="text-xs text-muted-foreground text-center mt-4">
+            Your cart has items from {sellerGroups.length} sellers. Separate orders will be created for each.
+          </p>
+        )}
       </div>
 
       {/* Place Order Footer */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t safe-bottom">
-        <Button
-          className="w-full"
-          size="lg"
-          onClick={handlePlaceOrder}
-          disabled={isPlacingOrder}
-        >
+        <Button className="w-full" size="lg" onClick={handlePlaceOrder} disabled={isPlacingOrder}>
           {isPlacingOrder ? 'Placing Order...' : `Place Order • ₹${finalAmount.toFixed(0)}`}
         </Button>
       </div>
 
-      {/* Razorpay Checkout */}
-      {pendingOrderId && (
+      {/* Razorpay Checkout - use first order for payment */}
+      {pendingOrderIds.length > 0 && (
         <RazorpayCheckout
           isOpen={showRazorpayCheckout}
-          onClose={() => {
-            setShowRazorpayCheckout(false);
-            handleRazorpayFailed();
-          }}
-          orderId={pendingOrderId}
+          onClose={() => { setShowRazorpayCheckout(false); handleRazorpayFailed(); }}
+          orderId={pendingOrderIds[0]}
           amount={finalAmount}
-          sellerId={currentSellerId || ''}
-          sellerName={seller?.business_name || 'Seller'}
+          sellerId={sellerGroups[0]?.sellerId || ''}
+          sellerName={sellerGroups[0]?.sellerName || 'Seller'}
           customerName={profile?.name || ''}
           customerEmail={user?.email || ''}
           customerPhone={profile?.phone || ''}

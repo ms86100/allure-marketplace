@@ -4,11 +4,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CartItem, Product } from '@/types/database';
 import { toast } from 'sonner';
 
+interface SellerGroup {
+  sellerId: string;
+  sellerName: string;
+  items: (CartItem & { product: Product })[];
+  subtotal: number;
+}
+
 interface CartContextType {
   items: (CartItem & { product: Product })[];
   itemCount: number;
   totalAmount: number;
-  currentSellerId: string | null;
+  sellerGroups: SellerGroup[];
   isLoading: boolean;
   addItem: (product: Product, quantity?: number) => Promise<void>;
   updateQuantity: (productId: string, quantity: number) => Promise<void>;
@@ -53,8 +60,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     fetchCart();
   }, [user]);
 
-  const currentSellerId = items.length > 0 ? items[0].product?.seller_id : null;
-
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   
   const totalAmount = items.reduce(
@@ -62,15 +67,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
     0
   );
 
+  // Group items by seller for multi-vendor support
+  const sellerGroups: SellerGroup[] = Object.values(
+    items.reduce<Record<string, SellerGroup>>((groups, item) => {
+      const sellerId = item.product?.seller_id || 'unknown';
+      if (!groups[sellerId]) {
+        groups[sellerId] = {
+          sellerId,
+          sellerName: (item.product as any)?.seller?.business_name || 'Seller',
+          items: [],
+          subtotal: 0,
+        };
+      }
+      groups[sellerId].items.push(item);
+      groups[sellerId].subtotal += (item.product?.price || 0) * item.quantity;
+      return groups;
+    }, {})
+  );
+
   const addItem = async (product: Product, quantity = 1) => {
     if (!user) {
       toast.error('Please sign in to add items to cart');
-      return;
-    }
-
-    // Check if adding from different seller
-    if (currentSellerId && currentSellerId !== product.seller_id) {
-      toast.error('You can only order from one seller at a time. Clear your cart first.');
       return;
     }
 
@@ -162,7 +179,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         items,
         itemCount,
         totalAmount,
-        currentSellerId,
+        sellerGroups,
         isLoading,
         addItem,
         updateQuantity,

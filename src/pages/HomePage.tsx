@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SocietyHealthDashboard } from '@/components/dashboard/SocietyHealthDashboard';
@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useEffectiveFeatures } from '@/hooks/useEffectiveFeatures';
 import { Search, ChevronRight, Store, Heart, Award, MapPin, Utensils, Star, TrendingUp, Activity, ShoppingBag, Shield, Globe } from 'lucide-react';
 import {
@@ -30,8 +31,24 @@ export default function HomePage() {
   const { isFeatureEnabled } = useEffectiveFeatures();
 
   // Cross-society browsing state
-  const [browseBeyond, setBrowseBeyond] = useState((profile as any)?.browse_beyond_community ?? false);
-  const [searchRadius, setSearchRadius] = useState((profile as any)?.search_radius_km ?? 5);
+  const [browseBeyond, setBrowseBeyondLocal] = useState((profile as any)?.browse_beyond_community ?? false);
+  const [searchRadius, setSearchRadiusLocal] = useState((profile as any)?.search_radius_km ?? 5);
+
+  // Persist buyer preferences to DB
+  const persistPreference = useCallback(async (field: string, value: any) => {
+    if (!user) return;
+    await supabase.from('profiles').update({ [field]: value } as any).eq('id', user.id);
+  }, [user]);
+
+  const setBrowseBeyond = useCallback((val: boolean) => {
+    setBrowseBeyondLocal(val);
+    persistPreference('browse_beyond_community', val);
+  }, [persistPreference]);
+
+  const setSearchRadius = useCallback((val: number) => {
+    setSearchRadiusLocal(val);
+    persistPreference('search_radius_km', val);
+  }, [persistPreference]);
 
   const { data: openNowSellers = [], isLoading: loadingOpen } = useOpenNowSellers();
   const { data: nearbyBlockSellers = [] } = useNearbyBlockSellers();
