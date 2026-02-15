@@ -10,6 +10,7 @@ import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useParentGroups } from '@/hooks/useParentGroups';
 import { useCategoryProducts } from '@/hooks/queries/usePopularProducts';
 import { ServiceCategory, CategoryConfig } from '@/types/categories';
+import { SORT_OPTIONS, SortKey } from '@/lib/marketplace-constants';
 import { ArrowLeft, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,7 +27,7 @@ export default function CategoryGroupPage() {
   const { getGroupBySlug, isLoading: groupsLoading } = useParentGroups();
   const [activeSubCategory, setActiveSubCategory] = useState<ServiceCategory | null>(subCategory);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'relevance' | 'price_low' | 'price_high' | 'popular'>('relevance');
+  const [sortBy, setSortBy] = useState<SortKey>('relevance');
 
   const parentGroup = category ? getGroupBySlug(category) : undefined;
   const subCategories = category ? groupedConfigs[category] || [] : [];
@@ -202,12 +203,7 @@ export default function CategoryGroupPage() {
 
         {/* Sort bar */}
         <div className="flex gap-2 px-4 pb-2 overflow-x-auto scrollbar-hide">
-          {[
-            { key: 'relevance' as const, label: 'Relevance' },
-            { key: 'price_low' as const, label: 'Price: Low' },
-            { key: 'price_high' as const, label: 'Price: High' },
-            { key: 'popular' as const, label: 'Popular' },
-          ].map((opt) => (
+          {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.key}
               onClick={() => setSortBy(opt.key)}

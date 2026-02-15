@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -214,8 +214,16 @@ export default function SearchPage() {
     }
   }, [debouncedQuery, filters, browseBeyond, searchRadius, selectedCategory]);
 
+  // Abort controller ref for cancelling stale searches
+  const abortRef = useRef<AbortController | null>(null);
+
   // ── Core search ──
   const runSearch = async (term: string) => {
+    // Cancel any in-flight search
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsLoading(true);
     setHasSearched(true);
 
@@ -366,11 +374,18 @@ export default function SearchPage() {
         });
       }
 
-      setResults(filtered);
+      // Only update if this search wasn't cancelled
+      if (!controller.signal.aborted) {
+        setResults(filtered);
+      }
     } catch (err) {
-      console.error('Search error:', err);
+      if (!controller.signal.aborted) {
+        console.error('Search error:', err);
+      }
     } finally {
-      setIsLoading(false);
+      if (!controller.signal.aborted) {
+        setIsLoading(false);
+      }
     }
   };
 

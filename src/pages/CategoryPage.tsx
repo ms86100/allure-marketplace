@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile, ProductCategory, Product } from '@/types/database';
+import { SORT_OPTIONS, SortKey } from '@/lib/marketplace-constants';
 import { ArrowLeft, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -34,7 +35,7 @@ export default function CategoryPage() {
   const [products, setProducts] = useState<ProductWithSeller[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'relevance' | 'price_low' | 'price_high' | 'popular'>('relevance');
+  const [sortBy, setSortBy] = useState<SortKey>('relevance');
 
   const categoryInfo = configs.find((c) => c.category === category);
 
@@ -161,12 +162,7 @@ export default function CategoryPage() {
 
         {/* Sort bar */}
         <div className="flex gap-2 px-4 pb-2 overflow-x-auto scrollbar-hide">
-          {[
-            { key: 'relevance' as const, label: 'Relevance' },
-            { key: 'price_low' as const, label: 'Price: Low' },
-            { key: 'price_high' as const, label: 'Price: High' },
-            { key: 'popular' as const, label: 'Popular' },
-          ].map((opt) => (
+          {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.key}
               onClick={() => setSortBy(opt.key)}

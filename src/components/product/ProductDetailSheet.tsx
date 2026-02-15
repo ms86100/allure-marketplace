@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/hooks/useCart';
 import { useSellerTrustSnapshot } from '@/hooks/queries/useProductTrustMetrics';
 import { ContactSellerModal } from './ContactSellerModal';
+import { ProductEnquirySheet } from './ProductEnquirySheet';
 import { ProductActionType } from '@/types/database';
 import { Plus, Minus, Store, MapPin, Home, Clock, Truck, Users, Zap, RotateCcw, ChevronRight, Phone, Calendar, Send, MessageCircle, ShoppingBag, Handshake } from 'lucide-react';
 
@@ -61,6 +62,7 @@ export function ProductDetailSheet({
   const { items, addItem, updateQuantity } = useCart();
   const { data: trustSnapshot } = useSellerTrustSnapshot(product?.seller_id || null);
   const [contactOpen, setContactOpen] = useState(false);
+  const [enquiryOpen, setEnquiryOpen] = useState(false);
 
   if (!product) return null;
 
@@ -77,9 +79,9 @@ export function ProductDetailSheet({
       return;
     }
 
+    // Non-cart actions open the enquiry sheet
     if (!isCartAction) {
-      // For non-cart actions, navigate to seller page
-      onOpenChange(false);
+      setEnquiryOpen(true);
       return;
     }
 
@@ -295,6 +297,20 @@ export function ProductDetailSheet({
           onOpenChange={setContactOpen}
           sellerName={product.seller_name}
           phone={product.contact_phone || ''}
+        />
+      )}
+
+      {/* Enquiry Sheet for non-cart, non-contact actions */}
+      {!isCartAction && actionType !== 'contact_seller' && (
+        <ProductEnquirySheet
+          open={enquiryOpen}
+          onOpenChange={setEnquiryOpen}
+          productId={product.product_id}
+          productName={product.product_name}
+          sellerId={product.seller_id}
+          sellerName={product.seller_name}
+          actionType={actionType}
+          price={product.price}
         />
       )}
     </>
