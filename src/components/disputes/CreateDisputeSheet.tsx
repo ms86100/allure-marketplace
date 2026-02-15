@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -11,6 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { notifySocietyAdmins } from '@/lib/society-notifications';
+import { disputeSchema, validateForm } from '@/lib/validation-schemas';
+import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 
 const CATEGORIES = [
   { value: 'noise', label: 'Noise' },
@@ -33,25 +34,32 @@ export function CreateDisputeSheet({ open, onOpenChange, onCreated }: Props) {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!description.trim() || !user || !profile?.society_id) return;
+  const handleSubmitInner = async () => {
+    if (!user || !profile?.society_id) return;
+
+    const validation = validateForm(disputeSchema, { category, description, is_anonymous: isAnonymous });
+    if (!validation.success) {
+      const firstError = Object.values((validation as { success: false; errors: Record<string, string> }).errors)[0];
+      toast({ title: 'Validation error', description: firstError as string, variant: 'destructive' });
+      return;
+    }
+
     setSaving(true);
     try {
       const { error } = await supabase.from('dispute_tickets').insert({
         society_id: profile.society_id,
         submitted_by: user.id,
-        category,
-        description: description.trim(),
-        is_anonymous: isAnonymous,
+        category: validation.data.category,
+        description: validation.data.description,
+        is_anonymous: validation.data.is_anonymous ?? false,
       } as any);
       if (error) throw error;
 
-      // Notify admins
       if (profile?.society_id) {
         notifySocietyAdmins(
           profile.society_id,
           '⚖️ New Dispute Filed',
-          `${category} concern: ${description.trim().substring(0, 80)}`,
+          `${category} concern: ${validation.data.description.substring(0, 80)}`,
           { type: 'dispute' }
         );
       }
@@ -68,6 +76,8 @@ export function CreateDisputeSheet({ open, onOpenChange, onCreated }: Props) {
       setSaving(false);
     }
   };
+
+  const handleSubmit = useSubmitGuard(handleSubmitInner);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

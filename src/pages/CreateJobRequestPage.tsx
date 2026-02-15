@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { jobRequestSchema, validateForm } from '@/lib/validation-schemas';
 
 const JOB_TYPES = [
   { value: 'maid', label: '🧹 Maid / Cleaning' },
@@ -39,18 +40,30 @@ export default function CreateJobRequestPage() {
   const createJob = useMutation({
     mutationFn: async () => {
       if (!profile?.id || !profile?.society_id) throw new Error('Not authenticated');
-      if (!jobType) throw new Error('Please select a job type');
+
+      const validation = validateForm(jobRequestSchema, {
+        job_type: jobType,
+        description: description || '',
+        price: price ? parseFloat(price) : null,
+        duration_hours: parseInt(durationHours) || 1,
+        urgency,
+      });
+
+      if (!validation.success) {
+        const firstError = Object.values((validation as { success: false; errors: Record<string, string> }).errors)[0] as string;
+        throw new Error(firstError);
+      }
 
       const { error } = await supabase.from('worker_job_requests').insert({
         society_id: profile.society_id,
         resident_id: profile.id,
-        job_type: jobType,
-        description: description || null,
-        price: price ? parseFloat(price) : null,
-        duration_hours: parseInt(durationHours) || 1,
+        job_type: validation.data.job_type,
+        description: validation.data.description || null,
+        price: validation.data.price || null,
+        duration_hours: validation.data.duration_hours,
         start_time: startTime ? new Date(startTime).toISOString() : null,
         location_details: locationDetails || null,
-        urgency,
+        urgency: validation.data.urgency,
       });
       if (error) throw error;
     },

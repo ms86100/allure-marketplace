@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { sendOrderStatusNotification } from '@/lib/notifications';
 import { PaymentMethod } from '@/types/database';
 import { toast } from 'sonner';
+import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -90,7 +91,7 @@ export default function CartPage() {
     return createdOrderIds;
   };
 
-  const handlePlaceOrder = async () => {
+  const handlePlaceOrderInner = async () => {
     if (!user || !profile || sellerGroups.length === 0) return;
 
     if (paymentMethod === 'upi') {
@@ -135,6 +136,8 @@ export default function CartPage() {
       setIsPlacingOrder(false);
     }
   };
+
+  const handlePlaceOrder = useSubmitGuard(handlePlaceOrderInner);
 
   const handleRazorpaySuccess = async (paymentId: string) => {
     setShowRazorpayCheckout(false);
