@@ -97,7 +97,7 @@ export function ProductListingCard({
   const { configs: categoryConfigs } = useCategoryConfigs();
   const mc = useMarketplaceConfig();
   const { badges: badgeConfigs } = useBadgeConfig();
-  const [contactOpen, setContactOpen] = useState(false);
+  const [contactOpen] = useState(false);
 
   const cartItem = items.find((item) => item.product_id === product.id);
   const quantity = cartItem?.quantity || 0;
@@ -116,15 +116,13 @@ export function ProductListingCard({
   }, [layout, catConfig]);
 
   /* ── All display flags from DB ── */
-  const isCartAction = useMemo(() => {
-    if (catConfig) return catConfig.behavior?.supportsCart ?? false;
-    return actionType === 'add_to_cart' || actionType === 'buy_now';
-  }, [catConfig, actionType]);
+  /* ── All products use cart action — single "Add" button always ── */
+  const isCartAction = true;
 
   const showVegBadge = catConfig?.formHints?.showVegToggle ?? false;
   const placeholderEmoji = catConfig?.formHints?.placeholderEmoji || mc.labels.defaultPlaceholderEmoji;
   const pricePrefix = catConfig?.formHints?.pricePrefix || '';
-  const buttonLabel = catConfig?.formHints?.primaryButtonLabel || mc.labels.defaultButtonLabel;
+  const buttonLabel = mc.labels.defaultButtonLabel;
 
   /* ── Display config from DB ── */
   const supportsBrand = catConfig?.display?.supportsBrandDisplay ?? false;
@@ -146,14 +144,6 @@ export function ProductListingCard({
     e.stopPropagation();
     e.preventDefault();
     trackAdd();
-    if (actionType === 'contact_seller') {
-      setContactOpen(true);
-      return;
-    }
-    if (!isCartAction) {
-      navigate(`/seller/${product.seller_id}`);
-      return;
-    }
     addItem(product as any);
   };
 
@@ -322,15 +312,6 @@ export function ProductListingCard({
           </div>
         </div>
       </div>
-
-      {actionType === 'contact_seller' && (
-        <ContactSellerModal
-          open={contactOpen}
-          onOpenChange={setContactOpen}
-          sellerName={sellerName}
-          phone={product.contact_phone || ''}
-        />
-      )}
     </>
   );
 }
