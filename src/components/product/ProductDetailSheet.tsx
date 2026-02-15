@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/hooks/useCart';
-import { Plus, Minus, Store, Star, MapPin, Home, Clock } from 'lucide-react';
+import { Plus, Minus, Store, Star, MapPin, Home, Clock, Truck } from 'lucide-react';
 
 interface ProductDetail {
   product_id: string;
@@ -15,6 +15,8 @@ interface ProductDetail {
   category: string | null;
   description?: string | null;
   prep_time_minutes?: number | null;
+  fulfillment_mode?: string | null;
+  delivery_note?: string | null;
   seller_id: string;
   seller_name: string;
   seller_rating: number;
@@ -112,6 +114,21 @@ export function ProductDetailSheet({
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Clock size={14} />
               <span>Ready in ~{product.prep_time_minutes} min</span>
+            </div>
+          )}
+
+          {/* Fulfillment info */}
+          {product.fulfillment_mode && (
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <Truck size={14} />
+              <span>
+                {product.fulfillment_mode === 'self_pickup' && 'Self Pickup Only'}
+                {product.fulfillment_mode === 'delivery' && 'Seller Delivers'}
+                {product.fulfillment_mode === 'both' && 'Pickup or Delivery'}
+              </span>
+              {product.delivery_note && (
+                <span className="italic text-xs">— {product.delivery_note}</span>
+              )}
             </div>
           )}
 

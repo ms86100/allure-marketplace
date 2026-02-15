@@ -3266,6 +3266,7 @@ export type Database = {
           completed_order_count: number | null
           cover_image_url: string | null
           created_at: string | null
+          delivery_note: string | null
           delivery_radius_km: number
           description: string | null
           food_license_reviewed_at: string | null
@@ -3273,6 +3274,7 @@ export type Database = {
           food_license_submitted_at: string | null
           food_license_url: string | null
           fssai_number: string | null
+          fulfillment_mode: string
           id: string
           is_available: boolean | null
           is_featured: boolean | null
@@ -3308,6 +3310,7 @@ export type Database = {
           completed_order_count?: number | null
           cover_image_url?: string | null
           created_at?: string | null
+          delivery_note?: string | null
           delivery_radius_km?: number
           description?: string | null
           food_license_reviewed_at?: string | null
@@ -3315,6 +3318,7 @@ export type Database = {
           food_license_submitted_at?: string | null
           food_license_url?: string | null
           fssai_number?: string | null
+          fulfillment_mode?: string
           id?: string
           is_available?: boolean | null
           is_featured?: boolean | null
@@ -3350,6 +3354,7 @@ export type Database = {
           completed_order_count?: number | null
           cover_image_url?: string | null
           created_at?: string | null
+          delivery_note?: string | null
           delivery_radius_km?: number
           description?: string | null
           food_license_reviewed_at?: string | null
@@ -3357,6 +3362,7 @@ export type Database = {
           food_license_submitted_at?: string | null
           food_license_url?: string | null
           fssai_number?: string | null
+          fulfillment_mode?: string
           id?: string
           is_available?: boolean | null
           is_featured?: boolean | null

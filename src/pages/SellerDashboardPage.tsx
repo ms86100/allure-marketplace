@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile } from '@/types/database';
-import { Package, Loader2 } from 'lucide-react';
+import { Package, Loader2, Eye, Star, Clock, CheckCircle, XCircle, ShieldCheck } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { logAudit } from '@/lib/audit';
 
@@ -136,6 +138,79 @@ export default function SellerDashboardPage() {
           sellerProfiles={sellerProfiles}
           onToggleAvailability={toggleAvailability}
         />
+
+        {/* Store Performance Card - "How buyers see your store" */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">How buyers see your store</h3>
+              <Link to={`/seller/${sellerProfile.id}`}>
+                <Button variant="ghost" size="sm" className="gap-1 text-xs h-7">
+                  <Eye size={14} />
+                  Preview
+                </Button>
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                <Star size={16} className="text-warning" />
+                <div>
+                  <p className="text-sm font-semibold">
+                    {Number(sellerProfile.rating || 0).toFixed(1)} ★
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {sellerProfile.total_reviews || 0} reviews
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                <Clock size={16} className="text-primary" />
+                <div>
+                  <p className="text-sm font-semibold">
+                    {(sellerProfile as any).avg_response_minutes != null
+                      ? `~${(sellerProfile as any).avg_response_minutes} min`
+                      : 'N/A'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Avg response</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                <CheckCircle size={16} className="text-success" />
+                <div>
+                  <p className="text-sm font-semibold">
+                    {(sellerProfile as any).completed_order_count || 0}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Orders fulfilled</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                <XCircle size={16} className="text-destructive" />
+                <div>
+                  <p className="text-sm font-semibold">
+                    {(sellerProfile as any).cancellation_rate != null
+                      ? `${(sellerProfile as any).cancellation_rate}%`
+                      : '0%'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Cancellation</p>
+                </div>
+              </div>
+            </div>
+            {/* Badges buyers see */}
+            <div className="flex flex-wrap gap-1.5">
+              {((sellerProfile as any).completed_order_count || 0) < 5 && (
+                <Badge variant="secondary" className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  New Seller
+                </Badge>
+              )}
+              {((sellerProfile as any).cancellation_rate === 0 || (sellerProfile as any).cancellation_rate === null) && ((sellerProfile as any).completed_order_count || 0) > 2 && (
+                <Badge variant="secondary" className="text-[10px] bg-success/10 text-success">
+                  <ShieldCheck size={10} className="mr-0.5" />
+                  0% Cancellation
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         <EarningsSummary
           todayEarnings={stats?.todayEarnings || 0}

@@ -49,6 +49,7 @@ export default function SellerProductsPage() {
     name: '',
     description: '',
     price: '',
+    prep_time_minutes: '',
     category: '' as ProductCategory | '',
     is_veg: true,
     is_available: true,
@@ -151,6 +152,7 @@ export default function SellerProductsPage() {
       name: '',
       description: '',
       price: '',
+      prep_time_minutes: '',
       category: defaultCategory,
       is_veg: true,
       is_available: true,
@@ -168,6 +170,7 @@ export default function SellerProductsPage() {
       name: product.name,
       description: product.description || '',
       price: product.price.toString(),
+      prep_time_minutes: (product as any).prep_time_minutes?.toString() || '',
       category: product.category,
       is_veg: product.is_veg,
       is_available: product.is_available,
@@ -195,11 +198,13 @@ export default function SellerProductsPage() {
 
     setIsSaving(true);
     try {
+      const prepTime = formData.prep_time_minutes ? parseInt(formData.prep_time_minutes) : null;
       const productData = {
         seller_id: sellerProfile.id,
         name: formData.name.trim(),
         description: formData.description.trim() || null,
         price,
+        prep_time_minutes: (prepTime && !isNaN(prepTime) && prepTime > 0) ? prepTime : null,
         category: formData.category,
         is_veg: formData.is_veg,
         is_available: formData.is_available,
@@ -366,6 +371,18 @@ export default function SellerProductsPage() {
                       value={formData.price}
                       onChange={(e) =>
                         setFormData({ ...formData, price: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="prep_time">Prep Time (min)</Label>
+                    <Input
+                      id="prep_time"
+                      type="number"
+                      placeholder="e.g. 30"
+                      value={formData.prep_time_minutes}
+                      onChange={(e) =>
+                        setFormData({ ...formData, prep_time_minutes: e.target.value })
                       }
                     />
                   </div>

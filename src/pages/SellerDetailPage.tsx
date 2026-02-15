@@ -320,6 +320,20 @@ export default function SellerDetailPage() {
             )}
           </div>
 
+          {/* Fulfillment Info */}
+          {(seller as any).fulfillment_mode && (
+            <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
+              <Badge variant="outline" className="text-[10px]">
+                {(seller as any).fulfillment_mode === 'self_pickup' && '🏪 Self Pickup Only'}
+                {(seller as any).fulfillment_mode === 'delivery' && '🚚 Seller Delivers'}
+                {(seller as any).fulfillment_mode === 'both' && '🏪🚚 Pickup or Delivery'}
+              </Badge>
+              {(seller as any).delivery_note && (
+                <span className="text-xs italic">{(seller as any).delivery_note}</span>
+              )}
+            </div>
+          )}
+
           {/* Operating Days */}
           <div className="flex items-center gap-2 mt-3">
             <Calendar size={14} className="text-muted-foreground" />

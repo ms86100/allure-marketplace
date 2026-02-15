@@ -17,7 +17,8 @@ import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useParentGroups } from '@/hooks/useParentGroups';
 import { ParentGroup, ServiceCategory } from '@/types/categories';
 import { Slider } from '@/components/ui/slider';
-import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2, Globe } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2, Globe, Truck, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { logAudit } from '@/lib/audit';
@@ -74,6 +75,9 @@ export default function SellerSettingsPage() {
     // Cross-society commerce
     sell_beyond_community: false,
     delivery_radius_km: 5,
+    // Fulfillment mode
+    fulfillment_mode: 'self_pickup' as string,
+    delivery_note: '',
   });
 
   useEffect(() => {
@@ -118,6 +122,8 @@ export default function SellerSettingsPage() {
           bank_account_holder: profile.bank_account_holder || '',
           sell_beyond_community: profile.sell_beyond_community ?? false,
           delivery_radius_km: profile.delivery_radius_km ?? 5,
+          fulfillment_mode: profile.fulfillment_mode || 'self_pickup',
+          delivery_note: profile.delivery_note || '',
         });
       }
     } catch (error) {
@@ -239,6 +245,8 @@ export default function SellerSettingsPage() {
           bank_account_holder: formData.bank_account_holder.trim() || null,
           sell_beyond_community: formData.sell_beyond_community,
           delivery_radius_km: formData.delivery_radius_km,
+          fulfillment_mode: formData.fulfillment_mode,
+          delivery_note: formData.delivery_note.trim() || null,
         } as any)
         .eq('id', sellerProfile.id);
 
@@ -553,6 +561,64 @@ export default function SellerSettingsPage() {
               )}
             </div>
           </div>
+
+          {/* Fulfillment Mode */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Truck size={16} className="text-muted-foreground" />
+              <Label>Fulfillment Mode</Label>
+            </div>
+            <div className="p-4 bg-muted rounded-lg space-y-3">
+              <RadioGroup
+                value={formData.fulfillment_mode}
+                onValueChange={(value) => setFormData({ ...formData, fulfillment_mode: value })}
+                className="space-y-2"
+              >
+                <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-background/50 cursor-pointer">
+                  <RadioGroupItem value="self_pickup" />
+                  <div>
+                    <p className="text-sm font-medium">Self Pickup Only</p>
+                    <p className="text-xs text-muted-foreground">Buyer picks up from your location</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-background/50 cursor-pointer">
+                  <RadioGroupItem value="delivery" />
+                  <div>
+                    <p className="text-sm font-medium">I Deliver</p>
+                    <p className="text-xs text-muted-foreground">You deliver to buyer's location</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-background/50 cursor-pointer">
+                  <RadioGroupItem value="both" />
+                  <div>
+                    <p className="text-sm font-medium">Both</p>
+                    <p className="text-xs text-muted-foreground">Buyer can choose pickup or delivery</p>
+                  </div>
+                </label>
+              </RadioGroup>
+              {(formData.fulfillment_mode === 'delivery' || formData.fulfillment_mode === 'both') && (
+                <div className="space-y-2 pt-2 border-t">
+                  <Label htmlFor="delivery_note" className="text-xs">Delivery Instructions</Label>
+                  <Input
+                    id="delivery_note"
+                    placeholder="e.g. Pickup from Gate 2 or Will deliver within 1 hour"
+                    value={formData.delivery_note}
+                    onChange={(e) => setFormData({ ...formData, delivery_note: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Preview My Store */}
+          {sellerProfile && (
+            <Link to={`/seller/${sellerProfile.id}`}>
+              <Button variant="outline" className="w-full gap-2">
+                <Eye size={16} />
+                Preview My Store
+              </Button>
+            </Link>
+          )}
 
           {/* Sell Beyond Community */}
           <div className="space-y-3">
