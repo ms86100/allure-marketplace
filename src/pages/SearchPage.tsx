@@ -593,7 +593,7 @@ function CategoryBubbleRow({
   );
 }
 
-// ── Product Result Card ────────────────────────────────
+// ── Product Result Card (Redesigned with trust signals) ──
 function ProductResultCard({
   product: p,
   categoryMap,
@@ -637,18 +637,19 @@ function ProductResultCard({
   return (
     <div
       onClick={() => onProductTap(p)}
-      className="flex gap-3 bg-card border border-border rounded-xl p-3 hover:shadow-sm transition-shadow cursor-pointer"
+      className="flex gap-3 bg-card border border-border/50 rounded-xl p-3 hover:shadow-sm transition-all cursor-pointer"
     >
-      <div className="relative w-20 h-20 shrink-0">
+      {/* Product Image */}
+      <div className="relative w-22 h-22 shrink-0 rounded-lg overflow-hidden">
         {p.image_url ? (
           <img
             src={p.image_url}
             alt={p.product_name}
-            className="w-full h-full rounded-lg object-cover"
+            className="w-20 h-20 rounded-lg object-cover"
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full rounded-lg bg-muted flex items-center justify-center">
+          <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center">
             {catInfo ? (
               <span className="text-2xl">{catInfo.icon}</span>
             ) : (
@@ -659,6 +660,7 @@ function ProductResultCard({
       </div>
 
       <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+        {/* Name + Price */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             {p.is_veg !== null && <VegBadge isVeg={p.is_veg} size="sm" />}
@@ -667,78 +669,72 @@ function ProductResultCard({
           <span className="text-sm font-bold text-primary whitespace-nowrap">₹{p.price}</span>
         </div>
 
-        {catInfo && (
-          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded w-fit flex items-center gap-1">
-            <span>{catInfo.icon}</span>
-            {catInfo.displayName}
-          </span>
-        )}
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="truncate max-w-[100px]">{p.seller_name}</span>
-            {isNewSeller ? (
-              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                New
-              </Badge>
-            ) : p.seller_rating > 0 ? (
-              <span className="flex items-center gap-0.5 bg-success/10 text-success px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0">
-                <Star size={9} className="fill-success" />
-                {Number(p.seller_rating).toFixed(1)}
-                {p.seller_reviews > 0 && <span className="opacity-70">({p.seller_reviews})</span>}
-              </span>
-            ) : null}
-          </div>
-
-          {/* Inline Add to Cart */}
-          <div onClick={(e) => e.stopPropagation()}>
-            {quantity === 0 ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-3 text-xs border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                onClick={handleAdd}
-              >
-                Add +
-              </Button>
-            ) : (
-              <div className="flex items-center gap-1 bg-primary rounded-md px-1">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20"
-                  onClick={(e) => { e.stopPropagation(); onUpdateQuantity(p.product_id, quantity - 1); }}
-                >
-                  <Minus size={12} />
-                </Button>
-                <span className="text-xs font-bold text-primary-foreground w-4 text-center">{quantity}</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20"
-                  onClick={(e) => { e.stopPropagation(); onUpdateQuantity(p.product_id, quantity + 1); }}
-                >
-                  <Plus size={12} />
-                </Button>
-              </div>
-            )}
-          </div>
+        {/* Seller identity - humanized */}
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+          <span className="truncate max-w-[120px]">by {p.seller_name}</span>
+          {isNewSeller && (
+            <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 bg-secondary text-secondary-foreground">
+              New
+            </Badge>
+          )}
+          {p.prep_time_minutes && (
+            <span className="flex items-center gap-0.5 text-[10px]">
+              <Clock size={9} /> {p.prep_time_minutes}m
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-1 text-[10px]">
+        {/* Location + Community info */}
+        <div className="flex items-center gap-2 mt-1">
           {p.is_same_society ? (
-            <span className="flex items-center gap-0.5 text-primary">
-              <Home size={9} />
-              Your community
+            <span className="flex items-center gap-0.5 text-[10px] text-primary font-medium">
+              <Home size={9} /> Your neighbor
             </span>
           ) : (
-            <span className="flex items-center gap-0.5 text-muted-foreground">
+            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
               <MapPin size={9} />
-              {p.society_name}
-              {p.distance_km != null && (
-                <span className="ml-1 text-primary font-medium">{p.distance_km} km</span>
-              )}
+              {p.distance_km != null ? `${p.distance_km} km` : p.society_name}
             </span>
+          )}
+          {p.fulfillment_mode && (
+            <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
+              <ShoppingBag size={8} />
+              {p.fulfillment_mode === 'self_pickup' ? 'Pickup' : p.fulfillment_mode === 'delivery' ? 'Delivery' : 'Pickup/Delivery'}
+            </span>
+          )}
+        </div>
+
+        {/* Action button row */}
+        <div className="flex items-center justify-end mt-1.5" onClick={(e) => e.stopPropagation()}>
+          {quantity === 0 ? (
+            <Button
+              size="sm"
+              variant="default"
+              className="h-7 px-4 text-xs font-semibold"
+              onClick={handleAdd}
+            >
+              Add +
+            </Button>
+          ) : (
+            <div className="flex items-center gap-1 bg-primary rounded-lg px-1.5">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20"
+                onClick={(e) => { e.stopPropagation(); onUpdateQuantity(p.product_id, quantity - 1); }}
+              >
+                <Minus size={12} />
+              </Button>
+              <span className="text-xs font-bold text-primary-foreground w-4 text-center">{quantity}</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20"
+                onClick={(e) => { e.stopPropagation(); onUpdateQuantity(p.product_id, quantity + 1); }}
+              >
+                <Plus size={12} />
+              </Button>
+            </div>
           )}
         </div>
       </div>

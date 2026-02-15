@@ -1,11 +1,10 @@
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { VegBadge } from '@/components/ui/veg-badge';
-import { RatingStars } from '@/components/ui/rating-stars';
 import { FavoriteButton } from '@/components/favorite/FavoriteButton';
 import { Badge } from '@/components/ui/badge';
 import { SellerProfile, Product } from '@/types/database';
-import { Clock, MapPin, Star, Award, Zap, Users } from 'lucide-react';
+import { Clock, MapPin, Award, Zap, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SellerCardProps {
@@ -17,10 +16,11 @@ interface SellerCardProps {
 export function SellerCard({ seller, featuredProduct, showFavorite = true }: SellerCardProps) {
   const isOpen = seller.is_available;
   const profile = seller.profile;
+  const isNewSeller = !seller.rating || seller.rating === 0 || seller.total_reviews === 0;
 
   return (
     <Link to={`/seller/${seller.id}`}>
-      <Card className="overflow-hidden hover:shadow-md transition-shadow">
+      <Card className="overflow-hidden hover:shadow-md transition-all border-border/50">
         <div className="relative h-32">
           {seller.cover_image_url ? (
             <img
@@ -29,21 +29,21 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-              <span className="text-4xl">🍴</span>
+            <div className="w-full h-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+              <span className="text-4xl opacity-40">🏪</span>
             </div>
           )}
           {!isOpen && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <span className="text-white font-medium">Currently Closed</span>
+            <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
+              <span className="text-foreground font-medium text-sm">Currently Closed</span>
             </div>
           )}
           
           {/* Featured Badge */}
           {seller.is_featured && (
-            <div className="absolute top-2 left-2 px-2 py-1 rounded-full bg-warning text-warning-foreground text-xs font-medium flex items-center gap-1">
+            <div className="absolute top-2 left-2 px-2 py-1 rounded-full bg-accent text-accent-foreground text-xs font-semibold flex items-center gap-1">
               <Award size={12} />
-              Featured
+              Trusted
             </div>
           )}
 
@@ -56,7 +56,7 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
 
           {/* Seller Avatar */}
           {seller.profile_image_url && (
-            <div className="absolute -bottom-4 left-3 w-12 h-12 rounded-full border-2 border-white overflow-hidden shadow-md">
+            <div className="absolute -bottom-4 left-3 w-12 h-12 rounded-full border-2 border-card overflow-hidden shadow-md">
               <img
                 src={seller.profile_image_url}
                 alt={seller.business_name}
@@ -76,14 +76,20 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
                 </p>
               )}
             </div>
-            <RatingStars
-              rating={seller.rating}
-              totalReviews={seller.total_reviews}
-              size="sm"
-              showCount={false}
-            />
+            {/* Replace star ratings with community proof */}
+            {isNewSeller ? (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 shrink-0">
+                New Seller
+              </Badge>
+            ) : (seller as any).completed_order_count > 0 ? (
+              <span className="text-[10px] px-2 py-1 rounded-full bg-primary/10 text-primary font-semibold flex items-center gap-1 shrink-0">
+                <Users size={10} />
+                {(seller as any).completed_order_count} orders
+              </span>
+            ) : null}
           </div>
 
+          {/* Location + Hours */}
           <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
             {profile && (
               <span className="flex items-center gap-1">
@@ -101,22 +107,21 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
 
           {/* Real trust signals */}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
-            {(seller as any).completed_order_count > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-0.5">
-                <Users size={9} />
-                {(seller as any).completed_order_count} orders fulfilled
-              </span>
-            )}
             {(seller as any).avg_response_minutes != null && (seller as any).avg_response_minutes > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/10 text-success flex items-center gap-0.5">
                 <Zap size={9} />
-                ~{(seller as any).avg_response_minutes} min response
+                ~{(seller as any).avg_response_minutes}m response
               </span>
             )}
             {(seller as any).last_active_at && isRecentlyActive((seller as any).last_active_at) && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/10 text-success flex items-center gap-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                Active
+                Active today
+              </span>
+            )}
+            {(seller as any).cancellation_rate != null && (seller as any).cancellation_rate < 5 && (seller as any).completed_order_count >= 5 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-0.5">
+                Reliable
               </span>
             )}
           </div>
@@ -126,7 +131,7 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
               {seller.categories.slice(0, 3).map((cat) => (
                 <span
                   key={cat}
-                  className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground"
+                  className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
                 >
                   {cat.replace('_', ' ')}
                 </span>
@@ -141,5 +146,5 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
 
 function isRecentlyActive(lastActive: string): boolean {
   const diff = Date.now() - new Date(lastActive).getTime();
-  return diff < 24 * 60 * 60 * 1000; // active in last 24 hours
+  return diff < 24 * 60 * 60 * 1000;
 }

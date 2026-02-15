@@ -4911,6 +4911,26 @@ export type Database = {
           source: string
         }[]
       }
+      get_product_trust_metrics: {
+        Args: { _product_ids: string[] }
+        Returns: {
+          last_ordered_at: string
+          product_id: string
+          repeat_buyer_count: number
+          total_orders: number
+          unique_buyers: number
+        }[]
+      }
+      get_seller_trust_snapshot: {
+        Args: { _seller_id: string }
+        Returns: {
+          avg_response_min: number
+          completed_orders: number
+          recent_order_count: number
+          repeat_customer_pct: number
+          unique_customers: number
+        }[]
+      }
       get_user_auth_context: { Args: { _user_id: string }; Returns: Json }
       get_user_society_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
