@@ -160,6 +160,26 @@ export interface Product {
   location_required?: boolean;
   available_slots?: any | null;
   prep_time_minutes?: number | null;
+  // Marketplace-grade fields (Phase 1)
+  mrp?: number | null;
+  brand?: string | null;
+  unit_type?: string | null;
+  price_per_unit?: string | null;
+  stock_quantity?: number | null;
+  secondary_images?: string[] | null;
+  bullet_features?: string[] | null;
+  specifications?: Record<string, any> | null;
+  ingredients?: string | null;
+  serving_size?: string | null;
+  spice_level?: string | null;
+  cuisine_type?: string | null;
+  warranty_period?: string | null;
+  service_scope?: string | null;
+  visit_charge?: number | null;
+  minimum_charge?: number | null;
+  delivery_time_text?: string | null;
+  tags?: string[] | null;
+  discount_percentage?: number | null;
   created_at: string;
   updated_at: string;
   // Joined data

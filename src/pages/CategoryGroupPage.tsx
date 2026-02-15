@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { ProductGridCard, ProductWithSeller } from '@/components/product/ProductGridCard';
+import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 // ProductDetailSheet removed — cards navigate directly to seller page
 import { SellerCard } from '@/components/seller/SellerCard';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -225,10 +225,9 @@ export default function CategoryGroupPage() {
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {displayProducts.map((product) => (
-                <ProductGridCard
+                <ProductListingCard
                   key={product.id}
                   product={product}
-                  behavior={getBehavior(product.category)}
                 />
               ))}
             </div>

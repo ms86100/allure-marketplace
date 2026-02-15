@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
 import { useNearbySellers } from '@/hooks/queries/useNearbySellers';
 import { CategoryGroupGrid } from '@/components/category/CategoryGroupGrid';
-import { ProductGridCard, ProductWithSeller } from '@/components/product/ProductGridCard';
+import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -147,7 +147,7 @@ export function MarketplaceSection() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {searchResults.map(product => (
-                <ProductGridCard key={product.id} product={product} />
+                <ProductListingCard key={product.id} product={product} />
               ))}
             </div>
           )}
@@ -261,7 +261,7 @@ function LocalProductsTab({
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {cat.products.slice(0, 4).map(product => (
-                <ProductGridCard key={product.id} product={product} />
+                <ProductListingCard key={product.id} product={product} />
               ))}
             </div>
             {cat.products.length > 4 && (
@@ -374,7 +374,7 @@ function NearbyTab({
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {cat.products.slice(0, 4).map((product, idx) => (
-                    <ProductGridCard key={`${product.id || idx}`} product={product} />
+                    <ProductListingCard key={`${product.id || idx}`} product={product} />
                   ))}
                 </div>
                 {cat.products.length > 4 && (

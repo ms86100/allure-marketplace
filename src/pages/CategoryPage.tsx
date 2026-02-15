@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { ProductGridCard, ProductWithSeller } from '@/components/product/ProductGridCard';
+import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { SellerCard } from '@/components/seller/SellerCard';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -185,10 +185,10 @@ export default function CategoryPage() {
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {displayProducts.map((product) => (
-                <ProductGridCard
+                <ProductListingCard
                   key={product.id}
                   product={product as any}
-                  behavior={categoryInfo?.behavior}
+                  parentGroup={(categoryInfo as any)?.parent_group}
                   onTap={handleProductTap}
                 />
               ))}

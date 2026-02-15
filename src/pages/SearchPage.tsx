@@ -10,7 +10,7 @@ import { SearchFilters, FilterState, defaultFilters } from '@/components/search/
 import { FilterPresets } from '@/components/search/FilterPresets';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
-import { ProductGridCard, ProductWithSeller } from '@/components/product/ProductGridCard';
+import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { ArrowLeft, Search as SearchIcon, X, Globe, ShoppingBag } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -689,10 +689,9 @@ function ProductGridByCategory({
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {items.map((p) => (
-                <ProductGridCard
+                <ProductListingCard
                   key={p.product_id}
                   product={toProductWithSeller(p)}
-                  behavior={config?.behavior || null}
                   onTap={handleGridProductTap}
                   viewOnly
                 />

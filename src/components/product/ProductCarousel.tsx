@@ -1,6 +1,6 @@
 import useEmblaCarousel from 'embla-carousel-react';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
-import { ProductGridCard, ProductWithSeller } from './ProductGridCard';
+import { ProductListingCard, ProductWithSeller } from './ProductListingCard';
 import { CategoryBehavior } from '@/types/categories';
 import { cn } from '@/lib/utils';
 import { useCallback, useEffect, useState } from 'react';
@@ -84,9 +84,8 @@ export function ProductCarousel({
           <div className="flex gap-3 pl-4 pr-2">
             {products.map((product) => (
               <div key={product.id} className={cn('shrink-0', cardWidth)}>
-                <ProductGridCard
+                <ProductListingCard
                   product={product}
-                  behavior={behavior}
                   onTap={onProductTap}
                 />
               </div>

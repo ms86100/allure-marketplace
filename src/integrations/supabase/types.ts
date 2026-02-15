@@ -2628,14 +2628,20 @@ export type Database = {
           action_type: string
           approval_status: string
           available_slots: Json | null
+          brand: string | null
+          bullet_features: string[] | null
           category: string
           condition: string | null
           contact_phone: string | null
           created_at: string | null
+          cuisine_type: string | null
+          delivery_time_text: string | null
           deposit_amount: number | null
           description: string | null
+          discount_percentage: number | null
           id: string
           image_url: string | null
+          ingredients: string | null
           is_available: boolean | null
           is_bestseller: boolean | null
           is_negotiable: boolean | null
@@ -2646,26 +2652,45 @@ export type Database = {
           location_required: boolean | null
           max_rental_duration: number | null
           min_rental_duration: number | null
+          minimum_charge: number | null
+          mrp: number | null
           name: string
           prep_time_minutes: number | null
           price: number
+          price_per_unit: string | null
           rental_period_type: string | null
+          secondary_images: string[] | null
           seller_id: string
           service_duration_minutes: number | null
+          service_scope: string | null
+          serving_size: string | null
+          specifications: Json | null
+          spice_level: string | null
+          stock_quantity: number | null
+          tags: string[] | null
+          unit_type: string | null
           updated_at: string | null
+          visit_charge: number | null
+          warranty_period: string | null
         }
         Insert: {
           action_type?: string
           approval_status?: string
           available_slots?: Json | null
+          brand?: string | null
+          bullet_features?: string[] | null
           category: string
           condition?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          cuisine_type?: string | null
+          delivery_time_text?: string | null
           deposit_amount?: number | null
           description?: string | null
+          discount_percentage?: number | null
           id?: string
           image_url?: string | null
+          ingredients?: string | null
           is_available?: boolean | null
           is_bestseller?: boolean | null
           is_negotiable?: boolean | null
@@ -2676,26 +2701,45 @@ export type Database = {
           location_required?: boolean | null
           max_rental_duration?: number | null
           min_rental_duration?: number | null
+          minimum_charge?: number | null
+          mrp?: number | null
           name: string
           prep_time_minutes?: number | null
           price: number
+          price_per_unit?: string | null
           rental_period_type?: string | null
+          secondary_images?: string[] | null
           seller_id: string
           service_duration_minutes?: number | null
+          service_scope?: string | null
+          serving_size?: string | null
+          specifications?: Json | null
+          spice_level?: string | null
+          stock_quantity?: number | null
+          tags?: string[] | null
+          unit_type?: string | null
           updated_at?: string | null
+          visit_charge?: number | null
+          warranty_period?: string | null
         }
         Update: {
           action_type?: string
           approval_status?: string
           available_slots?: Json | null
+          brand?: string | null
+          bullet_features?: string[] | null
           category?: string
           condition?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          cuisine_type?: string | null
+          delivery_time_text?: string | null
           deposit_amount?: number | null
           description?: string | null
+          discount_percentage?: number | null
           id?: string
           image_url?: string | null
+          ingredients?: string | null
           is_available?: boolean | null
           is_bestseller?: boolean | null
           is_negotiable?: boolean | null
@@ -2706,13 +2750,26 @@ export type Database = {
           location_required?: boolean | null
           max_rental_duration?: number | null
           min_rental_duration?: number | null
+          minimum_charge?: number | null
+          mrp?: number | null
           name?: string
           prep_time_minutes?: number | null
           price?: number
+          price_per_unit?: string | null
           rental_period_type?: string | null
+          secondary_images?: string[] | null
           seller_id?: string
           service_duration_minutes?: number | null
+          service_scope?: string | null
+          serving_size?: string | null
+          specifications?: Json | null
+          spice_level?: string | null
+          stock_quantity?: number | null
+          tags?: string[] | null
+          unit_type?: string | null
           updated_at?: string | null
+          visit_charge?: number | null
+          warranty_period?: string | null
         }
         Relationships: [
           {
