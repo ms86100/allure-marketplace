@@ -6,12 +6,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { PaymentRecord, Order, PAYMENT_STATUS_LABELS, PaymentStatus } from '@/types/database';
+import { PaymentRecord, Order, PAYMENT_STATUS_LABELS, PaymentStatus, SellerProfile } from '@/types/database';
 import { ArrowLeft, TrendingUp, DollarSign, Calendar, CreditCard } from 'lucide-react';
 import { format, startOfDay, startOfWeek, startOfMonth, isAfter, parseISO } from 'date-fns';
 
 export default function SellerEarningsPage() {
-  const { user } = useAuth();
+  const { user, currentSellerId, sellerProfiles } = useAuth();
   const [payments, setPayments] = useState<(PaymentRecord & { order?: Order })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -22,36 +22,28 @@ export default function SellerEarningsPage() {
     pendingPayout: 0,
   });
 
-  useEffect(() => {
-    if (user) {
-      fetchEarnings();
-    }
-  }, [user]);
+  const activeSellerId = currentSellerId || (sellerProfiles.length > 0 ? sellerProfiles[0].id : null);
 
-  const fetchEarnings = async () => {
+  useEffect(() => {
+    if (user && activeSellerId) {
+      fetchEarnings(activeSellerId);
+    } else {
+      setIsLoading(false);
+    }
+  }, [user, activeSellerId]);
+
+  const fetchEarnings = async (sellerId: string) => {
     if (!user) return;
 
     try {
-      // Get seller profile first
-      const { data: sellerProfile } = await supabase
-        .from('seller_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!sellerProfile) {
-        setIsLoading(false);
-        return;
-      }
-
-      // Fetch payment records
+      // Fetch payment records for the active seller
       const { data, error } = await supabase
         .from('payment_records')
         .select(`
           *,
           order:orders(id, status, created_at, buyer:profiles!orders_buyer_id_fkey(name))
         `)
-        .eq('seller_id', sellerProfile.id)
+        .eq('seller_id', sellerId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

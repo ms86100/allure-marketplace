@@ -34,7 +34,7 @@ import { toast } from 'sonner';
 
 export default function SellerDetailPage() {
   const { id } = useParams();
-  const { user, profile: authProfile, effectiveSocietyId } = useAuth();
+  const { user, effectiveSocietyId } = useAuth();
   const { configs: allCategoryConfigs } = useCategoryConfigs();
   const { items, totalAmount } = useCart();
   const [seller, setSeller] = useState<SellerProfile | null>(null);
@@ -69,6 +69,7 @@ export default function SellerDetailPage() {
           .select('*')
           .eq('seller_id', id)
           .eq('is_available', true)
+          .eq('approval_status', 'approved')
           .order('is_bestseller', { ascending: false })
           .order('is_recommended', { ascending: false })
           .order('category'),
@@ -77,10 +78,9 @@ export default function SellerDetailPage() {
       if (sellerRes.error) throw sellerRes.error;
       if (productsRes.error) throw productsRes.error;
 
-      // Society scoping: allow same-society or cross-society when browse_beyond is enabled
+      // Society scoping: allow same-society or cross-society based on seller's sell_beyond flag
       const sellerData = sellerRes.data as any;
-      const browseBeyond = (authProfile as any)?.browse_beyond_community === true;
-      if (effectiveSocietyId && sellerData.society_id && sellerData.society_id !== effectiveSocietyId && !browseBeyond) {
+      if (effectiveSocietyId && sellerData.society_id && sellerData.society_id !== effectiveSocietyId && !sellerData.sell_beyond_community) {
         setSeller(null);
         return;
       }

@@ -197,8 +197,8 @@ export default function SellerDashboardPage() {
             </div>
             {/* Badges buyers see */}
             <div className="flex flex-wrap gap-1.5">
-              {((sellerProfile as any).completed_order_count || 0) < 5 && (
-                <Badge variant="secondary" className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+              {((sellerProfile as any).completed_order_count || 0) === 0 && (
+                <Badge variant="secondary" className="text-[10px] bg-secondary text-secondary-foreground">
                   New Seller
                 </Badge>
               )}

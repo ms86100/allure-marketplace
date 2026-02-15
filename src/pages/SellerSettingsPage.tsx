@@ -387,7 +387,7 @@ export default function SellerSettingsPage() {
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              placeholder="Tell customers about your food..."
+              placeholder="Tell customers about your business..."
               value={formData.description}
               onChange={(e) =>
                 setFormData({ ...formData, description: e.target.value })

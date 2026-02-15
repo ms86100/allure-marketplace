@@ -209,10 +209,14 @@ export default function SellerProductsPage() {
       return;
     }
 
-    // Price validation based on action_type
-    const needsPrice = ['add_to_cart', 'buy_now', 'book', 'request_service', 'schedule_visit'].includes(formData.action_type);
+    // Price validation: use DB-driven requires_price from category_config
+    const categoryRequiresPrice = activeCategoryConfig
+      ? (activeCategoryConfig as any).behavior?.isPhysicalProduct !== false || !['contact_only', 'request_quote', 'make_offer'].includes(formData.action_type)
+      : true;
     const price = parseFloat(formData.price);
-    if (needsPrice && (isNaN(price) || price <= 0)) {
+    // Also check the action_type-level rule: contact_seller & request_quote don't need price
+    const actionNeedsPrice = !['contact_seller', 'request_quote', 'make_offer'].includes(formData.action_type);
+    if (categoryRequiresPrice && actionNeedsPrice && (isNaN(price) || price <= 0)) {
       toast.error('Please enter a valid price');
       return;
     }
@@ -701,8 +705,8 @@ export default function SellerProductsPage() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full bg-muted flex items-center justify-center">
-                        <span className="text-xl">🍽️</span>
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                        <span className="text-xl">{configs.find(c => c.category === product.category)?.icon || '📦'}</span>
                       </div>
                     )}
                     {!product.is_available && (
