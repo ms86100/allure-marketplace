@@ -2,20 +2,19 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { ProductGridCard } from '@/components/product/ProductGridCard';
 import { SellerCard } from '@/components/seller/SellerCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { VegBadge } from '@/components/ui/veg-badge';
 import { Button } from '@/components/ui/button';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCart } from '@/hooks/useCart';
 import { SellerProfile, ProductCategory, Product } from '@/types/database';
-import { ArrowLeft, Search, Clock, MapPin, Truck, ShoppingCart, Plus, Minus, X, MessageCircle, Calendar } from 'lucide-react';
+import { ArrowLeft, Search, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type ProductWithSeller = Product & {
+  seller_id: string;
   seller?: {
     id: string;
     business_name: string;
@@ -31,12 +30,11 @@ export default function CategoryPage() {
   const { category } = useParams<{ category: ProductCategory }>();
   const { configs } = useCategoryConfigs();
   const { effectiveSocietyId } = useAuth();
-  const { items, addItem, updateQuantity } = useCart();
   const [sellers, setSellers] = useState<SellerProfile[]>([]);
   const [products, setProducts] = useState<ProductWithSeller[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
+  const [sortBy, setSortBy] = useState<'relevance' | 'price_low' | 'price_high' | 'popular'>('relevance');
 
   const categoryInfo = configs.find((c) => c.category === category);
 
@@ -107,235 +105,145 @@ export default function CategoryPage() {
     }
   };
 
-  const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const q = searchQuery.toLowerCase();
-    return products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.description?.toLowerCase().includes(q)
-    );
-  }, [searchQuery, products]);
+  const displayProducts = useMemo(() => {
+    let filtered = products;
 
-  const showSearchResults = searchQuery.trim().length > 0;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.description?.toLowerCase().includes(q)
+      );
+    }
 
-  const getCartQuantity = (productId: string) => {
-    return items.find((item) => item.product_id === productId)?.quantity || 0;
-  };
+    const sorted = [...filtered];
+    switch (sortBy) {
+      case 'price_low':
+        sorted.sort((a, b) => a.price - b.price);
+        break;
+      case 'price_high':
+        sorted.sort((a, b) => b.price - a.price);
+        break;
+      case 'popular':
+        sorted.sort((a, b) => (b.is_bestseller ? 1 : 0) - (a.is_bestseller ? 1 : 0));
+        break;
+    }
+    return sorted;
+  }, [products, searchQuery, sortBy]);
 
   return (
     <AppLayout showHeader={false}>
-      <div className="p-4 pb-24">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-4">
-          <Link to="/">
-            <ArrowLeft size={24} />
-          </Link>
-          <div className="flex items-center gap-2 flex-1">
-            <span className="text-2xl">{categoryInfo?.icon}</span>
-            <h1 className="text-xl font-bold">{categoryInfo?.displayName || category}</h1>
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-30 bg-background border-b border-border/40">
+        <div className="px-4 pt-3 pb-2">
+          <div className="flex items-center gap-3 mb-3">
+            <Link to="/" className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+              <ArrowLeft size={18} />
+            </Link>
+            <h1 className="text-lg font-bold flex items-center gap-2 flex-1">
+              <span>{categoryInfo?.icon}</span>
+              {categoryInfo?.displayName || category}
+            </h1>
+          </div>
+
+          {/* Search */}
+          <div className="relative mb-2">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder={`Search in ${categoryInfo?.displayName || category}…`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-8 h-9 bg-muted border-0 rounded-lg text-sm"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative mb-5">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder={`Search in ${categoryInfo?.displayName || category}...`}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-10"
-          />
-          {searchQuery && (
+        {/* Sort bar */}
+        <div className="flex gap-2 px-4 pb-2 overflow-x-auto scrollbar-hide">
+          {[
+            { key: 'relevance' as const, label: 'Relevance' },
+            { key: 'price_low' as const, label: 'Price: Low' },
+            { key: 'price_high' as const, label: 'Price: High' },
+            { key: 'popular' as const, label: 'Popular' },
+          ].map((opt) => (
             <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              key={opt.key}
+              onClick={() => setSortBy(opt.key)}
+              className={cn(
+                'px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors',
+                sortBy === opt.key
+                  ? 'bg-foreground text-background'
+                  : 'bg-muted/60 text-muted-foreground'
+              )}
             >
-              <X size={16} />
+              {opt.label}
             </button>
-          )}
+          ))}
         </div>
+      </div>
 
-        {/* Search Results */}
-        {showSearchResults ? (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              {filteredProducts.length} result{filteredProducts.length !== 1 ? 's' : ''} for "{searchQuery}"
+      {/* Content */}
+      <div className="p-4 pb-6">
+        {isLoading ? (
+          <div className="grid grid-cols-3 gap-2.5">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-44 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : displayProducts.length > 0 ? (
+          <>
+            <p className="text-xs text-muted-foreground mb-3">
+              {displayProducts.length} item{displayProducts.length !== 1 ? 's' : ''}
             </p>
-            {filteredProducts.length > 0 ? (
-              filteredProducts.map((product) => {
-                const qty = getCartQuantity(product.id);
-                const seller = product.seller;
-                return (
-                  <Card key={product.id} className="overflow-hidden">
-                    <CardContent className="p-0">
-                      <div className="flex gap-3 p-3">
-                        {/* Product Image */}
-                        <div className="relative w-24 h-24 rounded-lg overflow-hidden flex-shrink-0">
-                          {product.image_url ? (
-                            <img
-                              src={product.image_url}
-                              alt={product.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-muted flex items-center justify-center">
-                              <span className="text-2xl">🍽️</span>
-                            </div>
-                          )}
-                          {product.is_bestseller && (
-                            <Badge className="absolute top-1 left-1 bg-warning text-warning-foreground text-[9px] px-1 py-0">
-                              Bestseller
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Product Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start gap-1.5">
-                            <VegBadge isVeg={product.is_veg} size="sm" className="mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-sm line-clamp-1">{product.name}</h3>
-                              {product.description && (
-                                <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                                  {product.description}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          <p className="font-bold text-primary mt-1.5">₹{product.price}</p>
-
-                          {/* Seller & Delivery Info */}
-                          {seller && (
-                            <div className="mt-2 space-y-1">
-                              <Link
-                                to={`/seller/${seller.id}`}
-                                className="text-xs font-medium text-primary hover:underline"
-                              >
-                                {seller.business_name}
-                              </Link>
-                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                                {seller.profile?.block && (
-                                  <span className="flex items-center gap-0.5">
-                                    <MapPin size={10} />
-                                    Block {seller.profile.block}
-                                    {seller.profile.flat_number && `, ${seller.profile.flat_number}`}
-                                  </span>
-                                )}
-                                {seller.availability_start && seller.availability_end && (
-                                  <span className="flex items-center gap-0.5">
-                                    <Clock size={10} />
-                                    {seller.availability_start.slice(0, 5)} – {seller.availability_end.slice(0, 5)}
-                                  </span>
-                                )}
-                                <span className="flex items-center gap-0.5">
-                                  <Truck size={10} />
-                                  {seller.delivery_radius
-                                    ? `Within ${seller.delivery_radius}`
-                                    : 'Society delivery'}
-                                </span>
-                              </div>
-                              {!seller.is_available && (
-                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-destructive/10 text-destructive">
-                                  Currently unavailable
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Action button - category-aware */}
-                      <div className="px-3 pb-3 flex justify-end">
-                        {categoryInfo?.behavior?.supportsCart && !categoryInfo?.behavior?.enquiryOnly && !categoryInfo?.behavior?.requiresTimeSlot ? (
-                          qty === 0 ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                              onClick={() => addItem(product)}
-                              disabled={!product.is_available || !seller?.is_available}
-                            >
-                              <Plus size={14} className="mr-1" /> Add
-                            </Button>
-                          ) : (
-                            <div className="flex items-center gap-2 bg-primary rounded-md px-2 shadow-sm">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 w-7 p-0 text-primary-foreground hover:bg-primary-foreground/20"
-                                onClick={() => updateQuantity(product.id, qty - 1)}
-                              >
-                                <Minus size={14} />
-                              </Button>
-                              <span className="font-semibold text-primary-foreground w-4 text-center text-sm">
-                                {qty}
-                              </span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-7 w-7 p-0 text-primary-foreground hover:bg-primary-foreground/20"
-                                onClick={() => updateQuantity(product.id, qty + 1)}
-                              >
-                                <Plus size={14} />
-                              </Button>
-                            </div>
-                          )
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                            disabled={!product.is_available || !seller?.is_available}
-                          >
-                            {categoryInfo?.behavior?.enquiryOnly ? (
-                              <><MessageCircle size={14} className="mr-1" /> Contact</>
-                            ) : categoryInfo?.behavior?.requiresTimeSlot ? (
-                              <><Calendar size={14} className="mr-1" /> Book</>
-                            ) : (
-                              <><Plus size={14} className="mr-1" /> View</>
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })
-            ) : (
-              <div className="text-center py-12">
-                <Search size={32} className="mx-auto text-muted-foreground mb-3" />
-                <p className="text-muted-foreground text-sm">No items found for "{searchQuery}"</p>
-                <p className="text-xs text-muted-foreground mt-1">Try a different search term</p>
-              </div>
+            <div className="grid grid-cols-3 gap-2.5">
+              {displayProducts.map((product) => (
+                <ProductGridCard
+                  key={product.id}
+                  product={product as any}
+                  behavior={categoryInfo?.behavior}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-16">
+            <span className="text-4xl mb-4 block">{categoryInfo?.icon}</span>
+            <h3 className="font-semibold mb-2">No items found</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {searchQuery ? 'Try a different search' : 'No products in this category yet'}
+            </p>
+            {!searchQuery && (
+              <Link to="/become-seller">
+                <Button variant="outline" size="sm">Be the first to sell here!</Button>
+              </Link>
             )}
           </div>
-        ) : (
-          /* Default: Seller List */
-          <>
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-48 w-full rounded-xl" />
-                ))}
-              </div>
-            ) : sellers.length > 0 ? (
-              <div className="space-y-3">
-                {sellers.map((seller) => (
-                  <SellerCard key={seller.id} seller={seller as any} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <span className="text-5xl mb-4 block">{categoryInfo?.icon}</span>
-                <p className="text-muted-foreground">No sellers in this category yet</p>
-                <Link to="/become-seller" className="text-primary text-sm mt-2 block">
-                  Be the first to sell here!
-                </Link>
-              </div>
-            )}
-          </>
+        )}
+
+        {/* Top Sellers */}
+        {sellers.length > 0 && !searchQuery && (
+          <div className="mt-8">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-base">⭐</span>
+              <h3 className="font-semibold text-sm">
+                Top Sellers in {categoryInfo?.displayName || category}
+              </h3>
+            </div>
+            <div className="space-y-3">
+              {sellers.slice(0, 5).map((seller) => (
+                <SellerCard key={seller.id} seller={seller as any} />
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </AppLayout>
