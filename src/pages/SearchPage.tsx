@@ -683,6 +683,9 @@ function ProductGridByCategory({
                 {catInfo?.displayName || cat}
               </h3>
               <span className="text-xs text-muted-foreground">({items.length})</span>
+              <span className="text-xs font-semibold text-success ml-1">
+                Starting ₹{Math.min(...items.map(p => p.price))}
+              </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {items.map((p) => (
