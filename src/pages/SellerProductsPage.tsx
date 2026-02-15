@@ -30,7 +30,7 @@ import { Product, ProductCategory, SellerProfile } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { ParentGroup } from '@/types/categories';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
-import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle, Store, ShieldAlert, Upload } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle, Store, ShieldAlert, Upload, Send, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { BulkProductUpload } from '@/components/seller/BulkProductUpload';
 
@@ -70,9 +70,8 @@ export default function SellerProductsPage() {
   // Determine if current category shows veg toggle (DB-driven)
   const showVegToggle = useMemo(() => {
     if (activeCategoryConfig) return activeCategoryConfig.formHints.showVegToggle;
-    // Fallback: check primary group
-    return primaryGroup === 'food';
-  }, [activeCategoryConfig, primaryGroup]);
+    return false;
+  }, [activeCategoryConfig]);
 
   // Determine if current category shows duration field (DB-driven)
   const showDurationField = useMemo(() => {
@@ -226,6 +225,7 @@ export default function SellerProductsPage() {
         is_recommended: formData.is_recommended,
         is_urgent: formData.is_urgent,
         image_url: formData.image_url,
+        ...(editingProduct ? {} : { approval_status: 'draft' }),
       };
 
       if (editingProduct) {
@@ -591,9 +591,35 @@ export default function SellerProductsPage() {
 
         <h1 className="text-xl font-bold mb-4">Your Products ({products.length})</h1>
 
+        {/* Bulk Submit for Approval */}
+        {products.some(p => (p as any).approval_status === 'draft') && (
+          <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-xl flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">
+                {products.filter(p => (p as any).approval_status === 'draft').length} draft product(s) ready
+              </p>
+              <p className="text-xs text-muted-foreground">Submit for admin review to make them visible to buyers</p>
+            </div>
+            <Button size="sm" onClick={async () => {
+              const draftIds = products.filter(p => (p as any).approval_status === 'draft').map(p => p.id);
+              const { error } = await supabase.from('products').update({ approval_status: 'pending' } as any).in('id', draftIds);
+              if (error) { toast.error('Failed to submit'); return; }
+              toast.success(`${draftIds.length} product(s) submitted for approval`);
+              if (sellerProfile) fetchData(sellerProfile.id);
+            }}>
+              <Send size={14} className="mr-1" />
+              Submit All for Approval
+            </Button>
+          </div>
+        )}
+
         {products.length > 0 ? (
           <div className="space-y-3">
-            {products.map((product) => (
+            {products.map((product) => {
+              const approvalStatus = (product as any).approval_status || 'approved';
+              const isEditable = approvalStatus === 'draft' || approvalStatus === 'rejected';
+
+              return (
               <div
                 key={product.id}
                 className={`bg-card rounded-xl p-4 shadow-sm transition-opacity ${
@@ -621,14 +647,34 @@ export default function SellerProductsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start gap-2 flex-wrap">
-                      {/* Only show VegBadge when category has showVegToggle */}
                       {(() => {
                         const prodConfig = configs.find(c => c.category === product.category);
-                        return (prodConfig?.formHints.showVegToggle ?? primaryGroup === 'food') && <VegBadge isVeg={product.is_veg} size="sm" />;
+                        return (prodConfig?.formHints.showVegToggle ?? false) && <VegBadge isVeg={product.is_veg} size="sm" />;
                       })()}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-medium truncate">{product.name}</h3>
+                          {/* Approval Status Badge */}
+                          {approvalStatus === 'draft' && (
+                            <Badge variant="outline" className="text-[10px] px-1 gap-0.5 border-muted-foreground/30">
+                              <Clock size={10} /> Draft
+                            </Badge>
+                          )}
+                          {approvalStatus === 'pending' && (
+                            <Badge className="bg-warning/20 text-warning-foreground text-[10px] px-1 gap-0.5">
+                              <Clock size={10} /> Pending
+                            </Badge>
+                          )}
+                          {approvalStatus === 'rejected' && (
+                            <Badge variant="destructive" className="text-[10px] px-1 gap-0.5">
+                              <XCircle size={10} /> Rejected
+                            </Badge>
+                          )}
+                          {approvalStatus === 'approved' && (
+                            <Badge className="bg-success/20 text-success text-[10px] px-1 gap-0.5">
+                              <CheckCircle2 size={10} /> Live
+                            </Badge>
+                          )}
                           {product.is_bestseller && (
                             <Badge className="bg-warning/20 text-warning-foreground text-[10px] px-1">
                               <Star size={10} className="mr-0.5 fill-warning text-warning" />
@@ -653,22 +699,45 @@ export default function SellerProductsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 mt-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => openEditDialog(product)}
-                      >
-                        <Edit size={14} className="mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive"
-                        onClick={() => handleDelete(product)}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
+                      {isEditable ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openEditDialog(product)}
+                          >
+                            <Edit size={14} className="mr-1" />
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive"
+                            onClick={() => handleDelete(product)}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                          {approvalStatus === 'draft' && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={async () => {
+                                const { error } = await supabase.from('products').update({ approval_status: 'pending' } as any).eq('id', product.id);
+                                if (error) { toast.error('Failed to submit'); return; }
+                                toast.success('Submitted for approval');
+                                if (sellerProfile) fetchData(sellerProfile.id);
+                              }}
+                            >
+                              <Send size={14} className="mr-1" />
+                              Submit
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">
+                          {approvalStatus === 'pending' ? 'Awaiting admin review' : 'Live — contact admin to edit'}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-col items-center gap-1">
@@ -682,7 +751,8 @@ export default function SellerProductsPage() {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-center py-12 bg-muted rounded-xl">

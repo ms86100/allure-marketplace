@@ -34,6 +34,7 @@ import { EmergencyBroadcastSheet } from '@/components/admin/EmergencyBroadcastSh
 import { logAudit } from '@/lib/audit';
 import { SocietySwitcher } from '@/components/admin/SocietySwitcher';
 import { FeatureManagement } from '@/components/admin/FeatureManagement';
+import { AdminProductApprovals } from '@/components/admin/AdminProductApprovals';
 interface Report {
   id: string;
   reporter_id: string;
@@ -304,9 +305,10 @@ export default function AdminPage() {
         </div>
 
         <Tabs defaultValue="users">
-          <TabsList className="w-full grid grid-cols-10">
+          <TabsList className="w-full grid grid-cols-11">
             <TabsTrigger value="users" className="text-[10px]">Users</TabsTrigger>
             <TabsTrigger value="sellers" className="text-[10px]">Sellers</TabsTrigger>
+            <TabsTrigger value="products" className="text-[10px]">Products</TabsTrigger>
             <TabsTrigger value="societies" className="text-[10px]">Societies</TabsTrigger>
             <TabsTrigger value="disputes" className="text-[10px]">Disputes</TabsTrigger>
             <TabsTrigger value="reports" className="text-[10px]">Reports</TabsTrigger>
@@ -316,6 +318,10 @@ export default function AdminPage() {
             <TabsTrigger value="features" className="text-[10px]">Features</TabsTrigger>
             <TabsTrigger value="settings" className="text-[10px]">Settings</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="products" className="mt-4">
+            <AdminProductApprovals />
+          </TabsContent>
 
           <TabsContent value="users" className="space-y-2 mt-4">
             <h3 className="text-sm font-semibold text-muted-foreground">Pending Users ({pendingUsers.length})</h3>

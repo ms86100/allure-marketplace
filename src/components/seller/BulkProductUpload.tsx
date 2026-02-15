@@ -3,7 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import {
   Sheet,
@@ -53,12 +52,21 @@ interface BulkProductUploadProps {
 
 const EMPTY_ROW: BulkRow = { name: '', price: '', category: '', description: '', is_veg: true, prep_time_minutes: '' };
 
+/** Look up the CategoryConfig for a given category slug */
+function getCategoryConfig(slug: string, categories: CategoryConfig[]): CategoryConfig | undefined {
+  return categories.find(c => c.category === slug);
+}
+
 export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories, onSuccess }: BulkProductUploadProps) {
   const [rows, setRows] = useState<BulkRow[]>([{ ...EMPTY_ROW, category: allowedCategories[0]?.category || '' }]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<{ success: number; errors: number } | null>(null);
 
   const categorySlugs = useMemo(() => allowedCategories.map(c => c.category), [allowedCategories]);
+
+  // Check if ANY allowed category has veg toggle / duration field (for column header visibility)
+  const anyShowVeg = useMemo(() => allowedCategories.some(c => c.formHints.showVegToggle), [allowedCategories]);
+  const anyShowDuration = useMemo(() => allowedCategories.some(c => c.formHints.showDurationField), [allowedCategories]);
 
   const addRow = () => {
     setRows([...rows, { ...EMPTY_ROW, category: allowedCategories[0]?.category || '' }]);
@@ -113,13 +121,20 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
 
       const parsed: BulkRow[] = lines.slice(1).map(line => {
         const cols = line.split(',').map(c => c.trim());
+        const cat = cols[categoryIdx] || allowedCategories[0]?.category || '';
+        const config = getCategoryConfig(cat, allowedCategories);
         return {
           name: cols[nameIdx] || '',
           price: cols[priceIdx] || '',
-          category: cols[categoryIdx] || allowedCategories[0]?.category || '',
+          category: cat,
           description: cols[descIdx] || '',
-          is_veg: vegIdx >= 0 ? cols[vegIdx]?.toLowerCase() === 'true' : true,
-          prep_time_minutes: prepIdx >= 0 ? cols[prepIdx] || '' : '',
+          // Default is_veg to true if category doesn't show veg toggle
+          is_veg: config?.formHints.showVegToggle
+            ? (vegIdx >= 0 ? cols[vegIdx]?.toLowerCase() === 'true' : true)
+            : true,
+          prep_time_minutes: config?.formHints.showDurationField
+            ? (prepIdx >= 0 ? cols[prepIdx] || '' : '')
+            : '',
         };
       });
 
@@ -138,6 +153,14 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
       const price = parseFloat(row.price);
       if (isNaN(price) || price <= 0) errors.push('Invalid price');
       if (row.category && !categorySlugs.includes(row.category)) errors.push('Invalid category');
+
+      // Category-aware validation
+      const config = getCategoryConfig(row.category, allowedCategories);
+      if (config) {
+        if (!config.formHints.showVegToggle && !row.is_veg) {
+          errors.push('Veg toggle not applicable for this category');
+        }
+      }
 
       // Duplicate check
       const isDupe = rows.some((other, otherIdx) =>
@@ -166,26 +189,30 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
     setSaveResult(null);
 
     try {
-      const products = rows.map(row => ({
-        seller_id: sellerId,
-        name: row.name.trim(),
-        price: parseFloat(row.price),
-        category: row.category,
-        description: row.description.trim() || null,
-        is_veg: row.is_veg,
-        prep_time_minutes: row.prep_time_minutes ? parseInt(row.prep_time_minutes) : null,
-        is_available: true,
-      }));
+      const products = rows.map(row => {
+        const config = getCategoryConfig(row.category, allowedCategories);
+        return {
+          seller_id: sellerId,
+          name: row.name.trim(),
+          price: parseFloat(row.price),
+          category: row.category,
+          description: row.description.trim() || null,
+          is_veg: config?.formHints.showVegToggle ? row.is_veg : true,
+          prep_time_minutes: config?.formHints.showDurationField && row.prep_time_minutes
+            ? parseInt(row.prep_time_minutes) : null,
+          is_available: true,
+          approval_status: 'draft',
+        };
+      });
 
       const { error } = await supabase.from('products').insert(products as any);
 
       if (error) throw error;
 
       setSaveResult({ success: products.length, errors: 0 });
-      toast.success(`${products.length} products added successfully`);
+      toast.success(`${products.length} products added as drafts`);
       onSuccess();
 
-      // Reset after brief delay
       setTimeout(() => {
         setRows([{ ...EMPTY_ROW, category: allowedCategories[0]?.category || '' }]);
         setSaveResult(null);
@@ -253,78 +280,105 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
                 <TableHead className="w-24">Price *</TableHead>
                 {allowedCategories.length > 1 && <TableHead className="w-32">Category</TableHead>}
                 <TableHead>Description</TableHead>
-                <TableHead className="w-16">Veg</TableHead>
+                {anyShowVeg && <TableHead className="w-16">Veg</TableHead>}
+                {anyShowDuration && <TableHead className="w-24">Duration</TableHead>}
                 <TableHead className="w-8"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row, idx) => (
-                <TableRow key={idx} className={row.error ? 'bg-destructive/5' : ''}>
-                  <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
-                  <TableCell>
-                    <Input
-                      value={row.name}
-                      onChange={(e) => updateRow(idx, 'name', e.target.value)}
-                      placeholder="Product name"
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={row.price}
-                      onChange={(e) => updateRow(idx, 'price', e.target.value)}
-                      placeholder="₹"
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  {allowedCategories.length > 1 && (
+              {rows.map((row, idx) => {
+                const rowConfig = getCategoryConfig(row.category, allowedCategories);
+                const rowShowVeg = rowConfig?.formHints.showVegToggle ?? false;
+                const rowShowDuration = rowConfig?.formHints.showDurationField ?? false;
+
+                return (
+                  <TableRow key={idx} className={row.error ? 'bg-destructive/5' : ''}>
+                    <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
                     <TableCell>
-                      <Select value={row.category} onValueChange={(v) => updateRow(idx, 'category', v)}>
-                        <SelectTrigger className="h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {allowedCategories.map(c => (
-                            <SelectItem key={c.category} value={c.category}>
-                              {c.icon} {c.displayName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Input
+                        value={row.name}
+                        onChange={(e) => updateRow(idx, 'name', e.target.value)}
+                        placeholder={rowConfig?.formHints.namePlaceholder || 'Product name'}
+                        className="h-8 text-sm"
+                      />
                     </TableCell>
-                  )}
-                  <TableCell>
-                    <Input
-                      value={row.description}
-                      onChange={(e) => updateRow(idx, 'description', e.target.value)}
-                      placeholder="Optional"
-                      className="h-8 text-sm"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={row.is_veg}
-                      onCheckedChange={(v) => updateRow(idx, 'is_veg', v)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive"
-                      onClick={() => removeRow(idx)}
-                      disabled={rows.length <= 1}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={row.price}
+                        onChange={(e) => updateRow(idx, 'price', e.target.value)}
+                        placeholder="₹"
+                        className="h-8 text-sm"
+                      />
+                    </TableCell>
+                    {allowedCategories.length > 1 && (
+                      <TableCell>
+                        <Select value={row.category} onValueChange={(v) => updateRow(idx, 'category', v)}>
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allowedCategories.map(c => (
+                              <SelectItem key={c.category} value={c.category}>
+                                {c.icon} {c.displayName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <Input
+                        value={row.description}
+                        onChange={(e) => updateRow(idx, 'description', e.target.value)}
+                        placeholder="Optional"
+                        className="h-8 text-sm"
+                      />
+                    </TableCell>
+                    {anyShowVeg && (
+                      <TableCell>
+                        {rowShowVeg ? (
+                          <Switch
+                            checked={row.is_veg}
+                            onCheckedChange={(v) => updateRow(idx, 'is_veg', v)}
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    )}
+                    {anyShowDuration && (
+                      <TableCell>
+                        {rowShowDuration ? (
+                          <Input
+                            type="number"
+                            value={row.prep_time_minutes}
+                            onChange={(e) => updateRow(idx, 'prep_time_minutes', e.target.value)}
+                            placeholder={rowConfig?.formHints.durationLabel || 'min'}
+                            className="h-8 text-sm"
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive"
+                        onClick={() => removeRow(idx)}
+                        disabled={rows.length <= 1}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
 
-          {/* Error display */}
           {rows.some(r => r.error) && (
             <div className="mt-3 space-y-1">
               {rows.map((r, idx) => r.error ? (
@@ -339,7 +393,7 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
 
         <div className="flex items-center justify-between mt-4 pt-4 border-t">
           <div className="text-sm text-muted-foreground">
-            {rows.length} product{rows.length !== 1 ? 's' : ''} to add
+            {rows.length} product{rows.length !== 1 ? 's' : ''} to add as drafts
           </div>
           <div className="flex gap-2">
             {saveResult && (

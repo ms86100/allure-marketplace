@@ -2613,6 +2613,7 @@ export type Database = {
       }
       products: {
         Row: {
+          approval_status: string
           available_slots: Json | null
           category: string
           condition: string | null
@@ -2640,6 +2641,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          approval_status?: string
           available_slots?: Json | null
           category: string
           condition?: string | null
@@ -2667,6 +2669,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          approval_status?: string
           available_slots?: Json | null
           category?: string
           condition?: string | null
