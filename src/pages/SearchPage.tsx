@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,8 +9,11 @@ import { SearchFilters, FilterState, defaultFilters } from '@/components/search/
 import { FilterPresets } from '@/components/search/FilterPresets';
 import { Skeleton } from '@/components/ui/skeleton';
 import { VegBadge } from '@/components/ui/veg-badge';
-import { ArrowLeft, Search as SearchIcon, X, Globe, Star, MapPin, Home, Tag } from 'lucide-react';
+import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
+import { ArrowLeft, Search as SearchIcon, X, Globe, Star, MapPin, Home, Tag, ShoppingBag } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+
 
 // ── Types ──────────────────────────────────────────────
 interface ProductSearchResult {
@@ -51,34 +54,34 @@ function useDebounce<T>(value: T, delay: number): T {
   return d;
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  food_drinks: 'Food',
-  home_food: 'Home Food',
-  groceries: 'Grocery',
-  education: 'Classes',
-  rentals: 'Rentals',
-  pets: 'Pets',
-  wellness: 'Wellness',
-  services: 'Services',
-  fashion: 'Fashion',
-  electronics: 'Electronics',
-};
-
 // ── Component ──────────────────────────────────────────
 export default function SearchPage() {
   const { user, effectiveSocietyId, profile } = useAuth();
   const [searchParams] = useSearchParams();
+  const { configs: categoryConfigs, isLoading: categoriesLoading } = useCategoryConfigs();
+
+  // Build a lookup map: category slug -> { icon, displayName }
+  const categoryMap = useMemo(() => {
+    const m: Record<string, { icon: string; displayName: string; color: string }> = {};
+    categoryConfigs.forEach((c) => {
+      m[c.category] = { icon: c.icon, displayName: c.displayName, color: c.color };
+    });
+    return m;
+  }, [categoryConfigs]);
 
   // Search state
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, 300);
   const [filters, setFilters] = useState<FilterState>(loadSavedFilters);
   const [activePreset, setActivePreset] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [results, setResults] = useState<ProductSearchResult[]>([]);
+  const [popularProducts, setPopularProducts] = useState<ProductSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingPopular, setIsLoadingPopular] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Cross-society browsing – initialised from profile
+  // Cross-society browsing
   const [browseBeyond, setBrowseBeyondLocal] = useState(
     (profile as any)?.browse_beyond_community ?? false,
   );
@@ -86,7 +89,6 @@ export default function SearchPage() {
     (profile as any)?.search_radius_km ?? 5,
   );
 
-  // ── Persist preferences (same pattern as HomePage) ──
   const persistPreference = useCallback(
     async (field: string, value: any) => {
       if (!user) return;
@@ -111,6 +113,52 @@ export default function SearchPage() {
     [persistPreference],
   );
 
+  // ── Load popular products on mount ──
+  useEffect(() => {
+    loadPopularProducts();
+  }, [effectiveSocietyId]);
+
+  const loadPopularProducts = async () => {
+    setIsLoadingPopular(true);
+    try {
+      let query = supabase
+        .from('products')
+        .select('id, name, price, image_url, is_veg, category, seller_id, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status)')
+        .eq('is_available', true)
+        .eq('seller.verification_status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      if (effectiveSocietyId) {
+        query = query.eq('seller.society_id', effectiveSocietyId);
+      }
+
+      const { data } = await query;
+      if (data) {
+        const mapped: ProductSearchResult[] = data.map((p: any) => ({
+          product_id: p.id,
+          product_name: p.name,
+          price: p.price,
+          image_url: p.image_url,
+          is_veg: p.is_veg,
+          category: p.category,
+          seller_id: p.seller?.id || p.seller_id,
+          seller_name: p.seller?.business_name || '',
+          seller_rating: p.seller?.rating || 0,
+          seller_reviews: p.seller?.total_reviews || 0,
+          society_name: null,
+          distance_km: null,
+          is_same_society: true,
+        }));
+        setPopularProducts(mapped);
+      }
+    } catch (err) {
+      console.error('Error loading popular products:', err);
+    } finally {
+      setIsLoadingPopular(false);
+    }
+  };
+
   // ── URL-driven presets on mount ──
   useEffect(() => {
     const sort = searchParams.get('sort');
@@ -118,17 +166,6 @@ export default function SearchPage() {
       handlePresetSelect('top_rated', { minRating: 4, sortBy: 'rating' });
     }
   }, []);
-
-  // ── Fire search on query / filter change ──
-  useEffect(() => {
-    if (debouncedQuery.length >= 1 || hasActiveFilters()) {
-      runSearch(debouncedQuery);
-      localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
-    } else {
-      setResults([]);
-      setHasSearched(false);
-    }
-  }, [debouncedQuery, filters, browseBeyond, searchRadius]);
 
   const hasActiveFilters = () =>
     filters.minRating > 0 ||
@@ -139,7 +176,21 @@ export default function SearchPage() {
     filters.priceRange[0] > 0 ||
     filters.priceRange[1] < 1000;
 
-  // ── Core search ──────────────────────────────────────
+  // ── Determine if we're in "active search" mode ──
+  const isSearchActive = debouncedQuery.length >= 1 || hasActiveFilters() || selectedCategory !== null;
+
+  // ── Fire search on query / filter / category change ──
+  useEffect(() => {
+    if (isSearchActive) {
+      runSearch(debouncedQuery);
+      localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
+    } else {
+      setResults([]);
+      setHasSearched(false);
+    }
+  }, [debouncedQuery, filters, browseBeyond, searchRadius, selectedCategory]);
+
+  // ── Core search ──
   const runSearch = async (term: string) => {
     setIsLoading(true);
     setHasSearched(true);
@@ -147,7 +198,12 @@ export default function SearchPage() {
     try {
       const products: ProductSearchResult[] = [];
 
-      // 1) Same-society search
+      // Combine selectedCategory with filter categories
+      const effectiveCategories = selectedCategory
+        ? [selectedCategory, ...filters.categories.filter(c => c !== selectedCategory)]
+        : filters.categories;
+
+      // 1) Same-society search via RPC (needs search term)
       if (term.length >= 1) {
         const { data } = await supabase.rpc('search_marketplace', {
           search_term: term,
@@ -175,9 +231,48 @@ export default function SearchPage() {
             });
           });
         }
+      } else if (selectedCategory || effectiveCategories.length > 0) {
+        // Category-only browse (no search term) - direct query
+        let q = supabase
+          .from('products')
+          .select('id, name, price, image_url, is_veg, category, seller_id, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status)')
+          .eq('is_available', true)
+          .eq('seller.verification_status', 'approved')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (effectiveSocietyId) {
+          q = q.eq('seller.society_id', effectiveSocietyId);
+        }
+
+        const targetCategory = selectedCategory || effectiveCategories[0];
+        if (targetCategory) {
+          q = q.eq('category', targetCategory);
+        }
+
+        const { data } = await q;
+        if (data) {
+          data.forEach((p: any) => {
+            products.push({
+              product_id: p.id,
+              product_name: p.name,
+              price: p.price,
+              image_url: p.image_url,
+              is_veg: p.is_veg,
+              category: p.category,
+              seller_id: p.seller?.id || p.seller_id,
+              seller_name: p.seller?.business_name || '',
+              seller_rating: p.seller?.rating || 0,
+              seller_reviews: p.seller?.total_reviews || 0,
+              society_name: null,
+              distance_km: null,
+              is_same_society: true,
+            });
+          });
+        }
       }
 
-      // 2) Cross-society search (only when toggled on)
+      // 2) Cross-society search
       if (browseBeyond && effectiveSocietyId && term.length >= 1) {
         const { data: nearby } = await supabase.rpc('search_nearby_sellers', {
           _buyer_society_id: effectiveSocietyId,
@@ -188,7 +283,6 @@ export default function SearchPage() {
           (nearby as any[]).forEach((seller) => {
             const items = (seller.matching_products as any[]) || [];
             items.forEach((p: any) => {
-              // Deduplicate by product_id
               if (!products.some((x) => x.product_id === p.id)) {
                 products.push({
                   product_id: p.id,
@@ -216,12 +310,14 @@ export default function SearchPage() {
       if (filters.minRating > 0) filtered = filtered.filter((p) => p.seller_rating >= filters.minRating);
       if (filters.isVeg === true) filtered = filtered.filter((p) => p.is_veg === true);
       if (filters.isVeg === false) filtered = filtered.filter((p) => p.is_veg === false);
-      if (filters.categories.length > 0) filtered = filtered.filter((p) => p.category && filters.categories.includes(p.category as any));
+      if (effectiveCategories.length > 0 && term.length >= 1) {
+        filtered = filtered.filter((p) => p.category && effectiveCategories.includes(p.category as any));
+      }
       if (filters.priceRange[0] > 0 || filters.priceRange[1] < 1000) {
         filtered = filtered.filter((p) => p.price >= filters.priceRange[0] && p.price <= filters.priceRange[1]);
       }
 
-      // Sort: same-society first, then by distance, then by rating
+      // Sort
       if (filters.sortBy === 'price_low') {
         filtered.sort((a, b) => a.price - b.price);
       } else if (filters.sortBy === 'price_high') {
@@ -248,6 +344,7 @@ export default function SearchPage() {
     setQuery('');
     setFilters(defaultFilters);
     setActivePreset(null);
+    setSelectedCategory(null);
     setResults([]);
     setHasSearched(false);
     localStorage.removeItem(FILTER_STORAGE_KEY);
@@ -263,17 +360,26 @@ export default function SearchPage() {
     setFilters(id ? { ...defaultFilters, ...pf } : defaultFilters);
   };
 
+  const handleCategoryTap = (cat: string) => {
+    setSelectedCategory(prev => prev === cat ? null : cat);
+  };
+
   // Active-filter pills
   const pills: string[] = [];
   if (query) pills.push(`"${query}"`);
+  if (selectedCategory) pills.push(categoryMap[selectedCategory]?.displayName || selectedCategory);
   if (filters.minRating > 0) pills.push(`${filters.minRating}+★`);
   if (filters.isVeg === true) pills.push('Veg');
   if (filters.isVeg === false) pills.push('Non-veg');
-  if (filters.categories.length) pills.push(...filters.categories.map((c) => CATEGORY_LABELS[c] || c));
+  if (filters.categories.length) pills.push(...filters.categories.map((c) => categoryMap[c]?.displayName || c));
   if (filters.sortBy) {
     const labels: Record<string, string> = { rating: 'Top Rated', newest: 'Newest', price_low: '₹ Low→High', price_high: '₹ High→Low' };
     pills.push(labels[filters.sortBy]);
   }
+
+  // Products to display
+  const displayProducts = isSearchActive ? results : popularProducts;
+  const showLoading = isSearchActive ? isLoading : isLoadingPopular;
 
   // ── Render ───────────────────────────────────────────
   return (
@@ -287,7 +393,7 @@ export default function SearchPage() {
           <div className="flex-1 relative">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
             <Input
-              placeholder="Search products, food, classes…"
+              placeholder="Search products, food, services…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-9 pr-9 h-10 rounded-xl text-sm"
@@ -302,10 +408,18 @@ export default function SearchPage() {
           <SearchFilters filters={filters} onFiltersChange={handleFiltersChange} showPriceFilter />
         </div>
 
+        {/* ─── Category Bubbles ─── */}
+        <CategoryBubbleRow
+          categories={categoryConfigs}
+          selectedCategory={selectedCategory}
+          onCategoryTap={handleCategoryTap}
+          isLoading={categoriesLoading}
+        />
+
         {/* ─── Filter presets ─── */}
         <FilterPresets activePreset={activePreset} onPresetSelect={handlePresetSelect} />
 
-        {/* ─── Browse-beyond toggle (compact) ─── */}
+        {/* ─── Browse-beyond toggle ─── */}
         <div className="flex items-center justify-between mt-3 mb-1 px-1">
           <button
             onClick={() => setBrowseBeyond(!browseBeyond)}
@@ -348,40 +462,107 @@ export default function SearchPage() {
           </div>
         )}
 
+        {/* ─── Section Title ─── */}
+        {!isSearchActive && !showLoading && displayProducts.length > 0 && (
+          <div className="flex items-center gap-2 mt-2 mb-2 px-1">
+            <ShoppingBag size={14} className="text-primary" />
+            <span className="text-sm font-semibold">Popular in your community</span>
+          </div>
+        )}
+
         {/* ─── Results ─── */}
-        {isLoading ? (
+        {showLoading ? (
           <div className="space-y-3 mt-2">
             {[1, 2, 3, 4].map((i) => (
               <Skeleton key={i} className="h-24 w-full rounded-xl" />
             ))}
           </div>
-        ) : hasSearched ? (
-          results.length > 0 ? (
-            <div className="space-y-2 mt-2">
+        ) : displayProducts.length > 0 ? (
+          <div className="space-y-2 mt-2">
+            {isSearchActive && (
               <p className="text-xs text-muted-foreground px-1">
                 {results.length} product{results.length !== 1 && 's'} found
               </p>
-              {results.map((p) => (
-                <ProductResultCard key={p.product_id} product={p} />
-              ))}
-            </div>
-          ) : (
-            <EmptyState />
-          )
+            )}
+            {displayProducts.map((p) => (
+              <ProductResultCard key={p.product_id} product={p} categoryMap={categoryMap} />
+            ))}
+          </div>
+        ) : isSearchActive ? (
+          <EmptyState />
         ) : (
-          <IdleState />
+          <EmptyMarketplace />
         )}
       </div>
     </AppLayout>
   );
 }
 
+// ── Category Bubble Row ────────────────────────────────
+function CategoryBubbleRow({
+  categories,
+  selectedCategory,
+  onCategoryTap,
+  isLoading,
+}: {
+  categories: { category: string; displayName: string; icon: string; color: string }[];
+  selectedCategory: string | null;
+  onCategoryTap: (cat: string) => void;
+  isLoading: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <div className="flex gap-2 mb-3 overflow-hidden">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <Skeleton key={i} className="h-16 w-16 rounded-2xl shrink-0" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <ScrollArea className="mb-3">
+      <div className="flex gap-2 pb-2">
+        {categories.map((cat) => {
+          const isActive = selectedCategory === cat.category;
+          return (
+            <button
+              key={cat.category}
+              onClick={() => onCategoryTap(cat.category)}
+              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-2xl min-w-[64px] transition-all shrink-0 ${
+                isActive
+                  ? 'bg-primary text-primary-foreground shadow-md scale-105'
+                  : 'bg-muted/60 hover:bg-muted'
+              }`}
+            >
+              <span className="text-xl leading-none">{cat.icon}</span>
+              <span className={`text-[10px] font-medium leading-tight text-center line-clamp-1 ${
+                isActive ? 'text-primary-foreground' : 'text-foreground'
+              }`}>
+                {cat.displayName}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <ScrollBar orientation="horizontal" />
+    </ScrollArea>
+  );
+}
+
 // ── Product Result Card ────────────────────────────────
-function ProductResultCard({ product: p }: { product: ProductSearchResult }) {
+function ProductResultCard({
+  product: p,
+  categoryMap,
+}: {
+  product: ProductSearchResult;
+  categoryMap: Record<string, { icon: string; displayName: string }>;
+}) {
+  const catInfo = p.category ? categoryMap[p.category] : null;
+
   return (
     <Link to={`/seller/${p.seller_id}`} className="block">
       <div className="flex gap-3 bg-card border border-border rounded-xl p-3 hover:shadow-sm transition-shadow">
-        {/* Image */}
         {p.image_url ? (
           <img
             src={p.image_url}
@@ -391,13 +572,15 @@ function ProductResultCard({ product: p }: { product: ProductSearchResult }) {
           />
         ) : (
           <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            <Tag className="text-muted-foreground" size={20} />
+            {catInfo ? (
+              <span className="text-2xl">{catInfo.icon}</span>
+            ) : (
+              <Tag className="text-muted-foreground" size={20} />
+            )}
           </div>
         )}
 
-        {/* Info */}
         <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-          {/* Row 1: Name + Price */}
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
               {p.is_veg !== null && <VegBadge isVeg={p.is_veg} size="sm" />}
@@ -406,14 +589,13 @@ function ProductResultCard({ product: p }: { product: ProductSearchResult }) {
             <span className="text-sm font-bold text-primary whitespace-nowrap">₹{p.price}</span>
           </div>
 
-          {/* Row 2: Category tag */}
-          {p.category && (
-            <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded w-fit">
-              {CATEGORY_LABELS[p.category] || p.category}
+          {catInfo && (
+            <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded w-fit flex items-center gap-1">
+              <span>{catInfo.icon}</span>
+              {catInfo.displayName}
             </span>
           )}
 
-          {/* Row 3: Seller + rating */}
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className="truncate">{p.seller_name}</span>
             {p.seller_rating > 0 && (
@@ -425,7 +607,6 @@ function ProductResultCard({ product: p }: { product: ProductSearchResult }) {
             )}
           </div>
 
-          {/* Row 4: Location / Distance */}
           <div className="flex items-center gap-1 text-[10px]">
             {p.is_same_society ? (
               <span className="flex items-center gap-0.5 text-primary">
@@ -454,17 +635,17 @@ function EmptyState() {
     <div className="text-center py-16">
       <SearchIcon className="mx-auto text-muted-foreground mb-3" size={28} />
       <p className="font-medium text-sm text-muted-foreground">No products found</p>
-      <p className="text-xs text-muted-foreground mt-1">Try a different term or adjust your filters</p>
+      <p className="text-xs text-muted-foreground mt-1">Try a different term or tap a category above</p>
     </div>
   );
 }
 
-function IdleState() {
+function EmptyMarketplace() {
   return (
     <div className="text-center py-16">
-      <SearchIcon className="mx-auto text-muted-foreground/40 mb-3" size={32} />
-      <p className="text-sm text-muted-foreground">Search for products across sellers</p>
-      <p className="text-xs text-muted-foreground mt-1">Try "biryani", "yoga", "pet grooming"</p>
+      <ShoppingBag className="mx-auto text-muted-foreground/40 mb-3" size={32} />
+      <p className="text-sm text-muted-foreground">No products available yet</p>
+      <p className="text-xs text-muted-foreground mt-1">Check back soon or try searching</p>
     </div>
   );
 }
