@@ -101,13 +101,15 @@ export default function ParcelManagementPage() {
   };
 
   const handleCollect = async (id: string) => {
+    if (!user) return;
     const { error } = await supabase.from('parcel_entries')
       .update({
         status: 'collected',
         collected_at: new Date().toISOString(),
         collected_by: profile?.name || 'Resident',
       })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('resident_id', user.id);
     if (!error) { toast.success('Parcel marked as collected'); fetchParcels(); }
   };
 

@@ -65,14 +65,16 @@ export default function GateEntryPage() {
   // Fetch recent entries
   useEffect(() => {
     if (!profile?.id) return;
+    if (!effectiveSocietyId) return;
     supabase
       .from('gate_entries')
       .select('*')
       .eq('user_id', profile.id)
+      .eq('society_id', effectiveSocietyId)
       .order('entry_time', { ascending: false })
       .limit(5)
       .then(({ data }) => setRecentEntries(data || []));
-  }, [profile?.id]);
+  }, [profile?.id, effectiveSocietyId]);
 
   return (
     <AppLayout headerTitle="Gate Entry" showLocation={false}>
