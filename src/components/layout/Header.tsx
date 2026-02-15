@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { MapPin, Bell, ShoppingCart, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/hooks/useCart';
 import { supabase } from '@/integrations/supabase/client';
@@ -82,6 +83,7 @@ export function Header({
           )}
 
           <div className="flex items-center gap-1">
+            <ThemeToggle className="text-primary-foreground hover:bg-white/15" />
             {isApproved && (
               <>
                 <Link to="/notifications/inbox">

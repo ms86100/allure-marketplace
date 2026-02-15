@@ -1,4 +1,5 @@
 import { useEffect, lazy, Suspense } from "react";
+import { ThemeProvider } from "next-themes";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -250,23 +251,25 @@ function AppRoutes() {
 
 const App = () => (
   <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <OfflineBanner />
-        <Toaster />
-        <Sonner />
-        <HashRouter>
-          <NavigationHandler />
-          <AuthProvider>
-            <CartProvider>
-              <PushNotificationProvider>
-                <AppRoutes />
-              </PushNotificationProvider>
-            </CartProvider>
-          </AuthProvider>
-        </HashRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <OfflineBanner />
+          <Toaster />
+          <Sonner />
+          <HashRouter>
+            <NavigationHandler />
+            <AuthProvider>
+              <CartProvider>
+                <PushNotificationProvider>
+                  <AppRoutes />
+                </PushNotificationProvider>
+              </CartProvider>
+            </AuthProvider>
+          </HashRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   </ErrorBoundary>
 );
 
