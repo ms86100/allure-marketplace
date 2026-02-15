@@ -2,15 +2,19 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/hooks/useCart';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
+import { Badge } from '@/components/ui/badge';
 import { SearchFilters, FilterState, defaultFilters } from '@/components/search/SearchFilters';
 import { FilterPresets } from '@/components/search/FilterPresets';
 import { Skeleton } from '@/components/ui/skeleton';
 import { VegBadge } from '@/components/ui/veg-badge';
+import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
-import { ArrowLeft, Search as SearchIcon, X, Globe, Star, MapPin, Home, Tag, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Search as SearchIcon, X, Globe, Star, MapPin, Home, Tag, ShoppingBag, Plus, Minus, Clock } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
@@ -57,7 +61,10 @@ function useDebounce<T>(value: T, delay: number): T {
 // ── Component ──────────────────────────────────────────
 export default function SearchPage() {
   const { user, effectiveSocietyId, profile } = useAuth();
+  const { items: cartItems, addItem, updateQuantity } = useCart();
   const [searchParams] = useSearchParams();
+  const [selectedProduct, setSelectedProduct] = useState<ProductSearchResult | null>(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const { configs: categoryConfigs, isLoading: categoriesLoading } = useCategoryConfigs();
 
   // Build a lookup map: category slug -> { icon, displayName }
@@ -381,6 +388,11 @@ export default function SearchPage() {
   const displayProducts = isSearchActive ? results : popularProducts;
   const showLoading = isSearchActive ? isLoading : isLoadingPopular;
 
+  const handleProductTap = (p: ProductSearchResult) => {
+    setSelectedProduct(p);
+    setDetailSheetOpen(true);
+  };
+
   // ── Render ───────────────────────────────────────────
   return (
     <AppLayout showHeader={false}>
@@ -485,7 +497,15 @@ export default function SearchPage() {
               </p>
             )}
             {displayProducts.map((p) => (
-              <ProductResultCard key={p.product_id} product={p} categoryMap={categoryMap} />
+              <ProductResultCard
+                key={p.product_id}
+                product={p}
+                categoryMap={categoryMap}
+                cartItems={cartItems}
+                onAddToCart={addItem}
+                onUpdateQuantity={updateQuantity}
+                onProductTap={handleProductTap}
+              />
             ))}
           </div>
         ) : isSearchActive ? (
@@ -494,6 +514,15 @@ export default function SearchPage() {
           <EmptyMarketplace />
         )}
       </div>
+
+      {/* Product Detail Sheet */}
+      <ProductDetailSheet
+        product={selectedProduct}
+        open={detailSheetOpen}
+        onOpenChange={setDetailSheetOpen}
+        categoryIcon={selectedProduct?.category ? categoryMap[selectedProduct.category]?.icon : undefined}
+        categoryName={selectedProduct?.category ? categoryMap[selectedProduct.category]?.displayName : undefined}
+      />
     </AppLayout>
   );
 }
@@ -554,24 +583,58 @@ function CategoryBubbleRow({
 function ProductResultCard({
   product: p,
   categoryMap,
+  cartItems,
+  onAddToCart,
+  onUpdateQuantity,
+  onProductTap,
 }: {
   product: ProductSearchResult;
   categoryMap: Record<string, { icon: string; displayName: string }>;
+  cartItems: any[];
+  onAddToCart: (product: any) => void;
+  onUpdateQuantity: (productId: string, quantity: number) => void;
+  onProductTap: (p: ProductSearchResult) => void;
 }) {
   const catInfo = p.category ? categoryMap[p.category] : null;
+  const cartItem = cartItems.find((item) => item.product_id === p.product_id);
+  const quantity = cartItem?.quantity || 0;
+  const isNewSeller = p.seller_reviews === 0 || p.seller_rating === 0;
+
+  const handleAdd = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onAddToCart({
+      id: p.product_id,
+      seller_id: p.seller_id,
+      name: p.product_name,
+      price: p.price,
+      image_url: p.image_url,
+      is_veg: p.is_veg ?? true,
+      is_available: true,
+      category: p.category,
+      description: null,
+      is_bestseller: false,
+      is_recommended: false,
+      is_urgent: false,
+      created_at: '',
+      updated_at: '',
+    });
+  };
 
   return (
-    <Link to={`/seller/${p.seller_id}`} className="block">
-      <div className="flex gap-3 bg-card border border-border rounded-xl p-3 hover:shadow-sm transition-shadow">
+    <div
+      onClick={() => onProductTap(p)}
+      className="flex gap-3 bg-card border border-border rounded-xl p-3 hover:shadow-sm transition-shadow cursor-pointer"
+    >
+      <div className="relative w-20 h-20 shrink-0">
         {p.image_url ? (
           <img
             src={p.image_url}
             alt={p.product_name}
-            className="w-20 h-20 rounded-lg object-cover shrink-0"
+            className="w-full h-full rounded-lg object-cover"
             loading="lazy"
           />
         ) : (
-          <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center shrink-0">
+          <div className="w-full h-full rounded-lg bg-muted flex items-center justify-center">
             {catInfo ? (
               <span className="text-2xl">{catInfo.icon}</span>
             ) : (
@@ -579,53 +642,92 @@ function ProductResultCard({
             )}
           </div>
         )}
+      </div>
 
-        <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-1.5 min-w-0">
-              {p.is_veg !== null && <VegBadge isVeg={p.is_veg} size="sm" />}
-              <span className="font-semibold text-sm truncate">{p.product_name}</span>
-            </div>
-            <span className="text-sm font-bold text-primary whitespace-nowrap">₹{p.price}</span>
+      <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {p.is_veg !== null && <VegBadge isVeg={p.is_veg} size="sm" />}
+            <span className="font-semibold text-sm truncate">{p.product_name}</span>
           </div>
+          <span className="text-sm font-bold text-primary whitespace-nowrap">₹{p.price}</span>
+        </div>
 
-          {catInfo && (
-            <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded w-fit flex items-center gap-1">
-              <span>{catInfo.icon}</span>
-              {catInfo.displayName}
-            </span>
-          )}
+        {catInfo && (
+          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded w-fit flex items-center gap-1">
+            <span>{catInfo.icon}</span>
+            {catInfo.displayName}
+          </span>
+        )}
 
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="truncate">{p.seller_name}</span>
-            {p.seller_rating > 0 && (
+            <span className="truncate max-w-[100px]">{p.seller_name}</span>
+            {isNewSeller ? (
+              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                New
+              </Badge>
+            ) : p.seller_rating > 0 ? (
               <span className="flex items-center gap-0.5 bg-success/10 text-success px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0">
                 <Star size={9} className="fill-success" />
                 {Number(p.seller_rating).toFixed(1)}
-                {p.seller_reviews > 0 && <span className="text-muted-foreground ml-0.5">({p.seller_reviews})</span>}
               </span>
-            )}
+            ) : null}
           </div>
 
-          <div className="flex items-center gap-1 text-[10px]">
-            {p.is_same_society ? (
-              <span className="flex items-center gap-0.5 text-primary">
-                <Home size={9} />
-                Your community
-              </span>
+          {/* Inline Add to Cart */}
+          <div onClick={(e) => e.stopPropagation()}>
+            {quantity === 0 ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-3 text-xs border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                onClick={handleAdd}
+              >
+                Add +
+              </Button>
             ) : (
-              <span className="flex items-center gap-0.5 text-muted-foreground">
-                <MapPin size={9} />
-                {p.society_name}
-                {p.distance_km != null && (
-                  <span className="ml-1 text-primary font-medium">{p.distance_km} km</span>
-                )}
-              </span>
+              <div className="flex items-center gap-1 bg-primary rounded-md px-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20"
+                  onClick={(e) => { e.stopPropagation(); onUpdateQuantity(p.product_id, quantity - 1); }}
+                >
+                  <Minus size={12} />
+                </Button>
+                <span className="text-xs font-bold text-primary-foreground w-4 text-center">{quantity}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 text-primary-foreground hover:bg-primary-foreground/20"
+                  onClick={(e) => { e.stopPropagation(); onUpdateQuantity(p.product_id, quantity + 1); }}
+                >
+                  <Plus size={12} />
+                </Button>
+              </div>
             )}
           </div>
         </div>
+
+        <div className="flex items-center gap-1 text-[10px]">
+          {p.is_same_society ? (
+            <span className="flex items-center gap-0.5 text-primary">
+              <Home size={9} />
+              Your community
+            </span>
+          ) : (
+            <span className="flex items-center gap-0.5 text-muted-foreground">
+              <MapPin size={9} />
+              {p.society_name}
+              {p.distance_km != null && (
+                <span className="ml-1 text-primary font-medium">{p.distance_km} km</span>
+              )}
+            </span>
+          )}
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }
 

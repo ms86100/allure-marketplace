@@ -18,6 +18,7 @@ import { QuickActions } from '@/components/seller/QuickActions';
 import { OrderFilters, OrderFilter } from '@/components/seller/OrderFilters';
 import { SellerOrderCard } from '@/components/seller/SellerOrderCard';
 import { CouponManager } from '@/components/seller/CouponManager';
+import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
 import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCounts } from '@/hooks/queries/useSellerOrders';
 
 export default function SellerDashboardPage() {
@@ -151,6 +152,9 @@ export default function SellerDashboardPage() {
 
         <QuickActions />
         <CouponManager />
+        
+        {/* Analytics Section */}
+        <SellerAnalytics sellerId={sellerProfile.id} />
 
         {/* Orders Section */}
         <div>

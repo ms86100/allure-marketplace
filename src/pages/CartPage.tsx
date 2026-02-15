@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2, Minus, Plus, Bell, Store } from 'lucide-react';
+import { ArrowLeft, Trash2, Minus, Plus, Bell, Store, MapPin, Clock } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { VegBadge } from '@/components/ui/veg-badge';
@@ -172,13 +172,19 @@ export default function CartPage() {
               <span className="text-5xl">🛒</span>
             </div>
             <h2 className="text-xl font-bold mb-2">Your cart is empty</h2>
-            <p className="text-muted-foreground mb-6">Add items from your favorite sellers</p>
-            <Link to="/"><Button>Browse Sellers</Button></Link>
+            <p className="text-muted-foreground mb-6">Discover products from sellers in your community</p>
+            <Link to="/search"><Button>Explore Marketplace</Button></Link>
           </div>
         </div>
       </AppLayout>
     );
   }
+
+  // Compute max prep time across all items
+  const maxPrepTime = items.reduce((max, item) => {
+    const pt = (item.product as any)?.prep_time_minutes;
+    return pt && pt > max ? pt : max;
+  }, 0);
 
   return (
     <AppLayout showHeader={false} showNav={false}>
@@ -220,6 +226,14 @@ export default function CartPage() {
                   </p>
                 </div>
               </div>
+              {/* Cross-society indicator */}
+              {profile?.society_id && (group.items[0]?.product?.seller as any)?.society_id &&
+                (group.items[0]?.product?.seller as any)?.society_id !== profile.society_id && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground bg-accent/50 rounded-lg">
+                  <MapPin size={12} />
+                  <span>Seller from another community</span>
+                </div>
+              )}
 
               {/* Items for this seller */}
               {group.items.map((item) => (
@@ -312,6 +326,12 @@ export default function CartPage() {
               <span>To Pay</span>
               <span>₹{finalAmount.toFixed(0)}</span>
             </div>
+            {maxPrepTime > 0 && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
+                <Clock size={12} />
+                <span>Estimated ready time: ~{maxPrepTime} min</span>
+              </div>
+            )}
           </div>
         </div>
 

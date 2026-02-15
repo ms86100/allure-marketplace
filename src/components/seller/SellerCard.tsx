@@ -75,14 +75,12 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
                 </p>
               )}
             </div>
-            {seller.rating > 0 && (
-              <RatingStars
-                rating={seller.rating}
-                totalReviews={seller.total_reviews}
-                size="sm"
-                showCount={false}
-              />
-            )}
+            <RatingStars
+              rating={seller.rating}
+              totalReviews={seller.total_reviews}
+              size="sm"
+              showCount={false}
+            />
           </div>
 
           <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
