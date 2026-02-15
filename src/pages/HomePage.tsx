@@ -24,6 +24,8 @@ import {
   useFavoriteSellers,
 } from '@/hooks/queries/useHomeSellers';
 import { useNearbySellers } from '@/hooks/queries/useNearbySellers';
+import { usePopularProducts } from '@/hooks/queries/usePopularProducts';
+import { ProductCarousel } from '@/components/product/ProductCarousel';
 
 export default function HomePage() {
   const { user, profile, isApproved, isSeller, society } = useAuth();
@@ -56,6 +58,7 @@ export default function HomePage() {
   const { data: featuredSellers = [] } = useFeaturedSellers();
   const { data: favorites = [] } = useFavoriteSellers();
   const { data: nearbySellers = [] } = useNearbySellers(searchRadius, browseBeyond);
+  const { data: popularProducts = [] } = usePopularProducts(12);
 
   const isLoading = loadingOpen || loadingTop;
 
@@ -143,6 +146,18 @@ export default function HomePage() {
           <h3 className="font-semibold text-sm mb-3">What are you looking for?</h3>
           <CategoryGroupGrid variant="compact" excludeGroups={['services']} />
         </div>
+
+        {/* Popular Products Carousel */}
+        {popularProducts.length > 0 && (
+          <div className="mt-5">
+            <ProductCarousel
+              title="Popular Right Now"
+              emoji="🔥"
+              products={popularProducts}
+              variant="compact"
+            />
+          </div>
+        )}
 
         {/* Open Now Section */}
         {openNowSellers.length > 0 && (
