@@ -12,9 +12,9 @@ export function ParentGroupTabs({ activeGroup, onGroupChange }: ParentGroupTabsP
 
   if (isLoading) {
     return (
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 py-2">
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-1">
         {[1, 2, 3, 4, 5].map(i => (
-          <Skeleton key={i} className="w-16 h-14 rounded-lg shrink-0" />
+          <Skeleton key={i} className="w-16 h-16 rounded-2xl shrink-0" />
         ))}
       </div>
     );
@@ -32,7 +32,7 @@ export function ParentGroupTabs({ activeGroup, onGroupChange }: ParentGroupTabsP
   const tabs = [allTab, ...parentGroupInfos];
 
   return (
-    <div className="flex gap-1 overflow-x-auto scrollbar-hide px-4 py-1">
+    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide px-4 py-1">
       {tabs.map((tab) => {
         const isActive = tab.value === '__all__' ? activeGroup === null : activeGroup === tab.value;
         return (
@@ -40,15 +40,15 @@ export function ParentGroupTabs({ activeGroup, onGroupChange }: ParentGroupTabsP
             key={tab.value}
             onClick={() => onGroupChange(tab.value === '__all__' ? null : tab.value)}
             className={cn(
-              'shrink-0 flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all min-w-[60px]',
+              'shrink-0 flex flex-col items-center gap-1 px-3 py-2 rounded-2xl transition-all min-w-[56px]',
               isActive
-                ? 'bg-primary/10 border-b-2 border-primary'
-                : 'hover:bg-muted/50'
+                ? 'glass-card shadow-md ring-1 ring-primary/20'
+                : 'hover:bg-card/60'
             )}
           >
-            <span className="text-lg">{tab.icon}</span>
+            <span className="text-xl leading-none">{tab.icon}</span>
             <span className={cn(
-              'text-[10px] font-semibold leading-none whitespace-nowrap',
+              'text-[9px] font-bold leading-none whitespace-nowrap uppercase tracking-wide',
               isActive ? 'text-primary' : 'text-muted-foreground'
             )}>
               {tab.label}

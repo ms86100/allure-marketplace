@@ -18,7 +18,6 @@ export function FeaturedBanners() {
         .order('display_order');
 
       if (effectiveSocietyId) {
-        // Show society-specific + global banners
         query = query.or(`society_id.eq.${effectiveSocietyId},society_id.is.null`);
       }
 
@@ -40,15 +39,15 @@ export function FeaturedBanners() {
   if (banners.length === 0) return null;
 
   return (
-    <div className="px-4">
+    <div className="px-4 animate-fade-in">
       <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
         {banners.map((banner: any) => (
           <div
             key={banner.id}
             onClick={() => banner.link_url && navigate(banner.link_url)}
             className="shrink-0 w-[85vw] sm:w-[400px] rounded-2xl overflow-hidden cursor-pointer
-              bg-gradient-to-br from-primary/10 to-accent/30 border border-border/20
-              transition-transform hover:scale-[1.01] active:scale-[0.99]"
+              border border-border/10 shadow-md
+              transition-all duration-200 hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]"
           >
             {banner.image_url ? (
               <img
@@ -58,8 +57,11 @@ export function FeaturedBanners() {
                 loading="lazy"
               />
             ) : (
-              <div className="w-full h-40 flex items-center justify-center p-6">
-                <h3 className="text-lg font-bold text-foreground text-center">
+              <div
+                className="w-full h-40 flex items-center justify-center p-6"
+                style={{ background: 'var(--gradient-warm)' }}
+              >
+                <h3 className="text-lg font-bold text-primary-foreground text-center drop-shadow-sm">
                   {banner.title || 'Featured'}
                 </h3>
               </div>

@@ -27,12 +27,10 @@ export function MarketplaceSection() {
   const { data: localCategories = [], isLoading: loadingLocal } = useProductsByCategory(200);
   const { parentGroupInfos } = useParentGroups();
 
-  // Filter categories by active parent group
   const filteredCategories = activeGroup
     ? localCategories.filter(cat => cat.parentGroup === activeGroup)
     : localCategories;
 
-  // Get parent groups that have products for category image sections
   const activeParentGroups = activeGroup
     ? parentGroupInfos.filter(g => g.value === activeGroup)
     : parentGroupInfos.filter(g =>
@@ -95,26 +93,37 @@ export function MarketplaceSection() {
   }, [searchQuery, effectiveSocietyId]);
 
   return (
-    <div className="mt-2 space-y-5">
-      {/* ━━━ Search Bar ━━━ */}
-      <div className="px-4">
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-          <Input
-            placeholder="Search products, services…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-9 bg-muted border-0 h-12 rounded-xl text-sm font-medium"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X size={16} />
-            </button>
-          )}
+    <div className="space-y-5 pb-2">
+      {/* ━━━ Hero gradient wash ━━━ */}
+      <div
+        className="pt-3 pb-5 -mt-1"
+        style={{ background: 'var(--gradient-hero)' }}
+      >
+        {/* ━━━ Glassy Search Bar ━━━ */}
+        <div className="px-4 mb-4">
+          <div className="relative glass-card">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+            <Input
+              placeholder="Search products, services…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-11 pr-9 bg-transparent border-0 h-12 rounded-2xl text-sm font-medium shadow-none focus-visible:ring-0"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* ━━━ Parent Group Tabs ━━━ */}
+        {searchResults === null && (
+          <ParentGroupTabs activeGroup={activeGroup} onGroupChange={setActiveGroup} />
+        )}
       </div>
 
       {/* ━━━ Search Results ━━━ */}
@@ -126,10 +135,7 @@ export function MarketplaceSection() {
         />
       ) : (
         <>
-          {/* ━━━ Parent Group Tabs ━━━ */}
-          <ParentGroupTabs activeGroup={activeGroup} onGroupChange={setActiveGroup} />
-
-          {/* ━━━ Category Image Sections (Blinkit style) ━━━ */}
+          {/* ━━━ Category Image Sections ━━━ */}
           {activeParentGroups.slice(0, 4).map(group => (
             <CategoryImageGrid
               key={group.value}
@@ -155,11 +161,9 @@ export function MarketplaceSection() {
   );
 }
 
-// ── Search Results View ──
+// ── Search Results ──
 function SearchResultsView({
-  results,
-  loading,
-  query,
+  results, loading, query,
 }: {
   results: ProductWithSeller[];
   loading: boolean;
@@ -193,8 +197,7 @@ function SearchResultsView({
 
 // ── Product Listings by Category ──
 function ProductListings({
-  categories,
-  isLoading,
+  categories, isLoading,
 }: {
   categories: { category: string; parentGroup: string; displayName: string; icon: string; products: ProductWithSeller[] }[];
   isLoading: boolean;
@@ -225,18 +228,19 @@ function ProductListings({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {categories.map(cat => (
         <div key={cat.category}>
-          <div className="flex items-center justify-between px-4 mb-2">
-            <h3 className="font-bold text-sm text-foreground">
-              {cat.icon} {cat.displayName}
+          <div className="flex items-center justify-between px-4 mb-2.5">
+            <h3 className="font-bold text-sm text-foreground flex items-center gap-1.5">
+              <span className="text-base">{cat.icon}</span>
+              {cat.displayName}
             </h3>
             <a
               href={`#/category/${cat.parentGroup}?sub=${cat.category}`}
-              className="text-xs font-semibold text-success hover:underline"
+              className="text-xs font-semibold text-primary hover:underline"
             >
-              see all
+              see all →
             </a>
           </div>
           <div className="flex gap-2.5 overflow-x-auto scrollbar-hide px-4 pb-1">

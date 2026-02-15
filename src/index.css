@@ -7,7 +7,7 @@
 @layer base {
   :root {
     /* Sociva warm palette — community marketplace */
-    --background: 0 0% 98%;
+    --background: 240 10% 96%;
     --foreground: 220 20% 10%;
 
     --card: 0 0% 100%;
@@ -24,7 +24,7 @@
     --secondary: 145 30% 94%;
     --secondary-foreground: 145 40% 25%;
 
-    --muted: 220 15% 95%;
+    --muted: 230 20% 93%;
     --muted-foreground: 220 10% 45%;
 
     /* Accent: Golden amber for highlights */
@@ -47,11 +47,20 @@
     --warning: 38 95% 55%;
     --info: 200 90% 50%;
 
+    /* Category tint colors */
+    --tint-food: 4 80% 95%;
+    --tint-services: 200 80% 94%;
+    --tint-personal: 310 60% 95%;
+    --tint-resale: 38 80% 94%;
+    --tint-events: 260 60% 95%;
+    --tint-default: 220 30% 95%;
+
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(4 90% 58%) 0%, hsl(20 90% 55%) 100%);
     --gradient-success: linear-gradient(135deg, hsl(142 70% 45%) 0%, hsl(160 60% 40%) 100%);
     --gradient-warm: linear-gradient(135deg, hsl(38 95% 55%) 0%, hsl(20 90% 55%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(4 90% 58% / 0.1) 0%, transparent 50%);
+    --gradient-hero: linear-gradient(180deg, hsl(4 90% 58% / 0.08) 0%, hsl(240 10% 96%) 60%);
+    --gradient-glass: linear-gradient(135deg, hsl(0 0% 100% / 0.85) 0%, hsl(0 0% 100% / 0.65) 100%);
 
     /* Shadows */
     --shadow-sm: 0 1px 2px hsl(220 20% 10% / 0.05);
@@ -59,6 +68,7 @@
     --shadow-lg: 0 12px 32px hsl(220 20% 10% / 0.12);
     --shadow-card: 0 2px 8px hsl(220 20% 10% / 0.06);
     --shadow-elevated: 0 8px 24px hsl(220 20% 10% / 0.1);
+    --shadow-glow: 0 0 20px hsl(4 90% 58% / 0.15);
 
     /* Sidebar */
     --sidebar-background: 0 0% 100%;
@@ -72,22 +82,22 @@
   }
 
   .dark {
-    --background: 220 20% 8%;
+    --background: 220 20% 7%;
     --foreground: 0 0% 95%;
 
-    --card: 220 20% 12%;
+    --card: 220 20% 11%;
     --card-foreground: 0 0% 95%;
 
-    --popover: 220 20% 12%;
+    --popover: 220 20% 11%;
     --popover-foreground: 0 0% 95%;
 
     --primary: 4 85% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 145 20% 18%;
+    --secondary: 145 20% 16%;
     --secondary-foreground: 145 30% 85%;
 
-    --muted: 220 15% 18%;
+    --muted: 220 15% 15%;
     --muted-foreground: 220 10% 60%;
 
     --accent: 38 90% 50%;
@@ -96,17 +106,30 @@
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 20%;
-    --input: 220 15% 20%;
+    --border: 220 15% 18%;
+    --input: 220 15% 18%;
     --ring: 4 85% 60%;
 
-    --sidebar-background: 220 20% 10%;
+    /* Dark mode tints */
+    --tint-food: 4 60% 15%;
+    --tint-services: 200 50% 14%;
+    --tint-personal: 310 40% 15%;
+    --tint-resale: 38 50% 14%;
+    --tint-events: 260 40% 15%;
+    --tint-default: 220 20% 14%;
+
+    --gradient-hero: linear-gradient(180deg, hsl(4 90% 58% / 0.12) 0%, hsl(220 20% 7%) 60%);
+    --gradient-glass: linear-gradient(135deg, hsl(220 20% 11% / 0.9) 0%, hsl(220 20% 11% / 0.7) 100%);
+
+    --shadow-glow: 0 0 20px hsl(4 85% 60% / 0.2);
+
+    --sidebar-background: 220 20% 9%;
     --sidebar-foreground: 0 0% 95%;
     --sidebar-primary: 4 85% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 145 20% 18%;
+    --sidebar-accent: 145 20% 16%;
     --sidebar-accent-foreground: 145 30% 85%;
-    --sidebar-border: 220 15% 20%;
+    --sidebar-border: 220 15% 18%;
     --sidebar-ring: 4 85% 60%;
   }
 }
@@ -211,9 +234,23 @@
     background-image: var(--gradient-primary);
   }
 
-  /* Glass effect */
+  /* Glass effects */
   .glass {
-    @apply bg-white/80 backdrop-blur-lg;
+    @apply backdrop-blur-xl;
+    background: var(--gradient-glass);
+    border-bottom: 1px solid hsl(var(--border) / 0.5);
+  }
+
+  .glass-card {
+    @apply backdrop-blur-md rounded-2xl border border-white/20;
+    background: linear-gradient(135deg, hsl(0 0% 100% / 0.9) 0%, hsl(0 0% 100% / 0.7) 100%);
+    box-shadow: var(--shadow-card), inset 0 1px 0 hsl(0 0% 100% / 0.5);
+  }
+
+  .glass-tinted {
+    @apply backdrop-blur-md rounded-2xl;
+    background: linear-gradient(135deg, hsl(0 0% 100% / 0.75) 0%, hsl(0 0% 100% / 0.55) 100%);
+    box-shadow: var(--shadow-sm), inset 0 1px 0 hsl(0 0% 100% / 0.4);
   }
 
   /* Hide scrollbar but keep functionality */
