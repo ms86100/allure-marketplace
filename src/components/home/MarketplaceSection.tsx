@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
 import { useNearbySellers } from '@/hooks/queries/useNearbySellers';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
-import { CategoryGroupGrid } from '@/components/category/CategoryGroupGrid';
 import { CategoryBrowseGrid } from '@/components/category/CategoryBrowseGrid';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { Input } from '@/components/ui/input';
@@ -156,12 +155,7 @@ export function MarketplaceSection() {
         </div>
       ) : (
         <>
-          {/* Category Strip — parent groups */}
-          <div className="px-4 mb-4">
-            <CategoryGroupGrid variant="compact" excludeGroups={['services']} />
-          </div>
-
-          {/* Sub-category browse grid — Blinkit style */}
+          {/* Category browse grid — Blinkit style, 2 rows collapsed */}
           <div className="mb-4">
             <CategoryBrowseGrid />
           </div>
