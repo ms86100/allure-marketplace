@@ -60,6 +60,9 @@ export interface CategoryFormHints {
   durationLabel: string | null;
   showVegToggle: boolean;
   showDurationField: boolean;
+  primaryButtonLabel: string | null;
+  pricePrefix: string | null;
+  placeholderEmoji: string | null;
 }
 
 export interface CategoryConfig {

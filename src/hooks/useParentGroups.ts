@@ -10,6 +10,7 @@ export interface ParentGroupRow {
   description: string;
   is_active: boolean;
   sort_order: number;
+  layout_type: 'ecommerce' | 'food' | 'service';
   created_at: string;
   updated_at: string;
 }
@@ -21,6 +22,7 @@ export interface ParentGroupInfo {
   icon: string;
   color: string;
   description: string;
+  layoutType: 'ecommerce' | 'food' | 'service';
 }
 
 export function useParentGroups() {
@@ -55,6 +57,7 @@ export function useParentGroups() {
       icon: g.icon,
       color: g.color,
       description: g.description,
+      layoutType: (g.layout_type as 'ecommerce' | 'food' | 'service') || 'ecommerce',
     }));
   }, [groups]);
 
@@ -64,11 +67,29 @@ export function useParentGroups() {
     return parentGroupInfos.find((g) => g.value === slug);
   };
 
+  // Get layout type for a parent group slug
+  const getLayoutType = (slug: string | null): 'ecommerce' | 'food' | 'service' => {
+    if (!slug) return 'ecommerce';
+    const group = groups.find((g) => g.slug === slug);
+    return (group?.layout_type as 'ecommerce' | 'food' | 'service') || 'ecommerce';
+  };
+
+  // Build a slug -> layout_type map for fast lookups
+  const layoutMap = useMemo(() => {
+    const map: Record<string, 'ecommerce' | 'food' | 'service'> = {};
+    for (const g of groups) {
+      map[g.slug] = (g.layout_type as 'ecommerce' | 'food' | 'service') || 'ecommerce';
+    }
+    return map;
+  }, [groups]);
+
   return {
     groups,
     parentGroupInfos,
     isLoading,
     refresh: fetchGroups,
     getGroupBySlug,
+    getLayoutType,
+    layoutMap,
   };
 }

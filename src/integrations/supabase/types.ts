@@ -530,7 +530,9 @@ export type Database = {
           is_physical_product: boolean
           name_placeholder: string | null
           parent_group: string
+          placeholder_emoji: string | null
           price_label: string | null
+          price_prefix: string | null
           primary_button_label: string
           requires_availability: boolean
           requires_delivery: boolean
@@ -562,7 +564,9 @@ export type Database = {
           is_physical_product?: boolean
           name_placeholder?: string | null
           parent_group: string
+          placeholder_emoji?: string | null
           price_label?: string | null
+          price_prefix?: string | null
           primary_button_label?: string
           requires_availability?: boolean
           requires_delivery?: boolean
@@ -594,7 +598,9 @@ export type Database = {
           is_physical_product?: boolean
           name_placeholder?: string | null
           parent_group?: string
+          placeholder_emoji?: string | null
           price_label?: string | null
+          price_prefix?: string | null
           primary_button_label?: string
           requires_availability?: boolean
           requires_delivery?: boolean
@@ -2263,6 +2269,7 @@ export type Database = {
           icon: string
           id: string
           is_active: boolean
+          layout_type: string
           license_description: string | null
           license_mandatory: boolean
           license_type_name: string | null
@@ -2279,6 +2286,7 @@ export type Database = {
           icon?: string
           id?: string
           is_active?: boolean
+          layout_type?: string
           license_description?: string | null
           license_mandatory?: boolean
           license_type_name?: string | null
@@ -2295,6 +2303,7 @@ export type Database = {
           icon?: string
           id?: string
           is_active?: boolean
+          layout_type?: string
           license_description?: string | null
           license_mandatory?: boolean
           license_type_name?: string | null

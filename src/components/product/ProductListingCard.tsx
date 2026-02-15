@@ -6,6 +6,8 @@ import { VegBadge } from '@/components/ui/veg-badge';
 import { useCart } from '@/hooks/useCart';
 import { ProductActionType } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
+import { useParentGroups } from '@/hooks/useParentGroups';
+import { useMarketplaceConfig } from '@/hooks/useMarketplaceConfig';
 import { ACTION_CONFIG } from '@/lib/marketplace-constants';
 import { useCardAnalytics } from '@/hooks/useCardAnalytics';
 import { ContactSellerModal } from './ContactSellerModal';
@@ -68,22 +70,13 @@ interface ProductListingCardProps {
   viewOnly?: boolean;
 }
 
-/* ━━━ Constants ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* ━━━ Constants — kept only for spice display (visual emoji, not logic) ━━━ */
 
 const SPICE_EMOJI: Record<string, string> = {
   mild: '🌶️',
   medium: '🌶️🌶️',
   hot: '🌶️🌶️🌶️',
   extra_hot: '🔥',
-};
-
-const FOOD_GROUPS = ['food', 'grocery'];
-const SERVICE_GROUPS = ['services', 'personal', 'professional', 'events'];
-
-const FALLBACK_EMOJI: Record<string, string> = {
-  food: '🍽️',
-  service: '🛠️',
-  ecommerce: '🛒',
 };
 
 /* Badge priority: bestseller > limited > new > trending (max 2) */
@@ -109,6 +102,8 @@ export function ProductListingCard({
   const navigate = useNavigate();
   const { items, addItem, updateQuantity } = useCart();
   const { configs: categoryConfigs } = useCategoryConfigs();
+  const { layoutMap } = useParentGroups();
+  const marketplaceConfig = useMarketplaceConfig();
   const [contactOpen, setContactOpen] = useState(false);
 
   const cartItem = items.find((item) => item.product_id === product.id);
@@ -117,28 +112,37 @@ export function ProductListingCard({
   const actionType: ProductActionType = (product.action_type as ProductActionType) || 'add_to_cart';
   const config = ACTION_CONFIG[actionType] || ACTION_CONFIG.add_to_cart;
 
-  /* ── Layout resolution ── */
+  /* ── Category config lookup ── */
+  const catConfig = useMemo(() => {
+    return categoryConfigs.find(c => c.category === product.category) || null;
+  }, [categoryConfigs, product.category]);
+
+  /* ── Layout resolution — fully DB-driven via parent_groups.layout_type ── */
   const resolvedParentGroup = useMemo(() => {
     if (parentGroup) return parentGroup;
-    const cat = categoryConfigs.find(c => c.category === product.category);
-    return (cat as any)?.parentGroup || (cat as any)?.parent_group || null;
-  }, [parentGroup, categoryConfigs, product.category]);
+    return catConfig?.parentGroup || null;
+  }, [parentGroup, catConfig]);
 
   const resolvedLayout = useMemo((): 'ecommerce' | 'food' | 'service' => {
     if (layout !== 'auto') return layout as 'ecommerce' | 'food' | 'service';
-    if (resolvedParentGroup) {
-      if (FOOD_GROUPS.includes(resolvedParentGroup)) return 'food';
-      if (SERVICE_GROUPS.includes(resolvedParentGroup)) return 'service';
+    if (resolvedParentGroup && layoutMap[resolvedParentGroup]) {
+      return layoutMap[resolvedParentGroup];
     }
     return 'ecommerce';
-  }, [layout, resolvedParentGroup]);
+  }, [layout, resolvedParentGroup, layoutMap]);
 
   const isCartAction = useMemo(() => {
     if (!config.isCart) return false;
-    const catConfig = categoryConfigs.find(c => c.category === product.category);
     if (catConfig) return catConfig.behavior?.supportsCart ?? false;
     return actionType === 'add_to_cart' || actionType === 'buy_now';
-  }, [config.isCart, categoryConfigs, product.category, actionType]);
+  }, [config.isCart, catConfig, actionType]);
+
+  /* ── DB-driven display flags ── */
+  const showVegBadge = catConfig?.formHints?.showVegToggle ?? (resolvedLayout === 'food');
+  const placeholderEmoji = catConfig?.formHints?.placeholderEmoji
+    || (resolvedLayout === 'food' ? '🍽️' : resolvedLayout === 'service' ? '🛠️' : '🛒');
+  const pricePrefix = catConfig?.formHints?.pricePrefix || (resolvedLayout === 'service' ? 'Starting ' : '');
+  const buttonLabel = catConfig?.formHints?.primaryButtonLabel || config.shortLabel;
 
   /* ── Analytics ── */
   const { ref: cardRef, onCardClick: trackClick, onAddClick: trackAdd } = useCardAnalytics({
@@ -179,19 +183,18 @@ export function ProductListingCard({
     else navigate(`/seller/${product.seller_id}`);
   };
 
-  /* ── Derived values ── */
+  /* ── Derived values — DB-driven thresholds ── */
   const sellerName = product.seller_name || (product.seller as any)?.business_name || 'Seller';
   const isOutOfStock = !product.is_available;
-  const isLowStock = product.stock_quantity != null && product.stock_quantity > 0 && product.stock_quantity <= 5;
+  const lowStockThreshold = marketplaceConfig.lowStockThreshold;
+  const isLowStock = product.stock_quantity != null && product.stock_quantity > 0 && product.stock_quantity <= lowStockThreshold;
 
-  /* Badge system — max 2, priority ordered */
+  /* Badge system — max 2, priority ordered, driven by product.tags[] and product flags */
   const badges: { label: string; variant: BadgeVariant }[] = [];
   if (product.is_bestseller) badges.push({ label: 'Bestseller', variant: 'bestseller' });
   if (isLowStock) badges.push({ label: `Only ${product.stock_quantity} left!`, variant: 'limited' });
   if (product.tags?.includes('New Arrival') && badges.length < 2) badges.push({ label: 'New', variant: 'new' });
   if (product.tags?.includes('Trending') && badges.length < 2) badges.push({ label: 'Trending', variant: 'trending' });
-
-  const showVegBadge = resolvedLayout === 'food' || (product.is_veg !== undefined && product.is_veg !== null);
 
   /* Image aspect ratio per layout */
   const imageAspect = resolvedLayout === 'food' ? 'aspect-[4/3]'
@@ -206,12 +209,9 @@ export function ProductListingCard({
         ref={cardRef}
         onClick={handleCardClick}
         className={cn(
-          // 8pt grid: p-3 card padding, rounded-xl, subtle border
           'bg-card rounded-xl border border-border/50 cursor-pointer flex flex-col h-full group',
-          // Motion: 200ms ease hover shadow elevation
           'transition-all duration-200 ease-out',
           'hover:shadow-lg hover:border-border/80',
-          // Mobile: active state instead of hover
           'active:scale-[0.98] md:active:scale-100',
           isOutOfStock && 'opacity-60 grayscale-[30%]',
           className
@@ -230,14 +230,13 @@ export function ProductListingCard({
                 className={cn(
                   'w-full h-full transition-transform duration-200 ease-out',
                   imageObjectFit,
-                  // Hover: 1.03 scale on desktop only
                   'md:group-hover:scale-[1.03]'
                 )}
                 loading="lazy"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-muted/50">
-                <span className="text-3xl">{FALLBACK_EMOJI[resolvedLayout]}</span>
+                <span className="text-3xl">{placeholderEmoji}</span>
               </div>
             )}
 
@@ -267,7 +266,7 @@ export function ProductListingCard({
               </div>
             )}
 
-            {/* Veg/NonVeg badge — top right */}
+            {/* Veg/NonVeg badge — driven by category_config.show_veg_toggle */}
             {showVegBadge && (
               <div className="absolute top-1.5 right-1.5">
                 <VegBadge isVeg={product.is_veg} size="sm" />
@@ -276,36 +275,42 @@ export function ProductListingCard({
           </div>
         </div>
 
-        {/* ━━━ CONTENT SECTION ━━━ 8pt grid: px-3, pb-3, space-y-1.5 */}
+        {/* ━━━ CONTENT SECTION ━━━ */}
         <div className="px-3 pb-3 pt-2 flex flex-col flex-1 space-y-1">
-          {/* Brand (ecommerce only) — smallest, uppercase, primary tint */}
+          {/* Brand (ecommerce only) */}
           {resolvedLayout === 'ecommerce' && product.brand && (
             <span className="text-[10px] font-semibold text-primary/70 uppercase tracking-wider truncate leading-none">
               {product.brand}
             </span>
           )}
 
-          {/* Title — text-sm, font-semibold, 2-line clamp */}
+          {/* Title */}
           <h4 className="font-semibold text-sm leading-snug line-clamp-2 text-foreground">
             {product.name}
           </h4>
 
-          {/* ── Layout-specific metadata ── */}
+          {/* Layout-specific metadata */}
           {resolvedLayout === 'ecommerce' && <EcommerceMetadata product={product} sellerName={sellerName} />}
           {resolvedLayout === 'food' && <FoodMetadata product={product} sellerName={sellerName} />}
-          {resolvedLayout === 'service' && <ServiceMetadata product={product} sellerName={sellerName} />}
+          {resolvedLayout === 'service' && (
+            <ServiceMetadata
+              product={product}
+              sellerName={sellerName}
+              fulfillmentLabels={marketplaceConfig.fulfillmentLabels}
+            />
+          )}
 
-          {/* Trust layer — rating + social proof */}
+          {/* Trust layer */}
           <TrustRow product={product} layout={resolvedLayout} />
 
           <div className="flex-1 min-h-1" />
 
           {/* ━━━ PRICE + ACTION ROW ━━━ */}
           <div className="flex items-end justify-between gap-2 pt-1">
-            <PriceBlock product={product} actionType={actionType} layout={resolvedLayout} />
+            <PriceBlock product={product} actionType={actionType} pricePrefix={pricePrefix} />
             <ActionButton
               actionType={actionType}
-              config={config}
+              buttonLabel={buttonLabel}
               isCartAction={isCartAction}
               isOutOfStock={isOutOfStock}
               quantity={quantity}
@@ -426,8 +431,16 @@ function FoodMetadata({ product, sellerName }: { product: ProductWithSeller; sel
   );
 }
 
-/* ── Service Metadata ── */
-function ServiceMetadata({ product, sellerName }: { product: ProductWithSeller; sellerName: string }) {
+/* ── Service Metadata — fulfillment labels from DB ── */
+function ServiceMetadata({
+  product,
+  sellerName,
+  fulfillmentLabels,
+}: {
+  product: ProductWithSeller;
+  sellerName: string;
+  fulfillmentLabels: Record<string, string>;
+}) {
   return (
     <div className="space-y-0.5">
       <SellerRow name={sellerName} verified={product.seller_verified} />
@@ -439,9 +452,7 @@ function ServiceMetadata({ product, sellerName }: { product: ProductWithSeller; 
       )}
       {product.fulfillment_mode && (
         <span className="text-[10px] text-primary font-medium">
-          {product.fulfillment_mode === 'delivery' ? '🚚 Delivery'
-            : product.fulfillment_mode === 'self_pickup' ? '📍 Pickup'
-            : '🚚 Delivery & Pickup'}
+          {fulfillmentLabels[product.fulfillment_mode] || product.fulfillment_mode}
         </span>
       )}
       {product.visit_charge != null && product.visit_charge > 0 && (
@@ -461,30 +472,30 @@ function DeliveryChip({ text }: { text: string }) {
   );
 }
 
-/* ── Price Block ── */
+/* ── Price Block — pricePrefix from DB ── */
 function PriceBlock({
   product,
   actionType,
-  layout,
+  pricePrefix,
 }: {
   product: ProductWithSeller;
   actionType: ProductActionType;
-  layout: string;
+  pricePrefix: string;
 }) {
   if (actionType === 'contact_seller') {
     return <span className="text-xs font-medium text-muted-foreground italic">Contact for price</span>;
   }
 
   const hasDiscount = product.mrp && product.mrp > product.price;
+  // Use DB-computed discount_percentage; only fallback if column is null
   const discountPct = product.discount_percentage
     || (hasDiscount ? Math.round(((product.mrp! - product.price) / product.mrp!) * 100) : 0);
 
   return (
     <div className="flex flex-col min-w-0">
       <div className="flex items-baseline gap-1 flex-wrap">
-        {/* Price: text-lg (biggest visual element after image) */}
         <span className="font-bold text-base text-foreground leading-none">
-          {layout === 'service' && 'Starting '}₹{product.price}
+          {pricePrefix}₹{product.price}
         </span>
       </div>
       {hasDiscount && (
@@ -502,10 +513,10 @@ function PriceBlock({
   );
 }
 
-/* ── Action Button — State Machine ── */
+/* ── Action Button — State Machine, label from DB ── */
 function ActionButton({
   actionType,
-  config,
+  buttonLabel,
   isCartAction,
   isOutOfStock,
   quantity,
@@ -517,7 +528,7 @@ function ActionButton({
   isAvailable,
 }: {
   actionType: ProductActionType;
-  config: typeof ACTION_CONFIG[ProductActionType];
+  buttonLabel: string;
   isCartAction: boolean;
   isOutOfStock: boolean;
   quantity: number;
@@ -560,7 +571,7 @@ function ActionButton({
           onClick={onAdd}
           className="border-2 border-success text-success font-bold text-xs px-4 py-1 rounded-full hover:bg-success hover:text-white transition-colors duration-200 shrink-0 min-w-[56px]"
         >
-          {config.shortLabel}
+          {buttonLabel}
         </button>
       );
     }
@@ -587,7 +598,7 @@ function ActionButton({
       onClick={onAdd}
       className="bg-primary text-primary-foreground font-bold text-xs px-3.5 py-1.5 rounded-full hover:bg-primary/90 transition-colors duration-200 shrink-0"
     >
-      {config.shortLabel}
+      {buttonLabel}
     </button>
   );
 }

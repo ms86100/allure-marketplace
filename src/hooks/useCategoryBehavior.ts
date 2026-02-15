@@ -37,6 +37,9 @@ interface CategoryConfigRow {
   duration_label: string | null;
   show_veg_toggle: boolean | null;
   show_duration_field: boolean | null;
+  primary_button_label: string | null;
+  price_prefix: string | null;
+  placeholder_emoji: string | null;
 }
 
 const fetchCategoryConfigs = async (): Promise<CategoryConfig[]> => {
@@ -74,6 +77,9 @@ const fetchCategoryConfigs = async (): Promise<CategoryConfig[]> => {
       durationLabel: row.duration_label,
       showVegToggle: row.show_veg_toggle ?? false,
       showDurationField: row.show_duration_field ?? false,
+      primaryButtonLabel: row.primary_button_label || null,
+      pricePrefix: row.price_prefix || null,
+      placeholderEmoji: row.placeholder_emoji || null,
     },
     displayOrder: row.display_order,
     isActive: row.is_active,
