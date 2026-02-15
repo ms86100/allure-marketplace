@@ -56,6 +56,7 @@ export function ManualEntryApproval() {
   };
 
   const respondToRequest = async (requestId: string, approved: boolean) => {
+    if (!profile?.id) return;
     const status = approved ? 'approved' : 'denied';
     const { error } = await supabase
       .from('manual_entry_requests')
@@ -63,7 +64,8 @@ export function ManualEntryApproval() {
         status,
         responded_at: new Date().toISOString(),
       })
-      .eq('id', requestId);
+      .eq('id', requestId)
+      .eq('resident_id', profile.id);
 
     if (error) {
       toast.error('Failed to respond');

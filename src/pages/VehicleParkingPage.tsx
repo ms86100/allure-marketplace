@@ -121,12 +121,13 @@ export default function VehicleParkingPage() {
   };
 
   const resolveViolation = async (id: string, status: 'resolved' | 'dismissed') => {
+    if (!effectiveSocietyId) return;
     try {
       await supabase.from('parking_violations').update({ 
         status, 
         resolved_at: new Date().toISOString(),
         resolved_by: profile?.id 
-      }).eq('id', id);
+      }).eq('id', id).eq('society_id', effectiveSocietyId);
       toast.success(`Violation ${status}`);
       fetchData();
     } catch {
