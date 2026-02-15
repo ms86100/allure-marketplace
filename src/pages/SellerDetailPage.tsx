@@ -269,13 +269,11 @@ export default function SellerDetailPage() {
                 </p>
               )}
             </div>
-            {seller.rating > 0 && (
-              <RatingStars
-                rating={seller.rating}
-                totalReviews={seller.total_reviews}
-                size="md"
-              />
-            )}
+            <RatingStars
+              rating={seller.rating}
+              totalReviews={seller.total_reviews}
+              size="md"
+            />
           </div>
 
           <div className="flex flex-wrap gap-3 mt-4 text-sm text-muted-foreground">

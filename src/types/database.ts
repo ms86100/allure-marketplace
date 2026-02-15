@@ -137,6 +137,7 @@ export interface Product {
   is_negotiable?: boolean;
   location_required?: boolean;
   available_slots?: any | null;
+  prep_time_minutes?: number | null;
   created_at: string;
   updated_at: string;
   // Joined data

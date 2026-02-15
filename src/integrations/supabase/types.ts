@@ -2614,6 +2614,7 @@ export type Database = {
           max_rental_duration: number | null
           min_rental_duration: number | null
           name: string
+          prep_time_minutes: number | null
           price: number
           rental_period_type: string | null
           seller_id: string
@@ -2640,6 +2641,7 @@ export type Database = {
           max_rental_duration?: number | null
           min_rental_duration?: number | null
           name: string
+          prep_time_minutes?: number | null
           price: number
           rental_period_type?: string | null
           seller_id: string
@@ -2666,6 +2668,7 @@ export type Database = {
           max_rental_duration?: number | null
           min_rental_duration?: number | null
           name?: string
+          prep_time_minutes?: number | null
           price?: number
           rental_period_type?: string | null
           seller_id?: string

@@ -18,6 +18,7 @@ interface DraftProduct {
   category: string;
   is_veg: boolean;
   image_url: string;
+  prep_time_minutes?: number | null;
 }
 
 interface DraftProductManagerProps {
@@ -42,6 +43,7 @@ export function DraftProductManager({
     category: categories[0] || '',
     is_veg: true,
     image_url: '',
+    prep_time_minutes: null,
   });
 
   const handleAddProduct = async () => {
@@ -67,7 +69,8 @@ export function DraftProductManager({
           is_veg: newProduct.is_veg,
           image_url: newProduct.image_url.trim() || null,
           is_available: true,
-        })
+          prep_time_minutes: newProduct.prep_time_minutes || null,
+        } as any)
         .select()
         .single();
 
@@ -81,6 +84,7 @@ export function DraftProductManager({
         category: categories[0] || '',
         is_veg: true,
         image_url: '',
+        prep_time_minutes: null,
       });
       setIsAdding(false);
       toast.success('Product added');
@@ -243,6 +247,19 @@ export function DraftProductManager({
               />
               <span className="text-sm">Vegetarian</span>
             </label>
+            <div className="space-y-2">
+              <Label htmlFor="prod-prep" className="text-xs">Preparation Time (minutes)</Label>
+              <Input
+                id="prod-prep"
+                type="number"
+                min={1}
+                placeholder="e.g., 30"
+                value={newProduct.prep_time_minutes || ''}
+                onChange={(e) =>
+                  setNewProduct({ ...newProduct, prep_time_minutes: e.target.value ? Number(e.target.value) : null })
+                }
+              />
+            </div>
 
             <div className="flex gap-2 pt-1">
               <Button
