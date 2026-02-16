@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Minus, Clock } from 'lucide-react';
+import { Plus, Minus, Clock, MapPin } from 'lucide-react';
 import { useHaptics } from '@/hooks/useHaptics';
 import { Badge } from '@/components/ui/badge';
 import { VegBadge } from '@/components/ui/veg-badge';
@@ -232,6 +232,16 @@ export function ProductListingCard({
           {showVegBadge && (
             <div className="absolute top-1 right-1">
               <VegBadge isVeg={product.is_veg} size="sm" />
+            </div>
+          )}
+
+          {/* Distance badge bottom-left */}
+          {(product as any).distance_km != null && !(product as any).is_same_society && (
+            <div className="absolute bottom-1 left-1">
+              <span className="inline-flex items-center gap-0.5 bg-background/90 backdrop-blur-sm text-[8px] font-bold text-primary px-1.5 py-0.5 rounded-full shadow-sm border border-border/50">
+                <MapPin size={7} className="shrink-0" />
+                {(product as any).distance_km} km
+              </span>
             </div>
           )}
         </div>

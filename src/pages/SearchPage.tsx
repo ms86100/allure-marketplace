@@ -31,6 +31,8 @@ interface ProductSearchResult {
   delivery_note?: string | null;
   action_type?: string | null;
   contact_phone?: string | null;
+  mrp?: number | null;
+  discount_percentage?: number | null;
   seller_id: string;
   seller_name: string;
   seller_rating: number;
@@ -140,7 +142,7 @@ export default function SearchPage() {
       // 1. Local society products
       let query = supabase
         .from('products')
-        .select('id, name, price, description, prep_time_minutes, image_url, is_veg, category, seller_id, action_type, contact_phone, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status, fulfillment_mode, delivery_note)')
+        .select('id, name, price, description, prep_time_minutes, image_url, is_veg, category, seller_id, action_type, contact_phone, mrp, discount_percentage, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status, fulfillment_mode, delivery_note)')
         .eq('is_available', true)
         .eq('approval_status', 'approved')
         .eq('seller.verification_status', 'approved')
@@ -165,6 +167,8 @@ export default function SearchPage() {
         delivery_note: p.seller?.delivery_note || null,
         action_type: p.action_type || null,
         contact_phone: p.contact_phone || null,
+        mrp: p.mrp || null,
+        discount_percentage: p.discount_percentage || null,
         seller_id: p.seller?.id || p.seller_id,
         seller_name: p.seller?.business_name || '',
         seller_rating: p.seller?.rating || 0,
@@ -202,6 +206,8 @@ export default function SearchPage() {
                     delivery_note: null,
                     action_type: p.action_type || 'add_to_cart',
                     contact_phone: p.contact_phone || null,
+                    mrp: p.mrp || null,
+                    discount_percentage: p.discount_percentage || null,
                     seller_id: seller.seller_id,
                     seller_name: seller.business_name || '',
                     seller_rating: seller.rating || 0,
@@ -321,6 +327,8 @@ export default function SearchPage() {
               delivery_note: p.seller?.delivery_note || null,
               action_type: p.action_type || null,
               contact_phone: p.contact_phone || null,
+              mrp: p.mrp || null,
+              discount_percentage: p.discount_percentage || null,
               seller_id: p.seller?.id || p.seller_id,
               seller_name: p.seller?.business_name || '',
               seller_rating: p.seller?.rating || 0,
@@ -365,6 +373,8 @@ export default function SearchPage() {
                   delivery_note: p.seller?.delivery_note || null,
                   action_type: p.action_type || null,
                   contact_phone: p.contact_phone || null,
+                  mrp: p.mrp || null,
+                  discount_percentage: p.discount_percentage || null,
                   seller_id: p.seller?.id || p.seller_id,
                   seller_name: p.seller?.business_name || '',
                   seller_rating: p.seller?.rating || 0,
@@ -381,7 +391,7 @@ export default function SearchPage() {
         // Category-only browse (no search term) - direct query
         let q = supabase
           .from('products')
-          .select('id, name, price, description, prep_time_minutes, image_url, is_veg, category, seller_id, action_type, contact_phone, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status, fulfillment_mode, delivery_note)')
+          .select('id, name, price, description, prep_time_minutes, image_url, is_veg, category, seller_id, action_type, contact_phone, mrp, discount_percentage, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status, fulfillment_mode, delivery_note)')
           .eq('is_available', true)
           .eq('approval_status', 'approved')
           .eq('seller.verification_status', 'approved')
@@ -413,6 +423,8 @@ export default function SearchPage() {
               delivery_note: p.seller?.delivery_note || null,
               action_type: p.action_type || null,
               contact_phone: p.contact_phone || null,
+              mrp: p.mrp || null,
+              discount_percentage: p.discount_percentage || null,
               seller_id: p.seller?.id || p.seller_id,
               seller_name: p.seller?.business_name || '',
               seller_rating: p.seller?.rating || 0,
@@ -453,6 +465,8 @@ export default function SearchPage() {
                     delivery_note: null,
                     action_type: p.action_type || 'add_to_cart',
                     contact_phone: p.contact_phone || null,
+                    mrp: p.mrp || null,
+                    discount_percentage: p.discount_percentage || null,
                     seller_id: seller.seller_id,
                     seller_name: seller.business_name || '',
                     seller_rating: seller.rating || 0,
@@ -814,6 +828,11 @@ function ProductGridByCategory({
     is_urgent: false,
     category: p.category || '',
     description: p.description || null,
+    mrp: p.mrp || null,
+    discount_percentage: p.discount_percentage || null,
+    distance_km: p.distance_km || null,
+    society_name: p.society_name || null,
+    is_same_society: p.is_same_society,
     created_at: '',
     updated_at: '',
     seller_name: p.seller_name,
