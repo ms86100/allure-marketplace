@@ -44,12 +44,11 @@ export function BottomNav() {
     : navItems.filter(item => !('featureKey' in item && item.featureKey) || isFeatureEnabled((item as any).featureKey));
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 glass border-t border-border safe-bottom">
-      <div className="flex items-center justify-around px-2 py-2">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border safe-bottom">
+      <div className="flex items-center justify-around px-2 py-1.5">
         {visibleItems.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname === to || 
             (to !== '/' && location.pathname.startsWith(to));
-          const showCartBadge = false; // Cart badge moved to FloatingCartBar
           
           return (
             <NavLink
@@ -57,21 +56,16 @@ export function BottomNav() {
               to={to}
               onClick={() => selectionChanged()}
               className={cn(
-                'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors min-w-[60px] relative',
+                'flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors min-w-[56px] relative',
                 isActive
-                  ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'text-foreground'
+                  : 'text-muted-foreground'
               )}
             >
               <div className="relative">
-                <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
-                {showCartBadge && (
-                  <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
-                    {itemCount > 9 ? '9+' : itemCount}
-                  </span>
-                )}
+                <Icon size={22} strokeWidth={isActive ? 2.5 : 1.8} />
               </div>
-              <span className={cn('text-[10px]', isActive && 'font-medium')}>
+              <span className={cn('text-[10px]', isActive ? 'font-bold' : 'font-medium')}>
                 {label}
               </span>
             </NavLink>

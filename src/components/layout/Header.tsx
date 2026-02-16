@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Bell, ShoppingCart, X } from 'lucide-react';
+import { Bell, ChevronDown, User, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/hooks/useCart';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { useHaptics } from '@/hooks/useHaptics';
 
 interface HeaderProps {
   showCart?: boolean;
@@ -23,6 +24,7 @@ export function Header({
 }: HeaderProps) {
   const { profile, isApproved, society, user, viewAsSocietyId, effectiveSociety, setViewAsSociety, isAdmin, isBuilderMember } = useAuth();
   const { itemCount } = useCart();
+  const { selectionChanged } = useHaptics();
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -60,66 +62,98 @@ export function Header({
   return (
     <>
       <header className={cn(
-        'sticky top-0 z-40 safe-top border-b border-primary/10',
+        'sticky top-0 z-40 safe-top bg-background',
         className
-      )} style={{ background: 'var(--gradient-primary)' }}>
-        <div className="flex items-center justify-between px-4 py-3">
-        {showLocation && profile ? (
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <MapPin className="text-primary-foreground shrink-0" size={20} />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold truncate text-primary-foreground">
-                  {profile.block}, {profile.flat_number}
+      )}>
+        <div className="px-4 pt-3 pb-2">
+          {/* Top row: delivery info + actions */}
+          <div className="flex items-start justify-between">
+            {showLocation && profile ? (
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-muted-foreground">Sociva in</p>
+                <p className="text-2xl font-extrabold text-foreground leading-tight tracking-tight">
+                  16 minutes
                 </p>
-                <p className="text-xs text-primary-foreground/70">{displaySociety?.name || 'Community Market'}</p>
+                <button 
+                  className="flex items-center gap-1 mt-0.5"
+                  onClick={() => selectionChanged()}
+                >
+                  <span className="text-xs font-semibold text-foreground">
+                    HOME
+                  </span>
+                  <span className="text-xs text-muted-foreground">-</span>
+                  <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                    {profile.block}, {profile.flat_number}
+                  </span>
+                  <ChevronDown size={12} className="text-muted-foreground shrink-0" />
+                </button>
               </div>
-            </div>
-          ) : title ? (
-            <h1 className="text-lg font-bold text-primary-foreground">{title}</h1>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-primary-foreground">Sociva</span>
-            </div>
-          )}
+            ) : title ? (
+              <h1 className="text-lg font-bold text-foreground">{title}</h1>
+            ) : (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Sociva in</p>
+                <p className="text-2xl font-extrabold text-foreground leading-tight">16 minutes</p>
+              </div>
+            )}
 
-          <div className="flex items-center gap-1">
-            <ThemeToggle className="text-primary-foreground hover:bg-white/15" />
-            {isApproved && (
-              <>
-                <Link to="/notifications/inbox">
-                  <Button variant="ghost" size="icon" className="relative text-primary-foreground hover:bg-white/15">
-                    <Bell size={20} />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground">
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </span>
-                    )}
-                  </Button>
-                </Link>
-                {showCart && (
-                  <Link to="/cart">
-                    <Button variant="ghost" size="icon" className="relative text-primary-foreground hover:bg-white/15">
-                      <ShoppingCart size={20} />
-                      {itemCount > 0 && (
-                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-accent-foreground">
-                          {itemCount > 9 ? '9+' : itemCount}
+            <div className="flex items-center gap-2 mt-1">
+              <ThemeToggle className="h-10 w-10 rounded-full bg-muted text-foreground" />
+              {isApproved && (
+                <>
+                  <Link to="/notifications/inbox">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="relative h-10 w-10 rounded-full bg-muted text-foreground"
+                    >
+                      <Bell size={18} />
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
+                          {unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                       )}
                     </Button>
                   </Link>
-                )}
-              </>
-            )}
+                  <Link to="/profile">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-10 w-10 rounded-full bg-muted text-foreground"
+                    >
+                      <User size={18} />
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
+
+          {/* Search bar */}
+          <Link to="/search" className="block mt-3">
+            <div className="flex items-center gap-3 bg-muted rounded-xl px-4 py-3">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.3-4.3"/>
+              </svg>
+              <span className="text-sm text-muted-foreground flex-1">Search "groceries"</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" x2="12" y1="19" y2="22"/>
+              </svg>
+            </div>
+          </Link>
         </div>
       </header>
+
       {isViewingAs && (
-        <div className="sticky top-[52px] z-39 bg-warning/15 border-b border-warning/30 px-4 py-1.5 flex items-center justify-between">
-          <p className="text-xs font-medium text-warning-foreground">
+        <div className="sticky top-[120px] z-39 bg-warning/15 border-b border-warning/30 px-4 py-1.5 flex items-center justify-between">
+          <p className="text-xs font-medium text-foreground">
             Viewing: <span className="font-bold">{effectiveSociety?.name}</span>
           </p>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setViewAsSociety(null)}>
-            <X size={14} />
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
           </Button>
         </div>
       )}

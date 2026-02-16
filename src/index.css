@@ -6,152 +6,154 @@
 
 @layer base {
   :root {
-    /* Sociva warm palette — community marketplace */
-    --background: 240 10% 96%;
-    --foreground: 220 20% 10%;
+    /* Blinkit-inspired clean light theme */
+    --background: 0 0% 97%;
+    --foreground: 0 0% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 20% 10%;
+    --card-foreground: 0 0% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 10%;
+    --popover-foreground: 0 0% 10%;
 
-    /* Primary: Warm coral red (Zomato-inspired) */
-    --primary: 4 90% 58%;
+    /* Primary: Blinkit yellow-green */
+    --primary: 85 70% 42%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary: Soft sage green (community/greenfield) */
-    --secondary: 145 30% 94%;
-    --secondary-foreground: 145 40% 25%;
+    /* Secondary: Soft neutral */
+    --secondary: 0 0% 94%;
+    --secondary-foreground: 0 0% 20%;
 
-    --muted: 230 20% 93%;
-    --muted-foreground: 220 10% 45%;
+    --muted: 0 0% 93%;
+    --muted-foreground: 0 0% 45%;
 
-    /* Accent: Golden amber for highlights */
-    --accent: 38 95% 55%;
-    --accent-foreground: 38 95% 15%;
+    /* Accent: Green for ADD buttons, success states */
+    --accent: 142 70% 38%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 90%;
-    --input: 220 15% 90%;
-    --ring: 4 90% 58%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 85 70% 42%;
 
     --radius: 0.75rem;
 
-    /* Custom colors for food app */
-    --veg: 142 70% 45%;
-    --non-veg: 4 80% 50%;
-    --success: 142 70% 45%;
+    /* Custom colors */
+    --veg: 142 70% 38%;
+    --non-veg: 0 80% 50%;
+    --success: 142 70% 38%;
     --warning: 38 95% 55%;
     --info: 200 90% 50%;
 
     /* Category tint colors */
-    --tint-food: 4 80% 95%;
-    --tint-services: 200 80% 94%;
-    --tint-personal: 310 60% 95%;
-    --tint-resale: 38 80% 94%;
-    --tint-events: 260 60% 95%;
-    --tint-default: 220 30% 95%;
+    --tint-food: 0 0% 95%;
+    --tint-services: 200 30% 95%;
+    --tint-personal: 310 20% 96%;
+    --tint-resale: 38 30% 95%;
+    --tint-events: 260 20% 96%;
+    --tint-default: 0 0% 95%;
 
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(4 90% 58%) 0%, hsl(20 90% 55%) 100%);
-    --gradient-success: linear-gradient(135deg, hsl(142 70% 45%) 0%, hsl(160 60% 40%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(85 70% 42%) 0%, hsl(100 60% 38%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(142 70% 38%) 0%, hsl(160 60% 35%) 100%);
     --gradient-warm: linear-gradient(135deg, hsl(38 95% 55%) 0%, hsl(20 90% 55%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(4 90% 58% / 0.08) 0%, hsl(240 10% 96%) 60%);
-    --gradient-glass: linear-gradient(135deg, hsl(0 0% 100% / 0.85) 0%, hsl(0 0% 100% / 0.65) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(85 70% 42% / 0.06) 0%, hsl(0 0% 97%) 60%);
+    --gradient-glass: linear-gradient(135deg, hsl(0 0% 100% / 0.92) 0%, hsl(0 0% 100% / 0.75) 100%);
 
     /* Shadows */
-    --shadow-sm: 0 1px 2px hsl(220 20% 10% / 0.05);
-    --shadow-md: 0 4px 12px hsl(220 20% 10% / 0.08);
-    --shadow-lg: 0 12px 32px hsl(220 20% 10% / 0.12);
-    --shadow-card: 0 2px 8px hsl(220 20% 10% / 0.06);
-    --shadow-elevated: 0 8px 24px hsl(220 20% 10% / 0.1);
-    --shadow-glow: 0 0 20px hsl(4 90% 58% / 0.15);
+    --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.04);
+    --shadow-md: 0 4px 12px hsl(0 0% 0% / 0.06);
+    --shadow-lg: 0 12px 32px hsl(0 0% 0% / 0.1);
+    --shadow-card: 0 1px 4px hsl(0 0% 0% / 0.05);
+    --shadow-elevated: 0 8px 24px hsl(0 0% 0% / 0.08);
+    --shadow-glow: 0 0 20px hsl(85 70% 42% / 0.12);
 
     /* Sidebar */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 20% 10%;
-    --sidebar-primary: 4 90% 58%;
+    --sidebar-foreground: 0 0% 10%;
+    --sidebar-primary: 85 70% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 145 30% 94%;
-    --sidebar-accent-foreground: 145 40% 25%;
-    --sidebar-border: 220 15% 90%;
-    --sidebar-ring: 4 90% 58%;
+    --sidebar-accent: 0 0% 94%;
+    --sidebar-accent-foreground: 0 0% 20%;
+    --sidebar-border: 0 0% 90%;
+    --sidebar-ring: 85 70% 42%;
   }
 
   .dark {
-    /* Deep graphite — not pure black, feels premium */
-    --background: 228 16% 8%;
-    --foreground: 0 0% 94%;
+    /* Blinkit dark — near-black, not gray */
+    --background: 0 0% 8%;
+    --foreground: 0 0% 93%;
 
-    --card: 228 14% 12%;
-    --card-foreground: 0 0% 94%;
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 93%;
 
-    --popover: 228 14% 12%;
-    --popover-foreground: 0 0% 94%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 93%;
 
-    /* Primary: Neon coral-red — bold, dominant, "main character energy" */
-    --primary: 4 90% 62%;
+    /* Primary: Same green */
+    --primary: 85 70% 45%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary: Deep muted green — complements the neon accents */
-    --secondary: 145 25% 14%;
-    --secondary-foreground: 145 40% 80%;
+    /* Secondary: Dark surface */
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 80%;
 
-    --muted: 228 12% 16%;
-    --muted-foreground: 228 10% 55%;
+    --muted: 0 0% 16%;
+    --muted-foreground: 0 0% 50%;
 
-    /* Accent: Neon electric green — the "ADD" button energy */
-    --accent: 142 80% 50%;
-    --accent-foreground: 142 80% 8%;
+    /* Accent: Bright green ADD button */
+    --accent: 142 70% 42%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 75% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 228 12% 18%;
-    --input: 228 12% 18%;
-    --ring: 4 90% 62%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 85 70% 45%;
 
-    /* Semantic: urgency & trust */
-    --veg: 142 80% 50%;
+    /* Semantic */
+    --veg: 142 70% 42%;
+    --non-veg: 0 75% 50%;
+    --success: 142 70% 42%;
     --warning: 38 95% 55%;
     --info: 200 85% 55%;
 
-    /* Dark mode tints — glowing against dark */
-    --tint-food: 4 70% 14%;
-    --tint-services: 200 55% 13%;
-    --tint-personal: 310 45% 14%;
-    --tint-resale: 38 55% 13%;
-    --tint-events: 260 45% 14%;
-    --tint-default: 228 18% 13%;
+    /* Dark mode tints — subtle */
+    --tint-food: 0 0% 14%;
+    --tint-services: 200 15% 13%;
+    --tint-personal: 310 10% 14%;
+    --tint-resale: 38 15% 13%;
+    --tint-events: 260 10% 14%;
+    --tint-default: 0 0% 13%;
 
-    /* Gradients — night-market glow */
-    --gradient-primary: linear-gradient(135deg, hsl(4 90% 62%) 0%, hsl(20 85% 55%) 100%);
-    --gradient-success: linear-gradient(135deg, hsl(142 80% 50%) 0%, hsl(160 65% 42%) 100%);
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(85 70% 45%) 0%, hsl(100 60% 40%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(142 70% 42%) 0%, hsl(160 60% 38%) 100%);
     --gradient-warm: linear-gradient(135deg, hsl(38 95% 55%) 0%, hsl(20 90% 55%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(4 90% 62% / 0.15) 0%, hsl(228 16% 8%) 60%);
-    --gradient-glass: linear-gradient(135deg, hsl(228 14% 14% / 0.92) 0%, hsl(228 14% 12% / 0.75) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(85 70% 45% / 0.1) 0%, hsl(0 0% 8%) 60%);
+    --gradient-glass: linear-gradient(135deg, hsl(0 0% 12% / 0.92) 0%, hsl(0 0% 10% / 0.75) 100%);
 
-    /* Shadows — neon glow effects */
+    /* Shadows */
     --shadow-sm: 0 1px 3px hsl(0 0% 0% / 0.4);
     --shadow-md: 0 4px 14px hsl(0 0% 0% / 0.5);
     --shadow-lg: 0 12px 36px hsl(0 0% 0% / 0.6);
     --shadow-card: 0 2px 10px hsl(0 0% 0% / 0.35);
     --shadow-elevated: 0 8px 28px hsl(0 0% 0% / 0.5);
-    --shadow-glow: 0 0 24px hsl(4 90% 62% / 0.25);
-    --shadow-glow-green: 0 0 16px hsl(142 80% 50% / 0.3);
+    --shadow-glow: 0 0 24px hsl(142 70% 42% / 0.2);
+    --shadow-glow-green: 0 0 16px hsl(142 70% 42% / 0.3);
     --shadow-glow-accent: 0 0 16px hsl(38 95% 55% / 0.3);
 
-    --sidebar-background: 228 14% 10%;
-    --sidebar-foreground: 0 0% 94%;
-    --sidebar-primary: 4 90% 62%;
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 93%;
+    --sidebar-primary: 85 70% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 145 25% 14%;
-    --sidebar-accent-foreground: 145 40% 80%;
-    --sidebar-border: 228 12% 18%;
-    --sidebar-ring: 4 90% 62%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 80%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 85 70% 45%;
   }
 }
 

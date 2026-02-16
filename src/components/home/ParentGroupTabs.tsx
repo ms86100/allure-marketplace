@@ -47,8 +47,8 @@ export function ParentGroupTabs({ activeGroup, onGroupChange }: ParentGroupTabsP
             className={cn(
               'shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full transition-all duration-200 text-xs font-bold whitespace-nowrap',
               isActive
-                ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25 scale-105'
-                : 'bg-card/80 text-foreground border border-border/40 hover:bg-card hover:shadow-sm active:scale-95'
+                ? 'bg-foreground text-background shadow-md scale-105'
+                : 'bg-card text-foreground border border-border/50 hover:bg-muted active:scale-95'
             )}
           >
             <span className="text-sm leading-none">{tab.icon}</span>

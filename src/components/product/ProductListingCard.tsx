@@ -284,18 +284,18 @@ export function ProductListingCard({
             quantity === 0 ? (
               <button
                 onClick={handleAdd}
-                className="border border-success text-success font-bold text-[10px] px-3.5 py-1.5 rounded-lg hover:bg-success hover:text-white transition-all duration-150 shrink-0 uppercase shadow-sm active:scale-90"
+                className="border border-accent text-accent font-bold text-[11px] px-4 py-1.5 rounded-md hover:bg-accent hover:text-accent-foreground transition-all duration-150 shrink-0 uppercase tracking-wide active:scale-90"
               >
                 ADD
               </button>
             ) : (
-              <div className="flex items-center bg-success rounded-md overflow-hidden shrink-0">
-                <button onClick={handleDecrement} className="px-1.5 py-1 text-white hover:bg-success/80 transition-colors">
-                  <Minus size={10} strokeWidth={3} />
+              <div className="flex items-center bg-accent rounded-md overflow-hidden shrink-0">
+                <button onClick={handleDecrement} className="px-2 py-1.5 text-accent-foreground hover:bg-accent/80 transition-colors">
+                  <Minus size={12} strokeWidth={3} />
                 </button>
-                <span className="font-bold text-[10px] text-white min-w-[14px] text-center">{quantity}</span>
-                <button onClick={handleIncrement} className="px-1.5 py-1 text-white hover:bg-success/80 transition-colors">
-                  <Plus size={10} strokeWidth={3} />
+                <span className="font-bold text-xs text-accent-foreground min-w-[18px] text-center">{quantity}</span>
+                <button onClick={handleIncrement} className="px-2 py-1.5 text-accent-foreground hover:bg-accent/80 transition-colors">
+                  <Plus size={12} strokeWidth={3} />
                 </button>
               </div>
             )
