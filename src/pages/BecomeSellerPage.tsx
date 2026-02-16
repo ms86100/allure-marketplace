@@ -495,7 +495,12 @@ export default function BecomeSellerPage() {
               <Label htmlFor="business_name">Business Name *</Label>
               <Input
                 id="business_name"
-                placeholder="e.g., Amma's Kitchen, Home Tutors"
+                placeholder={
+                  selectedGroup === 'food' ? "e.g., Amma's Kitchen, Fresh Bakes"
+                  : selectedGroup === 'services' ? "e.g., QuickFix Repairs, Yoga with Priya"
+                  : selectedGroup === 'shopping' ? "e.g., Style Corner, TechMart"
+                  : "e.g., Your Store Name"
+                }
                 value={formData.business_name}
                 onChange={(e) =>
                   setFormData({ ...formData, business_name: e.target.value })
