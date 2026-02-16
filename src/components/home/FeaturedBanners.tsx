@@ -40,15 +40,6 @@ export function FeaturedBanners() {
     return () => clearInterval(interval);
   }, [banners.length]);
 
-  const scrollToIndex = useCallback((idx: number) => {
-    setActiveIndex(idx);
-    const container = document.getElementById('banner-carousel');
-    if (container) {
-      const child = container.children[idx] as HTMLElement;
-      child?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }
-  }, []);
-
   // Sync scroll position with activeIndex
   useEffect(() => {
     const container = document.getElementById('banner-carousel');
@@ -58,10 +49,14 @@ export function FeaturedBanners() {
     }
   }, [activeIndex]);
 
+  const scrollToIndex = useCallback((idx: number) => {
+    setActiveIndex(idx);
+  }, []);
+
   if (isLoading) {
     return (
-      <div className="px-4">
-        <Skeleton className="h-40 rounded-2xl" />
+      <div className="px-4 my-4">
+        <Skeleton className="h-36 rounded-2xl" />
       </div>
     );
   }
@@ -69,34 +64,33 @@ export function FeaturedBanners() {
   if (banners.length === 0) return null;
 
   return (
-    <div className="animate-fade-in">
+    <div className="my-4">
       <div
         id="banner-carousel"
         className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1 snap-x snap-mandatory"
       >
-        {banners.map((banner: any, idx: number) => (
+        {banners.map((banner: any) => (
           <div
             key={banner.id}
             onClick={() => banner.link_url && navigate(banner.link_url)}
             className={cn(
               'shrink-0 w-[85vw] sm:w-[400px] rounded-2xl overflow-hidden cursor-pointer snap-center',
-              'border border-border/10 shadow-md',
-              'transition-all duration-300 hover:shadow-lg hover:scale-[1.01] active:scale-[0.99]'
+              'border border-border/20',
+              'transition-all duration-200 hover:shadow-md active:scale-[0.99]'
             )}
           >
             {banner.image_url ? (
               <img
                 src={banner.image_url}
                 alt={banner.title || 'Featured'}
-                className="w-full h-40 object-cover"
+                className="w-full h-36 object-cover"
                 loading="lazy"
               />
             ) : (
               <div
-                className="w-full h-40 flex items-center justify-center p-6"
-                style={{ background: 'var(--gradient-warm)' }}
+                className="w-full h-36 flex items-center justify-center p-6 bg-primary"
               >
-                <h3 className="text-lg font-bold text-primary-foreground text-center drop-shadow-sm">
+                <h3 className="text-lg font-bold text-primary-foreground text-center">
                   {banner.title || 'Featured'}
                 </h3>
               </div>
@@ -107,7 +101,7 @@ export function FeaturedBanners() {
 
       {/* Dot indicators */}
       {banners.length > 1 && (
-        <div className="flex justify-center gap-1.5 mt-3">
+        <div className="flex justify-center gap-1.5 mt-2.5">
           {banners.map((_: any, idx: number) => (
             <button
               key={idx}
@@ -116,7 +110,7 @@ export function FeaturedBanners() {
                 'rounded-full transition-all duration-300',
                 idx === activeIndex
                   ? 'w-5 h-1.5 bg-primary'
-                  : 'w-1.5 h-1.5 bg-border hover:bg-muted-foreground/40'
+                  : 'w-1.5 h-1.5 bg-border'
               )}
             />
           ))}

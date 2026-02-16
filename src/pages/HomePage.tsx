@@ -35,17 +35,17 @@ export default function HomePage() {
       <div className="pb-4">
         {/* Gate Entry Button */}
         {isFeatureEnabled('resident_identity_verification') && (
-          <div className="px-4 pt-4">
+          <div className="px-4 pt-3">
             <Link to="/gate-entry">
-              <div className="glass-card p-4 flex items-center gap-4 transition-all hover:shadow-lg active:scale-[0.98]">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'var(--gradient-primary)' }}>
-                  <Shield className="text-primary-foreground" size={22} />
+              <div className="bg-card border border-border/40 rounded-2xl p-3.5 flex items-center gap-3 transition-all active:scale-[0.98]">
+                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+                  <Shield className="text-primary-foreground" size={20} />
                 </div>
-                <div className="flex-1">
-                  <h4 className="font-bold text-foreground">Gate Entry</h4>
-                  <p className="text-xs text-muted-foreground">Show QR code to security</p>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-bold text-sm text-foreground">Gate Entry</h4>
+                  <p className="text-[11px] text-muted-foreground">Show QR code to security</p>
                 </div>
-                <ChevronRight className="text-muted-foreground" size={20} />
+                <ChevronRight className="text-muted-foreground shrink-0" size={18} />
               </div>
             </Link>
           </div>
@@ -56,19 +56,19 @@ export default function HomePage() {
 
         {/* Become a Seller CTA */}
         {!isSeller && (
-          <div className="mx-4 mt-6">
+          <div className="mx-4 mt-4">
             <Link to="/become-seller">
-              <div className="glass-card p-4 flex items-center gap-4 transition-all hover:shadow-lg active:scale-[0.98]" style={{ background: 'var(--gradient-success)', border: 'none' }}>
-                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <Store className="text-primary-foreground" size={22} />
+              <div className="bg-accent rounded-2xl p-3.5 flex items-center gap-3 transition-all active:scale-[0.98]">
+                <div className="w-10 h-10 rounded-xl bg-accent-foreground/20 flex items-center justify-center">
+                  <Store className="text-accent-foreground" size={20} />
                 </div>
-                <div className="flex-1">
-                  <h4 className="font-bold text-primary-foreground">Start Selling</h4>
-                  <p className="text-xs text-primary-foreground/80">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-bold text-sm text-accent-foreground">Start Selling</h4>
+                  <p className="text-[11px] text-accent-foreground/80">
                     Share your homemade food with neighbors
                   </p>
                 </div>
-                <ChevronRight className="text-primary-foreground/70" size={20} />
+                <ChevronRight className="text-accent-foreground/60 shrink-0" size={18} />
               </div>
             </Link>
           </div>

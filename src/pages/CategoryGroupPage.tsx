@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
-// ProductDetailSheet removed — cards navigate directly to seller page
 import { SellerCard } from '@/components/seller/SellerCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -17,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 export default function CategoryGroupPage() {
   const { category } = useParams<{ category: string }>();
@@ -29,7 +29,6 @@ export default function CategoryGroupPage() {
   const [activeSubCategory, setActiveSubCategory] = useState<ServiceCategory | null>(subCategory);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('relevance');
-  // No popup — product cards navigate to seller store directly
 
   const parentGroup = category ? getGroupBySlug(category) : undefined;
   const subCategories = category ? groupedConfigs[category] || [] : [];
@@ -61,11 +60,6 @@ export default function CategoryGroupPage() {
     enabled: !!category,
   });
 
-  const getBehavior = (cat: string) => {
-    const config = configs.find((c) => c.category === cat);
-    return config?.behavior || null;
-  };
-
   const displayProducts = useMemo(() => {
     let filtered = activeSubCategory
       ? allProducts.filter((p) => p.category === activeSubCategory)
@@ -96,15 +90,13 @@ export default function CategoryGroupPage() {
     }
   };
 
-  // No-op: cards navigate to seller page directly via ProductGridCard default behavior
-
   const isLoading = groupsLoading || configsLoading;
 
   if (isLoading) {
     return (
       <AppLayout showHeader={false}>
         <div className="p-4">
-          <Skeleton className="h-12 w-full rounded-xl mb-4" />
+          <Skeleton className="h-10 w-full rounded-xl mb-4" />
           <div className="flex gap-2 mb-4">
             {[1, 2, 3, 4].map((i) => (
               <Skeleton key={i} className="h-8 w-20 rounded-full" />
@@ -136,26 +128,27 @@ export default function CategoryGroupPage() {
   return (
     <AppLayout showHeader={false}>
       {/* Sticky Header */}
-      <div className="sticky top-0 z-30 bg-background border-b border-border/40">
+      <div className="sticky top-0 z-30 bg-background safe-top">
         <div className="px-4 pt-3 pb-2">
-          <div className="flex items-center gap-3 mb-3">
-            <Link to="/" className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-              <ArrowLeft size={18} />
+          {/* Back + title */}
+          <div className="flex items-center gap-2.5 mb-2.5">
+            <Link to="/" className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
+              <ArrowLeft size={18} className="text-foreground" />
             </Link>
-            <h1 className="text-lg font-bold flex items-center gap-2 flex-1">
+            <h1 className="text-base font-bold flex items-center gap-1.5 flex-1 min-w-0">
               <span>{parentGroup.icon}</span>
-              {parentGroup.label}
+              <span className="truncate">{parentGroup.label}</span>
             </h1>
           </div>
 
           {/* Search */}
           <div className="relative mb-2">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder={`Search in ${parentGroup.label}…`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-8 h-9 bg-muted border-0 rounded-lg text-sm"
+              className="pl-9 pr-8 h-9 bg-muted border-0 rounded-xl text-sm focus-visible:ring-1"
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
@@ -164,49 +157,63 @@ export default function CategoryGroupPage() {
             )}
           </div>
 
-          {/* Sub-category tabs */}
+          {/* Sub-category pills — horizontal scroll */}
           {subCategories.length > 0 && (
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
-              <button
-                onClick={() => handleSubCategorySelect(null)}
-                className={cn(
-                  'px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors',
-                  !activeSubCategory ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
-                )}
-              >
-                All
-              </button>
-              {subCategories.map((config) => (
+            <ScrollArea className="pb-1">
+              <div className="flex gap-1.5 pb-1">
                 <button
-                  key={config.category}
-                  onClick={() => handleSubCategorySelect(config.category)}
+                  onClick={() => handleSubCategorySelect(null)}
                   className={cn(
-                    'px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1',
-                    activeSubCategory === config.category ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
+                    'px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors',
+                    !activeSubCategory 
+                      ? 'bg-foreground text-background border-foreground' 
+                      : 'bg-background text-foreground border-border'
                   )}
                 >
-                  <span className="text-xs">{config.icon}</span>
-                  {config.displayName}
+                  All
                 </button>
-              ))}
-            </div>
+                {subCategories.map((config) => (
+                  <button
+                    key={config.category}
+                    onClick={() => handleSubCategorySelect(config.category)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors flex items-center gap-1',
+                      activeSubCategory === config.category 
+                        ? 'bg-foreground text-background border-foreground' 
+                        : 'bg-background text-foreground border-border'
+                    )}
+                  >
+                    <span className="text-xs">{config.icon}</span>
+                    {config.displayName}
+                  </button>
+                ))}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           )}
         </div>
 
         {/* Sort bar */}
-        <div className="flex gap-2 px-4 pb-2 overflow-x-auto scrollbar-hide">
-          {SORT_OPTIONS.map((opt) => (
-            <button
-              key={opt.key}
-              onClick={() => setSortBy(opt.key)}
-              className={cn(
-                'px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors',
-                sortBy === opt.key ? 'bg-foreground text-background' : 'bg-muted/60 text-muted-foreground'
-              )}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="border-t border-border/40">
+          <ScrollArea className="px-4 py-2">
+            <div className="flex gap-1.5">
+              {SORT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => setSortBy(opt.key)}
+                  className={cn(
+                    'px-3 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap border transition-colors',
+                    sortBy === opt.key 
+                      ? 'bg-primary/10 text-primary border-primary' 
+                      : 'bg-background text-muted-foreground border-border'
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
         </div>
       </div>
 
@@ -220,7 +227,7 @@ export default function CategoryGroupPage() {
           </div>
         ) : displayProducts.length > 0 ? (
           <>
-            <p className="text-xs text-muted-foreground mb-3">
+            <p className="text-[11px] text-muted-foreground mb-3">
               {displayProducts.length} item{displayProducts.length !== 1 ? 's' : ''}
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -235,8 +242,8 @@ export default function CategoryGroupPage() {
         ) : (
           <div className="text-center py-16">
             <div className="text-4xl mb-4">{parentGroup.icon}</div>
-            <h3 className="font-semibold mb-2">No items found</h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <h3 className="font-semibold text-sm mb-2">No items found</h3>
+            <p className="text-xs text-muted-foreground mb-4">
               {searchQuery ? 'Try a different search' : 'Check back soon for new listings!'}
             </p>
             {!searchQuery && (
@@ -252,7 +259,7 @@ export default function CategoryGroupPage() {
           <div className="mt-8">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-base">⭐</span>
-              <h3 className="font-semibold text-sm">
+              <h3 className="font-bold text-sm">
                 Top Sellers in {parentGroup.label}
               </h3>
             </div>
@@ -264,8 +271,6 @@ export default function CategoryGroupPage() {
           </div>
         )}
       </div>
-
-      {/* Popup removed — cards navigate directly to seller store */}
     </AppLayout>
   );
 }

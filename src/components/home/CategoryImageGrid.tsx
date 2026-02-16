@@ -1,25 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useHaptics } from '@/hooks/useHaptics';
-
-const GROUP_TINTS: Record<string, string> = {
-  food: 'bg-[hsl(var(--tint-food))]',
-  services: 'bg-[hsl(var(--tint-services))]',
-  personal: 'bg-[hsl(var(--tint-personal))]',
-  resale: 'bg-[hsl(var(--tint-resale))]',
-  events: 'bg-[hsl(var(--tint-events))]',
-};
-
-const SECTION_TINTS: Record<string, string> = {
-  food: 'bg-[hsl(var(--tint-food)/0.5)]',
-  services: 'bg-[hsl(var(--tint-services)/0.5)]',
-  personal: 'bg-[hsl(var(--tint-personal)/0.5)]',
-  resale: 'bg-[hsl(var(--tint-resale)/0.5)]',
-  events: 'bg-[hsl(var(--tint-events)/0.5)]',
-};
 
 interface CategoryImageGridProps {
   parentGroup: string;
@@ -30,12 +13,10 @@ export function CategoryImageGrid({ parentGroup, title }: CategoryImageGridProps
   const { groupedConfigs, isLoading } = useCategoryConfigs();
   const { selectionChanged } = useHaptics();
   const categories = groupedConfigs[parentGroup] || [];
-  const tint = GROUP_TINTS[parentGroup] || 'bg-[hsl(var(--tint-default))]';
-  const sectionTint = SECTION_TINTS[parentGroup] || 'bg-[hsl(var(--tint-default)/0.5)]';
 
   if (isLoading) {
     return (
-      <div className="px-4">
+      <div className="px-4 mb-4">
         <Skeleton className="h-5 w-40 mb-3" />
         <div className="grid grid-cols-4 gap-3">
           {[1, 2, 3, 4].map(i => (
@@ -49,32 +30,27 @@ export function CategoryImageGrid({ parentGroup, title }: CategoryImageGridProps
   if (categories.length === 0) return null;
 
   return (
-    <div className={cn('animate-fade-in py-4 rounded-3xl mx-2', sectionTint)}>
-      {/* Section header with "see all" chip */}
-      <div className="flex items-center justify-between px-4 mb-3">
-        <h3 className="font-bold text-base text-foreground">{title}</h3>
-        <Link
-          to={`/category/${parentGroup}`}
-          className="flex items-center gap-0.5 bg-card/80 border border-border/40 text-xs font-semibold text-primary px-2.5 py-1 rounded-full hover:bg-card transition-colors"
-        >
-          see all <ChevronRight size={12} />
-        </Link>
+    <div className="mb-4">
+      {/* Section header */}
+      <div className="flex items-center justify-between px-4 mb-2.5">
+        <h3 className="font-bold text-sm text-foreground">{title}</h3>
       </div>
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1">
-        {categories.map((cat) => (
+
+      {/* 4-column grid — Blinkit style with dark rounded cards */}
+      <div className="grid grid-cols-4 gap-2 px-4">
+        {categories.slice(0, 8).map((cat) => (
           <Link
             key={cat.category}
             to={`/category/${cat.parentGroup}?sub=${cat.category}`}
             onClick={() => selectionChanged()}
-            className="group shrink-0 w-[88px] flex flex-col items-center gap-1.5"
+            className="group flex flex-col items-center"
           >
             <div
               className={cn(
-                'w-[88px] h-[88px] rounded-2xl overflow-hidden',
-                'border border-white/60 shadow-sm',
-                'transition-all duration-200 group-hover:scale-105 group-hover:shadow-lg group-active:scale-95',
-                'flex items-center justify-center',
-                tint
+                'w-full aspect-square rounded-2xl overflow-hidden',
+                'bg-muted border border-border/30',
+                'transition-all duration-200 group-hover:scale-[1.03] group-active:scale-95',
+                'flex items-center justify-center'
               )}
             >
               {cat.imageUrl ? (
@@ -85,10 +61,10 @@ export function CategoryImageGrid({ parentGroup, title }: CategoryImageGridProps
                   loading="lazy"
                 />
               ) : (
-                <span className="text-4xl drop-shadow-sm">{cat.icon}</span>
+                <span className="text-3xl">{cat.icon}</span>
               )}
             </div>
-            <span className="text-[10px] font-semibold text-center leading-tight text-foreground line-clamp-2 max-w-[88px]">
+            <span className="text-[10px] font-medium text-center leading-tight text-foreground line-clamp-2 mt-1.5 px-0.5">
               {cat.displayName}
             </span>
           </Link>
