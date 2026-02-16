@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Trash2, Minus, Plus, Bell, Store, MapPin, Clock } from 'lucide-react';
+import { ArrowLeft, Minus, Plus, Clock, Store, MapPin, Bell, ChevronRight, Trash2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { VegBadge } from '@/components/ui/veg-badge';
@@ -29,7 +29,6 @@ export default function CartPage() {
 
   const finalAmount = appliedCoupon ? Math.max(0, totalAmount - appliedCoupon.discountAmount) : totalAmount;
 
-  // For single-seller cart, use first seller's payment preferences
   const firstSeller = sellerGroups[0]?.items[0]?.product?.seller;
   const acceptsCod = firstSeller?.accepts_cod ?? true;
   const acceptsUpi = !!(firstSeller as any)?.accepts_upi && !!(firstSeller as any)?.upi_id;
@@ -39,7 +38,6 @@ export default function CartPage() {
   const createOrdersForAllSellers = async (paymentStatus: 'pending' | 'paid', transactionRef?: string) => {
     if (!user || !profile || sellerGroups.length === 0) return [];
 
-    // Build seller_groups payload for the atomic RPC
     const sellerGroupsPayload = sellerGroups.map((group) => ({
       seller_id: group.sellerId,
       subtotal: group.subtotal,
@@ -72,7 +70,6 @@ export default function CartPage() {
 
     const createdOrderIds = result.order_ids;
 
-    // Send notifications (non-critical, fire-and-forget)
     for (const group of sellerGroups) {
       const sellerProfile = group.items[0]?.product?.seller;
       if (sellerProfile?.user_id) {
@@ -114,13 +111,11 @@ export default function CartPage() {
       return;
     }
 
-    // COD flow
     setIsPlacingOrder(true);
     try {
       const orderIds = await createOrdersForAllSellers('pending');
       if (orderIds.length === 0) throw new Error('Failed to create orders');
 
-      // Cart already cleared by RPC, just refresh local state
       await refresh();
       if (orderIds.length === 1) {
         toast.success('Order placed successfully!');
@@ -162,139 +157,150 @@ export default function CartPage() {
     toast.error('Payment failed. Please try again.');
   };
 
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  const maxPrepTime = items.reduce((max, item) => {
+    const pt = (item.product as any)?.prep_time_minutes;
+    return pt && pt > max ? pt : max;
+  }, 0);
+
   if (items.length === 0) {
     return (
       <AppLayout showHeader={false}>
         <div className="p-4">
-          <Link to="/" className="flex items-center gap-2 text-muted-foreground mb-8">
-            <ArrowLeft size={20} />
-            <span>Back</span>
+          <Link to="/" className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-muted mb-6">
+            <ArrowLeft size={18} />
           </Link>
-          <div className="text-center py-12">
-            <div className="w-24 h-24 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-              <span className="text-5xl">🛒</span>
+          <div className="text-center py-16">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
+              <span className="text-4xl">🛒</span>
             </div>
-            <h2 className="text-xl font-bold mb-2">Your cart is empty</h2>
-            <p className="text-muted-foreground mb-6">Discover products from sellers in your community</p>
-            <Link to="/search"><Button>Explore Marketplace</Button></Link>
+            <h2 className="text-lg font-bold mb-1">Your cart is empty</h2>
+            <p className="text-sm text-muted-foreground mb-6">Discover products from sellers in your community</p>
+            <Link to="/search"><Button size="sm">Explore Marketplace</Button></Link>
           </div>
         </div>
       </AppLayout>
     );
   }
 
-  // Compute max prep time across all items
-  const maxPrepTime = items.reduce((max, item) => {
-    const pt = (item.product as any)?.prep_time_minutes;
-    return pt && pt > max ? pt : max;
-  }, 0);
-
   return (
     <AppLayout showHeader={false} showNav={false}>
-      <div className="p-4 pb-32">
-        <div className="flex items-center justify-between mb-6">
-          <Link to="/" className="flex items-center gap-2 text-muted-foreground">
-            <ArrowLeft size={20} />
-            <span>Back</span>
+      <div className="pb-36">
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3 flex items-center gap-3">
+          <Link to="/" className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-muted shrink-0">
+            <ArrowLeft size={16} />
           </Link>
-          <Button variant="ghost" size="sm" className="text-destructive" onClick={clearCart}>
-            Clear Cart
+          <div className="flex-1 min-w-0">
+            <h1 className="text-base font-bold">Checkout</h1>
+            <p className="text-xs text-muted-foreground">Shipment of {itemCount} item{itemCount !== 1 ? 's' : ''}</p>
+          </div>
+          <Button variant="ghost" size="sm" className="text-destructive text-xs h-7 px-2" onClick={clearCart}>
+            Clear
           </Button>
         </div>
 
-        {/* Urgent Item Warning */}
-        {hasUrgentItem && (
-          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 mb-4 flex items-start gap-3">
-            <Bell className="text-warning shrink-0 mt-0.5" size={18} />
-            <div className="text-sm">
-              <p className="font-medium text-warning-foreground">Time-sensitive order</p>
-              <p className="text-muted-foreground text-xs mt-0.5">
-                Seller must respond within 3 minutes or order will be auto-cancelled
-              </p>
+        {/* Delivery Time Card */}
+        {maxPrepTime > 0 && (
+          <div className="mx-4 mt-3 flex items-center gap-3 bg-accent/50 rounded-xl p-3">
+            <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0">
+              <Clock size={18} className="text-accent-foreground" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Ready in ~{maxPrepTime} minutes</p>
+              <p className="text-xs text-muted-foreground">Estimated preparation time</p>
             </div>
           </div>
         )}
 
-        {/* Cart Items Grouped by Seller */}
-        <div className="space-y-4">
+        {/* Urgent Warning */}
+        {hasUrgentItem && (
+          <div className="mx-4 mt-3 bg-warning/10 border border-warning/30 rounded-xl p-3 flex items-start gap-3">
+            <Bell className="text-warning shrink-0 mt-0.5" size={16} />
+            <div className="text-xs">
+              <p className="font-medium text-warning-foreground">Time-sensitive order</p>
+              <p className="text-muted-foreground mt-0.5">Seller must respond within 3 min or auto-cancelled</p>
+            </div>
+          </div>
+        )}
+
+        {/* Cart Items by Seller */}
+        <div className="mt-4 space-y-3 px-4">
           {sellerGroups.map((group) => (
-            <div key={group.sellerId} className="space-y-3">
-              {/* Seller Header */}
-              <div className="bg-muted rounded-lg p-3 flex items-center gap-2">
-                <Store size={16} className="text-primary" />
-                <div className="flex-1">
-                  <h3 className="font-semibold text-sm">{group.sellerName}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    {group.items.length} item{group.items.length > 1 ? 's' : ''} • ₹{group.subtotal.toFixed(0)}
-                  </p>
-                </div>
+            <div key={group.sellerId} className="bg-card rounded-xl border border-border overflow-hidden">
+              {/* Seller Row */}
+              <div className="px-3 py-2.5 border-b border-border flex items-center gap-2">
+                <Store size={14} className="text-primary" />
+                <span className="text-sm font-semibold flex-1 truncate">{group.sellerName}</span>
+                <span className="text-xs text-muted-foreground">{group.items.length} item{group.items.length > 1 ? 's' : ''}</span>
               </div>
-              {/* Cross-society indicator */}
+
+              {/* Cross-society */}
               {profile?.society_id && (group.items[0]?.product?.seller as any)?.society_id &&
                 (group.items[0]?.product?.seller as any)?.society_id !== profile.society_id && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground bg-accent/50 rounded-lg">
-                  <MapPin size={12} />
+                <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground bg-muted">
+                  <MapPin size={11} />
                   <span>Seller from another community</span>
                 </div>
               )}
 
-              {/* Items for this seller */}
-              {group.items.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 bg-card rounded-lg p-3 shadow-sm">
-                  <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0">
-                    {item.product?.image_url ? (
-                      <img src={item.product.image_url} alt={item.product.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-muted flex items-center justify-center">
-                        <span className="text-xl">🛍️</span>
+              {/* Items */}
+              <div className="divide-y divide-border">
+                {group.items.map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 px-3 py-3">
+                    <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-muted">
+                      {item.product?.image_url ? (
+                        <img src={item.product.image_url} alt={item.product.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-lg">🛍️</div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <VegBadge isVeg={item.product?.is_veg ?? true} size="sm" />
+                        <h4 className="text-sm font-medium truncate">{item.product?.name}</h4>
                       </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-2">
-                      <VegBadge isVeg={item.product?.is_veg ?? true} size="sm" />
-                      <div className="min-w-0">
-                        <h4 className="font-medium text-sm truncate">{item.product?.name}</h4>
-                        <p className="text-sm font-semibold mt-0.5">₹{item.product?.price}</p>
+                      <p className="text-sm font-bold mt-0.5">₹{((item.product?.price || 0) * item.quantity).toFixed(0)}</p>
+                      <p className="text-[11px] text-muted-foreground">₹{item.product?.price} × {item.quantity}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="inline-flex items-center bg-accent rounded-lg overflow-hidden">
+                        <button className="h-8 w-8 flex items-center justify-center active:scale-95 transition-transform" onClick={() => updateQuantity(item.product_id, item.quantity - 1)}>
+                          <Minus size={14} className="text-accent-foreground" />
+                        </button>
+                        <span className="w-6 text-center text-sm font-bold text-accent-foreground">{item.quantity}</span>
+                        <button className="h-8 w-8 flex items-center justify-center active:scale-95 transition-transform" onClick={() => updateQuantity(item.product_id, item.quantity + 1)}>
+                          <Plus size={14} className="text-accent-foreground" />
+                        </button>
                       </div>
+                      <button className="h-8 w-8 flex items-center justify-center text-muted-foreground" onClick={() => removeItem(item.product_id)}>
+                        <Trash2 size={15} />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center border rounded-md">
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => updateQuantity(item.product_id, item.quantity - 1)}>
-                        <Minus size={14} />
-                      </Button>
-                      <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => updateQuantity(item.product_id, item.quantity + 1)}>
-                        <Plus size={14} />
-                      </Button>
-                    </div>
-                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => removeItem(item.product_id)}>
-                      <Trash2 size={18} />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           ))}
         </div>
 
         {/* Notes */}
-        <div className="mt-6">
-          <label className="text-sm font-medium mb-2 block">Add cooking instructions or notes</label>
-          <Textarea placeholder="e.g., Less spicy, no onions..." value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+        <div className="mt-4 px-4">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 block">Instructions</label>
+          <Textarea placeholder="e.g., Less spicy, no onions..." value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="text-sm" />
         </div>
 
         {/* Payment Method */}
-        <div className="mt-6">
-          <h3 className="font-semibold mb-3">Payment Method</h3>
+        <div className="mt-5 px-4">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Payment Method</h3>
           <PaymentMethodSelector acceptsCod={acceptsCod} acceptsUpi={acceptsUpi} selectedMethod={paymentMethod} onSelect={setPaymentMethod} />
         </div>
 
-        {/* Coupon - only show for single-seller carts */}
+        {/* Coupon */}
         {sellerGroups.length === 1 && (
-          <div className="mt-6">
-            <h3 className="font-semibold mb-3">Apply Coupon</h3>
+          <div className="mt-5 px-4">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Apply Coupon</h3>
             <CouponInput
               sellerId={sellerGroups[0].sellerId}
               totalAmount={totalAmount}
@@ -306,18 +312,18 @@ export default function CartPage() {
         )}
 
         {/* Bill Details */}
-        <div className="mt-6 bg-muted rounded-lg p-4">
-          <h3 className="font-semibold mb-3">Bill Details</h3>
+        <div className="mt-5 mx-4 bg-muted rounded-xl p-4">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Bill Details</h3>
           <div className="space-y-2 text-sm">
             {sellerGroups.map((group) => (
               <div key={group.sellerId} className="flex justify-between">
                 <span className="text-muted-foreground truncate mr-2">{group.sellerName}</span>
-                <span>₹{group.subtotal.toFixed(0)}</span>
+                <span className="font-medium">₹{group.subtotal.toFixed(0)}</span>
               </div>
             ))}
             {appliedCoupon && (
               <div className="flex justify-between text-primary">
-                <span>Coupon Discount ({appliedCoupon.code})</span>
+                <span>Coupon ({appliedCoupon.code})</span>
                 <span>-₹{appliedCoupon.discountAmount.toFixed(0)}</span>
               </div>
             )}
@@ -325,44 +331,53 @@ export default function CartPage() {
               <span className="text-muted-foreground">Delivery Fee</span>
               <span className="text-primary font-medium">FREE</span>
             </div>
-            <div className="border-t pt-2 mt-2 flex justify-between font-semibold">
+            <div className="border-t border-border pt-2 mt-1 flex justify-between font-bold">
               <span>To Pay</span>
               <span>₹{finalAmount.toFixed(0)}</span>
             </div>
-            {maxPrepTime > 0 && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
-                <Clock size={12} />
-                <span>Estimated ready time: ~{maxPrepTime} min</span>
-              </div>
-            )}
           </div>
         </div>
 
         {/* Delivery Address */}
-        <div className="mt-6 bg-card rounded-lg p-4 shadow-sm">
-          <h3 className="font-semibold mb-2">Deliver to</h3>
-          <p className="text-sm">
-            {profile?.name}<br />
-            Block {profile?.block}, Flat {profile?.flat_number}<br />
-            {society?.name || 'Your Society'}
-          </p>
+        <div className="mt-4 mx-4 bg-card border border-border rounded-xl p-4 flex items-center gap-3">
+          <MapPin size={16} className="text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deliver to</p>
+            <p className="text-sm font-medium mt-0.5">
+              {profile?.name} — Block {profile?.block}, Flat {profile?.flat_number}
+            </p>
+            <p className="text-xs text-muted-foreground">{society?.name || 'Your Society'}</p>
+          </div>
+          <ChevronRight size={16} className="text-muted-foreground" />
         </div>
 
         {sellerGroups.length > 1 && (
-          <p className="text-xs text-muted-foreground text-center mt-4">
+          <p className="text-xs text-muted-foreground text-center mt-4 px-4">
             Your cart has items from {sellerGroups.length} sellers. Separate orders will be created for each.
           </p>
         )}
       </div>
 
-      {/* Place Order Footer */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t safe-bottom">
-        <Button className="w-full" size="lg" onClick={handlePlaceOrder} disabled={isPlacingOrder}>
-          {isPlacingOrder ? 'Placing Order...' : `Place Order • ₹${finalAmount.toFixed(0)}`}
-        </Button>
+      {/* Sticky Place Order Footer */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border safe-bottom">
+        <div className="px-4 py-3 flex items-center gap-3">
+          <div className="flex-1">
+            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-lg font-bold">₹{finalAmount.toFixed(0)}</p>
+          </div>
+          <Button
+            className="px-8 rounded-xl bg-accent text-accent-foreground hover:bg-accent/90 font-bold"
+            size="lg"
+            onClick={handlePlaceOrder}
+            disabled={isPlacingOrder}
+          >
+            {isPlacingOrder ? 'Placing...' : 'Place Order'}
+            <ChevronRight size={18} className="ml-1" />
+          </Button>
+        </div>
       </div>
 
-      {/* Razorpay Checkout - use first order for payment */}
+      {/* Razorpay Checkout */}
       {pendingOrderIds.length > 0 && (
         <RazorpayCheckout
           isOpen={showRazorpayCheckout}

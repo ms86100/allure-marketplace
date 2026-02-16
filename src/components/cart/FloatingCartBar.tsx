@@ -24,8 +24,7 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
       >
         <Link to="/cart">
           <motion.div
-            className="rounded-xl px-4 py-3 flex items-center justify-between shadow-lg"
-            style={{ background: 'var(--gradient-primary)' }}
+            className="rounded-xl bg-accent px-4 py-3 flex items-center justify-between shadow-md"
             whileTap={{ scale: 0.97 }}
           >
             <div className="flex items-center gap-3">
@@ -36,19 +35,18 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 15 }}
               >
-                <ShoppingCart size={20} className="text-primary-foreground" />
-                <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-accent text-accent-foreground text-[9px] font-bold flex items-center justify-center">
+                <ShoppingCart size={18} className="text-accent-foreground" />
+                <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-background text-foreground text-[9px] font-bold flex items-center justify-center">
                   {itemCount > 9 ? '9+' : itemCount}
                 </span>
               </motion.div>
               <div>
-                <p className="text-primary-foreground text-sm font-semibold">
-                  {itemCount} item{itemCount !== 1 ? 's' : ''}
+                <p className="text-accent-foreground text-sm font-bold">
+                  {itemCount} item{itemCount !== 1 ? 's' : ''} · ₹{totalAmount}
                 </p>
-                <p className="text-primary-foreground/80 text-xs">₹{totalAmount}</p>
               </div>
             </div>
-            <div className="flex items-center gap-1 text-primary-foreground font-semibold text-sm">
+            <div className="flex items-center gap-0.5 text-accent-foreground font-bold text-sm">
               View Cart
               <ChevronRight size={16} />
             </div>
