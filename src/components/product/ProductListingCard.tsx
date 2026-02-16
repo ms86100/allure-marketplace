@@ -180,16 +180,16 @@ export function ProductListingCard({
       ref={cardRef}
       onClick={handleCardClick}
       className={cn(
-        'bg-card rounded-lg border border-border/40 cursor-pointer flex flex-col h-full relative',
-        'transition-shadow duration-150',
-        'hover:shadow-md',
+        'bg-card rounded-xl border border-border/30 cursor-pointer flex flex-col h-full relative',
+        'transition-all duration-150',
+        'hover:shadow-md active:scale-[0.98]',
         isOutOfStock && 'opacity-50 grayscale-[40%]',
         className
       )}
     >
       {/* ━━━ IMAGE ━━━ */}
-      <div className="relative px-2 pt-2">
-        <div className="relative aspect-square rounded-md overflow-hidden bg-muted/30">
+      <div className="relative p-2 pb-0">
+        <div className="relative aspect-square rounded-lg overflow-hidden bg-muted/20">
           {product.image_url ? (
             <img
               src={product.image_url}
@@ -211,13 +211,14 @@ export function ProductListingCard({
             </div>
           )}
 
+          {/* Badges top-left */}
           {badges.length > 0 && (
             <div className="absolute top-1 left-1 flex flex-col gap-0.5">
               {badges.map((b, i) => (
                 <Badge
                   key={i}
                   className={cn(
-                    'text-[8px] leading-none px-1 py-0.5 font-bold shadow-sm rounded border-0',
+                    'text-[8px] leading-none px-1.5 py-0.5 font-bold shadow-sm rounded border-0',
                     b.color
                   )}
                 >
@@ -227,16 +228,41 @@ export function ProductListingCard({
             </div>
           )}
 
+          {/* Veg badge top-right */}
           {showVegBadge && (
             <div className="absolute top-1 right-1">
               <VegBadge isVeg={product.is_veg} size="sm" />
             </div>
           )}
         </div>
+
+        {/* ADD button overlapping bottom of image — Blinkit signature */}
+        {!viewOnly && !isOutOfStock && (
+          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10">
+            {quantity === 0 ? (
+              <button
+                onClick={handleAdd}
+                className="border-2 border-accent text-accent bg-card font-bold text-[11px] px-5 py-1 rounded-lg shadow-sm hover:bg-accent hover:text-accent-foreground transition-all duration-150 uppercase tracking-wide active:scale-90"
+              >
+                ADD
+              </button>
+            ) : (
+              <div className="flex items-center bg-accent rounded-lg overflow-hidden shadow-sm animate-stepper-pop">
+                <button onClick={handleDecrement} className="px-2.5 py-1 text-accent-foreground hover:bg-accent/80 transition-colors">
+                  <Minus size={13} strokeWidth={3} />
+                </button>
+                <span className="font-bold text-xs text-accent-foreground min-w-[20px] text-center">{quantity}</span>
+                <button onClick={handleIncrement} className="px-2.5 py-1 text-accent-foreground hover:bg-accent/80 transition-colors">
+                  <Plus size={13} strokeWidth={3} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ━━━ CONTENT ━━━ */}
-      <div className="px-2 pb-2 pt-1.5 flex flex-col flex-1">
+      <div className="px-2 pb-2 pt-4 flex flex-col flex-1">
         {/* Delivery time chip */}
         {deliveryText && (
           <div className="flex items-center gap-0.5 mb-0.5">
@@ -259,64 +285,45 @@ export function ProductListingCard({
           </span>
         )}
 
-        <div className="flex-1 min-h-0.5" />
+        <div className="flex-1 min-h-1" />
 
-        {/* Price + ADD row */}
-        <div className="flex items-end justify-between gap-1 mt-auto">
-          <div className="flex flex-col min-w-0">
-            <span className="font-bold text-sm text-foreground leading-none">
-              {mc.currencySymbol}{product.price}
-            </span>
-            {hasDiscount && (
-              <div className="flex items-center gap-1 mt-0.5">
-                <span className="text-[9px] text-muted-foreground line-through leading-none">
-                  {mc.currencySymbol}{product.mrp}
-                </span>
-                <span className="text-[9px] font-bold text-success leading-none">
-                  {discountPct}{mc.labels.discountSuffix}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* ADD button or stepper */}
-          {!viewOnly && !isOutOfStock && (
-            quantity === 0 ? (
-              <button
-                onClick={handleAdd}
-                className="border border-accent text-accent font-bold text-[11px] px-4 py-1.5 rounded-md hover:bg-accent hover:text-accent-foreground transition-all duration-150 shrink-0 uppercase tracking-wide active:scale-90"
-              >
-                ADD
-              </button>
-            ) : (
-              <div className="flex items-center bg-accent rounded-md overflow-hidden shrink-0">
-                <button onClick={handleDecrement} className="px-2 py-1.5 text-accent-foreground hover:bg-accent/80 transition-colors">
-                  <Minus size={12} strokeWidth={3} />
-                </button>
-                <span className="font-bold text-xs text-accent-foreground min-w-[18px] text-center">{quantity}</span>
-                <button onClick={handleIncrement} className="px-2 py-1.5 text-accent-foreground hover:bg-accent/80 transition-colors">
-                  <Plus size={12} strokeWidth={3} />
-                </button>
-              </div>
-            )
-          )}
-
-          {viewOnly && (
-            <button
-              onClick={(e) => { e.stopPropagation(); navigate(`/seller/${product.seller_id}`); }}
-              className="border border-primary text-primary font-bold text-[10px] px-2.5 py-1 rounded-md hover:bg-primary hover:text-primary-foreground transition-colors shrink-0"
-            >
-              {mc.labels.viewButton}
-            </button>
-          )}
-
-          {!viewOnly && isOutOfStock && (
-            <span className="text-[9px] font-medium text-muted-foreground shrink-0">
-              {mc.labels.soldOut}
-            </span>
+        {/* Price row */}
+        <div className="flex items-end gap-1 mt-auto">
+          <span className="font-bold text-sm text-foreground leading-none">
+            {mc.currencySymbol}{product.price}
+          </span>
+          {hasDiscount && (
+            <>
+              <span className="text-[9px] text-muted-foreground line-through leading-none">
+                {mc.currencySymbol}{product.mrp}
+              </span>
+              <span className="text-[9px] font-bold text-accent leading-none">
+                {discountPct}{mc.labels.discountSuffix}
+              </span>
+            </>
           )}
         </div>
       </div>
+
+      {/* View-only button */}
+      {viewOnly && (
+        <div className="px-2 pb-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); navigate(`/seller/${product.seller_id}`); }}
+            className="w-full border border-primary text-primary font-bold text-[10px] py-1.5 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors"
+          >
+            {mc.labels.viewButton}
+          </button>
+        </div>
+      )}
+
+      {!viewOnly && isOutOfStock && (
+        <div className="px-2 pb-2 text-center">
+          <span className="text-[9px] font-medium text-muted-foreground">
+            {mc.labels.soldOut}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

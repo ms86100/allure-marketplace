@@ -33,7 +33,6 @@ export function FavoriteButton({
 
   const checkFavoriteStatus = async () => {
     if (!user) return;
-    
     try {
       const { data } = await supabase
         .from('favorites')
@@ -41,7 +40,6 @@ export function FavoriteButton({
         .eq('user_id', user.id)
         .eq('seller_id', sellerId)
         .single();
-      
       setIsFavorite(!!data);
     } catch (error) {
       // Not found is expected
@@ -65,7 +63,6 @@ export function FavoriteButton({
           .delete()
           .eq('user_id', user.id)
           .eq('seller_id', sellerId);
-
         if (error) throw error;
         setIsFavorite(false);
         toast.success('Removed from favorites');
@@ -75,7 +72,6 @@ export function FavoriteButton({
           user_id: user.id,
           seller_id: sellerId,
         });
-
         if (error) throw error;
         setIsFavorite(true);
         toast.success('Added to favorites');
@@ -89,11 +85,7 @@ export function FavoriteButton({
     }
   };
 
-  const iconSizes = {
-    sm: 16,
-    md: 20,
-    lg: 24,
-  };
+  const iconSizes = { sm: 16, md: 18, lg: 22 };
 
   if (variant === 'button') {
     return (
@@ -102,6 +94,7 @@ export function FavoriteButton({
         size="sm"
         onClick={toggleFavorite}
         disabled={isLoading}
+        className="rounded-lg"
       >
         <Heart
           size={iconSizes[size]}
@@ -117,11 +110,10 @@ export function FavoriteButton({
       onClick={toggleFavorite}
       disabled={isLoading}
       className={cn(
-        'p-2 rounded-full transition-all',
+        'p-1.5 rounded-full transition-all',
         isFavorite
-          ? 'bg-primary/10 text-primary'
-          : 'bg-white/80 text-muted-foreground hover:bg-white hover:text-primary',
-        'shadow-sm backdrop-blur-sm'
+          ? 'text-destructive'
+          : 'text-muted-foreground hover:text-foreground',
       )}
     >
       <Heart

@@ -10,7 +10,7 @@ import { ContactSellerModal } from './ContactSellerModal';
 import { ProductEnquirySheet } from './ProductEnquirySheet';
 import { ProductActionType } from '@/types/database';
 import { ACTION_CONFIG } from '@/lib/marketplace-constants';
-import { Plus, Minus, Store, MapPin, Home, Clock, Truck, Users, Zap, RotateCcw, ChevronRight } from 'lucide-react';
+import { Plus, Minus, Store, MapPin, Home, Clock, Truck, Users, Zap, RotateCcw, ChevronRight, ChevronDown, Shield } from 'lucide-react';
 
 interface ProductDetail {
   product_id: string;
@@ -53,6 +53,7 @@ export function ProductDetailSheet({
   const { data: trustSnapshot } = useSellerTrustSnapshot(product?.seller_id || null);
   const [contactOpen, setContactOpen] = useState(false);
   const [enquiryOpen, setEnquiryOpen] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   if (!product) return null;
 
@@ -68,13 +69,10 @@ export function ProductDetailSheet({
       setContactOpen(true);
       return;
     }
-
-    // Non-cart actions open the enquiry sheet
     if (!isCartAction) {
       setEnquiryOpen(true);
       return;
     }
-
     addItem({
       id: product.product_id,
       seller_id: product.seller_id,
@@ -95,192 +93,216 @@ export function ProductDetailSheet({
 
   const isNewSeller = product.seller_reviews === 0 || product.seller_rating === 0;
   const ActionIcon = config.icon;
-
-  // Dynamic label for "View Full Menu" based on category type
   const viewAllLabel = isCartAction ? 'View Full Menu →' : 'View All Listings →';
 
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto p-0">
+        <SheetContent side="bottom" className="rounded-t-3xl max-h-[90vh] overflow-y-auto p-0">
           <SheetHeader className="sr-only">
             <SheetTitle>{product.product_name}</SheetTitle>
           </SheetHeader>
 
-          {/* Big Product Image */}
-          <div className="relative w-full aspect-[16/10] bg-muted">
+          {/* Image — full width carousel style */}
+          <div className="relative w-full aspect-square bg-muted">
             {product.image_url ? (
               <img
                 src={product.image_url}
                 alt={product.product_name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <span className="text-5xl">{categoryIcon || '🛍️'}</span>
+                <span className="text-6xl">{categoryIcon || '🛍️'}</span>
               </div>
             )}
+            {/* Dot indicator placeholder */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
+              <div className="w-5 h-1.5 rounded-full bg-foreground" />
+              <div className="w-1.5 h-1.5 rounded-full bg-foreground/30" />
+              <div className="w-1.5 h-1.5 rounded-full bg-foreground/30" />
+            </div>
           </div>
 
-          <div className="p-4 space-y-4">
-            {/* Product Name + Price */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2 min-w-0">
-                {product.is_veg !== null && <VegBadge isVeg={product.is_veg} size="sm" className="mt-1" />}
-                <div>
-                  <h2 className="font-bold text-lg leading-tight">{product.product_name}</h2>
-                  {categoryName && (
-                    <span className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                      {categoryIcon && <span>{categoryIcon}</span>}
-                      {categoryName}
-                    </span>
-                  )}
-                </div>
-              </div>
-              {actionType === 'contact_seller' ? (
-                <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Contact for price</span>
-              ) : (
-                <span className="text-xl font-bold text-primary whitespace-nowrap">₹{product.price}</span>
-              )}
-            </div>
-
-            {/* Quick info chips */}
-            <div className="flex flex-wrap gap-2">
-              {product.prep_time_minutes && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted rounded-full px-2.5 py-1">
-                  <Clock size={12} />
-                  <span>Ready in ~{product.prep_time_minutes} min</span>
-                </div>
-              )}
-              {product.fulfillment_mode && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted rounded-full px-2.5 py-1">
-                  <Truck size={12} />
-                  <span>
-                    {product.fulfillment_mode === 'self_pickup' && 'Self Pickup Only'}
-                    {product.fulfillment_mode === 'delivery' && 'Seller Delivers'}
-                    {product.fulfillment_mode === 'both' && 'Pickup or Delivery'}
+          <div className="p-4 space-y-3">
+            {/* Delivery time badge */}
+            {product.prep_time_minutes && (
+              <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1 bg-muted rounded-md px-2 py-1">
+                  <Clock size={12} className="text-muted-foreground" />
+                  <span className="text-[11px] font-bold text-muted-foreground uppercase">
+                    {product.prep_time_minutes} MINS
                   </span>
                 </div>
-              )}
-              {product.delivery_note && (
-                <span className="text-xs text-muted-foreground italic">— {product.delivery_note}</span>
+              </div>
+            )}
+
+            {/* Product Name + Veg badge */}
+            <div className="flex items-start gap-2">
+              {product.is_veg !== null && <VegBadge isVeg={product.is_veg} size="sm" className="mt-1" />}
+              <div className="flex-1 min-w-0">
+                <h2 className="font-bold text-lg leading-tight text-foreground">{product.product_name}</h2>
+                {categoryName && (
+                  <span className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                    {categoryIcon && <span>{categoryIcon}</span>}
+                    {categoryName}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Price */}
+            <div className="flex items-baseline gap-2">
+              {actionType === 'contact_seller' ? (
+                <span className="text-sm font-medium text-muted-foreground">Contact for price</span>
+              ) : (
+                <span className="text-xl font-bold text-foreground">₹{product.price}</span>
               )}
             </div>
 
-            {/* Description */}
-            {product.description && (
-              <p className="text-sm text-muted-foreground leading-relaxed">{product.description}</p>
+            {/* "View product details" expandable */}
+            <button
+              onClick={() => setShowDetails(!showDetails)}
+              className="flex items-center gap-1 text-xs font-medium text-primary"
+            >
+              View product details
+              <ChevronDown size={14} className={`transition-transform ${showDetails ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showDetails && (
+              <div className="space-y-3 animate-fade-in">
+                {/* Quick support badges */}
+                <div className="flex gap-3">
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Shield size={14} className="text-accent" />
+                    <span>24/7 Support</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Truck size={14} className="text-accent" />
+                    <span>Fast Delivery</span>
+                  </div>
+                </div>
+
+                {/* Fulfillment info */}
+                {product.fulfillment_mode && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">
+                    <Truck size={14} />
+                    <span>
+                      {product.fulfillment_mode === 'self_pickup' && 'Self Pickup Only'}
+                      {product.fulfillment_mode === 'delivery' && 'Seller Delivers'}
+                      {product.fulfillment_mode === 'both' && 'Pickup or Delivery'}
+                    </span>
+                  </div>
+                )}
+
+                {product.delivery_note && (
+                  <p className="text-xs text-muted-foreground italic">— {product.delivery_note}</p>
+                )}
+
+                {/* Description */}
+                {product.description && (
+                  <div>
+                    <h4 className="text-xs font-bold text-foreground mb-1">Highlights</h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{product.description}</p>
+                  </div>
+                )}
+
+                {/* Trust Snapshot */}
+                {trustSnapshot && (trustSnapshot.completed_orders > 0 || trustSnapshot.avg_response_min > 0) && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {trustSnapshot.completed_orders > 0 && (
+                      <div className="bg-muted rounded-xl p-2.5 text-center">
+                        <Users size={14} className="mx-auto text-primary mb-1" />
+                        <p className="text-sm font-bold text-foreground">{trustSnapshot.completed_orders}</p>
+                        <p className="text-[9px] text-muted-foreground">Orders</p>
+                      </div>
+                    )}
+                    {trustSnapshot.avg_response_min > 0 && (
+                      <div className="bg-muted rounded-xl p-2.5 text-center">
+                        <Zap size={14} className="mx-auto text-accent mb-1" />
+                        <p className="text-sm font-bold text-foreground">~{trustSnapshot.avg_response_min}m</p>
+                        <p className="text-[9px] text-muted-foreground">Response</p>
+                      </div>
+                    )}
+                    {trustSnapshot.repeat_customer_pct > 0 && (
+                      <div className="bg-muted rounded-xl p-2.5 text-center">
+                        <RotateCcw size={14} className="mx-auto text-primary mb-1" />
+                        <p className="text-sm font-bold text-foreground">{trustSnapshot.repeat_customer_pct}%</p>
+                        <p className="text-[9px] text-muted-foreground">Repeat</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
-            {/* Seller Identity */}
+            {/* Seller card — Blinkit style */}
             <Link
               to={`/seller/${product.seller_id}`}
               onClick={() => onOpenChange(false)}
-              className="flex items-center gap-3 bg-muted/60 rounded-xl p-3 border border-border/30"
+              className="flex items-center gap-3 bg-muted rounded-xl p-3"
             >
-              <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center">
-                <Store size={20} className="text-primary" />
+              <div className="w-10 h-10 rounded-xl bg-card flex items-center justify-center border border-border/30">
+                <Store size={18} className="text-muted-foreground" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{product.seller_name}</p>
+                <p className="font-semibold text-sm text-foreground truncate">{product.seller_name}</p>
                 <div className="flex items-center gap-2 mt-0.5">
                   {isNewSeller ? (
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-secondary text-secondary-foreground">
+                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">
                       New Seller
                     </Badge>
                   ) : null}
                   {product.is_same_society ? (
-                    <span className="flex items-center gap-0.5 text-[11px] text-primary">
+                    <span className="flex items-center gap-0.5 text-[10px] text-accent font-medium">
                       <Home size={10} /> Your neighbor
                     </span>
                   ) : (
-                    <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
+                    <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
                       <MapPin size={10} />
                       {product.distance_km != null ? `${product.distance_km} km away` : product.society_name}
                     </span>
                   )}
                 </div>
               </div>
-              <ChevronRight size={16} className="text-muted-foreground" />
+              <ChevronRight size={16} className="text-muted-foreground shrink-0" />
             </Link>
+          </div>
 
-            {/* Trust Snapshot */}
-            {trustSnapshot && (trustSnapshot.completed_orders > 0 || trustSnapshot.avg_response_min > 0) && (
-              <div className="grid grid-cols-3 gap-2">
-                {trustSnapshot.completed_orders > 0 && (
-                  <div className="bg-muted/50 rounded-lg p-2.5 text-center">
-                    <Users size={16} className="mx-auto text-primary mb-1" />
-                    <p className="text-sm font-bold">{trustSnapshot.completed_orders}</p>
-                    <p className="text-[10px] text-muted-foreground">Orders done</p>
-                  </div>
-                )}
-                {trustSnapshot.avg_response_min > 0 && (
-                  <div className="bg-muted/50 rounded-lg p-2.5 text-center">
-                    <Zap size={16} className="mx-auto text-success mb-1" />
-                    <p className="text-sm font-bold">~{trustSnapshot.avg_response_min}m</p>
-                    <p className="text-[10px] text-muted-foreground">Response</p>
-                  </div>
-                )}
-                {trustSnapshot.repeat_customer_pct > 0 && (
-                  <div className="bg-muted/50 rounded-lg p-2.5 text-center">
-                    <RotateCcw size={16} className="mx-auto text-accent mb-1" />
-                    <p className="text-sm font-bold">{trustSnapshot.repeat_customer_pct}%</p>
-                    <p className="text-[10px] text-muted-foreground">Repeat</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Dynamic CTA */}
-            <div className="pt-2">
-              {isCartAction ? (
-                quantity === 0 ? (
-                  <Button className="w-full h-12 text-base font-semibold" onClick={handleAdd}>
-                    <ActionIcon size={18} className="mr-2" />
-                    {config.label} · ₹{product.price}
-                  </Button>
-                ) : (
-                  <div className="flex items-center justify-between bg-primary rounded-xl px-4 h-12">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-9 w-9 p-0 text-primary-foreground hover:bg-primary-foreground/20"
-                      onClick={() => updateQuantity(product.product_id, quantity - 1)}
-                    >
-                      <Minus size={18} />
-                    </Button>
-                    <span className="text-lg font-bold text-primary-foreground">{quantity} in cart</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-9 w-9 p-0 text-primary-foreground hover:bg-primary-foreground/20"
-                      onClick={() => updateQuantity(product.product_id, quantity + 1)}
-                    >
-                      <Plus size={18} />
-                    </Button>
-                  </div>
-                )
-              ) : (
-                <Button className="w-full h-12 text-base font-semibold" onClick={handleAdd}>
-                  <ActionIcon size={18} className="mr-2" />
-                  {config.label}
+          {/* Sticky bottom CTA — Blinkit style */}
+          <div className="sticky bottom-0 bg-background border-t border-border p-4">
+            {isCartAction ? (
+              quantity === 0 ? (
+                <Button className="w-full h-12 text-base font-bold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl" onClick={handleAdd}>
+                  Add to cart · ₹{product.price}
                 </Button>
-              )}
-            </div>
-
-            {/* View Full Menu/Listings link */}
-            <Link
-              to={`/seller/${product.seller_id}`}
-              onClick={() => onOpenChange(false)}
-              className="block text-center text-sm text-primary font-medium py-2"
-            >
-              {viewAllLabel}
-            </Link>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-lg font-bold text-foreground">₹{product.price * quantity}</span>
+                    <span className="text-xs text-muted-foreground ml-1.5">{quantity} item{quantity > 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="flex items-center bg-accent rounded-xl overflow-hidden">
+                    <button className="px-3 py-2.5 text-accent-foreground" onClick={() => updateQuantity(product.product_id, quantity - 1)}>
+                      <Minus size={16} strokeWidth={3} />
+                    </button>
+                    <span className="font-bold text-base text-accent-foreground min-w-[28px] text-center">{quantity}</span>
+                    <button className="px-3 py-2.5 text-accent-foreground" onClick={() => updateQuantity(product.product_id, quantity + 1)}>
+                      <Plus size={16} strokeWidth={3} />
+                    </button>
+                  </div>
+                </div>
+              )
+            ) : (
+              <Button className="w-full h-12 text-base font-bold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl" onClick={handleAdd}>
+                <ActionIcon size={18} className="mr-2" />
+                {config.label}
+              </Button>
+            )}
           </div>
         </SheetContent>
       </Sheet>
 
-      {/* Contact Seller Modal */}
       {actionType === 'contact_seller' && (
         <ContactSellerModal
           open={contactOpen}
@@ -290,7 +312,6 @@ export function ProductDetailSheet({
         />
       )}
 
-      {/* Enquiry Sheet for non-cart, non-contact actions */}
       {!isCartAction && actionType !== 'contact_seller' && (
         <ProductEnquirySheet
           open={enquiryOpen}
