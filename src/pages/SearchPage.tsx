@@ -714,7 +714,7 @@ export default function SearchPage() {
 
           {/* ─── Results ─── */}
           {showLoading ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-2">
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 mt-2">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <Skeleton key={i} className="h-52 w-full rounded-xl" />
               ))}
@@ -867,7 +867,7 @@ function ProductGridByCategory({
                 From ₹{Math.min(...items.map(p => p.price))}
               </span>
             </div>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
               {items.map((p) => (
                 <ProductListingCard
                   key={p.product_id}

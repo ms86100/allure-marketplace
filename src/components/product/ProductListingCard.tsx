@@ -180,16 +180,16 @@ export function ProductListingCard({
       ref={cardRef}
       onClick={handleCardClick}
       className={cn(
-        'bg-card rounded-xl border border-border/30 cursor-pointer flex flex-col h-full relative',
-        'transition-all duration-150',
-        'hover:shadow-md active:scale-[0.98]',
+        'bg-card rounded-lg border border-border/30 cursor-pointer flex flex-col h-full relative',
+        'transition-all duration-100',
+        'active:scale-[0.97]',
         isOutOfStock && 'opacity-50 grayscale-[40%]',
         className
       )}
     >
       {/* ━━━ IMAGE ━━━ */}
-      <div className="relative p-2 pb-0">
-        <div className="relative aspect-square rounded-lg overflow-hidden bg-muted/20">
+      <div className="relative p-1.5 pb-0">
+        <div className="relative aspect-[4/3] rounded-md overflow-hidden bg-muted/20">
           {product.image_url ? (
             <img
               src={product.image_url}
@@ -199,13 +199,13 @@ export function ProductListingCard({
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <span className="text-3xl">{placeholderEmoji}</span>
+              <span className="text-2xl opacity-40">{placeholderEmoji}</span>
             </div>
           )}
 
           {isOutOfStock && (
             <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
-              <span className="text-[9px] font-bold text-muted-foreground bg-muted/90 px-2 py-0.5 rounded-full uppercase tracking-wider">
+              <span className="text-[8px] font-bold text-muted-foreground bg-muted/90 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
                 {mc.labels.outOfStock}
               </span>
             </div>
@@ -213,12 +213,12 @@ export function ProductListingCard({
 
           {/* Badges top-left */}
           {badges.length > 0 && (
-            <div className="absolute top-1 left-1 flex flex-col gap-0.5">
+            <div className="absolute top-0.5 left-0.5 flex flex-col gap-0.5">
               {badges.map((b, i) => (
                 <Badge
                   key={i}
                   className={cn(
-                    'text-[8px] leading-none px-1.5 py-0.5 font-bold shadow-sm rounded border-0',
+                    'text-[7px] leading-none px-1 py-px font-bold shadow-sm rounded border-0',
                     b.color
                   )}
                 >
@@ -230,40 +230,40 @@ export function ProductListingCard({
 
           {/* Veg badge top-right */}
           {showVegBadge && (
-            <div className="absolute top-1 right-1">
+            <div className="absolute top-0.5 right-0.5">
               <VegBadge isVeg={product.is_veg} size="sm" />
             </div>
           )}
 
           {/* Distance badge bottom-left */}
           {(product as any).distance_km != null && !(product as any).is_same_society && (
-            <div className="absolute bottom-1 left-1">
-              <span className="inline-flex items-center gap-0.5 bg-background/90 backdrop-blur-sm text-[8px] font-bold text-primary px-1.5 py-0.5 rounded-full shadow-sm border border-border/50">
-                <MapPin size={7} className="shrink-0" />
+            <div className="absolute bottom-0.5 left-0.5">
+              <span className="inline-flex items-center gap-0.5 bg-background/90 backdrop-blur-sm text-[7px] font-bold text-primary px-1 py-px rounded-full shadow-sm border border-border/50">
+                <MapPin size={6} className="shrink-0" />
                 {(product as any).distance_km} km
               </span>
             </div>
           )}
         </div>
 
-        {/* ADD button overlapping bottom of image — Blinkit signature */}
+        {/* ADD button overlapping bottom of image */}
         {!viewOnly && !isOutOfStock && (
-          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10">
+          <div className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 z-10">
             {quantity === 0 ? (
               <button
                 onClick={handleAdd}
-                className="border-2 border-accent text-accent bg-card font-bold text-[11px] px-5 py-1 rounded-lg shadow-sm hover:bg-accent hover:text-accent-foreground transition-all duration-150 uppercase tracking-wide active:scale-90"
+                className="border border-accent text-accent bg-card font-bold text-[10px] px-4 py-0.5 rounded-md shadow-sm hover:bg-accent hover:text-accent-foreground transition-all duration-100 uppercase tracking-wide active:scale-90"
               >
                 ADD
               </button>
             ) : (
-              <div className="flex items-center bg-accent rounded-lg overflow-hidden shadow-sm animate-stepper-pop">
-                <button onClick={handleDecrement} className="px-2.5 py-1 text-accent-foreground hover:bg-accent/80 transition-colors">
-                  <Minus size={13} strokeWidth={3} />
+              <div className="flex items-center bg-accent rounded-md overflow-hidden shadow-sm animate-stepper-pop">
+                <button onClick={handleDecrement} className="px-2 py-0.5 text-accent-foreground hover:bg-accent/80 transition-colors">
+                  <Minus size={11} strokeWidth={3} />
                 </button>
-                <span className="font-bold text-xs text-accent-foreground min-w-[20px] text-center">{quantity}</span>
-                <button onClick={handleIncrement} className="px-2.5 py-1 text-accent-foreground hover:bg-accent/80 transition-colors">
-                  <Plus size={13} strokeWidth={3} />
+                <span className="font-bold text-[10px] text-accent-foreground min-w-[16px] text-center">{quantity}</span>
+                <button onClick={handleIncrement} className="px-2 py-0.5 text-accent-foreground hover:bg-accent/80 transition-colors">
+                  <Plus size={11} strokeWidth={3} />
                 </button>
               </div>
             )}
@@ -272,45 +272,45 @@ export function ProductListingCard({
       </div>
 
       {/* ━━━ CONTENT ━━━ */}
-      <div className="px-2 pb-2 pt-4 flex flex-col flex-1">
+      <div className="px-1.5 pb-1.5 pt-3 flex flex-col flex-1">
         {/* Variant / weight pills */}
         {variantText && (
-          <span className="inline-block bg-muted text-muted-foreground text-[9px] font-medium px-1.5 py-0.5 rounded mb-1 w-fit">
+          <span className="inline-block bg-muted text-muted-foreground text-[8px] font-medium px-1 py-px rounded mb-0.5 w-fit">
             {variantText}
           </span>
         )}
 
         {/* Product name */}
-        <h4 className="font-medium text-xs leading-tight line-clamp-2 text-foreground mb-0.5">
+        <h4 className="font-medium text-[10px] leading-tight line-clamp-2 text-foreground mb-0.5">
           {product.name}
         </h4>
 
         {/* Delivery time chip */}
         {deliveryText && (
           <div className="flex items-center gap-0.5 mb-0.5">
-            <Clock size={8} className="text-warning" />
-            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wide leading-none">
+            <Clock size={7} className="text-warning" />
+            <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-wide leading-none">
               {deliveryText}
             </span>
           </div>
         )}
 
-        <div className="flex-1 min-h-1" />
+        <div className="flex-1 min-h-0.5" />
 
         {/* Discount row */}
         {hasDiscount && discountPct > 0 && (
-          <span className="text-[9px] font-bold text-primary leading-none mb-0.5">
+          <span className="text-[8px] font-bold text-primary leading-none mb-0.5">
             {discountPct}{mc.labels.discountSuffix}
           </span>
         )}
 
         {/* Price row */}
-        <div className="flex items-end gap-1 mt-auto">
-          <span className="font-bold text-sm text-foreground leading-none">
+        <div className="flex items-end gap-0.5 mt-auto">
+          <span className="font-bold text-xs text-foreground leading-none">
             {mc.currencySymbol}{product.price}
           </span>
           {hasDiscount && (
-            <span className="text-[9px] text-muted-foreground line-through leading-none">
+            <span className="text-[8px] text-muted-foreground line-through leading-none">
               {mc.currencySymbol}{product.mrp}
             </span>
           )}
@@ -318,7 +318,7 @@ export function ProductListingCard({
 
         {/* Price per unit */}
         {product.price_per_unit && (
-          <span className="text-[8px] text-muted-foreground leading-none mt-0.5">
+          <span className="text-[7px] text-muted-foreground leading-none mt-0.5">
             {product.price_per_unit}
           </span>
         )}
@@ -326,10 +326,10 @@ export function ProductListingCard({
 
       {/* View-only button */}
       {viewOnly && (
-        <div className="px-2 pb-2">
+        <div className="px-1.5 pb-1.5">
           <button
             onClick={(e) => { e.stopPropagation(); navigate(`/seller/${product.seller_id}`); }}
-            className="w-full border border-primary text-primary font-bold text-[10px] py-1.5 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors"
+            className="w-full border border-primary text-primary font-bold text-[9px] py-1 rounded-md hover:bg-primary hover:text-primary-foreground transition-colors"
           >
             {mc.labels.viewButton}
           </button>
@@ -337,8 +337,8 @@ export function ProductListingCard({
       )}
 
       {!viewOnly && isOutOfStock && (
-        <div className="px-2 pb-2 text-center">
-          <span className="text-[9px] font-medium text-muted-foreground">
+        <div className="px-1.5 pb-1.5 text-center">
+          <span className="text-[8px] font-medium text-muted-foreground">
             {mc.labels.soldOut}
           </span>
         </div>
