@@ -8,6 +8,7 @@ import { useCart } from '@/hooks/useCart';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useHaptics } from '@/hooks/useHaptics';
+import { useSearchPlaceholder } from '@/hooks/useSearchPlaceholder';
 
 interface HeaderProps {
   showCart?: boolean;
@@ -25,6 +26,7 @@ export function Header({
   const { profile, isApproved, society, user, viewAsSocietyId, effectiveSociety, setViewAsSociety, isAdmin, isBuilderMember } = useAuth();
   const { itemCount } = useCart();
   const { selectionChanged } = useHaptics();
+  const searchPlaceholder = useSearchPlaceholder();
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -137,7 +139,7 @@ export function Header({
                 <circle cx="11" cy="11" r="8"/>
                 <path d="m21 21-4.3-4.3"/>
               </svg>
-              <span className="text-sm text-muted-foreground flex-1">Search "groceries"</span>
+              <span className="text-sm text-muted-foreground flex-1 transition-opacity duration-300">{searchPlaceholder}</span>
             </div>
           </Link>
         </div>

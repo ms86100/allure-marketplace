@@ -15,6 +15,7 @@ import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { ArrowLeft, Search as SearchIcon, X, Globe, ShoppingBag } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { useSearchPlaceholder } from '@/hooks/useSearchPlaceholder';
 
 
 // ── Types ──────────────────────────────────────────────
@@ -67,6 +68,7 @@ function useDebounce<T>(value: T, delay: number): T {
 // ── Component ──────────────────────────────────────────
 export default function SearchPage() {
   const { user, effectiveSocietyId, profile } = useAuth();
+  const searchPlaceholder = useSearchPlaceholder();
   const { items: cartItems, addItem, updateQuantity } = useCart();
   const [searchParams] = useSearchParams();
   const { configs: categoryConfigs, isLoading: categoriesLoading } = useCategoryConfigs();
@@ -582,7 +584,7 @@ export default function SearchPage() {
               <div className="flex-1 relative">
                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
                 <Input
-                  placeholder='Search "groceries"'
+                  placeholder={searchPlaceholder}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   className="pl-9 pr-16 h-10 rounded-xl text-sm bg-muted border-0 focus-visible:ring-1"
