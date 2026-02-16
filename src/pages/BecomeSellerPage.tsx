@@ -631,6 +631,11 @@ export default function BecomeSellerPage() {
               Edit business details
             </button>
 
+            {/* License Upload (if required for this group) — must be completed before adding products */}
+            {selectedGroupRow && (selectedGroupRow as any).requires_license && (
+              <LicenseUpload sellerId={draftSellerId} groupId={selectedGroupRow.id} />
+            )}
+
             <DraftProductManager
               sellerId={draftSellerId}
               categories={formData.categories}
@@ -697,9 +702,14 @@ export default function BecomeSellerPage() {
               </div>
             </div>
 
-            {/* License Upload (if required for this group) */}
+            {/* License status reminder (if required for this group) */}
             {draftSellerId && selectedGroupRow && (selectedGroupRow as any).requires_license && (
-              <LicenseUpload sellerId={draftSellerId} groupId={selectedGroupRow.id} />
+              <div className="bg-muted/50 rounded-lg p-3 text-sm text-muted-foreground flex items-center gap-2">
+                <Shield size={16} className="text-primary flex-shrink-0" />
+                <span>
+                  {(selectedGroupRow as any).license_type_name || 'License'} was uploaded in the previous step. Admin will verify it during review.
+                </span>
+              </div>
             )}
 
             {/* What happens next */}

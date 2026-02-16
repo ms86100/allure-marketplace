@@ -11,6 +11,10 @@ export interface ParentGroupRow {
   is_active: boolean;
   sort_order: number;
   layout_type: 'ecommerce' | 'food' | 'service';
+  requires_license: boolean;
+  license_mandatory: boolean;
+  license_type_name: string | null;
+  license_description: string | null;
   created_at: string;
   updated_at: string;
 }
