@@ -24,7 +24,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { Badge } from '@/components/ui/badge';
-import { ImageUpload } from '@/components/ui/image-upload';
+import { ProductImageUpload } from '@/components/ui/product-image-upload';
 import { useAuth } from '@/contexts/AuthContext';
 import { Product, ProductCategory, SellerProfile, ProductActionType, PRODUCT_ACTION_TYPES } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
@@ -379,13 +379,13 @@ export default function SellerProductsPage() {
                 <div className="space-y-2">
                   <Label>Product Image</Label>
                   {user && (
-                    <ImageUpload
+                    <ProductImageUpload
                       value={formData.image_url}
                       onChange={(url) => setFormData({ ...formData, image_url: url })}
-                      folder="products"
                       userId={user.id}
-                      aspectRatio="video"
-                      placeholder="Upload product photo"
+                      productName={formData.name}
+                      categoryName={activeCategoryConfig?.displayName || formData.category || undefined}
+                      description={formData.description || undefined}
                     />
                   )}
                 </div>
