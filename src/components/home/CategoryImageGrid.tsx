@@ -7,12 +7,16 @@ import { useHaptics } from '@/hooks/useHaptics';
 interface CategoryImageGridProps {
   parentGroup: string;
   title: string;
+  activeCategories?: Set<string>;
 }
 
-export function CategoryImageGrid({ parentGroup, title }: CategoryImageGridProps) {
+export function CategoryImageGrid({ parentGroup, title, activeCategories }: CategoryImageGridProps) {
   const { groupedConfigs, isLoading } = useCategoryConfigs();
   const { selectionChanged } = useHaptics();
-  const categories = groupedConfigs[parentGroup] || [];
+  const allCategories = groupedConfigs[parentGroup] || [];
+  const categories = activeCategories
+    ? allCategories.filter(c => activeCategories.has(c.category))
+    : allCategories;
 
   if (isLoading) {
     return (

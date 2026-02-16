@@ -26,6 +26,8 @@ export function MarketplaceSection() {
     ? localCategories.filter(cat => cat.parentGroup === activeGroup)
     : localCategories;
 
+  const activeCategorySet = new Set(localCategories.map(c => c.category));
+
   const activeParentGroups = activeGroup
     ? parentGroupInfos.filter(g => g.value === activeGroup)
     : parentGroupInfos.filter(g =>
@@ -45,6 +47,7 @@ export function MarketplaceSection() {
           key={group.value}
           parentGroup={group.value}
           title={group.label}
+          activeCategories={activeCategorySet}
         />
       ))}
 

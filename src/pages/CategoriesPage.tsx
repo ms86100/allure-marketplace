@@ -2,14 +2,17 @@ import { Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useParentGroups } from '@/hooks/useParentGroups';
+import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 export default function CategoriesPage() {
   const { configs, isLoading: configsLoading } = useCategoryConfigs();
   const { groups, isLoading: groupsLoading } = useParentGroups();
+  const { data: productCategories = [], isLoading: productsLoading } = useProductsByCategory();
 
-  const isLoading = configsLoading || groupsLoading;
+  const isLoading = configsLoading || groupsLoading || productsLoading;
+  const activeCategorySet = new Set(productCategories.map(c => c.category));
 
   // Group categories by parent_group
   const grouped = groups
@@ -18,7 +21,7 @@ export default function CategoriesPage() {
     .map(group => ({
       ...group,
       categories: configs
-        .filter(c => c.parentGroup === group.slug && c.isActive)
+        .filter(c => c.parentGroup === group.slug && c.isActive && activeCategorySet.has(c.category))
         .sort((a, b) => (a.displayOrder ?? 99) - (b.displayOrder ?? 99)),
     }))
     .filter(g => g.categories.length > 0);

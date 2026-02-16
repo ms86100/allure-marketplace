@@ -10,8 +10,15 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
  * Shows 2 rows (8 items) by default with expand toggle.
  * Pulls all active sub-categories from category_config (DB-driven).
  */
-export function CategoryBrowseGrid() {
-  const { configs, isLoading } = useCategoryConfigs();
+interface CategoryBrowseGridProps {
+  activeCategories?: Set<string>;
+}
+
+export function CategoryBrowseGrid({ activeCategories }: CategoryBrowseGridProps = {}) {
+  const { configs: allConfigs, isLoading } = useCategoryConfigs();
+  const configs = activeCategories
+    ? allConfigs.filter(c => activeCategories.has(c.category))
+    : allConfigs;
   const [expanded, setExpanded] = useState(false);
 
   if (isLoading) {
