@@ -12,6 +12,7 @@ import { OfflineBanner } from "@/components/network/OfflineBanner";
 import { PushNotificationProvider } from "@/components/notifications/PushNotificationProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
+import { GlobalHapticListener } from "@/components/haptics/GlobalHapticListener";
 import { initializeMedianBridge } from "@/lib/median";
 import { useDeepLinks } from "@/hooks/useDeepLinks";
 import { useSecurityOfficer } from "@/hooks/useSecurityOfficer";
@@ -260,6 +261,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <HashRouter>
+            <GlobalHapticListener />
             <NavigationHandler />
             <AuthProvider>
               <CartProvider>
