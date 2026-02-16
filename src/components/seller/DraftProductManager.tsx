@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { ProductImageUpload } from '@/components/ui/product-image-upload';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Trash2, Loader2, Package, Percent } from 'lucide-react';
+import { Plus, Trash2, Loader2, Package, Percent, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 
@@ -152,13 +152,40 @@ export function DraftProductManager({
         <div>
           <h3 className="font-semibold text-base">Your Products / Services</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Add at least one item to continue
+            {products.length === 0
+              ? 'Add at least one item to continue'
+              : `${products.length} item${products.length !== 1 ? 's' : ''} added`}
           </p>
         </div>
         <span className="text-sm font-medium text-muted-foreground">
           {products.length} item{products.length !== 1 ? 's' : ''}
         </span>
       </div>
+
+      {/* Friendly empty state */}
+      {products.length === 0 && !isAdding && (
+        <div className="flex flex-col items-center justify-center py-8 px-4 rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 text-center">
+          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+            <Package size={28} className="text-primary" />
+          </div>
+          <p className="font-medium text-sm mb-1">Your catalog is empty</p>
+          <p className="text-xs text-muted-foreground max-w-[240px]">
+            Add your first product — even one item is enough to get started!
+          </p>
+        </div>
+      )}
+
+      {/* Success encouragement after first product */}
+      {products.length > 0 && products.length <= 2 && !isAdding && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
+          <CheckCircle2 size={16} className="text-green-600 flex-shrink-0" />
+          <p className="text-xs text-green-700 dark:text-green-400">
+            {products.length === 1
+              ? "Great start! Add more items or continue to review."
+              : "You're on your way! Add more or continue when ready."}
+          </p>
+        </div>
+      )}
 
       {/* Existing Products */}
       {products.map((product, index) => {

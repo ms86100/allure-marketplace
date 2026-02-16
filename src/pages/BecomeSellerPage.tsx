@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -15,9 +15,10 @@ import { DraftProductManager } from '@/components/seller/DraftProductManager';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe } from 'lucide-react';
+import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe, LayoutGrid, Tags, FileText, Package, CheckCircle2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── Sub-category Selector ─────────────────────────────────────────────────
 function SubCategorySelector({
@@ -66,6 +67,14 @@ function SubCategorySelector({
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const TOTAL_STEPS = 5;
+
+const STEP_META = [
+  { label: 'Category', icon: LayoutGrid, title: 'What will you offer?', helper: 'This determines your store type and the tools available to you.' },
+  { label: 'Specialize', icon: Tags, title: 'Specialize your store', helper: 'Select the specific categories you\'ll serve. You can add more later.' },
+  { label: 'Store Details', icon: FileText, title: 'Set up your store', helper: 'These details help buyers find and trust your business.' },
+  { label: 'Products', icon: Package, title: 'Add your first products', helper: 'Buyers will see these once your store is approved. Start with 1-2 items.' },
+  { label: 'Review', icon: CheckCircle2, title: 'Review and submit', helper: 'Double-check everything. You can edit your store after approval too.' },
+];
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
 export default function BecomeSellerPage() {
@@ -377,64 +386,115 @@ export default function BecomeSellerPage() {
           )}
         </div>
 
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-secondary flex items-center justify-center">
-            <Store className="text-secondary-foreground" size={32} />
-          </div>
-          <h1 className="text-2xl font-bold">Become a Seller</h1>
-          <p className="text-muted-foreground mt-2">
-            Set up your complete store in one go
+        {/* Step-Specific Header */}
+        <div className="text-center mb-4">
+          <h1 className="text-2xl font-bold">{STEP_META[step - 1].title}</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {STEP_META[step - 1].helper}
           </p>
         </div>
 
-        {/* Step Indicator */}
-        <div className="flex items-center justify-center gap-2 mb-6">
-          {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
-            <div
-              key={s}
-              className={cn(
-                'w-8 h-1 rounded-full transition-colors',
-                s <= step ? 'bg-primary' : 'bg-muted'
-              )}
-            />
-          ))}
+        {/* Named Progress Stepper */}
+        <div className="flex items-center justify-between mb-6 px-1">
+          {STEP_META.map((meta, i) => {
+            const stepNum = i + 1;
+            const Icon = meta.icon;
+            const isCompleted = step > stepNum;
+            const isActive = step === stepNum;
+            return (
+              <div key={meta.label} className="flex flex-col items-center gap-1 flex-1">
+                <div
+                  className={cn(
+                    'w-8 h-8 rounded-full flex items-center justify-center transition-all text-xs',
+                    isCompleted && 'bg-primary text-primary-foreground',
+                    isActive && 'bg-primary/20 text-primary ring-2 ring-primary',
+                    !isCompleted && !isActive && 'bg-muted text-muted-foreground'
+                  )}
+                >
+                  {isCompleted ? <CheckCircle2 size={16} /> : <Icon size={14} />}
+                </div>
+                <span className={cn(
+                  'text-[10px] font-medium text-center leading-tight',
+                  isActive ? 'text-primary' : 'text-muted-foreground'
+                )}>
+                  {meta.label}
+                </span>
+              </div>
+            );
+          })}
         </div>
+
+        {/* Persistent Context Breadcrumb (Steps 3-5) */}
+        {step >= 3 && selectedGroupInfo && (
+          <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-muted/60 text-xs">
+            <div className={cn('w-6 h-6 rounded flex items-center justify-center text-sm', selectedGroupInfo.color)}>
+              {selectedGroupInfo.icon}
+            </div>
+            <span className="font-medium">{selectedGroupInfo.label}</span>
+            {formData.categories.length > 0 && (
+              <>
+                <ChevronRight size={12} className="text-muted-foreground" />
+                <span className="text-muted-foreground truncate">
+                  {formData.categories.map(cat => {
+                    const config = (groupedConfigs[selectedGroup as keyof typeof groupedConfigs] || []).find(c => c.category === cat);
+                    return config?.displayName || cat;
+                  }).join(', ')}
+                </span>
+              </>
+            )}
+            {formData.business_name.trim() && step >= 4 && (
+              <>
+                <span className="text-muted-foreground">|</span>
+                <span className="font-medium truncate">"{formData.business_name}"</span>
+              </>
+            )}
+          </div>
+        )}
 
         {/* ═══════════ Step 1: Choose Category Group ════════════ */}
         {step === 1 && (
           <div className="space-y-5">
-            <div className="text-center mb-4">
-              <h2 className="font-semibold text-lg">What do you want to offer?</h2>
-              <p className="text-sm text-muted-foreground">
-                Select the type of service or product
-              </p>
-            </div>
             <div className="grid grid-cols-2 gap-3">
-              {parentGroupInfos.map(({ value, label, icon, color }) => (
-                <button
-                  key={value}
-                  onClick={() => {
-                    setSelectedGroup(value);
-                    setFormData({ ...formData, categories: [] });
-                    setStep(2);
-                  }}
-                  className={cn(
-                    'flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center',
-                    'hover:border-primary/50 hover:bg-muted/50'
-                  )}
-                >
-                  <div
+              <AnimatePresence>
+                {parentGroupInfos.map(({ value, label, icon, color }) => (
+                  <motion.button
+                    key={value}
+                    layout
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => {
+                      setSelectedGroup(value);
+                      setFormData({ ...formData, categories: [] });
+                      // Brief "Great choice!" moment before advancing
+                      setTimeout(() => setStep(2), 350);
+                    }}
                     className={cn(
-                      'w-12 h-12 rounded-xl flex items-center justify-center text-2xl',
-                      color
+                      'flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center',
+                      selectedGroup === value
+                        ? 'border-primary bg-primary/5 scale-[1.03]'
+                        : 'hover:border-primary/50 hover:bg-muted/50'
                     )}
                   >
-                    {icon}
-                  </div>
-                  <span className="font-medium text-sm">{label}</span>
-                </button>
-              ))}
+                    <div
+                      className={cn(
+                        'w-12 h-12 rounded-xl flex items-center justify-center text-2xl',
+                        color
+                      )}
+                    >
+                      {icon}
+                    </div>
+                    <span className="font-medium text-sm">{label}</span>
+                    {selectedGroup === value && (
+                      <motion.span
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-xs text-primary font-medium"
+                      >
+                        Great choice! ✨
+                      </motion.span>
+                    )}
+                  </motion.button>
+                ))}
+              </AnimatePresence>
             </div>
           </div>
         )}
@@ -470,6 +530,11 @@ export default function BecomeSellerPage() {
               selectedCategories={formData.categories as ServiceCategory[]}
               onCategorySelect={handleCategoryChange}
             />
+            {/* What's Next hint */}
+            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
+              <ArrowRight size={12} />
+              Next: You'll name your store and set operating hours
+            </p>
             <Button
               className="w-full"
               onClick={() => setStep(3)}
@@ -491,28 +556,6 @@ export default function BecomeSellerPage() {
               <ArrowLeft size={16} />
               Change categories
             </button>
-
-            {/* Selected group & subcategories summary */}
-            <div className="p-3 bg-muted rounded-lg space-y-2">
-              <div className="flex items-center gap-2">
-                <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center text-lg', selectedGroupInfo?.color)}>
-                  {selectedGroupInfo?.icon}
-                </div>
-                <span className="font-semibold text-sm">{selectedGroupInfo?.label}</span>
-              </div>
-              {formData.categories.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {formData.categories.map((cat) => {
-                    const config = (groupedConfigs[selectedGroup as keyof typeof groupedConfigs] || []).find(c => c.category === cat);
-                    return (
-                      <span key={cat} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium">
-                        {config?.icon} {config?.displayName || cat}
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
 
             <div className="space-y-2">
               <Label htmlFor="business_name">Business Name *</Label>
@@ -634,6 +677,12 @@ export default function BecomeSellerPage() {
               )}
             </div>
 
+            {/* What's Next hint */}
+            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
+              <ArrowRight size={12} />
+              Next: Add at least one product or service to your catalog
+            </p>
+
             <Button
               className="w-full"
               onClick={handleProceedToProducts}
@@ -670,6 +719,12 @@ export default function BecomeSellerPage() {
               products={draftProducts}
               onProductsChange={setDraftProducts}
             />
+
+            {/* What's Next hint */}
+            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
+              <ArrowRight size={12} />
+              Next: Review everything and submit for approval
+            </p>
 
             <Button
               className="w-full"
