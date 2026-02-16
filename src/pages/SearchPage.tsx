@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
-import { ArrowLeft, Search as SearchIcon, X, Globe, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Search as SearchIcon, X, Globe, ShoppingBag, Mic } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
@@ -438,104 +438,171 @@ export default function SearchPage() {
   // ── Render ───────────────────────────────────────────
   return (
     <AppLayout showHeader={false}>
-      <div className="p-4 pb-24">
-        {/* ─── Search bar ─── */}
-        <div className="flex items-center gap-3 mb-3">
-          <Link to="/" className="shrink-0">
-            <ArrowLeft size={22} />
-          </Link>
-          <div className="flex-1 relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-            <Input
-              placeholder="Search products, food, services…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="pl-9 pr-9 h-10 rounded-xl text-sm"
-              autoFocus
-            />
-            {query && (
-              <button onClick={() => setQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                <X size={16} />
-              </button>
-            )}
+      <div className="pb-24">
+        {/* ─── Sticky search header ─── */}
+        <div className="sticky top-0 z-40 bg-background safe-top">
+          <div className="px-4 pt-3 pb-2">
+            <div className="flex items-center gap-2">
+              <Link to="/" className="shrink-0 h-9 w-9 rounded-full bg-muted flex items-center justify-center">
+                <ArrowLeft size={18} className="text-foreground" />
+              </Link>
+              <div className="flex-1 relative">
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
+                <Input
+                  placeholder='Search "groceries"'
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="pl-9 pr-16 h-10 rounded-xl text-sm bg-muted border-0 focus-visible:ring-1"
+                  autoFocus
+                />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  {query && (
+                    <button onClick={() => setQuery('')} className="p-1 text-muted-foreground hover:text-foreground">
+                      <X size={14} />
+                    </button>
+                  )}
+                  <button className="p-1 text-muted-foreground">
+                    <Mic size={15} />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-          <SearchFilters filters={filters} onFiltersChange={handleFiltersChange} showPriceFilter />
+
+          {/* ─── Horizontal filter bar (Blinkit style) ─── */}
+          <div className="px-4 pb-2">
+            <ScrollArea>
+              <div className="flex items-center gap-2 pb-1">
+                <SearchFilters filters={filters} onFiltersChange={handleFiltersChange} showPriceFilter />
+                
+                {/* Quick veg/non-veg toggles */}
+                <button
+                  onClick={() => setFilters({ ...filters, isVeg: filters.isVeg === true ? null : true })}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors ${
+                    filters.isVeg === true
+                      ? 'border-accent bg-accent/10 text-accent'
+                      : 'border-border bg-background text-foreground'
+                  }`}
+                >
+                  <div className="w-3 h-3 border-[1.5px] border-accent rounded-sm flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+                  </div>
+                  Veg
+                </button>
+                <button
+                  onClick={() => setFilters({ ...filters, isVeg: filters.isVeg === false ? null : false })}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors ${
+                    filters.isVeg === false
+                      ? 'border-destructive bg-destructive/10 text-destructive'
+                      : 'border-border bg-background text-foreground'
+                  }`}
+                >
+                  <div className="w-3 h-3 border-[1.5px] border-destructive rounded-sm flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full bg-destructive" />
+                  </div>
+                  Non-veg
+                </button>
+
+                {/* Sort shortcuts */}
+                {[
+                  { value: 'rating' as const, label: 'Top Rated' },
+                  { value: 'price_low' as const, label: 'Price ↑' },
+                  { value: 'price_high' as const, label: 'Price ↓' },
+                ].map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setFilters({ ...filters, sortBy: filters.sortBy === value ? null : value })}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors ${
+                      filters.sortBy === value
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-background text-foreground'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </div>
         </div>
 
-        {/* ─── Category Bubbles ─── */}
-        <CategoryBubbleRow
-          categories={categoryConfigs}
-          selectedCategory={selectedCategory}
-          onCategoryTap={handleCategoryTap}
-          isLoading={categoriesLoading}
-        />
-
-        {/* ─── Filter presets ─── */}
-        <FilterPresets activePreset={activePreset} onPresetSelect={handlePresetSelect} />
-
-        {/* ─── Browse-beyond toggle ─── */}
-        <div className="flex items-center justify-between mt-3 mb-1 px-1">
-          <button
-            onClick={() => setBrowseBeyond(!browseBeyond)}
-            className="flex items-center gap-2 text-sm"
-          >
-            <Globe size={14} className={browseBeyond ? 'text-primary' : 'text-muted-foreground'} />
-            <span className={browseBeyond ? 'text-primary font-medium' : 'text-muted-foreground'}>
-              Nearby societies
-            </span>
-          </button>
-          <Switch checked={browseBeyond} onCheckedChange={setBrowseBeyond} className="scale-90" />
-        </div>
-
-        {browseBeyond && (
-          <div className="flex items-center gap-3 px-1 mb-3">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">Radius</span>
-            <Slider
-              value={[searchRadius]}
-              onValueChange={([v]) => setSearchRadius(v)}
-              min={1}
-              max={10}
-              step={1}
-              className="flex-1"
-            />
-            <span className="text-xs font-semibold text-primary w-10 text-right">{searchRadius} km</span>
-          </div>
-        )}
-
-        {/* ─── Active filter pills ─── */}
-        {pills.length > 0 && (
-          <div className="flex items-center gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
-            {pills.map((label, i) => (
-              <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary whitespace-nowrap">
-                {label}
-              </span>
-            ))}
-            <button onClick={clearFilters} className="text-[11px] text-muted-foreground underline whitespace-nowrap ml-1">
-              Clear
-            </button>
-          </div>
-        )}
-
-        {/* ─── Results ─── */}
-        {showLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-2">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Skeleton key={i} className="h-56 w-full rounded-xl" />
-            ))}
-          </div>
-        ) : displayProducts.length > 0 ? (
-          <ProductGridByCategory
-            products={displayProducts}
-            categoryMap={categoryMap}
-            categoryConfigs={categoryConfigs}
-            
-            showCount={isSearchActive}
+        <div className="px-4">
+          {/* ─── Category Bubbles ─── */}
+          <CategoryBubbleRow
+            categories={categoryConfigs}
+            selectedCategory={selectedCategory}
+            onCategoryTap={handleCategoryTap}
+            isLoading={categoriesLoading}
           />
-        ) : isSearchActive ? (
-          <EmptyState />
-        ) : (
-          <EmptyMarketplace />
-        )}
+
+          {/* ─── Filter presets ─── */}
+          <FilterPresets activePreset={activePreset} onPresetSelect={handlePresetSelect} />
+
+          {/* ─── Browse-beyond toggle ─── */}
+          <div className="flex items-center justify-between mt-3 mb-1 px-1">
+            <button
+              onClick={() => setBrowseBeyond(!browseBeyond)}
+              className="flex items-center gap-2 text-sm"
+            >
+              <Globe size={14} className={browseBeyond ? 'text-primary' : 'text-muted-foreground'} />
+              <span className={browseBeyond ? 'text-primary font-medium' : 'text-muted-foreground'}>
+                Nearby societies
+              </span>
+            </button>
+            <Switch checked={browseBeyond} onCheckedChange={setBrowseBeyond} className="scale-90" />
+          </div>
+
+          {browseBeyond && (
+            <div className="flex items-center gap-3 px-1 mb-3">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Radius</span>
+              <Slider
+                value={[searchRadius]}
+                onValueChange={([v]) => setSearchRadius(v)}
+                min={1}
+                max={10}
+                step={1}
+                className="flex-1"
+              />
+              <span className="text-xs font-semibold text-primary w-10 text-right">{searchRadius} km</span>
+            </div>
+          )}
+
+          {/* ─── Active filter pills ─── */}
+          {pills.length > 0 && (
+            <div className="flex items-center gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
+              {pills.map((label, i) => (
+                <span key={i} className="text-[11px] px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium whitespace-nowrap">
+                  {label}
+                </span>
+              ))}
+              <button onClick={clearFilters} className="text-[11px] text-muted-foreground underline whitespace-nowrap ml-1">
+                Clear
+              </button>
+            </div>
+          )}
+
+          {/* ─── Results ─── */}
+          {showLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-2">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton key={i} className="h-56 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : displayProducts.length > 0 ? (
+            <ProductGridByCategory
+              products={displayProducts}
+              categoryMap={categoryMap}
+              categoryConfigs={categoryConfigs}
+              
+              showCount={isSearchActive}
+            />
+          ) : isSearchActive ? (
+            <EmptyState />
+          ) : (
+            <EmptyMarketplace />
+          )}
+        </div>
       </div>
 
     </AppLayout>
@@ -573,9 +640,9 @@ function CategoryBubbleRow({
             <button
               key={cat.category}
               onClick={() => onCategoryTap(cat.category)}
-              className={`flex flex-col items-center gap-1 px-2 py-2 rounded-2xl min-w-[64px] transition-all shrink-0 ${
+              className={`flex flex-col items-center gap-1 px-3 py-2 rounded-2xl min-w-[68px] transition-all shrink-0 ${
                 isActive
-                  ? 'bg-primary text-primary-foreground shadow-md scale-105'
+                  ? 'bg-primary text-primary-foreground shadow-md scale-[1.03]'
                   : 'bg-muted/60 hover:bg-muted'
               }`}
             >
@@ -653,17 +720,16 @@ function ProductGridByCategory({
       {categories.map((cat) => {
         const items = grouped[cat];
         const catInfo = categoryMap[cat];
-        const config = categoryConfigs.find((c) => c.category === cat);
         return (
           <div key={cat}>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-base leading-none">{catInfo?.icon || '📦'}</span>
-              <h3 className="font-semibold text-sm text-foreground">
+              <h3 className="font-bold text-sm text-foreground">
                 {catInfo?.displayName || cat}
               </h3>
               <span className="text-xs text-muted-foreground">({items.length})</span>
-              <span className="text-xs font-semibold text-success ml-1">
-                Starting ₹{Math.min(...items.map(p => p.price))}
+              <span className="text-[11px] font-semibold text-accent ml-auto">
+                From ₹{Math.min(...items.map(p => p.price))}
               </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -686,7 +752,7 @@ function EmptyState() {
   return (
     <div className="text-center py-16">
       <SearchIcon className="mx-auto text-muted-foreground mb-3" size={28} />
-      <p className="font-medium text-sm text-muted-foreground">No products found</p>
+      <p className="font-semibold text-sm text-foreground">No products found</p>
       <p className="text-xs text-muted-foreground mt-1">Try a different term or tap a category above</p>
     </div>
   );

@@ -67,15 +67,19 @@ export function SearchFilters({
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="relative">
-          <SlidersHorizontal size={16} className="mr-1" />
+        <button className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors ${
+          activeFilterCount > 0
+            ? 'border-primary bg-primary/10 text-primary'
+            : 'border-border bg-background text-foreground'
+        }`}>
+          <SlidersHorizontal size={13} />
           Filters
           {activeFilterCount > 0 && (
-            <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
+            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground px-1">
               {activeFilterCount}
-            </Badge>
+            </span>
           )}
-        </Button>
+        </button>
       </SheetTrigger>
       <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl">
         <SheetHeader>

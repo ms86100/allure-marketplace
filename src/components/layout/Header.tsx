@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, ChevronDown, User, Wallet } from 'lucide-react';
+import { Bell, ChevronDown, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -70,7 +70,7 @@ export function Header({
           <div className="flex items-start justify-between">
             {showLocation && profile ? (
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-muted-foreground">Sociva in</p>
+                <p className="text-xs font-medium text-muted-foreground tracking-wide uppercase">Sociva in</p>
                 <p className="text-2xl font-extrabold text-foreground leading-tight tracking-tight">
                   16 minutes
                 </p>
@@ -78,10 +78,10 @@ export function Header({
                   className="flex items-center gap-1 mt-0.5"
                   onClick={() => selectionChanged()}
                 >
-                  <span className="text-xs font-semibold text-foreground">
+                  <span className="text-xs font-bold text-foreground tracking-wide">
                     HOME
                   </span>
-                  <span className="text-xs text-muted-foreground">-</span>
+                  <span className="text-xs text-muted-foreground mx-0.5">—</span>
                   <span className="text-xs text-muted-foreground truncate max-w-[180px]">
                     {profile.block}, {profile.flat_number}
                   </span>
@@ -92,24 +92,24 @@ export function Header({
               <h1 className="text-lg font-bold text-foreground">{title}</h1>
             ) : (
               <div>
-                <p className="text-xs font-medium text-muted-foreground">Sociva in</p>
+                <p className="text-xs font-medium text-muted-foreground tracking-wide uppercase">Sociva in</p>
                 <p className="text-2xl font-extrabold text-foreground leading-tight">16 minutes</p>
               </div>
             )}
 
-            <div className="flex items-center gap-2 mt-1">
-              <ThemeToggle className="h-10 w-10 rounded-full bg-muted text-foreground" />
+            <div className="flex items-center gap-1.5 mt-1">
+              <ThemeToggle className="h-9 w-9 rounded-full bg-muted text-foreground hover:bg-muted/80" />
               {isApproved && (
                 <>
                   <Link to="/notifications/inbox">
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="relative h-10 w-10 rounded-full bg-muted text-foreground"
+                      className="relative h-9 w-9 rounded-full bg-muted text-foreground hover:bg-muted/80"
                     >
-                      <Bell size={18} />
+                      <Bell size={17} />
                       {unreadCount > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
+                        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
                           {unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                       )}
@@ -119,9 +119,9 @@ export function Header({
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="h-10 w-10 rounded-full bg-muted text-foreground"
+                      className="h-9 w-9 rounded-full bg-muted text-foreground hover:bg-muted/80"
                     >
-                      <User size={18} />
+                      <User size={17} />
                     </Button>
                   </Link>
                 </>
@@ -129,15 +129,15 @@ export function Header({
             </div>
           </div>
 
-          {/* Search bar */}
+          {/* Search bar — Blinkit style */}
           <Link to="/search" className="block mt-3">
-            <div className="flex items-center gap-3 bg-muted rounded-xl px-4 py-3">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0">
+            <div className="flex items-center gap-3 bg-muted rounded-xl px-4 py-2.5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0">
                 <circle cx="11" cy="11" r="8"/>
                 <path d="m21 21-4.3-4.3"/>
               </svg>
               <span className="text-sm text-muted-foreground flex-1">Search "groceries"</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0">
                 <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
                 <line x1="12" x2="12" y1="19" y2="22"/>
