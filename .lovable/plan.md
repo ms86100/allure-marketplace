@@ -1,94 +1,104 @@
 
 
-# Plan: Distance Badge, Discount Display Fix, and AI Product Image Generation
+# Plan: Location-Aware "Shop by Store" Discovery Section
 
-## Overview
+## What This Delivers
 
-Three interconnected improvements to make the marketplace more informative and visually polished.
+A completely redesigned "Shop by Store" section on the Home page that gives users instant visibility into **who is selling, what they sell, and how far they are** -- all powered by real database data with zero hardcoding.
 
----
+The section will have two parts:
+1. **"In Your Society"** -- sellers within the user's own society, grouped by category
+2. **"Nearby Societies"** -- sellers from other societies, grouped into distance bands (within 2 km, 5 km, 10 km)
 
-## 1. Distance Badge on Product Cards
-
-**Current state:** The `distance_km` data is already returned from the `search_nearby_sellers` RPC and stored in `ProductSearchResult`, but it is never passed to `ProductListingCard` for display.
-
-**Changes:**
-
-- **`ProductListingCard.tsx`**: Add a distance badge next to seller name or at the top-right of the card. When `distance_km` is present and the product is from a different society, show a small pill like "2.3 km". Also show `society_name` if available.
-  
-- **`ProductWithSeller` type**: Add `distance_km?: number | null`, `society_name?: string | null`, and `is_same_society?: boolean` fields.
-
-- **`SearchPage.tsx` (`toProductWithSeller` function, ~line 804)**: Pass through `distance_km`, `society_name`, and `is_same_society` from `ProductSearchResult` to `ProductWithSeller`.
+This works **regardless** of the "Nearby societies" search toggle -- it always calculates and displays distance-based groupings.
 
 ---
 
-## 2. Discount/Pricing Display Fix
+## Layout Design
 
-**Current state:** The seller form already captures `mrp` and `discount_percentage`, and `ProductListingCard` already renders strikethrough pricing and discount badge. However, the `SearchPage`'s data mapping (`toProductWithSeller`) does not pass `mrp` or `discount_percentage`, so discount info never appears in search results.
+```text
++--------------------------------------------------+
+|  In Your Society - Green Valley Residency         |
++--------------------------------------------------+
+|  [Food]  Seller A, Seller B                       |
+|  [Grocery]  Seller C                              |
++--------------------------------------------------+
 
-**Changes:**
++--------------------------------------------------+
+|  Nearby Societies                                 |
++--------------------------------------------------+
+|  Within 2 km                                      |
+|  ┌─ Lakeside Towers (1.8 km) ─────────────────┐  |
+|  │  [Food] Seller D  │  [Grocery] Seller E     │  |
+|  └─────────────────────────────────────────────┘  |
+|                                                    |
+|  Within 5 km                                      |
+|  ┌─ Hilltop Heights (4.2 km) ──────────────────┐  |
+|  │  [Food] Seller F  │  [Services] Seller G    │  |
+|  └─────────────────────────────────────────────┘  |
+|                                                    |
+|  Within 10 km                                     |
+|  (empty -- nothing in this range)                 |
++--------------------------------------------------+
+```
 
-- **`ProductSearchResult` type (SearchPage.tsx, ~line 21)**: Add `mrp`, `discount_percentage` fields.
-
-- **Search queries in `SearchPage.tsx`**: The product queries already select `mrp` and `discount_percentage` in the term-search branch (~line 292) but not in `loadPopularProducts` (~line 143) or the category-only branch (~line 384). Add these columns to all product queries.
-
-- **Mapping functions**: Update all `products.push(...)` blocks and `toProductWithSeller` to include `mrp` and `discount_percentage`.
-
-- **Nearby seller products**: The `search_nearby_sellers` RPC returns `matching_products` JSONB. Need to verify the RPC includes `mrp` and `discount_percentage` in that JSON. If not, update the RPC.
+Each seller entry is tappable and navigates to `/seller/{id}`. Category pills show `primary_group` from the seller profile. Society names and distances come from the database's `haversine_km()` function.
 
 ---
 
-## 3. AI Product Image Generation
+## Data Strategy (100% DB-backed, no dummies)
 
-**Current state:** An edge function `generate-category-image` already exists that uses Lovable AI (Gemini flash image model) to generate category images and upload them to storage. The `ImageUpload` component handles manual uploads to an `app-images` bucket.
+### "In Your Society" subsection
+- Query `seller_profiles` where `society_id = effectiveSocietyId` and `verification_status = 'approved'`
+- Join `profiles` for seller name, join `societies` for society name
+- Group sellers by `primary_group` (their main category like Food, Grocery, Services)
+- Already available via existing query patterns (similar to current `ShopByStore`)
 
-**Changes:**
-
-### Backend: New Edge Function `generate-product-image`
-
-- Based on the existing `generate-category-image` pattern
-- Accepts: `productName`, `categoryName`, `description` (optional)
-- Generates a 1:1 product image using Lovable AI with a prompt tailored to the product and its category
-- Uploads to the existing `app-images` bucket under `{userId}/products/ai-{timestamp}.png`
-- Returns the public URL
-
-### Frontend: Enhanced Image Upload Component
-
-- **New `ProductImageUpload` component** (wraps `ImageUpload`):
-  - Two-tab interface: "Upload" and "Generate with AI"
-  - Upload tab: existing `ImageUpload` with added validation:
-    - Accepted formats: JPG, PNG, WebP
-    - Max file size: 5MB (already enforced)
-    - Images displayed via `object-cover` in 1:1 aspect ratio (already handled)
-  - AI tab: 
-    - Button "Generate Image" that calls the edge function
-    - Shows loading state during generation
-    - Previews generated image before confirming
-    - Uses product name + category as context for generation
-
-- **`SellerProductsPage.tsx`**: Replace the existing `ImageUpload` usage with the new `ProductImageUpload` component, passing product name and category for AI context.
-
-### Image Quality Rules
-
-- All product images display in 1:1 aspect ratio with `object-cover` or `object-contain` (already consistent across all card components)
-- AI-generated images are produced at 1:1 ratio by prompt instruction
-- Upload validation rejects non-image files and files over 5MB (already in place)
-- No additional resolution enforcement needed since images are served at responsive sizes and the AI model produces adequate resolution
+### "Nearby Societies" subsection
+- Call the existing `search_nearby_sellers` RPC with `_radius_km = 10` (max range)
+- This RPC already returns: `seller_id`, `business_name`, `society_name`, `distance_km`, `categories`, `primary_group`, `profile_image_url`, `rating`
+- **No toggle dependency** -- we always call this RPC for the home page section regardless of the user's search toggle preference
+- Group results into distance bands: 0-2 km, 2-5 km, 5-10 km
+- Within each band, group by `society_name`, then by `primary_group`
+- Empty bands are hidden (not shown)
 
 ---
 
 ## Technical Details
 
 ### Files to Create
-1. `supabase/functions/generate-product-image/index.ts` -- new edge function
+
+1. **`src/components/home/ShopByStoreDiscovery.tsx`** -- New component replacing the current `ShopByStore`
+   - Fetches local sellers (own society) with `seller_profiles` query grouped by `primary_group`
+   - Fetches nearby sellers via `search_nearby_sellers` RPC with radius 10 km, `enabled: true` (always on)
+   - Groups nearby results into distance bands (0-2, 2-5, 5-10)
+   - Renders "In Your Society" section with society name from auth context
+   - Renders "Nearby Societies" section with collapsible distance bands
+   - Each seller shows: profile image, business name, rating, categories as pills
+   - Tapping a seller navigates to `/seller/{id}`
+
+2. **`src/hooks/queries/useStoreDiscovery.ts`** -- Custom hook encapsulating data fetching
+   - `useLocalSellers()`: queries `seller_profiles` for the user's society, returns sellers grouped by `primary_group`
+   - `useNearbySocietySellers()`: calls `search_nearby_sellers` RPC with `_radius_km: 10`, always enabled (not dependent on any toggle), groups results by distance band and society
 
 ### Files to Modify
-1. `src/pages/SearchPage.tsx` -- pass mrp, discount_percentage, distance_km through all mapping paths
-2. `src/components/product/ProductListingCard.tsx` -- add distance badge UI
-3. `src/components/ui/image-upload.tsx` -- add AI generation tab
-4. `src/pages/SellerProductsPage.tsx` -- integrate AI image option
-5. `supabase/config.toml` -- register new edge function
 
-### Database Changes
-- Verify `search_nearby_sellers` RPC includes `mrp` and `discount_percentage` in `matching_products` JSONB. If missing, update via migration.
+1. **`src/components/home/MarketplaceSection.tsx`**
+   - Replace `<ShopByStore />` import and usage with `<ShopByStoreDiscovery />`
+
+2. **`src/components/home/ShopByStore.tsx`**
+   - Kept for backward compatibility but no longer imported from MarketplaceSection
+
+### No Database Changes Required
+- The `search_nearby_sellers` RPC already returns all needed fields
+- The `seller_profiles` table already has `primary_group`, `categories`, `society_id`
+- The `societies` table already has `name`, `latitude`, `longitude`
+
+### Key Implementation Details
+- Distance bands are computed client-side from the RPC's `distance_km` field (no new SQL needed)
+- The "In Your Society" label dynamically shows the society name from `effectiveSociety.name` in auth context
+- Empty bands and empty category groups are hidden automatically
+- Horizontal scroll for sellers within each category group (Blinkit-style compact cards)
+- Loading skeletons shown while data fetches
+- If no sellers exist in any section, that section is hidden entirely (no dead-end UI)
 
