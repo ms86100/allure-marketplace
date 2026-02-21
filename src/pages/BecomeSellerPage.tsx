@@ -13,9 +13,12 @@ import { useParentGroups } from '@/hooks/useParentGroups';
 import { ServiceCategory } from '@/types/categories';
 import { DraftProductManager } from '@/components/seller/DraftProductManager';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
+import { ImageUpload } from '@/components/ui/image-upload';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe, LayoutGrid, Tags, FileText, Package, CheckCircle2, ArrowRight } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { DAYS_OF_WEEK } from '@/types/database';
+import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe, LayoutGrid, Tags, FileText, Package, CheckCircle2, ArrowRight, Truck, Smartphone, Banknote, Clock, ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -66,14 +69,21 @@ function SubCategorySelector({
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 const STEP_META = [
   { label: 'Category', icon: LayoutGrid, title: 'What will you offer?', helper: 'This determines your store type and the tools available to you.' },
   { label: 'Specialize', icon: Tags, title: 'Specialize your store', helper: 'Select the specific categories you\'ll serve. You can add more later.' },
   { label: 'Store Details', icon: FileText, title: 'Set up your store', helper: 'These details help buyers find and trust your business.' },
+  { label: 'Settings', icon: Settings, title: 'Configure your store', helper: 'Set up how you operate — delivery, payments, and schedule.' },
   { label: 'Products', icon: Package, title: 'Add your first products', helper: 'Buyers will see these once your store is approved. Start with 1-2 items.' },
   { label: 'Review', icon: CheckCircle2, title: 'Review and submit', helper: 'Double-check everything. You can edit your store after approval too.' },
+];
+
+const FULFILLMENT_OPTIONS = [
+  { value: 'self_pickup', label: 'Self Pickup Only', description: 'Customers pick up from your location', icon: Store },
+  { value: 'delivery', label: 'I Deliver', description: 'You deliver to customers', icon: Truck },
+  { value: 'both', label: 'Both', description: 'Pickup and delivery available', icon: Truck },
 ];
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
@@ -102,10 +112,18 @@ export default function BecomeSellerPage() {
     accepts_cod: true,
     sell_beyond_community: false,
     delivery_radius_km: 5,
+    // Store Settings (Step 4)
+    fulfillment_mode: 'self_pickup',
+    delivery_note: '',
+    accepts_upi: false,
+    upi_id: '',
+    operating_days: [...DAYS_OF_WEEK],
+    profile_image_url: null as string | null,
+    cover_image_url: null as string | null,
   });
   const [draftProducts, setDraftProducts] = useState<any[]>([]);
   const [acceptedDeclaration, setAcceptedDeclaration] = useState(false);
-  const [licenseStatus, setLicenseStatus] = useState<string | null>(null); // 'pending' | 'approved' | 'rejected' | null
+  const [licenseStatus, setLicenseStatus] = useState<string | null>(null);
 
   // ── Check for existing seller profile or draft ────────────────────────
   useEffect(() => {
@@ -121,7 +139,6 @@ export default function BecomeSellerPage() {
           .eq('user_id', user.id);
 
         if (data && data.length > 0) {
-          // Check for a draft profile to resume
           const draft = data.find(
             (s: any) => s.verification_status === 'draft'
           );
@@ -129,13 +146,12 @@ export default function BecomeSellerPage() {
             setDraftSellerId(draft.id);
             setSelectedGroup(draft.primary_group);
             setFormData((f) => ({ ...f, business_name: draft.business_name }));
-            // Load draft products
             const { data: prods } = await supabase
               .from('products')
               .select('*')
               .eq('seller_id', draft.id);
             setDraftProducts(prods || []);
-            setStep(3); // Resume at business details
+            setStep(3);
           }
         }
       } catch (error) {
@@ -199,10 +215,9 @@ export default function BecomeSellerPage() {
   // ── Auto-save draft when business name is filled on Step 3 (for license upload) ──
   useEffect(() => {
     if (step !== 3) return;
-    if (draftSellerId) return; // Already have a draft
+    if (draftSellerId) return;
     if (!formData.business_name.trim()) return;
     if (!selectedGroup) return;
-    // Only auto-save if the group requires a license
     const groupRow = groups.find((g) => g.slug === selectedGroup);
     if (!groupRow || !(groupRow as any).requires_license) return;
 
@@ -233,7 +248,7 @@ export default function BecomeSellerPage() {
       } catch (err) {
         console.error('Auto-save draft failed:', err);
       }
-    }, 800); // Debounce 800ms
+    }, 800);
 
     return () => clearTimeout(timer);
   }, [step, formData.business_name, draftSellerId, selectedGroup, groups, user, profile]);
@@ -260,39 +275,39 @@ export default function BecomeSellerPage() {
 
     setIsLoading(true);
     try {
+      const draftPayload = {
+        business_name: formData.business_name.trim(),
+        description: formData.description.trim() || null,
+        categories: formData.categories,
+        primary_group: selectedGroup,
+        availability_start: formData.availability_start,
+        availability_end: formData.availability_end,
+        accepts_cod: formData.accepts_cod,
+        sell_beyond_community: formData.sell_beyond_community,
+        delivery_radius_km: formData.delivery_radius_km,
+        // Store Settings fields
+        fulfillment_mode: formData.fulfillment_mode,
+        delivery_note: formData.delivery_note.trim() || null,
+        accepts_upi: formData.accepts_upi,
+        upi_id: formData.accepts_upi ? formData.upi_id.trim() || null : null,
+        operating_days: formData.operating_days,
+        profile_image_url: formData.profile_image_url,
+        cover_image_url: formData.cover_image_url,
+      };
+
       if (draftSellerId) {
-        // Update existing draft
         const { error } = await supabase
           .from('seller_profiles')
-          .update({
-            business_name: formData.business_name.trim(),
-            description: formData.description.trim() || null,
-            categories: formData.categories,
-            primary_group: selectedGroup,
-            availability_start: formData.availability_start,
-            availability_end: formData.availability_end,
-            accepts_cod: formData.accepts_cod,
-            sell_beyond_community: formData.sell_beyond_community,
-            delivery_radius_km: formData.delivery_radius_km,
-          } as any)
+          .update(draftPayload as any)
           .eq('id', draftSellerId);
         if (error) throw error;
         return draftSellerId;
       } else {
-        // Create new draft
         const { data, error } = await supabase
           .from('seller_profiles')
           .insert({
+            ...draftPayload,
             user_id: user.id,
-            business_name: formData.business_name.trim(),
-            description: formData.description.trim() || null,
-            categories: formData.categories,
-            primary_group: selectedGroup,
-            availability_start: formData.availability_start,
-            availability_end: formData.availability_end,
-            accepts_cod: formData.accepts_cod,
-            sell_beyond_community: formData.sell_beyond_community,
-            delivery_radius_km: formData.delivery_radius_km,
             society_id: profile?.society_id || null,
             verification_status: 'draft' as any,
           } as any)
@@ -311,11 +326,19 @@ export default function BecomeSellerPage() {
     }
   };
 
+  // ── Proceed to store settings step (saves draft first) ────────────────
+  const handleProceedToSettings = async () => {
+    const id = await saveDraft();
+    if (id) {
+      setStep(4);
+    }
+  };
+
   // ── Proceed to products step (saves draft first) ──────────────────────
   const handleProceedToProducts = async () => {
     const id = await saveDraft();
     if (id) {
-      setStep(4);
+      setStep(5);
     }
   };
 
@@ -342,7 +365,6 @@ export default function BecomeSellerPage() {
 
     setIsLoading(true);
     try {
-      // Update draft → pending
       const { error } = await supabase
         .from('seller_profiles')
         .update({
@@ -355,12 +377,18 @@ export default function BecomeSellerPage() {
           accepts_cod: formData.accepts_cod,
           sell_beyond_community: formData.sell_beyond_community,
           delivery_radius_km: formData.delivery_radius_km,
+          fulfillment_mode: formData.fulfillment_mode,
+          delivery_note: formData.delivery_note.trim() || null,
+          accepts_upi: formData.accepts_upi,
+          upi_id: formData.accepts_upi ? formData.upi_id.trim() || null : null,
+          operating_days: formData.operating_days,
+          profile_image_url: formData.profile_image_url,
+          cover_image_url: formData.cover_image_url,
         } as any)
         .eq('id', draftSellerId);
 
       if (error) throw error;
 
-      // Transition all draft products to pending for admin review
       const { error: prodError } = await supabase
         .from('products')
         .update({ approval_status: 'pending' } as any)
@@ -379,8 +407,25 @@ export default function BecomeSellerPage() {
     }
   };
 
+  // ── Toggle operating day ──────────────────────────────────────────────
+  const toggleOperatingDay = (day: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      operating_days: prev.operating_days.includes(day)
+        ? prev.operating_days.filter((d) => d !== day)
+        : [...prev.operating_days, day],
+    }));
+  };
+
   const selectedGroupInfo = parentGroupInfos.find((g) => g.value === selectedGroup);
   const selectedGroupRow = groups.find((g) => g.slug === selectedGroup);
+
+  // ── Fulfillment mode label for review ─────────────────────────────────
+  const fulfillmentLabel = FULFILLMENT_OPTIONS.find(o => o.value === formData.fulfillment_mode)?.label || formData.fulfillment_mode;
+  const paymentMethods = [
+    formData.accepts_cod && 'COD',
+    formData.accepts_upi && 'UPI',
+  ].filter(Boolean).join(', ') || 'None';
 
   // ── Loading state ─────────────────────────────────────────────────────
   if (isCheckingExisting || groupsLoading) {
@@ -495,7 +540,7 @@ export default function BecomeSellerPage() {
           })}
         </div>
 
-        {/* Persistent Context Breadcrumb (Steps 3-5) */}
+        {/* Persistent Context Breadcrumb (Steps 3-6) */}
         {step >= 3 && selectedGroupInfo && (
           <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-muted/60 text-xs">
             <div className={cn('w-6 h-6 rounded flex items-center justify-center text-sm', selectedGroupInfo.color)}>
@@ -535,7 +580,6 @@ export default function BecomeSellerPage() {
                     onClick={() => {
                       setSelectedGroup(value);
                       setFormData({ ...formData, categories: [] });
-                      // Brief "Great choice!" moment before advancing
                       setTimeout(() => setStep(2), 350);
                     }}
                     className={cn(
@@ -601,7 +645,6 @@ export default function BecomeSellerPage() {
               selectedCategories={formData.categories as ServiceCategory[]}
               onCategorySelect={handleCategoryChange}
             />
-            {/* What's Next hint */}
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
               <ArrowRight size={12} />
               Next: You'll name your store and set operating hours
@@ -690,21 +733,6 @@ export default function BecomeSellerPage() {
               </div>
             </div>
 
-            <label className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer">
-              <Checkbox
-                checked={formData.accepts_cod}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, accepts_cod: checked as boolean })
-                }
-              />
-              <div>
-                <span className="font-medium">Accept Cash on Delivery</span>
-                <p className="text-xs text-muted-foreground">
-                  Allow customers to pay in cash
-                </p>
-              </div>
-            </label>
-
             {/* Sell Beyond Community */}
             <div className="border rounded-lg p-4 space-y-4">
               <div className="flex items-center justify-between">
@@ -784,17 +812,217 @@ export default function BecomeSellerPage() {
             {/* What's Next hint */}
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
               <ArrowRight size={12} />
+              Next: Configure delivery, payments, and schedule
+            </p>
+
+            <Button
+              className="w-full"
+              onClick={handleProceedToSettings}
+              disabled={
+                isLoading ||
+                !formData.business_name.trim() ||
+                ((selectedGroupRow as any)?.license_mandatory && (!licenseStatus || licenseStatus === 'rejected'))
+              }
+            >
+              {isLoading ? (
+                <Loader2 className="animate-spin mr-2" size={18} />
+              ) : null}
+              Continue to Store Settings
+              <ChevronRight size={16} className="ml-1" />
+            </Button>
+          </div>
+        )}
+
+        {/* ═══════════ Step 4: Store Settings (NEW) ════════════ */}
+        {step === 4 && (
+          <div className="space-y-5">
+            <button
+              onClick={() => setStep(3)}
+              className="flex items-center gap-1 text-sm text-muted-foreground"
+            >
+              <ArrowLeft size={16} />
+              Edit store details
+            </button>
+
+            {/* Fulfillment Mode */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Truck size={16} className="text-primary" />
+                <h3 className="font-semibold text-sm">Fulfillment Mode</h3>
+              </div>
+              <RadioGroup
+                value={formData.fulfillment_mode}
+                onValueChange={(value) => setFormData({ ...formData, fulfillment_mode: value })}
+                className="space-y-2"
+              >
+                {FULFILLMENT_OPTIONS.map((option) => {
+                  const Icon = option.icon;
+                  return (
+                    <label
+                      key={option.value}
+                      className={cn(
+                        'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all',
+                        formData.fulfillment_mode === option.value
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-muted-foreground/30'
+                      )}
+                    >
+                      <RadioGroupItem value={option.value} />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium">{option.label}</span>
+                        <p className="text-xs text-muted-foreground">{option.description}</p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </RadioGroup>
+              {(formData.fulfillment_mode === 'delivery' || formData.fulfillment_mode === 'both') && (
+                <div className="space-y-2 pt-2 border-t">
+                  <Label htmlFor="delivery_note" className="text-xs text-muted-foreground">
+                    Delivery Note (optional)
+                  </Label>
+                  <Input
+                    id="delivery_note"
+                    placeholder="e.g., Delivery available within 2 km, after 5 PM only"
+                    value={formData.delivery_note}
+                    onChange={(e) => setFormData({ ...formData, delivery_note: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Payment Methods */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Banknote size={16} className="text-primary" />
+                <h3 className="font-semibold text-sm">Payment Methods</h3>
+              </div>
+              <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <Banknote size={18} className="text-muted-foreground" />
+                  <div>
+                    <span className="text-sm font-medium">Cash on Delivery</span>
+                    <p className="text-xs text-muted-foreground">Accept cash payments</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={formData.accepts_cod}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, accepts_cod: checked })
+                  }
+                />
+              </label>
+              <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer">
+                <div className="flex items-center gap-3">
+                  <Smartphone size={18} className="text-muted-foreground" />
+                  <div>
+                    <span className="text-sm font-medium">UPI Payment</span>
+                    <p className="text-xs text-muted-foreground">Accept UPI / digital payments</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={formData.accepts_upi}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, accepts_upi: checked })
+                  }
+                />
+              </label>
+              {formData.accepts_upi && (
+                <div className="space-y-2 pt-2 border-t">
+                  <Label htmlFor="upi_id" className="text-xs text-muted-foreground">
+                    UPI ID
+                  </Label>
+                  <Input
+                    id="upi_id"
+                    placeholder="e.g., yourname@upi"
+                    value={formData.upi_id}
+                    onChange={(e) => setFormData({ ...formData, upi_id: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Operating Days */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Clock size={16} className="text-primary" />
+                <h3 className="font-semibold text-sm">Operating Days</h3>
+              </div>
+              <p className="text-xs text-muted-foreground">Select the days your store is open</p>
+              <div className="flex gap-1.5 flex-wrap">
+                {DAYS_OF_WEEK.map((day) => (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleOperatingDay(day)}
+                    className={cn(
+                      'px-3 py-2 rounded-lg text-xs font-medium transition-all border',
+                      formData.operating_days.includes(day)
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted text-muted-foreground border-border hover:border-muted-foreground/30'
+                    )}
+                  >
+                    {day}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {formData.operating_days.length === 7
+                  ? 'Open every day'
+                  : formData.operating_days.length === 0
+                  ? 'No days selected'
+                  : `Open ${formData.operating_days.length} day(s) a week`}
+              </p>
+            </div>
+
+            {/* Store Images */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <ImageIcon size={16} className="text-primary" />
+                <h3 className="font-semibold text-sm">Store Images</h3>
+                <span className="text-[10px] text-muted-foreground ml-auto">Optional</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Add a profile photo and cover image to make your store stand out
+              </p>
+              {user && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Profile Photo</Label>
+                    <ImageUpload
+                      value={formData.profile_image_url}
+                      onChange={(url) => setFormData({ ...formData, profile_image_url: url })}
+                      folder="sellers"
+                      userId={user.id}
+                      aspectRatio="square"
+                      placeholder="Profile"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Cover Image</Label>
+                    <ImageUpload
+                      value={formData.cover_image_url}
+                      onChange={(url) => setFormData({ ...formData, cover_image_url: url })}
+                      folder="sellers"
+                      userId={user.id}
+                      aspectRatio="video"
+                      placeholder="Cover"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* What's Next hint */}
+            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
+              <ArrowRight size={12} />
               Next: Add at least one product or service to your catalog
             </p>
 
             <Button
               className="w-full"
               onClick={handleProceedToProducts}
-              disabled={
-                isLoading ||
-                !formData.business_name.trim() ||
-                ((selectedGroupRow as any)?.license_mandatory && (!licenseStatus || licenseStatus === 'rejected'))
-              }
+              disabled={isLoading || formData.operating_days.length === 0}
             >
               {isLoading ? (
                 <Loader2 className="animate-spin mr-2" size={18} />
@@ -805,15 +1033,15 @@ export default function BecomeSellerPage() {
           </div>
         )}
 
-        {/* ═══════════ Step 4: Add Products ════════════ */}
-        {step === 4 && draftSellerId && (
+        {/* ═══════════ Step 5: Add Products ════════════ */}
+        {step === 5 && draftSellerId && (
           <div className="space-y-5">
             <button
-              onClick={() => setStep(3)}
+              onClick={() => setStep(4)}
               className="flex items-center gap-1 text-sm text-muted-foreground"
             >
             <ArrowLeft size={16} />
-              Edit business details
+              Edit store settings
             </button>
 
             <DraftProductManager
@@ -831,7 +1059,7 @@ export default function BecomeSellerPage() {
 
             <Button
               className="w-full"
-              onClick={() => setStep(5)}
+              onClick={() => setStep(6)}
               disabled={draftProducts.length === 0}
             >
               Review & Submit
@@ -840,11 +1068,11 @@ export default function BecomeSellerPage() {
           </div>
         )}
 
-        {/* ═══════════ Step 5: Review & Submit ════════════ */}
-        {step === 5 && (
+        {/* ═══════════ Step 6: Review & Submit ════════════ */}
+        {step === 6 && (
           <div className="space-y-5">
             <button
-              onClick={() => setStep(4)}
+              onClick={() => setStep(5)}
               className="flex items-center gap-1 text-sm text-muted-foreground"
             >
               <ArrowLeft size={16} />
@@ -873,22 +1101,45 @@ export default function BecomeSellerPage() {
                     {formData.availability_start} – {formData.availability_end}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">COD</span>
-                  <span className="font-medium">
-                    {formData.accepts_cod ? 'Yes' : 'No'}
-                  </span>
+                {/* Store Settings summary */}
+                <div className="border-t pt-2 mt-2 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Fulfillment</span>
+                    <span className="font-medium">{fulfillmentLabel}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Payments</span>
+                    <span className="font-medium">{paymentMethods}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Operating Days</span>
+                    <span className="font-medium">
+                      {formData.operating_days.length === 7
+                        ? 'Every day'
+                        : `${formData.operating_days.length} day(s)`}
+                    </span>
+                  </div>
+                  {(formData.profile_image_url || formData.cover_image_url) && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Store Images</span>
+                      <span className="font-medium">
+                        {[formData.profile_image_url && 'Profile', formData.cover_image_url && 'Cover'].filter(Boolean).join(' + ')}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Cross-Society</span>
-                  <span className="font-medium">
-                    {formData.sell_beyond_community ? `Yes (${formData.delivery_radius_km} km)` : 'No'}
-                  </span>
+                <div className="border-t pt-2 mt-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Cross-Society</span>
+                    <span className="font-medium">
+                      {formData.sell_beyond_community ? `Yes (${formData.delivery_radius_km} km)` : 'No'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* License status reminder (if required for this group) */}
+            {/* License status reminder */}
             {draftSellerId && selectedGroupRow && (selectedGroupRow as any).requires_license && licenseStatus && (
               <div className={cn(
                 'rounded-lg p-3 text-sm flex items-center gap-2',
