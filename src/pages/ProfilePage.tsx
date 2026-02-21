@@ -143,7 +143,9 @@ export default function ProfilePage() {
               )}
               <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                 <MapPin size={12} />
-                <span>{profile?.phase && `${profile.phase}, `}Block {profile?.block}, {profile?.flat_number}</span>
+                <span className="line-clamp-2">
+                  {[profile?.flat_number, profile?.block && `Block ${profile.block}`, profile?.phase, society?.name, society?.address].filter(Boolean).join(', ')}
+                </span>
               </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Phone size={12} />
