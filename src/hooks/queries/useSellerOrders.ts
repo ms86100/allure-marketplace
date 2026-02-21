@@ -59,6 +59,7 @@ export function useSellerOrderStats(sellerId: string | null) {
 
         switch (row.status) {
           case 'completed':
+          case 'delivered':
             completedOrders++;
             totalEarnings += amt;
             if (isToday) todayEarnings += amt;

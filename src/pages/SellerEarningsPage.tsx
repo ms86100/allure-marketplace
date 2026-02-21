@@ -56,7 +56,7 @@ export default function SellerEarningsPage() {
       const weekStart = startOfWeek(new Date());
       const monthStart = startOfMonth(new Date());
 
-      const paidPayments = paymentList.filter((p: PaymentRecord) => p.payment_status === 'paid');
+      const paidPayments = paymentList.filter((p: PaymentRecord) => p.payment_status === 'paid' || (p.payment_status === 'pending' && (p as any).order?.status === 'completed'));
       const todayPayments = paidPayments.filter((p: PaymentRecord) => 
         isAfter(parseISO(p.created_at), today)
       );

@@ -172,16 +172,22 @@ export function ProductDetailSheet({
             {showDetails && (
               <div className="space-y-3 animate-fade-in">
                 {/* Quick support badges */}
-                <div className="flex gap-3">
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Shield size={14} className="text-accent" />
-                    <span>24/7 Support</span>
+                {product.fulfillment_mode && (
+                  <div className="flex gap-3">
+                    {product.fulfillment_mode === 'delivery' || product.fulfillment_mode === 'both' ? (
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <Truck size={14} className="text-accent" />
+                        <span>Seller Delivers</span>
+                      </div>
+                    ) : null}
+                    {product.fulfillment_mode === 'self_pickup' || product.fulfillment_mode === 'both' ? (
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <Shield size={14} className="text-accent" />
+                        <span>Self Pickup</span>
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Truck size={14} className="text-accent" />
-                    <span>Fast Delivery</span>
-                  </div>
-                </div>
+                )}
 
                 {/* Fulfillment info */}
                 {product.fulfillment_mode && (

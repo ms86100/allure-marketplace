@@ -226,7 +226,7 @@ function AppRoutes() {
         <Route path="/domestic-help" element={<ProtectedRoute><DomesticHelpPage /></ProtectedRoute>} />
         <Route path="/workforce" element={<ProtectedRoute><WorkforceManagementPage /></ProtectedRoute>} />
         <Route path="/parcels" element={<ProtectedRoute><ParcelManagementPage /></ProtectedRoute>} />
-        <Route path="/guard-kiosk" element={<ProtectedRoute><GuardKioskPage /></ProtectedRoute>} />
+        <Route path="/guard-kiosk" element={<ProtectedRoute><SecurityRoute><GuardKioskPage /></SecurityRoute></ProtectedRoute>} />
         <Route path="/gate-entry" element={<ProtectedRoute><GateEntryPage /></ProtectedRoute>} />
         <Route path="/security/verify" element={<ProtectedRoute><SecurityRoute><SecurityVerifyPage /></SecurityRoute></ProtectedRoute>} />
         <Route path="/security/audit" element={<ProtectedRoute><SecurityRoute><SecurityAuditPage /></SecurityRoute></ProtectedRoute>} />

@@ -8,18 +8,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PartyPopper, X } from 'lucide-react';
 
 export default function HomePage() {
-  const { user, profile, isApproved, isSeller } = useAuth();
+  const { user, profile, isApproved, isSeller, sellerProfiles } = useAuth();
   const { showOnboarding, hasChecked, completeOnboarding } = useOnboarding();
   const [showSellerCongrats, setShowSellerCongrats] = useState(false);
 
   useEffect(() => {
-    if (isSeller && user) {
+    if (isSeller && sellerProfiles?.some((s: any) => s.verification_status === 'approved') && user) {
       const key = `seller_congrats_seen_${user.id}`;
       if (!localStorage.getItem(key)) {
         setShowSellerCongrats(true);
       }
     }
-  }, [isSeller, user]);
+  }, [isSeller, sellerProfiles, user]);
 
   const dismissCongrats = () => {
     if (user) {

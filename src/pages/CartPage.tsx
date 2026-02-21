@@ -148,10 +148,10 @@ export default function CartPage() {
     setPendingOrderIds([]);
   };
 
-  const handleRazorpayFailed = () => {
+  const handleRazorpayFailed = async () => {
     setShowRazorpayCheckout(false);
     for (const orderId of pendingOrderIds) {
-      supabase.from('orders').update({ status: 'cancelled', payment_status: 'failed' }).eq('id', orderId);
+      await supabase.from('orders').update({ status: 'cancelled', payment_status: 'failed' }).eq('id', orderId);
     }
     setPendingOrderIds([]);
     toast.error('Payment failed. Please try again.');
@@ -298,7 +298,7 @@ export default function CartPage() {
         </div>
 
         {/* Coupon */}
-        {sellerGroups.length === 1 && (
+        {sellerGroups.length === 1 ? (
           <div className="mt-5 px-4">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Apply Coupon</h3>
             <CouponInput
@@ -309,7 +309,13 @@ export default function CartPage() {
               appliedCoupon={appliedCoupon}
             />
           </div>
-        )}
+        ) : sellerGroups.length > 1 ? (
+          <div className="mt-5 px-4">
+            <p className="text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">
+              Coupons are not available for multi-seller carts. Place separate orders to use seller-specific coupons.
+            </p>
+          </div>
+        ) : null}
 
         {/* Bill Details */}
         <div className="mt-5 mx-4 bg-muted rounded-xl p-4">

@@ -56,6 +56,23 @@ export function ReorderButton({
         return;
       }
 
+      // Check if user has existing cart items
+      const { data: existingCart } = await supabase
+        .from('cart_items')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1);
+
+      if (existingCart && existingCart.length > 0) {
+        const confirmReplace = window.confirm(
+          'This will replace your current cart items. Continue?'
+        );
+        if (!confirmReplace) {
+          setIsLoading(false);
+          return;
+        }
+      }
+
       await supabase
         .from('cart_items')
         .delete()

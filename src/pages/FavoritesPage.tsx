@@ -107,10 +107,10 @@ function FavoriteSellerCard({ seller, onRemoved }: { seller: any; onRemoved: () 
       <div className="relative rounded-xl border border-border bg-card overflow-hidden">
         {/* Image */}
         <div className="aspect-square bg-muted flex items-center justify-center relative">
-          {seller.logo_url ? (
+          {seller.profile_image_url || seller.cover_image_url ? (
             <img
-              src={seller.logo_url}
-              alt={seller.store_name}
+              src={seller.profile_image_url || seller.cover_image_url}
+              alt={seller.business_name}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -131,7 +131,7 @@ function FavoriteSellerCard({ seller, onRemoved }: { seller: any; onRemoved: () 
         {/* Label */}
         <div className="p-1.5">
           <p className="text-xs font-medium text-foreground truncate leading-tight">
-            {seller.store_name}
+            {seller.business_name}
           </p>
           {seller.profile?.name && (
             <p className="text-[10px] text-muted-foreground truncate">

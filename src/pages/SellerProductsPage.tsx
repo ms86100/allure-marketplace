@@ -260,7 +260,7 @@ export default function SellerProductsPage() {
         image_url: formData.image_url,
         action_type: formData.action_type,
         contact_phone: formData.contact_phone.trim() || null,
-        ...(editingProduct ? {} : { approval_status: 'draft' }),
+        ...(editingProduct ? { approval_status: 'pending' } : { approval_status: 'draft' }),
       };
 
       if (editingProduct) {
