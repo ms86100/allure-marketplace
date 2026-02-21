@@ -28,7 +28,7 @@ import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { ApiKeySettings } from '@/components/admin/ApiKeySettings';
 import { CategoryManager } from '@/components/admin/CategoryManager';
-import { LicenseManager } from '@/components/admin/LicenseManager';
+import { SellerApplicationReview } from '@/components/admin/SellerApplicationReview';
 import { AdminDisputesTab } from '@/components/admin/AdminDisputesTab';
 import { EmergencyBroadcastSheet } from '@/components/admin/EmergencyBroadcastSheet';
 import { logAudit } from '@/lib/audit';
@@ -321,9 +321,8 @@ export default function AdminPage() {
         </div>
 
         <Tabs defaultValue="sellers">
-          <TabsList className="w-full grid grid-cols-6">
+          <TabsList className="w-full grid grid-cols-5">
             <TabsTrigger value="sellers" className="text-[10px]">Sellers</TabsTrigger>
-            <TabsTrigger value="licenses" className="text-[10px]">Licenses</TabsTrigger>
             <TabsTrigger value="products" className="text-[10px]">Products</TabsTrigger>
             <TabsTrigger value="users" className="text-[10px]">Users</TabsTrigger>
             <TabsTrigger value="societies" className="text-[10px]">Societies</TabsTrigger>
@@ -360,37 +359,8 @@ export default function AdminPage() {
             )) : <p className="text-center text-muted-foreground py-8 text-sm">No pending users</p>}
           </TabsContent>
 
-          <TabsContent value="sellers" className="space-y-2 mt-4">
-            <h3 className="text-sm font-semibold text-muted-foreground">Pending Sellers ({pendingSellers.length})</h3>
-            {pendingSellers.length > 0 ? pendingSellers.map((seller) => (
-              <Card key={seller.id}><CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-semibold text-sm">{seller.business_name}</p>
-                    <p className="text-xs text-muted-foreground">{(seller as any).profile?.name} • Block {(seller as any).profile?.block}, Flat {(seller as any).profile?.flat_number}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="text-destructive h-8 w-8 p-0" onClick={() => updateSellerStatus(seller.id, 'rejected')}><X size={14} /></Button>
-                    <Button size="sm" className="h-8 w-8 p-0" onClick={() => updateSellerStatus(seller.id, 'approved')}><Check size={14} /></Button>
-                  </div>
-                </div>
-                {seller.description && (
-                  <p className="text-xs text-muted-foreground">{seller.description}</p>
-                )}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {seller.primary_group && (
-                    <div><span className="text-muted-foreground">Category:</span> <span className="font-medium capitalize">{seller.primary_group.replace(/_/g, ' ')}</span></div>
-                  )}
-                  {seller.categories && seller.categories.length > 0 && (
-                    <div className="col-span-2"><span className="text-muted-foreground">Sub-categories:</span> <span className="font-medium">{seller.categories.map((c: string) => c.replace(/_/g, ' ')).join(', ')}</span></div>
-                  )}
-                  {(seller.availability_start || seller.availability_end) && (
-                    <div><span className="text-muted-foreground">Hours:</span> <span className="font-medium">{seller.availability_start || '—'} – {seller.availability_end || '—'}</span></div>
-                  )}
-                  <div><span className="text-muted-foreground">COD:</span> <span className="font-medium">{seller.accepts_cod ? 'Yes' : 'No'}</span></div>
-                </div>
-              </CardContent></Card>
-            )) : <p className="text-center text-muted-foreground py-8 text-sm">No pending sellers</p>}
+          <TabsContent value="sellers" className="mt-4">
+            <SellerApplicationReview />
           </TabsContent>
 
           <TabsContent value="disputes" className="mt-4">
@@ -626,9 +596,6 @@ export default function AdminPage() {
             <FeatureManagement />
           </TabsContent>
 
-          <TabsContent value="licenses" className="mt-4">
-            <LicenseManager />
-          </TabsContent>
 
           <TabsContent value="settings" className="space-y-4 mt-4">
             <ApiKeySettings />
