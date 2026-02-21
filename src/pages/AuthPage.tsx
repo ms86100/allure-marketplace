@@ -746,38 +746,7 @@ export default function AuthPage() {
                           </div>
                         )}
 
-                        {/* Request society button */}
-                        <button onClick={() => setSocietySubStep('request-form')} className="w-full flex items-center gap-2 p-3 rounded-xl border-2 border-dashed border-muted-foreground/30 text-sm text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors">
-                          <Plus size={16} /> Can't find your society? Request to add it
-                        </button>
-
                         {/* Invite code */}
-                        {selectedSociety?.invite_code && (
-                          <div className="space-y-2">
-                            <Label htmlFor="invite_code" className="flex items-center gap-1"><Key size={14} /> Invite Code *</Label>
-                            <Input id="invite_code" placeholder="Enter society invite code" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} className="h-12 rounded-xl" />
-                            <p className="text-[10px] text-muted-foreground">Your society admin can share this code with you</p>
-                          </div>
-                        )}
-
-                        {/* GPS verification */}
-                        {selectedSociety && (
-                          <div className="space-y-2">
-                            <button onClick={verifyGpsLocation} disabled={gpsStatus === 'loading'} className={`w-full flex items-center gap-2 p-3 rounded-xl border text-sm transition-colors ${
-                              gpsStatus === 'verified' ? 'border-primary/30 bg-primary/5 text-primary' :
-                              gpsStatus === 'failed' ? 'border-warning/30 bg-warning/5 text-warning' :
-                              'border-border hover:border-primary/30 text-muted-foreground hover:text-foreground'
-                            }`}>
-                              <Navigation size={16} className={gpsStatus === 'loading' ? 'animate-spin' : ''} />
-                              {gpsStatus === 'idle' && 'Verify your location (optional)'}
-                              {gpsStatus === 'loading' && 'Checking location...'}
-                              {gpsStatus === 'verified' && `✓ Location verified (${gpsDistance}m away)`}
-                              {gpsStatus === 'failed' && `Location check failed${gpsDistance ? ` (${gpsDistance}m away)` : ''}`}
-                              {gpsStatus === 'unavailable' && 'GPS not available for this society'}
-                            </button>
-                            <p className="text-[10px] text-muted-foreground text-center">Location verification helps speed up admin approval</p>
-                          </div>
-                        )}
 
                         {/* Navigation buttons */}
                         <div className="flex gap-2">
