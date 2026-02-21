@@ -1,152 +1,139 @@
 
 
-# Design Thinking Integrity Audit -- Implementation Plan
+# Design Thinking KPI Audit -- Gap Analysis & Improvement Plan (Round 2)
 
-## Design Thinking Maturity Scores
+## Design Thinking Maturity Scores (Post-Previous Fixes)
 
-| Phase | Score | Rationale |
-|-------|-------|-----------|
-| Empathize | Medium | Good empty states and offline banner, but error messages are generic; waiting states lack reassurance; no contextual help. |
-| Define | Medium | Core flows are clear, but several screens mix responsibilities; some mandatory actions lack explanation (e.g., age checkbox, invite code). |
-| Ideate | Low | Most flows are linear with no save/resume, no undo, limited recovery; seller onboarding is the only flow with drafts. |
-| Prototype | Medium | Seller flow has drafts and incremental saves; buyer flows (cart, checkout) have no confirmation or preview before commitment. |
-| Test | Low | No in-app feedback mechanism; no NPS/CSAT prompt; error handling is silent in many places; no post-action learning signals. |
-
----
-
-## Key Gaps and Implementation Plan
-
-### Gap 1 -- Verification Pending: No Reassurance or Next Steps (Empathize)
-**Problem:** After signup, users land on `VerificationPendingScreen` with "Your community admin will verify your details shortly" -- no estimated time, no way to contact support, no "what to do next." Users feel abandoned.
-
-**User impact:** Anxiety, app abandonment during the critical first session.
-
-**Fix:**
-- Add a "What happens next?" expandable section explaining the process in plain language
-- Add a "Need help?" link to the Help page or a support email
-- Add a subtle auto-refresh that checks verification status every 60s with a toast when approved
-
-**Files:** `src/components/onboarding/VerificationPendingScreen.tsx`
-**Risk:** Low
-**Measure:** Reduction in support queries about "stuck verification"
+| Phase | Previous | Current | Rationale |
+|-------|----------|---------|-----------|
+| Empathize | Medium | Medium-High | Verification screen, order reassurance, and signup helper text now exist. But `friendlyError` was created and never adopted -- 130+ raw `error.message` toast calls remain across 19 files. |
+| Define | Medium | Medium-High | Helper text on signup fields added. Seller rejection guidance exists. Minor gaps remain in dispute and bulletin flows. |
+| Ideate | Low | Medium | Cart persistence is DB-backed. Seller drafts exist. But no undo on cancellation and no "save for later" from cart to favorites. |
+| Prototype | Medium | High | Order confirmation dialog added. Seller draft flow is strong. Minor: no preview before bulletin post submission. |
+| Test | Low | Medium | Feedback mechanism added. But feedback sheet is only on Profile page, not contextually triggered after key moments (post-order, post-cancellation). |
 
 ---
 
-### Gap 2 -- Checkout Has No Order Confirmation Step (Prototype)
-**Problem:** Tapping "Place Order" on `CartPage` immediately creates the order. There is no confirmation dialog showing a summary (items, address, payment method, total). Users who accidentally tap have no recovery.
+## Remaining / New Gaps
 
-**User impact:** Mistrust, accidental orders, increased cancellations.
+### Gap A -- friendlyError Utility Created But Never Adopted (Empathize)
+
+**Problem:** The `friendlyError()` function in `src/lib/utils.ts` was built in the previous round but is imported by zero files. There are 130+ instances of `toast.error(error.message || '...')` across 19 files showing raw technical errors to users.
+
+**User impact:** Users still see "row-level security policy violation" and other system jargon. The fix from the previous round is incomplete.
 
 **Fix:**
-- Add an `AlertDialog` confirmation before `handlePlaceOrder` fires
-- Show: item count, total, payment method, delivery address in the dialog
-- Two buttons: "Review Cart" (dismiss) and "Confirm Order"
+- Replace `toast.error(error.message || '...')` with `toast.error(friendlyError(error))` in the 8 highest-traffic files:
+  - `CartPage.tsx` (2 instances)
+  - `AuthPage.tsx` (3 instances)
+  - `BecomeSellerPage.tsx` (2 instances)
+  - `OrderDetailPage.tsx` (1 instance)
+  - `SellerDashboardPage.tsx` (1 instance)
+  - `SellerProductsPage.tsx` (1 instance)
+  - `SellerSettingsPage.tsx` (1 instance)
+  - `GateEntryPage.tsx` (1 instance)
 
-**Files:** `src/pages/CartPage.tsx`
-**Risk:** Low
-**Measure:** Reduction in immediate cancellations (orders cancelled < 30s after placement)
+**Risk:** Low -- purely additive string mapping
+**Measure:** Zero raw technical error strings shown to users in core flows
 
 ---
 
-### Gap 3 -- Error Messages Are Generic and System-Centric (Empathize)
-**Problem:** Many `catch` blocks show `error.message` directly (e.g., "row-level security policy violation," "JWT expired"). These are meaningless to non-technical users.
+### Gap B -- No Contextual Feedback Prompts After Key Moments (Test)
 
-**User impact:** Confusion, loss of trust, inability to self-recover.
+**Problem:** The `FeedbackSheet` only appears as a menu item on the Profile page. Users are never prompted to share feedback at natural moments of delight or frustration (after completing an order, after a cancellation, after first purchase).
 
-**Fix:**
-- Create a utility `friendlyError(error)` in `src/lib/utils.ts` that maps common Supabase/network errors to human-readable messages
-- Map patterns: "JWT" -> "Your session expired. Please log in again.", "row-level security" -> "You don't have permission for this action.", "NetworkError" -> "Please check your internet connection."
-- Replace raw `error.message` in key flows: auth, cart, orders, seller dashboard
-
-**Files:** `src/lib/utils.ts` (new function), `src/pages/AuthPage.tsx`, `src/pages/CartPage.tsx`, `src/pages/OrderDetailPage.tsx`, `src/pages/SellerDashboardPage.tsx`
-**Risk:** Low
-**Measure:** Reduction in user-reported "weird error" support tickets
-
----
-
-### Gap 4 -- No In-App Feedback Mechanism (Test)
-**Problem:** There is zero mechanism for users to share feedback, report bugs, or rate their experience inside the app. The product cannot learn or iterate based on user signals.
-
-**User impact:** Users with issues silently churn; product team has no qualitative signal.
+**User impact:** Low feedback volume; product team misses signals from the moments that matter most.
 
 **Fix:**
-- Add a "Feedback" menu item on `ProfilePage` that opens a simple sheet
-- Sheet contains: a 5-star emoji rating, a text area ("Tell us more"), and a submit button
-- Store in a new `user_feedback` table (user_id, rating, message, page_context, created_at)
-- Show a warm "Thank you" toast after submission
-
-**Files:** New `src/components/feedback/FeedbackSheet.tsx`, `src/pages/ProfilePage.tsx` (add link), new DB migration for `user_feedback` table
-**Risk:** Low
-**Measure:** Volume of feedback submissions per week
-
----
-
-### Gap 5 -- Seller Rejection Has No Guidance (Empathize + Test)
-**Problem:** When a seller application is rejected, there is no visible explanation or "what to do next" guidance. The `BecomeSellerPage` shows existing seller status but doesn't surface rejection reasons or offer a retry path.
-
-**User impact:** Frustration, feeling of unfairness, permanent drop-off from seller funnel.
-
-**Fix:**
-- On the seller dashboard / become-seller page, if `verification_status === 'rejected'`, show a card explaining:
-  - "Your application was not approved"
-  - The rejection reason (from `rejection_reason` column if it exists)
-  - "You can update your details and resubmit"
-  - A button to re-enter the seller onboarding flow
-
-**Files:** `src/pages/BecomeSellerPage.tsx`, `src/pages/SellerDashboardPage.tsx`
-**Risk:** Low
-**Measure:** Seller resubmission rate after rejection
-
----
-
-### Gap 6 -- Onboarding Lacks Contextual Explanation for Mandatory Fields (Define)
-**Problem:** During signup, fields like "Block," "Flat Number," and "Invite Code" are required but have no tooltip or helper text explaining why. The age confirmation checkbox ("I confirm I am 18+") appears without context on why age matters.
-
-**User impact:** Hesitation, privacy concerns, form abandonment.
-
-**Fix:**
-- Add brief helper text under sensitive fields:
-  - Block/Flat: "Used for delivery and identity verification within your society"
-  - Invite Code: "Your society admin can share this code with you"
-  - Age: "Required to comply with marketplace regulations"
-
-**Files:** `src/pages/AuthPage.tsx`
-**Risk:** Low
-**Measure:** Signup completion rate improvement
-
----
-
-### Gap 7 -- Order Status Has No Proactive Communication (Test)
-**Problem:** After placing an order, the `OrderDetailPage` shows a static status timeline. There is no proactive reassurance message like "Your seller usually responds within 5 minutes" or "Preparing typically takes 15-20 min."
-
-**User impact:** Anxiety during wait times, unnecessary seller calls/chats.
-
-**Fix:**
-- Below the status timeline card, add a contextual reassurance message based on current status:
-  - "Placed": "Waiting for seller to accept. Most sellers respond within 5 minutes."
-  - "Accepted": "Great! Your order has been confirmed."
-  - "Preparing": "Your order is being prepared. Sit tight!"
-  - "Ready": "Your order is ready! Head to pickup or wait for delivery."
+- After a completed/delivered order on `OrderDetailPage`, show a subtle "How was your experience?" prompt (only once per order, using localStorage key `feedback_prompted_{orderId}`)
+- Use the existing `FeedbackSheet` component, triggered via a small card below the review CTA
 
 **Files:** `src/pages/OrderDetailPage.tsx`
 **Risk:** Low
-**Measure:** Reduction in chat messages during "placed" status
+**Measure:** Increase in feedback submissions per week
 
 ---
 
-### Gap 8 -- Cart Cannot Be Saved or Shared (Ideate)
-**Problem:** The cart exists only in local state. If a user closes the app or switches devices, the cart is lost. There is no "save for later" or wishlist integration from the cart.
+### Gap C -- Bulletin Post Has No Preview Before Submission (Prototype)
 
-**User impact:** Frustration, lost purchase intent, re-browsing friction.
+**Problem:** When creating a bulletin post via `CreatePostSheet`, tapping "Post" immediately publishes. There is no preview of how the post will appear, and no confirmation step. Accidental or poorly formatted posts cannot be caught.
+
+**User impact:** Regret, embarrassment, need to delete and re-post.
 
 **Fix:**
-- Persist cart to the database (already uses `useCart` hook -- check if it's DB-backed or localStorage)
-- If localStorage only: migrate to a `cart_items` table with `user_id`, `product_id`, `quantity`
-- Add a "Save for later" action on individual cart items that moves them to favorites
+- Add a brief confirmation step or a preview card inside `CreatePostSheet` before the final submit action
+- Show the formatted title, body preview (first 100 chars), and category tag
 
-**Files:** `src/hooks/useCart.tsx`, potential DB migration
-**Risk:** Medium (requires checking current cart persistence mechanism)
-**Measure:** Cart recovery rate across sessions
+**Files:** `src/components/bulletin/CreatePostSheet.tsx`
+**Risk:** Low
+**Measure:** Reduction in posts deleted within 60 seconds of creation
+
+---
+
+### Gap D -- No Undo Window After Order Cancellation (Ideate)
+
+**Problem:** When a buyer cancels an order via `OrderCancellation`, it is immediately and permanently cancelled. There is no brief undo window ("Order cancelled. Undo?") even though the seller may not have started preparing.
+
+**User impact:** Regret, anxiety from irreversibility, support requests to "un-cancel."
+
+**Fix:**
+- After successful cancellation, show a toast with an "Undo" action button that lasts 5 seconds
+- If user taps "Undo," revert the order status back to its previous state
+- If the toast dismisses, the cancellation is final
+
+**Files:** `src/components/order/OrderCancellation.tsx`
+**Risk:** Medium -- requires storing previous status and reverting
+**Measure:** Undo usage rate and reduction in "un-cancel" support requests
+
+---
+
+### Gap E -- Empty States Lack Actionable Guidance (Empathize + Define)
+
+**Problem:** Several empty states show a generic message with no actionable next step:
+- `DisputesPage`: "No concerns yet" with no explanation of what disputes are for
+- `OrdersPage` (seller tab): "No orders received yet" with no guidance on how to get orders
+- `SellerDashboardPage`: "You haven't set up your seller profile yet" -- single CTA, no context
+
+**User impact:** Confusion about feature purpose; sellers don't know why they have no orders.
+
+**Fix:**
+- Disputes empty state: Add "Use this to raise concerns about orders, payments, or community issues"
+- Seller orders empty: Add "Share your store link with neighbors to get your first order"
+- Seller dashboard no profile: Add brief value proposition "Sell homemade food, groceries, or services to your community"
+
+**Files:** `src/pages/DisputesPage.tsx`, `src/pages/OrdersPage.tsx`, `src/pages/SellerDashboardPage.tsx`
+**Risk:** Low
+**Measure:** Feature discovery rate for disputes; seller activation rate
+
+---
+
+### Gap F -- Search Returns No Results Without Guidance (Empathize)
+
+**Problem:** When search returns zero results on `SearchPage`, the empty state says "No products found" with no suggestions for recovery (try different keywords, browse categories, expand to nearby communities).
+
+**User impact:** Dead end, user leaves the app.
+
+**Fix:**
+- When results are empty, show:
+  - "Try searching for something else, or browse by category below"
+  - Show category quick-filter chips as recovery actions
+  - If `browseBeyond` is off, suggest "Enable nearby communities to see more"
+
+**Files:** `src/pages/SearchPage.tsx`
+**Risk:** Low
+**Measure:** Reduction in search abandonment (search followed by app close)
+
+---
+
+## Design Thinking KPIs
+
+| Phase | Currently Measured | Should Measure | Missing Signal |
+|-------|-------------------|----------------|----------------|
+| Empathize | None | Error message clarity rate; first-session drop-off | User confusion events (tapping help, repeated errors) |
+| Define | None | Feature discovery rate per screen | Screens where users navigate away within 3 seconds |
+| Ideate | None | Draft save-and-resume rate; undo usage | Flows abandoned mid-way |
+| Prototype | None | Confirmation dialog completion rate | Preview-to-submit ratio |
+| Test | Feedback table exists | Feedback volume per week; contextual feedback rate | Post-order feedback; post-cancellation feedback |
 
 ---
 
@@ -154,14 +141,39 @@
 
 | Priority | Gap | Effort | Impact |
 |----------|-----|--------|--------|
-| 1 | Gap 2 -- Order Confirmation Dialog | Small | High |
-| 2 | Gap 3 -- Friendly Error Messages | Small | High |
-| 3 | Gap 1 -- Verification Reassurance | Small | High |
-| 4 | Gap 7 -- Order Status Reassurance | Small | Medium |
-| 5 | Gap 6 -- Signup Field Context | Small | Medium |
-| 6 | Gap 5 -- Seller Rejection Guidance | Small | Medium |
-| 7 | Gap 4 -- Feedback Mechanism | Medium | High |
-| 8 | Gap 8 -- Cart Persistence | Medium | Medium |
+| 1 | Gap A -- Adopt friendlyError across 8 files | Small | High |
+| 2 | Gap E -- Actionable empty states | Small | Medium |
+| 3 | Gap F -- Search recovery guidance | Small | Medium |
+| 4 | Gap B -- Contextual feedback prompts | Small | Medium |
+| 5 | Gap C -- Bulletin post preview | Small | Low |
+| 6 | Gap D -- Cancellation undo window | Medium | Medium |
 
-All changes are additive, non-breaking, and focused on clarity, empathy, and feedback -- consistent with Design Thinking principles.
+---
+
+## Technical Details
+
+### Gap A -- friendlyError adoption
+Import `friendlyError` from `@/lib/utils` in each file and replace patterns like:
+```
+toast.error(error.message || 'Failed to X');
+```
+with:
+```
+toast.error(friendlyError(error));
+```
+
+### Gap B -- Contextual feedback
+Reuse existing `FeedbackSheet` component. Add a state-driven trigger card on `OrderDetailPage` when `order.status === 'completed'` and `!localStorage.getItem('feedback_prompted_' + order.id)`.
+
+### Gap D -- Undo cancellation
+In `OrderCancellation.tsx`, after successful cancel:
+```typescript
+toast('Order cancelled', {
+  action: { label: 'Undo', onClick: () => revertCancel(previousStatus) },
+  duration: 5000,
+});
+```
+
+### Gap E/F -- Copy changes only
+Pure text/JSX additions, no logic changes required.
 
