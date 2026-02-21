@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
-import { ImageUpload } from '@/components/ui/image-upload';
+import { CroppableImageUpload } from '@/components/ui/croppable-image-upload';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile, ProductCategory, DAYS_OF_WEEK } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
@@ -347,7 +347,7 @@ export default function SellerSettingsPage() {
                 <Label className="text-xs text-muted-foreground mb-2 block">Cover Image</Label>
                 {user && (
                   <div className="max-h-48 max-w-full">
-                    <ImageUpload
+                    <CroppableImageUpload
                       value={formData.cover_image_url}
                       onChange={(url) => setFormData({ ...formData, cover_image_url: url })}
                       folder="sellers"
@@ -355,6 +355,7 @@ export default function SellerSettingsPage() {
                       aspectRatio="video"
                       placeholder="Upload cover photo"
                       className="max-h-48"
+                      cropAspect={16 / 9}
                     />
                   </div>
                 )}
@@ -363,13 +364,14 @@ export default function SellerSettingsPage() {
                 <Label className="text-xs text-muted-foreground mb-2 block">Profile Photo</Label>
                 {user && (
                   <div className="max-w-[160px]">
-                    <ImageUpload
+                    <CroppableImageUpload
                       value={formData.profile_image_url}
                       onChange={(url) => setFormData({ ...formData, profile_image_url: url })}
                       folder="sellers"
                       userId={user.id}
                       aspectRatio="square"
                       placeholder="Upload profile photo"
+                      cropAspect={1}
                     />
                   </div>
                 )}

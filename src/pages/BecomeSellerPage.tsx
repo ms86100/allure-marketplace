@@ -13,7 +13,7 @@ import { useParentGroups } from '@/hooks/useParentGroups';
 import { ServiceCategory } from '@/types/categories';
 import { DraftProductManager } from '@/components/seller/DraftProductManager';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
-import { ImageUpload } from '@/components/ui/image-upload';
+import { CroppableImageUpload } from '@/components/ui/croppable-image-upload';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -1068,24 +1068,26 @@ export default function BecomeSellerPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground">Profile Photo</Label>
-                    <ImageUpload
+                    <CroppableImageUpload
                       value={formData.profile_image_url}
                       onChange={(url) => setFormData({ ...formData, profile_image_url: url })}
                       folder="sellers"
                       userId={user.id}
                       aspectRatio="square"
                       placeholder="Profile"
+                      cropAspect={1}
                     />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground">Cover Image</Label>
-                    <ImageUpload
+                    <CroppableImageUpload
                       value={formData.cover_image_url}
                       onChange={(url) => setFormData({ ...formData, cover_image_url: url })}
                       folder="sellers"
                       userId={user.id}
                       aspectRatio="video"
                       placeholder="Cover"
+                      cropAspect={16 / 9}
                     />
                   </div>
                 </div>
