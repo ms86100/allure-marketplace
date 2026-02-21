@@ -762,6 +762,7 @@ export default function BecomeSellerPage() {
                   <LicenseUpload
                     sellerId={draftSellerId}
                     groupId={selectedGroupRow.id}
+                    isOnboarding={true}
                     onStatusChange={(status) => {
                       setLicenseStatus(status);
                     }}

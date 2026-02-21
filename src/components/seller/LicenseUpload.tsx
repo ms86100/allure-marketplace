@@ -14,6 +14,7 @@ interface LicenseUploadProps {
   sellerId: string;
   groupId: string;
   onStatusChange?: (status: string | null) => void;
+  isOnboarding?: boolean;
 }
 
 interface GroupLicenseConfig {
@@ -31,7 +32,7 @@ interface LicenseRecord {
   admin_notes: string | null;
 }
 
-export function LicenseUpload({ sellerId, groupId, onStatusChange }: LicenseUploadProps) {
+export function LicenseUpload({ sellerId, groupId, onStatusChange, isOnboarding = false }: LicenseUploadProps) {
   const { user } = useAuth();
   const [config, setConfig] = useState<GroupLicenseConfig | null>(null);
   const [license, setLicense] = useState<LicenseRecord | null>(null);
@@ -193,7 +194,14 @@ export function LicenseUpload({ sellerId, groupId, onStatusChange }: LicenseUplo
           </div>
         )}
 
-        {currentStatus === 'pending' && (
+        {currentStatus === 'pending' && isOnboarding && (
+          <div className="bg-success/10 rounded-lg p-3 text-sm text-success flex items-center gap-2">
+            <Check size={16} />
+            License uploaded successfully! You can continue setting up your store.
+          </div>
+        )}
+
+        {currentStatus === 'pending' && !isOnboarding && (
           <div className="bg-warning/10 rounded-lg p-3 text-sm text-warning flex items-center gap-2">
             <Clock size={16} />
             Your license is being reviewed by the admin.
