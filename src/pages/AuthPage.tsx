@@ -164,7 +164,12 @@ export default function AuthPage() {
       if (error) throw error;
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user?.id).single();
       if (profile) { toast.success('Welcome back!'); navigate('/'); }
-      else { setAuthMode('signup'); setSignupStep('society'); }
+      else {
+        // User has auth credentials but no profile — this is an orphaned account.
+        // Sign them out and show a clear error instead of redirecting to signup.
+        await supabase.auth.signOut();
+        toast.error('Your account setup is incomplete. Please sign up again with a new account, or contact support.', { duration: 8000 });
+      }
     } catch (error: any) {
       if (error.message.includes('Email not confirmed')) {
         toast.error('Your email is not verified yet. Please check your inbox and click the verification link before logging in.', { duration: 6000 });
@@ -331,7 +336,13 @@ export default function AuthPage() {
             toast.error('This phone number is already in use by another account.');
             return;
           }
-          console.warn('Profile creation during signup failed, will be auto-created on login:', e);
+          // Profile creation failed for a non-duplicate reason — do NOT proceed silently.
+          // Sign out the orphaned auth user and ask user to retry.
+          console.error('Profile creation during signup failed:', e);
+          await supabase.auth.signOut();
+          toast.error('Account setup failed. Please try signing up again. If the problem persists, contact support.', { duration: 8000 });
+          setIsLoading(false);
+          return;
         }
         setSignupStep('verification');
         toast.success('Please check your email to verify your account');
