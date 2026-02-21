@@ -277,6 +277,17 @@ export function ProductDetailSheet({
             </Link>
           </div>
 
+          {/* Report button — above sticky CTA */}
+          <div className="px-6 pb-3">
+            <button
+              onClick={() => { onOpenChange(false); setReportOpen(true); }}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <Flag size={12} />
+              Report this product
+            </button>
+          </div>
+
           {/* Sticky bottom CTA — Blinkit style */}
           <div className="sticky bottom-0 bg-background border-t border-border p-4">
             {isCartAction ? (
@@ -309,16 +320,6 @@ export function ProductDetailSheet({
             )}
           </div>
 
-          {/* Report button */}
-          <div className="px-6 pb-4">
-            <button
-              onClick={() => { onOpenChange(false); setReportOpen(true); }}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"
-            >
-              <Flag size={12} />
-              Report this product
-            </button>
-          </div>
         </SheetContent>
       </Sheet>
 

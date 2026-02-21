@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { PaymentMethodSelector } from '@/components/payment/PaymentMethodSelector';
 import { RazorpayCheckout } from '@/components/payment/RazorpayCheckout';
 import { CouponInput } from '@/components/cart/CouponInput';
@@ -228,9 +228,23 @@ export default function CartPage() {
             <h1 className="text-base font-bold">Checkout</h1>
             <p className="text-xs text-muted-foreground">Shipment of {itemCount} item{itemCount !== 1 ? 's' : ''}</p>
           </div>
-          <Button variant="ghost" size="sm" className="text-destructive text-xs h-7 px-2" onClick={clearCart}>
-            Clear
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="text-destructive text-xs h-7 px-2">
+                Clear
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear cart?</AlertDialogTitle>
+                <AlertDialogDescription>This will remove all items from your cart. This action cannot be undone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={clearCart} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Clear All</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         {/* Delivery Time Card */}

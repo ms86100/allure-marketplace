@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { Mail, ArrowRight, Loader2, Eye, EyeOff, CheckCircle2, User, Search, MapPin, Building2, Plus, Navigation, Key, ShieldCheck, Sparkles, Home, ArrowLeft, Phone } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { motion, AnimatePresence } from 'framer-motion';
 import authHero from '@/assets/auth-hero.jpg';
 import { Society } from '@/types/database';
@@ -558,13 +559,12 @@ export default function AuthPage() {
                     </div>
                     <PasswordStrengthIndicator password={password} />
                   </div>
-                  <div className="flex items-start gap-2 pt-1">
-                    <input
-                      type="checkbox"
+                  <div className="flex items-start gap-3 pt-1">
+                    <Checkbox
                       id="age-confirm"
                       checked={ageConfirmed}
-                      onChange={(e) => setAgeConfirmed(e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-input accent-primary"
+                      onCheckedChange={(checked) => setAgeConfirmed(checked === true)}
+                      className="mt-0.5"
                     />
                     <div>
                       <label htmlFor="age-confirm" className="text-xs text-muted-foreground leading-snug">
@@ -589,6 +589,9 @@ export default function AuthPage() {
               {/* Signup Step 2: Society Selection */}
               {authMode === 'signup' && signupStep === 'society' && (
                 <motion.div key="signup-society" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25, ease: 'easeInOut' }} className="space-y-4">
+                  <button type="button" onClick={() => setSignupStep('credentials')} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-1">
+                    <ArrowLeft size={16} /> Back
+                  </button>
                   <AnimatePresence mode="wait">
 
                     {/* Sub-step: Request Form */}
@@ -775,6 +778,9 @@ export default function AuthPage() {
               {/* Signup Step 3: Profile Details */}
               {authMode === 'signup' && signupStep === 'profile' && (
                 <motion.div key="signup-profile" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25, ease: 'easeInOut' }} className="space-y-4">
+                  <button type="button" onClick={() => setSignupStep('society')} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-1">
+                    <ArrowLeft size={16} /> Back
+                  </button>
                   {selectedSociety && (
                     <div className="flex items-center gap-2 p-2.5 bg-primary/5 rounded-xl border border-primary/20">
                       <Building2 size={14} className="text-primary" />
