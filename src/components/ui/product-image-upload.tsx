@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { Loader2, Sparkles, Upload } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ImageUpload } from '@/components/ui/image-upload';
+import { CroppableImageUpload } from '@/components/ui/croppable-image-upload';
 
 interface ProductImageUploadProps {
   value?: string | null;
@@ -80,7 +80,7 @@ export function ProductImageUpload({
   // If already has a value, show the standard upload component (which has change/remove)
   if (value) {
     return (
-      <ImageUpload
+      <CroppableImageUpload
         value={value}
         onChange={onChange}
         folder="products"
@@ -88,6 +88,7 @@ export function ProductImageUpload({
         aspectRatio="square"
         placeholder="Upload product photo"
         className={className}
+        cropAspect={1}
       />
     );
   }
@@ -106,13 +107,14 @@ export function ProductImageUpload({
       </TabsList>
 
       <TabsContent value="upload" className="mt-2">
-        <ImageUpload
+        <CroppableImageUpload
           value={value}
           onChange={onChange}
           folder="products"
           userId={userId}
-          aspectRatio="video"
+          aspectRatio="square"
           placeholder="Upload product photo"
+          cropAspect={1}
         />
       </TabsContent>
 
