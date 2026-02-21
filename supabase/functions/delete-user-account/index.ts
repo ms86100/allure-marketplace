@@ -51,6 +51,20 @@ Deno.serve(async (req) => {
       { table: 'reviews', column: 'buyer_id' },
       { table: 'warnings', column: 'user_id' },
       { table: 'reports', column: 'reporter_id' },
+      { table: 'bulletin_votes', column: 'user_id' },
+      { table: 'bulletin_rsvps', column: 'user_id' },
+      { table: 'bulletin_comments', column: 'author_id' },
+      { table: 'bulletin_posts', column: 'author_id' },
+      { table: 'help_responses', column: 'responder_id' },
+      { table: 'help_requests', column: 'author_id' },
+      { table: 'notification_queue', column: 'user_id' },
+      { table: 'dispute_comments', column: 'author_id' },
+      { table: 'expense_views', column: 'user_id' },
+      { table: 'expense_flags', column: 'flagged_by' },
+      { table: 'skill_endorsements', column: 'endorser_id' },
+      { table: 'skill_listings', column: 'user_id' },
+      { table: 'society_admins', column: 'user_id' },
+      { table: 'security_staff', column: 'user_id' },
     ];
 
     for (const { table, column } of cleanupTables) {

@@ -75,10 +75,11 @@ const config: CapacitorConfig = {
     scheme: 'sociva',
     contentInset: 'automatic',
     preferredContentMode: 'mobile',
-    // Skip App Store encryption compliance prompt — app only uses HTTPS (Apple's built-in TLS)
-    // All custom crypto (AES-GCM) runs server-side in edge functions, not in the app binary
     plistOverrides: {
       ITSAppUsesNonExemptEncryption: false,
+      NSLocationWhenInUseUsageDescription: 'Sociva uses your location to verify your residential society membership and show nearby sellers.',
+      NSCameraUsageDescription: 'Sociva needs camera access to let you photograph products for listing and upload profile pictures.',
+      NSPhotoLibraryUsageDescription: 'Sociva needs photo library access to let you select images for product listings and your profile.',
     },
   },
 
