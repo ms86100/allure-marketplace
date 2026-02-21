@@ -8,6 +8,17 @@ import { toast } from '@/hooks/use-toast';
 import { Pause, Play, X, RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface Subscription {
   id: string;
@@ -98,19 +109,37 @@ export default function MySubscriptionsPage() {
               )}
               <div className="flex gap-2">
                 {sub.status === 'active' && (
-                  <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => updateStatus(sub.id, 'paused')}>
+                  <Button variant="outline" className="gap-1 text-xs" onClick={() => updateStatus(sub.id, 'paused')}>
                     <Pause size={12} /> Pause
                   </Button>
                 )}
                 {sub.status === 'paused' && (
-                  <Button variant="outline" size="sm" className="gap-1 text-xs" onClick={() => updateStatus(sub.id, 'active')}>
+                  <Button variant="outline" className="gap-1 text-xs" onClick={() => updateStatus(sub.id, 'active')}>
                     <Play size={12} /> Resume
                   </Button>
                 )}
                 {sub.status !== 'cancelled' && (
-                  <Button variant="ghost" size="sm" className="gap-1 text-xs text-destructive" onClick={() => updateStatus(sub.id, 'cancelled')}>
-                    <X size={12} /> Cancel
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" className="gap-1 text-xs text-destructive">
+                        <X size={14} /> Cancel
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will cancel your subscription for {sub.product?.name}. You can subscribe again later from the seller's page.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => updateStatus(sub.id, 'cancelled')}>
+                          Yes, Cancel
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 )}
               </div>
             </div>

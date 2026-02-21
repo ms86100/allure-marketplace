@@ -26,7 +26,7 @@ export default function NotificationInboxPage() {
       <div className="p-4">
         {unreadCount > 0 && (
           <div className="flex justify-end mb-3">
-            <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => user && markAllRead.mutate(user.id)}>
+            <Button variant="ghost" className="text-sm gap-1" onClick={() => user && markAllRead.mutate(user.id)}>
               <CheckCheck size={14} /> Mark all read
             </Button>
           </div>

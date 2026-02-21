@@ -15,7 +15,7 @@ export default function WorkerHirePage() {
         <div className="p-4 pb-24">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Your Job Requests</h2>
-            <Button size="sm" onClick={() => navigate('/worker-hire/create')}>
+            <Button onClick={() => navigate('/worker-hire/create')}>
               <Plus size={16} className="mr-1" /> Post Job
             </Button>
           </div>
