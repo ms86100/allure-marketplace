@@ -135,7 +135,7 @@ export default function BecomeSellerPage() {
       try {
         const { data } = await supabase
           .from('seller_profiles')
-          .select('id, business_name, primary_group, verification_status')
+          .select('*')
           .eq('user_id', user.id);
 
         if (data && data.length > 0) {
@@ -145,7 +145,24 @@ export default function BecomeSellerPage() {
           if (draft) {
             setDraftSellerId(draft.id);
             setSelectedGroup(draft.primary_group);
-            setFormData((f) => ({ ...f, business_name: draft.business_name }));
+            setFormData((f) => ({
+              ...f,
+              business_name: draft.business_name || '',
+              description: draft.description || '',
+              categories: draft.categories || [],
+              availability_start: draft.availability_start || '09:00',
+              availability_end: draft.availability_end || '21:00',
+              accepts_cod: draft.accepts_cod ?? true,
+              sell_beyond_community: draft.sell_beyond_community ?? false,
+              delivery_radius_km: draft.delivery_radius_km ?? 5,
+              fulfillment_mode: draft.fulfillment_mode || 'self_pickup',
+              delivery_note: draft.delivery_note || '',
+              accepts_upi: draft.accepts_upi ?? false,
+              upi_id: draft.upi_id || '',
+              operating_days: draft.operating_days || [...DAYS_OF_WEEK],
+              profile_image_url: draft.profile_image_url || null,
+              cover_image_url: draft.cover_image_url || null,
+            }));
             const { data: prods } = await supabase
               .from('products')
               .select('*')
@@ -216,6 +233,7 @@ export default function BecomeSellerPage() {
   useEffect(() => {
     if (step !== 3) return;
     if (draftSellerId) return;
+    if (isCheckingExisting) return; // Guard: don't auto-save while initial check is in flight
     if (!formData.business_name.trim()) return;
     if (!selectedGroup) return;
     const groupRow = groups.find((g) => g.slug === selectedGroup);
@@ -360,6 +378,14 @@ export default function BecomeSellerPage() {
     }
     if (!acceptedDeclaration) {
       toast.error('Please accept the seller declaration');
+      return;
+    }
+    if (formData.operating_days.length === 0) {
+      toast.error('Please select at least one operating day');
+      return;
+    }
+    if (formData.accepts_upi && !formData.upi_id.trim()) {
+      toast.error('Please enter your UPI ID or disable UPI payments');
       return;
     }
 
@@ -1034,6 +1060,19 @@ export default function BecomeSellerPage() {
         )}
 
         {/* ═══════════ Step 5: Add Products ════════════ */}
+        {step === 5 && !draftSellerId && (
+          <div className="space-y-5 text-center py-8">
+            <div className="w-16 h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
+              <Package size={24} className="text-destructive" />
+            </div>
+            <h3 className="text-lg font-semibold">Unable to load your store</h3>
+            <p className="text-sm text-muted-foreground">Your store draft could not be found. Please go back and try again.</p>
+            <Button variant="outline" onClick={() => setStep(3)}>
+              <ArrowLeft size={16} className="mr-1" />
+              Go Back
+            </Button>
+          </div>
+        )}
         {step === 5 && draftSellerId && (
           <div className="space-y-5">
             <button

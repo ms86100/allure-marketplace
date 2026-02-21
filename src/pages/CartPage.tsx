@@ -91,12 +91,41 @@ export default function CartPage() {
   const handlePlaceOrderInner = async () => {
     if (!user || !profile || sellerGroups.length === 0) return;
 
+    // Pre-checkout: validate product availability
+    setIsPlacingOrder(true);
+    try {
+      const productIds = items.map(i => i.product_id);
+      const { data: freshProducts, error: freshError } = await supabase
+        .from('products')
+        .select('id, is_available, approval_status, seller_id')
+        .in('id', productIds);
+
+      if (freshError) throw freshError;
+
+      const unavailable = items.filter(item => {
+        const fresh = freshProducts?.find(p => p.id === item.product_id);
+        return !fresh || !fresh.is_available || fresh.approval_status !== 'approved';
+      });
+
+      if (unavailable.length > 0) {
+        const names = unavailable.map(i => i.product?.name || 'Unknown').join(', ');
+        toast.error(`Some items are no longer available: ${names}. Please remove them and try again.`);
+        await refresh();
+        setIsPlacingOrder(false);
+        return;
+      }
+    } catch (err) {
+      console.error('Pre-checkout validation failed:', err);
+      // Continue with order if validation itself fails (non-blocking)
+    }
+
     if (paymentMethod === 'upi') {
       if (!acceptsUpi) {
         toast.error('UPI payment not available for this seller');
+        setIsPlacingOrder(false);
         return;
       }
-      setIsPlacingOrder(true);
+      // isPlacingOrder already set above
       try {
         const orderIds = await createOrdersForAllSellers('pending');
         if (orderIds.length === 0) throw new Error('Failed to create orders');
@@ -111,7 +140,7 @@ export default function CartPage() {
       return;
     }
 
-    setIsPlacingOrder(true);
+    // isPlacingOrder already set above
     try {
       const orderIds = await createOrdersForAllSellers('pending');
       if (orderIds.length === 0) throw new Error('Failed to create orders');

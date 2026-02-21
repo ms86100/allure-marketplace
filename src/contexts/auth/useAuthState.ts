@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Profile, UserRole, SellerProfile, Society, SocietyAdmin } from '@/types/database';
 import { AuthState, initialAuthState } from './types';
+import { toast } from 'sonner';
 
 export function useAuthState() {
   const [state, setState] = useState<AuthState>(initialAuthState);
@@ -22,6 +23,48 @@ export function useAuthState() {
       }
 
       const ctx = data as any;
+
+      // Finding #3: If profile is null for an authenticated user, attempt to create one
+      if (!ctx.profile) {
+        console.warn('Authenticated user has no profile, attempting to create one');
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          const meta = userData.user.user_metadata || {};
+          const { error: insertError } = await supabase.from('profiles').insert({
+            id: userId,
+            email: userData.user.email || '',
+            name: meta.name || meta.full_name || 'User',
+            phone: meta.phone || null,
+            flat_number: meta.flat_number || '',
+            block: meta.block || '',
+            phase: meta.phase || null,
+            society_id: meta.society_id || null,
+          });
+          if (!insertError) {
+            await supabase.from('user_roles').insert({ user_id: userId, role: 'buyer' });
+            // Re-fetch after profile creation
+            const { data: retryData } = await supabase.rpc('get_user_auth_context', { _user_id: userId });
+            if (retryData) {
+              const retryCtx = retryData as any;
+              const retrySellers = (retryCtx.seller_profiles as SellerProfile[]) || [];
+              setState(prev => ({
+                ...prev,
+                profile: retryCtx.profile as Profile | null,
+                society: retryCtx.society as Society | null,
+                societyAdminRole: retryCtx.society_admin_role as SocietyAdmin | null,
+                roles: (retryCtx.roles as UserRole[]) || [],
+                sellerProfiles: retrySellers,
+                currentSellerId: retrySellers.length > 0 ? retrySellers[0].id : null,
+                managedBuilderIds: (retryCtx.builder_ids as string[]) || [],
+              }));
+              return;
+            }
+          } else {
+            console.error('Failed to auto-create profile:', insertError);
+          }
+        }
+        return;
+      }
       const sellers = (ctx.seller_profiles as SellerProfile[]) || [];
 
       setState(prev => {
@@ -72,7 +115,11 @@ export function useAuthState() {
     setState({ ...initialAuthState, isLoading: false });
   }, []);
 
+  // Track whether user explicitly called signOut
+  const isExplicitSignOut = useRef(false);
+
   const signOut = useCallback(async () => {
+    isExplicitSignOut.current = true;
     await supabase.auth.signOut();
     clearAuthState();
   }, [clearAuthState]);
@@ -85,6 +132,13 @@ export function useAuthState() {
 
         if (session?.user) {
           setTimeout(() => fetchProfile(session.user.id), 0);
+        } else if (event === 'SIGNED_OUT') {
+          if (!isExplicitSignOut.current) {
+            toast.error('Your session has expired. Please log in again.');
+            window.location.hash = '#/auth';
+          }
+          isExplicitSignOut.current = false;
+          clearAuthState();
         } else {
           clearAuthState();
         }
