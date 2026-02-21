@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+const APP_VERSION = '2.0.0';
+
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user, profile, society, isSeller, isAdmin, signOut, refreshProfile } = useAuth();
@@ -245,7 +247,7 @@ export default function ProfilePage() {
           <DeleteAccountDialog />
         </div>
 
-        <p className="text-center text-[11px] text-muted-foreground mt-4">Sociva v2.0.0</p>
+        <p className="text-center text-[11px] text-muted-foreground mt-4">Sociva v{APP_VERSION}</p>
       </div>
     </AppLayout>
   );

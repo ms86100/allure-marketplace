@@ -55,7 +55,9 @@ export default function PrivacyPolicyPage() {
               <ul className="list-disc list-inside text-muted-foreground space-y-1">
                 <li><strong>Sellers:</strong> Your name, block, and flat number for order delivery (within your society only)</li>
                 <li><strong>Society Admins:</strong> For verification and dispute resolution</li>
-                <li><strong>Service Providers:</strong> Third-party services that help operate the platform (e.g., payment processors, notification services)</li>
+                <li><strong>Razorpay:</strong> Order amount, email address, and phone number for payment processing. Razorpay's privacy policy applies to data they collect.</li>
+                <li><strong>Google Maps:</strong> GPS coordinates during signup for residence verification. Google's privacy policy applies.</li>
+                <li><strong>Push Notification Services:</strong> Device tokens for delivering order updates and community alerts.</li>
               </ul>
               <p className="text-muted-foreground mt-2">
                 We do not sell your personal information to third parties. Data is never shared across society boundaries.

@@ -32,50 +32,16 @@ export function DeleteAccountDialog() {
     setIsDeleting(true);
 
     try {
-      // Delete user data in order (respecting foreign keys)
-      // 1. Delete cart items
-      await supabase.from('cart_items').delete().eq('user_id', user.id);
-      
-      // 2. Delete device tokens
-      await supabase.from('device_tokens').delete().eq('user_id', user.id);
-      
-      // 3. Delete favorites
-      await supabase.from('favorites').delete().eq('user_id', user.id);
-      
-      // 4. Delete reviews (as buyer)
-      await supabase.from('reviews').delete().eq('buyer_id', user.id);
-      
-      // 5. Delete warnings
-      await supabase.from('warnings').delete().eq('user_id', user.id);
-      
-      // 6. Delete reports (as reporter)
-      await supabase.from('reports').delete().eq('reporter_id', user.id);
-      
-      // 7. Get user's seller profile if exists
-      const { data: sellerProfile } = await supabase
-        .from('seller_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // Call Edge Function to delete auth user and all data
+      const { data, error } = await supabase.functions.invoke('delete-user-account');
 
-      if (sellerProfile) {
-        // Delete seller-related data
-        await supabase.from('products').delete().eq('seller_id', sellerProfile.id);
-        await supabase.from('reviews').delete().eq('seller_id', sellerProfile.id);
-        await supabase.from('favorites').delete().eq('seller_id', sellerProfile.id);
-        await supabase.from('seller_profiles').delete().eq('id', sellerProfile.id);
-      }
+      if (error) throw error;
+      if (!data?.success) throw new Error('Deletion failed');
 
-      // 8. Delete user roles
-      await supabase.from('user_roles').delete().eq('user_id', user.id);
-      
-      // 9. Delete profile
-      await supabase.from('profiles').delete().eq('id', user.id);
-
-      // 10. Sign out (auth user deletion requires admin API or edge function)
+      // Sign out locally
       await signOut();
       
-      toast.success('Your account has been deleted');
+      toast.success('Your account has been permanently deleted');
       navigate('/auth');
     } catch (error: any) {
       console.error('Error deleting account:', error);
@@ -111,6 +77,7 @@ export function DeleteAccountDialog() {
               <li>Remove your favorites and saved items</li>
               <li>Delete your seller profile and products (if applicable)</li>
               <li>Remove all reviews you've written</li>
+              <li>Permanently delete your login credentials</li>
             </ul>
             <div className="pt-2">
               <Label htmlFor="confirm-delete" className="text-sm font-medium">

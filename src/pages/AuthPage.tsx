@@ -46,6 +46,7 @@ export default function AuthPage() {
   const [inviteCode, setInviteCode] = useState('');
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'verified' | 'failed' | 'unavailable'>('idle');
   const [gpsDistance, setGpsDistance] = useState<number | null>(null);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
 
   // Google Places autocomplete state
   const { predictions, isSearching, searchPlaces, getPlaceDetails, clearPredictions, isLoaded: mapsLoaded } = useAutocomplete();
@@ -556,7 +557,21 @@ export default function AuthPage() {
                     </div>
                     <PasswordStrengthIndicator password={password} />
                   </div>
-                  <Button onClick={handleCredentialsNext} disabled={!email || password.length < 6} className="w-full h-12 rounded-xl text-base font-semibold">
+                  <div className="flex items-start gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="age-confirm"
+                      checked={ageConfirmed}
+                      onChange={(e) => setAgeConfirmed(e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-input accent-primary"
+                    />
+                    <label htmlFor="age-confirm" className="text-xs text-muted-foreground leading-snug">
+                      I confirm that I am <strong>18 years of age or older</strong> and agree to the{' '}
+                      <a href="#/terms" target="_blank" className="text-primary underline">Terms & Conditions</a> and{' '}
+                      <a href="#/privacy-policy" target="_blank" className="text-primary underline">Privacy Policy</a>.
+                    </label>
+                  </div>
+                  <Button onClick={handleCredentialsNext} disabled={!email || password.length < 6 || !ageConfirmed} className="w-full h-12 rounded-xl text-base font-semibold">
                     <ArrowRight className="mr-2" size={18} /> Continue
                   </Button>
                   <div className="text-center pt-1">

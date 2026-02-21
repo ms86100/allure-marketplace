@@ -83,13 +83,13 @@ export default function LandingPage() {
         <Shield className="text-primary mb-6" size={48} />
         <h2 className="text-3xl font-bold mb-4">Only Verified<br />Residents</h2>
         <p className="text-muted-foreground text-base mb-8">
-          Every member is GPS-verified and admin-approved. Your community, your safety.
+          Every member is GPS-verified and community-authenticated. Your community, your safety.
         </p>
         <div className="space-y-4">
           {[
             { icon: MapPin, text: 'GPS location verification at signup' },
             { icon: Lock, text: 'Society invite code required' },
-            { icon: BadgeCheck, text: 'Admin-approved memberships' },
+            { icon: BadgeCheck, text: 'Verified residential communities' },
           ].map(({ icon: Icon, text }) => (
             <div key={text} className="flex items-center gap-3 bg-card p-3 rounded-xl border border-border">
               <Icon className="text-primary shrink-0" size={20} />

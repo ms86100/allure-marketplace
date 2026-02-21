@@ -395,6 +395,10 @@ export default function CartPage() {
 
       {/* Sticky Place Order Footer */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border safe-bottom">
+        <p className="text-[10px] text-muted-foreground text-center pt-2 px-4">
+          Payments are processed by third-party providers and are not covered by Apple.{' '}
+          <Link to="/terms" className="underline">Refund & Cancellation Policy</Link>
+        </p>
         <div className="px-4 py-3 flex items-center gap-3">
           <div className="flex-1">
             <p className="text-xs text-muted-foreground">Total</p>

@@ -3209,6 +3209,8 @@ export type Database = {
           description: string | null
           id: string
           report_type: string
+          reported_post_id: string | null
+          reported_product_id: string | null
           reported_seller_id: string | null
           reported_user_id: string | null
           reporter_id: string
@@ -3221,6 +3223,8 @@ export type Database = {
           description?: string | null
           id?: string
           report_type: string
+          reported_post_id?: string | null
+          reported_product_id?: string | null
           reported_seller_id?: string | null
           reported_user_id?: string | null
           reporter_id: string
@@ -3233,6 +3237,8 @@ export type Database = {
           description?: string | null
           id?: string
           report_type?: string
+          reported_post_id?: string | null
+          reported_product_id?: string | null
           reported_seller_id?: string | null
           reported_user_id?: string | null
           reporter_id?: string
@@ -3240,6 +3246,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "reports_reported_post_id_fkey"
+            columns: ["reported_post_id"]
+            isOneToOne: false
+            referencedRelation: "bulletin_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_reported_product_id_fkey"
+            columns: ["reported_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "reports_reporter_id_fkey"
             columns: ["reporter_id"]

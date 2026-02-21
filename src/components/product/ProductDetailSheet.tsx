@@ -8,9 +8,10 @@ import { useCart } from '@/hooks/useCart';
 import { useSellerTrustSnapshot } from '@/hooks/queries/useProductTrustMetrics';
 import { ContactSellerModal } from './ContactSellerModal';
 import { ProductEnquirySheet } from './ProductEnquirySheet';
+import { ReportSheet } from '@/components/report/ReportSheet';
 import { ProductActionType } from '@/types/database';
 import { ACTION_CONFIG } from '@/lib/marketplace-constants';
-import { Plus, Minus, Store, MapPin, Home, Clock, Truck, Users, Zap, RotateCcw, ChevronRight, ChevronDown, Shield } from 'lucide-react';
+import { Plus, Minus, Store, MapPin, Home, Clock, Truck, Users, Zap, RotateCcw, ChevronRight, ChevronDown, Shield, Flag } from 'lucide-react';
 
 interface ProductDetail {
   product_id: string;
@@ -54,6 +55,7 @@ export function ProductDetailSheet({
   const [contactOpen, setContactOpen] = useState(false);
   const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   if (!product) return null;
 
@@ -306,6 +308,17 @@ export function ProductDetailSheet({
               </Button>
             )}
           </div>
+
+          {/* Report button */}
+          <div className="px-6 pb-4">
+            <button
+              onClick={() => { onOpenChange(false); setReportOpen(true); }}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <Flag size={12} />
+              Report this product
+            </button>
+          </div>
         </SheetContent>
       </Sheet>
 
@@ -330,6 +343,14 @@ export function ProductDetailSheet({
           price={product.price}
         />
       )}
+
+      <ReportSheet
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        targetType="product"
+        targetId={product.product_id}
+        targetName={product.product_name}
+      />
     </>
   );
 }

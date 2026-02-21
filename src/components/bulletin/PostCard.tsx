@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { ArrowBigUp, MessageCircle, Pin, MapPin, Calendar, Users } from 'lucide-react';
+import { ArrowBigUp, MessageCircle, Pin, MapPin, Calendar, Users, Flag } from 'lucide-react';
+import { ReportSheet } from '@/components/report/ReportSheet';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,6 +38,7 @@ interface PostCardProps {
 }
 
 export function PostCard({ post, onUpvote, onOpen }: PostCardProps) {
+  const [reportOpen, setReportOpen] = useState(false);
   const cat = CATEGORY_CONFIG[post.category] || CATEGORY_CONFIG.alert;
   const CatIcon = cat.icon;
 
@@ -140,8 +143,23 @@ export function PostCard({ post, onUpvote, onOpen }: PostCardProps) {
             <MessageCircle size={14} />
             {post.comment_count}
           </span>
+          <button
+            className="text-muted-foreground hover:text-destructive transition-colors"
+            onClick={(e) => { e.stopPropagation(); setReportOpen(true); }}
+            aria-label="Report post"
+          >
+            <Flag size={13} />
+          </button>
         </div>
       </div>
+
+      <ReportSheet
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        targetType="post"
+        targetId={post.id}
+        targetName={post.title}
+      />
     </div>
   );
 }
