@@ -6,12 +6,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { PaymentRecord, Order, PAYMENT_STATUS_LABELS, PaymentStatus, SellerProfile } from '@/types/database';
+import { PaymentRecord, Order, PaymentStatus, SellerProfile } from '@/types/database';
+import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { ArrowLeft, TrendingUp, DollarSign, Calendar, CreditCard } from 'lucide-react';
 import { format, startOfDay, startOfWeek, startOfMonth, isAfter, parseISO } from 'date-fns';
 
 export default function SellerEarningsPage() {
   const { user, currentSellerId, sellerProfiles } = useAuth();
+  const { getPaymentStatus } = useStatusLabels();
   const [payments, setPayments] = useState<(PaymentRecord & { order?: Order })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -156,7 +158,7 @@ export default function SellerEarningsPage() {
             <div className="space-y-3">
               {payments.map((payment) => {
                 const order = payment.order as any;
-                const statusInfo = PAYMENT_STATUS_LABELS[payment.payment_status as PaymentStatus];
+                const statusInfo = getPaymentStatus(payment.payment_status as PaymentStatus);
                 
                 return (
                   <Card key={payment.id}>

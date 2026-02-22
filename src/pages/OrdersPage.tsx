@@ -7,14 +7,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ReorderButton } from '@/components/order/ReorderButton';
 import { useAuth } from '@/contexts/AuthContext';
-import { Order, ORDER_STATUS_LABELS } from '@/types/database';
+import { Order } from '@/types/database';
+import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { Package, ChevronRight, Loader2, ArrowLeft, CheckCircle, Truck } from 'lucide-react';
 import { format } from 'date-fns';
 
 const PAGE_SIZE = 20;
 
 function OrderCard({ order, type }: { order: Order; type: 'buyer' | 'seller' }) {
-  const statusInfo = ORDER_STATUS_LABELS[order.status];
+  const { getOrderStatus } = useStatusLabels();
+  const statusInfo = getOrderStatus(order.status);
   const seller = (order as any).seller;
   const buyer = (order as any).buyer;
   const items = (order as any).items || [];

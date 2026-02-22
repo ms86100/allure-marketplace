@@ -13,7 +13,8 @@ import { DeliveryStatusCard } from '@/components/delivery/DeliveryStatusCard';
 import { useUrgentOrderSound } from '@/hooks/useUrgentOrderSound';
 import { useAuth } from '@/contexts/AuthContext';
 import { logAudit } from '@/lib/audit';
-import { Order, OrderItem, ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS, OrderStatus, PaymentStatus, ItemStatus, ITEM_STATUS_LABELS } from '@/types/database';
+import { Order, OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
+import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { OrderItemCard } from '@/components/order/OrderItemCard';
 import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck } from 'lucide-react';
 import { format } from 'date-fns';
@@ -23,6 +24,7 @@ import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
 export default function OrderDetailPage() {
   const { id } = useParams();
   const { user, isSeller } = useAuth();
+  const { getOrderStatus, getPaymentStatus, getItemStatus } = useStatusLabels();
   const [order, setOrder] = useState<Order | null>(null);
   const [hasReview, setHasReview] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,7 +95,7 @@ export default function OrderDetailPage() {
       const { error } = await supabase.from('orders').update(updateData).eq('id', order.id);
       if (error) throw error;
       setOrder({ ...order, ...updateData });
-      toast.success(`Order ${ORDER_STATUS_LABELS[newStatus].label.toLowerCase()}`);
+      toast.success(`Order ${getOrderStatus(newStatus).label.toLowerCase()}`);
       if (order.society_id) {
         logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus, rejection_reason: rejectionReason });
       }
@@ -135,8 +137,8 @@ export default function OrderDetailPage() {
   const sellerProfile = seller?.profile;
   const buyer = (order as any).buyer;
   const items = (order as any).items || [];
-  const statusInfo = ORDER_STATUS_LABELS[order.status];
-  const paymentStatusInfo = PAYMENT_STATUS_LABELS[(order.payment_status as PaymentStatus) || 'pending'];
+  const statusInfo = getOrderStatus(order.status);
+  const paymentStatusInfo = getPaymentStatus((order.payment_status as PaymentStatus) || 'pending');
   const isBuyerView = order.buyer_id === user?.id;
 
   const statusOrder: OrderStatus[] = ['placed', 'accepted', 'preparing', 'ready', 'picked_up', 'delivered', 'completed'];
@@ -238,7 +240,7 @@ export default function OrderDetailPage() {
                         {isCompleted ? <Check size={14} /> : index + 1}
                       </div>
                       <span className="text-[9px] text-center mt-1 text-muted-foreground leading-tight">
-                        {ORDER_STATUS_LABELS[status as OrderStatus].label}
+                        {getOrderStatus(status as OrderStatus).label}
                       </span>
                     </div>
                   );
@@ -364,8 +366,8 @@ export default function OrderDetailPage() {
                   const count = items.filter((i: OrderItem) => (i.status || 'pending') === status).length;
                   if (count === 0) return null;
                   return (
-                    <span key={status} className={`text-[10px] px-1.5 py-0.5 rounded ${ITEM_STATUS_LABELS[status].color}`}>
-                      {count} {ITEM_STATUS_LABELS[status].label}
+                    <span key={status} className={`text-[10px] px-1.5 py-0.5 rounded ${getItemStatus(status).color}`}>
+                      {count} {getItemStatus(status).label}
                     </span>
                   );
                 })}
@@ -448,7 +450,7 @@ export default function OrderDetailPage() {
                 onClick={() => updateOrderStatus(nextStatus)}
                 disabled={isUpdating}
               >
-                {isUpdating ? 'Updating...' : `Mark ${ORDER_STATUS_LABELS[nextStatus].label}`}
+                {isUpdating ? 'Updating...' : `Mark ${getOrderStatus(nextStatus).label}`}
                 <ChevronRight size={14} className="ml-1" />
               </Button>
             ) : null}

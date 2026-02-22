@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Star, Clock, XCircle } from 'lucide-react';
+import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { friendlyError } from '@/lib/utils';
@@ -15,16 +16,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 
-const STATUS_COLORS: Record<string, string> = {
-  open: 'bg-yellow-100 text-yellow-800',
-  accepted: 'bg-blue-100 text-blue-800',
-  completed: 'bg-green-100 text-green-800',
-  cancelled: 'bg-red-100 text-red-800',
-  expired: 'bg-muted text-muted-foreground',
-};
+// STATUS_COLORS now provided by useStatusLabels().getWorkerJobStatus
 
 export function ResidentJobsList() {
   const { profile } = useAuth();
+  const { getWorkerJobStatus } = useStatusLabels();
   const queryClient = useQueryClient();
 
   const { data: jobs = [], isLoading } = useQuery({
@@ -76,7 +72,7 @@ export function ResidentJobsList() {
           <CardContent className="pt-4 space-y-2">
             <div className="flex justify-between items-center">
               <span className="font-medium text-sm">{job.job_type}</span>
-              <Badge className={STATUS_COLORS[job.status] || 'bg-muted'}>{job.status}</Badge>
+              <Badge className={getWorkerJobStatus(job.status).color}>{getWorkerJobStatus(job.status).label}</Badge>
             </div>
             {job.description && <p className="text-xs text-muted-foreground">{job.description}</p>}
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { useStatusLabels } from '@/hooks/useStatusLabels';
 
 interface DeliveryRecord {
   id: string;
@@ -34,6 +35,7 @@ const STATUS_BADGES: Record<string, { label: string; color: string }> = {
 };
 
 export function DeliveryMonitoringTab({ societyId }: DeliveryMonitoringTabProps) {
+  const { getDeliveryStatus } = useStatusLabels();
   const [allDeliveries, setAllDeliveries] = useState<DeliveryRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'active' | 'completed' | 'failed'>('active');
@@ -128,7 +130,7 @@ export function DeliveryMonitoringTab({ societyId }: DeliveryMonitoringTabProps)
       ) : (
         <div className="space-y-2">
           {deliveries.map(delivery => {
-            const statusConfig = STATUS_BADGES[delivery.status] || STATUS_BADGES.pending;
+            const statusConfig = getDeliveryStatus(delivery.status);
             return (
               <div key={delivery.id} className="bg-card border border-border rounded-xl p-3">
                 <div className="flex items-center justify-between mb-1.5">

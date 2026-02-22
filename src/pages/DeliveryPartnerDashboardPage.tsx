@@ -10,11 +10,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Truck, Package, MapPin, Clock, CheckCircle2, Phone, Navigation, Loader2 } from 'lucide-react';
+import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { format } from 'date-fns';
 
 export default function DeliveryPartnerDashboardPage() {
   const { user, effectiveSocietyId } = useAuth();
   const queryClient = useQueryClient();
+  const { getDeliveryStatus } = useStatusLabels();
   const [activeTab, setActiveTab] = useState('active');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -156,15 +158,7 @@ export default function DeliveryPartnerDashboardPage() {
     }
   };
 
-  const statusConfig: Record<string, { label: string; color: string }> = {
-    pending: { label: 'Pending', color: 'bg-warning/10 text-warning' },
-    assigned: { label: 'Assigned', color: 'bg-primary/10 text-primary' },
-    picked_up: { label: 'Picked Up', color: 'bg-blue-100 text-blue-700' },
-    at_gate: { label: 'At Gate', color: 'bg-cyan-100 text-cyan-700' },
-    delivered: { label: 'Delivered', color: 'bg-success/10 text-success' },
-    failed: { label: 'Failed', color: 'bg-destructive/10 text-destructive' },
-    cancelled: { label: 'Cancelled', color: 'bg-muted text-muted-foreground' },
-  };
+  // statusConfig is now provided by useStatusLabels().getDeliveryStatus
 
   if (profileLoading) {
     return (
@@ -274,7 +268,7 @@ export default function DeliveryPartnerDashboardPage() {
               </div>
             ) : (
               deliveries.map((delivery: any) => {
-                const sc = statusConfig[delivery.status] || statusConfig.pending;
+                const sc = getDeliveryStatus(delivery.status);
                 return (
                   <Card key={delivery.id}>
                     <CardContent className="p-4 space-y-2">

@@ -22,7 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Profile, SellerProfile, Review, PaymentRecord, ChatMessage, VerificationStatus, PAYMENT_STATUS_LABELS, PaymentStatus, Society } from '@/types/database';
+import { Profile, SellerProfile, Review, PaymentRecord, ChatMessage, VerificationStatus, PaymentStatus, Society } from '@/types/database';
+import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { Check, X, Users, Store, Package, Star, MessageSquare, Award, Eye, EyeOff, CreditCard, DollarSign, Flag, AlertTriangle, Settings, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -67,6 +68,7 @@ interface Warning {
 
 export default function AdminPage() {
   const location = useLocation();
+  const { getPaymentStatus } = useStatusLabels();
   const tabParam = useMemo(() => new URLSearchParams(location.search).get('tab'), [location.search]);
   const [activeTab, setActiveTab] = useState(tabParam || 'sellers');
   const [pendingUsers, setPendingUsers] = useState<Profile[]>([]);
@@ -393,7 +395,7 @@ export default function AdminPage() {
               </Select>
             </div>
             {filteredPayments.length > 0 ? filteredPayments.map((payment) => {
-              const statusInfo = PAYMENT_STATUS_LABELS[payment.payment_status as PaymentStatus];
+              const statusInfo = getPaymentStatus(payment.payment_status as PaymentStatus);
               return (
                 <Card key={payment.id}><CardContent className="p-3">
                   <div className="flex items-start justify-between">

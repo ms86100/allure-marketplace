@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { OrderItem, ItemStatus, ITEM_STATUS_LABELS } from '@/types/database';
+import { OrderItem, ItemStatus } from '@/types/database';
+import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -18,8 +19,9 @@ const STATUS_ORDER: ItemStatus[] = ['pending', 'accepted', 'preparing', 'ready',
 
 export function OrderItemCard({ item, isSellerView, orderStatus, onStatusUpdate }: OrderItemCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const { getItemStatus } = useStatusLabels();
   const currentStatus = (item.status || 'pending') as ItemStatus;
-  const statusInfo = ITEM_STATUS_LABELS[currentStatus];
+  const statusInfo = getItemStatus(currentStatus);
   
   const canUpdateStatus = isSellerView && 
     !['completed', 'cancelled'].includes(orderStatus) && 
@@ -45,7 +47,7 @@ export function OrderItemCard({ item, isSellerView, orderStatus, onStatusUpdate 
       if (error) throw error;
       
       onStatusUpdate?.(item.id, newStatus);
-      toast.success(`${item.product_name} marked as ${ITEM_STATUS_LABELS[newStatus].label}`);
+      toast.success(`${item.product_name} marked as ${getItemStatus(newStatus).label}`);
     } catch (error) {
       console.error('Error updating item status:', error);
       toast.error('Failed to update item status');
@@ -84,7 +86,7 @@ export function OrderItemCard({ item, isSellerView, orderStatus, onStatusUpdate 
             ) : (
               <>
                 <Check size={14} className="mr-1" />
-                {ITEM_STATUS_LABELS[nextStatus].label}
+                {getItemStatus(nextStatus).label}
               </>
             )}
           </Button>
@@ -110,7 +112,7 @@ export function OrderItemCard({ item, isSellerView, orderStatus, onStatusUpdate 
                 const isDisabled = statusIndex <= currentIndex;
                 return (
                   <SelectItem key={status} value={status} className="text-xs" disabled={isDisabled}>
-                    {ITEM_STATUS_LABELS[status].label}
+                    {getItemStatus(status).label}
                   </SelectItem>
                 );
               })}

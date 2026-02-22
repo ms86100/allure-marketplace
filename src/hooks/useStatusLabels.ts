@@ -12,18 +12,36 @@ interface StatusLabel {
   color: string;
 }
 
-type StatusDomain = 'order_status' | 'payment_status' | 'item_status';
+type StatusDomain = 'order_status' | 'payment_status' | 'item_status' | 'delivery_status' | 'worker_job_status';
 
 type StatusDisplayConfig = Record<StatusDomain, Record<string, StatusLabel>>;
 
 const UNKNOWN_STATUS: StatusLabel = { label: 'Unknown', color: 'bg-gray-100 text-gray-600' };
+
+const DELIVERY_STATUS_FALLBACK: Record<string, StatusLabel> = {
+  pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800' },
+  assigned: { label: 'Assigned', color: 'bg-blue-100 text-blue-800' },
+  picked_up: { label: 'In Transit', color: 'bg-indigo-100 text-indigo-800' },
+  at_gate: { label: 'At Gate', color: 'bg-cyan-100 text-cyan-800' },
+  delivered: { label: 'Delivered', color: 'bg-green-100 text-green-800' },
+  failed: { label: 'Failed', color: 'bg-red-100 text-red-800' },
+  cancelled: { label: 'Cancelled', color: 'bg-gray-100 text-gray-800' },
+};
+
+const WORKER_JOB_STATUS_FALLBACK: Record<string, StatusLabel> = {
+  open: { label: 'Open', color: 'bg-yellow-100 text-yellow-800' },
+  accepted: { label: 'Accepted', color: 'bg-blue-100 text-blue-800' },
+  completed: { label: 'Completed', color: 'bg-green-100 text-green-800' },
+  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-800' },
+  expired: { label: 'Expired', color: 'bg-muted text-muted-foreground' },
+};
 
 /**
  * Hook that provides status display labels from the DB (system_settings)
  * with hardcoded fallbacks from types/database.ts.
  *
  * Usage:
- *   const { getOrderStatus, getPaymentStatus, getItemStatus } = useStatusLabels();
+ *   const { getOrderStatus, getPaymentStatus, getItemStatus, getDeliveryStatus, getWorkerJobStatus } = useStatusLabels();
  *   const { label, color } = getOrderStatus('placed');
  */
 export function useStatusLabels() {
@@ -57,5 +75,13 @@ export function useStatusLabels() {
     return dbConfig?.item_status?.[status] ?? ITEM_STATUS_LABELS[status as keyof typeof ITEM_STATUS_LABELS] ?? UNKNOWN_STATUS;
   };
 
-  return { getOrderStatus, getPaymentStatus, getItemStatus };
+  const getDeliveryStatus = (status: string): StatusLabel => {
+    return dbConfig?.delivery_status?.[status] ?? DELIVERY_STATUS_FALLBACK[status] ?? UNKNOWN_STATUS;
+  };
+
+  const getWorkerJobStatus = (status: string): StatusLabel => {
+    return dbConfig?.worker_job_status?.[status] ?? WORKER_JOB_STATUS_FALLBACK[status] ?? UNKNOWN_STATUS;
+  };
+
+  return { getOrderStatus, getPaymentStatus, getItemStatus, getDeliveryStatus, getWorkerJobStatus };
 }

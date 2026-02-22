@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ORDER_STATUS_LABELS } from '@/types/database';
+import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { OrderItemStatusBadge, ItemStatus } from './OrderItemStatusBadge';
 import { ChevronRight, Clock, CreditCard, Package, MessageSquare, User, Truck, ShoppingBag } from 'lucide-react';
 import { format } from 'date-fns';
@@ -31,9 +31,10 @@ interface SellerOrderCardProps {
 }
 
 export function SellerOrderCard({ order }: SellerOrderCardProps) {
+  const { getOrderStatus } = useStatusLabels();
   const buyer = order.buyer;
   const items = order.items || [];
-  const statusInfo = ORDER_STATUS_LABELS[order.status as keyof typeof ORDER_STATUS_LABELS] || { label: order.status, color: 'bg-muted text-muted-foreground' };
+  const statusInfo = getOrderStatus(order.status);
 
   // Calculate item-level stats
   const itemStatuses = items.map(item => item.status || 'pending');
