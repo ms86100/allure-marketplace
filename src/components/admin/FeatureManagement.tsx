@@ -14,6 +14,7 @@ import { Plus, Package, Layers, Building2, Trash2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { logAudit } from '@/lib/audit';
 import { friendlyError } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PlatformFeature {
   id: string;
@@ -48,6 +49,7 @@ const CATEGORIES = ['governance', 'marketplace', 'finance', 'operations', 'const
 const TIERS = ['free', 'basic', 'pro', 'enterprise'];
 
 export function FeatureManagement() {
+  const { user } = useAuth();
   const [features, setFeatures] = useState<PlatformFeature[]>([]);
   const [packages, setPackages] = useState<FeaturePackage[]>([]);
   const [assignments, setAssignments] = useState<BuilderAssignment[]>([]);
@@ -71,7 +73,7 @@ export function FeatureManagement() {
   const [assignBuilder, setAssignBuilder] = useState('');
   const [assignPackage, setAssignPackage] = useState('');
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); }, [user?.id]);
 
   const fetchAll = async () => {
     const [featRes, pkgRes, assignRes, builderRes] = await Promise.all([
