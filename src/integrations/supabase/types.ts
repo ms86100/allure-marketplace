@@ -3199,6 +3199,7 @@ export type Database = {
           category: string
           created_at: string
           description: string | null
+          display_name: string | null
           feature_key: string
           feature_name: string
           icon_name: string | null
@@ -3216,6 +3217,7 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string | null
+          display_name?: string | null
           feature_key: string
           feature_name: string
           icon_name?: string | null
@@ -3233,6 +3235,7 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string | null
+          display_name?: string | null
           feature_key?: string
           feature_name?: string
           icon_name?: string | null
@@ -5485,6 +5488,47 @@ export type Database = {
           },
         ]
       }
+      visitor_types: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          label: string
+          society_id: string | null
+          type_key: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          label: string
+          society_id?: string | null
+          type_key: string
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          label?: string
+          society_id?: string | null
+          type_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visitor_types_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warnings: {
         Row: {
           acknowledged_at: string | null
@@ -6058,7 +6102,10 @@ export type Database = {
       get_effective_society_features: {
         Args: { _society_id: string }
         Returns: {
+          description: string
+          display_name: string
           feature_key: string
+          icon_name: string
           is_enabled: boolean
           society_configurable: boolean
           source: string
@@ -6098,6 +6145,15 @@ export type Database = {
       }
       get_user_auth_context: { Args: { _user_id: string }; Returns: Json }
       get_user_society_id: { Args: { _user_id: string }; Returns: string }
+      get_visitor_types_for_society: {
+        Args: { _society_id: string }
+        Returns: {
+          display_order: number
+          icon: string
+          label: string
+          type_key: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["user_role"]

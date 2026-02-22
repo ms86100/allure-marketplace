@@ -26,26 +26,7 @@ import { AdminDisputesTab } from '@/components/admin/AdminDisputesTab';
 import { AdminPaymentMilestones } from '@/components/admin/AdminPaymentMilestones';
 import type { FeatureKey } from '@/hooks/useEffectiveFeatures';
 
-const FEATURE_LABELS: Record<FeatureKey, { label: string; description: string }> = {
-  marketplace: { label: 'Marketplace', description: 'Buy & sell within the society' },
-  bulletin: { label: 'Community Bulletin', description: 'Announcements, polls, events' },
-  disputes: { label: 'Dispute System', description: 'Raise and track concerns' },
-  finances: { label: 'Society Finances', description: 'Income & expense tracking' },
-  construction_progress: { label: 'Construction Progress', description: 'Builder updates & milestones' },
-  snag_management: { label: 'Snag Management', description: 'Report construction defects' },
-  help_requests: { label: 'Help Requests', description: 'Community help board' },
-  visitor_management: { label: 'Visitor Management', description: 'Gate entry with OTP verification' },
-  domestic_help: { label: 'Domestic Help', description: 'Maid/cook/driver attendance tracking' },
-  parcel_management: { label: 'Parcel Management', description: 'Delivery logging & collection' },
-  inspection: { label: 'Pre-Handover Inspection', description: 'Digital inspection checklist' },
-  payment_milestones: { label: 'Payment Milestones', description: 'Construction-linked payment tracker' },
-  maintenance: { label: 'Maintenance Dues', description: 'Monthly maintenance payment tracking' },
-  guard_kiosk: { label: 'Guard Kiosk', description: 'Gate security OTP verification panel' },
-  vehicle_parking: { label: 'Vehicle Parking', description: 'Slot allocation & violation tracking' },
-  resident_identity_verification: { label: 'Resident ID Verification', description: 'QR-based gate entry with anti-impersonation' },
-  worker_marketplace: { label: 'Worker Marketplace', description: 'AI-assisted daily help hiring system' },
-  workforce_management: { label: 'Workforce Management', description: 'Worker registry with shift validation & gate integration' },
-};
+// Feature labels are now DB-driven via platform_features.display_name/description
 
 export default function SocietyAdminPage() {
   const { profile, effectiveSociety, effectiveSocietyId, isSocietyAdmin, isAdmin } = useAuth();
@@ -58,7 +39,7 @@ export default function SocietyAdminPage() {
   const [appointOpen, setAppointOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
-  const { features, isFeatureEnabled, getFeatureState, isConfigurable, toggleFeature } = useEffectiveFeatures();
+  const { features, isFeatureEnabled, getFeatureState, isConfigurable, toggleFeature, getFeatureDisplayName, getFeatureDescription } = useEffectiveFeatures();
 
   const societyId = effectiveSocietyId;
 
@@ -358,7 +339,8 @@ export default function SocietyAdminPage() {
                 <h3 className="text-sm font-semibold text-muted-foreground">Society Features</h3>
               </div>
               <Card><CardContent className="p-4 space-y-4">
-                {(Object.keys(FEATURE_LABELS) as FeatureKey[]).map((key) => {
+                {features.map((f) => {
+                  const key = f.feature_key as FeatureKey;
                   const state = getFeatureState(key);
                   const configurable = isConfigurable(key);
                   const enabled = isFeatureEnabled(key);
@@ -367,7 +349,7 @@ export default function SocietyAdminPage() {
                     <div key={key} className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <Label className="text-sm font-medium">{FEATURE_LABELS[key].label}</Label>
+                          <Label className="text-sm font-medium">{getFeatureDisplayName(key)}</Label>
                           {state === 'locked' && (
                             <Badge variant="secondary" className="text-[8px] h-4 gap-0.5">
                               <Lock size={8} /> Locked
@@ -379,7 +361,7 @@ export default function SocietyAdminPage() {
                             </Badge>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground">{FEATURE_LABELS[key].description}</p>
+                        <p className="text-xs text-muted-foreground">{getFeatureDescription(key)}</p>
                       </div>
                       <Switch
                         checked={enabled}

@@ -29,6 +29,9 @@ interface EffectiveFeature {
   is_enabled: boolean;
   source: string; // 'core' | 'package' | 'override' | 'default'
   society_configurable: boolean;
+  display_name: string | null;
+  description: string | null;
+  icon_name: string | null;
 }
 
 export function useEffectiveFeatures() {
@@ -71,6 +74,14 @@ export function useEffectiveFeatures() {
 
   const getFeatureSource = (key: FeatureKey): string => {
     return featureMap.get(key)?.source || 'default';
+  };
+
+  const getFeatureDisplayName = (key: FeatureKey): string => {
+    return featureMap.get(key)?.display_name || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  const getFeatureDescription = (key: FeatureKey): string => {
+    return featureMap.get(key)?.description || '';
   };
 
   const isConfigurable = (key: FeatureKey): boolean => {
@@ -119,6 +130,8 @@ export function useEffectiveFeatures() {
     isFeatureEnabled,
     getFeatureState,
     getFeatureSource,
+    getFeatureDisplayName,
+    getFeatureDescription,
     isConfigurable,
     toggleFeature,
   };

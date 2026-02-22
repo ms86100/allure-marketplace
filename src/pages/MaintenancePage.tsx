@@ -11,6 +11,7 @@ import { friendlyError } from '@/lib/utils';
 import { useRazorpay } from '@/hooks/useRazorpay';
 import { CheckCircle2, Clock, AlertTriangle, Plus, Download } from 'lucide-react';
 import { exportMaintenanceDues } from '@/lib/csv-export';
+import { FeatureGate } from '@/components/ui/FeatureGate';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -142,6 +143,7 @@ export default function MaintenancePage() {
 
   return (
     <AppLayout headerTitle="Maintenance" showLocation={false}>
+      <FeatureGate feature="maintenance">
       <div className="p-4 space-y-4">
         {canManage && (
           <div className="flex gap-2">
@@ -267,6 +269,7 @@ export default function MaintenancePage() {
           </div>
         )}
       </div>
+      </FeatureGate>
     </AppLayout>
   );
 }

@@ -10,7 +10,7 @@ import {
   IndianRupee, Building2, Bug, ShieldAlert, FileText, 
   MessageCircle, Radio, ChevronRight, CreditCard, Clock, BarChart3, Shield,
   Users, ClipboardCheck, Landmark, Package, UserCheck, ShieldCheck, Car, QrCode,
-  Wrench, Briefcase, Megaphone, Truck
+  Wrench, Briefcase, Megaphone, Truck, UserPlus, CalendarDays, Wallet, ClipboardList
 } from 'lucide-react';
 
 interface DashboardStat {
@@ -100,7 +100,8 @@ export default function SocietyDashboardPage() {
 
   const cards: DashboardStat[] = [
     { icon: Users, label: 'Visitors', to: '/visitors', stat: 'Gate Management', color: 'text-primary', featureKey: 'visitor_management' },
-    { icon: UserCheck, label: 'Domestic Help', to: '/domestic-help', stat: 'Attendance tracking', color: 'text-primary', featureKey: 'domestic_help' },
+    { icon: UserPlus, label: 'Authorized Persons', to: '/authorized-persons', stat: 'Family gate access', color: 'text-primary', featureKey: 'visitor_management' },
+    { icon: UserCheck, label: 'My Workers', to: '/my-workers', stat: 'Registered help', color: 'text-primary', featureKey: 'workforce_management' },
     { icon: Package, label: 'Parcels', to: '/parcels', stat: 'Delivery tracking', color: 'text-warning', featureKey: 'parcel_management' },
     { icon: Car, label: 'Parking', to: '/parking', stat: 'Slots & violations', color: 'text-primary', featureKey: 'vehicle_parking' },
     { icon: IndianRupee, label: 'Finances', to: '/society/finances', stat: `${stats.recentExpenses} this month`, color: 'text-warning', featureKey: 'finances' },
@@ -117,7 +118,10 @@ export default function SocietyDashboardPage() {
     { icon: Truck, label: 'Deliveries', to: '/society/deliveries', stat: 'Track deliveries', color: 'text-primary' },
     { icon: Megaphone, label: 'Notices', to: '/society/notices', stat: 'Official circulars', color: 'text-warning' },
     ...(isSocietyAdmin ? [
-      { icon: QrCode, label: 'Security Verify', to: '/security/verify', stat: 'Scan resident QR', color: 'text-success', featureKey: 'resident_identity_verification' } as DashboardStat,
+      { icon: CalendarDays, label: 'Worker Attendance', to: '/worker-attendance', stat: 'Track attendance', color: 'text-primary', featureKey: 'workforce_management' } as DashboardStat,
+      { icon: ClipboardList, label: 'Worker Leave', to: '/worker-leave', stat: 'Leave records', color: 'text-primary', featureKey: 'workforce_management' } as DashboardStat,
+      { icon: Wallet, label: 'Worker Salary', to: '/worker-salary', stat: 'Salary records', color: 'text-primary', featureKey: 'workforce_management' } as DashboardStat,
+      { icon: Truck, label: 'Delivery Partners', to: '/delivery-partners', stat: 'Manage partners', color: 'text-primary' } as DashboardStat,
       { icon: ShieldCheck, label: 'Guard Kiosk', to: '/guard-kiosk', stat: 'Verify visitor OTPs', color: 'text-success', featureKey: 'guard_kiosk' } as DashboardStat,
       { icon: Shield, label: 'Society Admin', to: '/society/admin', stat: 'Manage society', color: 'text-info' } as DashboardStat,
     ] : []),

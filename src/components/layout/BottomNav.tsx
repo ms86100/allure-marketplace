@@ -18,7 +18,7 @@ const residentNavItems: { to: string; icon: typeof Home; label: string; featureK
 ];
 
 const securityNavItems: { to: string; icon: typeof Shield; label: string }[] = [
-  { to: '/security/verify', icon: Shield, label: 'Verify' },
+  { to: '/guard-kiosk', icon: Shield, label: 'Kiosk' },
   { to: '/security/audit', icon: ClipboardList, label: 'History' },
   { to: '/profile', icon: User, label: 'Profile' },
 ];
