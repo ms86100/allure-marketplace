@@ -125,7 +125,7 @@ export default function SellerDashboardPage() {
             You haven't set up your seller profile yet
           </p>
           <p className="text-xs text-muted-foreground mb-4">
-            Sell homemade food, groceries, or services to your community
+            Sell products, groceries, or services to your community
           </p>
           <Link to="/become-seller">
             <Button>Become a Seller</Button>

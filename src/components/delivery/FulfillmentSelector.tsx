@@ -4,11 +4,11 @@ interface FulfillmentSelectorProps {
   value: 'self_pickup' | 'delivery';
   onChange: (value: 'self_pickup' | 'delivery') => void;
   deliveryFee: number;
-  freeDeliveryThreshold?: number;
+  freeDeliveryThreshold: number;
   orderValue?: number;
 }
 
-export function FulfillmentSelector({ value, onChange, deliveryFee, freeDeliveryThreshold = 500, orderValue = 0 }: FulfillmentSelectorProps) {
+export function FulfillmentSelector({ value, onChange, deliveryFee, freeDeliveryThreshold, orderValue = 0 }: FulfillmentSelectorProps) {
   const isFreeDelivery = orderValue >= freeDeliveryThreshold;
 
   return (

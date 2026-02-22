@@ -29,13 +29,13 @@ import {
 } from 'lucide-react';
 import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
 import { toast } from 'sonner';
-
-const APP_VERSION = '2.0.0';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user, profile, society, isSeller, isAdmin, isBuilderMember, signOut, refreshProfile } = useAuth();
   const { isFeatureEnabled } = useEffectiveFeatures();
+  const settings = useSystemSettings();
   const [largeFont, setLargeFont] = useState(() => {
     return localStorage.getItem('sociva_large_font') === 'true';
   });
@@ -216,7 +216,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className="font-bold text-sm text-accent-foreground">Start Selling</h4>
-                  <p className="text-[11px] text-accent-foreground/80">Share your homemade food with neighbors</p>
+                  <p className="text-[11px] text-accent-foreground/80">Start selling to your community</p>
                 </div>
                 <ChevronRight className="text-accent-foreground/60 shrink-0" size={18} />
               </div>
@@ -275,7 +275,7 @@ export default function ProfilePage() {
           <DeleteAccountDialog />
         </div>
 
-        <p className="text-center text-[11px] text-muted-foreground mt-4">Sociva v{APP_VERSION}</p>
+        <p className="text-center text-[11px] text-muted-foreground mt-4">Sociva v{settings.appVersion}</p>
       </div>
     </AppLayout>
   );

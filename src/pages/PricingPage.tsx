@@ -1,11 +1,25 @@
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Check, ArrowLeft } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
+import { jitteredStaleTime } from '@/lib/query-utils';
 
-const plans = [
+interface PricingPlan {
+  name: string;
+  price: string;
+  period: string;
+  description: string;
+  badge: string | null;
+  features: string[];
+}
+
+const FALLBACK_PLANS: PricingPlan[] = [
   {
     name: 'Free (Buyers)',
     price: 'Free',
@@ -34,39 +48,69 @@ const plans = [
       'Community visibility',
     ],
   },
-  {
-    name: 'Seller Pro',
-    price: '₹199',
-    period: '/month',
-    description: 'Unlock the full power of your home business.',
-    badge: 'Popular',
-    features: [
-      'Unlimited product listings',
-      'Create coupons & promotions',
-      'Advanced analytics dashboard',
-      'Priority in search results',
-      'Featured seller badge',
-      'Bulk order management',
-    ],
-  },
-  {
-    name: 'Society Plan',
-    price: '₹999',
-    period: '/month',
-    description: 'For society administrators and RWAs.',
-    badge: 'Enterprise',
-    features: [
-      'White-label society branding',
-      'Custom community rules',
-      'Admin moderation tools',
-      'Member verification controls',
-      'Priority support',
-      'Analytics for society activity',
-    ],
-  },
 ];
 
+const PRICE_TIER_MAP: Record<string, { price: string; period: string; badge: string | null }> = {
+  free: { price: 'Free', period: 'forever', badge: null },
+  pro: { price: '₹199', period: '/month', badge: 'Popular' },
+  enterprise: { price: '₹999', period: '/month', badge: 'Enterprise' },
+};
+
+function usePricingPlans() {
+  return useQuery({
+    queryKey: ['pricing-plans'],
+    queryFn: async (): Promise<PricingPlan[]> => {
+      const { data: packages } = await supabase
+        .from('feature_packages')
+        .select('id, package_name, description, price_tier')
+        .order('created_at', { ascending: true });
+
+      if (!packages || packages.length === 0) return FALLBACK_PLANS;
+
+      const { data: items } = await supabase
+        .from('feature_package_items')
+        .select('package_id, feature_id, enabled')
+        .eq('enabled', true);
+
+      const featureIds = [...new Set((items || []).map(i => i.feature_id))];
+      const { data: features } = await supabase
+        .from('platform_features')
+        .select('id, feature_key, description')
+        .in('id', featureIds.length > 0 ? featureIds : ['00000000-0000-0000-0000-000000000000']);
+
+      const featureMap = new Map((features || []).map(f => [f.id, f.description || f.feature_key]));
+      const packageFeatures = new Map<string, string[]>();
+
+      for (const item of items || []) {
+        if (!item.enabled) continue;
+        const list = packageFeatures.get(item.package_id) || [];
+        const desc = featureMap.get(item.feature_id);
+        if (desc) list.push(desc);
+        packageFeatures.set(item.package_id, list);
+      }
+
+      const dbPlans: PricingPlan[] = packages.map(pkg => {
+        const tierInfo = PRICE_TIER_MAP[pkg.price_tier] || PRICE_TIER_MAP.free;
+        return {
+          name: pkg.package_name,
+          price: tierInfo.price,
+          period: tierInfo.period,
+          description: pkg.description || '',
+          badge: tierInfo.badge,
+          features: packageFeatures.get(pkg.id) || [],
+        };
+      });
+
+      return [...FALLBACK_PLANS, ...dbPlans];
+    },
+    staleTime: jitteredStaleTime(10 * 60 * 1000),
+  });
+}
+
 export default function PricingPage() {
+  const { data: plans, isLoading } = usePricingPlans();
+  const settings = useSystemSettings();
+
   return (
     <AppLayout showHeader={false}>
       <div className="p-4 pb-8 safe-top">
@@ -80,42 +124,53 @@ export default function PricingPage() {
           </div>
         </div>
 
-        <div className="space-y-4">
-          {plans.map((plan) => (
-            <Card key={plan.name} className={plan.badge === 'Popular' ? 'border-primary shadow-md' : ''}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{plan.name}</CardTitle>
-                  {plan.badge && (
-                    <Badge variant={plan.badge === 'Popular' ? 'default' : 'secondary'}>
-                      {plan.badge}
-                    </Badge>
+        {isLoading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <Card key={i}>
+                <CardHeader><Skeleton className="h-6 w-1/3" /><Skeleton className="h-8 w-1/4 mt-2" /></CardHeader>
+                <CardContent><Skeleton className="h-20 w-full" /></CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {(plans || []).map((plan) => (
+              <Card key={plan.name} className={plan.badge === 'Popular' ? 'border-primary shadow-md' : ''}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">{plan.name}</CardTitle>
+                    {plan.badge && (
+                      <Badge variant={plan.badge === 'Popular' ? 'default' : 'secondary'}>
+                        {plan.badge}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-bold">{plan.price}</span>
+                    <span className="text-muted-foreground text-sm">{plan.period}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{plan.description}</p>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2 text-sm">
+                        <Check className="text-primary shrink-0 mt-0.5" size={16} />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {plan.price !== 'Free' && (
+                    <Button className="w-full mt-4" variant={plan.badge === 'Popular' ? 'default' : 'outline'} onClick={() => window.open(`mailto:${settings.supportEmail}?subject=Inquiry about ${plan.name}`, '_blank')}>
+                      Contact Us
+                    </Button>
                   )}
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-bold">{plan.price}</span>
-                  <span className="text-muted-foreground text-sm">{plan.period}</span>
-                </div>
-                <p className="text-sm text-muted-foreground">{plan.description}</p>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm">
-                      <Check className="text-primary shrink-0 mt-0.5" size={16} />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                {plan.price !== 'Free' && (
-                  <Button className="w-full mt-4" variant={plan.badge === 'Popular' ? 'default' : 'outline'} onClick={() => window.open('mailto:support@sociva.com?subject=Inquiry about ' + plan.name, '_blank')}>
-                    Contact Us
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         <p className="text-center text-xs text-muted-foreground mt-6">
           All prices are in INR. GST applicable where required.

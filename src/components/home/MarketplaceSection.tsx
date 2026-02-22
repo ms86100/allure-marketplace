@@ -119,7 +119,7 @@ function ProductListings({
         >
           <h2 className="text-lg font-bold text-foreground">Your marketplace is getting ready!</h2>
           <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-            Sellers from your community are setting up shop. Fresh products, homemade food & services — all coming your way.
+            Sellers from your community are setting up shop. Products, services & more — all coming your way.
           </p>
         </motion.div>
 

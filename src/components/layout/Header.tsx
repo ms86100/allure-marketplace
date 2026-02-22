@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useSearchPlaceholder } from '@/hooks/useSearchPlaceholder';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 
 interface HeaderProps {
   showCart?: boolean;
@@ -27,6 +28,7 @@ export function Header({
 }: HeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const settings = useSystemSettings();
 
   const handleBack = useCallback(() => {
     // If there's real history, go back; otherwise navigate to society dashboard or home
@@ -111,7 +113,7 @@ export function Header({
                   <span className="text-foreground">a</span>
                 </h1>
                 <p className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">
-                  Your Society, Your Store
+                  {settings.headerTagline}
                 </p>
                 {showLocation && displaySociety && (
                   <button 

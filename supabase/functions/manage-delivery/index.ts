@@ -412,10 +412,19 @@ async function handleCalculateFee(req: Request, db: any, userId: string) {
   const orderValue = parseFloat(url.searchParams.get('order_value') || '0');
   const societyId = url.searchParams.get('society_id');
 
-  // Simple fee calculation for v1
-  // Base fee: ₹20, Free above ₹500
-  const baseFee = 20;
-  const freeThreshold = 500;
+  // Read delivery fee config from system_settings
+  const { data: settingsRows } = await db
+    .from('system_settings')
+    .select('key, value')
+    .in('key', ['base_delivery_fee', 'free_delivery_threshold']);
+
+  const settingsMap: Record<string, string> = {};
+  for (const row of settingsRows || []) {
+    if (row.key && row.value) settingsMap[row.key] = row.value;
+  }
+
+  const baseFee = parseInt(settingsMap.base_delivery_fee || '20', 10) || 20;
+  const freeThreshold = parseInt(settingsMap.free_delivery_threshold || '500', 10) || 500;
 
   if (orderValue >= freeThreshold) {
     return jsonResponse({ delivery_fee: 0, partner_payout: 0, platform_margin: 0, free_delivery: true });

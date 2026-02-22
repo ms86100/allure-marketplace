@@ -318,7 +318,7 @@ export interface ChatMessage {
 
 // CATEGORIES constant removed - now fetched from database via useCategoryConfigs hook
 
-export const ORDER_STATUS_LABELS: Record<OrderStatus, { label: string; color: string }> = {
+const ORDER_STATUS_MAP: Record<string, { label: string; color: string }> = {
   placed: { label: 'Order Placed', color: 'bg-blue-100 text-blue-800' },
   accepted: { label: 'Accepted', color: 'bg-indigo-100 text-indigo-800' },
   preparing: { label: 'Preparing', color: 'bg-yellow-100 text-yellow-800' },
@@ -327,7 +327,6 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, { label: string; color: st
   delivered: { label: 'Delivered', color: 'bg-emerald-100 text-emerald-800' },
   completed: { label: 'Completed', color: 'bg-gray-100 text-gray-800' },
   cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-800' },
-  // New service/rental statuses
   enquired: { label: 'Enquiry Sent', color: 'bg-purple-100 text-purple-800' },
   quoted: { label: 'Quote Received', color: 'bg-orange-100 text-orange-800' },
   scheduled: { label: 'Scheduled', color: 'bg-cyan-100 text-cyan-800' },
@@ -335,11 +334,21 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, { label: string; color: st
   returned: { label: 'Returned', color: 'bg-slate-100 text-slate-800' },
 };
 
-export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, { label: string; color: string }> = {
+const UNKNOWN_STATUS = { label: 'Unknown', color: 'bg-gray-100 text-gray-600' };
+
+export const ORDER_STATUS_LABELS = new Proxy(ORDER_STATUS_MAP as Record<OrderStatus, { label: string; color: string }>, {
+  get: (target, prop: string) => target[prop] ?? UNKNOWN_STATUS,
+});
+
+const PAYMENT_STATUS_MAP: Record<string, { label: string; color: string }> = {
   pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800' },
   paid: { label: 'Paid', color: 'bg-green-100 text-green-800' },
   failed: { label: 'Failed', color: 'bg-red-100 text-red-800' },
   refunded: { label: 'Refunded', color: 'bg-purple-100 text-purple-800' },
 };
+
+export const PAYMENT_STATUS_LABELS = new Proxy(PAYMENT_STATUS_MAP as Record<PaymentStatus, { label: string; color: string }>, {
+  get: (target, prop: string) => target[prop] ?? UNKNOWN_STATUS,
+});
 
 export const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];

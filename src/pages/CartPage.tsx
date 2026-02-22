@@ -17,6 +17,7 @@ import { PaymentMethod } from '@/types/database';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { useSubmitGuard } from '@/hooks/useSubmitGuard';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -31,9 +32,9 @@ export default function CartPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [fulfillmentType, setFulfillmentType] = useState<'self_pickup' | 'delivery'>('self_pickup');
   const [deliveryFee, setDeliveryFee] = useState(0);
-  const freeDeliveryThreshold = 500;
+  const settings = useSystemSettings();
 
-  const effectiveDeliveryFee = fulfillmentType === 'delivery' ? (totalAmount >= freeDeliveryThreshold ? 0 : 20) : 0;
+  const effectiveDeliveryFee = fulfillmentType === 'delivery' ? (totalAmount >= settings.freeDeliveryThreshold ? 0 : settings.baseDeliveryFee) : 0;
   const finalAmount = (appliedCoupon ? Math.max(0, totalAmount - appliedCoupon.discountAmount) : totalAmount) + effectiveDeliveryFee;
 
   const firstSeller = sellerGroups[0]?.items[0]?.product?.seller;
@@ -396,8 +397,8 @@ export default function CartPage() {
           <FulfillmentSelector
             value={fulfillmentType}
             onChange={setFulfillmentType}
-            deliveryFee={20}
-            freeDeliveryThreshold={freeDeliveryThreshold}
+            deliveryFee={settings.baseDeliveryFee}
+            freeDeliveryThreshold={settings.freeDeliveryThreshold}
             orderValue={totalAmount}
           />
         </div>
@@ -453,7 +454,7 @@ export default function CartPage() {
         <div className="mt-4 mx-4 bg-card border border-border rounded-xl p-4 flex items-center gap-3">
           <MapPin size={16} className="text-primary shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deliver to</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{fulfillmentType === 'self_pickup' ? 'Pickup from' : 'Deliver to'}</p>
             <p className="text-sm font-medium mt-0.5">
               {profile?.name} — Block {profile?.block}, Flat {profile?.flat_number}
             </p>
