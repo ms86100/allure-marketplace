@@ -66,11 +66,13 @@ export function useEffectiveFeatures() {
   const featureMap = new Map(features.map(f => [f.feature_key, f]));
 
   const isFeatureEnabled = (key: FeatureKey): boolean => {
+    // No society context at all (logged out or no society) → default enabled for public pages
+    if (!effectiveSocietyId) return true;
+    
     const feature = featureMap.get(key);
     if (!feature) {
-      // No features returned at all = RPC error or no society context → default enabled
-      if (features.length === 0) return true;
-      // Features returned but this key missing = not in package → disabled
+      // RPC returned features but this key is missing → not in package → disabled
+      // RPC returned empty (no builder/package assigned) → also disabled (strict package enforcement)
       return false;
     }
     return feature.is_enabled;
@@ -78,7 +80,7 @@ export function useEffectiveFeatures() {
 
   const getFeatureState = (key: FeatureKey): FeatureState => {
     const feature = featureMap.get(key);
-    if (!feature) return features.length === 0 ? 'enabled' : 'unavailable';
+    if (!feature) return 'unavailable';
     if (feature.source === 'core') return 'locked';
     if (!feature.society_configurable) return feature.is_enabled ? 'locked' : 'disabled';
     return feature.is_enabled ? 'enabled' : 'disabled';
