@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ReorderButton } from '@/components/order/ReorderButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { Order, ORDER_STATUS_LABELS } from '@/types/database';
-import { Package, ChevronRight, Loader2, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Package, ChevronRight, Loader2, ArrowLeft, CheckCircle, Truck } from 'lucide-react';
 import { format } from 'date-fns';
 
 const PAGE_SIZE = 20;
@@ -47,6 +47,11 @@ function OrderCard({ order, type }: { order: Order; type: 'buyer' | 'seller' }) 
             {/* Status + date row */}
             <div className="flex items-center gap-2 mt-0.5">
               {isCompleted && <CheckCircle size={12} className="text-accent shrink-0" />}
+              {(order as any).fulfillment_type === 'delivery' && (
+                <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 flex items-center gap-0.5">
+                  <Truck size={10} /> Delivery
+                </span>
+              )}
               <span className={`text-[11px] px-1.5 py-0.5 rounded ${statusInfo.color}`}>
                 {statusInfo.label}
               </span>

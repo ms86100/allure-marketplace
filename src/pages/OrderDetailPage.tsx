@@ -142,9 +142,14 @@ export default function OrderDetailPage() {
   const statusOrder: OrderStatus[] = ['placed', 'accepted', 'preparing', 'ready', 'picked_up', 'delivered', 'completed'];
   const currentStatusIndex = statusOrder.indexOf(order.status);
   const displayStatuses = ['placed', 'accepted', 'preparing', 'ready'];
+  const orderFulfillmentType = (order as any).fulfillment_type || 'self_pickup';
 
   const getNextStatus = (): OrderStatus | null => {
     if (order.status === 'cancelled' || order.status === 'completed') return null;
+    // For delivery orders at 'ready', the delivery system takes over
+    if (orderFulfillmentType === 'delivery' && order.status === 'ready') return null;
+    // For self_pickup orders at 'ready', skip to completed
+    if (orderFulfillmentType !== 'delivery' && order.status === 'ready') return 'completed';
     const nextIndex = currentStatusIndex + 1;
     return nextIndex < statusOrder.length ? statusOrder[nextIndex] : null;
   };
@@ -392,7 +397,13 @@ export default function OrderDetailPage() {
               )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Delivery</span>
-                <span className="text-primary font-medium">FREE</span>
+                {orderFulfillmentType === 'delivery' ? (
+                  <span className={`font-medium ${(order as any).delivery_fee > 0 ? '' : 'text-primary'}`}>
+                    {(order as any).delivery_fee > 0 ? `₹${(order as any).delivery_fee}` : 'FREE'}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">Self Pickup</span>
+                )}
               </div>
               <div className="flex justify-between font-bold pt-1 border-t border-border">
                 <span>Total</span>
@@ -426,7 +437,12 @@ export default function OrderDetailPage() {
                 Reject
               </Button>
             )}
-            {nextStatus && (
+            {orderFulfillmentType === 'delivery' && order.status === 'ready' ? (
+              <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground">
+                <Truck size={16} className="text-primary" />
+                <span>Awaiting delivery pickup</span>
+              </div>
+            ) : nextStatus ? (
               <Button
                 className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12"
                 onClick={() => updateOrderStatus(nextStatus)}
@@ -435,7 +451,7 @@ export default function OrderDetailPage() {
                 {isUpdating ? 'Updating...' : `Mark ${ORDER_STATUS_LABELS[nextStatus].label}`}
                 <ChevronRight size={14} className="ml-1" />
               </Button>
-            )}
+            ) : null}
           </div>
         </div>
       )}

@@ -157,6 +157,17 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
         </div>
       )}
 
+      {/* Failed delivery action */}
+      {assignment.status === 'failed' && isBuyerView && (
+        <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 space-y-2">
+          <p className="text-xs text-destructive font-medium">Delivery could not be completed</p>
+          <p className="text-[11px] text-muted-foreground">You can raise a dispute for a refund or contact support.</p>
+          <a href="/disputes" className="inline-flex items-center text-xs font-medium text-primary hover:underline">
+            Raise a Dispute →
+          </a>
+        </div>
+      )}
+
       {/* Status message */}
       {isBuyerView && (
         <p className="text-xs text-muted-foreground">
@@ -165,7 +176,16 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
           {assignment.status === 'picked_up' && '🚚 Your order is on the way!'}
           {assignment.status === 'at_gate' && '🏠 Delivery partner is at your society gate.'}
           {assignment.status === 'delivered' && '🎉 Your order has been delivered!'}
-          {assignment.status === 'failed' && '❌ Delivery could not be completed.'}
+        </p>
+      )}
+      {!isBuyerView && (
+        <p className="text-xs text-muted-foreground">
+          {assignment.status === 'pending' && '⏳ Assigning a delivery partner...'}
+          {assignment.status === 'assigned' && `🚴 ${assignment.rider_name || 'Rider'} assigned, will pick up soon.`}
+          {assignment.status === 'picked_up' && '📦 Rider has picked up the order.'}
+          {assignment.status === 'at_gate' && '🏠 Rider is at the buyer\'s gate.'}
+          {assignment.status === 'delivered' && '✅ Delivery completed successfully.'}
+          {assignment.status === 'failed' && '❌ Delivery failed. Check reason above.'}
         </p>
       )}
     </div>

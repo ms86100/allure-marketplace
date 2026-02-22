@@ -34,13 +34,13 @@ const STATUS_BADGES: Record<string, { label: string; color: string }> = {
 };
 
 export function DeliveryMonitoringTab({ societyId }: DeliveryMonitoringTabProps) {
-  const [deliveries, setDeliveries] = useState<DeliveryRecord[]>([]);
+  const [allDeliveries, setAllDeliveries] = useState<DeliveryRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'active' | 'completed' | 'failed'>('active');
 
   useEffect(() => {
     fetchDeliveries();
-  }, [societyId, filter]);
+  }, [societyId]);
 
   const fetchDeliveries = async () => {
     setIsLoading(true);
@@ -49,22 +49,14 @@ export function DeliveryMonitoringTab({ societyId }: DeliveryMonitoringTabProps)
         .from('delivery_assignments')
         .select('id, order_id, status, rider_name, rider_phone, delivery_fee, created_at, pickup_at, delivered_at, failed_reason')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (societyId) {
         query = query.eq('society_id', societyId);
       }
 
-      if (filter === 'active') {
-        query = query.in('status', ['pending', 'assigned', 'picked_up', 'at_gate']);
-      } else if (filter === 'completed') {
-        query = query.eq('status', 'delivered');
-      } else {
-        query = query.in('status', ['failed', 'cancelled']);
-      }
-
       const { data, error } = await query;
-      if (!error) setDeliveries((data || []) as DeliveryRecord[]);
+      if (!error) setAllDeliveries((data || []) as DeliveryRecord[]);
     } catch (err) {
       console.error('Error fetching deliveries:', err);
     } finally {
@@ -72,13 +64,17 @@ export function DeliveryMonitoringTab({ societyId }: DeliveryMonitoringTabProps)
     }
   };
 
-  const activeCount = deliveries.length;
-
   const stats = {
-    active: deliveries.filter(d => ['pending', 'assigned', 'picked_up', 'at_gate'].includes(d.status)).length,
-    delivered: deliveries.filter(d => d.status === 'delivered').length,
-    failed: deliveries.filter(d => ['failed', 'cancelled'].includes(d.status)).length,
+    active: allDeliveries.filter(d => ['pending', 'assigned', 'picked_up', 'at_gate'].includes(d.status)).length,
+    delivered: allDeliveries.filter(d => d.status === 'delivered').length,
+    failed: allDeliveries.filter(d => ['failed', 'cancelled'].includes(d.status)).length,
   };
+
+  const deliveries = allDeliveries.filter(d => {
+    if (filter === 'active') return ['pending', 'assigned', 'picked_up', 'at_gate'].includes(d.status);
+    if (filter === 'completed') return d.status === 'delivered';
+    return ['failed', 'cancelled'].includes(d.status);
+  });
 
   return (
     <div className="space-y-4">

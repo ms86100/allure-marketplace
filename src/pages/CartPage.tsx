@@ -68,6 +68,8 @@ export default function CartPage() {
       _cart_total: totalAmount,
       _has_urgent: hasUrgentItem,
       _seller_groups: sellerGroupsPayload,
+      _fulfillment_type: fulfillmentType,
+      _delivery_fee: effectiveDeliveryFee,
     });
 
     if (error) throw error;
@@ -75,20 +77,8 @@ export default function CartPage() {
     const result = data as { success: boolean; order_ids: string[]; order_count: number };
     if (!result?.success) throw new Error('Failed to create orders');
 
-    const createdOrderIds = result.order_ids;
-
-    // Update fulfillment_type and delivery_fee on created orders
-    if (fulfillmentType === 'delivery') {
-      for (const oid of createdOrderIds) {
-        await supabase.from('orders').update({
-          fulfillment_type: 'delivery',
-          delivery_fee: effectiveDeliveryFee,
-        }).eq('id', oid);
-      }
-    }
-
     // Notifications are now handled by database triggers (enqueue_order_placed_notification)
-    return createdOrderIds;
+    return result.order_ids;
   };
 
   const handlePlaceOrderInner = async () => {
