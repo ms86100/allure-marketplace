@@ -10,7 +10,12 @@ export function cn(...inputs: ClassValue[]) {
  * Use in catch blocks instead of showing raw error.message.
  */
 export function friendlyError(error: unknown): string {
-  const msg = error instanceof Error ? error.message : String(error ?? '');
+  // Handle Supabase PostgrestError objects { message, code, details, hint }
+  const msg = error instanceof Error
+    ? error.message
+    : (typeof error === 'object' && error !== null && 'message' in error && typeof (error as any).message === 'string')
+      ? (error as any).message
+      : String(error ?? '');
   const lower = msg.toLowerCase();
 
   if (lower.includes('jwt') || lower.includes('token') || lower.includes('refresh_token')) {
