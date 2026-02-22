@@ -18,7 +18,7 @@ import { Truck, Plus, Phone, Star, Package, User, Loader2 } from 'lucide-react';
 import { ImageUpload } from '@/components/ui/image-upload';
 
 export default function DeliveryPartnerManagementPage() {
-  const { user, effectiveSocietyId, isSocietyAdmin, isAdmin } = useAuth();
+  const { user, profile, effectiveSocietyId, isSocietyAdmin, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const canManage = isSocietyAdmin || isAdmin;
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -49,8 +49,9 @@ export default function DeliveryPartnerManagementPage() {
     if (!name.trim() || !phone.trim() || !effectiveSocietyId || !user) return;
     setIsSubmitting(true);
 
+    const writeSocietyId = profile?.society_id || effectiveSocietyId;
     const { error } = await supabase.from('delivery_partner_pool').insert({
-      society_id: effectiveSocietyId,
+      society_id: writeSocietyId,
       name: name.trim(),
       phone: phone.trim(),
       vehicle_type: vehicleType,

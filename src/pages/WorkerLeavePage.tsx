@@ -24,7 +24,7 @@ interface WorkerOption {
 }
 
 export default function WorkerLeavePage() {
-  const { effectiveSocietyId, isSocietyAdmin, isAdmin, user } = useAuth();
+  const { effectiveSocietyId, isSocietyAdmin, isAdmin, user, profile } = useAuth();
   const { workerProfile, isWorker } = useWorkerRole();
   const [leaves, setLeaves] = useState<any[]>([]);
   const [workers, setWorkers] = useState<WorkerOption[]>([]);
@@ -93,11 +93,12 @@ export default function WorkerLeavePage() {
   };
 
   const handleAdd = async () => {
-    if (!workerId || !effectiveSocietyId || !user) return;
+    const writeSocietyId = profile?.society_id || effectiveSocietyId;
+    if (!workerId || !writeSocietyId || !user) return;
     setSubmitting(true);
     const { error } = await supabase.from('worker_leave_records').insert({
       worker_id: workerId,
-      society_id: effectiveSocietyId,
+      society_id: writeSocietyId,
       leave_date: leaveDate,
       leave_type: leaveType,
       reason: reason.trim() || null,

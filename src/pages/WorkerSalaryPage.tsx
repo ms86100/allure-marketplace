@@ -22,7 +22,7 @@ interface WorkerOption {
 }
 
 export default function WorkerSalaryPage() {
-  const { effectiveSocietyId, isSocietyAdmin, isAdmin, user } = useAuth();
+  const { effectiveSocietyId, isSocietyAdmin, isAdmin, user, profile } = useAuth();
   const { workerProfile, isWorker } = useWorkerRole();
   const [salaries, setSalaries] = useState<any[]>([]);
   const [workers, setWorkers] = useState<WorkerOption[]>([]);
@@ -90,11 +90,12 @@ export default function WorkerSalaryPage() {
   };
 
   const handleAdd = async () => {
-    if (!workerId || !amount || !effectiveSocietyId || !user) return;
+    const writeSocietyId = profile?.society_id || effectiveSocietyId;
+    if (!workerId || !amount || !writeSocietyId || !user) return;
     setSubmitting(true);
     const { error } = await supabase.from('worker_salary_records').insert({
       worker_id: workerId,
-      society_id: effectiveSocietyId,
+      society_id: writeSocietyId,
       month,
       amount: parseFloat(amount),
       status: 'pending',

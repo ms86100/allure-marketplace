@@ -269,11 +269,15 @@
 
 ## Discovered Issues Summary
 
-| ID | Severity | Module | Description |
-|----|----------|--------|-------------|
-| B1 | LOW | Bulletin | Help responses visible to all society members despite comment claiming otherwise |
-| B2 | LOW | Finances | Expense category filter is client-side only, no persistent state |
-| B3 | MEDIUM | Maintenance | `handleBulkGenerate` uses `profile.society_id` instead of `effectiveSocietyId`, generating dues for wrong society when admin uses "view as" |
+| ID | Severity | Module | Description | Status |
+|----|----------|--------|-------------|--------|
+| B1 | LOW | Bulletin | Help responses visible to all society members despite comment claiming otherwise | Documented |
+| B2 | LOW | Finances | Expense category filter is client-side only, no persistent state | Documented |
+| B3 | MEDIUM | Maintenance | `handleBulkGenerate` used `profile.society_id` instead of `effectiveSocietyId` | **FIXED** |
+| B4 | MEDIUM | Delivery | `DeliveryPartnerManagementPage` wrote partners to `effectiveSocietyId` instead of `profile.society_id` | **FIXED** |
+| B5 | LOW | Worker Leave | `WorkerLeavePage.handleAdd` wrote to `effectiveSocietyId` instead of `profile.society_id` | **FIXED** |
+| B6 | LOW | Worker Salary | `WorkerSalaryPage.handleAdd` wrote to `effectiveSocietyId` instead of `profile.society_id` | **FIXED** |
+| B7 | MEDIUM | Reports | `SocietyReportPage` has no feature gate — any authenticated user can view financial reports | Documented |
 
 ### Previously Fixed (Other Audits)
 - G1-G7: Security & Gate fixes (see security-gate-audit.md)
