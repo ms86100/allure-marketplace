@@ -6,19 +6,21 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkerRole } from '@/hooks/useWorkerRole';
 import { useQuery } from '@tanstack/react-query';
 import { Calendar, Clock, User, CheckCircle2, XCircle } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 
 export default function WorkerAttendancePage() {
   const { effectiveSocietyId } = useAuth();
+  const { workerProfile, isWorker } = useWorkerRole();
   const [dateFilter, setDateFilter] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   const { data: attendance = [], isLoading } = useQuery({
     queryKey: ['worker-attendance', effectiveSocietyId, dateFilter],
     queryFn: async () => {
       if (!effectiveSocietyId) return [];
-      const { data } = await (supabase
+      let query = (supabase
         .from('worker_attendance')
         .select(`
           *,
@@ -27,6 +29,11 @@ export default function WorkerAttendancePage() {
         .eq('society_id', effectiveSocietyId)
         .eq('date', dateFilter)
         .order('check_in_at', { ascending: false });
+      // Workers only see their own attendance
+      if (isWorker && workerProfile) {
+        query = query.eq('worker_id', workerProfile.id);
+      }
+      const { data } = await query;
       return data || [];
     },
     enabled: !!effectiveSocietyId,

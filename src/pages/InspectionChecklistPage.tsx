@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { FeatureGate } from '@/components/ui/FeatureGate';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -267,6 +268,7 @@ export default function InspectionChecklistPage() {
 
   return (
     <AppLayout headerTitle="Inspection Checklist" showLocation={false}>
+      <FeatureGate feature="inspection">
       <div className="p-4 space-y-4">
         {/* Progress Overview */}
         <Card className="border-primary/20">
@@ -472,6 +474,7 @@ export default function InspectionChecklistPage() {
           </Button>
         )}
       </div>
+      </FeatureGate>
     </AppLayout>
   );
 }

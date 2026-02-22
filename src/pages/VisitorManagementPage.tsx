@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { FeatureGate } from '@/components/ui/FeatureGate';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -234,6 +235,7 @@ export default function VisitorManagementPage() {
 
   return (
     <AppLayout headerTitle="Visitor Management" showLocation={false}>
+      <FeatureGate feature="visitor_management">
       <div className="p-4 space-y-4">
         {/* Summary Card */}
         <Card className="border-primary/20 bg-primary/5">
@@ -448,6 +450,7 @@ export default function VisitorManagementPage() {
           </TabsContent>
         </Tabs>
       </div>
+      </FeatureGate>
     </AppLayout>
   );
 }

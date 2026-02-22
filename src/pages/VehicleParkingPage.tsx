@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { FeatureGate } from '@/components/ui/FeatureGate';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -156,6 +157,7 @@ export default function VehicleParkingPage() {
 
   return (
     <AppLayout headerTitle="Vehicle Parking" showLocation={false}>
+      <FeatureGate feature="vehicle_parking">
       <div className="p-4 space-y-4">
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
@@ -303,6 +305,7 @@ export default function VehicleParkingPage() {
           </TabsContent>
         </Tabs>
       </div>
+      </FeatureGate>
     </AppLayout>
   );
 }

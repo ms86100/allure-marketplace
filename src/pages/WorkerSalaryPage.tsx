@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkerRole } from '@/hooks/useWorkerRole';
 import { toast } from 'sonner';
 import { IndianRupee, Plus, Loader2, Wallet } from 'lucide-react';
 
@@ -21,6 +22,7 @@ interface WorkerOption {
 
 export default function WorkerSalaryPage() {
   const { effectiveSocietyId, isSocietyAdmin, isAdmin, user } = useAuth();
+  const { workerProfile, isWorker } = useWorkerRole();
   const [salaries, setSalaries] = useState<any[]>([]);
   const [workers, setWorkers] = useState<WorkerOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,12 +41,19 @@ export default function WorkerSalaryPage() {
 
   const fetchData = async () => {
     setLoading(true);
+    let salaryQuery = supabase.from('worker_salary_records')
+      .select('*')
+      .eq('society_id', effectiveSocietyId!)
+      .order('month', { ascending: false })
+      .limit(100);
+    
+    // Workers only see their own salary records
+    if (isWorker && workerProfile) {
+      salaryQuery = salaryQuery.eq('worker_id', workerProfile.id);
+    }
+    
     const [{ data: salaryData }, { data: workerData }] = await Promise.all([
-      supabase.from('worker_salary_records')
-        .select('*')
-        .eq('society_id', effectiveSocietyId!)
-        .order('month', { ascending: false })
-        .limit(100),
+      salaryQuery,
       supabase.from('society_workers')
         .select('id, worker_type, user_id')
         .eq('society_id', effectiveSocietyId!)

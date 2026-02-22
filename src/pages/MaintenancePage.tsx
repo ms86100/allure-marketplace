@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { useRazorpay } from '@/hooks/useRazorpay';
-import { CheckCircle2, Clock, AlertTriangle, Plus, Download } from 'lucide-react';
+import { CheckCircle2, Clock, AlertTriangle, Plus, Download, Loader2 } from 'lucide-react';
 import { exportMaintenanceDues } from '@/lib/csv-export';
 import { FeatureGate } from '@/components/ui/FeatureGate';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -23,6 +23,7 @@ interface MaintenanceDue {
   flat_identifier: string;
   month: string;
   amount: number;
+  late_fee: number | null;
   status: string;
   paid_date: string | null;
   created_at: string;
@@ -38,7 +39,7 @@ export default function MaintenancePage() {
   const [generateAmount, setGenerateAmount] = useState('');
   const [generating, setGenerating] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-
+  const [applyingLateFees, setApplyingLateFees] = useState(false);
   useEffect(() => {
     fetchDues();
   }, [user, profile]);
@@ -127,6 +128,20 @@ export default function MaintenancePage() {
     }
   };
 
+  const handleApplyLateFees = async () => {
+    setApplyingLateFees(true);
+    try {
+      const { error } = await supabase.rpc('apply_maintenance_late_fees' as any);
+      if (error) throw error;
+      toast.success('Late fees applied to overdue records');
+      fetchDues();
+    } catch (err: any) {
+      toast.error(friendlyError(err));
+    } finally {
+      setApplyingLateFees(false);
+    }
+  };
+
   const statusIcon = (status: string) => {
     if (status === 'paid') return <CheckCircle2 size={14} className="text-success" />;
     if (status === 'overdue') return <AlertTriangle size={14} className="text-destructive" />;
@@ -186,6 +201,9 @@ export default function MaintenancePage() {
               <Download size={16} />
             </Button>
           )}
+          <Button variant="outline" size="sm" onClick={handleApplyLateFees} disabled={applyingLateFees} title="Apply late fees to overdue dues">
+            {applyingLateFees ? <Loader2 size={16} className="animate-spin" /> : <AlertTriangle size={16} />}
+          </Button>
           </div>
         )}
 
@@ -227,6 +245,7 @@ export default function MaintenancePage() {
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {d.month} · ₹{d.amount.toLocaleString()}
+                      {d.late_fee ? ` + ₹${d.late_fee.toLocaleString()} late fee` : ''}
                       {d.paid_date && ` · Paid ${d.paid_date}`}
                     </p>
                   </div>

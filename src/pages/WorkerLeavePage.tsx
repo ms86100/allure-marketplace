@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWorkerRole } from '@/hooks/useWorkerRole';
 import { toast } from 'sonner';
 import { CalendarOff, Plus, Loader2, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
@@ -23,6 +24,7 @@ interface WorkerOption {
 
 export default function WorkerLeavePage() {
   const { effectiveSocietyId, isSocietyAdmin, isAdmin, user } = useAuth();
+  const { workerProfile, isWorker } = useWorkerRole();
   const [leaves, setLeaves] = useState<any[]>([]);
   const [workers, setWorkers] = useState<WorkerOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,12 +44,19 @@ export default function WorkerLeavePage() {
 
   const fetchData = async () => {
     setLoading(true);
+    let leaveQuery = supabase.from('worker_leave_records')
+      .select('*')
+      .eq('society_id', effectiveSocietyId!)
+      .order('leave_date', { ascending: false })
+      .limit(100);
+    
+    // Workers only see their own leave
+    if (isWorker && workerProfile) {
+      leaveQuery = leaveQuery.eq('worker_id', workerProfile.id);
+    }
+    
     const [{ data: leaveData }, { data: workerData }] = await Promise.all([
-      supabase.from('worker_leave_records')
-        .select('*')
-        .eq('society_id', effectiveSocietyId!)
-        .order('leave_date', { ascending: false })
-        .limit(100),
+      leaveQuery,
       supabase.from('society_workers')
         .select('id, worker_type, user_id')
         .eq('society_id', effectiveSocietyId!)

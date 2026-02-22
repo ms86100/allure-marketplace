@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { FeatureGate } from '@/components/ui/FeatureGate';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -93,6 +94,7 @@ export default function AuthorizedPersonsPage() {
 
   return (
     <AppLayout headerTitle="Authorized Persons" showLocation={false}>
+      <FeatureGate feature="visitor_management">
       <div className="p-4 space-y-4">
         <p className="text-xs text-muted-foreground">
           Family members and trusted individuals authorized for gate entry without OTP.
@@ -165,6 +167,7 @@ export default function AuthorizedPersonsPage() {
           ))
         )}
       </div>
+      </FeatureGate>
     </AppLayout>
   );
 }
