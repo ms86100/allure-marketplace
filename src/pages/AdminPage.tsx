@@ -38,6 +38,7 @@ import { logAudit } from '@/lib/audit';
 import { SocietySwitcher } from '@/components/admin/SocietySwitcher';
 import { FeatureManagement } from '@/components/admin/FeatureManagement';
 import { AdminProductApprovals } from '@/components/admin/AdminProductApprovals';
+import { PlatformSettingsManager } from '@/components/admin/PlatformSettingsManager';
 interface Report {
   id: string;
   reporter_id: string;
@@ -605,6 +606,7 @@ export default function AdminPage() {
 
 
           <TabsContent value="settings" className="space-y-4 mt-4">
+            <PlatformSettingsManager />
             <ApiKeySettings />
             <CategoryManager />
             <SubcategoryManager />
