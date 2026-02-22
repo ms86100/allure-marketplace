@@ -7,9 +7,9 @@ import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
 import { useNearbySocietySellers } from '@/hooks/queries/useStoreDiscovery';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
+
 import { motion } from 'framer-motion';
-import { Store, Sparkles, Clock, Search, X } from 'lucide-react';
+import { Store, Sparkles, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function CategoriesPage() {
@@ -22,7 +22,7 @@ export default function CategoriesPage() {
   const searchRadius = profile?.search_radius_km ?? 10;
   const { data: nearbyBands = [] } = useNearbySocietySellers(searchRadius, browseBeyond);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const searchQuery = '';
   const [activeGroup, setActiveGroup] = useState<string>('all');
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -97,24 +97,8 @@ export default function CategoriesPage() {
       {/* Header */}
       <div className="px-4 pt-3 pb-1">
         <h1 className="text-lg font-bold text-foreground">Explore Categories</h1>
-        <p className="text-xs text-muted-foreground mb-2">Find what you love</p>
-        <div className="h-[2px] rounded-full bg-gradient-to-r from-primary via-primary/50 to-transparent mb-3" />
-
-        {/* Search */}
-        <div className="relative mb-2">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search categories…"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="pl-8 pr-7 h-8 bg-muted border-0 rounded-lg text-xs"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
-              <X size={12} />
-            </button>
-          )}
-        </div>
+        <p className="text-xs text-muted-foreground mb-1">Find what you love</p>
+        <div className="h-[2px] rounded-full bg-gradient-to-r from-primary via-primary/50 to-transparent" />
       </div>
 
       {/* Parent Group Pills */}
