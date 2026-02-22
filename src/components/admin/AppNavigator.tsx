@@ -155,7 +155,7 @@ export function AppNavigator() {
               <Card
                 key={item.route}
                 className="cursor-pointer hover:bg-muted/50 transition-colors active:scale-[0.98]"
-                onClick={() => navigate(item.route)}
+                onClick={() => navigate(`${item.route}${item.route.includes('?') ? '&' : '?'}from=navigator`)}
               >
                 <CardContent className="p-3 flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${section.color}`}>
