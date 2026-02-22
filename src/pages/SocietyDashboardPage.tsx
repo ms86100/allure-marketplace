@@ -158,8 +158,8 @@ export default function SocietyDashboardPage() {
         emoji: '🏘️',
         items: [
           { icon: ShieldAlert, label: 'Disputes', to: '/disputes', stat: `${stats.openDisputes} open`, iconBg: 'bg-rose-500/10', iconColor: 'text-rose-500', featureKey: 'disputes', keywords: ['complaint', 'issue', 'grievance', 'escalate', 'resolve', 'ticket'] },
-          { icon: Truck, label: 'Deliveries', to: '/society/deliveries', stat: 'Track deliveries', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-500', keywords: ['delivery', 'rider', 'order', 'track', 'shipping'] },
-          { icon: Megaphone, label: 'Notices', to: '/society/notices', stat: 'Official circulars', iconBg: 'bg-yellow-500/10', iconColor: 'text-yellow-500', keywords: ['announcement', 'circular', 'notice', 'news', 'update', 'alert'] },
+          { icon: Truck, label: 'Deliveries', to: '/society/deliveries', stat: 'Track deliveries', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-500', featureKey: 'delivery_management', keywords: ['delivery', 'rider', 'order', 'track', 'shipping'] },
+          { icon: Megaphone, label: 'Notices', to: '/society/notices', stat: 'Official circulars', iconBg: 'bg-yellow-500/10', iconColor: 'text-yellow-500', featureKey: 'society_notices', keywords: ['announcement', 'circular', 'notice', 'news', 'update', 'alert'] },
         ],
       },
     ];
@@ -173,7 +173,7 @@ export default function SocietyDashboardPage() {
           { icon: CalendarDays, label: 'Worker Attendance', to: '/worker-attendance', stat: 'Track attendance', iconBg: 'bg-primary/10', iconColor: 'text-primary', featureKey: 'workforce_management', keywords: ['attendance', 'check-in', 'present', 'absent'] },
           { icon: ClipboardList, label: 'Worker Leave', to: '/worker-leave', stat: 'Leave records', iconBg: 'bg-primary/10', iconColor: 'text-primary', featureKey: 'workforce_management', keywords: ['leave', 'off', 'holiday', 'absence'] },
           { icon: Wallet, label: 'Worker Salary', to: '/worker-salary', stat: 'Salary records', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', featureKey: 'workforce_management', keywords: ['salary', 'pay', 'wage', 'payment'] },
-          { icon: Truck, label: 'Delivery Partners', to: '/delivery-partners', stat: 'Manage partners', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-500', keywords: ['delivery', 'partner', 'rider', 'logistics'] },
+          { icon: Truck, label: 'Delivery Partners', to: '/delivery-partners', stat: 'Manage partners', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-500', featureKey: 'delivery_management', keywords: ['delivery', 'partner', 'rider', 'logistics'] },
           { icon: ShieldCheck, label: 'Guard Kiosk', to: '/guard-kiosk', stat: 'Verify visitor OTPs', iconBg: 'bg-green-500/10', iconColor: 'text-green-500', featureKey: 'guard_kiosk', keywords: ['guard', 'security', 'otp', 'verify', 'gate', 'watchman'] },
           { icon: Shield, label: 'Society Admin', to: '/society/admin', stat: 'Manage society', iconBg: 'bg-blue-500/10', iconColor: 'text-blue-500', keywords: ['admin', 'settings', 'manage', 'configure', 'committee'] },
         ],
