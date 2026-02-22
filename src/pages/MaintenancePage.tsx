@@ -8,7 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
-import { CheckCircle2, Clock, AlertTriangle, Plus } from 'lucide-react';
+import { useRazorpay } from '@/hooks/useRazorpay';
+import { CheckCircle2, Clock, AlertTriangle, Plus, Download } from 'lucide-react';
+import { exportMaintenanceDues } from '@/lib/csv-export';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -28,6 +30,7 @@ interface MaintenanceDue {
 export default function MaintenancePage() {
   const { user, profile, isAdmin, isSocietyAdmin, effectiveSocietyId } = useAuth();
   const canManage = isAdmin || isSocietyAdmin;
+  const { createOrder: razorpayOrder, isLoading: paymentLoading } = useRazorpay();
   const [dues, setDues] = useState<MaintenanceDue[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [generateMonth, setGenerateMonth] = useState('');
@@ -141,6 +144,7 @@ export default function MaintenancePage() {
     <AppLayout headerTitle="Maintenance" showLocation={false}>
       <div className="p-4 space-y-4">
         {canManage && (
+          <div className="flex gap-2">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
               <Button className="w-full gap-2">
@@ -175,6 +179,12 @@ export default function MaintenancePage() {
               </div>
             </SheetContent>
           </Sheet>
+          {dues.length > 0 && (
+            <Button variant="outline" size="icon" onClick={() => exportMaintenanceDues(dues)} title="Export CSV">
+              <Download size={16} />
+            </Button>
+          )}
+          </div>
         )}
 
         {/* Confirmation dialog for bulk generation */}
@@ -221,6 +231,34 @@ export default function MaintenancePage() {
                   {canManage && d.status !== 'paid' && (
                     <Button size="sm" variant="outline" className="text-xs" onClick={() => handleMarkPaid(d.id)}>
                       Mark Paid
+                    </Button>
+                  )}
+                  {!canManage && d.status !== 'paid' && (
+                    <Button
+                      size="sm"
+                      className="text-xs"
+                      disabled={paymentLoading}
+                      onClick={() => {
+                        razorpayOrder({
+                          orderId: d.id,
+                          amount: d.amount,
+                          sellerId: d.id,
+                          customerName: profile?.name || '',
+                          customerEmail: '',
+                          customerPhone: profile?.phone || '',
+                          businessName: 'Maintenance Dues',
+                          onSuccess: async (paymentId) => {
+                            await supabase.from('maintenance_dues')
+                              .update({ status: 'paid', paid_date: new Date().toISOString().split('T')[0], receipt_url: paymentId })
+                              .eq('id', d.id);
+                            toast.success('Payment successful!');
+                            fetchDues();
+                          },
+                          onFailure: () => toast.error('Payment failed'),
+                        });
+                      }}
+                    >
+                      Pay ₹{d.amount.toLocaleString()}
                     </Button>
                   )}
                 </CardContent>

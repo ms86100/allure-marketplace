@@ -12,6 +12,7 @@ import { BuilderFeaturePlan } from '@/components/builder/BuilderFeaturePlan';
 import { BuilderSocietyFeatures } from '@/components/builder/BuilderSocietyFeatures';
 import { BuilderActionCenter } from '@/components/builder/BuilderActionCenter';
 import { BuilderAnnouncementSheet } from '@/components/builder/BuilderAnnouncementSheet';
+import { BuilderSetupWizard } from '@/components/builder/BuilderSetupWizard';
 
 interface BuilderSociety {
   id: string;
@@ -222,6 +223,9 @@ export default function BuilderDashboardPage() {
                       </button>
                     )}
                     <BuilderSocietyFeatures societyId={s.id} />
+                    <span onClick={e => e.stopPropagation()}>
+                      <BuilderSetupWizard societyId={s.id} societyName={s.name} />
+                    </span>
                     {s.open_snags > 0 && (
                       <button
                         className="text-[10px] bg-destructive/10 text-destructive px-1.5 py-0.5 rounded hover:bg-destructive/20 transition-colors"

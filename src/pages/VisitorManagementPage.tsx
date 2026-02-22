@@ -19,8 +19,9 @@ import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import {
   UserPlus, Shield, Clock, Car, Phone, Truck, Users,
-  CheckCircle, XCircle, Copy, RefreshCw, LogIn, LogOut
+  CheckCircle, XCircle, Copy, RefreshCw, LogIn, LogOut, Download
 } from 'lucide-react';
+import { exportVisitorLog } from '@/lib/csv-export';
 
 type VisitorType = 'guest' | 'delivery' | 'cab' | 'domestic_help' | 'contractor';
 type VisitorStatus = 'expected' | 'checked_in' | 'checked_out' | 'cancelled' | 'expired';
@@ -216,6 +217,11 @@ export default function VisitorManagementPage() {
                   Add
                 </Button>
               </SheetTrigger>
+            {visitors.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => exportVisitorLog(visitors)} title="Export CSV">
+                <Download size={16} />
+              </Button>
+            )}
               <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
                 <SheetHeader>
                   <SheetTitle>Add Visitor</SheetTitle>

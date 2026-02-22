@@ -21,6 +21,7 @@ import { SocietySwitcher } from '@/components/admin/SocietySwitcher';
 import { SecurityStaffManager } from '@/components/admin/SecurityStaffManager';
 import { SecurityModeSettings } from '@/components/admin/SecurityModeSettings';
 import { useEffectiveFeatures } from '@/hooks/useEffectiveFeatures';
+import { CommitteeDashboard } from '@/components/admin/CommitteeDashboard';
 import type { FeatureKey } from '@/hooks/useEffectiveFeatures';
 
 const FEATURE_LABELS: Record<FeatureKey, { label: string; description: string }> = {
@@ -229,8 +230,9 @@ export default function SocietyAdminPage() {
           </CardContent></Card>
         </div>
 
-        <Tabs defaultValue="users">
-          <TabsList className="w-full grid grid-cols-6">
+        <Tabs defaultValue="overview">
+          <TabsList className="w-full grid grid-cols-7">
+            <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
             <TabsTrigger value="users" className="text-xs">Users</TabsTrigger>
             <TabsTrigger value="sellers" className="text-xs">Sellers</TabsTrigger>
             <TabsTrigger value="admins" className="text-xs">Admins</TabsTrigger>
@@ -238,6 +240,11 @@ export default function SocietyAdminPage() {
             <TabsTrigger value="features" className="text-xs">Features</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs">Settings</TabsTrigger>
           </TabsList>
+
+          {/* Committee Dashboard */}
+          <TabsContent value="overview" className="mt-4">
+            {societyId && <CommitteeDashboard societyId={societyId} />}
+          </TabsContent>
 
           {/* Pending Users */}
           <TabsContent value="users" className="space-y-2 mt-4">

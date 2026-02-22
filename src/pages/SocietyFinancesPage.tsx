@@ -14,7 +14,8 @@ import { SpendingPieChart } from '@/components/finances/SpendingPieChart';
 import { ExpenseList } from '@/components/finances/ExpenseList';
 import { AddExpenseSheet } from '@/components/finances/AddExpenseSheet';
 import { IncomeVsExpenseChart } from '@/components/finances/IncomeVsExpenseChart';
-import { Loader2, Plus, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import { Loader2, Plus, TrendingUp, TrendingDown, Wallet, Download } from 'lucide-react';
+import { exportFinances } from '@/lib/csv-export';
 
 interface Expense {
   id: string;
@@ -167,6 +168,11 @@ export default function SocietyFinancesPage() {
       {/* Admin FABs */}
       {(isAdmin || isSocietyAdmin) && (
         <div className="fixed bottom-24 right-4 z-40 flex flex-col gap-2">
+          {(expenses.length > 0 || income.length > 0) && (
+            <Button size="sm" variant="outline" className="rounded-full shadow-lg gap-1" onClick={() => exportFinances(expenses, income)}>
+              <Download size={14} /> Export
+            </Button>
+          )}
           <Button size="sm" className="rounded-full shadow-lg gap-1" onClick={() => setShowAddIncome(true)}>
             <Plus size={14} /> Income
           </Button>

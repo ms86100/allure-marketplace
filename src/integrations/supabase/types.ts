@@ -4406,6 +4406,60 @@ export type Database = {
           },
         ]
       }
+      society_notices: {
+        Row: {
+          attachment_urls: string[] | null
+          body: string
+          category: string
+          created_at: string
+          id: string
+          is_pinned: boolean
+          posted_by: string
+          society_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          attachment_urls?: string[] | null
+          body: string
+          category?: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          posted_by: string
+          society_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          attachment_urls?: string[] | null
+          body?: string
+          category?: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          posted_by?: string
+          society_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "society_notices_posted_by_fkey"
+            columns: ["posted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "society_notices_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       society_report_cards: {
         Row: {
           generated_at: string
