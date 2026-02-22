@@ -450,15 +450,27 @@ export default function CartPage() {
           </div>
         </div>
 
-        {/* Delivery Address */}
+        {/* Delivery / Pickup Address */}
         <div className="mt-4 mx-4 bg-card border border-border rounded-xl p-4 flex items-center gap-3">
           <MapPin size={16} className="text-primary shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{fulfillmentType === 'self_pickup' ? 'Pickup from' : 'Deliver to'}</p>
-            <p className="text-sm font-medium mt-0.5">
-              {profile?.name} — {[profile?.block, profile?.flat_number].filter(Boolean).join(', ')}
-            </p>
-            <p className="text-xs text-muted-foreground">{society?.name || 'Your Society'}</p>
+            {fulfillmentType === 'self_pickup' ? (
+              <>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pickup from</p>
+                <p className="text-sm font-medium mt-0.5">
+                  {sellerGroups[0]?.sellerName || 'Seller'}
+                </p>
+                <p className="text-xs text-muted-foreground">{society?.name || 'Your Society'}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deliver to</p>
+                <p className="text-sm font-medium mt-0.5">
+                  {profile?.name} — {[profile?.block, profile?.flat_number].filter(Boolean).join(', ')}
+                </p>
+                <p className="text-xs text-muted-foreground">{society?.name || 'Your Society'}</p>
+              </>
+            )}
           </div>
           <ChevronRight size={16} className="text-muted-foreground" />
         </div>
@@ -509,8 +521,12 @@ export default function CartPage() {
                   <span className="font-medium">{paymentMethod === 'cod' ? 'Cash on Delivery' : 'UPI'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Deliver to</span>
-                  <span className="font-medium text-right">Block {profile?.block}, {profile?.flat_number}</span>
+                  <span className="text-muted-foreground">{fulfillmentType === 'self_pickup' ? 'Pickup from' : 'Deliver to'}</span>
+                  <span className="font-medium text-right">
+                    {fulfillmentType === 'self_pickup'
+                      ? sellerGroups[0]?.sellerName || 'Seller'
+                      : `${profile?.block}, ${profile?.flat_number}`}
+                  </span>
                 </div>
                 {sellerGroups.length > 1 && (
                   <p className="text-xs text-muted-foreground">

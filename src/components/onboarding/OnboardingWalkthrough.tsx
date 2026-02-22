@@ -1,17 +1,26 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, ShoppingBag, Users, MapPin, Shield, X } from 'lucide-react';
+import { ChevronRight, ShoppingBag, Users, MapPin, Shield, X, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+export interface OnboardingSlide {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  color: string;
+}
 
 interface OnboardingWalkthroughProps {
   onComplete: () => void;
+  /** Override default slides for white-label customization */
+  slides?: OnboardingSlide[];
 }
 
-const slides = [
+const DEFAULT_SLIDES: OnboardingSlide[] = [
   {
     icon: Users,
     title: 'Community Marketplace',
-    description: 'Buy homemade food and local goods exclusively from your community neighbors. Everything is made fresh and delivered within the society.',
+    description: 'Buy and sell local goods and services exclusively within your verified residential community.',
     color: 'bg-primary/10 text-primary',
   },
   {
@@ -34,7 +43,8 @@ const slides = [
   },
 ];
 
-export function OnboardingWalkthrough({ onComplete }: OnboardingWalkthroughProps) {
+export function OnboardingWalkthrough({ onComplete, slides: customSlides }: OnboardingWalkthroughProps) {
+  const slides = customSlides || DEFAULT_SLIDES;
   const [currentSlide, setCurrentSlide] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -66,14 +76,13 @@ export function OnboardingWalkthrough({ onComplete }: OnboardingWalkthroughProps
     if (touchStartX.current === null || touchStartY.current === null) return;
     const deltaX = e.changedTouches[0].clientX - touchStartX.current;
     const deltaY = e.changedTouches[0].clientY - touchStartY.current;
-    // Only trigger if horizontal swipe is dominant
     if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
       if (deltaX < 0) handleNext();
       else handlePrev();
     }
     touchStartX.current = null;
     touchStartY.current = null;
-  }, [currentSlide]);
+  }, [currentSlide, slides.length]);
 
   const slide = slides[currentSlide];
   const Icon = slide.icon;

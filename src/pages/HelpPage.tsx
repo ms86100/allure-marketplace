@@ -12,18 +12,25 @@ import {
   HelpCircle,
   ChevronRight,
   BookOpen,
-  RefreshCw
+  RefreshCw,
+  type LucideIcon,
 } from 'lucide-react';
 import { useOnboarding } from '@/components/onboarding/OnboardingWalkthrough';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 
-const HELP_SECTIONS = [
+export interface HelpSection {
+  icon: LucideIcon;
+  title: string;
+  items: string[];
+}
+
+const DEFAULT_HELP_SECTIONS: HelpSection[] = [
   {
     icon: ShoppingBag,
     title: 'How to Order',
     items: [
       'Browse sellers on the Home screen',
-      'Tap on a seller to see their menu',
+      'Tap on a seller to see their listings',
       'Add items to your cart',
       'Choose payment method (UPI or Cash)',
       'Place your order and track status',
@@ -62,9 +69,15 @@ const HELP_SECTIONS = [
   },
 ];
 
-export default function HelpPage() {
+interface HelpPageProps {
+  /** Override default sections for white-label customization */
+  sections?: HelpSection[];
+}
+
+export default function HelpPage({ sections: customSections }: HelpPageProps) {
   const { resetOnboarding } = useOnboarding();
   const settings = useSystemSettings();
+  const helpSections = customSections || DEFAULT_HELP_SECTIONS;
 
   return (
     <AppLayout showHeader={false} showNav={false}>
@@ -80,7 +93,7 @@ export default function HelpPage() {
           </div>
           <h1 className="text-2xl font-bold">Help & Guide</h1>
           <p className="text-muted-foreground mt-1">
-            Learn how to use Sociva
+            Learn how to use the platform
           </p>
         </div>
 
@@ -107,7 +120,7 @@ export default function HelpPage() {
 
         {/* Help Sections */}
         <div className="space-y-4">
-          {HELP_SECTIONS.map(({ icon: Icon, title, items }) => (
+          {helpSections.map(({ icon: Icon, title, items }) => (
             <Card key={title}>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3 mb-3">

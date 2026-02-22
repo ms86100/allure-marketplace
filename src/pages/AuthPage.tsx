@@ -14,6 +14,7 @@ import authHero from '@/assets/auth-hero.jpg';
 import { Society } from '@/types/database';
 import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
 import { useAutocomplete, PlaceDetails } from '@/hooks/useGoogleMaps';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 
 type SignupStep = 'credentials' | 'society' | 'profile' | 'verification';
 type SocietySubStep = 'search' | 'map-confirm' | 'request-form';
@@ -54,6 +55,7 @@ export default function AuthPage() {
   const { predictions, isSearching, searchPlaces, getPlaceDetails, clearPredictions, isLoaded: mapsLoaded } = useAutocomplete();
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [adjustedCoords, setAdjustedCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const settings = useSystemSettings();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Request form
@@ -811,11 +813,11 @@ export default function AuthPage() {
                   <div className="space-y-1">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
-                        <Label htmlFor="block">Block / Tower *</Label>
+                        <Label htmlFor="block">{settings.addressBlockLabel} *</Label>
                         <Input id="block" placeholder="e.g., A, B, T1" value={profileData.block} onChange={(e) => setProfileData({ ...profileData, block: e.target.value })} className="h-12 rounded-xl" />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="flat">Flat Number *</Label>
+                        <Label htmlFor="flat">{settings.addressFlatLabel} *</Label>
                         <Input id="flat" placeholder="e.g., 101" value={profileData.flat_number} onChange={(e) => setProfileData({ ...profileData, flat_number: e.target.value })} className="h-12 rounded-xl" />
                       </div>
                     </div>

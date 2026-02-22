@@ -1,14 +1,17 @@
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 
 export default function TermsPage() {
+  const settings = useSystemSettings();
+
   return (
     <AppLayout headerTitle="Terms & Conditions" showLocation={false}>
       <div className="p-4 space-y-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Terms & Conditions</CardTitle>
-            <p className="text-sm text-muted-foreground">Last updated: February 13, 2026</p>
+            <p className="text-sm text-muted-foreground">Last updated: {settings.termsLastUpdated}</p>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <section>
@@ -170,7 +173,7 @@ export default function TermsPage() {
             <section>
               <h3 className="font-semibold mb-2">19. Contact</h3>
               <p className="text-muted-foreground">
-                For questions about these Terms, please contact us through the app's Help & Support section or email support@sociva.com.
+                For questions about these Terms, please contact us through the app's Help & Support section or email {settings.supportEmail}.
               </p>
             </section>
           </CardContent>

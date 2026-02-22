@@ -352,3 +352,14 @@ export const PAYMENT_STATUS_LABELS = new Proxy(PAYMENT_STATUS_MAP as Record<Paym
 });
 
 export const DAYS_OF_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/** Full day names for i18n-ready display. Keyed by short abbreviation. */
+export const DAY_LABELS: Record<string, string> = {
+  Mon: 'Monday',
+  Tue: 'Tuesday',
+  Wed: 'Wednesday',
+  Thu: 'Thursday',
+  Fri: 'Friday',
+  Sat: 'Saturday',
+  Sun: 'Sunday',
+};

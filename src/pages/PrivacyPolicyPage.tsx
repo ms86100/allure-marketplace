@@ -1,14 +1,17 @@
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 
 export default function PrivacyPolicyPage() {
+  const settings = useSystemSettings();
+
   return (
     <AppLayout headerTitle="Privacy Policy" showLocation={false}>
       <div className="p-4 space-y-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Privacy Policy</CardTitle>
-            <p className="text-sm text-muted-foreground">Last updated: February 13, 2026</p>
+            <p className="text-sm text-muted-foreground">Last updated: {settings.privacyLastUpdated}</p>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <section>
@@ -108,7 +111,7 @@ export default function PrivacyPolicyPage() {
             <section>
               <h3 className="font-semibold mb-2">11. Data Protection Officer</h3>
               <p className="text-muted-foreground">
-                For any data privacy concerns or to exercise your rights, contact our Data Protection Officer through the app's Help & Support section or email dpo@sociva.com.
+                For any data privacy concerns or to exercise your rights, contact our Data Protection Officer through the app's Help & Support section or email {settings.dpoEmail}.
               </p>
             </section>
 

@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import useEmblaCarousel from 'embla-carousel-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useParentGroups, ParentGroupInfo } from '@/hooks/useParentGroups';
 import { 
   Utensils, ShoppingBag, Wrench, GraduationCap, Package,
   Star, Shield, MapPin, Users, ChevronRight, Sparkles,
-  TrendingUp, BadgeCheck, Lock, Ticket
+  TrendingUp, BadgeCheck, Lock, Ticket,
+  type LucideIcon,
 } from 'lucide-react';
 
 const AUTOPLAY_INTERVAL = 8000;
@@ -25,10 +27,34 @@ function useAutoplay(emblaApi: any, interval: number) {
   }, [emblaApi, interval]);
 }
 
+const ICON_MAP: Record<string, LucideIcon> = {
+  Utensils, ShoppingBag, Wrench, GraduationCap, Package, Ticket, Users, Star, Shield,
+};
+
+const GROUP_COLORS = [
+  'bg-primary/10 text-primary',
+  'bg-secondary/30 text-secondary-foreground',
+  'bg-accent/20 text-accent-foreground',
+  'bg-muted text-muted-foreground',
+  'bg-primary/10 text-primary',
+  'bg-warning/10 text-warning',
+];
+
 export default function LandingPage() {
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
   const [activeSlide, setActiveSlide] = useState(0);
   const [stats, setStats] = useState({ societies: 0, sellers: 0, categories: 0 });
+  const { parentGroupInfos } = useParentGroups();
+
+  const displayGroups = useMemo(() => {
+    const active = parentGroupInfos.filter(g => g.label);
+    return active.slice(0, 6).map((g, i) => ({
+      icon: ICON_MAP[g.icon] || Package,
+      title: g.label,
+      desc: g.description || '',
+      color: GROUP_COLORS[i % GROUP_COLORS.length],
+    }));
+  }, [parentGroupInfos]);
 
   useAutoplay(emblaApi, AUTOPLAY_INTERVAL);
 
@@ -106,14 +132,7 @@ export default function LandingPage() {
         <h2 className="text-3xl font-bold mb-2">Everything You Need</h2>
         <p className="text-muted-foreground mb-6">From your neighbors, for your community.</p>
         <div className="grid grid-cols-2 gap-3">
-          {[
-            { icon: Utensils, title: 'Home Food', desc: 'Fresh meals & snacks', color: 'bg-primary/10 text-primary' },
-            { icon: GraduationCap, title: 'Classes', desc: 'Yoga, dance, tutoring', color: 'bg-secondary/30 text-secondary-foreground' },
-            { icon: Wrench, title: 'Services', desc: 'Electrician, plumber...', color: 'bg-accent/20 text-accent-foreground' },
-            { icon: Package, title: 'Rentals', desc: 'Party supplies & more', color: 'bg-muted text-muted-foreground' },
-            { icon: ShoppingBag, title: 'Buy & Sell', desc: 'Pre-loved items', color: 'bg-primary/10 text-primary' },
-            { icon: Ticket, title: 'Coupons', desc: 'Exclusive deals', color: 'bg-warning/10 text-warning' },
-          ].map(({ icon: Icon, title, desc, color }) => (
+          {displayGroups.map(({ icon: Icon, title, desc, color }) => (
             <div key={title} className="p-4 rounded-xl bg-card border border-border">
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${color}`}>
                 <Icon size={20} />

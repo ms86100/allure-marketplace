@@ -28,6 +28,10 @@ const SETTING_FIELDS: SettingField[] = [
   { key: 'grievance_officer_name', label: 'Grievance Officer Name', type: 'text', icon: Type, group: 'Contact', description: 'Displayed in the Grievance Officer card' },
   { key: 'header_tagline', label: 'Header Tagline', type: 'text', icon: Type, group: 'Branding', description: 'Shown below the logo in the app header' },
   { key: 'app_version', label: 'App Version', type: 'text', icon: Settings, group: 'Branding', description: 'Displayed on the Profile page' },
+  { key: 'address_block_label', label: 'Address Block Label', type: 'text', icon: Type, group: 'Address', description: 'Label for block/tower field (e.g., Block / Tower, Wing)' },
+  { key: 'address_flat_label', label: 'Address Flat Label', type: 'text', icon: Type, group: 'Address', description: 'Label for flat/unit field (e.g., Flat Number, Unit)' },
+  { key: 'terms_last_updated', label: 'Terms Last Updated', type: 'text', icon: Type, group: 'Legal', description: 'Date shown on Terms & Conditions page' },
+  { key: 'privacy_last_updated', label: 'Privacy Last Updated', type: 'text', icon: Type, group: 'Legal', description: 'Date shown on Privacy Policy page' },
 ];
 
 export function PlatformSettingsManager() {
@@ -65,10 +69,23 @@ export function PlatformSettingsManager() {
     setSaving(true);
     try {
       for (const key of changedKeys) {
-        await supabase
+        // Upsert: update if exists, insert if not
+        const { data: existing } = await supabase
           .from('system_settings')
-          .update({ value: values[key], updated_at: new Date().toISOString() })
-          .eq('key', key);
+          .select('key')
+          .eq('key', key)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from('system_settings')
+            .update({ value: values[key], updated_at: new Date().toISOString() })
+            .eq('key', key);
+        } else {
+          await supabase
+            .from('system_settings')
+            .insert({ key, value: values[key] });
+        }
       }
       setOriginal({ ...values });
       queryClient.invalidateQueries({ queryKey: ['system-settings-core'] });

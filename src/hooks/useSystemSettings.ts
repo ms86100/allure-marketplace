@@ -12,6 +12,10 @@ export interface SystemSettings {
   grievanceOfficerName: string;
   headerTagline: string;
   appVersion: string;
+  addressBlockLabel: string;
+  addressFlatLabel: string;
+  termsLastUpdated: string;
+  privacyLastUpdated: string;
 }
 
 const DEFAULTS: SystemSettings = {
@@ -24,6 +28,10 @@ const DEFAULTS: SystemSettings = {
   grievanceOfficerName: 'Sociva Grievance Cell',
   headerTagline: 'Your Society, Your Store',
   appVersion: '2.0.0',
+  addressBlockLabel: 'Block / Tower',
+  addressFlatLabel: 'Flat Number',
+  termsLastUpdated: 'February 13, 2026',
+  privacyLastUpdated: 'February 13, 2026',
 };
 
 export function useSystemSettings(): SystemSettings {
@@ -37,6 +45,8 @@ export function useSystemSettings(): SystemSettings {
           'base_delivery_fee', 'free_delivery_threshold', 'platform_fee_percent',
           'support_email', 'grievance_email', 'dpo_email', 'grievance_officer_name',
           'header_tagline', 'app_version',
+          'address_block_label', 'address_flat_label',
+          'terms_last_updated', 'privacy_last_updated',
         ]);
 
       const map: Record<string, string> = {};
@@ -54,6 +64,10 @@ export function useSystemSettings(): SystemSettings {
         grievanceOfficerName: map.grievance_officer_name || DEFAULTS.grievanceOfficerName,
         headerTagline: map.header_tagline || DEFAULTS.headerTagline,
         appVersion: map.app_version || DEFAULTS.appVersion,
+        addressBlockLabel: map.address_block_label || DEFAULTS.addressBlockLabel,
+        addressFlatLabel: map.address_flat_label || DEFAULTS.addressFlatLabel,
+        termsLastUpdated: map.terms_last_updated || DEFAULTS.termsLastUpdated,
+        privacyLastUpdated: map.privacy_last_updated || DEFAULTS.privacyLastUpdated,
       };
     },
     staleTime: jitteredStaleTime(15 * 60 * 1000),
