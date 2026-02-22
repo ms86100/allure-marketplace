@@ -96,7 +96,7 @@ export function SecurityModeSettings() {
                   <div className="flex items-center gap-2">
                     <span>🔴 AI Match</span>
                     <Badge variant="outline" className="text-[8px] h-4 gap-0.5">
-                      <Lock size={8} /> Coming Soon
+                      <Lock size={8} /> Enterprise
                     </Badge>
                   </div>
                 </SelectItem>

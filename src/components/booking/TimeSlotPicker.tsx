@@ -22,6 +22,7 @@ interface TimeSlotPickerProps {
   availabilityStart?: string; // "09:00"
   availabilityEnd?: string; // "21:00"
   unavailableDates?: Date[];
+  maxBookingDays?: number;
   className?: string;
 }
 
@@ -35,10 +36,11 @@ export function TimeSlotPicker({
   availabilityStart = '09:00',
   availabilityEnd = '21:00',
   unavailableDates = [],
+  maxBookingDays = 30,
   className,
 }: TimeSlotPickerProps) {
   const today = startOfToday();
-  const maxDate = addDays(today, 30); // Allow booking up to 30 days ahead
+  const maxDate = addDays(today, maxBookingDays);
 
   // Generate time slots based on availability
   const timeSlots = useMemo(() => {

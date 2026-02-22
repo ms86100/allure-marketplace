@@ -160,9 +160,9 @@ export default function LandingPage() {
             ))}
           </div>
           <p className="text-sm italic text-foreground/80 mb-3">
-            "Finally a marketplace just for our community! Fresh food from neighbors, trusted services — all in one app."
+            "A marketplace built exclusively for our community — trusted neighbors, verified sellers, all in one place."
           </p>
-          <p className="text-xs font-medium text-muted-foreground">— Priya S., Verified Resident</p>
+          <p className="text-xs font-medium text-muted-foreground">— The Sociva Team</p>
         </div>
 
         <div className="flex justify-around mb-8 bg-card rounded-xl p-4 border border-border">
