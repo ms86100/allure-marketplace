@@ -5,6 +5,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { SocietyTrustBadge } from '@/components/trust/SocietyTrustBadge';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEffectiveFeatures, type FeatureKey } from '@/hooks/useEffectiveFeatures';
 import { 
   IndianRupee, Building2, Bug, ShieldAlert, FileText, 
   MessageCircle, Radio, ChevronRight, CreditCard, Clock, BarChart3, Shield,
@@ -18,10 +19,12 @@ interface DashboardStat {
   stat: string;
   color: string;
   adminOnly?: boolean;
+  featureKey?: FeatureKey;
 }
 
 export default function SocietyDashboardPage() {
   const { profile, effectiveSociety, effectiveSocietyId, isAdmin, isSocietyAdmin } = useAuth();
+  const { isFeatureEnabled } = useEffectiveFeatures();
   const [stats, setStats] = useState({
     openSnags: 0,
     openDisputes: 0,
@@ -95,26 +98,28 @@ export default function SocietyDashboardPage() {
   };
 
   const cards: DashboardStat[] = [
-    { icon: Users, label: 'Visitors', to: '/visitors', stat: 'Gate Management', color: 'text-primary' },
-    { icon: UserCheck, label: 'Domestic Help', to: '/domestic-help', stat: 'Attendance tracking', color: 'text-primary' },
-    { icon: Package, label: 'Parcels', to: '/parcels', stat: 'Delivery tracking', color: 'text-warning' },
-    { icon: Car, label: 'Parking', to: '/parking', stat: 'Slots & violations', color: 'text-primary' },
-    { icon: IndianRupee, label: 'Finances', to: '/society/finances', stat: `${stats.recentExpenses} this month`, color: 'text-warning' },
-    { icon: Landmark, label: 'Payment Schedule', to: '/payment-milestones', stat: 'Track milestones', color: 'text-info' },
-    { icon: Building2, label: 'Construction', to: '/society/progress', stat: `${stats.recentMilestones} updates this week`, color: 'text-primary' },
-    { icon: Bug, label: 'Snag Reports', to: '/society/snags', stat: `${stats.openSnags} open`, color: 'text-destructive' },
-    { icon: ClipboardCheck, label: 'Inspection', to: '/inspection', stat: 'Pre-handover check', color: 'text-success' },
-    { icon: ShieldAlert, label: 'Disputes', to: '/disputes', stat: `${stats.openDisputes} open`, color: 'text-destructive' },
-    { icon: FileText, label: 'Documents', to: '/society/progress', stat: `${stats.documents} uploaded`, color: 'text-info' },
-    { icon: MessageCircle, label: 'Q&A', to: '/society/progress', stat: `${stats.unansweredQs} unanswered`, color: 'text-primary' },
-    { icon: CreditCard, label: 'Maintenance', to: '/maintenance', stat: stats.pendingDues > 0 ? `${stats.pendingDues} pending` : 'All clear', color: 'text-success' },
+    { icon: Users, label: 'Visitors', to: '/visitors', stat: 'Gate Management', color: 'text-primary', featureKey: 'visitor_management' },
+    { icon: UserCheck, label: 'Domestic Help', to: '/domestic-help', stat: 'Attendance tracking', color: 'text-primary', featureKey: 'domestic_help' },
+    { icon: Package, label: 'Parcels', to: '/parcels', stat: 'Delivery tracking', color: 'text-warning', featureKey: 'parcel_management' },
+    { icon: Car, label: 'Parking', to: '/parking', stat: 'Slots & violations', color: 'text-primary', featureKey: 'vehicle_parking' },
+    { icon: IndianRupee, label: 'Finances', to: '/society/finances', stat: `${stats.recentExpenses} this month`, color: 'text-warning', featureKey: 'finances' },
+    { icon: Landmark, label: 'Payment Schedule', to: '/payment-milestones', stat: 'Track milestones', color: 'text-info', featureKey: 'payment_milestones' },
+    { icon: Building2, label: 'Construction', to: '/society/progress', stat: `${stats.recentMilestones} updates this week`, color: 'text-primary', featureKey: 'construction_progress' },
+    { icon: Bug, label: 'Snag Reports', to: '/society/snags', stat: `${stats.openSnags} open`, color: 'text-destructive', featureKey: 'snag_management' },
+    { icon: ClipboardCheck, label: 'Inspection', to: '/inspection', stat: 'Pre-handover check', color: 'text-success', featureKey: 'inspection' },
+    { icon: ShieldAlert, label: 'Disputes', to: '/disputes', stat: `${stats.openDisputes} open`, color: 'text-destructive', featureKey: 'disputes' },
+    { icon: FileText, label: 'Documents', to: '/society/progress', stat: `${stats.documents} uploaded`, color: 'text-info', featureKey: 'construction_progress' },
+    { icon: MessageCircle, label: 'Q&A', to: '/society/progress', stat: `${stats.unansweredQs} unanswered`, color: 'text-primary', featureKey: 'construction_progress' },
+    { icon: CreditCard, label: 'Maintenance', to: '/maintenance', stat: stats.pendingDues > 0 ? `${stats.pendingDues} pending` : 'All clear', color: 'text-success', featureKey: 'maintenance' },
     ...(isSocietyAdmin ? [
-      { icon: QrCode, label: 'Security Verify', to: '/security/verify', stat: 'Scan resident QR', color: 'text-success' } as DashboardStat,
-      { icon: ShieldCheck, label: 'Guard Kiosk', to: '/guard-kiosk', stat: 'Verify visitor OTPs', color: 'text-success' } as DashboardStat,
+      { icon: QrCode, label: 'Security Verify', to: '/security/verify', stat: 'Scan resident QR', color: 'text-success', featureKey: 'resident_identity_verification' } as DashboardStat,
+      { icon: ShieldCheck, label: 'Guard Kiosk', to: '/guard-kiosk', stat: 'Verify visitor OTPs', color: 'text-success', featureKey: 'guard_kiosk' } as DashboardStat,
       { icon: Shield, label: 'Society Admin', to: '/society/admin', stat: 'Manage society', color: 'text-info' } as DashboardStat,
     ] : []),
     ...(isAdmin ? [{ icon: Radio, label: 'Platform Admin', to: '/admin', stat: 'Global admin', color: 'text-destructive', adminOnly: true } as DashboardStat] : []),
   ];
+
+  const visibleCards = cards.filter(card => !card.featureKey || isFeatureEnabled(card.featureKey));
 
   return (
     <AppLayout headerTitle={effectiveSociety?.name || 'Society'} showLocation={false}>
@@ -141,7 +146,7 @@ export default function SocietyDashboardPage() {
 
         {/* Action Cards Grid */}
         <div className="grid grid-cols-2 gap-3">
-          {cards.map(({ icon: Icon, label, to, stat, color }) => (
+          {visibleCards.map(({ icon: Icon, label, to, stat, color }) => (
             <Link key={label} to={to}>
               <Card className="hover:shadow-md transition-shadow h-full">
                 <CardContent className="p-4 flex flex-col gap-2">
