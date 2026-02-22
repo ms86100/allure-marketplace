@@ -8,7 +8,7 @@ import {
   Wrench, FileText, BarChart, Car, Users, CreditCard, Clipboard,
   HelpCircle, Bell, BookOpen, Award, Briefcase, ListChecks, Plus,
   Map, LogIn, Lock, Megaphone, Layers, Cog, Tags, CheckSquare,
-  Truck, Globe, PenTool, Boxes
+  Truck, Globe, PenTool, Boxes, Calendar
 } from 'lucide-react';
 
 interface NavItem {
@@ -70,6 +70,7 @@ const sections: NavSection[] = [
     items: [
       { label: 'Society Dashboard', route: '/society', icon: Building2, description: 'Society health overview' },
       { label: 'Community Bulletin', route: '/community', icon: MessageSquare, description: 'Posts, polls, help requests' },
+      { label: 'Society Notices', route: '/society/notices', icon: Megaphone, description: 'Official society notices' },
       { label: 'Society Finances', route: '/society/finances', icon: Wallet, description: 'Expenses, income charts' },
       { label: 'Construction Progress', route: '/society/progress', icon: Construction, description: 'Milestones, timeline, documents' },
       { label: 'Snag List', route: '/society/snags', icon: Bug, description: 'Report & track snags' },
@@ -79,6 +80,7 @@ const sections: NavSection[] = [
       { label: 'Society Admin', route: '/society/admin', icon: Cog, description: 'Society-level admin controls' },
       { label: 'Payment Milestones', route: '/payment-milestones', icon: CreditCard, description: 'Construction payment tracking' },
       { label: 'Inspection Checklist', route: '/inspection', icon: CheckSquare, description: 'Property inspection' },
+      { label: 'Authorized Persons', route: '/authorized-persons', icon: Users, description: 'Manage authorized flat persons' },
     ],
   },
   {
@@ -99,6 +101,7 @@ const sections: NavSection[] = [
     items: [
       { label: 'Builder Dashboard', route: '/builder', icon: Building2, description: 'Builder societies & feature plan' },
       { label: 'Builder Analytics', route: '/builder/analytics', icon: BarChart, description: 'Cross-society analytics' },
+      { label: 'Builder Inspections', route: '/builder-inspections', icon: CheckSquare, description: 'Builder inspection management' },
     ],
   },
   {
@@ -111,6 +114,10 @@ const sections: NavSection[] = [
       { label: 'Create Job Request', route: '/worker-hire/create', icon: Plus, description: 'New job request form' },
       { label: 'Domestic Help', route: '/domestic-help', icon: HelpCircle, description: 'Help entries & attendance' },
       { label: 'Workforce Management', route: '/workforce', icon: Clipboard, description: 'Worker registration & gate validation' },
+      { label: 'My Workers', route: '/my-workers', icon: Users, description: 'Manage your assigned workers' },
+      { label: 'Worker Attendance', route: '/worker-attendance', icon: ClipboardList, description: 'Track worker attendance' },
+      { label: 'Worker Leave', route: '/worker-leave', icon: Calendar, description: 'Manage worker leave requests' },
+      { label: 'Worker Salary', route: '/worker-salary', icon: DollarSign, description: 'Worker salary management' },
     ],
   },
   {
@@ -118,6 +125,15 @@ const sections: NavSection[] = [
     color: 'bg-muted text-muted-foreground',
     items: [
       { label: 'Vehicle Parking', route: '/parking', icon: Car, description: 'Parking management' },
+    ],
+  },
+  {
+    title: '🚚 Delivery',
+    color: 'bg-warning/10 text-warning',
+    items: [
+      { label: 'Society Deliveries', route: '/society/deliveries', icon: Truck, description: 'Society delivery overview' },
+      { label: 'Delivery Partners', route: '/delivery-partners', icon: Users, description: 'Manage delivery partners' },
+      { label: 'My Deliveries', route: '/my-deliveries', icon: Package, description: 'Delivery partner dashboard' },
     ],
   },
   {
