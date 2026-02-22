@@ -3,16 +3,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { Settings, Save, Loader2, RefreshCw, IndianRupee, Mail, Type, Percent } from 'lucide-react';
+import { Settings, Save, Loader2, RefreshCw, IndianRupee, Mail, Type, Percent, FileText } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface SettingField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'email';
+  type: 'text' | 'number' | 'email' | 'textarea';
   icon: React.ElementType;
   group: string;
   description: string;
@@ -32,6 +33,9 @@ const SETTING_FIELDS: SettingField[] = [
   { key: 'address_flat_label', label: 'Address Flat Label', type: 'text', icon: Type, group: 'Address', description: 'Label for flat/unit field (e.g., Flat Number, Unit)' },
   { key: 'terms_last_updated', label: 'Terms Last Updated', type: 'text', icon: Type, group: 'Legal', description: 'Date shown on Terms & Conditions page' },
   { key: 'privacy_last_updated', label: 'Privacy Last Updated', type: 'text', icon: Type, group: 'Legal', description: 'Date shown on Privacy Policy page' },
+  { key: 'terms_content_md', label: 'Terms & Conditions Content', type: 'textarea', icon: FileText, group: 'Legal CMS', description: 'Plain text content for Terms page. Leave empty to use default template.' },
+  { key: 'privacy_content_md', label: 'Privacy Policy Content', type: 'textarea', icon: FileText, group: 'Legal CMS', description: 'Plain text content for Privacy page. Leave empty to use default template.' },
+  { key: 'help_sections_json', label: 'Help Sections (JSON)', type: 'textarea', icon: FileText, group: 'Help CMS', description: 'JSON array: [{"icon":"ShoppingBag","title":"How to Order","items":["Step 1","Step 2"]}]. Leave empty for defaults.' },
 ];
 
 export function PlatformSettingsManager() {
@@ -147,13 +151,23 @@ export function PlatformSettingsManager() {
                       {field.label}
                       {isChanged && <span className="text-[9px] text-warning font-medium ml-1">• modified</span>}
                     </Label>
-                    <Input
-                      type={field.type}
-                      value={values[field.key] ?? ''}
-                      onChange={(e) => setValues(prev => ({ ...prev, [field.key]: e.target.value }))}
-                      className="h-8 text-sm"
-                      placeholder={field.description}
-                    />
+                    {field.type === 'textarea' ? (
+                      <Textarea
+                        value={values[field.key] ?? ''}
+                        onChange={(e) => setValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+                        className="text-sm min-h-[80px]"
+                        placeholder={field.description}
+                        rows={4}
+                      />
+                    ) : (
+                      <Input
+                        type={field.type}
+                        value={values[field.key] ?? ''}
+                        onChange={(e) => setValues(prev => ({ ...prev, [field.key]: e.target.value }))}
+                        className="h-8 text-sm"
+                        placeholder={field.description}
+                      />
+                    )}
                     <p className="text-[10px] text-muted-foreground mt-0.5">{field.description}</p>
                   </div>
                 );

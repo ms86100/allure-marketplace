@@ -16,6 +16,9 @@ export interface SystemSettings {
   addressFlatLabel: string;
   termsLastUpdated: string;
   privacyLastUpdated: string;
+  helpSectionsJson: string;
+  termsContentMd: string;
+  privacyContentMd: string;
 }
 
 const DEFAULTS: SystemSettings = {
@@ -32,6 +35,9 @@ const DEFAULTS: SystemSettings = {
   addressFlatLabel: 'Flat Number',
   termsLastUpdated: 'February 13, 2026',
   privacyLastUpdated: 'February 13, 2026',
+  helpSectionsJson: '',
+  termsContentMd: '',
+  privacyContentMd: '',
 };
 
 export function useSystemSettings(): SystemSettings {
@@ -47,6 +53,7 @@ export function useSystemSettings(): SystemSettings {
           'header_tagline', 'app_version',
           'address_block_label', 'address_flat_label',
           'terms_last_updated', 'privacy_last_updated',
+          'help_sections_json', 'terms_content_md', 'privacy_content_md',
         ]);
 
       const map: Record<string, string> = {};
@@ -68,6 +75,9 @@ export function useSystemSettings(): SystemSettings {
         addressFlatLabel: map.address_flat_label || DEFAULTS.addressFlatLabel,
         termsLastUpdated: map.terms_last_updated || DEFAULTS.termsLastUpdated,
         privacyLastUpdated: map.privacy_last_updated || DEFAULTS.privacyLastUpdated,
+        helpSectionsJson: map.help_sections_json || DEFAULTS.helpSectionsJson,
+        termsContentMd: map.terms_content_md || DEFAULTS.termsContentMd,
+        privacyContentMd: map.privacy_content_md || DEFAULTS.privacyContentMd,
       };
     },
     staleTime: jitteredStaleTime(15 * 60 * 1000),

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -77,7 +78,23 @@ interface HelpPageProps {
 export default function HelpPage({ sections: customSections }: HelpPageProps) {
   const { resetOnboarding } = useOnboarding();
   const settings = useSystemSettings();
-  const helpSections = customSections || DEFAULT_HELP_SECTIONS;
+
+  // Priority: prop > DB > default
+  const helpSections = useMemo(() => {
+    if (customSections) return customSections;
+    if (settings.helpSectionsJson) {
+      try {
+        const parsed = JSON.parse(settings.helpSectionsJson) as { icon: string; title: string; items: string[] }[];
+        const ICON_MAP: Record<string, LucideIcon> = { ShoppingBag, Store, CreditCard, MessageCircle, Shield, HelpCircle };
+        return parsed.map(s => ({
+          icon: ICON_MAP[s.icon] || HelpCircle,
+          title: s.title,
+          items: s.items,
+        }));
+      } catch { /* fall through to defaults */ }
+    }
+    return DEFAULT_HELP_SECTIONS;
+  }, [customSections, settings.helpSectionsJson]);
 
   return (
     <AppLayout showHeader={false} showNav={false}>
