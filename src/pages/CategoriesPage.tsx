@@ -1,3 +1,4 @@
+import { useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
@@ -6,11 +7,13 @@ import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
 import { useNearbySocietySellers } from '@/hooks/queries/useStoreDiscovery';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { motion } from 'framer-motion';
-import { Store, Sparkles, Clock } from 'lucide-react';
+import { Store, Sparkles, Clock, Search, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function CategoriesPage() {
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
   const { configs, isLoading: configsLoading } = useCategoryConfigs();
   const { groups, isLoading: groupsLoading } = useParentGroups();
   const { data: productCategories = [], isLoading: productsLoading } = useProductsByCategory();
@@ -19,58 +22,149 @@ export default function CategoriesPage() {
   const searchRadius = profile?.search_radius_km ?? 10;
   const { data: nearbyBands = [] } = useNearbySocietySellers(searchRadius, browseBeyond);
 
-  const activeCategorySet = new Set(productCategories.map(c => c.category));
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeGroup, setActiveGroup] = useState<string>('all');
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  if (browseBeyond && nearbyBands.length > 0) {
-    for (const band of nearbyBands) {
-      for (const society of band.societies) {
-        for (const group of Object.keys(society.sellersByGroup)) {
-          for (const seller of society.sellersByGroup[group]) {
-            if (seller.categories) {
-              seller.categories.forEach(cat => activeCategorySet.add(cat));
+  // Build product count map
+  const productCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const pc of productCategories) {
+      map[pc.category] = (pc.products?.length ?? 0);
+    }
+    return map;
+  }, [productCategories]);
+
+  const activeCategorySet = useMemo(() => {
+    const s = new Set(productCategories.map(c => c.category));
+    if (browseBeyond && nearbyBands.length > 0) {
+      for (const band of nearbyBands) {
+        for (const society of band.societies) {
+          for (const group of Object.keys(society.sellersByGroup)) {
+            for (const seller of society.sellersByGroup[group]) {
+              if (seller.categories) {
+                seller.categories.forEach((cat: string) => s.add(cat));
+              }
             }
           }
         }
       }
     }
-  }
+    return s;
+  }, [productCategories, nearbyBands, browseBeyond]);
 
   const isLoading = configsLoading || groupsLoading || productsLoading;
 
-  const grouped = groups
-    .filter(g => g.is_active)
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .map(group => ({
-      ...group,
-      categories: configs
-        .filter(c => c.parentGroup === group.slug && c.isActive && activeCategorySet.has(c.category))
-        .sort((a, b) => (a.displayOrder ?? 99) - (b.displayOrder ?? 99)),
-    }))
-    .filter(g => g.categories.length > 0);
+  const grouped = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return groups
+      .filter(g => g.is_active)
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(group => ({
+        ...group,
+        categories: configs
+          .filter(c =>
+            c.parentGroup === group.slug &&
+            c.isActive &&
+            activeCategorySet.has(c.category) &&
+            (!q || c.displayName.toLowerCase().includes(q))
+          )
+          .sort((a, b) => (a.displayOrder ?? 99) - (b.displayOrder ?? 99)),
+      }))
+      .filter(g => g.categories.length > 0);
+  }, [groups, configs, activeCategorySet, searchQuery]);
+
+  const filteredGroups = activeGroup === 'all'
+    ? grouped
+    : grouped.filter(g => g.slug === activeGroup);
 
   const isEmpty = !isLoading && grouped.length === 0;
 
+  const handlePillClick = (slug: string) => {
+    setActiveGroup(slug);
+    if (slug !== 'all' && sectionRefs.current[slug]) {
+      sectionRefs.current[slug]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const activeParentGroups = useMemo(() => {
+    const slugs = new Set(grouped.map(g => g.slug));
+    return groups.filter(g => g.is_active && slugs.has(g.slug)).sort((a, b) => a.sort_order - b.sort_order);
+  }, [groups, grouped]);
+
   return (
     <AppLayout>
-      <div className="px-4 py-2">
-        <h2 className="text-sm font-bold text-foreground">All Categories</h2>
+      {/* Header */}
+      <div className="px-4 pt-3 pb-1">
+        <h1 className="text-lg font-bold text-foreground">Explore Categories</h1>
+        <p className="text-xs text-muted-foreground mb-2">Find what you love</p>
+        <div className="h-[2px] rounded-full bg-gradient-to-r from-primary via-primary/50 to-transparent mb-3" />
+
+        {/* Search */}
+        <div className="relative mb-2">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search categories…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-8 pr-7 h-8 bg-muted border-0 rounded-lg text-xs"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
+              <X size={12} />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="px-3 py-3 pb-20">
+      {/* Parent Group Pills */}
+      {!isLoading && activeParentGroups.length > 0 && (
+        <div className="flex gap-1.5 px-4 pb-2 overflow-x-auto scrollbar-hide">
+          <button
+            onClick={() => handlePillClick('all')}
+            className={cn(
+              'px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all border',
+              activeGroup === 'all'
+                ? 'bg-primary text-primary-foreground border-primary scale-105'
+                : 'bg-card text-muted-foreground border-border active:scale-[0.97]'
+            )}
+          >
+            All
+          </button>
+          {activeParentGroups.map(g => (
+            <button
+              key={g.slug}
+              onClick={() => handlePillClick(g.slug)}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all border',
+                activeGroup === g.slug
+                  ? 'bg-primary text-primary-foreground border-primary scale-105'
+                  : 'bg-card text-muted-foreground border-border active:scale-[0.97]'
+              )}
+            >
+              {g.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Content */}
+      <div className="px-3 pb-20">
         {isLoading ? (
-          <div className="space-y-6">
-            {[1, 2, 3].map(i => (
+          <div className="space-y-5">
+            {[1, 2].map(i => (
               <div key={i}>
-                <Skeleton className="h-4 w-32 mb-2" />
-                <div className="grid grid-cols-4 gap-2">
-                  {[1, 2, 3, 4].map(j => (
-                    <Skeleton key={j} className="aspect-square rounded-xl" />
+                <Skeleton className="h-4 w-28 mb-2 rounded-full" />
+                <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                  {[1, 2, 3, 4, 5, 6].map(j => (
+                    <Skeleton key={j} className="aspect-[4/5] rounded-2xl" />
                   ))}
                 </div>
               </div>
             ))}
           </div>
         ) : isEmpty ? (
+          /* Keep existing empty state */
           <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
@@ -91,7 +185,6 @@ export default function CategoriesPage() {
                 </div>
               </motion.div>
             </motion.div>
-
             <motion.div
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -103,7 +196,6 @@ export default function CategoriesPage() {
                 New sellers are joining your community. Products will be available here very soon.
               </p>
             </motion.div>
-
             <motion.div
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -116,32 +208,79 @@ export default function CategoriesPage() {
           </div>
         ) : (
           <div className="space-y-5">
-            {grouped.map(group => (
-              <div key={group.slug}>
-                <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">
-                  {group.name}
-                </h2>
-                <div className="grid grid-cols-4 gap-2">
-                  {group.categories.map(cat => (
-                    <Link
-                      key={cat.category}
-                      to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-                      className="flex flex-col items-center"
-                    >
-                      <div className="w-full aspect-square rounded-xl bg-card border border-border flex items-center justify-center mb-1 overflow-hidden">
-                        {cat.imageUrl ? (
-                          <img src={cat.imageUrl} alt={cat.displayName} className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-2xl">{cat.icon}</span>
-                        )}
-                      </div>
-                      <span className="text-[10px] font-medium text-foreground text-center leading-tight line-clamp-2">
-                        {cat.displayName}
-                      </span>
-                    </Link>
-                  ))}
+            {filteredGroups.map((group, groupIdx) => (
+              <motion.div
+                key={group.slug}
+                ref={el => { sectionRefs.current[group.slug] = el; }}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: groupIdx * 0.08, duration: 0.35 }}
+              >
+                {/* Section Header */}
+                <div className="flex items-center gap-2 mb-2 px-1">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-bold">
+                    {group.icon || '📦'} {group.name}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">({group.categories.length})</span>
+                  <div className="flex-1 h-px bg-border" />
                 </div>
-              </div>
+
+                {/* Category Cards Grid */}
+                <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                  {group.categories.map((cat, catIdx) => {
+                    const count = productCountMap[cat.category] || 0;
+                    return (
+                      <motion.div
+                        key={cat.category}
+                        initial={{ opacity: 0, scale: 0.92 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: groupIdx * 0.08 + catIdx * 0.04, duration: 0.3 }}
+                      >
+                        <Link
+                          to={`/category/${cat.parentGroup}?sub=${cat.category}`}
+                          className="block relative aspect-[4/5] rounded-2xl overflow-hidden active:scale-[0.97] transition-transform group"
+                        >
+                          {/* Image or emoji fallback */}
+                          {cat.imageUrl ? (
+                            <img
+                              src={cat.imageUrl}
+                              alt={cat.displayName}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 bg-muted flex items-center justify-center">
+                              <span className="text-3xl">{cat.icon}</span>
+                            </div>
+                          )}
+
+                          {/* Gradient overlay */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+
+                          {/* Icon badge top-left */}
+                          <div className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center text-xs shadow-sm">
+                            {cat.icon}
+                          </div>
+
+                          {/* Product count badge top-right */}
+                          {count > 0 && (
+                            <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-full bg-primary/90 text-primary-foreground text-[8px] font-bold shadow-sm">
+                              {count}
+                            </div>
+                          )}
+
+                          {/* Category name */}
+                          <div className="absolute bottom-0 left-0 right-0 p-2">
+                            <span className="text-[10px] font-bold text-white leading-tight line-clamp-2 drop-shadow-md">
+                              {cat.displayName}
+                            </span>
+                          </div>
+                        </Link>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </motion.div>
             ))}
           </div>
         )}
