@@ -6,6 +6,7 @@ import { useEffectiveFeatures } from '@/hooks/useEffectiveFeatures';
 import { useSecurityOfficer } from '@/hooks/useSecurityOfficer';
 import { useWorkerRole } from '@/hooks/useWorkerRole';
 import { useCart } from '@/hooks/useCart';
+import { useAuth } from '@/contexts/AuthContext';
 import type { FeatureKey } from '@/hooks/useEffectiveFeatures';
 
 const residentNavItems: { to: string; icon: typeof Home; label: string; featureKey?: FeatureKey; badge?: string }[] = [
@@ -33,10 +34,18 @@ export function BottomNav() {
   const { isFeatureEnabled, isLoading } = useEffectiveFeatures();
   const { isSecurityOfficer } = useSecurityOfficer();
   const { isWorker } = useWorkerRole();
+  const { isAdmin, isSocietyAdmin, isBuilderMember } = useAuth();
   const { itemCount } = useCart();
   const { selectionChanged } = useHaptics();
 
-  const navItems = isSecurityOfficer ? securityNavItems : isWorker ? workerNavItems : residentNavItems;
+  // Builders, admins, and society admins always see the full resident nav
+  // Only pure security officers / workers (no admin/builder role) get restricted nav
+  const isPrimaryRoleUser = isAdmin || isSocietyAdmin || isBuilderMember;
+  const navItems = !isPrimaryRoleUser && isSecurityOfficer
+    ? securityNavItems
+    : !isPrimaryRoleUser && isWorker
+      ? workerNavItems
+      : residentNavItems;
 
   const visibleItems = isLoading
     ? navItems
