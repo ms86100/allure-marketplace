@@ -1,92 +1,52 @@
 
 
-# End-to-End Builder & Resident Management Plan
+# Fix Builder Member Experience
 
-## Problem Statement
+## Problem
 
-The current admin panel lets you **create a builder** and **assign a feature package**, but is missing two critical management capabilities:
+When tester3 logs in as a builder member, they can't see or access anything related to their builder role. Three issues cause this:
 
-1. **No way to add team members to a builder** -- The `builder_members` table exists, but there's no admin UI to assign a user as a builder team member. This means a builder user can never log in and see the Builder Dashboard.
+1. **No navigation to the Builder Dashboard** -- The `/builder` route exists, but there is no link anywhere in the app (Profile page, Bottom Nav, Header) for builder members to reach it. It's a dead route unless you type the URL manually.
 
-2. **No way to assign societies to a builder** -- The `builder_societies` table exists, but there's no admin UI to link a society to a builder. Without this, builders have no societies in their portfolio, and the feature monetization hierarchy (Package -> Builder -> Society) doesn't cascade.
+2. **tester3's society doesn't match the builder's society** -- tester3 belongs to "Hoskote Toll Plaza" but the builder (Prestige Group) is linked to "Prestige Tranquility". Since feature packages cascade from Builder to Society, tester3's own society is unaffected by the builder's plan.
 
-Without these two pieces, the full flow cannot work:
-- Admin creates builder (works)
-- Admin assigns package to builder (works)
-- Admin assigns a user as builder member (MISSING)
-- Admin assigns societies to builder (MISSING)
-- Builder logs in and sees their dashboard with societies (blocked)
-- Resident of that society sees features gated by the builder's package (blocked)
+3. **No builder-specific navigation** -- Builder members should see a distinct experience when they log in, similar to how security officers and workers get their own bottom nav.
 
 ## Solution
 
-### 1. Builder Management Sheet (new component)
+### Step 1: Add "Builder Dashboard" link in the Profile page
 
-Create `src/components/admin/BuilderManagementSheet.tsx` -- a sheet that opens when you click on a builder assignment card. It will have two sections:
+Add a visible link to `/builder` in the Profile page, shown only when `isBuilderMember` is true. This gives builder members a clear way to access their dashboard.
 
-**a) Members Tab**
-- Shows current builder members (from `builder_members` table)
-- "Add Member" form: search for a user by email/name from `profiles`, then insert into `builder_members` with a role (admin/viewer)
-- Remove member button (delete from `builder_members`)
+**File:** `src/pages/ProfilePage.tsx`
+- Import `Building2` icon from lucide-react
+- Import `isBuilderMember` from `useAuth()`
+- Add a "Builder Dashboard" menu item (similar to Admin/Seller links) that navigates to `/builder`
 
-**b) Societies Tab**  
-- Shows societies currently linked to this builder (from `builder_societies`)
-- "Link Society" form: dropdown of all societies not yet assigned to any builder, insert into `builder_societies`
-- Unlink society button (delete from `builder_societies`)
+### Step 2: Add builder link in the Header
 
-### 2. Integration into FeatureManagement
+When a user is a builder member, show a small builder icon/button in the Header that links to `/builder`.
 
-Update the Assignments tab in `src/components/admin/FeatureManagement.tsx`:
-- Each builder assignment card gets a "Manage" button that opens the new `BuilderManagementSheet`
-- The sheet receives the `builder_id` and `builder_name` as props
+**File:** `src/components/layout/Header.tsx`
+- Add a `Building2` icon button next to other header actions when `isBuilderMember` is true
+- Links to `/builder`
 
-### 3. RLS Policy for builder_societies INSERT
+### Step 3: (No code change -- Data fix)
 
-Currently only platform admins can insert into `builder_societies`. A migration will ensure the INSERT policy exists:
+If you want tester3 to see the builder's feature plan affecting their own society experience, you need to either:
+- Link "Hoskote Toll Plaza" to the Prestige Group builder via the Manage sheet, OR
+- Change tester3's society to "Prestige Tranquility"
 
-```sql
--- Ensure admins can insert into builder_societies
-CREATE POLICY IF NOT EXISTS "Admins can manage builder societies"
-ON public.builder_societies FOR ALL
-USING (public.is_admin(auth.uid()));
-```
-
-### 4. RLS Policy for builder_members INSERT
-
-Same for `builder_members` -- ensure the admin INSERT policy covers all operations.
+This is a data configuration step, not a code fix.
 
 ## Technical Details
 
-### New File
-- `src/components/admin/BuilderManagementSheet.tsx`
-
 ### Modified Files
-- `src/components/admin/FeatureManagement.tsx` -- Add "Manage" button per assignment card, import and render `BuilderManagementSheet`
+- `src/pages/ProfilePage.tsx` -- Add "Builder Dashboard" navigation item visible to builder members
+- `src/components/layout/Header.tsx` -- Add builder shortcut icon in header for builder members
 
-### Database Migration
-- Ensure INSERT policies on `builder_societies` and `builder_members` for admins (likely already covered by the existing `FOR ALL` policy, but will verify and add if missing)
-
-### Data Flow After Implementation
-
-```text
-Admin Panel > Features Tab > Assignments
-  |
-  +-- "Add Builder" -> CreateBuilderSheet (exists)
-  +-- "Assign Package" -> Package assignment (exists)  
-  +-- "Manage" -> BuilderManagementSheet (NEW)
-        |
-        +-- Members Tab: Add/remove users as builder members
-        +-- Societies Tab: Link/unlink societies to builder
-```
-
-### End-to-End Test Flow
-
-1. Admin creates a builder (e.g., "Shriram Properties")
-2. Admin assigns a feature package (e.g., "Pro Plan")
-3. Admin clicks "Manage" on the assignment card
-4. Admin adds a user as a builder member (the builder's login account)
-5. Admin links "Shriram Greenfield Phase-2" society to this builder
-6. Builder user logs in -> sees Builder Dashboard with their society
-7. Resident of that society -> sees features gated by the Pro Plan package
-8. Society admin -> can only toggle features marked as `society_configurable` within the package scope
+### What This Fixes
+- Builder members will see a clear "Builder Dashboard" option in their profile
+- Builder members can quickly access their dashboard from the header
+- The full builder portfolio management experience becomes discoverable
 
