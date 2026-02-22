@@ -304,12 +304,13 @@ export default function SellerDetailPage() {
 
       {/* Seller Info */}
       <div className="px-4 -mt-8 relative z-10">
-        <div className="bg-card rounded-xl shadow-elevated p-4">
+        <div className="bg-card rounded-xl shadow-elevated p-4 space-y-3">
+          {/* Row 1: Name + Rating */}
           <div className="flex items-start justify-between">
             <div className={seller.profile_image_url ? 'ml-16' : ''}>
               <h1 className="text-xl font-bold">{seller.business_name}</h1>
               {seller.description && (
-                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
                   {seller.description}
                 </p>
               )}
@@ -321,86 +322,91 @@ export default function SellerDetailPage() {
             />
           </div>
 
-          <div className="flex flex-wrap gap-3 mt-4 text-sm text-muted-foreground">
+          {/* Row 2: Location · Distance · Hours — compact info line */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
             {(seller as any).society && (
               <span className="flex items-center gap-1">
-                <MapPin size={14} className="shrink-0" />
-                <span>{(seller as any).society.name}</span>
+                <MapPin size={13} className="text-primary shrink-0" />
+                {(seller as any).society.name}
               </span>
             )}
             {distanceKm !== null && distanceKm > 0 && (
-              <Badge variant="outline" className="text-[10px] font-medium">
-                📍 {distanceKm} km away
-              </Badge>
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span className="text-xs font-medium text-primary">📍 {distanceKm} km</span>
+              </>
             )}
             {seller.availability_start && seller.availability_end && (
-              <span className="flex items-center gap-1">
-                <Clock size={14} />
-                {seller.availability_start.slice(0, 5)} - {seller.availability_end.slice(0, 5)}
-              </span>
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <span className="flex items-center gap-1">
+                  <Clock size={13} className="shrink-0" />
+                  {seller.availability_start.slice(0, 5)} – {seller.availability_end.slice(0, 5)}
+                </span>
+              </>
             )}
           </div>
 
-          {/* Real trust signals */}
-          <div className="flex flex-wrap gap-2 mt-3">
-            {(seller as any).completed_order_count > 0 && (
-              <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary border-0">
-                <Users size={10} className="mr-1" />
-                {(seller as any).completed_order_count} orders fulfilled
-              </Badge>
-            )}
-            {(seller as any).avg_response_minutes != null && (seller as any).avg_response_minutes > 0 && (
-              <Badge variant="secondary" className="text-[10px] bg-success/10 text-success border-0">
-                <Zap size={10} className="mr-1" />
-                Responds in ~{(seller as any).avg_response_minutes} min
-              </Badge>
-            )}
-            {(seller as any).cancellation_rate !== undefined && (seller as any).cancellation_rate === 0 && (seller as any).completed_order_count > 2 && (
-              <Badge variant="secondary" className="text-[10px] bg-success/10 text-success border-0">
-                <ShieldCheck size={10} className="mr-1" />
-                0% cancellation
-              </Badge>
-            )}
+          {/* Row 3: Status badges — Active + Fulfillment + Min order */}
+          <div className="flex items-center gap-2 flex-wrap">
             {(seller as any).last_active_at && (Date.now() - new Date((seller as any).last_active_at).getTime()) < 24 * 60 * 60 * 1000 && (
-              <Badge variant="secondary" className="text-[10px] bg-success/10 text-success border-0">
+              <Badge variant="secondary" className="text-[10px] bg-success/15 text-success border-0 font-medium">
                 <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse mr-1" />
                 Active today
               </Badge>
             )}
+            {(seller as any).fulfillment_mode && (
+              <Badge variant="outline" className="text-[10px] font-medium">
+                {(seller as any).fulfillment_mode === 'self_pickup' && '🏪 Self Pickup'}
+                {(seller as any).fulfillment_mode === 'delivery' && '🚚 Delivery'}
+                {(seller as any).fulfillment_mode === 'both' && '🏪🚚 Pickup & Delivery'}
+              </Badge>
+            )}
+            {(seller as any).minimum_order_amount != null && (seller as any).minimum_order_amount > 0 && (
+              <Badge variant="outline" className="text-[10px] font-medium">
+                Min ₹{(seller as any).minimum_order_amount}
+              </Badge>
+            )}
+            {(seller as any).delivery_note && (
+              <span className="text-[11px] text-muted-foreground italic">{(seller as any).delivery_note}</span>
+            )}
           </div>
 
-          {/* Fulfillment Info */}
-          {(seller as any).fulfillment_mode && (
-            <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
-              <Badge variant="outline" className="text-[10px]">
-                {(seller as any).fulfillment_mode === 'self_pickup' && '🏪 Self Pickup Only'}
-                {(seller as any).fulfillment_mode === 'delivery' && '🚚 Seller Delivers'}
-                {(seller as any).fulfillment_mode === 'both' && '🏪🚚 Pickup or Delivery'}
-              </Badge>
-              {(seller as any).delivery_note && (
-                <span className="text-xs italic">{(seller as any).delivery_note}</span>
+          {/* Row 4: Trust signals */}
+          {((seller as any).completed_order_count > 0 || ((seller as any).avg_response_minutes != null && (seller as any).avg_response_minutes > 0)) && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {(seller as any).completed_order_count > 0 && (
+                <Badge variant="secondary" className="text-[10px] bg-primary/10 text-primary border-0">
+                  <Users size={10} className="mr-1" />
+                  {(seller as any).completed_order_count} orders
+                </Badge>
+              )}
+              {(seller as any).avg_response_minutes != null && (seller as any).avg_response_minutes > 0 && (
+                <Badge variant="secondary" className="text-[10px] bg-success/10 text-success border-0">
+                  <Zap size={10} className="mr-1" />
+                  ~{(seller as any).avg_response_minutes} min response
+                </Badge>
+              )}
+              {(seller as any).cancellation_rate !== undefined && (seller as any).cancellation_rate === 0 && (seller as any).completed_order_count > 2 && (
+                <Badge variant="secondary" className="text-[10px] bg-success/10 text-success border-0">
+                  <ShieldCheck size={10} className="mr-1" />
+                  0% cancellation
+                </Badge>
               )}
             </div>
           )}
 
-          {/* Minimum Order Amount */}
-          {(seller as any).minimum_order_amount != null && (seller as any).minimum_order_amount > 0 && (
-            <div className="flex items-center gap-2 mt-3 text-sm">
-              <Badge variant="outline" className="text-[10px]">
-                Min. order ₹{(seller as any).minimum_order_amount}
-              </Badge>
-            </div>
-          )}
-          <div className="flex items-center gap-2 mt-3">
-            <Calendar size={14} className="text-muted-foreground" />
+          {/* Row 5: Operating days */}
+          <div className="flex items-center gap-2">
+            <Calendar size={14} className="text-muted-foreground shrink-0" />
             <div className="flex gap-1">
               {DAYS_OF_WEEK.map((day) => (
                 <span
                   key={day}
-                  className={`text-[10px] px-1.5 py-0.5 rounded ${
+                  className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                     operatingDays.includes(day)
                       ? 'bg-success/20 text-success'
-                      : 'bg-muted text-muted-foreground'
+                      : 'bg-muted text-muted-foreground/50'
                   }`}
                 >
                   {day}
@@ -409,14 +415,15 @@ export default function SellerDetailPage() {
             </div>
           </div>
 
+          {/* Row 6: Category tags */}
           {seller.categories.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-3">
+            <div className="flex flex-wrap gap-1.5">
               {seller.categories.map((cat) => {
                 const categoryInfo = allCategoryConfigs.find((c) => c.category === cat);
                 return (
                   <span
                     key={cat}
-                    className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground"
+                    className="text-xs px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground font-medium"
                   >
                     {categoryInfo?.icon} {categoryInfo?.displayName || cat}
                   </span>
