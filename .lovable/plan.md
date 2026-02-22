@@ -1,288 +1,215 @@
 
 
-# Hardcoded Logic and Fragile Implementation Audit v2
+# Sociva -- Critical Hardcoding and Dynamic Integrity Audit v3
 
 ## Executive Summary
 
-Following the Sprint 1-4 remediation, 18 of the original 23 gaps have been fully resolved. This fresh audit identifies **14 remaining or new issues** across the codebase. The overall posture is significantly improved -- financial logic, contact emails, pricing, and key copy are now config-driven. The remaining gaps are mostly medium/low severity, with two high-priority items that could still surface during an investor demo.
+The Sprint 1-4 and v2 remediation passes have resolved the majority of structural issues. The system is meaningfully config-driven for financial logic, contact info, legal pages, pricing, and feature flags. However, **11 remaining gaps** exist, including one critical item (currency symbol not adopted despite utility existing) and several medium-severity issues that would surface during investor scrutiny or multi-tenant deployment.
 
 ---
 
-## Status of Original 23 Gaps
+## 1. CRITICAL HARDCODING INVENTORY
 
-**Fully Resolved (18):** Gaps 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 21
+### C1. Currency Symbol "₹" Still Hardcoded in 54 Files (formatPrice Exists But Is Unused)
 
-**Partially Resolved (3):** Gaps 6 (categories dynamic but landing page slide copy still static), 20 (main copy fixed but empty state still generic), 23 (pickup vs. delivery labels fixed but seller address is just the seller name, not actual location)
+- **Files:** 54 component files including CartPage, ProductCard, ProductDetailSheet, EarningsSummary, CouponInput, MaintenancePage, SocietyFinancesPage, SellerCard, SellerOrderCard, OrderDetailPage, etc.
+- **What Happened:** `formatPrice()` was created in `src/lib/format-price.ts` and `currencySymbol` was added to `useSystemSettings`, but zero files import or use them. Every single price display still uses bare `₹` template literals.
+- **Risk:** This is a "config exists but does nothing" gap identical to the old platform fee problem. If someone inspects the codebase or tries to change the currency, they'll find the setting is completely decorative.
+- **Fix:** Replace all `₹${amount}` with `formatPrice(amount, settings.currencySymbol)` across all 54 files. This is mechanical but high-volume.
+- **Severity:** Critical (architectural credibility gap)
+- **Effort:** Medium (bulk find-and-replace with context)
 
-**Not Resolved (2):** Gap 16 (i18n day labels -- flagged only), Gap 22 (CMS for legal -- markdown fields exist in settings but TermsPage/PrivacyPolicyPage still render hardcoded HTML as fallback with no admin preview)
+### C2. "Sociva" Brand Still Hardcoded in 4 Files Despite `platformName` Existing
 
----
+- **Files:**
+  - `AuthPage.tsx` line 402: `<h1>Sociva</h1>` -- the login screen title
+  - `LandingPage.tsx` line 184: `"-- The Sociva Team"`
+  - `SearchPage.tsx` line 47: `sociva_search_filters` localStorage key
+  - `useDeepLinks.ts` lines 10-17, 37: `sociva://` URL scheme in comments and code
+- **What Happened:** `platformName` is used in TermsPage, PrivacyPolicyPage, ProfilePage, and CommunityRulesPage, but these 4 files were missed.
+- **Risk:** Login screen and landing page are the first thing an investor or white-label client sees.
+- **Fix:** Replace with `settings.platformName` in AuthPage and LandingPage. Change `sociva_search_filters` to `app_search_filters`. Deep link scheme is acceptable as a technical constant.
+- **Severity:** Critical (visible on first screen)
+- **Effort:** Low
 
-## NEW FINDINGS
+### C3. Food-Biased Copy in CommunityRulesPage DEFAULT_RULES
 
-### HIGH (Visible During Demo)
-
-#### H1. Pricing Page PRICE_TIER_MAP Hardcodes Actual Prices
-
-**File:** `PricingPage.tsx` lines 53-57
-
-```
-const PRICE_TIER_MAP = {
-  free: { price: 'Free', period: 'forever', badge: null },
-  pro: { price: '199', period: '/month', badge: 'Popular' },
-  enterprise: { price: '999', period: '/month', badge: 'Enterprise' },
-};
-```
-
-The pricing page fetches package **names and features** from the database, but the **actual price display** (199/999) is hardcoded in a frontend mapping. If an admin changes the price_tier label in the DB, the display won't match. The `feature_packages` table has a `price_tier` column (free/pro/enterprise) but no `price_amount` column.
-
-**Risk:** An investor asks "Can we change the Pro plan to 299?" -- the admin panel has no UI for this, and changing it requires a code deployment.
-
-**Fix:** Add a `price_amount` numeric column and `price_period` text column to `feature_packages`. Render from DB. Fall back to the current map only if columns are null.
-
----
-
-#### H2. Currency Symbol is Hardcoded as "₹" Across 52 Files
-
-All 52 component files use the literal `₹` symbol. The `system_settings` table has a `currency_symbol` key defined in the marketplace config pattern, but it's never actually read or used for rendering.
-
-**Risk:** Low for India-only launch, but blocks any future international expansion. More importantly, it contradicts the config-driven architecture claim.
-
-**Fix:** Add `currency_symbol` to `useSystemSettings` and create a `formatPrice(amount, symbol)` utility. Replace bare `₹` references incrementally. Low urgency but architecturally correct.
+- **File:** `CommunityRulesPage.tsx` lines 28, 36
+- **Content:** "Maintain food safety and hygiene standards", "Misrepresent food items or ingredients"
+- **What Happened:** The violation consequences were made dynamic (violationPolicyJson), but the default DO/DON'T rules for sellers still reference food specifically.
+- **Risk:** A services-only or shopping-focused society would see irrelevant food hygiene rules.
+- **Fix:** Change to generic seller rules: "Maintain quality and safety standards", "Misrepresent products or services". Or make DEFAULT_RULES configurable via system_settings.
+- **Severity:** High
+- **Effort:** Low (text change)
 
 ---
 
-#### H3. Platform Fee Still Zero in RPC with No Config Read
+## 2. HIGH SEVERITY GAPS
 
-**File:** `create_multi_vendor_orders` RPC function
+### H1. Price Range Filter Max Hardcoded at 5000
 
-```sql
-platform_fee, net_amount
-) VALUES (
-  ...
-  0, _final_amount
-);
-```
+- **Files:** `SearchFilters.tsx` lines 26, 47, 209
+- **Content:** `priceRange: [0, 5000]`, `max={5000}`, `filters.priceRange[1] < 5000`
+- **Also:** `SearchPage.tsx` lines 257, 502 use `5000` as the max price boundary
+- **Risk:** Products priced above 5000 (electronics, furniture, services) will be filtered out by default. No way to configure this per society.
+- **Fix:** Add `max_price_filter` to `system_settings` (default 5000). Read in SearchFilters and SearchPage.
+- **Severity:** High (data visibility issue)
+- **Effort:** Low
 
-While `platform_fee_percent` is now in `system_settings` and visible in the admin UI, the RPC that actually creates payment records still hardcodes `platform_fee = 0` and `net_amount = _final_amount`. The setting exists but is never consumed by the backend.
+### H2. PRICE_TIER_MAP Still Contains Hardcoded ₹ Symbol
 
-**Risk:** If an admin sets `platform_fee_percent = 5` in the settings UI, nothing changes in actual financial calculations. This is a "config exists but does nothing" gap.
+- **File:** `PricingPage.tsx` lines 53-57
+- **Content:** `pro: { price: '₹199', ... }, enterprise: { price: '₹999', ... }`
+- **Issue:** While the code now prefers `price_amount` from DB, the fallback map uses `₹` literally instead of `currencySymbol`.
+- **Fix:** Use `${currencySymbol}199` pattern or remove hardcoded prices from fallback since DB columns now exist.
+- **Severity:** High (inconsistency with config-driven claim)
+- **Effort:** Low
 
-**Fix:** Modify the RPC to read `platform_fee_percent` from `system_settings` and compute:
-```sql
-_fee_percent := COALESCE((SELECT value::numeric FROM system_settings WHERE key = 'platform_fee_percent'), 0);
-_platform_fee := ROUND(_final_amount * _fee_percent / 100, 2);
-_net := _final_amount - _platform_fee;
-```
+### H3. "All prices are in INR" Hardcoded on Pricing Page
 
----
-
-### MEDIUM (Polish, Edge Cases)
-
-#### M1. FilterPresets Hardcodes "Under 150" Budget Filter
-
-**File:** `FilterPresets.tsx` line 21
-
-```
-label: 'Under 150',
-filters: { priceRange: [0, 150] as [number, number] },
-```
-
-This budget filter threshold should be configurable. For a premium society, 150 may be irrelevant.
-
-**Fix:** Add `budget_filter_threshold` to `system_settings`. Read in FilterPresets.
+- **File:** `PricingPage.tsx` line 182
+- **Content:** `"All prices are in INR. GST applicable where required."`
+- **Risk:** Contradicts any currency configurability claim.
+- **Fix:** Use `settings.currencySymbol` to derive currency name, or make this footer configurable.
+- **Severity:** High
+- **Effort:** Low
 
 ---
 
-#### M2. Landing Page Slide Copy is Still Hardcoded
+## 3. MEDIUM SEVERITY GAPS
 
-**File:** `LandingPage.tsx` lines 80-213
+### M1. Landing Page Marketing Copy Not Configurable
 
-While the "What You Can Do" categories section (Slide 3) is now dynamically fetched from `parent_groups`, the other 4 slides contain hardcoded marketing copy:
-- Slide 1: "Your Society. Your Marketplace."
-- Slide 2: "Only Verified Residents" (GPS verification, invite code, etc.)
-- Slide 4: "Turn Your Passion Into Income" (Zero listing fee, etc.)
-- Slide 5: "A marketplace built exclusively for our community"
+- **File:** `LandingPage.tsx` lines 80-213
+- **Content:** 5 slides with hardcoded text: "Your Society. Your Marketplace.", "Only Verified Residents", "Turn Your Passion Into Income", etc.
+- **Status:** `landingSlidesJson` was added to `useSystemSettings` but is never read in `LandingPage.tsx`. The setting exists as dead configuration.
+- **Fix:** Parse `settings.landingSlidesJson` in LandingPage and use it when non-empty, falling back to current slides.
+- **Severity:** Medium (white-label blocker)
+- **Effort:** Medium
 
-These are reasonable defaults but cannot be customized per deployment.
+### M2. Seller Onboarding Placeholder Text Hardcoded Per Group
 
-**Fix:** Store landing page slides as JSON in `system_settings` (key: `landing_slides_json`). Fall back to current hardcoded slides if empty. Low urgency -- current copy is generic enough.
+- **File:** `BecomeSellerPage.tsx` lines 757-761
+- **Content:** `selectedGroup === 'food' ? "e.g., Amma's Kitchen, Fresh Bakes" : ...`
+- **Risk:** New parent groups added by admin will get the generic fallback "e.g., Your Store Name" -- acceptable but not polished.
+- **Fix:** Add `placeholder_hint` column to `parent_groups` table. Low priority.
+- **Severity:** Medium
+- **Effort:** Low
 
----
+### M3. Help Sections Default to Hardcoded Array Despite DB Setting
 
-#### M3. CommunityRulesPage Violations Are Hardcoded
+- **File:** `HelpPage.tsx` lines 28-76
+- **Status:** The page reads `settings.helpSectionsJson` and parses it, but the JSON format requires icon names as strings that must map to Lucide components. This mapping is incomplete -- the HelpPage only maps 4 icons (ShoppingBag, Store, CreditCard, MessageCircle). A CMS-driven help section with different icons would fail silently.
+- **Fix:** Expand icon mapping or use a generic icon fallback.
+- **Severity:** Medium
+- **Effort:** Low
 
-**File:** `CommunityRulesPage.tsx` lines 42-46
+### M4. SearchPage localStorage Key Still Uses "sociva_" Prefix
 
-```
-const VIOLATIONS = [
-  { level: 'Warning', description: 'First-time minor violations', action: 'Written warning' },
-  { level: 'Temporary Suspension', ... action: '7-day account suspension' },
-  { level: 'Permanent Ban', ... action: 'Account permanently disabled' },
-];
-```
+- **File:** `SearchPage.tsx` line 47
+- **Content:** `const FILTER_STORAGE_KEY = 'sociva_search_filters';`
+- **Status:** ProfilePage and tooltip-guide were fixed to use `app_` prefix, but SearchPage was missed.
+- **Fix:** Change to `app_search_filters`.
+- **Severity:** Medium (white-label leak)
+- **Effort:** Trivial
 
-The rules section reads `society.rules_text` but the violation consequences table is always hardcoded. The "7-day" suspension duration is not configurable.
+### M5. Onboarding localStorage Key "hasSeenOnboarding" Not Prefixed
 
-**Fix:** Add `violation_policy_json` to `system_settings` or render from `societies.rules_text` as a complete document.
-
----
-
-#### M4. Seller Dashboard Empty State Copy is Generic but Not Configurable
-
-**File:** `SellerDashboardPage.tsx` line 128
-
-```
-"Sell products, groceries, or services to your community"
-```
-
-This was previously food-biased and was fixed to be generic. But it's still a hardcoded string that can't be customized per society or deployment.
-
-**Fix:** Low priority. Could be stored in `system_settings` as `seller_empty_state_copy` but this is over-engineering for a fallback empty state.
-
----
-
-#### M5. Pricing Page Always Shows FALLBACK_PLANS + DB Plans
-
-**File:** `PricingPage.tsx` line 104
-
-```
-return [...FALLBACK_PLANS, ...dbPlans];
-```
-
-The pricing page **always** renders the two hardcoded "Free (Buyers)" and "Free (Sellers)" plans alongside whatever the database returns. Even if an admin removes or renames these tiers, the hardcoded ones persist.
-
-**Fix:** Only show FALLBACK_PLANS when `dbPlans` is empty. Currently line 68 handles the empty case, but line 104 concatenates them regardless.
+- **File:** `OnboardingWalkthrough.tsx` lines 141, 149, 154
+- **Content:** `localStorage.getItem('hasSeenOnboarding')`
+- **Risk:** Could collide with other apps on the same domain.
+- **Fix:** Change to `app_has_seen_onboarding`.
+- **Severity:** Low
+- **Effort:** Trivial
 
 ---
 
-#### M6. Legal Pages Have Dual Rendering Path But No Markdown Renderer
+## 4. LOW SEVERITY (Future-Proofing)
 
-**Files:** `TermsPage.tsx`, `PrivacyPolicyPage.tsx`
+### L1. "en-IN" Locale Hardcoded in Date/Number Formatting
 
-These pages check `settings.termsContentMd` and render it in a `<pre>` tag with `whitespace-pre-wrap`. This is not actually markdown rendering -- it's raw text display. Bold, headings, links won't render.
+- **Files:** `format-price.ts`, `PaymentMilestonesPage.tsx`, `BuilderAnalyticsPage.tsx`, `PostDetailSheet.tsx`
+- **Content:** `toLocaleDateString('en-IN', ...)`, `toLocaleString('en-IN', ...)`
+- **Risk:** Blocks localization for non-Indian deployments.
+- **Fix:** Add `locale` to `system_settings`. Very low priority for India-only launch.
+- **Severity:** Low
+- **Effort:** Low
 
-**Fix:** Install a lightweight markdown renderer (e.g., `react-markdown`) or render as `dangerouslySetInnerHTML` with sanitization. Alternatively, keep the HTML fallback as the primary path and treat the markdown field as a "future CMS" feature.
+### L2. AUTOPLAY_INTERVAL (8000ms) and Urgent Timer (3 min) Hardcoded
 
----
-
-### LOW (Future-Proofing)
-
-#### L1. Brand Name "Sociva" Hardcoded in 11 Files
-
-The brand name appears in:
-- `TermsPage.tsx` (multiple legal references)
-- `PrivacyPolicyPage.tsx` (multiple legal references)
-- `CommunityRulesPage.tsx` ("By using Sociva...")
-- `ProfilePage.tsx` ("Sociva v2.0.0")
-- `types/database.ts` (comment)
-- `tooltip-guide.tsx` (localStorage key)
-
-For white-labeling, the brand name needs to be configurable.
-
-**Fix:** Add `platform_name` to `system_settings`. Replace hardcoded "Sociva" references. Low urgency unless white-labeling is imminent.
+- **Files:** `LandingPage.tsx` line 14, `CartPage.tsx` line 282
+- **Risk:** Minor UX constants. 3-min urgent timer is enforced server-side so frontend display is cosmetic.
+- **Severity:** Low
+- **Effort:** Trivial
 
 ---
 
-#### L2. AUTOPLAY_INTERVAL Hardcoded at 8000ms
+## 5. UI-TO-BACKEND INTEGRITY CHECK
 
-**File:** `LandingPage.tsx` line 14
-
-The landing page carousel auto-advances every 8 seconds. This is a UX decision that could be configurable, but is low priority.
-
----
-
-#### L3. Seller Onboarding Placeholder Text is Group-Specific But Hardcoded
-
-**File:** `BecomeSellerPage.tsx` lines 757-759
-
-```
-placeholder={
-  selectedGroup === 'food' ? "e.g., Amma's Kitchen, Fresh Bakes"
-  : selectedGroup === 'services' ? "e.g., QuickFix Repairs, Yoga with Priya"
-  ...
-}
-```
-
-These placeholder examples are hardcoded per group. They should ideally come from `parent_groups.placeholder_hint` or similar.
-
-**Fix:** Add a `placeholder_examples` text column to `parent_groups`. Low priority.
+| Area | Status | Notes |
+|------|--------|-------|
+| Feature flags (FeatureGate) | OK | Enforced via DB function + UI gating |
+| Role checks | OK | Server-side via user_roles table + RLS |
+| Order status transitions | OK | Enforced by DB trigger |
+| Platform fee calculation | OK | Now reads from system_settings in RPC |
+| Delivery fee | OK | Reads from system_settings |
+| Pricing display | Partial | DB columns exist but PRICE_TIER_MAP fallback has ₹ |
+| Currency display | FAIL | formatPrice exists but is never imported anywhere |
+| Legal CMS | OK | ReactMarkdown renders DB content, falls back to HTML |
+| Help CMS | Partial | JSON parsing works but icon mapping is limited |
+| Landing slides CMS | FAIL | Setting exists but LandingPage never reads it |
+| Violation policy CMS | OK | Reads from violationPolicyJson |
+| Contact emails | OK | All pages use settings |
+| Address labels | OK | Auth page uses settings |
+| Platform name | Partial | 4 files still use "Sociva" literally |
 
 ---
 
-#### L4. LocalStorage Keys Use "sociva_" Prefix
+## 6. PRIORITIZED EXECUTION ROADMAP
 
-**Files:** `ProfilePage.tsx` ("sociva_large_font"), `tooltip-guide.tsx` ("sociva_tooltips_viewed")
+### Phase 1 -- Critical (Before Any Demo)
 
-For white-labeling, localStorage keys with brand names will leak the underlying platform identity.
+| # | Gap | Files | Effort |
+|---|-----|-------|--------|
+| C2 | Fix "Sociva" in AuthPage, LandingPage, SearchPage | 3 files | 15 min |
+| C3 | Fix food-biased community rules text | 1 file | 5 min |
+| H2 | Fix ₹ in PRICE_TIER_MAP fallback | 1 file | 5 min |
+| H3 | Fix "All prices are in INR" text | 1 file | 5 min |
+| M4 | Fix sociva_ localStorage key in SearchPage | 1 file | 2 min |
 
-**Fix:** Use a generic prefix like `app_` or make it configurable. Very low priority.
+### Phase 2 -- Structural (Currency Symbol Adoption)
 
----
+| # | Gap | Files | Effort |
+|---|-----|-------|--------|
+| C1 | Replace ₹ with formatPrice() across 54 files | 54 files | 2-3 hours |
+| H1 | Add max_price_filter to system_settings | 3 files + migration | 30 min |
 
-## Prioritized Implementation Plan
+### Phase 3 -- CMS Completion
 
-### Immediate (Before Next Demo)
+| # | Gap | Files | Effort |
+|---|-----|-------|--------|
+| M1 | Wire landingSlidesJson into LandingPage | 1 file | 30 min |
+| M3 | Expand HelpPage icon mapping | 1 file | 15 min |
+| M2 | Add placeholder_hint to parent_groups | 2 files + migration | 30 min |
 
-| # | Gap | Effort | Impact |
-|---|-----|--------|--------|
-| H3 | Platform fee RPC reads from config | Low | Financial logic actually works end-to-end |
-| M5 | Pricing page: don't duplicate free plans | Low | Prevents confusing duplicate tiers |
+### Phase 4 -- Cleanup
 
-### Short-Term (Investor Readiness)
-
-| # | Gap | Effort | Impact |
-|---|-----|--------|--------|
-| H1 | Price amounts from DB, not frontend map | Medium | Admin can change prices without code deploy |
-| M6 | Markdown rendering for legal CMS | Low | Makes the CMS feature actually usable |
-| M3 | Configurable violation policy | Low | Completes community rules config story |
-
-### Medium-Term (Production Polish)
-
-| # | Gap | Effort | Impact |
-|---|-----|--------|--------|
-| H2 | Currency symbol utility | Medium | Config-driven architecture consistency |
-| M1 | Configurable budget filter | Low | Multi-market flexibility |
-| M2 | Landing page slide CMS | Medium | White-label readiness |
-| L1 | Platform name from config | Low | White-label readiness |
-
-### Deferred (Future-Proofing)
-
-| # | Gap | Effort | Impact |
-|---|-----|--------|--------|
-| L2 | Carousel interval config | Trivial | Minor UX control |
-| L3 | Seller onboarding placeholders from DB | Low | Polish |
-| L4 | Generic localStorage prefix | Trivial | White-label edge case |
-| M4 | Seller empty state copy from config | Trivial | Over-engineering concern |
+| # | Gap | Effort |
+|---|-----|--------|
+| M5 | Prefix onboarding localStorage key | 5 min |
+| L1 | Configurable locale | Low priority |
+| L2 | Configurable carousel interval | Trivial |
 
 ---
 
-## Technical Implementation Notes
+## Summary Scorecard
 
-### H3 - Platform Fee RPC Fix (SQL migration)
+| Category | Total | Resolved | Remaining |
+|----------|-------|----------|-----------|
+| Critical | 3 | 0 | 3 |
+| High | 3 | 0 | 3 |
+| Medium | 5 | 0 | 5 |
+| Low | 2 | 0 | 2 |
 
-```sql
--- Inside create_multi_vendor_orders, replace hardcoded 0:
-_fee_percent := COALESCE(
-  (SELECT value::numeric FROM system_settings WHERE key = 'platform_fee_percent'),
-  0
-);
-_platform_fee := ROUND(_final_amount * _fee_percent / 100, 2);
-_net := _final_amount - _platform_fee;
-
--- Then use _platform_fee and _net in the INSERT
-```
-
-### M5 - Pricing Page Fix (1-line change)
-
-```typescript
-// Line 104: Change from
-return [...FALLBACK_PLANS, ...dbPlans];
-// To
-return dbPlans.length > 0 ? dbPlans : FALLBACK_PLANS;
-```
-
-### H1 - Price Amount from DB
-
-Add `price_amount` (numeric, nullable) and `price_period` (text, nullable) columns to `feature_packages`. When non-null, use them for display instead of `PRICE_TIER_MAP`. Keep the map as fallback.
+**Overall Assessment:** The platform has strong config-driven bones but the currency symbol gap (C1) is the single largest credibility risk -- a utility was created but never connected. Phase 1 fixes are all under 30 minutes combined and should be done immediately. Phase 2 (currency adoption) is the most impactful structural change.
 
