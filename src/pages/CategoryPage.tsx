@@ -65,8 +65,7 @@ export default function CategoryPage() {
         .select('*, seller:seller_profiles!products_seller_id_fkey(id, business_name, rating, society_id, verification_status, fulfillment_mode, delivery_note)')
         .eq('category', category as string)
         .eq('is_available', true)
-        .eq('approval_status', 'approved')
-        .eq('seller.verification_status', 'approved');
+        .eq('approval_status', 'approved');
 
       // Reset subcategory when category changes
       setSelectedSubcategory('all');
@@ -76,7 +75,7 @@ export default function CategoryPage() {
       }
 
       const res = await q;
-      const prodResults = (res.data || []).filter((p: any) => p.seller != null) as any[];
+      const prodResults = (res.data || []).filter((p: any) => p.seller != null && p.seller.verification_status === 'approved') as any[];
       const enriched = prodResults.map((p: any) => ({ ...p, seller: p.seller }));
       setProducts(enriched);
     } catch (error) {

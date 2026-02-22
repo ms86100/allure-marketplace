@@ -66,13 +66,12 @@ export function useCategoryProducts(parentGroup: string | null, societyId: strin
         .from('products')
         .select(`
           *,
-          seller:seller_profiles!inner(
+          seller:seller_profiles!products_seller_id_fkey(
             id, business_name, rating, society_id, verification_status, primary_group, fulfillment_mode, delivery_note
           )
         `)
         .eq('is_available', true)
         .eq('approval_status', 'approved')
-        .eq('seller.verification_status', 'approved')
         .eq('seller.primary_group', parentGroup!)
         .order('is_bestseller', { ascending: false })
         .order('created_at', { ascending: false });
@@ -84,7 +83,7 @@ export function useCategoryProducts(parentGroup: string | null, societyId: strin
       const { data, error } = await query;
       if (error) throw error;
 
-      return (data || []).map((p: any) => ({
+      return (data || []).filter((p: any) => p.seller?.verification_status === 'approved').map((p: any) => ({
         ...p,
         seller_name: p.seller?.business_name || 'Seller',
         seller_rating: p.seller?.rating || 0,
