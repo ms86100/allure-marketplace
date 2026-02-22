@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -64,6 +65,9 @@ interface Warning {
 }
 
 export default function AdminPage() {
+  const location = useLocation();
+  const tabParam = useMemo(() => new URLSearchParams(location.search).get('tab'), [location.search]);
+  const [activeTab, setActiveTab] = useState(tabParam || 'sellers');
   const [pendingUsers, setPendingUsers] = useState<Profile[]>([]);
   const [pendingSellers, setPendingSellers] = useState<SellerProfile[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -322,7 +326,7 @@ export default function AdminPage() {
           <Card><CardContent className="p-2 text-center"><Flag className="mx-auto text-destructive" size={14} /><p className="text-sm font-bold">{stats.pendingReports}</p><p className="text-[8px] text-muted-foreground">Reports</p></CardContent></Card>
         </div>
 
-        <Tabs defaultValue="sellers">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full grid grid-cols-5">
             <TabsTrigger value="sellers" className="text-[10px]">Sellers</TabsTrigger>
             <TabsTrigger value="products" className="text-[10px]">Products</TabsTrigger>
