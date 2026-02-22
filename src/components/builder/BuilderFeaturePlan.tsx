@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Package, Check, Lock, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { FeatureShowcase } from '@/components/admin/FeatureShowcase';
-import { featureShowcaseMap } from '@/lib/feature-showcase-data';
 
 interface BuilderFeaturePlanProps {
   builderId: string;

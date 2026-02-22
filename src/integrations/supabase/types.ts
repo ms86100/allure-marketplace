@@ -2744,39 +2744,54 @@ export type Database = {
       }
       platform_features: {
         Row: {
+          audience: string[] | null
+          capabilities: string[] | null
           category: string
           created_at: string
           description: string | null
           feature_key: string
           feature_name: string
+          icon_name: string | null
           id: string
           is_core: boolean
           is_experimental: boolean
+          route: string | null
           society_configurable: boolean
+          tagline: string | null
           updated_at: string
         }
         Insert: {
+          audience?: string[] | null
+          capabilities?: string[] | null
           category?: string
           created_at?: string
           description?: string | null
           feature_key: string
           feature_name: string
+          icon_name?: string | null
           id?: string
           is_core?: boolean
           is_experimental?: boolean
+          route?: string | null
           society_configurable?: boolean
+          tagline?: string | null
           updated_at?: string
         }
         Update: {
+          audience?: string[] | null
+          capabilities?: string[] | null
           category?: string
           created_at?: string
           description?: string | null
           feature_key?: string
           feature_name?: string
+          icon_name?: string | null
           id?: string
           is_core?: boolean
           is_experimental?: boolean
+          route?: string | null
           society_configurable?: boolean
+          tagline?: string | null
           updated_at?: string
         }
         Relationships: []
