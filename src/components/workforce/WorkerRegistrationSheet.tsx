@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { LiveCameraCapture } from './LiveCameraCapture';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { logAudit } from '@/lib/audit';
 import { friendlyError } from '@/lib/utils';
+import { workerRegistrationSchema, validateForm } from '@/lib/validation-schemas';
 
 const DEFAULT_TYPES = ['maid', 'cook', 'driver', 'nanny', 'gardener', 'electrician', 'plumber', 'caretaker', 'other'];
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -37,26 +37,82 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const toggleDay = (day: string) => {
     setActiveDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
   };
 
   const handlePhotoCapture = (blob: Blob) => {
+    // Revoke previous preview URL to prevent memory leak
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
     setPhotoBlob(blob);
     setPhotoPreview(URL.createObjectURL(blob));
   };
 
+  const clearPhoto = () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoBlob(null);
+    setPhotoPreview(null);
+  };
+
+  // Reset form when sheet closes
+  useEffect(() => {
+    if (!open) {
+      resetForm();
+    }
+  }, [open]);
+
+  // Cleanup preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (photoPreview) URL.revokeObjectURL(photoPreview);
+    };
+  }, [photoPreview]);
+
   const handleSubmit = async () => {
-    if (!name.trim() || !user || !effectiveSocietyId || !photoBlob) {
-      toast.error(!photoBlob ? 'Live photo is required' : 'Please fill required fields');
+    if (!user || !effectiveSocietyId) {
+      toast.error('Please log in and select a society');
       return;
     }
+
+    // Validate with zod
+    const validation = validateForm(workerRegistrationSchema, {
+      name,
+      phone,
+      workerType,
+      shiftStart,
+      shiftEnd,
+      entryFrequency,
+      emergencyPhone,
+      flatNumbers,
+    });
+
+    if (!validation.success) {
+      const errors = (validation as { success: false; errors: Record<string, string> }).errors;
+      setFieldErrors(errors);
+      const firstError = Object.values(errors)[0];
+      toast.error(firstError as string);
+      return;
+    }
+
+    if (!photoBlob) {
+      toast.error('Live photo is required');
+      return;
+    }
+
+    if (activeDays.length === 0) {
+      toast.error('Select at least one active day');
+      return;
+    }
+
+    setFieldErrors({});
     setIsSubmitting(true);
 
     try {
       // Upload photo to storage
-      const fileName = `workers/${effectiveSocietyId}/${Date.now()}_${name.replace(/\s/g, '_')}.jpg`;
+      const sanitizedName = name.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+      const fileName = `workers/${effectiveSocietyId}/${Date.now()}_${sanitizedName}.jpg`;
       const { error: uploadError } = await supabase.storage
         .from('app-images')
         .upload(fileName, photoBlob, { contentType: 'image/jpeg' });
@@ -65,7 +121,7 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
 
       const { data: { publicUrl } } = supabase.storage.from('app-images').getPublicUrl(fileName);
 
-      // Create worker record — user_id is the registrant (security/admin), not a worker user account
+      // Create worker record
       const { data: worker, error } = await supabase.from('society_workers').insert({
         user_id: user.id,
         society_id: effectiveSocietyId,
@@ -87,13 +143,19 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
       // Create flat assignments
       if (flatNumbers.trim() && worker) {
         const flats = flatNumbers.split(',').map(f => f.trim()).filter(Boolean);
-        const assignments = flats.map(flat => ({
-          worker_id: worker.id,
-          society_id: effectiveSocietyId,
-          flat_number: flat,
-          assigned_by: user.id,
-        }));
-        await supabase.from('worker_flat_assignments').insert(assignments);
+        if (flats.length > 0) {
+          const assignments = flats.map(flat => ({
+            worker_id: worker.id,
+            society_id: effectiveSocietyId,
+            flat_number: flat,
+            assigned_by: user.id,
+          }));
+          const { error: flatError } = await supabase.from('worker_flat_assignments').insert(assignments);
+          if (flatError) {
+            console.error('Flat assignment error:', flatError);
+            toast.error('Worker registered but flat assignments failed');
+          }
+        }
       }
 
       await logAudit('worker_registered', 'society_worker', worker?.id || '', effectiveSocietyId, {
@@ -103,7 +165,6 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
       toast.success('Worker registered successfully');
       onSuccess();
       onOpenChange(false);
-      resetForm();
     } catch (err: any) {
       console.error(err);
       toast.error(friendlyError(err));
@@ -113,11 +174,13 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
   };
 
   const resetForm = () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
     setName(''); setPhone(''); setWorkerType('maid');
     setCategoryId(null); setShiftStart('06:00'); setShiftEnd('18:00');
     setActiveDays([...DAYS]); setEntryFrequency('daily');
     setEmergencyPhone(''); setFlatNumbers('');
     setPhotoBlob(null); setPhotoPreview(null);
+    setFieldErrors({});
   };
 
   return (
@@ -135,7 +198,7 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
             <LiveCameraCapture
               onCapture={handlePhotoCapture}
               capturedPreview={photoPreview}
-              onClear={() => { setPhotoBlob(null); setPhotoPreview(null); }}
+              onClear={clearPhoto}
             />
           </div>
 
@@ -143,11 +206,24 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Name *</Label>
-              <Input value={name} onChange={e => setName(e.target.value)} placeholder="Worker name" />
+              <Input
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Worker name"
+                className={fieldErrors.name ? 'border-destructive' : ''}
+              />
+              {fieldErrors.name && <p className="text-xs text-destructive mt-1">{fieldErrors.name}</p>}
             </div>
             <div>
               <Label>Phone</Label>
-              <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91..." />
+              <Input
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="9876543210"
+                inputMode="tel"
+                className={fieldErrors.phone ? 'border-destructive' : ''}
+              />
+              {fieldErrors.phone && <p className="text-xs text-destructive mt-1">{fieldErrors.phone}</p>}
             </div>
           </div>
 
@@ -199,7 +275,13 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
             </div>
             <div>
               <Label>Shift End</Label>
-              <Input type="time" value={shiftEnd} onChange={e => setShiftEnd(e.target.value)} />
+              <Input
+                type="time"
+                value={shiftEnd}
+                onChange={e => setShiftEnd(e.target.value)}
+                className={fieldErrors.shiftEnd ? 'border-destructive' : ''}
+              />
+              {fieldErrors.shiftEnd && <p className="text-xs text-destructive mt-1">{fieldErrors.shiftEnd}</p>}
             </div>
           </div>
 
@@ -237,7 +319,14 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
           {/* Emergency Contact */}
           <div>
             <Label>Emergency Contact</Label>
-            <Input value={emergencyPhone} onChange={e => setEmergencyPhone(e.target.value)} placeholder="+91..." />
+            <Input
+              value={emergencyPhone}
+              onChange={e => setEmergencyPhone(e.target.value)}
+              placeholder="9876543210"
+              inputMode="tel"
+              className={fieldErrors.emergencyPhone ? 'border-destructive' : ''}
+            />
+            {fieldErrors.emergencyPhone && <p className="text-xs text-destructive mt-1">{fieldErrors.emergencyPhone}</p>}
           </div>
 
           <Button

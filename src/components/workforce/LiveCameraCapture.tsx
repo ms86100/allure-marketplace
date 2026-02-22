@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Camera, RotateCcw, Check } from 'lucide-react';
 
@@ -29,6 +29,13 @@ export function LiveCameraCapture({ onCapture, capturedPreview, onClear }: LiveC
       console.error('Camera access denied:', err);
     }
   }, []);
+
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      stream?.getTracks().forEach(t => t.stop());
+    };
+  }, [stream]);
 
   const stopCamera = useCallback(() => {
     stream?.getTracks().forEach(t => t.stop());

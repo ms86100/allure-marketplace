@@ -42,6 +42,21 @@ export const disputeSchema = z.object({
   is_anonymous: z.boolean().optional(),
 });
 
+// Worker registration schema
+export const workerRegistrationSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(100, 'Name too long'),
+  phone: z.string().regex(/^(\+?\d{10,13})?$/, 'Invalid phone number').optional().or(z.literal('')),
+  workerType: z.string().min(1, 'Worker type is required'),
+  shiftStart: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time'),
+  shiftEnd: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time'),
+  entryFrequency: z.enum(['daily', 'occasional', 'per_visit']),
+  emergencyPhone: z.string().regex(/^(\+?\d{10,13})?$/, 'Invalid phone number').optional().or(z.literal('')),
+  flatNumbers: z.string().max(500, 'Too many flats').optional().or(z.literal('')),
+}).refine(data => data.shiftStart < data.shiftEnd, {
+  message: 'Shift end must be after shift start',
+  path: ['shiftEnd'],
+});
+
 // Job request schema
 export const jobRequestSchema = z.object({
   job_type: z.string().min(1, 'Please select a job type'),
