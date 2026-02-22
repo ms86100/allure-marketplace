@@ -13,6 +13,7 @@ import { ReportSheet } from '@/components/report/ReportSheet';
 import { ProductActionType } from '@/types/database';
 import { ACTION_CONFIG } from '@/lib/marketplace-constants';
 import { Plus, Minus, Store, MapPin, Home, Clock, Truck, Users, Zap, RotateCcw, ChevronRight, ChevronDown, Shield, Flag } from 'lucide-react';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface ProductDetail {
   product_id: string;
@@ -58,6 +59,7 @@ export function ProductDetailSheet({
   const [showDetails, setShowDetails] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
+  const { formatPrice } = useCurrency();
 
   // Fetch similar products from same category
   useEffect(() => {
@@ -177,7 +179,7 @@ export function ProductDetailSheet({
               {actionType === 'contact_seller' ? (
                 <span className="text-sm font-medium text-muted-foreground">Contact for price</span>
               ) : (
-                <span className="text-xl font-bold text-foreground">₹{product.price}</span>
+                <span className="text-xl font-bold text-foreground">{formatPrice(product.price)}</span>
               )}
             </div>
 
@@ -312,7 +314,7 @@ export function ProductDetailSheet({
                     </div>
                     <p className="text-[11px] font-medium line-clamp-1">{sp.name}</p>
                     <p className="text-[11px] text-muted-foreground">{sp.seller?.business_name}</p>
-                    {sp.price > 0 && <p className="text-xs font-bold">₹{sp.price}</p>}
+                    {sp.price > 0 && <p className="text-xs font-bold">{formatPrice(sp.price)}</p>}
                   </div>
                 ))}
               </div>
@@ -335,12 +337,12 @@ export function ProductDetailSheet({
             {isCartAction ? (
               quantity === 0 ? (
                 <Button className="w-full h-12 text-base font-bold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl" onClick={handleAdd}>
-                  Add to cart · ₹{product.price}
+                  Add to cart · {formatPrice(product.price)}
                 </Button>
               ) : (
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-lg font-bold text-foreground">₹{product.price * quantity}</span>
+                    <span className="text-lg font-bold text-foreground">{formatPrice(product.price * quantity)}</span>
                     <span className="text-xs text-muted-foreground ml-1.5">{quantity} item{quantity > 1 ? 's' : ''}</span>
                   </div>
                   <div className="flex items-center bg-accent rounded-xl overflow-hidden">

@@ -25,7 +25,7 @@ const DEFAULT_RULES = [
   {
     title: 'For Sellers',
     do: [
-      'Maintain food safety and hygiene standards',
+      'Maintain quality and safety standards',
       'Keep your menu and availability up to date',
       'Respond to orders promptly',
       'Communicate clearly with buyers',
@@ -33,7 +33,7 @@ const DEFAULT_RULES = [
     ],
     dont: [
       'Accept orders you cannot fulfill',
-      'Misrepresent food items or ingredients',
+      'Misrepresent products or services',
       'Share buyer contact details with others',
       'Charge differently than listed prices',
     ],

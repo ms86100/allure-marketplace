@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { TrendingUp, ChevronRight } from 'lucide-react';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface EarningsSummaryProps {
   todayEarnings: number;
@@ -8,6 +9,7 @@ interface EarningsSummaryProps {
 }
 
 export function EarningsSummary({ todayEarnings, weekEarnings, totalEarnings }: EarningsSummaryProps) {
+  const { formatPrice } = useCurrency();
   return (
     <Link to="/seller/earnings">
       <div className="bg-gradient-to-r from-success/10 to-success/5 rounded-xl p-4">
@@ -21,15 +23,15 @@ export function EarningsSummary({ todayEarnings, weekEarnings, totalEarnings }: 
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-background/50 rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">Today</p>
-            <p className="text-lg font-bold text-success">₹{todayEarnings}</p>
+            <p className="text-lg font-bold text-success">{formatPrice(todayEarnings)}</p>
           </div>
           <div className="bg-background/50 rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">This Week</p>
-            <p className="text-lg font-bold text-success">₹{weekEarnings}</p>
+            <p className="text-lg font-bold text-success">{formatPrice(weekEarnings)}</p>
           </div>
           <div className="bg-background/50 rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">All Time</p>
-            <p className="text-lg font-bold text-success">₹{totalEarnings}</p>
+            <p className="text-lg font-bold text-success">{formatPrice(totalEarnings)}</p>
           </div>
         </div>
       </div>

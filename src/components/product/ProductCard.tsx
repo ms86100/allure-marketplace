@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Product } from '@/types/database';
 import { useCart } from '@/hooks/useCart';
 import { cn } from '@/lib/utils';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface ProductCardProps {
   product: Product;
@@ -15,6 +16,7 @@ interface ProductCardProps {
 
 export function ProductCard({ product, variant = 'horizontal', onTap }: ProductCardProps) {
   const { items, addItem, updateQuantity } = useCart();
+  const { formatPrice } = useCurrency();
   const cartItem = items.find((item) => item.product_id === product.id);
   const quantity = cartItem?.quantity || 0;
 
@@ -73,7 +75,7 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
             <div className="flex-1 min-w-0">
               <h4 className="font-medium text-sm truncate">{product.name}</h4>
               <p className="text-sm font-semibold text-primary mt-1">
-                ₹{product.price}
+                {formatPrice(product.price)}
               </p>
             </div>
           </div>
@@ -130,7 +132,7 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
                 {product.description}
               </p>
             )}
-            <p className="font-semibold mt-2">₹{product.price}</p>
+            <p className="font-semibold mt-2">{formatPrice(product.price)}</p>
           </div>
         </div>
       </div>

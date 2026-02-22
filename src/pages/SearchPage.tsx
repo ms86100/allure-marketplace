@@ -16,6 +16,7 @@ import { ArrowLeft, Search as SearchIcon, X, Globe, ShoppingBag } from 'lucide-r
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useSearchPlaceholder } from '@/hooks/useSearchPlaceholder';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 
 
 // ── Types ──────────────────────────────────────────────
@@ -44,7 +45,7 @@ interface ProductSearchResult {
 }
 
 // ── Helpers ────────────────────────────────────────────
-const FILTER_STORAGE_KEY = 'sociva_search_filters';
+const FILTER_STORAGE_KEY = 'app_search_filters';
 
 const loadSavedFilters = (): FilterState => {
   try {
@@ -72,6 +73,7 @@ export default function SearchPage() {
   const { items: cartItems, addItem, updateQuantity } = useCart();
   const [searchParams] = useSearchParams();
   const { configs: categoryConfigs, isLoading: categoriesLoading } = useCategoryConfigs();
+  const settings = useSystemSettings();
 
   // Build a lookup map: category slug -> { icon, displayName, supportsCart, etc. }
   const categoryMap = useMemo(() => {
@@ -254,7 +256,7 @@ export default function SearchPage() {
     filters.categories.length > 0 ||
     filters.sortBy !== null ||
     filters.priceRange[0] > 0 ||
-    filters.priceRange[1] < 5000;
+    filters.priceRange[1] < settings.maxPriceFilter;
 
   // ── Determine if we're in "active search" mode ──
   const isSearchActive = debouncedQuery.length >= 1 || hasActiveFilters() || selectedCategory !== null;
@@ -499,7 +501,7 @@ export default function SearchPage() {
       if (effectiveCategories.length > 0 && term.length >= 1) {
         filtered = filtered.filter((p) => p.category && effectiveCategories.includes(p.category as any));
       }
-      if (filters.priceRange[0] > 0 || filters.priceRange[1] < 5000) {
+      if (filters.priceRange[0] > 0 || filters.priceRange[1] < settings.maxPriceFilter) {
         filtered = filtered.filter((p) => p.price >= filters.priceRange[0] && p.price <= filters.priceRange[1]);
       }
 

@@ -399,7 +399,7 @@ export default function AuthPage() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Home className="text-primary-foreground" size={16} />
             </div>
-            <h1 className="text-2xl font-extrabold text-white tracking-tight drop-shadow-lg">Sociva</h1>
+            <h1 className="text-2xl font-extrabold text-white tracking-tight drop-shadow-lg">{settings.platformName}</h1>
           </div>
           <p className="text-sm text-white/80 drop-shadow font-medium">Your Community Marketplace</p>
         </div>

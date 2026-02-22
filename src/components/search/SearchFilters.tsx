@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ProductCategory } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 
 export interface FilterState {
   priceRange: [number, number];
@@ -23,7 +24,7 @@ interface SearchFiltersProps {
 }
 
 const defaultFilters: FilterState = {
-  priceRange: [0, 5000],
+  priceRange: [0, 50000],
   minRating: 0,
   isVeg: null,
   categories: [],
@@ -36,6 +37,8 @@ export function SearchFilters({
   showPriceFilter = true,
 }: SearchFiltersProps) {
   const { configs: allCategories } = useCategoryConfigs();
+  const settings = useSystemSettings();
+  const maxPrice = settings.maxPriceFilter;
   const [isOpen, setIsOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState(filters);
 
@@ -44,7 +47,7 @@ export function SearchFilters({
     filters.isVeg !== null,
     filters.categories.length > 0,
     filters.sortBy !== null,
-    filters.priceRange[0] > 0 || filters.priceRange[1] < 5000,
+    filters.priceRange[0] > 0 || filters.priceRange[1] < maxPrice,
   ].filter(Boolean).length;
 
   const handleApply = () => {
@@ -194,7 +197,7 @@ export function SearchFilters({
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-semibold">Price Range</Label>
                 <span className="text-sm text-muted-foreground">
-                  ₹{localFilters.priceRange[0]} - ₹{localFilters.priceRange[1]}
+                  {settings.currencySymbol}{localFilters.priceRange[0]} - {settings.currencySymbol}{localFilters.priceRange[1]}
                 </span>
               </div>
               <Slider
@@ -206,7 +209,7 @@ export function SearchFilters({
                   })
                 }
                 min={0}
-                max={5000}
+                max={maxPrice}
                 step={50}
                 className="mt-4"
               />

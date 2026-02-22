@@ -6,6 +6,7 @@ import { VegBadge } from '@/components/ui/veg-badge';
 import { useCart } from '@/hooks/useCart';
 import { Product } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { useCurrency } from '@/hooks/useCurrency';
 
 export interface ProductWithSeller extends Product {
   seller_name?: string;
@@ -27,6 +28,7 @@ export function ProductGridCard({ product, behavior, onTap, className, viewOnly 
   const navigate = useNavigate();
   const { items, addItem, updateQuantity } = useCart();
   const { impact, selectionChanged } = useHaptics();
+  const { formatPrice } = useCurrency();
   const cartItem = items.find((item) => item.product_id === product.id);
   const quantity = cartItem?.quantity || 0;
 
@@ -143,7 +145,7 @@ export function ProductGridCard({ product, behavior, onTap, className, viewOnly 
         <div className="flex-1 min-h-0.5" />
 
         <div className="flex items-end gap-1 mt-auto">
-          <span className="font-bold text-xs text-foreground leading-none">₹{product.price}</span>
+          <span className="font-bold text-xs text-foreground leading-none">{formatPrice(product.price)}</span>
         </div>
       </div>
     </div>

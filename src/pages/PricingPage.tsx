@@ -50,10 +50,10 @@ const FALLBACK_PLANS: PricingPlan[] = [
   },
 ];
 
-const PRICE_TIER_MAP: Record<string, { price: string; period: string; badge: string | null }> = {
-  free: { price: 'Free', period: 'forever', badge: null },
-  pro: { price: '₹199', period: '/month', badge: 'Popular' },
-  enterprise: { price: '₹999', period: '/month', badge: 'Enterprise' },
+const PRICE_TIER_MAP: Record<string, { priceAmount: number; period: string; badge: string | null }> = {
+  free: { priceAmount: 0, period: 'forever', badge: null },
+  pro: { priceAmount: 199, period: '/month', badge: 'Popular' },
+  enterprise: { priceAmount: 999, period: '/month', badge: 'Enterprise' },
 };
 
 function usePricingPlans(currencySymbol: string) {
@@ -94,7 +94,7 @@ function usePricingPlans(currencySymbol: string) {
         // H1: Use DB columns if available, fallback to tier map
         const price = (pkg as any).price_amount != null
           ? ((pkg as any).price_amount === 0 ? 'Free' : `${currencySymbol}${(pkg as any).price_amount}`)
-          : tierInfo.price;
+          : (tierInfo.priceAmount === 0 ? 'Free' : `${currencySymbol}${tierInfo.priceAmount}`);
         const period = (pkg as any).price_period || tierInfo.period;
         return {
           name: pkg.package_name,
@@ -179,7 +179,7 @@ export default function PricingPage() {
         )}
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          All prices are in INR. GST applicable where required.
+          All prices are in {settings.currencySymbol === '₹' ? 'INR' : settings.currencySymbol}. GST applicable where required.
         </p>
       </div>
     </AppLayout>

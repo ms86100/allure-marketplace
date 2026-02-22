@@ -25,6 +25,7 @@ export interface SystemSettings {
   violationPolicyJson: string;
   sellerEmptyStateCopy: string;
   landingSlidesJson: string;
+  maxPriceFilter: number;
 }
 
 const DEFAULTS: SystemSettings = {
@@ -50,6 +51,7 @@ const DEFAULTS: SystemSettings = {
   violationPolicyJson: '',
   sellerEmptyStateCopy: 'Sell products, groceries, or services to your community',
   landingSlidesJson: '',
+  maxPriceFilter: 50000,
 };
 
 export function useSystemSettings(): SystemSettings {
@@ -68,6 +70,7 @@ export function useSystemSettings(): SystemSettings {
           'help_sections_json', 'terms_content_md', 'privacy_content_md',
           'currency_symbol', 'budget_filter_threshold', 'platform_name',
           'violation_policy_json', 'seller_empty_state_copy', 'landing_slides_json',
+          'max_price_filter',
         ]);
 
       const map: Record<string, string> = {};
@@ -98,6 +101,7 @@ export function useSystemSettings(): SystemSettings {
         violationPolicyJson: map.violation_policy_json || DEFAULTS.violationPolicyJson,
         sellerEmptyStateCopy: map.seller_empty_state_copy || DEFAULTS.sellerEmptyStateCopy,
         landingSlidesJson: map.landing_slides_json || DEFAULTS.landingSlidesJson,
+        maxPriceFilter: parseInt(map.max_price_filter || '50000', 10) || 50000,
       };
     },
     staleTime: jitteredStaleTime(15 * 60 * 1000),

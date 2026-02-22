@@ -138,7 +138,7 @@ export function useOnboarding() {
   const [hasChecked, setHasChecked] = useState(false);
 
   useEffect(() => {
-    const hasSeenOnboarding = localStorage.getItem('hasSeenOnboarding');
+    const hasSeenOnboarding = localStorage.getItem('app_has_seen_onboarding');
     if (!hasSeenOnboarding) {
       setShowOnboarding(true);
     }
@@ -146,12 +146,12 @@ export function useOnboarding() {
   }, []);
 
   const completeOnboarding = () => {
-    localStorage.setItem('hasSeenOnboarding', 'true');
+    localStorage.setItem('app_has_seen_onboarding', 'true');
     setShowOnboarding(false);
   };
 
   const resetOnboarding = () => {
-    localStorage.removeItem('hasSeenOnboarding');
+    localStorage.removeItem('app_has_seen_onboarding');
     setShowOnboarding(true);
   };
 

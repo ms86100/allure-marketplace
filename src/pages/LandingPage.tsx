@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import useEmblaCarousel from 'embla-carousel-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useParentGroups, ParentGroupInfo } from '@/hooks/useParentGroups';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { 
   Utensils, ShoppingBag, Wrench, GraduationCap, Package,
   Star, Shield, MapPin, Users, ChevronRight, Sparkles,
@@ -45,6 +46,7 @@ export default function LandingPage() {
   const [activeSlide, setActiveSlide] = useState(0);
   const [stats, setStats] = useState({ societies: 0, sellers: 0, categories: 0 });
   const { parentGroupInfos } = useParentGroups();
+  const { platformName } = useSystemSettings();
 
   const displayGroups = useMemo(() => {
     const active = parentGroupInfos.filter(g => g.label);
@@ -181,7 +183,7 @@ export default function LandingPage() {
           <p className="text-sm italic text-foreground/80 mb-3">
             "A marketplace built exclusively for our community — trusted neighbors, verified sellers, all in one place."
           </p>
-          <p className="text-xs font-medium text-muted-foreground">— The Sociva Team</p>
+          <p className="text-xs font-medium text-muted-foreground">— The {platformName} Team</p>
         </div>
 
         <div className="flex justify-around mb-8 bg-card rounded-xl p-4 border border-border">
