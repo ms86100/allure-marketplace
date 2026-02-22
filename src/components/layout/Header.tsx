@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Bell, Building, Building2, ChevronDown } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,6 +26,16 @@ export function Header({
   className 
 }: HeaderProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleBack = useCallback(() => {
+    // If there's real history, go back; otherwise navigate to society dashboard or home
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate('/society');
+    }
+  }, [navigate]);
   const { profile, isApproved, society, user, viewAsSocietyId, effectiveSociety, setViewAsSociety, isAdmin, isBuilderMember } = useAuth();
   const { itemCount } = useCart();
   const { selectionChanged } = useHaptics();
@@ -85,7 +95,7 @@ export function Header({
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 rounded-full shrink-0"
-                    onClick={() => navigate(-1)}
+                    onClick={handleBack}
                   >
                     <ArrowLeft size={18} />
                   </Button>
