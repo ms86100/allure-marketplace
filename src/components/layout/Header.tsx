@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, Building, ChevronDown } from 'lucide-react';
+import { Bell, Building, Building2, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -105,6 +105,17 @@ export function Header({
 
             <div className="flex items-center gap-1.5 mt-1">
               <ThemeToggle className="h-8 w-8 rounded-full bg-muted text-foreground hover:bg-muted/80" />
+              {isBuilderMember && (
+                <Link to="/builder">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 rounded-full bg-muted text-foreground hover:bg-muted/80"
+                  >
+                    <Building2 size={16} />
+                  </Button>
+                </Link>
+              )}
               {isApproved && (
                 <>
                   <Link to="/notifications/inbox">

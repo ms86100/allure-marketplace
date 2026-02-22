@@ -25,6 +25,7 @@ import {
   Camera,
   Repeat,
   Award,
+  Building2,
 } from 'lucide-react';
 import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
 import { toast } from 'sonner';
@@ -33,7 +34,7 @@ const APP_VERSION = '2.0.0';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user, profile, society, isSeller, isAdmin, signOut, refreshProfile } = useAuth();
+  const { user, profile, society, isSeller, isAdmin, isBuilderMember, signOut, refreshProfile } = useAuth();
   const { isFeatureEnabled } = useEffectiveFeatures();
   const [largeFont, setLargeFont] = useState(() => {
     return localStorage.getItem('sociva_large_font') === 'true';
@@ -97,6 +98,9 @@ export default function ProfilePage() {
 
   const menuItems = [
     { icon: Award, label: 'Community Directory', to: '/directory' },
+    ...(isBuilderMember
+      ? [{ icon: Building2, label: 'Builder Dashboard', to: '/builder' }]
+      : []),
     ...(isSeller
       ? [{ icon: Store, label: 'Seller Dashboard', to: '/seller' }]
       : [{ icon: Store, label: 'Become a Seller', to: '/become-seller' }]),
