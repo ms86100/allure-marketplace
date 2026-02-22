@@ -2616,6 +2616,7 @@ export type Database = {
           description: string | null
           flat_number: string | null
           id: string
+          logged_by: string | null
           notified_at: string | null
           photo_url: string | null
           received_at: string
@@ -2633,6 +2634,7 @@ export type Database = {
           description?: string | null
           flat_number?: string | null
           id?: string
+          logged_by?: string | null
           notified_at?: string | null
           photo_url?: string | null
           received_at?: string
@@ -2650,6 +2652,7 @@ export type Database = {
           description?: string | null
           flat_number?: string | null
           id?: string
+          logged_by?: string | null
           notified_at?: string | null
           photo_url?: string | null
           received_at?: string
