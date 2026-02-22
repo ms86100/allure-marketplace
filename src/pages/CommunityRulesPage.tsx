@@ -2,8 +2,9 @@ import { Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowLeft, Shield, Check, X, AlertTriangle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
-const RULES = [
+const DEFAULT_RULES = [
   {
     title: 'For Buyers',
     do: [
@@ -45,6 +46,11 @@ const VIOLATIONS = [
 ];
 
 export default function CommunityRulesPage() {
+  const { society } = useAuth();
+  // Use society-specific rules_text if available, otherwise fall back to defaults
+  const customRulesText = (society as any)?.rules_text as string | null;
+  const RULES = customRulesText ? null : DEFAULT_RULES;
+
   return (
     <AppLayout showHeader={false} showNav={false}>
       <div className="p-4 pb-8 safe-top">
@@ -63,8 +69,18 @@ export default function CommunityRulesPage() {
           </p>
         </div>
 
-        {/* Rules */}
-        {RULES.map(({ title, do: doList, dont: dontList }) => (
+        {/* Custom society rules */}
+        {customRulesText && (
+          <Card className="mb-4">
+            <CardContent className="p-4">
+              <h3 className="font-semibold mb-3">Society Rules</h3>
+              <div className="text-sm text-muted-foreground whitespace-pre-line">{customRulesText}</div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Default Rules */}
+        {RULES && RULES.map(({ title, do: doList, dont: dontList }) => (
           <Card key={title} className="mb-4">
             <CardContent className="p-4">
               <h3 className="font-semibold mb-4">{title}</h3>

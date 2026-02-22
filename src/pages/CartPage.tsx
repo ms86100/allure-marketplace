@@ -59,7 +59,7 @@ export default function CartPage() {
 
     const { data, error } = await supabase.rpc('create_multi_vendor_orders', {
       _buyer_id: user.id,
-      _delivery_address: `Block ${profile.block}, Flat ${profile.flat_number}`,
+      _delivery_address: [profile.block, profile.flat_number].filter(Boolean).join(', '),
       _notes: notes || null,
       _payment_method: paymentMethod,
       _payment_status: paymentStatus,
@@ -456,7 +456,7 @@ export default function CartPage() {
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{fulfillmentType === 'self_pickup' ? 'Pickup from' : 'Deliver to'}</p>
             <p className="text-sm font-medium mt-0.5">
-              {profile?.name} — Block {profile?.block}, Flat {profile?.flat_number}
+              {profile?.name} — {[profile?.block, profile?.flat_number].filter(Boolean).join(', ')}
             </p>
             <p className="text-xs text-muted-foreground">{society?.name || 'Your Society'}</p>
           </div>
