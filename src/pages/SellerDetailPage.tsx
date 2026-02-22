@@ -29,7 +29,8 @@ import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile, Product, DAYS_OF_WEEK } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
-import { ArrowLeft, Clock, MapPin, Phone, ShoppingCart, Star, Calendar, Flag, Zap, Users, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, Phone, Search, ShoppingCart, Star, Calendar, Flag, X, Zap, Users, ShieldCheck } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
@@ -43,6 +44,7 @@ export default function SellerDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [activeTab, setActiveTab] = useState('menu');
+  const [menuSearch, setMenuSearch] = useState('');
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [reportType, setReportType] = useState<string>('');
@@ -131,9 +133,14 @@ export default function SellerDetailPage() {
     }
   };
 
-  const filteredProducts = activeCategory === 'all'
-    ? products
-    : products.filter((p) => p.category === activeCategory);
+  const filteredProducts = (() => {
+    let result = activeCategory === 'all' ? products : products.filter((p) => p.category === activeCategory);
+    if (menuSearch.trim()) {
+      const q = menuSearch.toLowerCase();
+      result = result.filter((p) => p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q));
+    }
+    return result;
+  })();
 
   const categories = ['all', ...new Set(products.map((p) => p.category))];
 
@@ -436,6 +443,21 @@ export default function SellerDetailPage() {
           </TabsList>
 
           <TabsContent value="menu" className="mt-4">
+            {/* Search within menu */}
+            <div className="relative mb-3">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={`Search in ${seller.business_name}…`}
+                value={menuSearch}
+                onChange={(e) => setMenuSearch(e.target.value)}
+                className="pl-8 pr-8 h-9 bg-muted border-0 rounded-lg text-sm"
+              />
+              {menuSearch && (
+                <button onClick={() => setMenuSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
             {categories.length > 2 && (
               <div className="flex gap-2 overflow-x-auto scrollbar-hide mb-4 -mx-4 px-4">
                 {categories.map((cat) => {
