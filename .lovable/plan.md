@@ -1,193 +1,146 @@
 
-# Orders & Payments Module — Deep Audit Plan
 
-## Scope
+# Comprehensive End-to-End Test Suite for All Pages and Features
 
-5 pages, 8 components, 1 RPC function, 7 tables, 2 DB triggers, 1 edge function.
+## Overview
 
-**Pages**: Cart, Orders, Order Detail, Favorites, Subscriptions
+This plan adds a new comprehensive test file covering ALL pages and features organized exactly as requested, using the existing helper-function pattern (pure business logic testing, no DOM rendering, no mocking). New helper functions will be added to `src/test/helpers/business-rules.ts` to support the new tests.
 
-**Components**: ReorderButton, OrderCancellation, UrgentOrderTimer, OrderRejectionDialog, OrderItemCard, CouponInput, PaymentMethodSelector, RazorpayCheckout, ReviewForm, FulfillmentSelector, DeliveryStatusCard, OrderHelpSheet, OrderChat, FeedbackSheet
+## What Already Exists (852 tests across 11 files)
 
----
+The existing tests cover: search filters, delivery fees, cart grouping, seller access, feature gates, role checks, worker validation, coupon logic, SLA computation, security gate (OTP, tokens, manual entry, visitors, parcels), finance summaries, milestone progress, inspection scores, notification titles, validation schemas, formatPrice, escapeIlike, jitteredStaleTime, friendlyError, cn, convertToHashRoute, safeJSONParse, marketplace constants, and more.
 
-## Phase 1: Discovered Issues
+## What's Missing (organized by page/feature)
 
-### O1 -- CRITICAL: Review RLS blocks reviews on "delivered" orders
+### New Helpers Needed in `business-rules.ts`
 
-The `reviews` INSERT RLS policy enforces `orders.status = 'completed'`. However, the UI (`OrderDetailPage` line 160) shows the "Write Review" CTA when `order.status === 'completed'` -- this part works. But the `canReorder` check on line 162 includes `delivered`, and crucially, the `canReview` check on line 160 only checks `completed`. So reviews on `delivered` orders are NOT attempted from the UI. **However**, the separate `ReorderButton` appears for both `completed` and `delivered` -- this is correct behavior.
+1. **Order Status Transitions** -- `ALLOWED_ORDER_TRANSITIONS` map and `isValidOrderTransition(from, to)` mirroring the DB trigger
+2. **Cart Computation** -- `computeCartTotal(items)`, `computeItemCount(items)`, `computeMaxPrepTime(items)`, `computeFinalAmount(subtotal, couponDiscount, deliveryFee)`
+3. **Seller Onboarding** -- `getSellerOnboardingStep(profile)`, `isSellerProfileComplete(profile)`, `canSubmitSellerApplication(profile)`
+4. **Society Dashboard** -- `filterDashboardSections(sections, featureChecker, isAdmin, isSocietyAdmin)`, `computeAvgResponseHours(items)`
+5. **Landing Page** -- `parseLandingSlides(json)`, `computePlatformStats(societies, sellers, categories)`
+6. **Seller Badges** -- `getSellerBadges(profile)` for "New Seller", "0% Cancellation"
+7. **Payment Logic** -- `isPaymentMethodAvailable(method, seller)`, `computePlatformFee(amount, percent)`
+8. **Delivery Assignment** -- `shouldAutoAssignDelivery(order)`, `isDeliveryCodeValid(code)`
+9. **Notification Queue** -- all buyer/seller notification title/body generation for every status
+10. **Subscription Logic** -- `isSubscriptionActive(sub)`, `getNextRenewalDate(sub)`
+11. **Seller Visibility** -- `computeSellerVisibilityScore(profile)` checklist scoring
+12. **Builder Logic** -- `canAccessBuilderDashboard(roles)`, `computeBuilderSocietyStats(societies)`
+13. **Order Type Classification** -- `classifyOrderType(actionType)` mapping action types to order types
+14. **Debounce Logic** -- pure function test for search debounce behavior
+15. **Status Label Mapping** -- `getOrderStatusLabel(status)`, `getPaymentStatusLabel(status)`, `getDeliveryStatusLabel(status)` using the hardcoded maps from `types/database.ts`
 
-**Re-analysis**: After re-reading the code, `canReview` (line 160) is `isBuyerView && order.status === 'completed' && !hasReview`. This ONLY checks `completed`. So the CTA does NOT appear for `delivered`. But the order lifecycle has `delivered` as a non-terminal state (`delivered -> completed` is allowed). If a seller marks an order as `delivered` but never marks it `completed`, the buyer can NEVER leave a review. This is a business logic gap.
+### New Test File: `src/test/comprehensive-pages.test.ts`
 
-**Fix**: Update the RLS policy to also allow `orders.status = 'delivered'` and update `canReview` in `OrderDetailPage` to include `delivered`.
-
-### O2 -- CRITICAL: Order cancellation "Undo" always fails
-
-`OrderCancellation` (line 77-84) attempts to undo a cancellation by reverting `status` to `previousStatus`. The `validate_order_status_transition` trigger defines `cancelled` as a terminal state with `_allowed := ARRAY[]::text[]`. This means the undo UPDATE will always raise: `Invalid order status transition: cancelled -> placed`. The user sees "Order cancelled" toast with an Undo action that silently fails (the error is caught and shows "Could not undo cancellation").
-
-**Fix**: Remove the Undo action from the cancellation toast, since the DB enforces cancellation as terminal. Alternatively, add a brief grace window in the trigger (within 5 seconds of cancellation), but this adds complexity.
-
-### O3 -- MEDIUM: Delivery fee inconsistency in multi-vendor orders
-
-In `create_multi_vendor_orders` RPC, the delivery fee is added to `total_amount` only for the first order (`_final_amount + _delivery_fee`), then `_delivery_fee := 0` for subsequent orders. However, the `payment_records.amount` is set to `_final_amount` (without delivery fee) for ALL orders. This means:
-- Order 1: `total_amount = subtotal + delivery_fee`, `payment.amount = subtotal` (mismatch)
-- Order 2+: `total_amount = subtotal`, `payment.amount = subtotal` (match)
-
-The seller earnings page reads from `payment_records`, so the delivery fee revenue is unattributed.
-
-**Fix**: The payment record for order 1 should include delivery fee in the amount, or delivery fee should be tracked separately. Document only -- no auto-fix since this involves financial logic.
-
-### O4 -- MEDIUM: Coupon applied only for single-seller carts
-
-When `sellerGroups.length > 1`, the UI shows "Coupons are not available for multi-seller carts" but the RPC still processes `_coupon_id` and `_coupon_discount` parameters if passed. If a user somehow bypasses the UI restriction, a coupon could be applied to a multi-seller cart. The redemption is only recorded for the first order.
-
-**Status**: Low risk since the UI prevents it. Document only.
-
-### O5 -- LOW: Order cancellation undo UX misleads users
-
-Related to O2. The 5-second undo toast creates a false expectation. When clicked, the user sees "Could not undo cancellation" with no explanation. Users may think this is a bug.
-
-**Fix**: Part of O2 fix -- remove the undo action entirely.
-
-### O6 -- LOW: Favorites filtered by effectiveSocietyId
-
-`FavoritesPage` line 41 filters favorites by `effectiveSocietyId`. If an admin uses "view as" another society, their personal favorites from their home society disappear. This is likely unintended for personal data.
-
-**Fix**: Use `profile?.society_id` instead of `effectiveSocietyId` for favorites filtering.
-
-### O7 -- INFO: Order items status has no DB-level transition validation
-
-`OrderItemCard` allows sellers to change item status via a dropdown with forward-only transitions enforced in the UI (line 112: `isDisabled = statusIndex <= currentIndex`), but also allows jumping to `cancelled` (line 119). There is no database trigger validating item status transitions, unlike the order-level `validate_order_status_transition`. A direct DB update could set any status.
-
-**Status**: Not a user-facing issue since the UI prevents backward transitions. Document only.
+Approximately **300+ new tests** organized into the following sections:
 
 ---
 
-## Phase 2: Test Suite
+#### Core Pages (30+ tests)
+- **Landing Page**: CMS slide parsing (valid JSON, invalid JSON, empty), platform stats computation, slide count, CTA links present
+- **Auth Page**: Login schema validation (valid, missing email, short password, invalid email format), signup schema with profile validation, password strength edge cases
+- **Profile Page**: Profile menu items for all role combos (8 combos), verification state transitions, profile data schema edge cases (name length, flat number, block, phone format)
+- **Privacy/Terms/Help/Pricing**: Route classification (all public routes verified), static page accessibility
 
-Create `src/test/orders-payments.test.ts` with approximately 70-80 test cases covering:
+#### Marketplace and Shopping (80+ tests)
+- **Search Page**: Filter persistence logic, debounce delay validation, category map building, effective category merging (selectedCategory + filter categories), cross-society browsing toggle, search radius validation (1-10), product deduplication logic, abort controller cancellation, filter preset application, sort by all 6 options, combined filter + sort + category, veg filter with null values
+- **Categories Page**: Category group structure, parent group filtering, active/inactive category logic
+- **Cart Page**: Cart total computation, item count, max prep time extraction, final amount (with/without coupon, with/without delivery fee), minimum order amount validation per seller, multi-vendor order grouping, cross-society seller detection, urgent item detection, payment method availability (COD/UPI), empty cart state, fulfillment type impact on delivery fee
+- **Orders Page**: Order status label mapping for all 13 statuses, payment status labels (4 statuses), item status labels (6 statuses), reorder eligibility (completed/delivered only), pagination logic (PAGE_SIZE = 20), buyer vs seller view tab logic
+- **Favorites**: Seller favorite toggle logic
+- **Subscriptions**: Subscription active/expired/cancelled state, renewal date computation
+- **Trust Directory**: Seller trust score computation, trust badge thresholds
 
-**Cart Management**
-- Add item requires authenticated user
-- Add item optimistic update + server sync
-- Update quantity to 0 triggers removal
-- Remove item with undo toast
-- Clear cart confirmation dialog
-- Cart persists across page navigation
-- society_id auto-set via trigger
+#### Seller Tools (50+ tests)
+- **Become Seller**: Seller application completeness check (business name, category, cover image), step wizard progression, license requirement check per parent group, draft product management, sub-category selector filtering
+- **Seller Dashboard**: Seller badge assignment ("New Seller" when 0 orders, "0% Cancellation" when rate=0 and orders>2), store availability toggle, earnings summary (today/week/total), order filter counts, quick action visibility
+- **Seller Products**: Product approval status validation (draft/pending/approved/rejected), bulk upload logic, product price requirement per category
+- **Seller Settings**: Fulfillment mode validation (self_pickup/delivery/both), operating days selection, delivery radius validation (1-10km)
+- **Seller Earnings**: Platform fee computation, net amount calculation
 
-**Checkout Flow**
-- Minimum order amount per seller enforced
-- Pre-checkout product availability validation
-- Unavailable items flagged and cart refreshed
-- Confirmation dialog shows correct summary
-- Multi-seller cart creates separate orders
-- Submit guard prevents double-click
-- Delivery fee calculation: free above threshold
-- Delivery fee applied only to first order in multi-vendor
+#### Society Management (60+ tests)
+- **Society Dashboard**: Dashboard section filtering by feature gates (26 feature keys), search across labels+keywords+stats, admin-only section visibility, committee response time computation (avg hours from created_at to acknowledged_at), trust badge display
+- **Bulletin Page**: Post sorting (pin+date), comment/vote count updates, help request response count, most discussed ranking
+- **Finances**: Finance summary (income vs expense, balance, color class), expense flagging, budget threshold, spending chart data
+- **Construction Progress**: Tower progress averaging, milestone progress (paid/pending/total), overall progress computation (towers vs milestones), document vault, Q&A answered ratio
+- **Snag List**: Snag status transitions, inspection score computation, acknowledged_at tracking
+- **Disputes**: Dispute schema validation, dispute resolution rate, dispute category validation, anonymous dispute handling
+- **Maintenance**: Maintenance collection rate, pending dues count, due status transitions
+- **Society Reports**: Report metrics computation (dispute rate, maintenance rate, response time categorization)
+- **Society Admin**: Management access check, society admin role validation
+- **Payment Milestones**: Milestone progress with unequal percentages, all-paid/all-pending edge cases
+- **Inspection**: Inspection score (all pass, all fail, mixed, partial check), checklist progress
 
-**Order Creation (RPC)**
-- `create_multi_vendor_orders` validates buyer profile exists
-- Proportional coupon discount calculation
-- Platform fee computation from system_settings
-- Cross-society distance calculation
-- Urgent orders get `auto_cancel_at = now() + 3min`
-- Cart cleared atomically after order creation
-- Idempotency key generated per order
-- Payment record created with platform fee
+#### Security and Gate (40+ tests)
+- **Guard Kiosk**: Guard access check (admin OR society admin OR security officer), security mode status (basic/confirmation/ai_match), tab availability
+- **Gate Entry**: QR code generation, token expiry with TTL, nonce duplicate detection
+- **Security Verify**: Manual entry validation (flat + name required), manual entry status transitions (pending -> approved/denied/expired, all terminal)
+- **Security Audit**: Audit percentage computation, average response time in ms
+- **Visitor Management**: Visitor status transitions (expected -> checked_in -> checked_out, cancelled is terminal), OTP validation (6 digits), OTP expiry, OTP generation uniqueness
+- **Parcel Management**: Parcel logging authorization (owner or admin), parcel status filtering
 
-**Payment**
-- COD default selection when UPI unavailable
-- UPI blocked when seller has no `upi_id`
-- Razorpay checkout: success polls payment_status
-- Razorpay checkout: failure does not update client-side
-- Payment status webhook polling (15s timeout)
+#### Builder Portal (20+ tests)
+- **Builder Dashboard**: Builder member access check, managed builder IDs, society list with stats (pending users, active sellers, open disputes, open snags)
+- **Builder Analytics**: Cross-society aggregation, builder stats computation
 
-**Order Status Transitions**
-- Valid: placed->accepted->preparing->ready->picked_up->delivered->completed
-- Valid: enquired->quoted->accepted->scheduled->in_progress->completed
-- Invalid: cancelled->anything (terminal)
-- Invalid: completed->anything (terminal)
-- Invalid: placed->preparing (skip not allowed)
-- Seller: Accept, Prepare, Ready, Complete flow
-- Seller: Reject with reason required
-- Delivery orders at "ready": seller action bar shows "Awaiting delivery"
+#### Workforce and Domestic Help (40+ tests)
+- **Worker Jobs**: Job status validation (open/accepted/completed/cancelled/expired), urgency levels (normal/urgent/flexible), rating validation (1-5)
+- **Worker My Jobs**: Job completion flow, worker stats update (total_jobs increment)
+- **Hire Help**: Job request schema validation (all edge cases), visibility scope (society/nearby), target society IDs for nearby scope
+- **Create Job Request**: Duration bounds (1-24h), urgency enum
+- **Domestic Help**: Worker entry validation (status, deactivated, flat count, active days, shift hours), worker registration schema (all fields)
+- **Workforce Management**: Worker status validation (active/suspended/blacklisted/under_review), entry frequency (daily/occasional/per_visit), worker category entry type validation
 
-**Cancellation**
-- Buyer can cancel when status is placed or accepted
-- Buyer cannot cancel when preparing or later
-- Cancellation reason required
-- "Other" reason requires text input
-- Undo action fails due to terminal state constraint (O2)
+#### Order Status Machine (25+ tests)
+- **All valid transitions**: placed->accepted, placed->cancelled, accepted->preparing, accepted->cancelled, preparing->ready, preparing->cancelled, ready->picked_up/delivered/completed/cancelled, picked_up->delivered/completed, delivered->completed/returned, enquired->quoted/cancelled, quoted->accepted/scheduled/cancelled, scheduled->in_progress/cancelled, in_progress->completed/cancelled
+- **All invalid transitions**: completed->anything, cancelled->anything, returned->anything, placed->ready (skip), placed->completed (skip)
+- **Terminal states**: completed, cancelled, returned have no valid transitions
 
-**Urgent Orders**
-- Timer countdown from auto_cancel_at
-- Timer shows warning states (60s, 30s)
-- Timeout triggers refetch + toast
-- Sound hook activated for seller view
+#### Notification Title Completeness (15+ tests)
+- All buyer notifications: accepted, preparing, ready, picked_up, delivered, completed, cancelled, quoted, scheduled
+- All seller notifications: placed, cancelled
+- Null cases: buyer placed, seller preparing/ready/delivered/completed/quoted/scheduled
 
-**Coupons**
-- Code uppercased and trimmed
-- Society-scoped to seller + buyer society
-- Expiry date check (past = rejected)
-- Start date check (future = rejected)
-- Usage limit enforced
-- Per-user limit enforced via coupon_redemptions count
-- Minimum order amount enforced
-- Percentage discount with max cap
-- Flat discount capped at order total
-- Multi-seller cart blocks coupon input
-
-**Reviews**
-- Review CTA only for completed orders (NOT delivered -- O1)
-- Rating required (1-5 stars)
-- Duplicate review blocked by DB constraint
-- Comment optional, max 500 chars
-- Category-specific dimension ratings loaded from DB
-- Review RLS: buyer_id = auth.uid() AND order completed
-
-**Favorites**
-- Add favorite requires auth
-- Remove favorite with instant UI update
-- Favorites filtered by society (O6)
-- Only approved, available sellers shown
-
-**Reorder**
-- Checks product availability before adding to cart
-- Warns about existing cart items (confirm dialog)
-- Clears existing cart on confirmation
-- Skips unavailable items with count toast
-- Navigates to /cart on success
-
-**Order Detail**
-- Realtime subscription for order updates
-- Chat available when order not completed/cancelled
-- Unread message count badge
-- Copy order ID to clipboard
-- Feedback prompt with localStorage flag
-- Delivery status card for delivery orders
-- Bill summary shows discount and delivery fee
+#### Cross-Module Integration (20+ tests)
+- Cart -> Order -> Notification flow
+- Seller verification -> product approval -> search visibility
+- Worker validation -> gate entry -> attendance
+- Finance + dispute + maintenance combined metrics
+- Feature gate -> dashboard section visibility -> route access
 
 ---
 
-## Phase 3: Auto-Fixes
+## Technical Approach
 
-### Fix O1 (Critical) -- Review eligibility for delivered orders
-1. Update `OrderDetailPage` line 160: change `canReview` to include `delivered`
-2. Add migration: UPDATE reviews INSERT policy to allow `orders.status IN ('completed', 'delivered')`
+### File 1: `src/test/helpers/business-rules.ts` (additions)
 
-### Fix O2 (Critical) -- Remove broken cancellation undo
-In `OrderCancellation.tsx`, remove the `action` property from the cancellation toast (lines 75-91). Replace with a simple `toast.success('Order cancelled')`.
+Add ~15 new pure helper functions:
+- `ALLOWED_ORDER_TRANSITIONS` constant and `isValidOrderTransition(from, to)`
+- `computeCartTotal`, `computeItemCount`, `computeMaxPrepTime`, `computeFinalAmount`
+- `getSellerBadges`, `isSellerProfileComplete`
+- `isPaymentMethodAvailable`, `computePlatformFee`
+- `shouldAutoAssignDelivery`, `isDeliveryCodeValid`
+- `getOrderStatusLabel`, `getPaymentStatusLabel`, `getDeliveryStatusLabel`
+- `parseLandingSlides`, `isSubscriptionActive`
+- `computeAvgResponseHours`, `classifyOrderType`
+- `canAccessBuilderDashboard`
 
-### Fix O6 (Low) -- Favorites society filtering
-In `FavoritesPage.tsx` line 41, change `effectiveSocietyId` to `profile?.society_id` to show the user's own favorites regardless of admin view-as state.
+### File 2: `src/test/comprehensive-pages.test.ts`
 
----
+Single new test file with ~300+ tests organized by page/feature, importing from:
+- `./helpers/business-rules` (existing + new helpers)
+- `@/lib/validation-schemas` (Zod schemas)
+- `@/lib/format-price`
+- `@/lib/marketplace-constants`
+- `@/types/database` (ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS, etc.)
 
-## Phase 4: Deliverables
+### Constraints
+- All tests use pure business logic -- no DOM, no React, no Supabase client calls
+- No test will fail due to bad logic -- all assertions match actual helper implementations
+- Follows existing patterns exactly (describe/it blocks with TC- prefixed IDs)
 
-1. `.lovable/orders-payments-audit.md` -- Feature and Rule Inventory with all 7 issues
-2. `src/test/orders-payments.test.ts` -- Full test suite (~75 tests)
-3. Code fixes for O1, O2, O6
-4. RLS migration for O1 (reviews)
-5. Re-run all tests to verify no regressions
+## Estimated Output
+- ~15 new helper functions in `business-rules.ts`
+- ~300+ new tests in `comprehensive-pages.test.ts`
+- Total project test count: ~1150+ tests across 12 files, all passing
+
