@@ -1,100 +1,166 @@
 
 
-# Attribute Blocks: Onboarding, Admin Visibility, Dialog Width, and Bug Fixes
+# Attribute Block Schema Standardization, Category Enforcement, and Input Type Clarity
 
-## Overview
+## Problems Found
 
-This plan addresses four areas:
-1. Add the AttributeBlockBuilder to the onboarding product form (BecomeSellerPage / DraftProductManager)
-2. Show attribute blocks in the admin product approval screen
-3. Widen the Add Product dialog on SellerProductsPage
-4. Fix the `discount_percentage` insertion error (it's a GENERATED ALWAYS column)
-5. Seed ~60 new category-specific attribute blocks for all the categories listed
+### 1. Two Incompatible Schema Formats
+The original 12 blocks use a JSON Schema format (`{properties: {key: {type: "string"}}}`), while the newer ~60 blocks use a structured fields format (`{fields: [{key, label, type, options?}]}`). The `AttributeBlockForm` component only understands the `properties` format, so **all ~60 newer blocks render as empty forms with no input fields**.
 
----
+### 2. No Category Enforcement
+Currently, `AttributeBlockBuilder` shows ALL blocks to every seller regardless of category. Blocks matching the seller's category are merely sorted to the top ("Suggested" badge) but every other block is still available. This allows a Home Food seller to add "BHK Configuration" or a Plumber to add "Book Details" -- completely irrelevant attributes.
 
-## 1. Fix: `discount_percentage` GENERATED ALWAYS Column Error
+### 3. "Custom Details" Block Allows Arbitrary Data
+The `custom_attributes` block has empty `category_hints` (`[]`), letting any seller add unlimited free-form key-value pairs, defeating the purpose of structured attributes.
 
-**Root Cause:** The `discount_percentage` column is defined as `GENERATED ALWAYS AS (...)` in the database. Attempting to insert or update a value for this column causes a PostgreSQL error. The code in both `SellerProductsPage.tsx` (line 296) and `DraftProductManager.tsx` (line 106-107) tries to set `discount_percentage` on insert/update.
-
-**Fix:**
-- `SellerProductsPage.tsx` line 296: Remove `discount_percentage` from the `productData` object sent to Supabase
-- `DraftProductManager.tsx` line 100-113: The insert payload does not include `discount_percentage` (already correct), but confirm no other path sends it
-- Remove `discount_percentage` from `formData` state in SellerProductsPage since it's auto-computed by the DB
+### 4. Buyer Renderer Hardcoded
+`ProductAttributeBlocks` uses hardcoded checks for specific block types (`variants`, `size_chart`, `custom_attributes`) and specific field names (`methods`, `certifications`, `policy`). It cannot render the ~60 newer blocks meaningfully since their data keys don't match any hardcoded path.
 
 ---
 
-## 2. Integrate AttributeBlockBuilder into Onboarding (DraftProductManager)
+## Solution
 
-**File:** `src/components/seller/DraftProductManager.tsx`
+### A. Standardize All Schemas to the `fields` Format
 
-Changes:
-- Import `AttributeBlockBuilder` and `BlockData` from the hooks
-- Add `attributeBlocks` state to the "Add Product" form
-- Render `AttributeBlockBuilder` inside the add-product card, below the image upload / veg toggle area
-- On save, include `specifications: { blocks: attributeBlocks }` in the product insert payload
-- Reset `attributeBlocks` after successful save
+Migrate the original 12 block schemas from `{properties: ...}` to `{fields: [...]}`. Every field will have:
 
----
+| Property | Required | Description |
+|----------|----------|-------------|
+| `key` | Yes | Data storage key |
+| `label` | Yes | Human-readable label shown in the form |
+| `type` | Yes | One of: `text`, `number`, `select`, `tag_input`, `boolean`, `textarea`, `date` |
+| `options` | For `select` | Array of allowed values |
+| `placeholder` | No | Input placeholder text |
 
-## 3. Widen the Add Product Dialog
-
-**File:** `src/pages/SellerProductsPage.tsx` (line 417)
-
-Change the DialogContent className from:
-```
-max-h-[90vh] overflow-y-auto
-```
-to:
-```
-max-h-[90vh] overflow-y-auto sm:max-w-2xl
+Example -- `service_duration` block (before):
+```text
+{ "properties": { "duration_minutes": { "type": "number" }, "unit": { "type": "string" } } }
 ```
 
-This makes the dialog 672px wide on desktop (up from the default ~450px), giving more room for attribute blocks while remaining responsive on mobile.
+After:
+```text
+{
+  "fields": [
+    { "key": "duration_minutes", "label": "Duration (minutes)", "type": "number", "placeholder": "e.g. 60" },
+    { "key": "unit", "label": "Unit", "type": "select", "options": ["Minutes", "Hours", "Days"] }
+  ]
+}
+```
 
----
+All 12 original blocks will be updated via a data UPDATE query.
 
-## 4. Admin Visibility: Show Attribute Blocks in Product Approval
+### B. Rewrite `AttributeBlockForm` to Render from `fields` Array
 
-**File:** `src/components/admin/AdminProductApprovals.tsx`
+The form renderer will iterate over `schema.fields` and render each field based on its `type`:
 
-Changes:
-- Update the Supabase query to also fetch `specifications` from products
-- Import `ProductAttributeBlocks` component
-- Below each product's description, render `ProductAttributeBlocks` if specifications exist
-- This gives admins full visibility into seller-added attributes during approval
+| Field Type | UI Component | Example |
+|-----------|-------------|---------|
+| `text` | `Input` (single line) | Brand name, Title |
+| `textarea` | `Textarea` (multi-line) | Description, Policy details |
+| `number` | `Input type="number"` | Duration, Price, Quantity |
+| `select` | `Select` dropdown | Condition (New/Used), Mode (Online/Offline) |
+| `tag_input` | Chip/tag input (add/remove) | Cuisine tags, Dance styles |
+| `boolean` | `Switch` toggle | Materials included (yes/no) |
+| `date` | `Input type="date"` | Expiry date, Availability date |
 
----
+This replaces the current generic JSON Schema interpreter with an explicit, predictable system.
 
-## 5. Seed Category-Specific Attribute Blocks
+### C. Enforce Category-Based Block Filtering
 
-**New migration** to insert approximately 60 additional blocks into `attribute_block_library`, covering:
+In `AttributeBlockBuilder`, change the filtering logic:
+- **With a category selected**: Only show blocks where `category_hints` includes the seller's current category. Blocks with empty `category_hints` are hidden (no universal free-for-all blocks).
+- **Without a category**: Show no attribute blocks (the seller must select a category first).
 
-| Category Group | Categories | Blocks Added |
-|---|---|---|
-| Food | home_food, bakery, snacks, groceries | cuisine_type, portion_size, item_type_bakery, ingredients_allergens, freshness, snack_type, shelf_life, grocery_category, brand, expiry_date |
-| Beverages | beverages | beverage_type, temperature_served, volume |
-| Classes | tuition, yoga, dance, music, art_craft, language, fitness, coaching | subject, grade_level, mode_of_delivery, session_duration, schedule, yoga_type, skill_level, batch_timing, dance_style, instrument_type, craft_type, materials_included, language_taught, proficiency_level, fitness_type, coaching_subject, target_exam |
-| Home Services | electrician, plumber, carpenter, ac_service, pest_control, appliance_repair, maid_service, cook, driver | service_type, visit_fee, estimated_duration, service_area, certification_experience, material_handled, ac_type, brand_supported, pest_type, area_coverage, chemicals_used, warranty_period, appliance_type, issue_type, work_type_maid, frequency, working_hours, cuisine_type_cook, meal_type, vehicle_type, license_type, shift_duration |
-| Personal Care | tailoring, laundry, beauty, mehendi, salon | garment_type, stitching_type, fabric_provided, measurement_method, laundry_type, price_per_unit, turnaround_time, pickup_drop, design_type_mehendi, coverage_area, occasion, gender_served |
-| Professional | tax_consultant, it_support, tutoring, resume_writing | qualification, years_experience, consultation_mode, device_supported, response_time, resume_type, revisions_included, delivery_format |
-| Rentals | equipment_rental, vehicle_rental, party_supplies, baby_gear | equipment_type, rental_duration, security_deposit, pickup_location, fuel_policy, damage_policy, age_suitability, hygiene_assurance |
-| Buy and Sell | furniture, electronics, books, toys, kitchen, clothing | furniture_type, dimensions, material_condition, device_type, key_specifications, warranty_status, book_title, author, edition, toy_type, age_range, safety_standard, item_type_kitchen, capacity_size, usage_type, clothing_category, size, color, fabric, fit |
-| Events | catering, decoration, photography, dj_music | guest_capacity, cuisine_type_catering, event_type, theme, materials_included_event, setup_time, deliverables, equipment_used, turnaround_time_photo, music_genre |
-| Pet Services | pet_food, pet_grooming, pet_sitting, dog_walking | pet_type, food_type_pet, grooming_type, stay_type, feeding_included, dog_size, walk_duration, area_covered |
-| Property | flat_for_rent, roommate, parking | bhk_configuration, furnishing_status, rent_amount, room_type, rent_share, occupancy_type, gender_preference, parking_type, vehicle_supported, monthly_charge |
-| Donation | puja | puja_type, puja_occasion, puja_inclusions |
+This completely prevents irrelevant blocks from appearing.
 
-Each block will use `category_hints` for soft guidance and appropriate `renderer_type` and `schema`.
+### D. Remove the "Custom Details" Block
+
+Delete the `custom_attributes` block from the library. Sellers cannot add arbitrary key-value pairs. If a specific attribute is needed, it should be added as a proper block by the platform (via admin or migration).
+
+### E. Rewrite `ProductAttributeBlocks` for Generic Field-Based Rendering
+
+Instead of hardcoding for specific block types, the buyer renderer will:
+1. Look up each block's `type` in the block library (fetched once, cached)
+2. Use the `renderer_type` to decide layout (key_value, tags, table, badge_list, text)
+3. Use the `fields` schema to get proper labels for data keys
+4. Handle tag arrays as Badge rows, select values as text, etc.
+
+For blocks with `tag_input` fields, render as `Badge` chips. For `key_value` blocks, render label-value pairs using the field labels from the schema (not raw keys like `duration_minutes`).
 
 ---
 
 ## Files to Change
 
 | File | Action | What Changes |
-|---|---|---|
-| New migration SQL | Create | Seed ~60 new attribute blocks |
-| `src/pages/SellerProductsPage.tsx` | Edit | Widen dialog; remove `discount_percentage` from insert/update payload |
-| `src/components/seller/DraftProductManager.tsx` | Edit | Add AttributeBlockBuilder; include specifications in product insert |
-| `src/components/admin/AdminProductApprovals.tsx` | Edit | Fetch specifications; render ProductAttributeBlocks |
+|------|------|---------|
+| `src/components/seller/AttributeBlockForm.tsx` | Rewrite | Render from `schema.fields` array with select, tag_input, date, textarea support |
+| `src/components/seller/AttributeBlockBuilder.tsx` | Edit | Filter blocks strictly by category match; hide blocks when no category selected |
+| `src/components/product/ProductAttributeBlocks.tsx` | Rewrite | Generic renderer using block library metadata + fields schema for labels |
+| `src/hooks/useAttributeBlocks.ts` | Edit | Update `suggestedBlocksFirst` to `filterByCategory`; export block library for buyer renderer |
+| DB data update (12 original blocks) | Data update | Convert `properties`-based schemas to `fields` format |
+| DB data update (custom_attributes) | Data delete | Remove the `custom_attributes` block |
+
+---
+
+## Technical Details
+
+### Updated Schema Examples for Original 12 Blocks
+
+**Variants:**
+```text
+{
+  "fields": [
+    { "key": "options", "label": "Variant Options", "type": "variant_rows" }
+  ]
+}
+```
+(Special composite type -- renders as repeatable label + values rows. Handled as a special case in the form.)
+
+**Size Chart:**
+```text
+{
+  "fields": [
+    { "key": "rows", "label": "Size Chart Rows", "type": "size_table" }
+  ]
+}
+```
+(Special composite type -- renders as a table editor.)
+
+**Inventory:**
+```text
+{
+  "fields": [
+    { "key": "stock_count", "label": "Stock Count", "type": "number", "placeholder": "e.g. 50" },
+    { "key": "low_stock_alert", "label": "Low Stock Alert At", "type": "number", "placeholder": "e.g. 5" },
+    { "key": "unlimited", "label": "Unlimited Stock", "type": "boolean" }
+  ]
+}
+```
+
+**Availability Window:**
+```text
+{
+  "fields": [
+    { "key": "available_from", "label": "Available From", "type": "text", "placeholder": "e.g. 9:00 AM" },
+    { "key": "available_until", "label": "Available Until", "type": "text", "placeholder": "e.g. 9:00 PM" },
+    { "key": "seasonal_note", "label": "Seasonal Note", "type": "textarea" }
+  ]
+}
+```
+
+### Category Filtering Logic (Pseudocode)
+
+```text
+if (!category) return [];  // No blocks available without a category
+return library.filter(b => b.category_hints.includes(category) && !activeTypes.has(b.block_type));
+```
+
+### Buyer Renderer Approach
+
+The renderer will fetch the block library (cached 10 min) and for each block in `specifications.blocks`:
+1. Find the matching library entry by `block_type`
+2. Use `display_name` as the section header
+3. Use `fields` from the schema to map data keys to human labels
+4. Use `renderer_type` to choose layout (grid, tags, table, text)
+5. Skip unknown block types silently (forward-compatible)
 
