@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Minus, Clock, MapPin } from 'lucide-react';
 import { useHaptics } from '@/hooks/useHaptics';
@@ -7,7 +7,7 @@ import { VegBadge } from '@/components/ui/veg-badge';
 import { useCart } from '@/hooks/useCart';
 import { ProductActionType } from '@/types/database';
 import { useCardAnalytics } from '@/hooks/useCardAnalytics';
-import type { MarketplaceConfig } from '@/hooks/useMarketplaceConfig';
+import { MARKETPLACE_FALLBACKS, type MarketplaceConfig } from '@/hooks/useMarketplaceConfig';
 import type { BadgeConfigRow } from '@/hooks/useBadgeConfig';
 import type { CategoryConfig } from '@/types/categories';
 import { cn } from '@/lib/utils';
@@ -62,14 +62,14 @@ export interface ProductWithSeller {
 
 type CardLayout = 'auto' | 'ecommerce' | 'food' | 'service';
 
-// Fix #1: Config props passed from parent instead of each card fetching its own
+// Fix #1: Config props passed from parent — NO fallback hooks
 interface ProductListingCardProps {
   product: ProductWithSeller;
   layout?: CardLayout;
   onTap?: (product: ProductWithSeller) => void;
   className?: string;
   viewOnly?: boolean;
-  // Lifted config props — parent provides these
+  // Parent provides these (required for perf, defaults used if missing)
   categoryConfigs?: CategoryConfig[];
   marketplaceConfig?: MarketplaceConfig;
   badgeConfigs?: BadgeConfigRow[];
@@ -77,34 +77,22 @@ interface ProductListingCardProps {
 
 /* ━━━ Main Component — Blinkit-style compact card ━━━ */
 
-// Fix #1 + #2: Lift hooks to parent, wrap in React.memo
-import { memo } from 'react';
-import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
-import { useMarketplaceConfig, MARKETPLACE_FALLBACKS } from '@/hooks/useMarketplaceConfig';
-import { useBadgeConfig } from '@/hooks/useBadgeConfig';
-
 function ProductListingCardInner({
   product,
   layout = 'auto',
   onTap,
   className,
   viewOnly = false,
-  categoryConfigs: propConfigs,
-  marketplaceConfig: propMc,
-  badgeConfigs: propBadges,
+  categoryConfigs = [],
+  marketplaceConfig,
+  badgeConfigs = [],
 }: ProductListingCardProps) {
   const navigate = useNavigate();
   const { items, addItem, updateQuantity } = useCart();
   const { impact, selectionChanged } = useHaptics();
 
-  // Fallback: use hooks only when parent doesn't provide props (backward compat)
-  const { configs: hookConfigs } = useCategoryConfigs();
-  const hookMc = useMarketplaceConfig();
-  const { badges: hookBadges } = useBadgeConfig();
-
-  const categoryConfigs = propConfigs || hookConfigs;
-  const mc = propMc || hookMc;
-  const badgeConfigs = propBadges || hookBadges;
+  // Fix #1/#12: No fallback hooks — use provided props or static defaults
+  const mc = marketplaceConfig || MARKETPLACE_FALLBACKS;
 
   const cartItem = items.find((item) => item.product_id === product.id);
   const quantity = cartItem?.quantity || 0;
@@ -295,26 +283,22 @@ function ProductListingCardInner({
 
       {/* ━━━ CONTENT ━━━ */}
       <div className="px-1.5 pb-1.5 pt-3 flex flex-col flex-1">
-        {/* Variant / weight pills */}
         {variantText && (
           <span className="inline-block bg-muted text-muted-foreground text-[8px] font-medium px-1 py-px rounded mb-0.5 w-fit">
             {variantText}
           </span>
         )}
 
-        {/* Product name */}
         <h4 className="font-medium text-[10px] leading-tight line-clamp-2 text-foreground mb-0.5">
           {product.name}
         </h4>
 
-        {/* Seller name */}
         {product.seller_name && (
           <p className="text-[8px] text-muted-foreground leading-tight line-clamp-1 mb-0.5">
             by {product.seller_name}
           </p>
         )}
 
-        {/* Delivery time chip */}
         {deliveryText && (
           <div className="flex items-center gap-0.5 mb-0.5">
             <Clock size={7} className="text-warning" />
@@ -324,7 +308,6 @@ function ProductListingCardInner({
           </div>
         )}
 
-        {/* Lead time & Pre-order badges */}
         {product.lead_time_hours != null && product.lead_time_hours > 0 && (
           <div className="flex items-center gap-0.5 mb-0.5">
             <Clock size={7} className="text-primary" />
@@ -340,14 +323,12 @@ function ProductListingCardInner({
         )}
         <div className="flex-1 min-h-0.5" />
 
-        {/* Discount row */}
         {hasDiscount && discountPct > 0 && (
           <span className="text-[8px] font-bold text-primary leading-none mb-0.5">
             {discountPct}{mc.labels.discountSuffix}
           </span>
         )}
 
-        {/* Price row */}
         <div className="flex items-end gap-0.5 mt-auto">
           <span className="font-bold text-xs text-foreground leading-none">
             {mc.currencySymbol}{product.price.toLocaleString()}
@@ -359,7 +340,6 @@ function ProductListingCardInner({
           )}
         </div>
 
-        {/* Price per unit */}
         {product.price_per_unit && (
           <span className="text-[7px] text-muted-foreground leading-none mt-0.5">
             {product.price_per_unit}
@@ -367,7 +347,6 @@ function ProductListingCardInner({
         )}
       </div>
 
-      {/* View-only button */}
       {viewOnly && (
         <div className="px-1.5 pb-1.5">
           <button

@@ -12,11 +12,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
+import { useMarketplaceConfig, type MarketplaceConfig } from '@/hooks/useMarketplaceConfig';
+import { useBadgeConfig, type BadgeConfigRow } from '@/hooks/useBadgeConfig';
 import { ArrowLeft, Search as SearchIcon, X, Globe, ShoppingBag } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
+import { useQuery } from '@tanstack/react-query';
+import { jitteredStaleTime } from '@/lib/query-utils';
 import { useCurrency } from '@/hooks/useCurrency';
 
 
@@ -74,6 +78,9 @@ export default function SearchPage() {
   const { items: cartItems, addItem, updateQuantity } = useCart();
   const [searchParams] = useSearchParams();
   const { configs: categoryConfigs, isLoading: categoriesLoading } = useCategoryConfigs();
+  // Fix #1: Lift config hooks for card props
+  const mc = useMarketplaceConfig();
+  const { badges: badgeConfigs } = useBadgeConfig();
   const settings = useSystemSettings();
   const { formatPrice, currencySymbol } = useCurrency();
 
@@ -100,15 +107,12 @@ export default function SearchPage() {
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [results, setResults] = useState<ProductSearchResult[]>([]);
-  const [popularProducts, setPopularProducts] = useState<ProductSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingPopular, setIsLoadingPopular] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
 
   // Cross-society browsing - initialize from auth context profile (already loaded)
   const [browseBeyond, setBrowseBeyondLocal] = useState(profile?.browse_beyond_community ?? true);
   const [searchRadius, setSearchRadiusLocal] = useState(profile?.search_radius_km ?? 10);
-  const prefsLoaded = true;
 
   // Sync local state when profile finishes loading (profile may be null on first render)
   useEffect(() => {
@@ -142,16 +146,12 @@ export default function SearchPage() {
     [persistPreference],
   );
 
-  // ── Load popular products on mount (+ nearby when browseBeyond enabled) ──
-  useEffect(() => {
-    loadPopularProducts();
-  }, [effectiveSocietyId, browseBeyond, searchRadius]);
-
-  const loadPopularProducts = async () => {
-    setIsLoadingPopular(true);
-    try {
+  // Fix #6: Convert loadPopularProducts to useQuery for caching + dedup
+  const { data: popularProducts = [], isLoading: isLoadingPopular } = useQuery({
+    queryKey: ['search-popular-products', effectiveSocietyId, browseBeyond, searchRadius],
+    queryFn: async (): Promise<ProductSearchResult[]> => {
       // 1. Local society products
-      let query = supabase
+      let q = supabase
         .from('products')
         .select('id, name, price, description, prep_time_minutes, image_url, is_veg, category, seller_id, action_type, contact_phone, mrp, discount_percentage, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status, fulfillment_mode, delivery_note)')
         .eq('is_available', true)
@@ -161,10 +161,21 @@ export default function SearchPage() {
         .limit(30);
 
       if (effectiveSocietyId) {
-        query = query.eq('seller.society_id', effectiveSocietyId);
+        q = q.eq('seller.society_id', effectiveSocietyId);
       }
 
-      const { data } = await query;
+      // Fix #15: Run local + nearby in parallel
+      const nearbyPromise = (browseBeyond && effectiveSocietyId)
+        ? supabase.rpc('search_nearby_sellers', {
+            _buyer_society_id: effectiveSocietyId,
+            _radius_km: searchRadius,
+            _search_term: null,
+            _category: null,
+          })
+        : Promise.resolve({ data: null, error: null });
+
+      const [{ data }, nearbyResult] = await Promise.all([q, nearbyPromise]);
+
       const mapped: ProductSearchResult[] = (data || []).map((p: any) => ({
         product_id: p.id,
         product_name: p.name,
@@ -189,60 +200,45 @@ export default function SearchPage() {
         is_same_society: true,
       }));
 
-      // 2. Append nearby society products when browseBeyond is enabled
-      if (browseBeyond && effectiveSocietyId) {
-        try {
-          const { data: nearbyData, error: nearbyErr } = await supabase.rpc('search_nearby_sellers', {
-            _buyer_society_id: effectiveSocietyId,
-            _radius_km: searchRadius,
-            _search_term: null,
-            _category: null,
-          });
-
-          if (!nearbyErr && nearbyData) {
-            (nearbyData as any[]).forEach((seller: any) => {
-              const sellerProducts = seller.matching_products || [];
-              sellerProducts.forEach((p: any) => {
-                if (!mapped.some(x => x.product_id === p.id)) {
-                  mapped.push({
-                    product_id: p.id,
-                    product_name: p.name,
-                    price: p.price,
-                    image_url: p.image_url,
-                    is_veg: p.is_veg,
-                    category: p.category,
-                    description: null,
-                    prep_time_minutes: null,
-                    fulfillment_mode: null,
-                    delivery_note: null,
-                    action_type: p.action_type || 'add_to_cart',
-                    contact_phone: p.contact_phone || null,
-                    mrp: p.mrp || null,
-                    discount_percentage: p.discount_percentage || null,
-                    seller_id: seller.seller_id,
-                    seller_name: seller.business_name || '',
-                    seller_rating: seller.rating || 0,
-                    seller_reviews: seller.total_reviews || 0,
-                    society_name: seller.society_name || null,
-                    distance_km: seller.distance_km || null,
-                    is_same_society: false,
-                  });
-                }
+      // Merge nearby products
+      if (nearbyResult.data && !nearbyResult.error) {
+        (nearbyResult.data as any[]).forEach((seller: any) => {
+          const sellerProducts = seller.matching_products || [];
+          sellerProducts.forEach((p: any) => {
+            if (!mapped.some(x => x.product_id === p.id)) {
+              mapped.push({
+                product_id: p.id,
+                product_name: p.name,
+                price: p.price,
+                image_url: p.image_url,
+                is_veg: p.is_veg,
+                category: p.category,
+                description: null,
+                prep_time_minutes: null,
+                fulfillment_mode: null,
+                delivery_note: null,
+                action_type: p.action_type || 'add_to_cart',
+                contact_phone: p.contact_phone || null,
+                mrp: p.mrp || null,
+                discount_percentage: p.discount_percentage || null,
+                seller_id: seller.seller_id,
+                seller_name: seller.business_name || '',
+                seller_rating: seller.rating || 0,
+                seller_reviews: seller.total_reviews || 0,
+                society_name: seller.society_name || null,
+                distance_km: seller.distance_km || null,
+                is_same_society: false,
               });
-            });
-          }
-        } catch (nearbyErr) {
-          console.error('Error loading nearby products:', nearbyErr);
-        }
+            }
+          });
+        });
       }
 
-      setPopularProducts(mapped);
-    } catch (err) {
-      console.error('Error loading popular products:', err);
-    } finally {
-      setIsLoadingPopular(false);
-    }
-  };
+      return mapped;
+    },
+    enabled: !!effectiveSocietyId,
+    staleTime: jitteredStaleTime(3 * 60 * 1000),
+  });
 
   // ── URL-driven presets on mount ──
   useEffect(() => {
@@ -285,7 +281,6 @@ export default function SearchPage() {
 
   // ── Core search ──
   const runSearch = async (term: string) => {
-    // Cancel any in-flight search
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -294,18 +289,41 @@ export default function SearchPage() {
     setHasSearched(true);
 
     try {
-      const products: ProductSearchResult[] = [];
+      let products: ProductSearchResult[] = [];
 
-      // Combine selectedCategory with filter categories
       const effectiveCategories = selectedCategory
         ? [selectedCategory, ...filters.categories.filter(c => c !== selectedCategory)]
         : filters.categories;
 
-      // Deep product-level search: search name, description, brand, tags directly
+      const mapProduct = (p: any, isSameSociety = true): ProductSearchResult => ({
+        product_id: p.id,
+        product_name: p.name,
+        price: p.price,
+        image_url: p.image_url,
+        is_veg: p.is_veg,
+        category: p.category,
+        description: p.description || null,
+        prep_time_minutes: p.prep_time_minutes || null,
+        fulfillment_mode: p.seller?.fulfillment_mode || null,
+        delivery_note: p.seller?.delivery_note || null,
+        action_type: p.action_type || null,
+        contact_phone: p.contact_phone || null,
+        mrp: p.mrp || null,
+        discount_percentage: p.discount_percentage || null,
+        seller_id: p.seller?.id || p.seller_id,
+        seller_name: p.seller?.business_name || '',
+        seller_rating: p.seller?.rating || 0,
+        seller_reviews: p.seller?.total_reviews || 0,
+        society_name: null,
+        distance_km: null,
+        is_same_society: isSameSociety,
+      });
+
       if (term.length >= 2) {
         const searchTerm = `%${term.trim()}%`;
         
-        let q = supabase
+        // Fix #15: Run product search, seller-name search, and nearby search in PARALLEL
+        let productQ = supabase
           .from('products')
           .select('id, name, price, description, prep_time_minutes, image_url, is_veg, category, seller_id, action_type, contact_phone, mrp, brand, unit_type, price_per_unit, stock_quantity, tags, discount_percentage, delivery_time_text, serving_size, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status, fulfillment_mode, delivery_note)')
           .eq('is_available', true)
@@ -316,91 +334,83 @@ export default function SearchPage() {
           .limit(80);
 
         if (effectiveSocietyId && !browseBeyond) {
-          q = q.eq('seller.society_id', effectiveSocietyId);
+          productQ = productQ.eq('seller.society_id', effectiveSocietyId);
         }
-
         if (effectiveCategories.length > 0) {
-          q = q.in('category', effectiveCategories);
+          productQ = productQ.in('category', effectiveCategories);
         }
 
-        const { data } = await q;
-        if (data) {
-          data.forEach((p: any) => {
-            products.push({
-              product_id: p.id,
-              product_name: p.name,
-              price: p.price,
-              image_url: p.image_url,
-              is_veg: p.is_veg,
-              category: p.category,
-              description: p.description,
-              prep_time_minutes: p.prep_time_minutes,
-              fulfillment_mode: p.seller?.fulfillment_mode || null,
-              delivery_note: p.seller?.delivery_note || null,
-              action_type: p.action_type || null,
-              contact_phone: p.contact_phone || null,
-              mrp: p.mrp || null,
-              discount_percentage: p.discount_percentage || null,
-              seller_id: p.seller?.id || p.seller_id,
-              seller_name: p.seller?.business_name || '',
-              seller_rating: p.seller?.rating || 0,
-              seller_reviews: p.seller?.total_reviews || 0,
-              society_name: null,
-              distance_km: null,
-              is_same_society: !browseBeyond || (effectiveSocietyId ? p.seller?.society_id === effectiveSocietyId : true),
+        let sellerQ = supabase
+          .from('products')
+          .select('id, name, price, description, prep_time_minutes, image_url, is_veg, category, seller_id, action_type, contact_phone, mrp, discount_percentage, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status, fulfillment_mode, delivery_note)')
+          .eq('is_available', true)
+          .eq('approval_status', 'approved')
+          .eq('seller.verification_status', 'approved')
+          .ilike('seller.business_name' as any, searchTerm)
+          .order('created_at', { ascending: false })
+          .limit(30);
+
+        if (effectiveSocietyId && !browseBeyond) {
+          sellerQ = sellerQ.eq('seller.society_id', effectiveSocietyId);
+        }
+
+        const nearbyPromise = (browseBeyond && effectiveSocietyId)
+          ? supabase.rpc('search_nearby_sellers', {
+              _buyer_society_id: effectiveSocietyId,
+              _radius_km: searchRadius,
+              _search_term: term.trim(),
+              _category: selectedCategory || (effectiveCategories.length === 1 ? effectiveCategories[0] : null),
+            }).then(res => res, () => ({ data: null, error: null }))
+          : Promise.resolve({ data: null, error: null });
+
+        const [productResult, sellerResult, nearbyResult] = await Promise.all([
+          productQ, sellerQ, nearbyPromise,
+        ]);
+
+        // Merge product results
+        if (productResult.data) {
+          productResult.data.forEach((p: any) => {
+            const isSame = !browseBeyond || (effectiveSocietyId ? p.seller?.society_id === effectiveSocietyId : true);
+            products.push(mapProduct(p, isSame));
+          });
+        }
+
+        // Merge seller-name results (dedup)
+        if (sellerResult.data) {
+          const existingIds = new Set(products.map(p => p.product_id));
+          sellerResult.data.forEach((p: any) => {
+            if (!existingIds.has(p.id)) {
+              products.push(mapProduct(p, true));
+            }
+          });
+        }
+
+        // Merge nearby results (dedup)
+        if (nearbyResult.data && !nearbyResult.error) {
+          const existingIds = new Set(products.map(p => p.product_id));
+          (nearbyResult.data as any[]).forEach((seller: any) => {
+            (seller.matching_products || []).forEach((p: any) => {
+              if (!existingIds.has(p.id)) {
+                existingIds.add(p.id);
+                products.push({
+                  product_id: p.id, product_name: p.name, price: p.price,
+                  image_url: p.image_url, is_veg: p.is_veg, category: p.category,
+                  description: null, prep_time_minutes: null, fulfillment_mode: null,
+                  delivery_note: null, action_type: p.action_type || 'add_to_cart',
+                  contact_phone: p.contact_phone || null, mrp: p.mrp || null,
+                  discount_percentage: p.discount_percentage || null,
+                  seller_id: seller.seller_id, seller_name: seller.business_name || '',
+                  seller_rating: seller.rating || 0, seller_reviews: seller.total_reviews || 0,
+                  society_name: seller.society_name || null,
+                  distance_km: seller.distance_km || null, is_same_society: false,
+                });
+              }
             });
           });
         }
 
-        // Also search by seller name if few results
-        if (products.length < 10) {
-          let sellerQ = supabase
-            .from('products')
-            .select('id, name, price, description, prep_time_minutes, image_url, is_veg, category, seller_id, action_type, contact_phone, mrp, brand, unit_type, price_per_unit, stock_quantity, tags, discount_percentage, delivery_time_text, serving_size, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status, fulfillment_mode, delivery_note)')
-            .eq('is_available', true)
-            .eq('approval_status', 'approved')
-            .eq('seller.verification_status', 'approved')
-            .ilike('seller.business_name' as any, searchTerm)
-            .order('created_at', { ascending: false })
-            .limit(30);
-
-          if (effectiveSocietyId && !browseBeyond) {
-            sellerQ = sellerQ.eq('seller.society_id', effectiveSocietyId);
-          }
-
-          const { data: sellerData } = await sellerQ;
-          if (sellerData) {
-            sellerData.forEach((p: any) => {
-              if (!products.some(x => x.product_id === p.id)) {
-                products.push({
-                  product_id: p.id,
-                  product_name: p.name,
-                  price: p.price,
-                  image_url: p.image_url,
-                  is_veg: p.is_veg,
-                  category: p.category,
-                  description: p.description,
-                  prep_time_minutes: p.prep_time_minutes,
-                  fulfillment_mode: p.seller?.fulfillment_mode || null,
-                  delivery_note: p.seller?.delivery_note || null,
-                  action_type: p.action_type || null,
-                  contact_phone: p.contact_phone || null,
-                  mrp: p.mrp || null,
-                  discount_percentage: p.discount_percentage || null,
-                  seller_id: p.seller?.id || p.seller_id,
-                  seller_name: p.seller?.business_name || '',
-                  seller_rating: p.seller?.rating || 0,
-                  seller_reviews: p.seller?.total_reviews || 0,
-                  society_name: null,
-                  distance_km: null,
-                  is_same_society: true,
-                });
-              }
-            });
-          }
-        }
       } else if (selectedCategory || effectiveCategories.length > 0) {
-        // Category-only browse (no search term) - direct query
+        // Category-only browse
         let q = supabase
           .from('products')
           .select('id, name, price, description, prep_time_minutes, image_url, is_veg, category, seller_id, action_type, contact_phone, mrp, discount_percentage, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status, fulfillment_mode, delivery_note)')
@@ -413,90 +423,14 @@ export default function SearchPage() {
         if (effectiveSocietyId && !browseBeyond) {
           q = q.eq('seller.society_id', effectiveSocietyId);
         }
-
         const targetCategory = selectedCategory || effectiveCategories[0];
-        if (targetCategory) {
-          q = q.eq('category', targetCategory);
-        }
+        if (targetCategory) q = q.eq('category', targetCategory);
 
         const { data } = await q;
-        if (data) {
-          data.forEach((p: any) => {
-            products.push({
-              product_id: p.id,
-              product_name: p.name,
-              price: p.price,
-              image_url: p.image_url,
-              is_veg: p.is_veg,
-              category: p.category,
-              description: p.description,
-              prep_time_minutes: p.prep_time_minutes,
-              fulfillment_mode: p.seller?.fulfillment_mode || null,
-              delivery_note: p.seller?.delivery_note || null,
-              action_type: p.action_type || null,
-              contact_phone: p.contact_phone || null,
-              mrp: p.mrp || null,
-              discount_percentage: p.discount_percentage || null,
-              seller_id: p.seller?.id || p.seller_id,
-              seller_name: p.seller?.business_name || '',
-              seller_rating: p.seller?.rating || 0,
-              seller_reviews: p.seller?.total_reviews || 0,
-              society_name: null,
-              distance_km: null,
-              is_same_society: true,
-            });
-          });
-        }
+        if (data) data.forEach((p: any) => products.push(mapProduct(p)));
       }
 
-      // Cross-society: call search_nearby_sellers RPC for real distance filtering
-      if (browseBeyond && effectiveSocietyId) {
-        try {
-          const { data: nearbyData, error: nearbyErr } = await supabase.rpc('search_nearby_sellers', {
-            _buyer_society_id: effectiveSocietyId,
-            _radius_km: searchRadius,
-            _search_term: term.length >= 1 ? term.trim() : null,
-            _category: selectedCategory || (effectiveCategories.length === 1 ? effectiveCategories[0] : null),
-          });
-
-          if (!nearbyErr && nearbyData) {
-            (nearbyData as any[]).forEach((seller: any) => {
-              const sellerProducts = seller.matching_products || [];
-              sellerProducts.forEach((p: any) => {
-                if (!products.some(x => x.product_id === p.id)) {
-                  products.push({
-                    product_id: p.id,
-                    product_name: p.name,
-                    price: p.price,
-                    image_url: p.image_url,
-                    is_veg: p.is_veg,
-                    category: p.category,
-                    description: null,
-                    prep_time_minutes: null,
-                    fulfillment_mode: null,
-                    delivery_note: null,
-                    action_type: p.action_type || 'add_to_cart',
-                    contact_phone: p.contact_phone || null,
-                    mrp: p.mrp || null,
-                    discount_percentage: p.discount_percentage || null,
-                    seller_id: seller.seller_id,
-                    seller_name: seller.business_name || '',
-                    seller_rating: seller.rating || 0,
-                    seller_reviews: seller.total_reviews || 0,
-                    society_name: seller.society_name || null,
-                    distance_km: seller.distance_km || null,
-                    is_same_society: false,
-                  });
-                }
-              });
-            });
-          }
-        } catch (err) {
-          console.error('Nearby sellers error:', err);
-        }
-      }
-
-      // 3) Apply client-side filters
+      // Apply client-side filters
       let filtered = products;
       if (filters.minRating > 0) filtered = filtered.filter((p) => p.seller_rating >= filters.minRating);
       if (filters.isVeg === true) filtered = filtered.filter((p) => p.is_veg === true);
@@ -509,31 +443,19 @@ export default function SearchPage() {
       }
 
       // Sort
-      if (filters.sortBy === 'price_low') {
-        filtered.sort((a, b) => a.price - b.price);
-      } else if (filters.sortBy === 'price_high') {
-        filtered.sort((a, b) => b.price - a.price);
-      } else if (filters.sortBy === 'rating') {
-        filtered.sort((a, b) => b.seller_rating - a.seller_rating);
-      } else {
-        filtered.sort((a, b) => {
-          if (a.is_same_society !== b.is_same_society) return a.is_same_society ? -1 : 1;
-          return (a.distance_km ?? 0) - (b.distance_km ?? 0);
-        });
-      }
+      if (filters.sortBy === 'price_low') filtered.sort((a, b) => a.price - b.price);
+      else if (filters.sortBy === 'price_high') filtered.sort((a, b) => b.price - a.price);
+      else if (filters.sortBy === 'rating') filtered.sort((a, b) => b.seller_rating - a.seller_rating);
+      else filtered.sort((a, b) => {
+        if (a.is_same_society !== b.is_same_society) return a.is_same_society ? -1 : 1;
+        return (a.distance_km ?? 0) - (b.distance_km ?? 0);
+      });
 
-      // Only update if this search wasn't cancelled
-      if (!controller.signal.aborted) {
-        setResults(filtered);
-      }
+      if (!controller.signal.aborted) setResults(filtered);
     } catch (err) {
-      if (!controller.signal.aborted) {
-        console.error('Search error:', err);
-      }
+      if (!controller.signal.aborted) console.error('Search error:', err);
     } finally {
-      if (!controller.signal.aborted) {
-        setIsLoading(false);
-      }
+      if (!controller.signal.aborted) setIsLoading(false);
     }
   };
 
@@ -741,7 +663,8 @@ export default function SearchPage() {
               products={displayProducts}
               categoryMap={categoryMap}
               categoryConfigs={categoryConfigs}
-              
+              marketplaceConfig={mc}
+              badgeConfigs={badgeConfigs}
               showCount={isSearchActive}
             />
           ) : isSearchActive ? (
@@ -813,11 +736,15 @@ function ProductGridByCategory({
   products,
   categoryMap,
   categoryConfigs,
+  marketplaceConfig,
+  badgeConfigs,
   showCount,
 }: {
   products: ProductSearchResult[];
   categoryMap: Record<string, { icon: string; displayName: string; color: string }>;
   categoryConfigs: { category: string; displayName: string; icon: string; behavior?: any }[];
+  marketplaceConfig?: MarketplaceConfig;
+  badgeConfigs?: BadgeConfigRow[];
   showCount?: boolean;
 }) {
   const { formatPrice } = useCurrency();
@@ -890,6 +817,9 @@ function ProductGridByCategory({
                 <ProductListingCard
                   key={p.product_id}
                   product={toProductWithSeller(p)}
+                  categoryConfigs={categoryConfigs as any}
+                  marketplaceConfig={marketplaceConfig}
+                  badgeConfigs={badgeConfigs}
                 />
               ))}
             </div>

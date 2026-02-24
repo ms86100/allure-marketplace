@@ -179,7 +179,7 @@ export default function CategoriesPage() {
               </div>
               <motion.div
                 animate={{ y: [0, -6, 0] }}
-                transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+                transition={{ repeat: 0, duration: 2, ease: 'easeInOut' }}
                 className="absolute -top-2 -right-2"
               >
                 <div className="w-8 h-8 rounded-full bg-warning/20 flex items-center justify-center">

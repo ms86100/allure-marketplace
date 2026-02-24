@@ -1,11 +1,14 @@
 import { useMemo } from 'react';
-import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { jitteredStaleTime } from '@/lib/query-utils';
 import { useTypewriterPlaceholder } from '@/hooks/useTypewriterPlaceholder';
 
 /**
  * Context-aware search placeholder with typewriter animation.
- * Accepts an optional `context` to adapt the words and prefix
- * based on which page/module the user is viewing.
+ * 
+ * Fix #4: Uses lightweight category_config query instead of
+ * useProductsByCategory(200) which was fetching full product rows.
  */
 export type SearchContext =
   | 'home'
@@ -22,10 +25,7 @@ export type SearchContext =
   | 'maintenance'
   | 'search';
 
-const CONTEXT_WORDS: Record<SearchContext, string[]> = {
-  home: [], // filled dynamically from categories
-  marketplace: [], // filled dynamically from categories
-  search: [], // filled dynamically from categories
+const CONTEXT_WORDS: Record<string, string[]> = {
   society: ['visitors', 'parking', 'finances', 'snags', 'disputes', 'workers', 'notices'],
   visitors: ['guest name', 'flat number', 'OTP code'],
   finances: ['expense', 'income', 'budget', 'receipt'],
@@ -38,27 +38,20 @@ const CONTEXT_WORDS: Record<SearchContext, string[]> = {
   maintenance: ['dues', 'payment', 'receipt'],
 };
 
-const CONTEXT_PREFIX: Partial<Record<SearchContext, string>> = {
-  society: 'Search "',
-  visitors: 'Search "',
-  finances: 'Search "',
-  construction: 'Search "',
-  disputes: 'Search "',
-  workforce: 'Search "',
-  parking: 'Search "',
-  bulletin: 'Search "',
-  deliveries: 'Search "',
-  maintenance: 'Search "',
-};
-
 export function useSearchPlaceholder(context: SearchContext = 'home') {
-  const { data: categories = [] } = useProductsByCategory(200);
-
-  const categoryNames = useMemo(() => {
-    return categories
-      .filter(c => c.products.length > 0)
-      .map(c => c.displayName);
-  }, [categories]);
+  // Fix #4: Lightweight category-only query — no product fetching
+  const { data: categoryNames = [] } = useQuery({
+    queryKey: ['category-display-names'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('category_config')
+        .select('display_name')
+        .eq('is_active', true)
+        .order('display_order');
+      return (data || []).map((c: any) => c.display_name);
+    },
+    staleTime: jitteredStaleTime(15 * 60 * 1000),
+  });
 
   const words = useMemo(() => {
     if (['home', 'marketplace', 'search'].includes(context)) {
@@ -67,7 +60,7 @@ export function useSearchPlaceholder(context: SearchContext = 'home') {
     return CONTEXT_WORDS[context] || ['items'];
   }, [context, categoryNames]);
 
-  const prefix = CONTEXT_PREFIX[context] || 'Search "';
+  const prefix = 'Search "';
 
   return useTypewriterPlaceholder(words, { prefix, suffix: '"' });
 }
