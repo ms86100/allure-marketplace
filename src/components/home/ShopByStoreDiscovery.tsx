@@ -117,26 +117,65 @@ function DistanceBandSection({ band }: { band: DistanceBand }) {
 
 // ── Society Card inside a distance band ──
 function SocietyCard({ society }: { society: SocietyGroup }) {
+  const navigate = useNavigate();
+  // Flatten all sellers across groups into one horizontal list
+  const allSellers = Object.entries(society.sellersByGroup).flatMap(([group, sellers]) =>
+    sellers.map(s => ({
+      id: s.seller_id,
+      business_name: s.business_name,
+      profile_image_url: s.profile_image_url,
+      rating: s.rating,
+      group,
+    }))
+  );
+
   return (
     <div className="mx-4 rounded-2xl border border-border bg-card overflow-hidden">
       <div className="px-3 py-2.5 bg-secondary flex items-center justify-between">
         <span className="text-xs font-bold text-foreground">{society.societyName}</span>
         <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{society.distanceKm} km</span>
       </div>
-      <div className="p-2 space-y-1.5">
-        {Object.entries(society.sellersByGroup).map(([group, sellers]) => (
-          <CategorySellerRow
-            key={group}
-            groupLabel={group}
-            sellers={sellers.map(s => ({
-              id: s.seller_id,
-              business_name: s.business_name,
-              profile_image_url: s.profile_image_url,
-              rating: s.rating,
-            }))}
-            compact
-          />
-        ))}
+      <div className="relative p-2">
+        <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
+          {allSellers.map(seller => (
+            <div
+              key={seller.id}
+              onClick={() => navigate(`/seller/${seller.id}`)}
+              className={cn(
+                'shrink-0 w-20 rounded-2xl overflow-hidden cursor-pointer',
+                'bg-card border border-border',
+                'transition-all duration-200 hover:scale-[1.02] active:scale-[0.97]',
+              )}
+            >
+              <div className="flex items-center justify-center bg-muted h-12 p-1.5">
+                {seller.profile_image_url ? (
+                  <img
+                    src={seller.profile_image_url}
+                    alt={seller.business_name}
+                    className="rounded-xl object-cover w-9 h-9"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="rounded-xl bg-muted flex items-center justify-center w-9 h-9">
+                    <Store className="text-muted-foreground" size={16} />
+                  </div>
+                )}
+              </div>
+              <div className="px-1.5 pb-2 pt-1.5 text-center">
+                <p className="font-bold text-foreground line-clamp-2 leading-tight text-[9px]">
+                  {seller.business_name}
+                </p>
+                {seller.rating > 0 && (
+                  <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                    <Star size={8} className="text-warning fill-warning" />
+                    <span className="text-[9px] font-bold text-muted-foreground">{seller.rating}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="absolute right-0 top-0 bottom-1 w-6 pointer-events-none bg-gradient-to-l from-card to-transparent" />
       </div>
     </div>
   );
