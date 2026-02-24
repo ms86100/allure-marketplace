@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
+import { useCurrency } from '@/hooks/useCurrency';
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ export default function CartPage() {
   const [fulfillmentType, setFulfillmentType] = useState<'self_pickup' | 'delivery'>('self_pickup');
   const [deliveryFee, setDeliveryFee] = useState(0);
   const settings = useSystemSettings();
+  const { formatPrice, currencySymbol } = useCurrency();
 
   const effectiveDeliveryFee = fulfillmentType === 'delivery' ? (totalAmount >= settings.freeDeliveryThreshold ? 0 : settings.baseDeliveryFee) : 0;
   const finalAmount = (appliedCoupon ? Math.max(0, totalAmount - appliedCoupon.discountAmount) : totalAmount) + effectiveDeliveryFee;
@@ -89,7 +91,7 @@ export default function CartPage() {
     for (const group of sellerGroups) {
       const minOrder = (group.items[0]?.product?.seller as any)?.minimum_order_amount;
       if (minOrder && group.subtotal < minOrder) {
-        toast.error(`${group.sellerName} requires a minimum order of ₹${minOrder}. Your current total is ₹${group.subtotal.toFixed(0)}.`);
+        toast.error(`${group.sellerName} requires a minimum order of ${formatPrice(minOrder)}. Your current total is ${formatPrice(group.subtotal)}.`);
         return;
       }
     }
@@ -302,9 +304,9 @@ export default function CartPage() {
                 <div className="bg-warning/10 border border-warning/30 rounded-xl p-3 flex items-start gap-3">
                   <Store className="text-warning shrink-0 mt-0.5" size={16} />
                   <div className="text-xs">
-                    <p className="font-medium text-warning-foreground">{group.sellerName}: Minimum order ₹{minOrder}</p>
+                    <p className="font-medium text-warning-foreground">{group.sellerName}: Minimum order {formatPrice(minOrder)}</p>
                     <p className="text-muted-foreground mt-0.5">
-                      Add ₹{(minOrder - group.subtotal).toFixed(0)} more to place this order
+                      Add {formatPrice(minOrder - group.subtotal)} more to place this order
                     </p>
                   </div>
                 </div>
@@ -349,8 +351,8 @@ export default function CartPage() {
                         <VegBadge isVeg={item.product?.is_veg ?? true} size="sm" />
                         <h4 className="text-sm font-medium truncate">{item.product?.name}</h4>
                       </div>
-                      <p className="text-sm font-bold mt-0.5">₹{((item.product?.price || 0) * item.quantity).toFixed(0)}</p>
-                      <p className="text-[11px] text-muted-foreground">₹{item.product?.price} × {item.quantity}</p>
+                      <p className="text-sm font-bold mt-0.5">{formatPrice((item.product?.price || 0) * item.quantity)}</p>
+                      <p className="text-[11px] text-muted-foreground">{formatPrice(item.product?.price || 0)} × {item.quantity}</p>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <div className="inline-flex items-center bg-accent rounded-lg overflow-hidden">
@@ -428,24 +430,24 @@ export default function CartPage() {
             {sellerGroups.map((group) => (
               <div key={group.sellerId} className="flex justify-between">
                 <span className="text-muted-foreground truncate mr-2">{group.sellerName}</span>
-                <span className="font-medium">₹{group.subtotal.toFixed(0)}</span>
+                <span className="font-medium">{formatPrice(group.subtotal)}</span>
               </div>
             ))}
             {appliedCoupon && (
               <div className="flex justify-between text-primary">
                 <span>Coupon ({appliedCoupon.code})</span>
-                <span>-₹{appliedCoupon.discountAmount.toFixed(0)}</span>
+                <span>-{formatPrice(appliedCoupon.discountAmount)}</span>
               </div>
             )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Delivery Fee</span>
               <span className={`font-medium ${effectiveDeliveryFee === 0 ? 'text-primary' : ''}`}>
-                {fulfillmentType === 'delivery' ? (effectiveDeliveryFee === 0 ? 'FREE' : `₹${effectiveDeliveryFee}`) : 'Self Pickup'}
+                {fulfillmentType === 'delivery' ? (effectiveDeliveryFee === 0 ? 'FREE' : formatPrice(effectiveDeliveryFee)) : 'Self Pickup'}
               </span>
             </div>
             <div className="border-t border-border pt-2 mt-1 flex justify-between font-bold">
               <span>To Pay</span>
-              <span>₹{finalAmount.toFixed(0)}</span>
+              <span>{formatPrice(finalAmount)}</span>
             </div>
           </div>
         </div>
@@ -491,7 +493,7 @@ export default function CartPage() {
         <div className="px-4 py-3 flex items-center gap-3">
           <div className="flex-1">
             <p className="text-xs text-muted-foreground">Total</p>
-            <p className="text-lg font-bold">₹{finalAmount.toFixed(0)}</p>
+            <p className="text-lg font-bold">{formatPrice(finalAmount)}</p>
           </div>
           <Button
             className="px-8 rounded-xl bg-accent text-accent-foreground hover:bg-accent/90 font-bold"
@@ -535,7 +537,7 @@ export default function CartPage() {
                 )}
                 <div className="flex justify-between border-t border-border pt-2 font-bold">
                   <span>Total</span>
-                  <span>₹{finalAmount.toFixed(0)}</span>
+                  <span>{formatPrice(finalAmount)}</span>
                 </div>
               </div>
             </AlertDialogDescription>

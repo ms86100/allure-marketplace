@@ -17,6 +17,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useSearchPlaceholder } from '@/hooks/useSearchPlaceholder';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
+import { useCurrency } from '@/hooks/useCurrency';
 
 
 // ── Types ──────────────────────────────────────────────
@@ -74,6 +75,7 @@ export default function SearchPage() {
   const [searchParams] = useSearchParams();
   const { configs: categoryConfigs, isLoading: categoriesLoading } = useCategoryConfigs();
   const settings = useSystemSettings();
+  const { formatPrice, currencySymbol } = useCurrency();
 
   // Build a lookup map: category slug -> { icon, displayName, supportsCart, etc. }
   const categoryMap = useMemo(() => {
@@ -568,7 +570,7 @@ export default function SearchPage() {
   if (filters.isVeg === false) pills.push('Non-veg');
   if (filters.categories.length) pills.push(...filters.categories.map((c) => categoryMap[c]?.displayName || c));
   if (filters.sortBy) {
-    const labels: Record<string, string> = { rating: 'Top Rated', newest: 'Newest', price_low: '₹ Low→High', price_high: '₹ High→Low' };
+    const labels: Record<string, string> = { rating: 'Top Rated', newest: 'Newest', price_low: `${currencySymbol} Low→High`, price_high: `${currencySymbol} High→Low` };
     pills.push(labels[filters.sortBy]);
   }
 
@@ -812,6 +814,7 @@ function ProductGridByCategory({
   categoryConfigs: { category: string; displayName: string; icon: string; behavior?: any }[];
   showCount?: boolean;
 }) {
+  const { formatPrice } = useCurrency();
   const grouped = useMemo(() => {
     const g: Record<string, ProductSearchResult[]> = {};
     products.forEach((p) => {
@@ -873,7 +876,7 @@ function ProductGridByCategory({
               </h3>
               <span className="text-xs text-muted-foreground">({items.length})</span>
               <span className="text-[11px] font-semibold text-accent ml-auto">
-                From ₹{Math.min(...items.map(p => p.price))}
+                From {formatPrice(Math.min(...items.map(p => p.price)))}
               </span>
             </div>
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">

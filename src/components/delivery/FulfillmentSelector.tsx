@@ -1,4 +1,5 @@
 import { Package, Truck } from 'lucide-react';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface FulfillmentSelectorProps {
   value: 'self_pickup' | 'delivery';
@@ -9,6 +10,7 @@ interface FulfillmentSelectorProps {
 }
 
 export function FulfillmentSelector({ value, onChange, deliveryFee, freeDeliveryThreshold, orderValue = 0 }: FulfillmentSelectorProps) {
+  const { formatPrice } = useCurrency();
   const isFreeDelivery = orderValue >= freeDeliveryThreshold;
 
   return (
@@ -42,13 +44,13 @@ export function FulfillmentSelector({ value, onChange, deliveryFee, freeDelivery
             Delivery
           </span>
           <span className={`text-[11px] font-medium ${isFreeDelivery ? 'text-primary' : 'text-muted-foreground'}`}>
-            {isFreeDelivery ? 'FREE' : `₹${deliveryFee}`}
+            {isFreeDelivery ? 'FREE' : formatPrice(deliveryFee)}
           </span>
         </button>
       </div>
       {value === 'delivery' && !isFreeDelivery && freeDeliveryThreshold > 0 && (
         <p className="text-[11px] text-muted-foreground text-center">
-          Free delivery on orders above ₹{freeDeliveryThreshold}
+          Free delivery on orders above {formatPrice(freeDeliveryThreshold)}
         </p>
       )}
     </div>

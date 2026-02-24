@@ -26,6 +26,8 @@ export interface SystemSettings {
   sellerEmptyStateCopy: string;
   landingSlidesJson: string;
   maxPriceFilter: number;
+  locale: string;
+  upiProviderLabel: string;
 }
 
 const DEFAULTS: SystemSettings = {
@@ -52,6 +54,8 @@ const DEFAULTS: SystemSettings = {
   sellerEmptyStateCopy: 'Sell products, groceries, or services to your community',
   landingSlidesJson: '',
   maxPriceFilter: 50000,
+  locale: 'en-IN',
+  upiProviderLabel: 'GPay, PhonePe, Paytm',
 };
 
 export function useSystemSettings(): SystemSettings {
@@ -70,7 +74,7 @@ export function useSystemSettings(): SystemSettings {
           'help_sections_json', 'terms_content_md', 'privacy_content_md',
           'currency_symbol', 'budget_filter_threshold', 'platform_name',
           'violation_policy_json', 'seller_empty_state_copy', 'landing_slides_json',
-          'max_price_filter',
+          'max_price_filter', 'locale', 'upi_provider_label',
         ]);
 
       const map: Record<string, string> = {};
@@ -102,6 +106,8 @@ export function useSystemSettings(): SystemSettings {
         sellerEmptyStateCopy: map.seller_empty_state_copy || DEFAULTS.sellerEmptyStateCopy,
         landingSlidesJson: map.landing_slides_json || DEFAULTS.landingSlidesJson,
         maxPriceFilter: parseInt(map.max_price_filter || '50000', 10) || 50000,
+        locale: map.locale || DEFAULTS.locale,
+        upiProviderLabel: map.upi_provider_label || DEFAULTS.upiProviderLabel,
       };
     },
     staleTime: jitteredStaleTime(15 * 60 * 1000),

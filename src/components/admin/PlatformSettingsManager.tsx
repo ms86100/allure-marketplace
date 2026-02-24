@@ -20,8 +20,8 @@ interface SettingField {
 }
 
 const SETTING_FIELDS: SettingField[] = [
-  { key: 'base_delivery_fee', label: 'Base Delivery Fee (₹)', type: 'number', icon: IndianRupee, group: 'Financial', description: 'Charged when order is below free delivery threshold' },
-  { key: 'free_delivery_threshold', label: 'Free Delivery Threshold (₹)', type: 'number', icon: IndianRupee, group: 'Financial', description: 'Orders above this amount get free delivery' },
+  { key: 'base_delivery_fee', label: 'Base Delivery Fee', type: 'number', icon: IndianRupee, group: 'Financial', description: 'Charged when order is below free delivery threshold' },
+  { key: 'free_delivery_threshold', label: 'Free Delivery Threshold', type: 'number', icon: IndianRupee, group: 'Financial', description: 'Orders above this amount get free delivery' },
   { key: 'platform_fee_percent', label: 'Platform Fee (%)', type: 'number', icon: Percent, group: 'Financial', description: 'Commission deducted from seller earnings' },
   { key: 'support_email', label: 'Support Email', type: 'email', icon: Mail, group: 'Contact', description: 'Shown on Terms & Pricing pages' },
   { key: 'grievance_email', label: 'Grievance Email', type: 'email', icon: Mail, group: 'Contact', description: 'Shown on Help & Grievance Officer section' },

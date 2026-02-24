@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format, parseISO } from 'date-fns';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 
 interface Props {
   expenses: { amount: number; expense_date: string }[];
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function IncomeVsExpenseChart({ expenses, income }: Props) {
+  const { currencySymbol } = useSystemSettings();
   const data = useMemo(() => {
     const monthMap: Record<string, { month: string; income: number; expenses: number }> = {};
 
@@ -37,8 +39,8 @@ export function IncomeVsExpenseChart({ expenses, income }: Props) {
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={data}>
         <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-        <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} />
-        <Tooltip formatter={(value: number) => `₹${value.toLocaleString()}`} />
+        <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${currencySymbol}${(v / 1000).toFixed(0)}k`} />
+        <Tooltip formatter={(value: number) => `${currencySymbol}${value.toLocaleString()}`} />
         <Legend wrapperStyle={{ fontSize: 10 }} />
         <Bar dataKey="income" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} name="Income" />
         <Bar dataKey="expenses" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} name="Expenses" />

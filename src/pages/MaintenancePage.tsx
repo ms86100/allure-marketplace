@@ -17,6 +17,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface MaintenanceDue {
   id: string;
@@ -32,6 +33,7 @@ interface MaintenanceDue {
 export default function MaintenancePage() {
   const { user, profile, isAdmin, isSocietyAdmin, effectiveSocietyId } = useAuth();
   const canManage = isAdmin || isSocietyAdmin;
+  const { formatPrice, currencySymbol } = useCurrency();
   const { createOrder: razorpayOrder, isLoading: paymentLoading } = useRazorpay();
   const [dues, setDues] = useState<MaintenanceDue[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -184,7 +186,7 @@ export default function MaintenancePage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Amount per flat (₹)</label>
+                  <label className="text-sm font-medium">Amount per flat ({currencySymbol})</label>
                   <Input 
                     type="number" 
                     value={generateAmount} 
@@ -215,7 +217,7 @@ export default function MaintenancePage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirm Dues Generation</AlertDialogTitle>
               <AlertDialogDescription>
-                This will create dues for <strong>{residentCount}</strong> flats, totaling <strong>₹{((residentCount || 0) * parseFloat(generateAmount || '0')).toLocaleString()}</strong> for {generateMonth || 'the selected month'}.
+                This will create dues for <strong>{residentCount}</strong> flats, totaling <strong>{formatPrice((residentCount || 0) * parseFloat(generateAmount || '0'))}</strong> for {generateMonth || 'the selected month'}.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -246,8 +248,8 @@ export default function MaintenancePage() {
                       {statusBadge(d.status)}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {d.month} · ₹{d.amount.toLocaleString()}
-                      {d.late_fee ? ` + ₹${d.late_fee.toLocaleString()} late fee` : ''}
+                      {d.month} · {formatPrice(d.amount)}
+                      {d.late_fee ? ` + ${formatPrice(d.late_fee)} late fee` : ''}
                       {d.paid_date && ` · Paid ${d.paid_date}`}
                     </p>
                   </div>

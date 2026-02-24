@@ -14,6 +14,7 @@ import { Listing } from '@/components/listing/ListingCard';
 import { useCategoryBehavior } from '@/hooks/useCategoryBehavior';
 import { RentalPeriodType } from '@/types/categories';
 import { Clock, Calendar, MessageCircle, Loader2 } from 'lucide-react';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface BookingSheetProps {
   open: boolean;
@@ -44,6 +45,7 @@ export function BookingSheet({
   isLoading = false,
 }: BookingSheetProps) {
   const { requiresTimeSlot, hasDateRange, enquiryOnly, hasDuration } = useCategoryBehavior(listing.category);
+  const { formatPrice } = useCurrency();
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string | undefined>();
@@ -119,7 +121,7 @@ export function BookingSheet({
             )}
             <div className="flex-1">
               <h4 className="font-medium">{listing.name}</h4>
-              <p className="text-lg font-bold text-primary">₹{listing.price}</p>
+              <p className="text-lg font-bold text-primary">{formatPrice(listing.price)}</p>
               {listing.service_duration_minutes && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Clock size={10} />

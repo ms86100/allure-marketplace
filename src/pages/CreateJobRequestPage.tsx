@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { jobRequestSchema, validateForm } from '@/lib/validation-schemas';
+import { useCurrency } from '@/hooks/useCurrency';
 import { friendlyError } from '@/lib/utils';
 import { FeatureGate } from '@/components/ui/FeatureGate';
 import { Building, Globe, MapPin, Loader2 } from 'lucide-react';
@@ -23,6 +24,7 @@ import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
 
 export default function CreateJobRequestPage() {
   const { profile, effectiveSocietyId } = useAuth();
+  const { currencySymbol } = useCurrency();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { getSetting } = useSystemSettingsRaw(['worker_broadcast_radius_options', 'worker_broadcast_default_radius', 'worker_urgency_options']);
@@ -181,7 +183,7 @@ export default function CreateJobRequestPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Budget (₹)</Label>
+                <Label>Budget ({currencySymbol})</Label>
                 <Input
                   type="number"
                   placeholder="e.g. 500"

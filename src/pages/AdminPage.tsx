@@ -39,6 +39,7 @@ import { FeatureManagement } from '@/components/admin/FeatureManagement';
 import { AdminProductApprovals } from '@/components/admin/AdminProductApprovals';
 import { PlatformSettingsManager } from '@/components/admin/PlatformSettingsManager';
 import { AdminCatalogManager } from '@/components/admin/AdminCatalogManager';
+import { useCurrency } from '@/hooks/useCurrency';
 interface Report {
   id: string;
   reporter_id: string;
@@ -68,6 +69,7 @@ interface Warning {
 export default function AdminPage() {
   const location = useLocation();
   const { getPaymentStatus } = useStatusLabels();
+  const { formatPrice } = useCurrency();
   const tabParam = useMemo(() => new URLSearchParams(location.search).get('tab'), [location.search]);
   const [activeTab, setActiveTab] = useState(tabParam || 'sellers');
   const [pendingUsers, setPendingUsers] = useState<Profile[]>([]);
@@ -324,7 +326,7 @@ export default function AdminPage() {
           <Card><CardContent className="p-2 text-center"><Building2 className="mx-auto text-info" size={14} /><p className="text-sm font-bold">{stats.societies}</p><p className="text-[8px] text-muted-foreground">Societies</p></CardContent></Card>
           <Card><CardContent className="p-2 text-center"><Package className="mx-auto text-warning" size={14} /><p className="text-sm font-bold">{stats.orders}</p><p className="text-[8px] text-muted-foreground">Orders</p></CardContent></Card>
           <Card><CardContent className="p-2 text-center"><Star className="mx-auto text-info" size={14} /><p className="text-sm font-bold">{stats.reviews}</p><p className="text-[8px] text-muted-foreground">Reviews</p></CardContent></Card>
-          <Card><CardContent className="p-2 text-center"><DollarSign className="mx-auto text-success" size={14} /><p className="text-sm font-bold">₹{stats.revenue}</p><p className="text-[8px] text-muted-foreground">Revenue</p></CardContent></Card>
+          <Card><CardContent className="p-2 text-center"><DollarSign className="mx-auto text-success" size={14} /><p className="text-sm font-bold">{formatPrice(stats.revenue)}</p><p className="text-[8px] text-muted-foreground">Revenue</p></CardContent></Card>
           <Card><CardContent className="p-2 text-center"><Flag className="mx-auto text-destructive" size={14} /><p className="text-sm font-bold">{stats.pendingReports}</p><p className="text-[8px] text-muted-foreground">Reports</p></CardContent></Card>
         </div>
 
@@ -407,7 +409,7 @@ export default function AdminPage() {
                       <p className="text-[10px] text-muted-foreground">Order #{payment.order_id.slice(0, 8)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold">₹{payment.amount}</p>
+                      <p className="font-semibold">{formatPrice(payment.amount)}</p>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full ${statusInfo.color}`}>
                         {statusInfo.label}
                       </span>

@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { OrderItem, ItemStatus } from '@/types/database';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { Check, Loader2 } from 'lucide-react';
+import { useCurrency } from '@/hooks/useCurrency';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +19,7 @@ interface OrderItemCardProps {
 const STATUS_ORDER: ItemStatus[] = ['pending', 'accepted', 'preparing', 'ready', 'delivered'];
 
 export function OrderItemCard({ item, isSellerView, orderStatus, onStatusUpdate }: OrderItemCardProps) {
+  const { formatPrice } = useCurrency();
   const [isUpdating, setIsUpdating] = useState(false);
   const { getItemStatus } = useStatusLabels();
   const currentStatus = (item.status || 'pending') as ItemStatus;
@@ -69,7 +71,7 @@ export function OrderItemCard({ item, isSellerView, orderStatus, onStatusUpdate 
             </span>
           </div>
           <p className="text-sm text-muted-foreground">
-            ₹{item.unit_price} × {item.quantity} = ₹{item.unit_price * item.quantity}
+            {formatPrice(item.unit_price)} × {item.quantity} = {formatPrice(item.unit_price * item.quantity)}
           </p>
         </div>
         

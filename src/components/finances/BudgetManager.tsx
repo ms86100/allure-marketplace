@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Plus, Target, Loader2 } from 'lucide-react';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface Budget {
   id: string;
@@ -36,6 +37,7 @@ const LABELS: Record<string, string> = {
 
 export function BudgetManager({ expenses }: Props) {
   const { effectiveSocietyId, isSocietyAdmin, isAdmin } = useAuth();
+  const { formatPrice, currencySymbol } = useCurrency();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
@@ -110,7 +112,7 @@ export function BudgetManager({ expenses }: Props) {
                   </Select>
                 </div>
                 <div>
-                  <Label>Budget Amount (₹)</Label>
+                  <Label>Budget Amount ({currencySymbol})</Label>
                   <Input type="number" value={newAmount} onChange={e => setNewAmount(e.target.value)} placeholder="50000" />
                 </div>
                 <Button className="w-full" onClick={handleAdd} disabled={submitting || !newCategory || !newAmount}>
@@ -126,7 +128,7 @@ export function BudgetManager({ expenses }: Props) {
         <Card>
           <CardContent className="p-3">
             <div className="flex justify-between text-xs mb-1">
-              <span>Total: ₹{totalSpent.toLocaleString()} / ₹{totalBudget.toLocaleString()}</span>
+              <span>Total: {formatPrice(totalSpent)} / {formatPrice(totalBudget)}</span>
               <span className={totalSpent > totalBudget ? 'text-destructive font-bold' : 'text-success'}>
                 {Math.round((totalSpent / totalBudget) * 100)}%
               </span>
@@ -156,8 +158,8 @@ export function BudgetManager({ expenses }: Props) {
                 </div>
                 <Progress value={Math.min(pct, 100)} className="h-1.5 mb-1" />
                 <p className="text-[10px] text-muted-foreground">
-                  ₹{spent.toLocaleString()} spent of ₹{Number(b.budget_amount).toLocaleString()}
-                  {overBudget && <span className="text-destructive ml-1">• Over by ₹{(spent - Number(b.budget_amount)).toLocaleString()}</span>}
+                  {formatPrice(spent)} spent of {formatPrice(Number(b.budget_amount))}
+                  {overBudget && <span className="text-destructive ml-1">• Over by {formatPrice(spent - Number(b.budget_amount))}</span>}
                 </p>
               </CardContent>
             </Card>

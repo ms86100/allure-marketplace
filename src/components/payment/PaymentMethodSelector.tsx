@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Banknote, Smartphone, Check } from 'lucide-react';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 
 interface PaymentMethodSelectorProps {
   acceptsCod: boolean;
@@ -18,11 +19,12 @@ export function PaymentMethodSelector({
   selectedMethod,
   onSelect,
 }: PaymentMethodSelectorProps) {
+  const { upiProviderLabel } = useSystemSettings();
   const methods = [
     {
       id: 'upi' as PaymentMethod,
       label: 'UPI Payment',
-      description: 'Pay via GPay, PhonePe, Paytm',
+      description: `Pay via ${upiProviderLabel}`,
       icon: Smartphone,
       enabled: acceptsUpi,
       color: 'text-info',

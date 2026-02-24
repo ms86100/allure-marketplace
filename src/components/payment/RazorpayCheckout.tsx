@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/sheet';
 import { Loader2, CreditCard, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { useRazorpay } from '@/hooks/useRazorpay';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface RazorpayCheckoutProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ export function RazorpayCheckout({
   onPaymentFailed,
 }: RazorpayCheckoutProps) {
   const { createOrder, isLoading, isScriptLoaded } = useRazorpay();
+  const { formatPrice } = useCurrency();
   const [status, setStatus] = useState<'pending' | 'processing' | 'success' | 'failed'>('pending');
 
   useEffect(() => {
@@ -85,7 +87,7 @@ export function RazorpayCheckout({
         <SheetHeader className="text-center pb-4">
           <SheetTitle>Pay with UPI</SheetTitle>
           <SheetDescription>
-            Pay ₹{amount} to {sellerName}
+            Pay {formatPrice(amount)} to {sellerName}
           </SheetDescription>
         </SheetHeader>
 
@@ -96,13 +98,13 @@ export function RazorpayCheckout({
                 <CreditCard className="text-primary" size={40} />
               </div>
               <div>
-                <p className="font-semibold text-2xl">₹{amount}</p>
+                <p className="font-semibold text-2xl">{formatPrice(amount)}</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   Secure payment via Razorpay
                 </p>
                 <div className="flex items-center justify-center gap-2 mt-3">
                   <img src="https://razorpay.com/assets/razorpay-glyph.svg" alt="Razorpay" className="h-4" />
-                  <span className="text-xs text-muted-foreground">GPay • PhonePe • Paytm • All UPI</span>
+                  <span className="text-xs text-muted-foreground">Secure UPI payment</span>
                 </div>
               </div>
               <div className="flex gap-3 pt-4">

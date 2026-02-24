@@ -11,11 +11,13 @@ import { Order } from '@/types/database';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { Package, ChevronRight, Loader2, ArrowLeft, CheckCircle, Truck } from 'lucide-react';
 import { format } from 'date-fns';
+import { useCurrency } from '@/hooks/useCurrency';
 
 const PAGE_SIZE = 20;
 
 function OrderCard({ order, type }: { order: Order; type: 'buyer' | 'seller' }) {
   const { getOrderStatus } = useStatusLabels();
+  const { formatPrice } = useCurrency();
   const statusInfo = getOrderStatus(order.status);
   const seller = (order as any).seller;
   const buyer = (order as any).buyer;
@@ -64,7 +66,7 @@ function OrderCard({ order, type }: { order: Order; type: 'buyer' | 'seller' }) 
 
             {/* Items + price */}
             <p className="text-xs text-muted-foreground mt-1">
-              {items.length} item{items.length > 1 ? 's' : ''} · ₹{order.total_amount}
+              {items.length} item{items.length > 1 ? 's' : ''} · {formatPrice(order.total_amount)}
             </p>
 
             {type === 'seller' && buyer && (

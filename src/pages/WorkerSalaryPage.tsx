@@ -14,6 +14,7 @@ import { useWorkerRole } from '@/hooks/useWorkerRole';
 import { FeatureGate } from '@/components/ui/FeatureGate';
 import { toast } from 'sonner';
 import { IndianRupee, Plus, Loader2, Wallet } from 'lucide-react';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface WorkerOption {
   id: string;
@@ -24,6 +25,7 @@ interface WorkerOption {
 export default function WorkerSalaryPage() {
   const { effectiveSocietyId, isSocietyAdmin, isAdmin, user, profile } = useAuth();
   const { workerProfile, isWorker } = useWorkerRole();
+  const { formatPrice } = useCurrency();
   const [salaries, setSalaries] = useState<any[]>([]);
   const [workers, setWorkers] = useState<WorkerOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,7 +170,7 @@ export default function WorkerSalaryPage() {
                   <p className="font-medium text-sm">{s.workerInfo?.displayName || 'Unknown'}</p>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{s.month}</span>
-                    <span>₹{s.amount.toLocaleString('en-IN')}</span>
+                    <span>{formatPrice(s.amount)}</span>
                   </div>
                 </div>
                 {s.status === 'paid' ? (

@@ -55,7 +55,7 @@ const DEFAULT_HELP_SECTIONS: HelpSection[] = [
     icon: CreditCard,
     title: 'Payments',
     items: [
-      'UPI: Pay instantly via GPay, PhonePe, Paytm',
+      'UPI: Pay instantly via supported UPI apps',
       'Cash on Delivery: Pay when you receive',
       'All transactions are within the community',
       'No extra charges or hidden fees',

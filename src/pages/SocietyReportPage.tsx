@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { BarChart3, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface ReportData {
   expenses_total: number;
@@ -29,6 +30,7 @@ export default function SocietyReportPage() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { formatPrice } = useCurrency();
 
   const targetMonth = subMonths(new Date(), monthOffset);
   const monthStart = startOfMonth(targetMonth).toISOString();
@@ -129,12 +131,12 @@ export default function SocietyReportPage() {
             <Card>
               <CardHeader className="pb-2"><CardTitle className="text-sm">💰 Financial Summary</CardTitle></CardHeader>
               <CardContent className="divide-y divide-border">
-                <StatRow label="Total Expenses" value={`₹${report.expenses_total.toLocaleString()}`} />
+                <StatRow label="Total Expenses" value={formatPrice(report.expenses_total)} />
                 <StatRow label="Expense Entries" value={String(report.expenses_count)} />
-                <StatRow label="Total Income" value={`₹${report.income_total.toLocaleString()}`} />
+                <StatRow label="Total Income" value={formatPrice(report.income_total)} />
                 <StatRow
                   label="Net Position"
-                  value={`₹${(report.income_total - report.expenses_total).toLocaleString()}`}
+                  value={formatPrice(report.income_total - report.expenses_total)}
                   trend={report.income_total >= report.expenses_total ? 'up' : 'down'}
                 />
               </CardContent>

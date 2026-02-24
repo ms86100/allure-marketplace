@@ -13,6 +13,7 @@ import {
   TrendingUp, AlertTriangle, Clock, CheckCircle, Building2, 
   Bug, ShieldAlert, Users, IndianRupee, BarChart3
 } from 'lucide-react';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface SocietyAnalytics {
   id: string;
@@ -39,6 +40,7 @@ const CHART_COLORS = [
 
 export default function BuilderAnalyticsPage() {
   const { managedBuilderIds, isAdmin } = useAuth();
+  const { formatPrice } = useCurrency();
   const [societies, setSocieties] = useState<SocietyAnalytics[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [monthlyTrend, setMonthlyTrend] = useState<any[]>([]);
@@ -225,7 +227,7 @@ export default function BuilderAnalyticsPage() {
           <Card>
             <CardContent className="p-3 text-center">
               <IndianRupee className="mx-auto text-primary mb-1" size={18} />
-              <p className="text-xl font-bold">₹{totals.totalRevenue.toLocaleString()}</p>
+              <p className="text-xl font-bold">{formatPrice(totals.totalRevenue)}</p>
               <p className="text-[10px] text-muted-foreground">Total Revenue</p>
             </CardContent>
           </Card>

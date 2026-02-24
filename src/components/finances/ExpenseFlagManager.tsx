@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Flag, CheckCircle, XCircle, Loader2, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface ExpenseFlag {
   id: string;
@@ -24,6 +25,7 @@ interface ExpenseFlag {
 export function ExpenseFlagManager() {
   const { user, effectiveSocietyId } = useAuth();
   const [flags, setFlags] = useState<ExpenseFlag[]>([]);
+  const { formatPrice } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [updating, setUpdating] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export function ExpenseFlagManager() {
               <div className="flex-1">
                 <p className="text-sm font-medium">{flag.expense?.title || 'Unknown Expense'}</p>
                 <p className="text-xs text-muted-foreground">
-                  ₹{Number(flag.expense?.amount || 0).toLocaleString()} · {flag.expense?.category}
+                  {formatPrice(Number(flag.expense?.amount || 0))} · {flag.expense?.category}
                 </p>
                 <p className="text-xs mt-1">
                   <span className="text-muted-foreground">Flagged by:</span> {flag.flagger?.name} ({flag.flagger?.flat_number})

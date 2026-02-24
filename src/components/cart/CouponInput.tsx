@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Ticket, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface CouponInputProps {
   sellerId: string;
@@ -15,6 +16,7 @@ interface CouponInputProps {
 }
 
 export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedCoupon }: CouponInputProps) {
+  const { formatPrice } = useCurrency();
   const { user, effectiveSocietyId } = useAuth();
   const [code, setCode] = useState('');
   const [isValidating, setIsValidating] = useState(false);
@@ -71,7 +73,7 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
 
       // Check min order
       if (coupon.min_order_amount && totalAmount < coupon.min_order_amount) {
-        toast.error(`Minimum order of ₹${coupon.min_order_amount} required`);
+        toast.error(`Minimum order of ${formatPrice(coupon.min_order_amount)} required`);
         return;
       }
 
@@ -89,7 +91,7 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
       discountAmount = Math.round(discountAmount * 100) / 100;
 
       onApply({ id: coupon.id, code: coupon.code, discountAmount });
-      toast.success(`Coupon applied! You save ₹${discountAmount.toFixed(0)}`);
+      toast.success(`Coupon applied! You save ${formatPrice(discountAmount)}`);
     } catch {
       toast.error('Failed to validate coupon');
     } finally {

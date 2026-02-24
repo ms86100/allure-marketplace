@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle, CheckCircle2, Clock, Users, IndianRupee, Shield, TrendingUp } from 'lucide-react';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface DashboardMetrics {
   openDisputes: number;
@@ -61,6 +62,7 @@ export function CommitteeDashboard({ societyId }: Props) {
     return <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full" />)}</div>;
   }
 
+  const { formatPrice } = useCurrency();
   if (!metrics) return null;
 
   const collectionRate = (metrics.maintenanceCollected + metrics.maintenancePending) > 0
@@ -118,8 +120,8 @@ export function CommitteeDashboard({ societyId }: Props) {
             <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${collectionRate}%` }} />
           </div>
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>₹{metrics.maintenanceCollected.toLocaleString()} collected</span>
-            <span>₹{metrics.maintenancePending.toLocaleString()} pending</span>
+            <span>{formatPrice(metrics.maintenanceCollected)} collected</span>
+            <span>{formatPrice(metrics.maintenancePending)} pending</span>
           </div>
         </CardContent>
       </Card>

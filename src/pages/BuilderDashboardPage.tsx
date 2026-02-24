@@ -13,6 +13,7 @@ import { BuilderSocietyFeatures } from '@/components/builder/BuilderSocietyFeatu
 import { BuilderActionCenter } from '@/components/builder/BuilderActionCenter';
 import { BuilderAnnouncementSheet } from '@/components/builder/BuilderAnnouncementSheet';
 import { BuilderSetupWizard } from '@/components/builder/BuilderSetupWizard';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface BuilderSociety {
   id: string;
@@ -37,6 +38,7 @@ interface BuilderSociety {
 export default function BuilderDashboardPage() {
   const { isBuilderMember, managedBuilderIds, isAdmin, setViewAsSociety } = useAuth();
   const navigate = useNavigate();
+  const { formatPrice } = useCurrency();
   const [builder, setBuilder] = useState<Builder | null>(null);
   const [societies, setSocieties] = useState<BuilderSociety[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -137,7 +139,7 @@ export default function BuilderDashboardPage() {
             <CardContent className="p-4 grid grid-cols-3 gap-3">
               <div className="text-center">
                 <IndianRupee size={14} className="mx-auto text-primary mb-1" />
-                <p className="text-sm font-bold">₹{builderStats.totalRevenue.toLocaleString()}</p>
+                <p className="text-sm font-bold">{formatPrice(builderStats.totalRevenue)}</p>
                 <p className="text-[10px] text-muted-foreground">Total Revenue</p>
               </div>
               <div className="text-center">

@@ -10,10 +10,12 @@ import { PaymentRecord, Order, PaymentStatus, SellerProfile } from '@/types/data
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { ArrowLeft, TrendingUp, DollarSign, Calendar, CreditCard } from 'lucide-react';
 import { format, startOfDay, startOfWeek, startOfMonth, isAfter, parseISO } from 'date-fns';
+import { useCurrency } from '@/hooks/useCurrency';
 
 export default function SellerEarningsPage() {
   const { user, currentSellerId, sellerProfiles } = useAuth();
   const { getPaymentStatus } = useStatusLabels();
+  const { formatPrice } = useCurrency();
   const [payments, setPayments] = useState<(PaymentRecord & { order?: Order })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -117,19 +119,19 @@ export default function SellerEarningsPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-background/50 rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">Today</p>
-              <p className="text-xl font-bold text-success">₹{stats.today}</p>
+              <p className="text-xl font-bold text-success">{formatPrice(stats.today)}</p>
             </div>
             <div className="bg-background/50 rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">This Week</p>
-              <p className="text-xl font-bold text-success">₹{stats.thisWeek}</p>
+              <p className="text-xl font-bold text-success">{formatPrice(stats.thisWeek)}</p>
             </div>
             <div className="bg-background/50 rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">This Month</p>
-              <p className="text-xl font-bold text-success">₹{stats.thisMonth}</p>
+              <p className="text-xl font-bold text-success">{formatPrice(stats.thisMonth)}</p>
             </div>
             <div className="bg-background/50 rounded-lg p-3 text-center">
               <p className="text-xs text-muted-foreground">All Time</p>
-              <p className="text-xl font-bold text-success">₹{stats.allTime}</p>
+              <p className="text-xl font-bold text-success">{formatPrice(stats.allTime)}</p>
             </div>
           </div>
         </div>
@@ -145,7 +147,7 @@ export default function SellerEarningsPage() {
                 <p className="font-semibold">Pending Collection</p>
                 <p className="text-sm text-muted-foreground">COD payments to collect</p>
               </div>
-              <p className="text-xl font-bold text-warning">₹{stats.pendingPayout}</p>
+              <p className="text-xl font-bold text-warning">{formatPrice(stats.pendingPayout)}</p>
             </CardContent>
           </Card>
         )}
@@ -181,7 +183,7 @@ export default function SellerEarningsPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold">₹{payment.amount}</p>
+                          <p className="font-semibold">{formatPrice(payment.amount)}</p>
                           <span className={`text-[10px] px-2 py-0.5 rounded-full ${statusInfo.color}`}>
                             {statusInfo.label}
                           </span>

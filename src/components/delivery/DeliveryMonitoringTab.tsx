@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface DeliveryRecord {
   id: string;
@@ -36,6 +37,7 @@ const STATUS_BADGES: Record<string, { label: string; color: string }> = {
 
 export function DeliveryMonitoringTab({ societyId }: DeliveryMonitoringTabProps) {
   const { getDeliveryStatus } = useStatusLabels();
+  const { formatPrice } = useCurrency();
   const [allDeliveries, setAllDeliveries] = useState<DeliveryRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'active' | 'completed' | 'failed'>('active');
@@ -151,7 +153,7 @@ export function DeliveryMonitoringTab({ societyId }: DeliveryMonitoringTabProps)
                     </p>
                   </div>
                   {delivery.delivery_fee > 0 && (
-                    <span className="text-sm font-semibold">₹{delivery.delivery_fee}</span>
+                    <span className="text-sm font-semibold">{formatPrice(delivery.delivery_fee)}</span>
                   )}
                 </div>
                 {delivery.failed_reason && (

@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { ShoppingCart, ChevronRight } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
+import { useCurrency } from '@/hooks/useCurrency';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +11,7 @@ interface FloatingCartBarProps {
 
 export function FloatingCartBar({ className }: FloatingCartBarProps) {
   const { itemCount, totalAmount, items } = useCart();
+  const { formatPrice } = useCurrency();
   const location = useLocation();
 
   // Hide on cart page — user is already there
@@ -48,7 +50,7 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
               )}
               <div>
                 <p className="text-primary-foreground text-sm font-bold">
-                  {itemCount} item{itemCount !== 1 ? 's' : ''} · ₹{totalAmount}
+                  {itemCount} item{itemCount !== 1 ? 's' : ''} · {formatPrice(totalAmount)}
                 </p>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 
 const CATEGORY_COLORS: Record<string, string> = {
   security: '#ef4444',
@@ -28,6 +29,7 @@ interface Props {
 }
 
 export function SpendingPieChart({ expenses, onCategoryClick }: Props) {
+  const { currencySymbol } = useSystemSettings();
   // Aggregate by category
   const categoryTotals = expenses.reduce((acc, e) => {
     acc[e.category] = (acc[e.category] || 0) + Number(e.amount);
@@ -67,7 +69,7 @@ export function SpendingPieChart({ expenses, onCategoryClick }: Props) {
               <Cell key={entry.category} fill={CATEGORY_COLORS[entry.category] || '#6b7280'} />
             ))}
           </Pie>
-          <Tooltip formatter={(value: number) => `₹${value.toLocaleString()}`} />
+          <Tooltip formatter={(value: number) => `${currencySymbol}${value.toLocaleString()}`} />
         </PieChart>
       </ResponsiveContainer>
       <div className="grid grid-cols-2 gap-2">

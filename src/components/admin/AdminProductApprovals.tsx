@@ -8,6 +8,7 @@ import { Check, X, Loader2, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { logAudit } from '@/lib/audit';
 import { ProductAttributeBlocks } from '@/components/product/ProductAttributeBlocks';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface PendingProduct {
   id: string;
@@ -26,6 +27,7 @@ interface PendingProduct {
 }
 
 export function AdminProductApprovals() {
+  const { formatPrice } = useCurrency();
   const [products, setProducts] = useState<PendingProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -99,7 +101,7 @@ export function AdminProductApprovals() {
                     <h4 className="font-medium text-sm truncate">{product.name}</h4>
                     <Badge variant="outline" className="text-[10px]">{product.category}</Badge>
                   </div>
-                  <p className="text-sm font-semibold text-primary">₹{product.price}</p>
+                  <p className="text-sm font-semibold text-primary">{formatPrice(product.price)}</p>
                   {product.seller && (
                     <p className="text-xs text-muted-foreground mt-0.5">by {product.seller.business_name}</p>
                   )}

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { SellerProfile, Product } from '@/types/database';
 import { Clock, MapPin, Award, Zap, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useCurrency } from '@/hooks/useCurrency';
 
 interface SellerCardProps {
   seller: SellerProfile & { profile?: { name: string; block: string }; products?: { price: number }[] };
@@ -15,6 +16,7 @@ interface SellerCardProps {
 
 export function SellerCard({ seller, featuredProduct, showFavorite = true }: SellerCardProps) {
   const isOpen = seller.is_available;
+  const { formatPrice } = useCurrency();
   const profile = seller.profile;
   const isNewSeller = !seller.rating || seller.rating === 0 || seller.total_reviews === 0;
   const minPrice = (seller as any).products?.length
@@ -80,7 +82,7 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
               )}
               {minPrice !== null && (
                 <p className="text-xs font-semibold text-success mt-0.5">
-                  Starting from ₹{minPrice}
+                  Starting from {formatPrice(minPrice)}
                 </p>
               )}
             </div>

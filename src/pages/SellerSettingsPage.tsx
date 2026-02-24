@@ -18,6 +18,7 @@ import { useParentGroups } from '@/hooks/useParentGroups';
 import { ParentGroup, ServiceCategory } from '@/types/categories';
 import { Slider } from '@/components/ui/slider';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { useCurrency } from '@/hooks/useCurrency';
 import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2, Globe, Truck, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn, friendlyError } from '@/lib/utils';
@@ -49,6 +50,7 @@ function LicenseUploadSection({ sellerId, primaryGroup }: { sellerId: string; pr
 
 export default function SellerSettingsPage() {
   const { user, currentSellerId, sellerProfiles } = useAuth();
+  const { currencySymbol } = useCurrency();
   const { groupedConfigs } = useCategoryConfigs();
   const { getGroupBySlug } = useParentGroups();
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
@@ -543,7 +545,7 @@ export default function SellerSettingsPage() {
                   <Smartphone className="text-info" size={20} />
                   <div>
                     <p className="font-medium text-sm">UPI Payments</p>
-                    <p className="text-xs text-muted-foreground">GPay, PhonePe, Paytm</p>
+                    <p className="text-xs text-muted-foreground">Accepts UPI payments</p>
                   </div>
                 </div>
                 <Switch
@@ -593,7 +595,7 @@ export default function SellerSettingsPage() {
               </div>
               {formData.minimum_order_amount !== '' && (
                 <div className="space-y-2 pt-2 border-t">
-                  <Label htmlFor="min_order" className="text-xs">Minimum Amount (₹)</Label>
+                  <Label htmlFor="min_order" className="text-xs">Minimum Amount ({currencySymbol})</Label>
                   <Input
                     id="min_order"
                     type="number"

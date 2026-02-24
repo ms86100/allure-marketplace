@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { friendlyError } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
+import { useCurrency } from '@/hooks/useCurrency';
 
 const EXPENSE_CATEGORIES = [
   { value: 'security', label: 'Security' },
@@ -38,6 +39,7 @@ interface Props {
 
 export function AddExpenseSheet({ open, onOpenChange, onCreated, type }: Props) {
   const { user, profile, viewAsSocietyId } = useAuth();
+  const { currencySymbol } = useCurrency();
   const [category, setCategory] = useState(type === 'expense' ? 'miscellaneous' : 'maintenance');
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
@@ -109,7 +111,7 @@ export function AddExpenseSheet({ open, onOpenChange, onCreated, type }: Props) 
             <Input value={title} onChange={e => setTitle(e.target.value)} placeholder={type === 'expense' ? 'e.g. Guard salary - Jan' : 'e.g. Q1 maintenance'} />
           </div>
           <div>
-            <Label>Amount (₹)</Label>
+            <Label>Amount ({currencySymbol})</Label>
             <Input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" />
           </div>
           {type === 'expense' && (
