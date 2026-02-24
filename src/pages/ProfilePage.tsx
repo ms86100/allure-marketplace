@@ -26,6 +26,7 @@ import {
   Repeat,
   Award,
   Building2,
+  FlaskConical,
 } from 'lucide-react';
 import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
 import { toast } from 'sonner';
@@ -91,9 +92,9 @@ export default function ProfilePage() {
   };
 
   const quickActions = [
-    { icon: Package, label: 'Orders', to: '/orders' },
-    { icon: Heart, label: 'Favorites', to: '/favorites' },
-    { icon: Repeat, label: 'Order Again', to: '/orders' },
+    { icon: Package, label: 'Orders', to: '/orders', key: 'orders' },
+    { icon: Heart, label: 'Favorites', to: '/favorites', key: 'favorites' },
+    { icon: Repeat, label: 'Order Again', to: '/orders', key: 'reorder' },
   ];
 
   const menuItems = [
@@ -107,9 +108,10 @@ export default function ProfilePage() {
     { icon: Bell, label: 'Notifications', to: '/notifications' },
     { icon: HelpCircle, label: 'Help & Guide', to: '/help' },
     { icon: FileText, label: 'Community Rules', to: '/community-rules' },
+    ...(isAdmin ? [{ icon: Shield, label: 'Admin Panel', to: '/admin' }] : []),
+    ...(isAdmin ? [{ icon: FlaskConical, label: 'Test Results', to: '/test-results' }] : []),
     { icon: Shield, label: 'Privacy Policy', to: '/privacy-policy' },
     { icon: FileText, label: 'Terms & Conditions', to: '/terms' },
-    ...(isAdmin ? [{ icon: Shield, label: 'Admin Panel', to: '/admin' }] : []),
   ];
 
   return (
@@ -180,8 +182,8 @@ export default function ProfilePage() {
 
         {/* Quick Actions - 3 column */}
         <div className="grid grid-cols-3 gap-2.5 px-4 mt-4">
-          {quickActions.map(({ icon: Icon, label, to }) => (
-            <Link key={to} to={to}>
+          {quickActions.map(({ icon: Icon, label, to, key }) => (
+            <Link key={key} to={to}>
               <div className="bg-card border border-border rounded-xl p-3 flex flex-col items-center gap-1.5 active:scale-[0.97] transition-transform">
                 <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                   <Icon size={18} className="text-foreground" />
@@ -240,7 +242,7 @@ export default function ProfilePage() {
         <div className="mt-4 px-4 space-y-px">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">Your Information</p>
           {menuItems.slice(0, menuItems.findIndex(m => m.label === 'Privacy Policy')).map(({ icon: Icon, label, to }) => (
-            <Link key={to} to={to}>
+            <Link key={label} to={to}>
               <div className="flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-muted/50 active:bg-muted transition-colors">
                 <Icon size={18} className="text-muted-foreground shrink-0" />
                 <span className="flex-1 text-sm font-medium">{label}</span>
@@ -250,7 +252,7 @@ export default function ProfilePage() {
           ))}
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 mt-4 px-1">Legal & Support</p>
           {menuItems.slice(menuItems.findIndex(m => m.label === 'Privacy Policy')).map(({ icon: Icon, label, to }) => (
-            <Link key={to} to={to}>
+            <Link key={label} to={to}>
               <div className="flex items-center gap-3 px-3 py-3.5 rounded-lg hover:bg-muted/50 active:bg-muted transition-colors">
                 <Icon size={18} className="text-muted-foreground shrink-0" />
                 <span className="flex-1 text-sm font-medium">{label}</span>
