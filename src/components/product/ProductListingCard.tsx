@@ -222,7 +222,9 @@ function ProductListingCardInner({
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <span className="text-3xl opacity-40">{placeholderEmoji}</span>
+              <div className="w-14 h-14 rounded-full bg-card shadow-md flex items-center justify-center dark:bg-[hsl(0_0%_20%)]">
+                <span className="text-2xl opacity-50">{placeholderEmoji}</span>
+              </div>
             </div>
           )}
 
