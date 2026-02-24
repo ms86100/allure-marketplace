@@ -87,7 +87,7 @@
     --background: 0 0% 6%;
     --foreground: 0 0% 100%;
 
-    --card: 0 0% 15%;
+    --card: 0 0% 12%;
     --card-foreground: 0 0% 100%;
 
     --popover: 0 0% 15%;
@@ -349,6 +349,15 @@
 
   .safe-top {
     padding-top: max(12px, env(safe-area-inset-top));
+  }
+
+  /* Warm beige product image background — dark mode only */
+  .product-image-bg {
+    @apply bg-muted;
+  }
+
+  .dark .product-image-bg {
+    background-color: #FFF8E7;
   }
 }
 

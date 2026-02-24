@@ -118,14 +118,14 @@ export default function CategoryPage() {
   return (
     <AppLayout showHeader={false}>
       {/* Sticky Header */}
-      <div className="sticky top-0 z-30 bg-background border-b border-border safe-top">
+      <div className="sticky top-0 z-30 bg-secondary border-b border-border safe-top">
         <div className="px-3 pt-1 pb-2">
           <div className="flex items-center gap-2 mb-2">
-            <Link to="/" className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-              <ArrowLeft size={18} />
+            <Link to="/" className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0 shadow-sm">
+              <ArrowLeft size={18} className="text-foreground" />
             </Link>
-            <h1 className="text-sm font-bold flex items-center gap-1.5 flex-1 truncate">
-              <span className="text-base">{categoryInfo?.icon}</span>
+            <h1 className="text-lg font-semibold flex items-center gap-1.5 flex-1 truncate text-foreground">
+              <span className="text-lg">{categoryInfo?.icon}</span>
               {categoryInfo?.displayName || category}
             </h1>
           </div>
@@ -137,7 +137,7 @@ export default function CategoryPage() {
               placeholder={`Search in ${categoryInfo?.displayName || category}…`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-7 h-8 bg-muted border-0 rounded-lg text-xs"
+              className="pl-8 pr-7 h-9 bg-muted border-0 rounded-xl text-xs"
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">
@@ -148,16 +148,16 @@ export default function CategoryPage() {
         </div>
 
         {/* Filter/Sort bar */}
-        <div className="flex gap-1.5 px-3 pb-2 overflow-x-auto scrollbar-hide">
+        <div className="flex gap-2 px-3 pb-2 overflow-x-auto scrollbar-hide">
           {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.key}
               onClick={() => setSortBy(opt.key)}
               className={cn(
-                'px-2 py-1 rounded-md text-[10px] font-medium whitespace-nowrap transition-colors border',
+                'px-4 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors',
                 sortBy === opt.key
-                  ? 'bg-foreground text-background border-foreground'
-                  : 'bg-card text-muted-foreground border-border'
+                  ? 'bg-foreground text-background'
+                  : 'bg-secondary text-muted-foreground'
               )}
             >
               {opt.label}
@@ -167,14 +167,14 @@ export default function CategoryPage() {
 
         {/* Subcategory filter chips */}
         {subcategories.length > 0 && (
-          <div className="flex gap-1.5 px-3 pb-2 overflow-x-auto scrollbar-hide">
+          <div className="flex gap-2 px-3 pb-2 overflow-x-auto scrollbar-hide">
             <button
               onClick={() => setSelectedSubcategory('all')}
               className={cn(
-                'px-2.5 py-1 rounded-full text-[10px] font-medium whitespace-nowrap transition-colors border',
+                'px-3.5 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors',
                 selectedSubcategory === 'all'
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-card text-muted-foreground border-border'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-muted-foreground'
               )}
             >
               All
@@ -184,10 +184,10 @@ export default function CategoryPage() {
                 key={sub.id}
                 onClick={() => setSelectedSubcategory(sub.id)}
                 className={cn(
-                  'px-2.5 py-1 rounded-full text-[10px] font-medium whitespace-nowrap transition-colors border',
+                  'px-3.5 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-colors',
                   selectedSubcategory === sub.id
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'bg-card text-muted-foreground border-border'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary text-muted-foreground'
                 )}
               >
                 {sub.icon || ''} {sub.display_name}
@@ -199,9 +199,9 @@ export default function CategoryPage() {
 
       {/* Main: Left sidebar + Right product grid */}
       <div className="flex min-h-[calc(100vh-180px)]">
-        {/* Left sidebar — sub-category thumbnails */}
+        {/* Left sidebar — category thumbnails */}
         {siblingCategories.length > 1 && (
-          <div className="w-[72px] shrink-0 border-r border-border bg-card overflow-y-auto scrollbar-hide py-2">
+          <div className="w-[100px] shrink-0 border-r border-border dark:bg-[hsl(0,0%,5%)] bg-card overflow-y-auto scrollbar-hide py-2">
             {siblingCategories.map((cat) => {
               const isActive = cat.category === category;
               return (
@@ -209,27 +209,27 @@ export default function CategoryPage() {
                   key={cat.category}
                   to={`/category/${cat.category}`}
                   className={cn(
-                    'flex flex-col items-center gap-1 px-1 py-2 relative transition-colors',
+                    'flex flex-col items-center gap-1.5 px-1.5 py-3 relative transition-colors',
                     isActive && 'bg-primary/10'
                   )}
                 >
                   {isActive && (
-                    <div className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-primary" />
+                    <div className="absolute left-0 top-1 bottom-1 w-1 rounded-r-full bg-primary" />
                   )}
                   <div className={cn(
-                    'w-11 h-11 rounded-full flex items-center justify-center text-lg border-2 transition-colors',
+                    'w-[60px] h-[60px] rounded-xl flex items-center justify-center text-xl overflow-hidden transition-colors',
                     isActive
-                      ? 'border-primary bg-primary/10'
-                      : 'border-transparent bg-muted'
+                      ? 'ring-2 ring-primary bg-primary/10'
+                      : 'bg-muted'
                   )}>
                     {cat.imageUrl ? (
-                      <img src={cat.imageUrl} alt={cat.displayName} className="w-full h-full rounded-full object-cover" />
+                      <img src={cat.imageUrl} alt={cat.displayName} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-base">{cat.icon}</span>
+                      <span className="text-xl">{cat.icon}</span>
                     )}
                   </div>
                   <span className={cn(
-                    'text-[8px] leading-tight text-center line-clamp-2 w-full px-0.5',
+                    'text-[10px] leading-tight text-center line-clamp-2 w-full px-0.5',
                     isActive ? 'font-bold text-primary' : 'text-muted-foreground font-medium'
                   )}>
                     {cat.displayName}
@@ -241,9 +241,9 @@ export default function CategoryPage() {
         )}
 
         {/* Right product grid */}
-        <div className="flex-1 p-2 pb-6 overflow-y-auto">
+        <div className="flex-1 p-3 pb-6 overflow-y-auto">
           {isLoadingProducts ? (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <Skeleton key={i} className="h-48 w-full rounded-xl" />
               ))}
@@ -253,7 +253,7 @@ export default function CategoryPage() {
               <p className="text-[10px] text-muted-foreground mb-2 px-1">
                 {displayProducts.length} item{displayProducts.length !== 1 ? 's' : ''}
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 {displayProducts.map((product) => (
                    <ProductListingCard
                     key={product.id}
