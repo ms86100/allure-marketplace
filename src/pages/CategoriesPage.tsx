@@ -20,7 +20,7 @@ export default function CategoriesPage() {
 
   const browseBeyond = profile?.browse_beyond_community ?? true;
   const searchRadius = profile?.search_radius_km ?? 10;
-  const { data: nearbyBands = [] } = useNearbySocietySellers(searchRadius, browseBeyond);
+  const { data: nearbyBands = [], isLoading: nearbyLoading } = useNearbySocietySellers(searchRadius, browseBeyond);
 
   const searchQuery = '';
   const [activeGroup, setActiveGroup] = useState<string>('all');
@@ -53,7 +53,7 @@ export default function CategoriesPage() {
     return s;
   }, [productCategories, nearbyBands, browseBeyond]);
 
-  const isLoading = configsLoading || groupsLoading || productsLoading;
+  const isLoading = configsLoading || groupsLoading || productsLoading || (browseBeyond && nearbyLoading);
 
   const grouped = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
