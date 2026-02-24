@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ProductCard } from '@/components/product/ProductCard';
-
+import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { RatingStars } from '@/components/ui/rating-stars';
 import { ReviewList } from '@/components/review/ReviewList';
 import { FavoriteButton } from '@/components/favorite/FavoriteButton';
@@ -53,7 +53,8 @@ export default function SellerDetailPage() {
   const [reportType, setReportType] = useState<string>('');
   const [reportDescription, setReportDescription] = useState('');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
-
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   useEffect(() => {
     if (id) {
       fetchSellerDetails();
@@ -490,7 +491,34 @@ export default function SellerDetailPage() {
             {filteredProducts.length > 0 ? (
               <div className="space-y-0">
                 {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <div key={product.id} onClick={() => {
+                    const categoryInfo = allCategoryConfigs.find(c => c.category === product.category);
+                    setSelectedProduct({
+                      product_id: product.id,
+                      product_name: product.name,
+                      price: product.price,
+                      image_url: product.image_url,
+                      is_veg: product.is_veg,
+                      category: product.category,
+                      description: product.description,
+                      prep_time_minutes: product.prep_time_minutes,
+                      fulfillment_mode: (seller as any).fulfillment_mode || null,
+                      delivery_note: (seller as any).delivery_note || null,
+                      action_type: product.action_type || 'add_to_cart',
+                      contact_phone: product.contact_phone || null,
+                      specifications: product.specifications,
+                      seller_id: seller!.id,
+                      seller_name: seller!.business_name,
+                      seller_rating: seller!.rating,
+                      seller_reviews: seller!.total_reviews,
+                      society_name: (seller as any).society?.name || null,
+                      distance_km: distanceKm,
+                      is_same_society: seller!.society_id === effectiveSocietyId,
+                    });
+                    setDetailOpen(true);
+                  }} className="cursor-pointer">
+                    <ProductCard product={product} />
+                  </div>
                 ))}
               </div>
             ) : (
@@ -528,6 +556,14 @@ export default function SellerDetailPage() {
           </Link>
         </div>
       )}
+
+      <ProductDetailSheet
+        product={selectedProduct}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        categoryIcon={selectedProduct ? allCategoryConfigs.find(c => c.category === selectedProduct.category)?.icon : undefined}
+        categoryName={selectedProduct ? allCategoryConfigs.find(c => c.category === selectedProduct.category)?.displayName : undefined}
+      />
 
     </AppLayout>
   );
