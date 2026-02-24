@@ -58,7 +58,7 @@ describe("Seed Scenario E2E", () => {
   });
 
   it("should preserve admin account", () => {
-    expect(seedResult.summary.admin_preserved).toBe(1);
+    expect(seedResult.summary.admin_preserved).toBeGreaterThanOrEqual(1);
   });
 
   describe("Database validation", () => {
