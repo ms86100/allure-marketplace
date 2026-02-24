@@ -59,7 +59,7 @@ const FALLBACK_SPICE: Record<string, string> = {
   extra_hot: '🔥',
 };
 
-const FALLBACKS: MarketplaceConfig = {
+export const MARKETPLACE_FALLBACKS: MarketplaceConfig = {
   lowStockThreshold: 5,
   currencySymbol: '₹',
   defaultCurrency: 'INR',
@@ -88,7 +88,7 @@ const FALLBACKS: MarketplaceConfig = {
 };
 
 export function useMarketplaceConfig(): MarketplaceConfig {
-  const { data: config = FALLBACKS } = useQuery({
+  const { data: config = MARKETPLACE_FALLBACKS } = useQuery({
     queryKey: ['marketplace-config-v3'],
     queryFn: async (): Promise<MarketplaceConfig> => {
       const [sysResult, adminResult] = await Promise.all([
@@ -110,7 +110,7 @@ export function useMarketplaceConfig(): MarketplaceConfig {
         if (row.key && row.value) adminMap[row.key] = row.value;
       }
 
-      let fulfillmentLabels = FALLBACKS.fulfillmentLabels;
+      let fulfillmentLabels = MARKETPLACE_FALLBACKS.fulfillmentLabels;
       try {
         if (adminMap.fulfillment_labels) fulfillmentLabels = JSON.parse(adminMap.fulfillment_labels);
       } catch { /* use fallbacks */ }
@@ -120,12 +120,12 @@ export function useMarketplaceConfig(): MarketplaceConfig {
         if (sysMap.spice_emoji_map) spiceEmojiMap = JSON.parse(sysMap.spice_emoji_map);
       } catch { /* use fallbacks */ }
 
-      let itemConditionLabels = FALLBACKS.itemConditionLabels;
+      let itemConditionLabels = MARKETPLACE_FALLBACKS.itemConditionLabels;
       try {
         if (sysMap.item_condition_labels) itemConditionLabels = JSON.parse(sysMap.item_condition_labels);
       } catch { /* use fallbacks */ }
 
-      let rentalPeriodLabels = FALLBACKS.rentalPeriodLabels;
+      let rentalPeriodLabels = MARKETPLACE_FALLBACKS.rentalPeriodLabels;
       try {
         if (sysMap.rental_period_labels) rentalPeriodLabels = JSON.parse(sysMap.rental_period_labels);
       } catch { /* use fallbacks */ }

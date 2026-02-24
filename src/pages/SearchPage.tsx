@@ -15,7 +15,7 @@ import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { ArrowLeft, Search as SearchIcon, X, Globe, ShoppingBag } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { useSearchPlaceholder } from '@/hooks/useSearchPlaceholder';
+import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { useCurrency } from '@/hooks/useCurrency';
 
@@ -70,7 +70,7 @@ function useDebounce<T>(value: T, delay: number): T {
 // ── Component ──────────────────────────────────────────
 export default function SearchPage() {
   const { user, effectiveSocietyId, profile } = useAuth();
-  const searchPlaceholder = useSearchPlaceholder('search');
+  // Fix #10: Typewriter moved to isolated component (TypewriterPlaceholder)
   const { items: cartItems, addItem, updateQuantity } = useCart();
   const [searchParams] = useSearchParams();
   const { configs: categoryConfigs, isLoading: categoriesLoading } = useCategoryConfigs();
@@ -261,7 +261,8 @@ export default function SearchPage() {
     filters.priceRange[1] < settings.maxPriceFilter;
 
   // ── Determine if we're in "active search" mode ──
-  const isSearchActive = debouncedQuery.length >= 1 || hasActiveFilters() || selectedCategory !== null;
+  // Fix #14: Require 2+ chars for text search to avoid slow LIKE '%a%' queries
+  const isSearchActive = debouncedQuery.length >= 2 || hasActiveFilters() || selectedCategory !== null;
 
   // ── Fire search on query / filter / category change ──
   useEffect(() => {
@@ -301,7 +302,7 @@ export default function SearchPage() {
         : filters.categories;
 
       // Deep product-level search: search name, description, brand, tags directly
-      if (term.length >= 1) {
+      if (term.length >= 2) {
         const searchTerm = `%${term.trim()}%`;
         
         let q = supabase
@@ -500,7 +501,7 @@ export default function SearchPage() {
       if (filters.minRating > 0) filtered = filtered.filter((p) => p.seller_rating >= filters.minRating);
       if (filters.isVeg === true) filtered = filtered.filter((p) => p.is_veg === true);
       if (filters.isVeg === false) filtered = filtered.filter((p) => p.is_veg === false);
-      if (effectiveCategories.length > 0 && term.length >= 1) {
+      if (effectiveCategories.length > 0 && term.length >= 2) {
         filtered = filtered.filter((p) => p.category && effectiveCategories.includes(p.category as any));
       }
       if (filters.priceRange[0] > 0 || filters.priceRange[1] < settings.maxPriceFilter) {
@@ -592,8 +593,13 @@ export default function SearchPage() {
               </Link>
               <div className="flex-1 relative">
                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
+                {!query && (
+                  <div className="absolute left-9 top-1/2 -translate-y-1/2 pointer-events-none pr-16 overflow-hidden max-w-[calc(100%-4rem)]">
+                    <TypewriterPlaceholder context="search" />
+                  </div>
+                )}
                 <Input
-                  placeholder={searchPlaceholder}
+                  placeholder=""
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   className="pl-9 pr-16 h-10 rounded-xl text-sm bg-muted border-0 focus-visible:ring-1"

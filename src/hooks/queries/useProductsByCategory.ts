@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { jitteredStaleTime } from '@/lib/query-utils';
-import { useNearbyProducts, mergeProducts } from './useNearbyProducts';
+// Fix #5: Nearby products decoupled — caller merges externally if needed
 
 interface CategoryGroup {
   category: string;
@@ -16,7 +16,6 @@ interface CategoryGroup {
 export function useProductsByCategory(limit = 50) {
   const { effectiveSocietyId } = useAuth();
   const queryClient = useQueryClient();
-  const { data: nearbyProducts } = useNearbyProducts();
 
   const localQuery = useQuery({
     queryKey: ['products-by-category', effectiveSocietyId, limit],
@@ -32,10 +31,16 @@ export function useProductsByCategory(limit = 50) {
             .order('display_order')
             .then(({ data }) => data || []);
 
+      // Fix #16: Select only columns needed for card rendering
       let query = supabase
         .from('products')
         .select(`
-          *,
+          id, name, price, image_url, category, is_veg, is_available,
+          is_bestseller, is_recommended, is_urgent, action_type, contact_phone,
+          mrp, discount_percentage, brand, unit_type, price_per_unit,
+          stock_quantity, serving_size, delivery_time_text, tags,
+          prep_time_minutes, lead_time_hours, accepts_preorders,
+          seller_id, created_at, updated_at,
           seller:seller_profiles!products_seller_id_fkey(
             id, business_name, rating, society_id, verification_status, fulfillment_mode, delivery_note
           )
@@ -82,12 +87,12 @@ export function useProductsByCategory(limit = 50) {
     staleTime: jitteredStaleTime(5 * 60 * 1000),
   });
 
-  // Post-process: merge nearby products and group by category
+  // Post-process: group by category (nearby products merged externally by caller)
   const rawData = localQuery.data as any;
   let result: CategoryGroup[] = [];
 
   if (rawData?.approved) {
-    const allProducts = mergeProducts(rawData.approved, nearbyProducts);
+    const allProducts = rawData.approved;
     const configMap: Map<string, any> = rawData.configMap;
 
     const grouped: Record<string, ProductWithSeller[]> = {};

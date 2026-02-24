@@ -6,10 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { useCart } from '@/hooks/useCart';
 import { ProductActionType } from '@/types/database';
-import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
-import { useMarketplaceConfig } from '@/hooks/useMarketplaceConfig';
-import { useBadgeConfig } from '@/hooks/useBadgeConfig';
 import { useCardAnalytics } from '@/hooks/useCardAnalytics';
+import type { MarketplaceConfig } from '@/hooks/useMarketplaceConfig';
+import type { BadgeConfigRow } from '@/hooks/useBadgeConfig';
+import type { CategoryConfig } from '@/types/categories';
 import { cn } from '@/lib/utils';
 
 /* ━━━ Types ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
@@ -62,29 +62,49 @@ export interface ProductWithSeller {
 
 type CardLayout = 'auto' | 'ecommerce' | 'food' | 'service';
 
+// Fix #1: Config props passed from parent instead of each card fetching its own
 interface ProductListingCardProps {
   product: ProductWithSeller;
   layout?: CardLayout;
   onTap?: (product: ProductWithSeller) => void;
   className?: string;
   viewOnly?: boolean;
+  // Lifted config props — parent provides these
+  categoryConfigs?: CategoryConfig[];
+  marketplaceConfig?: MarketplaceConfig;
+  badgeConfigs?: BadgeConfigRow[];
 }
 
 /* ━━━ Main Component — Blinkit-style compact card ━━━ */
 
-export function ProductListingCard({
+// Fix #1 + #2: Lift hooks to parent, wrap in React.memo
+import { memo } from 'react';
+import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
+import { useMarketplaceConfig, MARKETPLACE_FALLBACKS } from '@/hooks/useMarketplaceConfig';
+import { useBadgeConfig } from '@/hooks/useBadgeConfig';
+
+function ProductListingCardInner({
   product,
   layout = 'auto',
   onTap,
   className,
   viewOnly = false,
+  categoryConfigs: propConfigs,
+  marketplaceConfig: propMc,
+  badgeConfigs: propBadges,
 }: ProductListingCardProps) {
   const navigate = useNavigate();
   const { items, addItem, updateQuantity } = useCart();
   const { impact, selectionChanged } = useHaptics();
-  const { configs: categoryConfigs } = useCategoryConfigs();
-  const mc = useMarketplaceConfig();
-  const { badges: badgeConfigs } = useBadgeConfig();
+
+  // Fallback: use hooks only when parent doesn't provide props (backward compat)
+  const { configs: hookConfigs } = useCategoryConfigs();
+  const hookMc = useMarketplaceConfig();
+  const { badges: hookBadges } = useBadgeConfig();
+
+  const categoryConfigs = propConfigs || hookConfigs;
+  const mc = propMc || hookMc;
+  const badgeConfigs = propBadges || hookBadges;
 
   const cartItem = items.find((item) => item.product_id === product.id);
   const quantity = cartItem?.quantity || 0;
@@ -369,3 +389,16 @@ export function ProductListingCard({
     </div>
   );
 }
+
+// Fix #2: React.memo with custom comparator
+export const ProductListingCard = memo(ProductListingCardInner, (prev, next) => {
+  return (
+    prev.product.id === next.product.id &&
+    prev.product.is_available === next.product.is_available &&
+    prev.product.price === next.product.price &&
+    prev.product.stock_quantity === next.product.stock_quantity &&
+    prev.layout === next.layout &&
+    prev.viewOnly === next.viewOnly &&
+    prev.className === next.className
+  );
+});

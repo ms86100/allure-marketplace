@@ -50,16 +50,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCurrentSellerId: (id: string | null) => setPartial({ currentSellerId: id }),
   }), [sellerProfiles, currentSellerId, isSeller, setPartial]);
 
-  // Legacy combined value (not memoized — consumers should migrate to focused hooks)
-  const legacyValue: AuthContextType = {
+  // Fix #9: Memoize legacy value to prevent entire app tree re-renders
+  const setCurrentSellerId = useMemo(() => (id: string | null) => setPartial({ currentSellerId: id }), [setPartial]);
+
+  const legacyValue = useMemo<AuthContextType>(() => ({
     user, session, profile, society, roles, sellerProfiles,
     currentSellerId, isLoading, isApproved, isSeller, isAdmin,
     isSocietyAdmin, isBuilderMember, societyAdminRole, managedBuilderIds,
     signOut, refreshProfile,
-    setCurrentSellerId: (id) => setPartial({ currentSellerId: id }),
+    setCurrentSellerId,
     viewAsSocietyId, setViewAsSociety,
     effectiveSocietyId, effectiveSociety,
-  };
+  }), [
+    user, session, profile, society, roles, sellerProfiles,
+    currentSellerId, isLoading, isApproved, isSeller, isAdmin,
+    isSocietyAdmin, isBuilderMember, societyAdminRole, managedBuilderIds,
+    signOut, refreshProfile, setCurrentSellerId,
+    viewAsSocietyId, setViewAsSociety, effectiveSocietyId, effectiveSociety,
+  ]);
 
   return (
     <IdentityContext.Provider value={identityValue}>

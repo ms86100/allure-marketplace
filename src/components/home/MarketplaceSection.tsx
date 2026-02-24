@@ -15,6 +15,8 @@ import { Search, Store, ChevronRight, ShoppingBag, Sparkles, Clock } from 'lucid
 import { motion } from 'framer-motion';
 import { escapeIlike } from '@/lib/query-utils';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
+import { useMarketplaceConfig } from '@/hooks/useMarketplaceConfig';
+import { useBadgeConfig } from '@/hooks/useBadgeConfig';
 
 export function MarketplaceSection() {
   const navigate = useNavigate();
@@ -24,6 +26,9 @@ export function MarketplaceSection() {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const { configs: categoryConfigs } = useCategoryConfigs();
+  // Fix #1: Lift config hooks to parent, pass as props to cards
+  const mc = useMarketplaceConfig();
+  const { badges: badgeConfigs } = useBadgeConfig();
 
   const { data: localCategories = [], isLoading: loadingLocal } = useProductsByCategory(80);
   const { parentGroupInfos } = useParentGroups();
@@ -93,6 +98,9 @@ export function MarketplaceSection() {
         categories={filteredCategories}
         isLoading={loadingLocal}
         onProductTap={handleProductTap}
+        categoryConfigs={categoryConfigs}
+        marketplaceConfig={mc}
+        badgeConfigs={badgeConfigs}
       />
 
       {/* ━━━ Shop by Store Discovery ━━━ */}
@@ -111,11 +119,14 @@ export function MarketplaceSection() {
 }
 // ── Product Listings by Category ──
 function ProductListings({
-  categories, isLoading, onProductTap,
+  categories, isLoading, onProductTap, categoryConfigs, marketplaceConfig, badgeConfigs,
 }: {
   categories: { category: string; parentGroup: string; displayName: string; icon: string; products: ProductWithSeller[] }[];
   isLoading: boolean;
   onProductTap?: (product: ProductWithSeller) => void;
+  categoryConfigs?: any[];
+  marketplaceConfig?: any;
+  badgeConfigs?: any[];
 }) {
   if (isLoading) {
     return (
@@ -144,15 +155,11 @@ function ProductListings({
           <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
             <ShoppingBag size={40} className="text-primary" />
           </div>
-          <motion.div
-            animate={{ y: [0, -6, 0] }}
-            transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-            className="absolute -top-2 -right-2"
-          >
+          <div className="absolute -top-2 -right-2">
             <div className="w-8 h-8 rounded-full bg-warning/20 flex items-center justify-center">
               <Sparkles size={16} className="text-warning" />
             </div>
-          </motion.div>
+          </div>
         </motion.div>
 
         <motion.div
@@ -200,7 +207,13 @@ function ProductListings({
             <div className="flex gap-2.5 overflow-x-auto scrollbar-hide px-4 pb-1">
               {cat.products.slice(0, 8).map(product => (
                 <div key={product.id} className="w-[140px] shrink-0">
-                  <ProductListingCard product={product} onTap={onProductTap} />
+                <ProductListingCard
+                  product={product}
+                  onTap={onProductTap}
+                  categoryConfigs={categoryConfigs}
+                  marketplaceConfig={marketplaceConfig}
+                  badgeConfigs={badgeConfigs}
+                />
                 </div>
               ))}
             </div>

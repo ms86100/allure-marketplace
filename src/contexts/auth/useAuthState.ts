@@ -123,6 +123,9 @@ export function useAuthState() {
     clearAuthState();
   }, [clearAuthState]);
 
+  // Fix #8: Guard against double fetchProfile on mount
+  const profileFetchedFor = useRef<string | null>(null);
+
   // Auth state listener
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -130,8 +133,12 @@ export function useAuthState() {
         setPartial({ session, user: session?.user ?? null, isLoading: false });
 
         if (session?.user) {
-          setTimeout(() => fetchProfile(session.user.id), 0);
+          if (profileFetchedFor.current !== session.user.id) {
+            profileFetchedFor.current = session.user.id;
+            setTimeout(() => fetchProfile(session.user.id), 0);
+          }
         } else if (event === 'SIGNED_OUT') {
+          profileFetchedFor.current = null;
           if (!isExplicitSignOut.current) {
             toast.error('Your session has expired. Please log in again.');
             window.location.hash = '#/auth';
@@ -146,7 +153,8 @@ export function useAuthState() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setPartial({ session, user: session?.user ?? null, isLoading: false });
-      if (session?.user) {
+      if (session?.user && profileFetchedFor.current !== session.user.id) {
+        profileFetchedFor.current = session.user.id;
         fetchProfile(session.user.id);
       }
     });
