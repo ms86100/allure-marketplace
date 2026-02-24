@@ -35,7 +35,8 @@ export default function CategoriesPage() {
     return map;
   }, [productCategories]);
 
-  const activeCategorySet = useMemo(() => {
+  // Compute active categories inline — useMemo was producing stale results
+  const activeCategorySet = (() => {
     const s = new Set(productCategories.map(c => c.category));
     if (browseBeyond && nearbyBands.length > 0) {
       for (const band of nearbyBands) {
@@ -51,11 +52,12 @@ export default function CategoriesPage() {
       }
     }
     return s;
-  }, [productCategories, nearbyBands, browseBeyond]);
+  })();
 
   const isLoading = authLoading || !effectiveSocietyId || configsLoading || groupsLoading || productsLoading || (browseBeyond && nearbyLoading);
 
-  const grouped = useMemo(() => {
+  // Compute grouped inline — useMemo was producing stale results
+  const grouped = (() => {
     const q = searchQuery.toLowerCase().trim();
     return groups
       .filter(g => g.is_active)
@@ -72,13 +74,14 @@ export default function CategoriesPage() {
           .sort((a, b) => (a.displayOrder ?? 99) - (b.displayOrder ?? 99)),
       }))
       .filter(g => g.categories.length > 0);
-  }, [groups, configs, activeCategorySet, searchQuery]);
+  })();
 
   const filteredGroups = activeGroup === 'all'
     ? grouped
     : grouped.filter(g => g.slug === activeGroup);
 
   const isEmpty = !isLoading && grouped.length === 0;
+  console.log('[CategoriesPage] grouped', { groupedLen: grouped.length, isEmpty, isLoading, configSample: configs.slice(0,3).map(c => ({ cat: c.category, pg: c.parentGroup, active: c.isActive })), groupSlugs: groups.filter(g => g.is_active).map(g => g.slug) });
 
   const handlePillClick = (slug: string) => {
     setActiveGroup(slug);
