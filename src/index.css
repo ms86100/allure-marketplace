@@ -351,9 +351,9 @@
     padding-top: env(safe-area-inset-top);
   }
 
-  /* Warm beige product image background — dark mode only */
+  /* Product image background — matches card in light, warm beige in dark */
   .product-image-bg {
-    @apply bg-muted;
+    @apply bg-card;
   }
 
   .dark .product-image-bg {
