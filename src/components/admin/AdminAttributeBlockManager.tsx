@@ -360,14 +360,14 @@ export function AdminAttributeBlockManager() {
                 <Label className="text-xs">Attach to Categories * ({selectedCategories.length} selected)</Label>
                 <Card>
                   <CardContent className="p-2 max-h-40 overflow-y-auto">
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-1 gap-1.5">
                       {categories.map((c: any) => (
-                        <label key={c.category} className="flex items-center gap-2 text-xs cursor-pointer py-0.5">
+                        <label key={c.category} className="flex items-center gap-2 text-xs cursor-pointer py-1">
                           <Checkbox
                             checked={selectedCategories.includes(c.category)}
                             onCheckedChange={() => toggleCategory(c.category)}
                           />
-                          <span className="truncate">{c.icon} {c.display_name}</span>
+                          <span>{c.icon} {c.display_name}</span>
                         </label>
                       ))}
                     </div>
