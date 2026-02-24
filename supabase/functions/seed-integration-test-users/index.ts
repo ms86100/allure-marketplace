@@ -19,6 +19,7 @@ const TEST_USERS = [
     flat_number: "ADMIN-01",
     block: "Admin Block",
     role: "admin",
+    phone: "9876543201",
   },
   {
     email: "integration-seller@test.sociva.com",
@@ -27,6 +28,7 @@ const TEST_USERS = [
     flat_number: "S-101",
     block: "Tower A",
     role: "seller",
+    phone: "9876543202",
   },
   {
     email: "integration-buyer@test.sociva.com",
@@ -35,6 +37,7 @@ const TEST_USERS = [
     flat_number: "B-204",
     block: "Tower C",
     role: "buyer",
+    phone: "9876543203",
   },
   {
     email: "integration-guard@test.sociva.com",
@@ -43,6 +46,7 @@ const TEST_USERS = [
     flat_number: "G-001",
     block: "Gate Block",
     role: "guard",
+    phone: "9876543204",
   },
 ];
 
@@ -118,29 +122,29 @@ Deno.serve(async (req) => {
 
     const results: Record<string, { id: string; email: string; society_id: string; created: boolean }> = {};
 
+    // Fetch all existing users once (avoid repeated calls)
+    const { data: existingUsers } = await supabase.auth.admin.listUsers();
+
     for (const user of TEST_USERS) {
-      // Check if user already exists
-      const { data: existingUsers } = await supabase.auth.admin.listUsers();
       const existing = existingUsers?.users?.find((u: any) => u.email === user.email);
+      const userSociety = user.role === "buyer" ? society2Id : societyId;
+      let userId: string;
 
       if (existing) {
-        results[user.role] = { id: existing.id, email: user.email, society_id: user.role === "buyer" ? society2Id : societyId, created: false };
-        continue;
+        userId = existing.id;
+      } else {
+        // Create user with auto-confirm
+        const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+          email: user.email,
+          password: user.password,
+          email_confirm: true,
+        });
+        if (authErr) throw authErr;
+        userId = authData.user!.id;
       }
 
-      // Create user with auto-confirm
-      const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
-        email: user.email,
-        password: user.password,
-        email_confirm: true,
-      });
-
-      if (authErr) throw authErr;
-      const userId = authData.user!.id;
-      const userSociety = user.role === "buyer" ? society2Id : societyId;
-
-      // Create profile
-      const { error: profileErr } = await supabase.from("profiles").insert({
+      // Upsert profile (ensures profile exists even for pre-existing users)
+      const { error: profileErr } = await supabase.from("profiles").upsert({
         id: userId,
         name: user.name,
         email: user.email,
@@ -148,28 +152,40 @@ Deno.serve(async (req) => {
         block: user.block,
         society_id: userSociety,
         verification_status: "approved",
-        phone: "9876543210",
-      });
+        phone: user.phone,
+      }, { onConflict: "id" });
 
       if (profileErr) {
-        console.error(`Profile error for ${user.email}:`, profileErr);
+        console.error(`Profile upsert error for ${user.email}:`, profileErr);
       }
 
-      // Grant admin role if needed
+      // Grant admin role if needed (upsert to avoid duplicates)
       if (user.role === "admin") {
-        await supabase.from("user_roles").insert({ user_id: userId, role: "admin" });
+        await supabase.from("user_roles").upsert(
+          { user_id: userId, role: "admin" },
+          { onConflict: "user_id,role" }
+        );
       }
 
-      // Make guard a security officer
+      // Make guard a security officer (upsert)
       if (user.role === "guard") {
-        await supabase.from("security_staff").insert({
-          user_id: userId,
-          society_id: societyId,
-          is_active: true,
-        });
+        const { data: existingStaff } = await supabase
+          .from("security_staff")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("society_id", societyId)
+          .maybeSingle();
+
+        if (!existingStaff) {
+          await supabase.from("security_staff").insert({
+            user_id: userId,
+            society_id: societyId,
+            is_active: true,
+          });
+        }
       }
 
-      results[user.role] = { id: userId, email: user.email, society_id: userSociety, created: true };
+      results[user.role] = { id: userId, email: user.email, society_id: userSociety, created: !existing };
     }
 
     return new Response(

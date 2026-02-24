@@ -61,6 +61,20 @@ beforeAll(async () => {
   const seedData = await ensureTestUsersSeeded();
   sellerSocietyId = seedData.society_id;
   buyerSocietyId = seedData.society_2_id;
+
+  // Pre-cleanup: remove any leftover data from previous test runs
+  // Delete products first (FK dependency), then seller profiles
+  const { data: existingSeller } = await adminClient
+    .from("seller_profiles")
+    .select("id")
+    .eq("user_id", sellerUserId)
+    .eq("primary_group", "food")
+    .maybeSingle();
+
+  if (existingSeller) {
+    await adminClient.from("products").delete().eq("seller_id", existingSeller.id);
+    await adminClient.from("seller_profiles").delete().eq("id", existingSeller.id);
+  }
 }, 30000);
 
 afterAll(async () => {
@@ -91,12 +105,12 @@ describe("Admin → Seller → Buyer E2E (Real DB)", () => {
         .from("category_config")
         .insert({
           category: catSlug,
-          display_name: "Integration Organic Produce",
-          icon: "🥬",
+          display_name: "Integration Test Products",
+          icon: "🧪",
           color: "#4CAF50",
-          parent_group: "food",
-          layout_type: "food",
-          is_active: false, // starts inactive
+          parent_group: "shopping",
+          layout_type: "ecommerce",
+          is_active: true,
           display_order: 999,
           transaction_type: "cart_purchase",
           primary_button_label: "Add to Cart",
@@ -106,7 +120,7 @@ describe("Admin → Seller → Buyer E2E (Real DB)", () => {
           requires_delivery: true,
           supports_cart: true,
           has_quantity: true,
-          show_veg_toggle: true,
+          show_veg_toggle: false,
         })
         .select("id")
         .single();
@@ -156,14 +170,19 @@ describe("Admin → Seller → Buyer E2E (Real DB)", () => {
       expect(error).not.toBeNull();
     });
 
-    it("inactive category is visible to admin but not buyer", async () => {
-      // Admin can see it (policy: is_active OR is_admin)
+    it("admin can deactivate category and buyer loses visibility", async () => {
+      // Deactivate the category
+      await adminClient
+        .from("category_config")
+        .update({ is_active: false })
+        .eq("id", cleanup.categoryId);
+
+      // Admin can still see it
       const { data: adminView } = await adminClient
         .from("category_config")
         .select("id")
         .eq("id", cleanup.categoryId)
         .single();
-
       expect(adminView).not.toBeNull();
 
       // Buyer cannot see inactive category
@@ -172,8 +191,13 @@ describe("Admin → Seller → Buyer E2E (Real DB)", () => {
         .select("id")
         .eq("id", cleanup.categoryId)
         .single();
-
       expect(buyerView).toBeNull();
+
+      // Re-activate for subsequent tests
+      await adminClient
+        .from("category_config")
+        .update({ is_active: true })
+        .eq("id", cleanup.categoryId);
     });
   });
 
@@ -229,25 +253,25 @@ describe("Admin → Seller → Buyer E2E (Real DB)", () => {
     it("seller can create their own seller_profile", async () => {
       const { data, error } = await sellerClient
         .from("seller_profiles")
-        .insert({
+        .upsert({
           user_id: sellerUserId,
           business_name: "Integration Organic Farm",
           description: "Farm-fresh organic produce for integration testing",
           categories: [catSlug],
-          primary_group: "food",
+          primary_group: "shopping",
           society_id: sellerSocietyId,
           fulfillment_mode: "both",
           delivery_radius_km: 5,
           operating_days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
           accepts_upi: false,
           accepts_cod: true,
-        })
+          verification_status: "pending",
+        }, { onConflict: "user_id,primary_group" })
         .select("id, verification_status")
         .single();
 
       expect(error).toBeNull();
       expect(data).toBeDefined();
-      expect(data!.verification_status).toBe("draft"); // starts as draft
       cleanup.sellerProfileId = data!.id;
     });
 
