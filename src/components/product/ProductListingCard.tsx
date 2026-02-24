@@ -222,9 +222,7 @@ function ProductListingCardInner({
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <div className="w-12 h-12 rounded-xl bg-card/80 shadow-sm flex items-center justify-center dark:bg-[hsl(0_0%_25%)]">
-                <ShoppingCart size={24} className="text-muted-foreground/60" strokeWidth={1.5} />
-              </div>
+              <ShoppingCart size={36} className="text-muted-foreground/40" strokeWidth={1.5} />
             </div>
           )}
 

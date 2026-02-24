@@ -351,13 +351,13 @@
     padding-top: env(safe-area-inset-top);
   }
 
-  /* Product image background — subtle gray in light, warm beige in dark */
+  /* Product image background — light gray in light mode, muted dark in dark mode */
   .product-image-bg {
-    background-color: hsl(0 0% 96%);
+    background-color: hsl(0 0% 91%);
   }
 
   .dark .product-image-bg {
-    background-color: #FFF8E7;
+    background-color: hsl(0 0% 15%);
   }
 }
 
