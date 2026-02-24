@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { useSearchPlaceholder } from '@/hooks/useSearchPlaceholder';
 
 interface DashboardItem {
   icon: typeof IndianRupee;
@@ -219,16 +220,7 @@ export default function SocietyDashboardPage() {
       .filter(section => section.items.length > 0);
   }, [sections, searchQuery]);
 
-  const SEARCH_PLACEHOLDERS = [
-    'Search visitors, parking, finances…',
-    'Try "snag", "maintenance", "worker"…',
-    'Find disputes, notices, documents…',
-  ];
-  const [placeholderIdx, setPlaceholderIdx] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => setPlaceholderIdx(i => (i + 1) % SEARCH_PLACEHOLDERS.length), 3000);
-    return () => clearInterval(interval);
-  }, []);
+  const societyPlaceholder = useSearchPlaceholder('society');
 
   return (
     <AppLayout showHeader={false}>
@@ -253,7 +245,7 @@ export default function SocietyDashboardPage() {
           <div className="relative">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder={SEARCH_PLACEHOLDERS[placeholderIdx]}
+              placeholder={societyPlaceholder}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="pl-8 pr-7 h-9 bg-muted border-0 rounded-xl text-xs"

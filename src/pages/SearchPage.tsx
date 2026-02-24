@@ -69,7 +69,7 @@ function useDebounce<T>(value: T, delay: number): T {
 // ── Component ──────────────────────────────────────────
 export default function SearchPage() {
   const { user, effectiveSocietyId, profile } = useAuth();
-  const searchPlaceholder = useSearchPlaceholder();
+  const searchPlaceholder = useSearchPlaceholder('search');
   const { items: cartItems, addItem, updateQuantity } = useCart();
   const [searchParams] = useSearchParams();
   const { configs: categoryConfigs, isLoading: categoriesLoading } = useCategoryConfigs();

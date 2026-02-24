@@ -176,7 +176,7 @@ export function Header({
                 <circle cx="11" cy="11" r="8"/>
                 <path d="m21 21-4.3-4.3"/>
               </svg>
-              <span className="text-sm text-muted-foreground flex-1 transition-opacity duration-300">{searchPlaceholder}</span>
+              <span className="text-sm text-muted-foreground flex-1 transition-opacity duration-300 truncate">{searchPlaceholder}</span>
             </div>
           </Link>
         </div>
