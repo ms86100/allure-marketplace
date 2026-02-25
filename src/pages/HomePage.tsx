@@ -51,7 +51,7 @@ export default function HomePage() {
 
   return (
     <AppLayout>
-      <div className="pb-6">
+      <div className="pb-6 max-w-5xl">
         {/* ═══ SELLER CONGRATS BANNER ═══ */}
         {showSellerCongrats && (
           <motion.div

@@ -107,7 +107,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
   if (categories.length === 0) return null;
 
   return (
-    <div className="mb-6 max-w-5xl">
+    <div className="mb-6">
       {/* Section header */}
       <div className="flex items-center justify-between mb-3 px-4">
         <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{title}</h3>
