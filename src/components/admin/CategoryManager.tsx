@@ -65,7 +65,7 @@ function GenerateImageButton({ categoryName, categoryKey, parentGroup, imageUrl,
   );
 }
 
-function SortableGroupItem({ group, groupCats, onToggle, onEdit, onDelete, onAddSubcategory, children }: { group: ParentGroupRow; groupCats: CategoryConfigRow[]; onToggle: (group: ParentGroupRow, enabled: boolean) => void; onEdit: (group: ParentGroupRow) => void; onDelete: (group: ParentGroupRow) => void; onAddSubcategory: (slug: string) => void; children: React.ReactNode; }) {
+function SortableGroupItem({ group, groupCats, onToggle, onEdit, onDelete, onAddCategory, children }: { group: ParentGroupRow; groupCats: CategoryConfigRow[]; onToggle: (group: ParentGroupRow, enabled: boolean) => void; onEdit: (group: ParentGroupRow) => void; onDelete: (group: ParentGroupRow) => void; onAddCategory: (slug: string) => void; children: React.ReactNode; }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 50 : 'auto' as any };
   const activeCount = groupCats.filter((c) => c.is_active).length;
@@ -93,8 +93,8 @@ function SortableGroupItem({ group, groupCats, onToggle, onEdit, onDelete, onAdd
           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(group)}>
             <Trash2 size={13} />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => onAddSubcategory(group.slug)} className="rounded-xl text-xs h-8 font-semibold">
-            <Plus size={12} className="mr-1" />Add
+          <Button variant="outline" size="sm" onClick={() => onAddCategory(group.slug)} className="rounded-xl text-xs h-8 font-semibold">
+            <Plus size={12} className="mr-1" />Add Category
           </Button>
           <Switch checked={group.is_active} onCheckedChange={(checked) => onToggle(group, checked)} />
         </div>
@@ -104,7 +104,7 @@ function SortableGroupItem({ group, groupCats, onToggle, onEdit, onDelete, onAdd
   );
 }
 
-function SortableCategoryItem({ cat, groupIsActive, onToggle, onEdit, onDelete }: { cat: CategoryConfigRow; groupIsActive: boolean; onToggle: (id: string, isActive: boolean) => void; onEdit: (cat: CategoryConfigRow) => void; onDelete: (cat: CategoryConfigRow) => void; }) {
+function SortableCategoryItem({ cat, groupIsActive, onToggle, onEdit, onDelete, onAddSubcategory }: { cat: CategoryConfigRow; groupIsActive: boolean; onToggle: (id: string, isActive: boolean) => void; onEdit: (cat: CategoryConfigRow) => void; onDelete: (cat: CategoryConfigRow) => void; onAddSubcategory: (cat: CategoryConfigRow) => void; }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 50 : 'auto' as any };
   return (
@@ -126,6 +126,16 @@ function SortableCategoryItem({ cat, groupIsActive, onToggle, onEdit, onDelete }
         {!cat.image_url && <span className="text-[10px] text-amber-500 font-semibold">No image</span>}
       </div>
       <div className="flex items-center gap-1.5">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 rounded-lg"
+          onClick={() => onAddSubcategory(cat)}
+          title="Add subcategory"
+          aria-label={`Add subcategory to ${cat.display_name}`}
+        >
+          <Plus size={13} />
+        </Button>
         <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => onEdit(cat)}>
           <Edit2 size={13} />
         </Button>
@@ -140,6 +150,13 @@ function SortableCategoryItem({ cat, groupIsActive, onToggle, onEdit, onDelete }
 
 export function CategoryManager() {
   const cm = useCategoryManagerData();
+
+  const openSubcategoryCreate = (category: CategoryConfigRow) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('admin:open-subcategory-create', {
+      detail: { categoryConfigId: category.id },
+    }));
+  };
 
   if (cm.isLoading || cm.groupsLoading) return (
     <div className="flex items-center justify-center py-12">
@@ -185,15 +202,15 @@ export function CategoryManager() {
                     const groupCats = (cm.groupedCategories[group.slug] || []).sort((a, b) => a.display_order - b.display_order);
                     return (
                       <motion.div key={group.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }}>
-                        <SortableGroupItem group={group} groupCats={groupCats} onToggle={cm.toggleGroup} onEdit={cm.openGroupDialog} onDelete={cm.setDeleteGroup} onAddSubcategory={cm.openAddDialog}>
+                        <SortableGroupItem group={group} groupCats={groupCats} onToggle={cm.toggleGroup} onEdit={cm.openGroupDialog} onDelete={cm.setDeleteGroup} onAddCategory={cm.openAddDialog}>
                           <div className="space-y-1.5 ml-3">
                             {groupCats.length === 0 && (
-                              <p className="text-sm text-muted-foreground py-3 px-3">No categories yet. Click "Add" to create one.</p>
+                              <p className="text-sm text-muted-foreground py-3 px-3">No categories yet. Click "Add Category" to create one.</p>
                             )}
                             <DndContext sensors={cm.sensors} collisionDetection={closestCenter} onDragEnd={(e) => cm.handleSubcategoryDragEnd(group.slug, e)}>
                               <SortableContext items={groupCats.map(c => c.id)} strategy={verticalListSortingStrategy}>
                                 {groupCats.map((cat) => (
-                                  <SortableCategoryItem key={cat.id} cat={cat} groupIsActive={group.is_active} onToggle={cm.toggleCategory} onEdit={cm.openEditDialog} onDelete={cm.setDeleteCategory} />
+                                  <SortableCategoryItem key={cat.id} cat={cat} groupIsActive={group.is_active} onToggle={cm.toggleCategory} onEdit={cm.openEditDialog} onDelete={cm.setDeleteCategory} onAddSubcategory={openSubcategoryCreate} />
                                 ))}
                               </SortableContext>
                             </DndContext>

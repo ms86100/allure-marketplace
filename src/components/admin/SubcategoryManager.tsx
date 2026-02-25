@@ -33,6 +33,10 @@ interface Subcategory {
   created_at: string;
 }
 
+interface OpenSubcategoryCreateEventDetail {
+  categoryConfigId?: string;
+}
+
 export function SubcategoryManager() {
   const { configs } = useCategoryConfigs();
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
@@ -67,6 +71,26 @@ export function SubcategoryManager() {
 
   useEffect(() => { fetchSubcategories(); }, [fetchSubcategories]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleOpenCreate = (event: Event) => {
+      const detail = (event as CustomEvent<OpenSubcategoryCreateEventDetail>).detail;
+      const preferredConfigId = detail?.categoryConfigId || selectedConfigId || '';
+
+      setFormData({ display_name: '', slug: '', icon: '', display_order: '0', is_active: true });
+      setEditingSub(null);
+      setCreateConfigId(preferredConfigId);
+      if (preferredConfigId) {
+        setSelectedConfigId(preferredConfigId);
+      }
+      setIsDialogOpen(true);
+    };
+
+    window.addEventListener('admin:open-subcategory-create', handleOpenCreate);
+    return () => window.removeEventListener('admin:open-subcategory-create', handleOpenCreate);
+  }, [selectedConfigId]);
+
   const getCategoryName = (configId: string) => {
     const c = configs.find(cfg => cfg.id === configId);
     return c ? `${c.icon} ${c.displayName}` : configId;
@@ -78,10 +102,13 @@ export function SubcategoryManager() {
     setCreateConfigId('');
   };
 
-  const openCreate = () => {
+  const openCreate = (preferredConfigId?: string) => {
     resetForm();
-    // Pre-select the currently filtered category if one is selected
-    setCreateConfigId(selectedConfigId || '');
+    const nextConfigId = preferredConfigId ?? selectedConfigId ?? '';
+    setCreateConfigId(nextConfigId);
+    if (nextConfigId) {
+      setSelectedConfigId(nextConfigId);
+    }
     setIsDialogOpen(true);
   };
 
@@ -182,8 +209,8 @@ export function SubcategoryManager() {
               ))}
             </SelectContent>
           </Select>
-          <Button size="sm" onClick={openCreate} className="rounded-xl font-semibold gap-1.5">
-            <Plus size={13} /> Add
+          <Button size="sm" onClick={() => openCreate()} className="rounded-xl font-semibold gap-1.5">
+            <Plus size={13} /> Add Subcategory
           </Button>
         </div>
 
