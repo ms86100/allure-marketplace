@@ -40,7 +40,7 @@ export function FeaturedBanners() {
     return () => clearInterval(interval);
   }, [banners.length]);
 
-  // Sync scroll position with activeIndex
+  // Sync scroll position with activeIndex (programmatic scroll)
   useEffect(() => {
     const container = document.getElementById('banner-carousel');
     if (container && container.children[activeIndex]) {
@@ -48,6 +48,39 @@ export function FeaturedBanners() {
       child.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
   }, [activeIndex]);
+
+  // Detect manual swipe: sync activeIndex from scroll position
+  useEffect(() => {
+    const container = document.getElementById('banner-carousel');
+    if (!container || banners.length <= 1) return;
+
+    let scrollTimeout: ReturnType<typeof setTimeout>;
+    const handleScroll = () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        const containerRect = container.getBoundingClientRect();
+        const centerX = containerRect.left + containerRect.width / 2;
+        let closestIdx = 0;
+        let closestDist = Infinity;
+        Array.from(container.children).forEach((child, idx) => {
+          const childRect = (child as HTMLElement).getBoundingClientRect();
+          const childCenter = childRect.left + childRect.width / 2;
+          const dist = Math.abs(childCenter - centerX);
+          if (dist < closestDist) {
+            closestDist = dist;
+            closestIdx = idx;
+          }
+        });
+        setActiveIndex(closestIdx);
+      }, 80);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      clearTimeout(scrollTimeout);
+    };
+  }, [banners.length]);
 
   const scrollToIndex = useCallback((idx: number) => {
     setActiveIndex(idx);

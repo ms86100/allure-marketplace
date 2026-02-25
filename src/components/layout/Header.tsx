@@ -129,13 +129,13 @@ function HeaderInner({
             )}
 
             <div className="flex items-center gap-1.5 mt-1">
-              <ThemeToggle className="h-8 w-8 rounded-full bg-secondary text-foreground border border-border hover:bg-muted" />
+              <ThemeToggle className="h-9 w-9 rounded-full bg-secondary text-foreground border border-border hover:bg-muted" />
               {isBuilderMember && (
                 <Link to="/builder">
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-8 w-8 rounded-full bg-secondary text-foreground border border-border hover:bg-muted"
+                    className="h-9 w-9 rounded-full bg-secondary text-foreground border border-border hover:bg-muted"
                   >
                     <Building2 size={16} />
                   </Button>
@@ -147,7 +147,7 @@ function HeaderInner({
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="relative h-8 w-8 rounded-full bg-secondary text-foreground border border-border hover:bg-muted"
+                      className="relative h-9 w-9 rounded-full bg-secondary text-foreground border border-border hover:bg-muted"
                     >
                       <Bell size={16} />
                       {unreadCount > 0 && (
@@ -158,7 +158,7 @@ function HeaderInner({
                     </Button>
                   </Link>
                   <Link to="/profile">
-                    <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[10px] font-bold cursor-pointer hover:opacity-90 transition-opacity">
+                    <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[10px] font-bold cursor-pointer hover:opacity-90 transition-opacity">
                       {initials}
                     </div>
                   </Link>

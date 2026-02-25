@@ -32,7 +32,7 @@ export function SocietyQuickLinks() {
 
   return (
     <div className="mt-4 mb-2">
-      <div className="w-fit max-w-full px-4">
+      <div className="px-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
             <Building2 size={15} className="text-primary" />

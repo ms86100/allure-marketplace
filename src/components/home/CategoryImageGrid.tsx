@@ -108,21 +108,19 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
 
   return (
     <div className="mb-6 px-4">
-      {/* Wrapper constrains header to match grid width */}
-      <div className="w-fit max-w-full">
-        {/* Section header */}
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{title}</h3>
-          <Link
-            to={`/category/${parentGroup}`}
-            className="text-[11px] font-bold text-primary flex items-center gap-0.5 ml-4"
-          >
-            See all <ChevronRight size={12} />
-          </Link>
-        </div>
+      {/* Section header */}
+      <div className="flex items-center justify-between mb-3">
+      <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{title}</h3>
+        <Link
+          to={`/category/${parentGroup}`}
+          className="text-[11px] font-bold text-primary flex items-center gap-0.5 ml-4"
+        >
+          See all <ChevronRight size={12} />
+        </Link>
+      </div>
 
         {/* Responsive card grid — auto-fit so columns match actual items */}
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,220px))] gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {categories.slice(0, 6).map((cat) => {
           const meta = metaMap[cat.category] || { count: 0, sellerCount: 0, minPrice: null, collageImages: [], hasBestseller: false };
           return (
@@ -186,7 +184,6 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
           );
         })}
         </div>
-      </div>
     </div>
   );
 }
