@@ -1,21 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LiveCameraCapture } from './LiveCameraCapture';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
-import { logAudit } from '@/lib/audit';
-import { friendlyError } from '@/lib/utils';
-import { workerRegistrationSchema, validateForm } from '@/lib/validation-schemas';
-import { useQuery } from '@tanstack/react-query';
-import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
-
-// Worker types loaded from categories prop — no hardcoded defaults used when categories available
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+import { useWorkerRegistration, DAYS } from '@/hooks/useWorkerRegistration';
 
 interface WorkerRegistrationSheetProps {
   open: boolean;
@@ -25,200 +14,7 @@ interface WorkerRegistrationSheetProps {
 }
 
 export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categories = [] }: WorkerRegistrationSheetProps) {
-  const { user, profile, effectiveSocietyId } = useAuth();
-  const { getSetting } = useSystemSettingsRaw([
-    'worker_default_shift_start', 'worker_default_shift_end', 'worker_entry_frequency_options'
-  ]);
-
-  // Load defaults and options from DB
-  const defaultShiftStart = getSetting('worker_default_shift_start') || '';
-  const defaultShiftEnd = getSetting('worker_default_shift_end') || '';
-  const entryFrequencyOptions: { value: string; label: string }[] = useMemo(() => {
-    try {
-      const raw = getSetting('worker_entry_frequency_options');
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-  }, [getSetting]);
-
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [workerType, setWorkerType] = useState('');
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [shiftStart, setShiftStart] = useState('');
-  const [shiftEnd, setShiftEnd] = useState('');
-  const [activeDays, setActiveDays] = useState<string[]>([...DAYS]);
-  const [entryFrequency, setEntryFrequency] = useState('');
-  const [emergencyPhone, setEmergencyPhone] = useState('');
-  const [flatNumbers, setFlatNumbers] = useState('');
-  const [preferredLanguage, setPreferredLanguage] = useState('');
-  const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  // Apply DB defaults when they load
-  useEffect(() => {
-    if (defaultShiftStart && !shiftStart) setShiftStart(defaultShiftStart);
-    if (defaultShiftEnd && !shiftEnd) setShiftEnd(defaultShiftEnd);
-  }, [defaultShiftStart, defaultShiftEnd]);
-
-  // Fetch supported languages from DB
-  const { data: languages = [] } = useQuery({
-    queryKey: ['supported-languages'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('supported_languages')
-        .select('code, name, native_name')
-        .eq('is_active', true)
-        .order('display_order');
-      if (error) {
-        console.error('Error fetching languages:', error);
-        return [];
-      }
-      return data || [];
-    },
-    staleTime: 10 * 60 * 1000,
-  });
-
-  const toggleDay = (day: string) => {
-    setActiveDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
-  };
-
-  const handlePhotoCapture = (blob: Blob) => {
-    if (photoPreview) URL.revokeObjectURL(photoPreview);
-    setPhotoBlob(blob);
-    setPhotoPreview(URL.createObjectURL(blob));
-  };
-
-  const clearPhoto = () => {
-    if (photoPreview) URL.revokeObjectURL(photoPreview);
-    setPhotoBlob(null);
-    setPhotoPreview(null);
-  };
-
-  useEffect(() => {
-    if (!open) {
-      resetForm();
-    }
-  }, [open]);
-
-  useEffect(() => {
-    return () => {
-      if (photoPreview) URL.revokeObjectURL(photoPreview);
-    };
-  }, [photoPreview]);
-
-  const handleSubmit = async () => {
-    if (!user || !effectiveSocietyId) {
-      toast.error('Please log in and select a society');
-      return;
-    }
-
-    const validation = validateForm(workerRegistrationSchema, {
-      name,
-      phone,
-      workerType,
-      shiftStart,
-      shiftEnd,
-      entryFrequency,
-      emergencyPhone,
-      flatNumbers,
-      preferredLanguage,
-    });
-
-    if (!validation.success) {
-      const errors = (validation as { success: false; errors: Record<string, string> }).errors;
-      setFieldErrors(errors);
-      const firstError = Object.values(errors)[0];
-      toast.error(firstError as string);
-      return;
-    }
-
-    if (!photoBlob) {
-      toast.error('Live photo is required');
-      return;
-    }
-
-    if (activeDays.length === 0) {
-      toast.error('Select at least one active day');
-      return;
-    }
-
-    setFieldErrors({});
-    setIsSubmitting(true);
-
-    try {
-      const sanitizedName = name.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-      const fileName = `workers/${effectiveSocietyId}/${Date.now()}_${sanitizedName}.jpg`;
-      const { error: uploadError } = await supabase.storage
-        .from('app-images')
-        .upload(fileName, photoBlob, { contentType: 'image/jpeg' });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage.from('app-images').getPublicUrl(fileName);
-
-      const { data: worker, error } = await supabase.from('society_workers').insert({
-        user_id: user.id,
-        society_id: effectiveSocietyId,
-        worker_type: workerType,
-        photo_url: publicUrl,
-        allowed_shift_start: shiftStart,
-        allowed_shift_end: shiftEnd,
-        active_days: activeDays,
-        entry_frequency: entryFrequency,
-        emergency_contact_phone: emergencyPhone || null,
-        category_id: categoryId || null,
-        registered_by: user.id,
-        skills: { name: name.trim(), phone: phone || null },
-        languages: [],
-        preferred_language: preferredLanguage,
-      }).select('id').single();
-
-      if (error) throw error;
-
-      if (flatNumbers.trim() && worker) {
-        const flats = flatNumbers.split(',').map(f => f.trim()).filter(Boolean);
-        if (flats.length > 0) {
-          const assignments = flats.map(flat => ({
-            worker_id: worker.id,
-            society_id: effectiveSocietyId,
-            flat_number: flat,
-            assigned_by: user.id,
-          }));
-          const { error: flatError } = await supabase.from('worker_flat_assignments').insert(assignments);
-          if (flatError) {
-            console.error('Flat assignment error:', flatError);
-            toast.error('Worker registered but flat assignments failed');
-          }
-        }
-      }
-
-      await logAudit('worker_registered', 'society_worker', worker?.id || '', effectiveSocietyId, {
-        worker_type: workerType, name: name.trim(),
-      });
-
-      toast.success('Worker registered successfully');
-      onSuccess();
-      onOpenChange(false);
-    } catch (err: any) {
-      console.error(err);
-      toast.error(friendlyError(err));
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const resetForm = () => {
-    if (photoPreview) URL.revokeObjectURL(photoPreview);
-    setName(''); setPhone(''); setWorkerType('');
-    setCategoryId(null); setShiftStart(defaultShiftStart); setShiftEnd(defaultShiftEnd);
-    setActiveDays([...DAYS]); setEntryFrequency('');
-    setEmergencyPhone(''); setFlatNumbers('');
-    setPreferredLanguage('');
-    setPhotoBlob(null); setPhotoPreview(null);
-    setFieldErrors({});
-  };
+  const w = useWorkerRegistration(open, onOpenChange, onSuccess, categories);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -232,75 +28,48 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
           {/* Live Photo */}
           <div>
             <Label className="mb-2 block">Photo (Live Capture Only) *</Label>
-            <LiveCameraCapture
-              onCapture={handlePhotoCapture}
-              capturedPreview={photoPreview}
-              onClear={clearPhoto}
-            />
+            <LiveCameraCapture onCapture={w.handlePhotoCapture} capturedPreview={w.photoPreview} onClear={w.clearPhoto} />
           </div>
 
           {/* Name & Phone */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Name *</Label>
-              <Input
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="Worker name"
-                className={fieldErrors.name ? 'border-destructive' : ''}
-              />
-              {fieldErrors.name && <p className="text-xs text-destructive mt-1">{fieldErrors.name}</p>}
+              <Input value={w.name} onChange={e => w.setName(e.target.value)} placeholder="Worker name" className={w.fieldErrors.name ? 'border-destructive' : ''} />
+              {w.fieldErrors.name && <p className="text-xs text-destructive mt-1">{w.fieldErrors.name}</p>}
             </div>
             <div>
               <Label>Phone</Label>
-              <Input
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                placeholder="9876543210"
-                inputMode="tel"
-                className={fieldErrors.phone ? 'border-destructive' : ''}
-              />
-              {fieldErrors.phone && <p className="text-xs text-destructive mt-1">{fieldErrors.phone}</p>}
+              <Input value={w.phone} onChange={e => w.setPhone(e.target.value)} placeholder="9876543210" inputMode="tel" className={w.fieldErrors.phone ? 'border-destructive' : ''} />
+              {w.fieldErrors.phone && <p className="text-xs text-destructive mt-1">{w.fieldErrors.phone}</p>}
             </div>
           </div>
 
           {/* Preferred Language */}
           <div>
             <Label>Preferred Language *</Label>
-            <Select value={preferredLanguage} onValueChange={setPreferredLanguage}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select language" />
-              </SelectTrigger>
+            <Select value={w.preferredLanguage} onValueChange={w.setPreferredLanguage}>
+              <SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger>
               <SelectContent>
-                {languages.length > 0 ? (
-                  languages.map((lang: any) => (
-                    <SelectItem key={lang.code} value={lang.code}>
-                      {lang.native_name} ({lang.name})
-                    </SelectItem>
-                  ))
+                {w.languages.length > 0 ? (
+                  w.languages.map((lang: any) => <SelectItem key={lang.code} value={lang.code}>{lang.native_name} ({lang.name})</SelectItem>)
                 ) : (
                   <SelectItem value="" disabled>No languages configured</SelectItem>
                 )}
               </SelectContent>
             </Select>
-            {languages.length === 0 && (
-              <p className="text-xs text-destructive mt-1">⚠️ No languages configured. Contact admin.</p>
-            )}
+            {w.languages.length === 0 && <p className="text-xs text-destructive mt-1">⚠️ No languages configured. Contact admin.</p>}
             <p className="text-[10px] text-muted-foreground mt-1">Job summaries will be read in this language</p>
           </div>
 
           {/* Category / Type */}
           <div className="grid grid-cols-2 gap-3">
-            {categories.length > 0 ? (
+            {w.categories.length > 0 ? (
               <div>
                 <Label>Category</Label>
-                <Select value={categoryId || ''} onValueChange={v => setCategoryId(v)}>
+                <Select value={w.categoryId || ''} onValueChange={v => w.setCategoryId(v)}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent>
-                    {categories.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
+                  <SelectContent>{w.categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             ) : (
@@ -311,39 +80,27 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
             )}
             <div>
               <Label>Entry Frequency *</Label>
-              <Select value={entryFrequency} onValueChange={setEntryFrequency}>
+              <Select value={w.entryFrequency} onValueChange={w.setEntryFrequency}>
                 <SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger>
                 <SelectContent>
-                  {entryFrequencyOptions.length > 0 ? (
-                    entryFrequencyOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))
+                  {w.entryFrequencyOptions.length > 0 ? (
+                    w.entryFrequencyOptions.map((opt) => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)
                   ) : (
                     <SelectItem value="" disabled>No options configured</SelectItem>
                   )}
                 </SelectContent>
               </Select>
-              {entryFrequencyOptions.length === 0 && (
-                <p className="text-xs text-destructive mt-1">⚠️ Entry frequency options not configured. Contact admin.</p>
-              )}
+              {w.entryFrequencyOptions.length === 0 && <p className="text-xs text-destructive mt-1">⚠️ Entry frequency options not configured. Contact admin.</p>}
             </div>
           </div>
 
           {/* Shift */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Shift Start</Label>
-              <Input type="time" value={shiftStart} onChange={e => setShiftStart(e.target.value)} />
-            </div>
+            <div><Label>Shift Start</Label><Input type="time" value={w.shiftStart} onChange={e => w.setShiftStart(e.target.value)} /></div>
             <div>
               <Label>Shift End</Label>
-              <Input
-                type="time"
-                value={shiftEnd}
-                onChange={e => setShiftEnd(e.target.value)}
-                className={fieldErrors.shiftEnd ? 'border-destructive' : ''}
-              />
-              {fieldErrors.shiftEnd && <p className="text-xs text-destructive mt-1">{fieldErrors.shiftEnd}</p>}
+              <Input type="time" value={w.shiftEnd} onChange={e => w.setShiftEnd(e.target.value)} className={w.fieldErrors.shiftEnd ? 'border-destructive' : ''} />
+              {w.fieldErrors.shiftEnd && <p className="text-xs text-destructive mt-1">{w.fieldErrors.shiftEnd}</p>}
             </div>
           </div>
 
@@ -352,16 +109,8 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
             <Label className="mb-2 block">Active Days</Label>
             <div className="flex gap-1 flex-wrap">
               {DAYS.map(day => (
-                <button
-                  key={day}
-                  type="button"
-                  onClick={() => toggleDay(day)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                    activeDays.includes(day)
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground'
-                  }`}
-                >
+                <button key={day} type="button" onClick={() => w.toggleDay(day)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${w.activeDays.includes(day) ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                   {day}
                 </button>
               ))}
@@ -369,34 +118,17 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
           </div>
 
           {/* Flat Assignments */}
-          <div>
-            <Label>Assigned Flats (comma separated)</Label>
-            <Input
-              value={flatNumbers}
-              onChange={e => setFlatNumbers(e.target.value)}
-              placeholder="e.g. 301, 402, 505"
-            />
-          </div>
+          <div><Label>Assigned Flats (comma separated)</Label><Input value={w.flatNumbers} onChange={e => w.setFlatNumbers(e.target.value)} placeholder="e.g. 301, 402, 505" /></div>
 
           {/* Emergency Contact */}
           <div>
             <Label>Emergency Contact</Label>
-            <Input
-              value={emergencyPhone}
-              onChange={e => setEmergencyPhone(e.target.value)}
-              placeholder="9876543210"
-              inputMode="tel"
-              className={fieldErrors.emergencyPhone ? 'border-destructive' : ''}
-            />
-            {fieldErrors.emergencyPhone && <p className="text-xs text-destructive mt-1">{fieldErrors.emergencyPhone}</p>}
+            <Input value={w.emergencyPhone} onChange={e => w.setEmergencyPhone(e.target.value)} placeholder="9876543210" inputMode="tel" className={w.fieldErrors.emergencyPhone ? 'border-destructive' : ''} />
+            {w.fieldErrors.emergencyPhone && <p className="text-xs text-destructive mt-1">{w.fieldErrors.emergencyPhone}</p>}
           </div>
 
-          <Button
-            onClick={handleSubmit}
-            disabled={!name.trim() || !photoBlob || !preferredLanguage || !entryFrequency || languages.length === 0 || entryFrequencyOptions.length === 0 || isSubmitting}
-            className="w-full"
-          >
-            {isSubmitting ? 'Registering...' : 'Register Worker'}
+          <Button onClick={w.handleSubmit} disabled={w.isSubmitDisabled} className="w-full">
+            {w.isSubmitting ? 'Registering...' : 'Register Worker'}
           </Button>
         </div>
       </SheetContent>
