@@ -102,7 +102,7 @@ export default function GateEntryPage() {
                 
                 <div className="flex items-center justify-center gap-2">
                   <Clock size={16} className={timeLeft <= 10 ? 'text-destructive' : 'text-muted-foreground'} />
-                  <span className={`text-2xl font-mono font-bold ${timeLeft <= 10 ? 'text-destructive animate-pulse' : 'text-foreground'}`}>
+                  <span className={`text-2xl font-mono font-bold tabular-nums ${timeLeft <= 10 ? 'text-destructive animate-pulse' : 'text-foreground'}`}>
                     {timeLeft}s
                   </span>
                 </div>

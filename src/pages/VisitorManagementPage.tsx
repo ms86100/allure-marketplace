@@ -25,11 +25,17 @@ export default function VisitorManagementPage() {
         <ModuleSearchBar context="visitors" value={v.searchQuery} onChange={v.setSearchQuery} />
 
         {/* Summary */}
-        <Card className="border-primary/20 bg-primary/5"><CardContent className="p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center"><Shield className="text-primary" size={24} /></div>
-            <div><p className="font-semibold">Today's Visitors</p><p className="text-2xl font-bold text-primary">{v.todayCount}</p></div>
-          </div>
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Shield className="text-primary" size={24} />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">Today's Visitors</p>
+                <p className="text-2xl font-bold text-primary tabular-nums">{v.todayCount}</p>
+              </div>
+            </div>
           <Sheet open={v.isAddOpen} onOpenChange={v.setIsAddOpen}>
             <div className="flex gap-2">
               {v.visitors.length > 0 && <Button size="sm" variant="outline" onClick={v.handleExport} title="Export CSV"><Download size={16} /></Button>}
@@ -57,7 +63,8 @@ export default function VisitorManagementPage() {
               </div>
             </SheetContent>
           </Sheet>
-        </CardContent></Card>
+          </CardContent>
+        </Card>
 
         {/* Tabs */}
         <Tabs value={v.activeTab} onValueChange={v.setActiveTab}>

@@ -65,15 +65,15 @@ export default function FavoritesPage() {
         )}
       </div>
 
-      <div className="p-3">
+      <div className="p-4">
         {isLoading ? (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2.5">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <Skeleton key={i} className="aspect-square rounded-xl" />
             ))}
           </div>
         ) : favorites.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2.5">
             {favorites.map((seller) => (
               <FavoriteSellerCard
                 key={seller.id}

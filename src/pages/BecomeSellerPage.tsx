@@ -89,7 +89,7 @@ export default function BecomeSellerPage() {
     return (
       <AppLayout showHeader={false} showNav={false}>
         <div className="p-4 safe-top">
-          <Link to="/" className="flex items-center gap-2 text-muted-foreground mb-6"><span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></span><span>Back</span></Link>
+          <Link to="/" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0 mb-6"><ArrowLeft size={18} /></Link>
           <div className="text-center py-12">
             {isRejected ? (
               <>

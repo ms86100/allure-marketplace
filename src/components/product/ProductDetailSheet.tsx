@@ -38,11 +38,14 @@ export function ProductDetailSheet({ product, open, onOpenChange, categoryIcon, 
             ) : (
               <div className="w-full h-full flex items-center justify-center"><span className="text-6xl">{categoryIcon || '🛍️'}</span></div>
             )}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
-              <div className="w-5 h-1.5 rounded-full bg-foreground" />
-              <div className="w-1.5 h-1.5 rounded-full bg-foreground/30" />
-              <div className="w-1.5 h-1.5 rounded-full bg-foreground/30" />
-            </div>
+            {/* Image pagination dots - only show if we have an image */}
+            {product.image_url && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
+                <div className="w-5 h-1.5 rounded-full bg-foreground/80" />
+                <div className="w-1.5 h-1.5 rounded-full bg-foreground/30" />
+                <div className="w-1.5 h-1.5 rounded-full bg-foreground/30" />
+              </div>
+            )}
           </div>
 
           <div className="p-4 space-y-3">
@@ -78,15 +81,10 @@ export function ProductDetailSheet({ product, open, onOpenChange, categoryIcon, 
 
             {d.showDetails && (
               <div className="space-y-3 animate-fade-in">
-                {product.fulfillment_mode && (
-                  <div className="flex gap-3">
-                    {(product.fulfillment_mode === 'delivery' || product.fulfillment_mode === 'both') && <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><Truck size={14} className="text-accent" /><span>Seller Delivers</span></div>}
-                    {(product.fulfillment_mode === 'self_pickup' || product.fulfillment_mode === 'both') && <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><Shield size={14} className="text-accent" /><span>Self Pickup</span></div>}
-                  </div>
-                )}
+                {/* Fulfillment mode - consolidated, no duplicate */}
                 {product.fulfillment_mode && (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">
-                    <Truck size={14} />
+                    <Truck size={14} className="text-accent shrink-0" />
                     <span>
                       {product.fulfillment_mode === 'self_pickup' && 'Self Pickup Only'}
                       {product.fulfillment_mode === 'delivery' && 'Seller Delivers'}

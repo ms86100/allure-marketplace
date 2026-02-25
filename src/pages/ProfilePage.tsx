@@ -155,10 +155,12 @@ export default function ProfilePage() {
                   {[profile?.flat_number, profile?.block && `Block ${profile.block}`, profile?.phase].filter(Boolean).join(', ')}
                 </span>
               </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Phone size={12} />
-                <span>{profile?.phone}</span>
-              </div>
+              {profile?.phone && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Phone size={12} />
+                  <span>{profile.phone}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -279,7 +281,7 @@ export default function ProfilePage() {
           <DeleteAccountDialog />
         </div>
 
-        <p className="text-center text-[11px] text-muted-foreground mt-4">{settings.platformName} v{settings.appVersion}</p>
+        <p className="text-center text-[11px] text-muted-foreground mt-4 pb-2">{settings.platformName} v{settings.appVersion}</p>
       </div>
     </AppLayout>
   );

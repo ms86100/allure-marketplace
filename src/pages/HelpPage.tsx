@@ -107,24 +107,27 @@ export default function HelpPage({ sections: customSections }: HelpPageProps) {
 
   return (
     <AppLayout showHeader={false} showNav={false}>
-      <div className="p-4 pb-8 safe-top">
-        <Link to="/profile" className="flex items-center gap-2 text-muted-foreground mb-6">
-          <ArrowLeft size={20} />
-          <span>Back to Profile</span>
-        </Link>
+      <div className="pb-8 safe-top">
+        {/* Sticky header with proper touch target */}
+        <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 flex items-center gap-3">
+          <Link to="/profile" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0">
+            <ArrowLeft size={18} />
+          </Link>
+          <h1 className="text-lg font-bold text-foreground">Help & Guide</h1>
+        </div>
 
-        <div className="text-center mb-6">
+        <div className="text-center mb-6 px-4 pt-4">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
             <HelpCircle className="text-primary" size={32} />
           </div>
-          <h1 className="text-2xl font-bold">Help & Guide</h1>
-          <p className="text-muted-foreground mt-1">
+          <h2 className="text-xl font-bold">How can we help?</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
             Learn how to use the platform
           </p>
         </div>
 
         {/* Replay Onboarding */}
-        <Card className="mb-6">
+        <Card className="mb-6 mx-4">
           <CardContent className="p-4">
             <button
               onClick={resetOnboarding}
@@ -145,7 +148,7 @@ export default function HelpPage({ sections: customSections }: HelpPageProps) {
         </Card>
 
         {/* Help Sections */}
-        <div className="space-y-4">
+        <div className="space-y-4 px-4">
           {helpSections.map(({ icon: Icon, title, items }) => (
             <Card key={title}>
               <CardContent className="p-4">
@@ -167,7 +170,7 @@ export default function HelpPage({ sections: customSections }: HelpPageProps) {
         </div>
 
         {/* Grievance Officer */}
-        <Card className="mt-6">
+        <Card className="mt-6 mx-4">
           <CardContent className="p-4">
             <div className="flex items-center gap-3 mb-3">
               <Shield className="text-primary" size={20} />
@@ -187,7 +190,7 @@ export default function HelpPage({ sections: customSections }: HelpPageProps) {
 
         {/* Community Rules Link */}
         <Link to="/community-rules">
-          <Card className="mt-4">
+          <Card className="mt-4 mx-4">
             <CardContent className="p-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center">
                 <BookOpen className="text-warning" size={20} />

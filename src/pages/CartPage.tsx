@@ -53,8 +53,8 @@ export default function CartPage() {
 
         {/* Delivery Time */}
         {c.maxPrepTime > 0 && (
-          <div className="mx-4 mt-3 flex items-center gap-3 bg-accent/50 rounded-xl p-3">
-            <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shrink-0"><Clock size={18} className="text-accent-foreground" /></div>
+          <div className="mx-4 mt-3 flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-xl p-3">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0"><Clock size={18} className="text-primary" /></div>
             <div><p className="text-sm font-semibold">Ready in ~{c.maxPrepTime} minutes</p><p className="text-xs text-muted-foreground">Estimated preparation time</p></div>
           </div>
         )}

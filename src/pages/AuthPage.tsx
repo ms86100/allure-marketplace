@@ -14,7 +14,7 @@ export default function AuthPage() {
   const auth = useAuthPage();
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20">
+    <div className="min-h-[100dvh] bg-gradient-to-b from-background to-secondary/20 overflow-y-auto">
       {/* Hero Banner */}
       <div className="relative h-40 sm:h-56 overflow-hidden">
         <img src={authHero} alt="Community marketplace" className="w-full h-full object-cover" />
