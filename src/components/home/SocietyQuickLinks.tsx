@@ -31,17 +31,19 @@ export function SocietyQuickLinks() {
   if (visibleLinks.length === 0) return null;
 
   return (
-    <div className="px-4 mt-4 mb-2">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
-          <Building2 size={15} className="text-primary" />
-          Your Society
-        </h3>
-        <Link to="/society" className="text-[11px] font-bold text-primary flex items-center gap-0.5">
-          View all <ChevronRight size={12} />
-        </Link>
+    <div className="mt-4 mb-2">
+      <div className="w-fit max-w-full px-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
+            <Building2 size={15} className="text-primary" />
+            Your Society
+          </h3>
+          <Link to="/society" className="text-[11px] font-bold text-primary flex items-center gap-0.5 ml-4">
+            View all <ChevronRight size={12} />
+          </Link>
+        </div>
       </div>
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 px-4">
         {visibleLinks.slice(0, 6).map(({ icon: Icon, label, to }) => (
           <Link key={to} to={to} className="shrink-0">
             <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-center gap-2.5 active:scale-[0.97] transition-all duration-200 hover:border-primary/30">

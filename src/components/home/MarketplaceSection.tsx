@@ -205,22 +205,19 @@ function ProductListings({
               see all <ChevronRight size={12} />
             </a>
           </div>
-          <div className="relative">
-            <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1">
-              {cat.products.slice(0, 8).map(product => (
-                <div key={product.id} className="w-[155px] shrink-0">
-                  <ProductListingCard
-                    product={product}
-                    onTap={onProductTap}
-                    onNavigate={onNavigate}
-                    categoryConfigs={categoryConfigs}
-                    marketplaceConfig={marketplaceConfig}
-                    badgeConfigs={badgeConfigs}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="absolute right-0 top-0 bottom-1 w-10 pointer-events-none bg-gradient-to-l from-background to-transparent" />
+          <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1">
+            {cat.products.slice(0, 8).map(product => (
+              <div key={product.id} className="w-[155px] shrink-0">
+                <ProductListingCard
+                  product={product}
+                  onTap={onProductTap}
+                  onNavigate={onNavigate}
+                  categoryConfigs={categoryConfigs}
+                  marketplaceConfig={marketplaceConfig}
+                  badgeConfigs={badgeConfigs}
+                />
+              </div>
+            ))}
           </div>
         </div>
       ))}

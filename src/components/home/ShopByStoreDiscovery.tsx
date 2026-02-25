@@ -175,7 +175,6 @@ function SocietyCard({ society }: { society: SocietyGroup }) {
             </div>
           ))}
         </div>
-        <div className="absolute right-0 top-0 bottom-1 w-6 pointer-events-none bg-gradient-to-l from-card to-transparent" />
       </div>
     </div>
   );
@@ -241,7 +240,6 @@ function CategorySellerRow({
             </div>
           ))}
         </div>
-        <div className="absolute right-0 top-0 bottom-1 w-6 pointer-events-none bg-gradient-to-l from-card to-transparent" />
       </div>
     </div>
   );
