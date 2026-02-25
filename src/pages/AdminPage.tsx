@@ -94,6 +94,13 @@ export default function AdminPage() {
   const [adminNotes, setAdminNotes] = useState('');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
 
+  // B1: Cursor-based pagination state
+  const PAGE_SIZE = 50;
+  const [hasMoreReviews, setHasMoreReviews] = useState(true);
+  const [hasMorePayments, setHasMorePayments] = useState(true);
+  const [hasMoreReports, setHasMoreReports] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -103,11 +110,11 @@ export default function AdminPage() {
       const [usersRes, sellersRes, reviewsRes, allSellersRes, paymentsRes, reportsRes, warningsRes, societiesRes, statsRes] = await Promise.all([
         supabase.from('profiles').select('*, society:societies!profiles_society_id_fkey(name)').eq('verification_status', 'pending'),
         supabase.from('seller_profiles').select('*, profile:profiles!seller_profiles_user_id_fkey(name, block, flat_number)').eq('verification_status', 'pending'),
-        supabase.from('reviews').select('*, buyer:profiles!reviews_buyer_id_fkey(name), seller:seller_profiles(business_name)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('reviews').select('*, buyer:profiles!reviews_buyer_id_fkey(name), seller:seller_profiles(business_name)').order('created_at', { ascending: false }).limit(PAGE_SIZE),
         supabase.from('seller_profiles').select('*, profile:profiles!seller_profiles_user_id_fkey(name, block)').eq('verification_status', 'approved'),
-        supabase.from('payment_records').select('*, seller:seller_profiles(business_name), order:orders(buyer:profiles!orders_buyer_id_fkey(name))').order('created_at', { ascending: false }).limit(100),
-        supabase.from('reports').select('*, reporter:profiles!reports_reporter_id_fkey(name), reported_seller:seller_profiles(business_name)').order('created_at', { ascending: false }).limit(50),
-        supabase.from('warnings').select('*, user:profiles!warnings_user_id_fkey(name)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('payment_records').select('*, seller:seller_profiles(business_name), order:orders(buyer:profiles!orders_buyer_id_fkey(name))').order('created_at', { ascending: false }).limit(PAGE_SIZE),
+        supabase.from('reports').select('*, reporter:profiles!reports_reporter_id_fkey(name), reported_seller:seller_profiles(business_name)').order('created_at', { ascending: false }).limit(PAGE_SIZE),
+        supabase.from('warnings').select('*, user:profiles!warnings_user_id_fkey(name)').order('created_at', { ascending: false }).limit(PAGE_SIZE),
         supabase.from('societies').select('*').order('created_at', { ascending: false }),
         Promise.all([
           supabase.from('profiles').select('id', { count: 'exact', head: true }),
@@ -122,10 +129,16 @@ export default function AdminPage() {
 
       setPendingUsers((usersRes.data as any) || []);
       setPendingSellers((sellersRes.data as any) || []);
-      setReviews((reviewsRes.data as any) || []);
+      const reviewsData = (reviewsRes.data as any) || [];
+      setReviews(reviewsData);
+      setHasMoreReviews(reviewsData.length >= PAGE_SIZE);
       setAllSellers((allSellersRes.data as any) || []);
-      setPayments((paymentsRes.data as any) || []);
-      setReports((reportsRes.data as any) || []);
+      const paymentsData = (paymentsRes.data as any) || [];
+      setPayments(paymentsData);
+      setHasMorePayments(paymentsData.length >= PAGE_SIZE);
+      const reportsData = (reportsRes.data as any) || [];
+      setReports(reportsData);
+      setHasMoreReports(reportsData.length >= PAGE_SIZE);
       setWarnings((warningsRes.data as any) || []);
       setAllSocieties((societiesRes.data as Society[]) || []);
       
@@ -145,6 +158,55 @@ export default function AdminPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // B1: Cursor-based "Load More" functions
+  const loadMoreReviews = async () => {
+    if (!hasMoreReviews || isLoadingMore) return;
+    setIsLoadingMore(true);
+    const lastItem = reviews[reviews.length - 1];
+    const { data } = await supabase
+      .from('reviews')
+      .select('*, buyer:profiles!reviews_buyer_id_fkey(name), seller:seller_profiles(business_name)')
+      .order('created_at', { ascending: false })
+      .lt('created_at', lastItem.created_at)
+      .limit(PAGE_SIZE);
+    const newItems = (data as any) || [];
+    setReviews(prev => [...prev, ...newItems]);
+    setHasMoreReviews(newItems.length >= PAGE_SIZE);
+    setIsLoadingMore(false);
+  };
+
+  const loadMorePayments = async () => {
+    if (!hasMorePayments || isLoadingMore) return;
+    setIsLoadingMore(true);
+    const lastItem = payments[payments.length - 1];
+    const { data } = await supabase
+      .from('payment_records')
+      .select('*, seller:seller_profiles(business_name), order:orders(buyer:profiles!orders_buyer_id_fkey(name))')
+      .order('created_at', { ascending: false })
+      .lt('created_at', lastItem.created_at)
+      .limit(PAGE_SIZE);
+    const newItems = (data as any) || [];
+    setPayments(prev => [...prev, ...newItems]);
+    setHasMorePayments(newItems.length >= PAGE_SIZE);
+    setIsLoadingMore(false);
+  };
+
+  const loadMoreReports = async () => {
+    if (!hasMoreReports || isLoadingMore) return;
+    setIsLoadingMore(true);
+    const lastItem = reports[reports.length - 1];
+    const { data } = await supabase
+      .from('reports')
+      .select('*, reporter:profiles!reports_reporter_id_fkey(name), reported_seller:seller_profiles(business_name)')
+      .order('created_at', { ascending: false })
+      .lt('created_at', lastItem.created_at)
+      .limit(PAGE_SIZE);
+    const newItems = (data as any) || [];
+    setReports(prev => [...prev, ...newItems]);
+    setHasMoreReports(newItems.length >= PAGE_SIZE);
+    setIsLoadingMore(false);
   };
 
   const fetchChatForOrder = async (orderId: string) => {
@@ -420,6 +482,11 @@ export default function AdminPage() {
                 </CardContent></Card>
               );
             }) : <p className="text-center text-muted-foreground py-8 text-sm">No payments found</p>}
+            {hasMorePayments && payments.length > 0 && (
+              <Button variant="outline" size="sm" className="w-full" onClick={loadMorePayments} disabled={isLoadingMore}>
+                {isLoadingMore ? 'Loading…' : 'Load More Payments'}
+              </Button>
+            )}
           </TabsContent>
 
           <TabsContent value="societies" className="space-y-2 mt-4">
@@ -550,6 +617,11 @@ export default function AdminPage() {
                 </CardContent></Card>
               );
             }) : <p className="text-center text-muted-foreground py-8 text-sm">No reports</p>}
+            {hasMoreReports && reports.length > 0 && (
+              <Button variant="outline" size="sm" className="w-full" onClick={loadMoreReports} disabled={isLoadingMore}>
+                {isLoadingMore ? 'Loading…' : 'Load More Reports'}
+              </Button>
+            )}
           </TabsContent>
 
           <TabsContent value="reviews" className="space-y-2 mt-4">
@@ -587,6 +659,11 @@ export default function AdminPage() {
                 </div>
               </CardContent></Card>
             ))}
+            {hasMoreReviews && reviews.length > 0 && (
+              <Button variant="outline" size="sm" className="w-full" onClick={loadMoreReviews} disabled={isLoadingMore}>
+                {isLoadingMore ? 'Loading…' : 'Load More Reviews'}
+              </Button>
+            )}
           </TabsContent>
 
           <TabsContent value="featured" className="space-y-2 mt-4">
