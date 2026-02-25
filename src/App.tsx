@@ -66,12 +66,12 @@ const VehicleParkingPage = lazy(() => import("./pages/VehicleParkingPage"));
 const VisitorManagementPage = lazy(() => import("./pages/VisitorManagementPage"));
 const PaymentMilestonesPage = lazy(() => import("./pages/PaymentMilestonesPage"));
 const InspectionChecklistPage = lazy(() => import("./pages/InspectionChecklistPage"));
-const DomesticHelpPage = lazy(() => import("./pages/DomesticHelpPage"));
+
 const WorkforceManagementPage = lazy(() => import("./pages/WorkforceManagementPage"));
 const ParcelManagementPage = lazy(() => import("./pages/ParcelManagementPage"));
 const GuardKioskPage = lazy(() => import("./pages/GuardKioskPage"));
 const GateEntryPage = lazy(() => import("./pages/GateEntryPage"));
-const SecurityVerifyPage = lazy(() => import("./pages/SecurityVerifyPage"));
+
 const SecurityAuditPage = lazy(() => import("./pages/SecurityAuditPage"));
 const WorkerJobsPage = lazy(() => import("./pages/WorkerJobsPage"));
 const WorkerMyJobsPage = lazy(() => import("./pages/WorkerMyJobsPage"));
@@ -284,12 +284,12 @@ function AppRoutes() {
         <Route path="/visitors" element={<ProtectedRoute><VisitorManagementPage /></ProtectedRoute>} />
         <Route path="/payment-milestones" element={<ProtectedRoute><PaymentMilestonesPage /></ProtectedRoute>} />
         <Route path="/inspection" element={<ProtectedRoute><InspectionChecklistPage /></ProtectedRoute>} />
-        <Route path="/domestic-help" element={<ProtectedRoute><DomesticHelpPage /></ProtectedRoute>} />
+        <Route path="/domestic-help" element={<Navigate to="/workforce" replace />} />
         <Route path="/workforce" element={<ProtectedRoute><WorkforceManagementPage /></ProtectedRoute>} />
         <Route path="/parcels" element={<ProtectedRoute><ParcelManagementPage /></ProtectedRoute>} />
         <Route path="/guard-kiosk" element={<ProtectedRoute><SecurityRoute><GuardKioskPage /></SecurityRoute></ProtectedRoute>} />
         <Route path="/gate-entry" element={<ProtectedRoute><GateEntryPage /></ProtectedRoute>} />
-        <Route path="/security/verify" element={<ProtectedRoute><SecurityRoute><SecurityVerifyPage /></SecurityRoute></ProtectedRoute>} />
+        <Route path="/security/verify" element={<Navigate to="/guard-kiosk" replace />} />
         <Route path="/security/audit" element={<ProtectedRoute><SecurityRoute><SecurityAuditPage /></SecurityRoute></ProtectedRoute>} />
         <Route path="/worker/jobs" element={<ProtectedRoute><WorkerRoute><WorkerJobsPage /></WorkerRoute></ProtectedRoute>} />
         <Route path="/worker/my-jobs" element={<ProtectedRoute><WorkerRoute><WorkerMyJobsPage /></WorkerRoute></ProtectedRoute>} />

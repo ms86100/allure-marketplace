@@ -43,7 +43,7 @@ const config: CapacitorConfig = {
       androidScheme: 'https',
       allowNavigation: [
         'rvvctaikytfeyzkwoqxg.supabase.co',
-        'block-eats.lovable.app',
+        'sociva.app',
       ],
     },
   }),

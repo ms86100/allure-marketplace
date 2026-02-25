@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Check, ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { jitteredStaleTime } from '@/lib/query-utils';
@@ -168,7 +169,7 @@ export default function PricingPage() {
                     ))}
                   </ul>
                   {plan.price !== 'Free' && (
-                    <Button className="w-full mt-4" variant={plan.badge === 'Popular' ? 'default' : 'outline'} onClick={() => window.open(`mailto:${settings.supportEmail}?subject=Inquiry about ${plan.name}`, '_blank')}>
+                    <Button className="w-full mt-4" variant={plan.badge === 'Popular' ? 'default' : 'outline'} onClick={() => toast.info(`For ${plan.name} inquiries, email ${settings.supportEmail}`)}>
                       Contact Us
                     </Button>
                   )}

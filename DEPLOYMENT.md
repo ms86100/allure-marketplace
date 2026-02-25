@@ -1,4 +1,4 @@
-# Greenfield Community - Production Deployment Guide
+# Sociva - Production Deployment Guide
 
 ## Prerequisites
 
@@ -26,23 +26,23 @@ Push notifications for both iOS and Android are handled through Firebase Cloud M
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. Click "Create a project" or select existing project
-3. Enter project name (e.g., "Greenfield Community")
+3. Enter project name (e.g., "Sociva")
 4. Enable Google Analytics (optional)
 5. Click "Create project"
 
 ### 1.2 Add iOS App to Firebase
 
 1. In Firebase Console, click "Add app" → iOS
-2. Enter iOS bundle ID: `app.greenfield.community`
-3. Enter app nickname: "Greenfield Community iOS"
+2. Enter iOS bundle ID: `app.sociva.community`
+3. Enter app nickname: "Sociva iOS"
 4. Download `GoogleService-Info.plist`
 5. Place the file in `ios/App/App/` folder
 
 ### 1.3 Add Android App to Firebase
 
 1. In Firebase Console, click "Add app" → Android
-2. Enter package name: `app.greenfield.community`
-3. Enter app nickname: "Greenfield Community Android"
+2. Enter package name: `app.sociva.community`
+3. Enter app nickname: "Sociva Android"
 4. Get SHA-1 fingerprint: `keytool -list -v -keystore your-release-key.keystore`
 5. Download `google-services.json`
 6. Place the file in `android/app/` folder
@@ -69,14 +69,12 @@ Push notifications for both iOS and Android are handled through Firebase Cloud M
 
 ## Step 2: Prepare the Codebase
 
-### 2.1 Switch to Production Capacitor Config
+### 2.1 Build for Production
+
+The Capacitor config automatically switches between development and production modes based on the `CAPACITOR_ENV` environment variable. No file swapping is needed.
 
 ```bash
-# Backup development config
-mv capacitor.config.ts capacitor.config.dev.ts
-
-# Use production config (no remote server)
-mv capacitor.config.production.ts capacitor.config.ts
+export CAPACITOR_ENV=production
 ```
 
 ### 2.2 Update Deep Linking Configuration
@@ -96,13 +94,8 @@ Edit `public/.well-known/assetlinks.json`:
 ## Step 3: Build the Web App
 
 ```bash
-# Install dependencies
 npm install
-
-# Build for production
 npm run build
-
-# Verify the dist folder was created
 ls -la dist/
 ```
 
@@ -111,9 +104,7 @@ ls -la dist/
 ## Step 4: Sync with Native Projects
 
 ```bash
-# Sync web assets to native projects
 npx cap sync
-
 # This copies the dist/ folder to:
 # - ios/App/App/public/
 # - android/app/src/main/assets/public/
@@ -137,12 +128,12 @@ npx cap open ios
 1. Select the project in navigator
 2. Go to "Signing & Capabilities"
 3. Select your Team
-4. Ensure bundle ID matches: `app.greenfield.community`
+4. Ensure bundle ID matches: `app.sociva.community`
 
 ### 5.4 Add Required Capabilities
 Click "+ Capability" and add:
 - **Push Notifications** - Required for FCM
-- **Associated Domains** - Add: `applinks:block-eats.lovable.app`
+- **Associated Domains** - Add: `applinks:sociva.app`
 - **Background Modes** - Check "Remote notifications"
 
 ### 5.5 Build Archive
@@ -191,13 +182,13 @@ Ensure `android/app/google-services.json` exists and is correct.
 - [x] Privacy Policy page (`/#/privacy-policy`)
 - [x] Terms of Service page (`/#/terms`)
 - [x] Account Deletion feature (Profile → Delete Account)
-- [x] Demo account for reviewers (`demo@blockeats.app` / `DemoReview2026!`)
+- [x] Demo account for reviewers (`demo@sociva.app` / `DemoReview2026!`)
 - [x] Deep linking support (Universal Links / App Links)
 - [x] Push notification backend (FCM HTTP v1)
 - [x] Push notification client (Capacitor)
 - [x] Offline support banner
 - [x] Error boundary for crash handling
-- [x] Branding: "Greenfield Community"
+- [x] Branding: "Sociva"
 
 ### 📋 Required Screenshots (You need to create)
 - iPhone 6.7" (1290 x 2796 px)
@@ -208,9 +199,9 @@ Ensure `android/app/google-services.json` exists and is correct.
 - Android Tablet (1200 x 1920 px minimum)
 
 ### 📋 Required App Store Metadata
-- App name: Greenfield Community
-- Subtitle: Community Marketplace
-- Keywords: community, marketplace, homemade food, local, neighbors
+- App name: Sociva
+- Subtitle: Community Services Marketplace
+- Keywords: community, marketplace, services, food delivery, tutoring, home services, rentals, local, neighbors
 - Description (4000 chars max) - See STORE_METADATA.md
 - What's New (for updates)
 - Support URL
@@ -249,24 +240,17 @@ Configure in Admin Panel → Settings → API Configuration:
 - [ ] Push notifications received on iOS
 - [ ] Push notifications received on Android
 - [ ] Offline banner appears when no network
-- [ ] Deep links open correct pages (test: `greenfield://orders`)
+- [ ] Deep links open correct pages (test: `sociva://orders`)
 - [ ] Account deletion works
 - [ ] Demo account can access app
-
-### Testing Push Notifications
-1. Log in to the app on a physical device
-2. The app will automatically register for push notifications
-3. Device token is saved to the database
-4. Trigger a test notification via the backend function
-5. Verify notification appears on device
 
 ---
 
 ## Common Issues & Solutions
 
 ### iOS: App rejected for not working
-- Ensure the production config is used (no server block)
-- Verify `dist/` folder is synced with `npx cap sync`
+- Ensure `CAPACITOR_ENV=production` is set before `npx cap sync`
+- Verify `dist/` folder is synced
 
 ### Android: Signing issues
 - Use the same keystore for all builds
@@ -285,10 +269,10 @@ Configure in Admin Panel → Settings → API Configuration:
 
 ### Deep links not working
 - Verify AASA/assetlinks.json are accessible via HTTPS
-- Test: `curl https://block-eats.lovable.app/.well-known/apple-app-site-association`
+- Test: `curl https://sociva.app/.well-known/apple-app-site-association`
 - Check Team ID and SHA256 fingerprints are correct
 - Wait up to 24 hours for Apple/Google to cache files
-- For testing, use: `npx uri-scheme open "greenfield://orders" --ios`
+- For testing, use: `npx uri-scheme open "sociva://orders" --ios`
 
 ### FCM errors in edge function logs
 - Verify `FIREBASE_SERVICE_ACCOUNT` secret is set correctly
@@ -306,10 +290,3 @@ Configure in Admin Panel → Settings → API Configuration:
 | Feature Graphic (Android) | 1024x500 | Required for Play Store |
 
 **Tip:** Use [App Icon Generator](https://www.appicon.co/) to generate all required sizes from a single 1024x1024 image.
-
----
-
-## Support
-
-For issues with the app, contact your development team.
-For Lovable platform issues, visit: https://docs.lovable.dev/
