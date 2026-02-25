@@ -29,7 +29,14 @@ export type FeatureKey =
   | 'worker_leave'
   | 'security_audit'
   | 'seller_tools'
-  | 'gate_entry';
+  | 'gate_entry'
+  | 'collective_buy'
+  | 'authorized_persons'
+  | 'society_reports'
+  | 'subscriptions'
+  | 'trust_directory'
+  | 'community_rules'
+  | 'notifications';
 
 export type FeatureState = 'enabled' | 'disabled' | 'locked' | 'unavailable';
 
