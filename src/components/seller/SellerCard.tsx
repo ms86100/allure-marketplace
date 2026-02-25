@@ -39,7 +39,7 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
             </div>
           )}
           {!isOpen && (
-            <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
+            <div className="absolute inset-0 bg-background/70 backdrop-blur-[2px] flex items-center justify-center">
               <span className="text-foreground font-medium text-sm">Currently Closed</span>
             </div>
           )}
@@ -81,7 +81,7 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
                 </p>
               )}
               {minPrice !== null && (
-                <p className="text-xs font-semibold text-success mt-0.5">
+                <p className="text-xs font-semibold text-success mt-0.5 tabular-nums">
                   Starting from {formatPrice(minPrice)}
                 </p>
               )}

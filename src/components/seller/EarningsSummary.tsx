@@ -23,15 +23,15 @@ export function EarningsSummary({ todayEarnings, weekEarnings, totalEarnings }: 
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-background/50 rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">Today</p>
-            <p className="text-lg font-bold text-success">{formatPrice(todayEarnings)}</p>
+            <p className="text-lg font-bold text-success tabular-nums">{formatPrice(todayEarnings)}</p>
           </div>
           <div className="bg-background/50 rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">This Week</p>
-            <p className="text-lg font-bold text-success">{formatPrice(weekEarnings)}</p>
+            <p className="text-lg font-bold text-success tabular-nums">{formatPrice(weekEarnings)}</p>
           </div>
           <div className="bg-background/50 rounded-lg p-3 text-center">
             <p className="text-xs text-muted-foreground">All Time</p>
-            <p className="text-lg font-bold text-success">{formatPrice(totalEarnings)}</p>
+            <p className="text-lg font-bold text-success tabular-nums">{formatPrice(totalEarnings)}</p>
           </div>
         </div>
       </div>

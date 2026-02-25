@@ -121,7 +121,7 @@ export function BookingSheet({
             )}
             <div className="flex-1">
               <h4 className="font-medium">{listing.name}</h4>
-              <p className="text-lg font-bold text-primary">{formatPrice(listing.price)}</p>
+              <p className="text-lg font-bold text-primary tabular-nums">{formatPrice(listing.price)}</p>
               {listing.service_duration_minutes && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Clock size={10} />
@@ -175,7 +175,7 @@ export function BookingSheet({
         </div>
 
         {/* Confirm Button */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-background border-t safe-bottom">
+        <div className="absolute bottom-0 left-0 right-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-background border-t">
           <Button
             className="w-full"
             size="lg"

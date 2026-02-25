@@ -82,8 +82,8 @@ export default function WorkerMyJobsPage() {
       <div className="p-4 pb-24">
         <Tabs defaultValue="active">
           <TabsList className="w-full">
-            <TabsTrigger value="active" className="flex-1">Active ({activeJobs.length})</TabsTrigger>
-            <TabsTrigger value="completed" className="flex-1">Completed ({completedJobs.length})</TabsTrigger>
+            <TabsTrigger value="active" className="flex-1 min-h-[40px]">Active ({activeJobs.length})</TabsTrigger>
+            <TabsTrigger value="completed" className="flex-1 min-h-[40px]">Completed ({completedJobs.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="active" className="space-y-3 mt-3">
@@ -102,7 +102,7 @@ export default function WorkerMyJobsPage() {
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {job.description && <p className="text-sm text-muted-foreground">{job.description}</p>}
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground tabular-nums">
                       📍 {(job.resident as any)?.block}-{(job.resident as any)?.flat_number} • 
                       {job.start_time && ` ${format(new Date(job.start_time), 'dd MMM, h:mm a')}`}
                       {job.price && ` • ${formatPrice(job.price)}`}
@@ -132,7 +132,7 @@ export default function WorkerMyJobsPage() {
                       <span className="font-medium text-sm">{job.job_type}</span>
                       <Badge className={STATUS_CONFIG.completed.color}>{STATUS_CONFIG.completed.label}</Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground mt-1 tabular-nums">
                       {job.completed_at && format(new Date(job.completed_at), 'dd MMM yyyy')}
                       {job.resident_rating && ` • ⭐ ${job.resident_rating}/5`}
                       {job.price && ` • ${formatPrice(job.price)}`}

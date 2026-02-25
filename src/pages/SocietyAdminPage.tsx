@@ -34,18 +34,18 @@ export default function SocietyAdminPage() {
         {sa.isAdmin && <SocietySwitcher />}
 
         <div className="grid grid-cols-3 gap-3">
-          <Card><CardContent className="p-3 text-center"><Users className="mx-auto text-primary mb-1" size={18} /><p className="text-lg font-bold">{sa.pendingUsers.length}</p><p className="text-[10px] text-muted-foreground">Pending Users</p></CardContent></Card>
-          <Card><CardContent className="p-3 text-center"><Store className="mx-auto text-warning mb-1" size={18} /><p className="text-lg font-bold">{sa.pendingSellers.length}</p><p className="text-[10px] text-muted-foreground">Pending Sellers</p></CardContent></Card>
-          <Card><CardContent className="p-3 text-center"><Shield className="mx-auto text-info mb-1" size={18} /><p className="text-lg font-bold">{sa.societyAdmins.length}</p><p className="text-[10px] text-muted-foreground">Admins</p></CardContent></Card>
+          <Card><CardContent className="p-3 text-center"><Users className="mx-auto text-primary mb-1" size={18} /><p className="text-lg font-bold tabular-nums">{sa.pendingUsers.length}</p><p className="text-[10px] text-muted-foreground">Pending Users</p></CardContent></Card>
+          <Card><CardContent className="p-3 text-center"><Store className="mx-auto text-warning mb-1" size={18} /><p className="text-lg font-bold tabular-nums">{sa.pendingSellers.length}</p><p className="text-[10px] text-muted-foreground">Pending Sellers</p></CardContent></Card>
+          <Card><CardContent className="p-3 text-center"><Shield className="mx-auto text-info mb-1" size={18} /><p className="text-lg font-bold tabular-nums">{sa.societyAdmins.length}</p><p className="text-[10px] text-muted-foreground">Admins</p></CardContent></Card>
         </div>
 
         <Tabs defaultValue="overview">
           <TabsList className="w-full grid grid-cols-5">
-            <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
-            <TabsTrigger value="users" className="text-xs">Users</TabsTrigger>
-            <TabsTrigger value="sellers" className="text-xs">Sellers</TabsTrigger>
-            <TabsTrigger value="disputes" className="text-xs">Disputes</TabsTrigger>
-            <TabsTrigger value="more" className="text-xs">More</TabsTrigger>
+            <TabsTrigger value="overview" className="text-xs min-h-[40px]">Overview</TabsTrigger>
+            <TabsTrigger value="users" className="text-xs min-h-[40px]">Users</TabsTrigger>
+            <TabsTrigger value="sellers" className="text-xs min-h-[40px]">Sellers</TabsTrigger>
+            <TabsTrigger value="disputes" className="text-xs min-h-[40px]">Disputes</TabsTrigger>
+            <TabsTrigger value="more" className="text-xs min-h-[40px]">More</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-4">{sa.societyId && <CommitteeDashboard societyId={sa.societyId} />}</TabsContent>
@@ -137,7 +137,7 @@ export default function SocietyAdminPage() {
               <h3 className="font-semibold text-sm flex items-center gap-2"><Settings size={16} /> Society Settings</h3>
               <div className="flex items-center justify-between"><div><Label className="text-sm font-medium">Auto-approve residents</Label><p className="text-xs text-muted-foreground">Skip manual approval</p></div><Switch checked={sa.autoApprove} onCheckedChange={checked => { sa.setAutoApprove(checked); sa.updateSocietySettings('auto_approve_residents', checked); }} /></div>
               <div className="space-y-2"><Label className="text-sm font-medium">Approval Method</Label><Select value={sa.approvalMethod} onValueChange={value => { sa.setApprovalMethod(value); sa.updateSocietySettings('approval_method', value); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="manual">Manual</SelectItem><SelectItem value="invite_code">Invite Code</SelectItem><SelectItem value="auto">Auto (GPS match)</SelectItem></SelectContent></Select></div>
-              {sa.effectiveSociety?.invite_code && <div className="p-3 bg-muted rounded-lg"><p className="text-xs text-muted-foreground">Society Invite Code</p><p className="font-mono font-bold text-lg">{sa.effectiveSociety.invite_code}</p></div>}
+              {sa.effectiveSociety?.invite_code && <div className="p-3 bg-muted rounded-lg"><p className="text-xs text-muted-foreground">Society Invite Code</p><p className="font-mono font-bold text-lg tracking-widest tabular-nums">{sa.effectiveSociety.invite_code}</p></div>}
             </CardContent></Card>
           </TabsContent>
         </Tabs>

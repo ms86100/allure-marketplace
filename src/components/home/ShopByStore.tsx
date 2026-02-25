@@ -88,7 +88,7 @@ export function ShopByStore() {
                 {seller.rating > 0 && (
                   <div className="flex items-center justify-center gap-0.5 mt-0.5">
                     <Star size={8} className="text-warning fill-warning" />
-                    <span className="text-[9px] font-bold text-muted-foreground">
+                    <span className="text-[9px] font-bold text-muted-foreground tabular-nums">
                       {seller.rating}
                     </span>
                   </div>

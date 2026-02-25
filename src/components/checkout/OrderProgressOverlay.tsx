@@ -19,7 +19,7 @@ function OrderProgressOverlayInner({ isVisible, step }: OrderProgressOverlayProp
   const currentIdx = STEPS.findIndex(s => s.key === step);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center">
+    <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center safe-top safe-bottom">
       <div className="bg-card border border-border rounded-2xl p-6 mx-6 w-full max-w-sm shadow-lg">
         <div className="flex items-center justify-center mb-5">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />

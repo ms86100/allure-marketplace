@@ -59,8 +59,8 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
             </div>
           )}
           {!product.is_available && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <span className="text-white text-sm font-medium">Unavailable</span>
+            <div className="absolute inset-0 bg-foreground/50 flex items-center justify-center">
+              <span className="text-background text-sm font-medium">Unavailable</span>
             </div>
           )}
           {/* Badges */}
@@ -72,7 +72,7 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
               </Badge>
             )}
             {product.is_recommended && (
-              <Badge className="bg-success text-white text-[10px] px-1.5">
+              <Badge className="bg-success text-success-foreground text-[10px] px-1.5">
                 <Award size={10} className="mr-0.5" />
                 Recommended
               </Badge>
@@ -84,7 +84,7 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
             <VegBadge isVeg={product.is_veg} size="sm" className="mt-1" />
             <div className="flex-1 min-w-0">
               <h4 className="font-medium text-sm truncate">{product.name}</h4>
-              <p className="text-sm font-semibold text-primary mt-1">
+              <p className="text-sm font-semibold text-primary mt-1 tabular-nums">
                 {formatPrice(product.price)}
               </p>
             </div>
@@ -95,7 +95,7 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-primary" onClick={handleDecrement}>
                   <Minus size={16} />
                 </Button>
-                <span className="font-semibold text-primary w-6 text-center">{quantity}</span>
+                <span className="font-semibold text-primary w-6 text-center tabular-nums">{quantity}</span>
                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-primary" onClick={handleIncrement}>
                   <Plus size={16} />
                 </Button>
@@ -143,7 +143,7 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
                 {product.description}
               </p>
             )}
-            <p className="font-semibold mt-2">{formatPrice(product.price)}</p>
+            <p className="font-semibold mt-2 tabular-nums">{formatPrice(product.price)}</p>
           </div>
         </div>
       </div>
@@ -167,7 +167,7 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
             <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-primary-foreground hover:bg-primary-foreground/20" onClick={handleDecrement}>
               <Minus size={14} />
             </Button>
-            <span className="font-semibold text-primary-foreground w-4 text-center">{quantity}</span>
+            <span className="font-semibold text-primary-foreground w-4 text-center tabular-nums">{quantity}</span>
             <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-primary-foreground hover:bg-primary-foreground/20" onClick={handleIncrement}>
               <Plus size={14} />
             </Button>

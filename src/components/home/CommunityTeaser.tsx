@@ -104,7 +104,7 @@ export function CommunityTeaser() {
             <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-center gap-3 active:scale-[0.98] transition-transform hover:border-primary/20">
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-semibold text-foreground line-clamp-1">{post.title}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
+                <p className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
                   {post.comment_count} comment{post.comment_count !== 1 ? 's' : ''} · {post.vote_count} vote{post.vote_count !== 1 ? 's' : ''}
                 </p>
               </div>

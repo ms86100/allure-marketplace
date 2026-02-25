@@ -252,7 +252,7 @@ export default function WorkerJobsPage() {
                       )}
                       <Badge
                         variant={isOwnSociety ? 'default' : 'secondary'}
-                        className={`text-[10px] ${isOwnSociety ? 'bg-success hover:bg-success/90' : 'bg-info hover:bg-info/90 text-primary-foreground'}`}
+                        className={`text-[10px] ${isOwnSociety ? 'bg-success text-success-foreground hover:bg-success/90' : 'bg-info text-info-foreground hover:bg-info/90'}`}
                       >
                         {isOwnSociety ? 'Your Society' : societyName}
                       </Badge>
@@ -265,7 +265,7 @@ export default function WorkerJobsPage() {
                   )}
                   <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                     {job.price && (
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1 tabular-nums">
                         <IndianRupee size={12} /> {formatPrice(job.price)}
                       </span>
                     )}

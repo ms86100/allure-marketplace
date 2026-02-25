@@ -105,14 +105,14 @@ export function ReviewForm({ orderId, sellerId, sellerName, category, onSuccess,
             <p className="text-sm text-muted-foreground mb-2">Tap to rate</p>
             <div className="flex justify-center gap-1">
               {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setRating(star)}
-                  onMouseEnter={() => setHoveredRating(star)}
-                  onMouseLeave={() => setHoveredRating(0)}
-                  className="p-1 transition-transform hover:scale-110"
-                >
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setRating(star)}
+                    onMouseEnter={() => setHoveredRating(star)}
+                    onMouseLeave={() => setHoveredRating(0)}
+                    className="p-1.5 transition-transform hover:scale-110 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  >
                   <Star
                     size={32}
                     className={cn(
@@ -147,7 +147,7 @@ export function ReviewForm({ orderId, sellerId, sellerName, category, onSuccess,
                         key={star}
                         type="button"
                         onClick={() => setDimensionRatings(prev => ({ ...prev, [dim]: star }))}
-                        className="p-0.5"
+                        className="p-1 min-w-[32px] min-h-[32px] flex items-center justify-center"
                       >
                         <Star
                           size={18}

@@ -104,7 +104,7 @@ export function ListingCard({
           >
             <Minus size={14} />
           </Button>
-          <span className="w-6 text-center font-semibold">{quantity}</span>
+          <span className="w-6 text-center font-semibold tabular-nums">{quantity}</span>
           <Button
             size="icon"
             className="h-8 w-8 rounded-full"
@@ -138,7 +138,7 @@ export function ListingCard({
     if (listing.rental_period_type) {
       return (
         <div>
-          <span className="font-bold text-lg">{formatPrice(listing.price)}</span>
+          <span className="font-bold text-lg tabular-nums">{formatPrice(listing.price)}</span>
           <span className="text-xs text-muted-foreground ml-1">
             {marketplaceConfig.rentalPeriodLabels[listing.rental_period_type] || listing.rental_period_type}
           </span>
@@ -155,7 +155,7 @@ export function ListingCard({
     if (listing.service_duration_minutes) {
       return (
         <div>
-          <span className="font-bold text-lg">{formatPrice(listing.price)}</span>
+          <span className="font-bold text-lg tabular-nums">{formatPrice(listing.price)}</span>
           <p className="text-xs text-muted-foreground flex items-center gap-1">
             <Clock size={10} />
             {listing.service_duration_minutes} min
@@ -167,7 +167,7 @@ export function ListingCard({
     // Standard pricing
     return (
       <div>
-        <span className="font-bold text-lg">{formatPrice(listing.price)}</span>
+        <span className="font-bold text-lg tabular-nums">{formatPrice(listing.price)}</span>
         {isNegotiable && (
           <Badge variant="outline" className="ml-2 text-[10px]">
             Negotiable
@@ -224,7 +224,7 @@ export function ListingCard({
         )}
         <div className="flex-1 min-w-0">
           <p className="font-medium truncate">{listing.name}</p>
-          <p className="text-sm font-semibold text-primary">{formatPrice(listing.price)}</p>
+          <p className="text-sm font-semibold text-primary tabular-nums">{formatPrice(listing.price)}</p>
         </div>
         {renderActionButton()}
       </div>

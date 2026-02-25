@@ -139,13 +139,18 @@ export function FeaturedBanners() {
             <button
               key={idx}
               onClick={() => scrollToIndex(idx)}
+              aria-label={`Go to banner ${idx + 1}`}
               className={cn(
+                'rounded-full transition-all duration-300 min-h-[24px] min-w-[24px] flex items-center justify-center',
+              )}
+            >
+              <span className={cn(
                 'rounded-full transition-all duration-300',
                 idx === activeIndex
                   ? 'w-5 h-1.5 bg-primary'
                   : 'w-1.5 h-1.5 bg-border'
-              )}
-            />
+              )} />
+            </button>
           ))}
         </div>
       )}

@@ -70,7 +70,7 @@ export function OrderItemCard({ item, isSellerView, orderStatus, onStatusUpdate 
               {statusInfo.label}
             </span>
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground tabular-nums">
             {formatPrice(item.unit_price)} × {item.quantity} = {formatPrice(item.unit_price * item.quantity)}
           </p>
         </div>

@@ -115,7 +115,7 @@ export function OnboardingWalkthrough({ onComplete, slides: customSlides }: Onbo
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       {/* Skip button */}
-      <div className="flex justify-end p-4">
+      <div className="flex justify-end p-4 safe-top">
         <Button variant="ghost" size="sm" onClick={handleSkip}>
           Skip
           <X size={16} className="ml-1" />
@@ -132,7 +132,7 @@ export function OnboardingWalkthrough({ onComplete, slides: customSlides }: Onbo
       </div>
 
       {/* Navigation */}
-      <div className="p-6 space-y-4">
+      <div className="p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] space-y-4">
         {/* Dots */}
         <div className="flex justify-center gap-2">
           {slides.map((_, index) => (
@@ -140,8 +140,8 @@ export function OnboardingWalkthrough({ onComplete, slides: customSlides }: Onbo
               key={index}
               onClick={() => setCurrentSlide(index)}
               className={cn(
-                'w-2 h-2 rounded-full transition-all',
-                index === currentSlide ? 'w-6 bg-primary' : 'bg-muted'
+                'h-2 rounded-full transition-all min-w-[8px]',
+                index === currentSlide ? 'w-6 bg-primary' : 'w-2 bg-muted'
               )}
             />
           ))}

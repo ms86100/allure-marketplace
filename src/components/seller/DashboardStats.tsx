@@ -42,7 +42,7 @@ export function DashboardStats({ totalOrders, pendingOrders, todayOrders, comple
         <Card key={label}>
           <CardContent className="p-2.5 text-center">
             <Icon className={`mx-auto mb-1 ${color}`} size={18} />
-            <p className="text-lg font-bold">{value}</p>
+            <p className="text-lg font-bold tabular-nums">{value}</p>
             <p className="text-[9px] text-muted-foreground leading-tight">{label}</p>
           </CardContent>
         </Card>

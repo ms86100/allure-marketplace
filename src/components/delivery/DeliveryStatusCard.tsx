@@ -22,13 +22,13 @@ interface DeliveryStatusCardProps {
 }
 
 const DELIVERY_STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
-  pending: { label: 'Assigning Rider', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-  assigned: { label: 'Rider Assigned', color: 'bg-blue-100 text-blue-800', icon: Truck },
-  picked_up: { label: 'Out for Delivery', color: 'bg-indigo-100 text-indigo-800', icon: Truck },
-  at_gate: { label: 'At Your Gate', color: 'bg-cyan-100 text-cyan-800', icon: MapPin },
-  delivered: { label: 'Delivered', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-  failed: { label: 'Delivery Failed', color: 'bg-red-100 text-red-800', icon: XCircle },
-  cancelled: { label: 'Cancelled', color: 'bg-gray-100 text-gray-800', icon: XCircle },
+  pending: { label: 'Assigning Rider', color: 'bg-warning/15 text-warning', icon: Clock },
+  assigned: { label: 'Rider Assigned', color: 'bg-info/15 text-info', icon: Truck },
+  picked_up: { label: 'Out for Delivery', color: 'bg-primary/15 text-primary', icon: Truck },
+  at_gate: { label: 'At Your Gate', color: 'bg-info/15 text-info', icon: MapPin },
+  delivered: { label: 'Delivered', color: 'bg-success/15 text-success', icon: CheckCircle },
+  failed: { label: 'Delivery Failed', color: 'bg-destructive/15 text-destructive', icon: XCircle },
+  cancelled: { label: 'Cancelled', color: 'bg-muted text-muted-foreground', icon: XCircle },
 };
 
 export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliveryStatusCardProps) {
