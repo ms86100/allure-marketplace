@@ -4,8 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Package, Check, Lock, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { Package, Check, Lock, Info, ExternalLink } from 'lucide-react';
 import { FeatureShowcase } from '@/components/admin/FeatureShowcase';
+import { getFeatureIcon } from '@/lib/feature-showcase-data';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 interface BuilderFeaturePlanProps {
   builderId: string;
@@ -17,16 +20,18 @@ interface PackageFeature {
   enabled: boolean;
   is_core: boolean;
   category: string;
+  route: string | null;
+  icon_name: string | null;
+  description: string | null;
 }
 
 export function BuilderFeaturePlan({ builderId }: BuilderFeaturePlanProps) {
-  const [expanded, setExpanded] = useState(false);
   const [showcaseKey, setShowcaseKey] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const { data, isLoading } = useQuery({
     queryKey: ['builder-feature-plan', builderId],
     queryFn: async () => {
-      // Get builder's assigned package
       const { data: assignment } = await supabase
         .from('builder_feature_packages')
         .select('id, package_id, assigned_at, expires_at')
@@ -37,7 +42,6 @@ export function BuilderFeaturePlan({ builderId }: BuilderFeaturePlanProps) {
 
       if (!assignment) return null;
 
-      // Get package details
       const { data: pkg } = await supabase
         .from('feature_packages')
         .select('package_name, description, price_tier')
@@ -46,16 +50,14 @@ export function BuilderFeaturePlan({ builderId }: BuilderFeaturePlanProps) {
 
       if (!pkg) return null;
 
-      // Get package items with feature details
       const { data: items } = await supabase
         .from('feature_package_items')
         .select('feature_id, enabled')
         .eq('package_id', assignment.package_id);
 
-      // Get all platform features
       const { data: allFeatures } = await supabase
         .from('platform_features')
-        .select('id, feature_key, feature_name, is_core, category')
+        .select('id, feature_key, feature_name, is_core, category, route, icon_name, description')
         .order('category')
         .order('feature_name');
 
@@ -67,6 +69,9 @@ export function BuilderFeaturePlan({ builderId }: BuilderFeaturePlanProps) {
         enabled: f.is_core || (itemMap.has(f.id) && itemMap.get(f.id) === true),
         is_core: f.is_core,
         category: f.category,
+        route: f.route,
+        icon_name: f.icon_name,
+        description: f.description,
       }));
 
       const enabledCount = features.filter(f => f.enabled).length;
@@ -75,8 +80,6 @@ export function BuilderFeaturePlan({ builderId }: BuilderFeaturePlanProps) {
         packageName: pkg.package_name,
         priceTier: pkg.price_tier,
         description: pkg.description,
-        assignedAt: assignment.assigned_at,
-        expiresAt: assignment.expires_at,
         features,
         enabledCount,
         totalCount: features.length,
@@ -85,15 +88,26 @@ export function BuilderFeaturePlan({ builderId }: BuilderFeaturePlanProps) {
     staleTime: 5 * 60 * 1000,
   });
 
-  if (isLoading) return <Skeleton className="h-24 w-full" />;
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-20 w-full rounded-xl" />
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 w-full rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (!data) {
     return (
       <Card className="border-dashed border-muted-foreground/30">
-        <CardContent className="p-4 text-center">
-          <Package size={20} className="mx-auto text-muted-foreground/50 mb-2" />
+        <CardContent className="p-6 text-center">
+          <Package size={24} className="mx-auto text-muted-foreground/50 mb-2" />
           <p className="text-sm font-medium text-muted-foreground">No package assigned</p>
-          <p className="text-xs text-muted-foreground/70">Contact your platform admin to get a feature package.</p>
+          <p className="text-xs text-muted-foreground/70 mt-1">Contact your platform admin to get a feature package.</p>
         </CardContent>
       </Card>
     );
@@ -106,62 +120,137 @@ export function BuilderFeaturePlan({ builderId }: BuilderFeaturePlanProps) {
     enterprise: 'bg-warning/10 text-warning',
   };
 
+  // Group features: enabled first, then disabled
+  const enabledFeatures = data.features.filter(f => f.enabled);
+  const disabledFeatures = data.features.filter(f => !f.enabled);
+
   return (
     <>
-      <Card className="border-primary/20 bg-primary/5">
+      {/* Plan Summary */}
+      <Card className="border-0 shadow-sm bg-primary/5">
         <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Package size={16} className="text-primary" />
-              <span className="text-sm font-semibold">Your Plan: {data.packageName}</span>
-              <Badge className={`text-[10px] capitalize ${tierColors[data.priceTier] || tierColors.free}`}>
-                {data.priceTier}
-              </Badge>
-            </div>
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
+          <div className="flex items-center gap-2 mb-2">
+            <Package size={18} className="text-primary" />
+            <span className="text-sm font-bold">Your Plan: {data.packageName}</span>
+            <Badge className={`text-[10px] capitalize ${tierColors[data.priceTier] || tierColors.free}`}>
+              {data.priceTier}
+            </Badge>
           </div>
-
-          <p className="text-xs text-muted-foreground mb-1">
+          <p className="text-xs text-muted-foreground mb-2">
             {data.enabledCount} of {data.totalCount} features included
           </p>
-
-          {/* Progress bar */}
           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
             <div
               className="h-full bg-primary rounded-full transition-all"
               style={{ width: `${(data.enabledCount / data.totalCount) * 100}%` }}
             />
           </div>
-
-          {expanded && (
-            <div className="mt-3 space-y-1 border-t pt-3">
-              {data.features.map(f => (
-                <button
-                  key={f.feature_key}
-                  className="flex items-center gap-2 w-full text-left py-1 hover:bg-primary/5 rounded px-1 transition-colors"
-                  onClick={() => setShowcaseKey(f.feature_key)}
-                >
-                  {f.enabled ? (
-                    <Check size={13} className="text-primary shrink-0" />
-                  ) : (
-                    <Lock size={13} className="text-muted-foreground/40 shrink-0" />
-                  )}
-                  <span className={`text-xs flex-1 ${f.enabled ? 'text-foreground' : 'text-muted-foreground/50'}`}>
-                    {f.feature_name}
-                  </span>
-                  {f.is_core && <Badge variant="secondary" className="text-[8px] h-3.5">Core</Badge>}
-                  <Info size={11} className="text-muted-foreground/30" />
-                </button>
-              ))}
-            </div>
-          )}
         </CardContent>
       </Card>
+
+      {/* Enabled Feature Cards */}
+      {enabledFeatures.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            Active Features ({enabledFeatures.length})
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            {enabledFeatures.map((f, i) => {
+              const Icon = getFeatureIcon(f.icon_name);
+              return (
+                <motion.div
+                  key={f.feature_key}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.03, duration: 0.25 }}
+                >
+                  <Card
+                    className="border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer group relative overflow-hidden"
+                    onClick={() => setShowcaseKey(f.feature_key)}
+                  >
+                    <CardContent className="p-3.5">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Icon size={18} className="text-primary" />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {f.is_core && (
+                            <Badge variant="secondary" className="text-[8px] h-4 px-1">Core</Badge>
+                          )}
+                          <Check size={14} className="text-primary" />
+                        </div>
+                      </div>
+                      <p className="text-xs font-semibold leading-tight line-clamp-2">
+                        {f.feature_name}
+                      </p>
+                      {f.description && (
+                        <p className="text-[10px] text-muted-foreground line-clamp-2 mt-1 leading-snug">
+                          {f.description}
+                        </p>
+                      )}
+                      {f.route && (
+                        <button
+                          className="mt-2 flex items-center gap-1 text-[10px] text-primary font-medium hover:underline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(f.route!);
+                          }}
+                        >
+                          <ExternalLink size={10} /> Open
+                        </button>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Disabled Feature Cards */}
+      {disabledFeatures.length > 0 && (
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            Locked Features ({disabledFeatures.length})
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            {disabledFeatures.map((f, i) => {
+              const Icon = getFeatureIcon(f.icon_name);
+              return (
+                <motion.div
+                  key={f.feature_key}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.02, duration: 0.2 }}
+                >
+                  <Card
+                    className="border-0 shadow-sm opacity-60 hover:opacity-80 transition-opacity cursor-pointer"
+                    onClick={() => setShowcaseKey(f.feature_key)}
+                  >
+                    <CardContent className="p-3.5">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                          <Icon size={18} className="text-muted-foreground" />
+                        </div>
+                        <Lock size={14} className="text-muted-foreground/50" />
+                      </div>
+                      <p className="text-xs font-semibold leading-tight line-clamp-2 text-muted-foreground">
+                        {f.feature_name}
+                      </p>
+                      {f.description && (
+                        <p className="text-[10px] text-muted-foreground/60 line-clamp-2 mt-1 leading-snug">
+                          {f.description}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <FeatureShowcase
         featureKey={showcaseKey}
