@@ -1075,6 +1075,7 @@ export type Database = {
         Row: {
           code: string
           created_at: string
+          description: string | null
           discount_type: string
           discount_value: number
           expires_at: string | null
@@ -1084,6 +1085,7 @@ export type Database = {
           min_order_amount: number | null
           per_user_limit: number
           seller_id: string
+          show_to_buyers: boolean
           society_id: string
           starts_at: string
           times_used: number
@@ -1093,6 +1095,7 @@ export type Database = {
         Insert: {
           code: string
           created_at?: string
+          description?: string | null
           discount_type?: string
           discount_value?: number
           expires_at?: string | null
@@ -1102,6 +1105,7 @@ export type Database = {
           min_order_amount?: number | null
           per_user_limit?: number
           seller_id: string
+          show_to_buyers?: boolean
           society_id: string
           starts_at?: string
           times_used?: number
@@ -1111,6 +1115,7 @@ export type Database = {
         Update: {
           code?: string
           created_at?: string
+          description?: string | null
           discount_type?: string
           discount_value?: number
           expires_at?: string | null
@@ -1120,6 +1125,7 @@ export type Database = {
           min_order_amount?: number | null
           per_user_limit?: number
           seller_id?: string
+          show_to_buyers?: boolean
           society_id?: string
           starts_at?: string
           times_used?: number

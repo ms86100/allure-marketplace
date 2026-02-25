@@ -11,6 +11,7 @@ import { hapticImpact } from '@/lib/haptics';
 interface CouponData {
   id: string;
   code: string;
+  description: string | null;
   discount_type: string;
   discount_value: number;
   max_discount_amount: number | null;
@@ -20,6 +21,7 @@ interface CouponData {
   usage_limit: number | null;
   times_used: number;
   per_user_limit: number;
+  show_to_buyers: boolean;
 }
 
 interface CouponInputProps {
@@ -46,10 +48,11 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
     async function fetchCoupons() {
       const { data } = await supabase
         .from('coupons')
-        .select('id, code, discount_type, discount_value, max_discount_amount, min_order_amount, expires_at, starts_at, usage_limit, times_used, per_user_limit')
+        .select('id, code, description, discount_type, discount_value, max_discount_amount, min_order_amount, expires_at, starts_at, usage_limit, times_used, per_user_limit, show_to_buyers')
         .eq('society_id', effectiveSocietyId!)
         .eq('seller_id', sellerId)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('show_to_buyers', true);
 
       if (cancelled || !data) return;
 
@@ -63,7 +66,6 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
 
       setAvailableCoupons(valid);
 
-      // Fetch user redemption counts
       if (valid.length > 0) {
         const { data: redemptions } = await supabase
           .from('coupon_redemptions')
@@ -221,6 +223,9 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
                 <div className="flex items-center gap-2">
                   <span className="font-mono font-bold text-primary text-sm tracking-wide">{coupon.code}</span>
                 </div>
+                {coupon.description && (
+                  <p className="text-xs text-foreground/80 mt-0.5 line-clamp-2">{coupon.description}</p>
+                )}
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {coupon.discount_type === 'percentage'
                     ? `${coupon.discount_value}% off${coupon.max_discount_amount ? ` (up to ${formatPrice(coupon.max_discount_amount)})` : ''}`
@@ -249,6 +254,9 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
                 <div className="flex items-center gap-2">
                   <span className="font-mono font-bold text-muted-foreground text-sm tracking-wide">{coupon.code}</span>
                 </div>
+                {coupon.description && (
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{coupon.description}</p>
+                )}
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {coupon.discount_type === 'percentage'
                     ? `${coupon.discount_value}% off${coupon.max_discount_amount ? ` (up to ${formatPrice(coupon.max_discount_amount)})` : ''}`
