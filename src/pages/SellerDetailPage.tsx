@@ -189,7 +189,7 @@ export default function SellerDetailPage() {
   if (isLoading) {
     return (
       <AppLayout showHeader={false}>
-        <Skeleton className="h-48 w-full" />
+        <Skeleton className="h-48 w-full rounded-b-2xl" />
         <div className="p-4 space-y-4">
           <Skeleton className="h-8 w-3/4" />
           <Skeleton className="h-4 w-1/2" />
@@ -228,21 +228,21 @@ export default function SellerDetailPage() {
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/30 to-transparent" />
         
         <div className="absolute top-[max(1rem,env(safe-area-inset-top))] left-4 right-4 flex justify-between">
           <button
             onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center shadow-md border border-white/20"
+            className="w-10 h-10 rounded-full bg-foreground/50 backdrop-blur-sm flex items-center justify-center shadow-md border border-primary-foreground/20"
           >
-            <ArrowLeft size={18} className="text-white" />
+            <ArrowLeft size={18} className="text-primary-foreground" />
           </button>
           <div className="flex gap-2">
             {user && (
               <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
                 <DialogTrigger asChild>
-                   <button className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center shadow-md border border-white/20">
-                     <Flag size={18} className="text-white" />
+                   <button className="w-10 h-10 rounded-full bg-foreground/50 backdrop-blur-sm flex items-center justify-center shadow-md border border-primary-foreground/20">
+                     <Flag size={18} className="text-primary-foreground" />
                   </button>
                 </DialogTrigger>
                 <DialogContent>

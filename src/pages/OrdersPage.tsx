@@ -195,7 +195,7 @@ export default function OrdersPage() {
   if (!user) return null;
 
   return (
-    <AppLayout>
+    <AppLayout headerTitle="Orders">
       <div className="pb-4">
         <div className="px-4 pt-3">
           {isSeller ? (

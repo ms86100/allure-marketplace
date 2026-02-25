@@ -70,8 +70,8 @@ export default function SnagListPage() {
     return (
       <AppLayout headerTitle="Snag Reports" showLocation={false}>
         <div className="p-4 space-y-3">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
         </div>
       </AppLayout>
     );

@@ -101,7 +101,7 @@ export function SellerOrderCard({ order }: SellerOrderCardProps) {
             </div>
             <div className="flex items-center gap-1.5 text-muted-foreground justify-end">
               <CreditCard size={12} />
-              <span className="font-medium text-foreground">{formatPrice(order.total_amount)}</span>
+              <span className="font-medium text-foreground tabular-nums">{formatPrice(order.total_amount)}</span>
             </div>
           </div>
 

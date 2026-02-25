@@ -169,28 +169,28 @@ export default function SellerDashboardPage() {
                 <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
                   <Star size={16} className="text-warning" />
                   <div>
-                    <p className="text-sm font-semibold">{Number(sellerProfile.rating || 0).toFixed(1)} ★</p>
+                    <p className="text-sm font-semibold tabular-nums">{Number(sellerProfile.rating || 0).toFixed(1)} ★</p>
                     <p className="text-[10px] text-muted-foreground">{sellerProfile.total_reviews || 0} reviews</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
                   <Clock size={16} className="text-primary" />
                   <div>
-                    <p className="text-sm font-semibold">{sellerProfile.avg_response_minutes != null ? `~${sellerProfile.avg_response_minutes} min` : 'N/A'}</p>
+                    <p className="text-sm font-semibold tabular-nums">{sellerProfile.avg_response_minutes != null ? `~${sellerProfile.avg_response_minutes} min` : 'N/A'}</p>
                     <p className="text-[10px] text-muted-foreground">Avg response</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
                   <CheckCircle size={16} className="text-success" />
                   <div>
-                    <p className="text-sm font-semibold">{sellerProfile.completed_order_count || 0}</p>
+                    <p className="text-sm font-semibold tabular-nums">{sellerProfile.completed_order_count || 0}</p>
                     <p className="text-[10px] text-muted-foreground">Orders fulfilled</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
                   <XCircle size={16} className="text-destructive" />
                   <div>
-                    <p className="text-sm font-semibold">{sellerProfile.cancellation_rate != null ? `${sellerProfile.cancellation_rate}%` : '0%'}</p>
+                    <p className="text-sm font-semibold tabular-nums">{sellerProfile.cancellation_rate != null ? `${sellerProfile.cancellation_rate}%` : '0%'}</p>
                     <p className="text-[10px] text-muted-foreground">Cancellation</p>
                   </div>
                 </div>

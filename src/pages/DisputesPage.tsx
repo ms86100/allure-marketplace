@@ -86,8 +86,8 @@ export default function DisputesPage() {
         <ModuleSearchBar context="disputes" value={searchQuery} onChange={setSearchQuery} />
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="open">Open ({openTickets.length})</TabsTrigger>
-            <TabsTrigger value="closed">Resolved ({closedTickets.length})</TabsTrigger>
+            <TabsTrigger value="open" className="text-xs">Open ({openTickets.length})</TabsTrigger>
+            <TabsTrigger value="closed" className="text-xs">Resolved ({closedTickets.length})</TabsTrigger>
           </TabsList>
         </Tabs>
 

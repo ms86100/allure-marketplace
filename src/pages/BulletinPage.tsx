@@ -178,7 +178,7 @@ export default function BulletinPage() {
       <FeatureGate feature="bulletin">
       <div className="pt-2">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-2 mx-4 mb-3" style={{ width: 'calc(100% - 2rem)' }}>
+          <TabsList className="w-full grid grid-cols-2 mb-3 mx-4" style={{ width: 'calc(100% - 2rem)' }}>
             <TabsTrigger value="board">Board</TabsTrigger>
             <TabsTrigger value="help">Quick Help</TabsTrigger>
           </TabsList>

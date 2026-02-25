@@ -43,10 +43,10 @@ export function SocietyQuickLinks() {
           </Link>
         </div>
       </div>
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 px-4">
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1 px-4 snap-x snap-mandatory">
         {visibleLinks.slice(0, 6).map(({ icon: Icon, label, to }) => (
-          <Link key={to} to={to} className="shrink-0">
-            <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-center gap-2.5 active:scale-[0.97] transition-all duration-200 hover:border-primary/30">
+          <Link key={to} to={to} className="shrink-0 snap-start">
+            <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-center gap-2.5 active:scale-[0.97] transition-all duration-200 hover:border-primary/30 min-w-[120px]">
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Icon size={16} className="text-primary" />
               </div>

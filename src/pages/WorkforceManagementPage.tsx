@@ -120,7 +120,7 @@ export default function WorkforceManagementPage() {
               <p className="text-[10px] text-muted-foreground">Active</p>
             </CardContent></Card>
             <Card><CardContent className="p-3 text-center">
-              <AlertTriangle className="mx-auto text-amber-500 mb-1" size={18} />
+              <AlertTriangle className="mx-auto text-warning mb-1" size={18} />
               <p className="text-lg font-bold">{suspendedCount}</p>
               <p className="text-[10px] text-muted-foreground">Suspended</p>
             </CardContent></Card>

@@ -138,8 +138,8 @@ export default function ProfilePage() {
                   ) : (
                     <User className="text-muted-foreground" size={28} />
                   )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Camera className="text-white" size={18} />
+                   <div className="absolute inset-0 bg-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Camera className="text-primary-foreground" size={18} />
                   </div>
                 </button>
               )}

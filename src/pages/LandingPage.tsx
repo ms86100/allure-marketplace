@@ -280,7 +280,7 @@ export default function LandingPage() {
       </div>
 
       {/* Dot Indicators */}
-      <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 flex gap-2 bg-card/80 backdrop-blur-sm px-4 py-2.5 rounded-full border border-border shadow-lg">
+      <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 flex gap-2 bg-card/80 backdrop-blur-sm px-4 py-2.5 rounded-full border border-border shadow-lg safe-bottom">
         {slides.map((_, i) => (
           <button
             key={i}
@@ -302,7 +302,7 @@ export default function LandingPage() {
       </div>
 
       {/* Legal Footer */}
-      <div className="fixed bottom-4 left-0 right-0 z-40 flex justify-center gap-4 text-xs text-muted-foreground">
+      <div className="fixed bottom-4 left-0 right-0 z-40 flex justify-center gap-4 text-xs text-muted-foreground safe-bottom">
         <Link to="/privacy-policy" className="hover:text-foreground">Privacy</Link>
         <span>•</span>
         <Link to="/terms" className="hover:text-foreground">Terms</Link>

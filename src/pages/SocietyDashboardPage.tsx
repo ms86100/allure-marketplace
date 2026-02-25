@@ -236,7 +236,7 @@ export default function SocietyDashboardPage() {
             >
               <ArrowLeft size={18} />
             </Button>
-            <h1 className="text-sm font-bold text-foreground flex-1 truncate">
+            <h1 className="text-base font-bold text-foreground flex-1 truncate">
               {effectiveSociety?.name || 'Society'}
             </h1>
           </div>
@@ -284,7 +284,7 @@ export default function SocietyDashboardPage() {
             </div>
             <div className="flex-1">
               <p className="text-[10px] text-muted-foreground font-medium">Avg. committee response</p>
-              <p className="text-base font-bold text-primary leading-tight">
+              <p className="text-base font-bold text-primary leading-tight tabular-nums">
                 {avgResponseHours < 1 ? '<1 hour' : `${avgResponseHours}h`}
               </p>
             </div>

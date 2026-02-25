@@ -121,8 +121,8 @@ export default function PricingPage() {
     <AppLayout showHeader={false}>
       <div className="p-4 pb-8 safe-top">
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => window.history.back()}>
-            <ArrowLeft size={24} />
+          <button onClick={() => window.history.back()} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0">
+            <ArrowLeft size={18} />
           </button>
           <div>
             <h1 className="text-xl font-bold">Pricing</h1>

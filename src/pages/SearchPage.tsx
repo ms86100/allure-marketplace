@@ -35,7 +35,7 @@ export default function SearchPage() {
   const s = useSearchPage();
 
   return (
-    <AppLayout showHeader={false}>
+    <AppLayout showHeader={false} showCart={false}>
       <div className="pb-24">
         {/* Sticky search header */}
         <div className="sticky top-0 z-40 bg-background safe-top">
