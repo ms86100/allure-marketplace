@@ -7,12 +7,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Label } from '@/components/ui/label';
-import { Plus, Pencil, Trash2, GripVertical, Eye } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Pencil, Trash2, GripVertical, Eye, Megaphone } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 type BannerTemplate = 'image_only' | 'text_overlay' | 'split_left' | 'gradient_cta' | 'minimal_text';
 
@@ -148,56 +149,72 @@ export function AdminBannerManager() {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-muted-foreground">
-          Featured Banners ({banners.length})
-        </h3>
-        <Button size="sm" onClick={openCreate} className="gap-1">
-          <Plus size={14} /> Add Banner
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center">
+            <Megaphone size={15} className="text-amber-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold">Featured Banners</h3>
+            <p className="text-[10px] text-muted-foreground">{banners.length} banner{banners.length !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+        <Button size="sm" onClick={openCreate} className="gap-1.5 rounded-xl font-semibold">
+          <Plus size={13} /> Add Banner
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="space-y-2">{[1, 2].map(i => <div key={i} className="h-20 bg-muted rounded-xl animate-pulse" />)}</div>
+        <div className="space-y-2">{[1, 2].map(i => <div key={i} className="h-20 bg-muted rounded-2xl animate-pulse" />)}</div>
       ) : banners.length === 0 ? (
-        <Card><CardContent className="py-8 text-center text-sm text-muted-foreground">No banners yet. Create one to feature on the home page.</CardContent></Card>
+        <Card className="border-0 shadow-[var(--shadow-card)] rounded-2xl">
+          <CardContent className="py-10 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-muted mx-auto mb-3 flex items-center justify-center">
+              <Megaphone size={20} className="text-muted-foreground/40" />
+            </div>
+            <p className="text-sm text-muted-foreground font-medium">No banners yet</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Create one to feature on the home page.</p>
+          </CardContent>
+        </Card>
       ) : (
-        banners.map((b: any) => (
-          <Card key={b.id} className={cn(!b.is_active && 'opacity-50')}>
-            <CardContent className="p-3 flex items-center gap-3">
-              <GripVertical size={14} className="text-muted-foreground shrink-0" />
-              {b.image_url ? (
-                <img src={b.image_url} alt="" className="w-16 h-10 rounded-lg object-cover shrink-0" />
-              ) : (
-                <div className="w-16 h-10 rounded-lg shrink-0 flex items-center justify-center text-[10px] text-white font-bold" style={{ backgroundColor: b.bg_color || '#16a34a' }}>
-                  {(b.template || 'text').toUpperCase()}
+        banners.map((b: any, idx: number) => (
+          <motion.div key={b.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }}>
+            <Card className={cn('border-0 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-md)] transition-all duration-300 rounded-2xl', !b.is_active && 'opacity-50')}>
+              <CardContent className="p-3.5 flex items-center gap-3">
+                <GripVertical size={14} className="text-muted-foreground shrink-0" />
+                {b.image_url ? (
+                  <img src={b.image_url} alt="" className="w-16 h-10 rounded-xl object-cover shrink-0" />
+                ) : (
+                  <div className="w-16 h-10 rounded-xl shrink-0 flex items-center justify-center text-[10px] text-white font-bold" style={{ backgroundColor: b.bg_color || '#16a34a' }}>
+                    {(b.template || 'text').toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">{b.title || 'Untitled'}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {TEMPLATES.find(t => t.value === b.template)?.label || 'Image Only'} · Order: {b.display_order}
+                  </p>
                 </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{b.title || 'Untitled'}</p>
-                <p className="text-[10px] text-muted-foreground">
-                  {TEMPLATES.find(t => t.value === b.template)?.label || 'Image Only'} • Order: {b.display_order}
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Switch
-                  checked={b.is_active}
-                  onCheckedChange={async (checked) => {
-                    await supabase.from('featured_items').update({ is_active: checked }).eq('id', b.id);
-                    qc.invalidateQueries({ queryKey: ['admin-banners'] });
-                    qc.invalidateQueries({ queryKey: ['featured-banners'] });
-                  }}
-                />
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => openEdit(b)}>
-                  <Pencil size={12} />
-                </Button>
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" onClick={() => deleteMutation.mutate(b.id)}>
-                  <Trash2 size={12} />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Switch
+                    checked={b.is_active}
+                    onCheckedChange={async (checked) => {
+                      await supabase.from('featured_items').update({ is_active: checked }).eq('id', b.id);
+                      qc.invalidateQueries({ queryKey: ['admin-banners'] });
+                      qc.invalidateQueries({ queryKey: ['featured-banners'] });
+                    }}
+                  />
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl" onClick={() => openEdit(b)}>
+                    <Pencil size={12} />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl text-destructive hover:text-destructive" onClick={() => deleteMutation.mutate(b.id)}>
+                    <Trash2 size={12} />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         ))
       )}
 
@@ -205,26 +222,26 @@ export function AdminBannerManager() {
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent side="bottom" className="h-[90vh] overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editingId ? 'Edit Banner' : 'Create Banner'}</SheetTitle>
+            <SheetTitle className="font-bold">{editingId ? 'Edit Banner' : 'Create Banner'}</SheetTitle>
           </SheetHeader>
 
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 space-y-5">
             {/* Template Selection */}
             <div>
-              <Label className="text-xs font-semibold mb-2 block">Template</Label>
+              <Label className="text-xs font-bold mb-2 block uppercase tracking-wider text-muted-foreground">Template</Label>
               <div className="grid grid-cols-2 gap-2">
                 {TEMPLATES.map(t => (
                   <button
                     key={t.value}
                     onClick={() => updateField('template', t.value)}
                     className={cn(
-                      'p-3 rounded-xl border text-left transition-all',
+                      'p-3 rounded-xl border text-left transition-all duration-200',
                       form.template === t.value
-                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                        : 'border-border hover:border-primary/50'
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-sm'
+                        : 'border-border hover:border-primary/40 hover:shadow-sm'
                     )}
                   >
-                    <p className="text-xs font-semibold">{t.label}</p>
+                    <p className="text-xs font-bold">{t.label}</p>
                     <p className="text-[10px] text-muted-foreground">{t.description}</p>
                   </button>
                 ))}
@@ -233,8 +250,8 @@ export function AdminBannerManager() {
 
             {/* Live Preview */}
             <div>
-              <Label className="text-xs font-semibold mb-2 flex items-center gap-1"><Eye size={12} /> Preview</Label>
-              <div className="rounded-2xl overflow-hidden border">
+              <Label className="text-xs font-bold mb-2 flex items-center gap-1 uppercase tracking-wider text-muted-foreground"><Eye size={12} /> Preview</Label>
+              <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm">
                 <BannerPreview form={form} />
               </div>
             </div>
@@ -242,47 +259,47 @@ export function AdminBannerManager() {
             {/* Fields */}
             <div className="space-y-3">
               <div>
-                <Label className="text-xs">Title</Label>
-                <Input value={form.title} onChange={e => updateField('title', e.target.value)} placeholder="Banner headline" />
+                <Label className="text-xs font-semibold">Title</Label>
+                <Input value={form.title} onChange={e => updateField('title', e.target.value)} placeholder="Banner headline" className="rounded-xl" />
               </div>
 
               {form.template !== 'image_only' && (
                 <div>
-                  <Label className="text-xs">Subtitle</Label>
-                  <Textarea value={form.subtitle} onChange={e => updateField('subtitle', e.target.value)} placeholder="Supporting text" rows={2} />
+                  <Label className="text-xs font-semibold">Subtitle</Label>
+                  <Textarea value={form.subtitle} onChange={e => updateField('subtitle', e.target.value)} placeholder="Supporting text" rows={2} className="rounded-xl" />
                 </div>
               )}
 
               {['image_only', 'text_overlay', 'split_left'].includes(form.template) && (
                 <div>
-                  <Label className="text-xs">Image URL</Label>
-                  <Input value={form.image_url} onChange={e => updateField('image_url', e.target.value)} placeholder="https://..." />
+                  <Label className="text-xs font-semibold">Image URL</Label>
+                  <Input value={form.image_url} onChange={e => updateField('image_url', e.target.value)} placeholder="https://..." className="rounded-xl" />
                 </div>
               )}
 
               <div>
-                <Label className="text-xs">Link URL (route)</Label>
-                <Input value={form.link_url} onChange={e => updateField('link_url', e.target.value)} placeholder="/search or /bulletin" />
+                <Label className="text-xs font-semibold">Link URL (route)</Label>
+                <Input value={form.link_url} onChange={e => updateField('link_url', e.target.value)} placeholder="/search or /bulletin" className="rounded-xl" />
               </div>
 
               {form.template !== 'image_only' && (
                 <div>
-                  <Label className="text-xs">Button Text</Label>
-                  <Input value={form.button_text} onChange={e => updateField('button_text', e.target.value)} placeholder="Shop Now" />
+                  <Label className="text-xs font-semibold">Button Text</Label>
+                  <Input value={form.button_text} onChange={e => updateField('button_text', e.target.value)} placeholder="Shop Now" className="rounded-xl" />
                 </div>
               )}
 
               {form.template !== 'image_only' && (
                 <div>
-                  <Label className="text-xs font-semibold mb-2 block">Background Color</Label>
+                  <Label className="text-xs font-bold mb-2 block uppercase tracking-wider text-muted-foreground">Background Color</Label>
                   <div className="flex gap-2 flex-wrap">
                     {DEFAULT_COLORS.map(c => (
                       <button
                         key={c}
                         onClick={() => updateField('bg_color', c)}
                         className={cn(
-                          'w-8 h-8 rounded-full border-2 transition-all',
-                          form.bg_color === c ? 'border-foreground scale-110' : 'border-transparent'
+                          'w-8 h-8 rounded-full border-2 transition-all duration-200',
+                          form.bg_color === c ? 'border-foreground scale-110 shadow-md' : 'border-transparent hover:scale-105'
                         )}
                         style={{ backgroundColor: c }}
                       />
@@ -291,21 +308,21 @@ export function AdminBannerManager() {
                 </div>
               )}
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4 p-3 bg-muted/40 rounded-xl">
                 <div>
-                  <Label className="text-xs">Display Order</Label>
-                  <Input type="number" value={form.display_order} onChange={e => updateField('display_order', parseInt(e.target.value) || 0)} className="w-20" />
+                  <Label className="text-xs font-semibold">Display Order</Label>
+                  <Input type="number" value={form.display_order} onChange={e => updateField('display_order', parseInt(e.target.value) || 0)} className="w-20 rounded-xl" />
                 </div>
-                <div className="flex items-center gap-2 mt-4">
+                <div className="flex items-center gap-2">
                   <Switch checked={form.is_active} onCheckedChange={v => updateField('is_active', v)} />
-                  <Label className="text-xs">Active</Label>
+                  <Label className="text-xs font-medium">Active</Label>
                 </div>
               </div>
             </div>
 
             <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={closeSheet}>Cancel</Button>
-              <Button className="flex-1" onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending}>
+              <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={closeSheet}>Cancel</Button>
+              <Button className="flex-1 rounded-xl h-11 font-semibold" onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending}>
                 {saveMutation.isPending ? 'Saving...' : editingId ? 'Update' : 'Create'}
               </Button>
             </div>

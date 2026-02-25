@@ -30,9 +30,7 @@ export function AdminCatalogManager() {
 
   const { data: categories = [], isLoading: categoriesLoading } = useCategoryConfig();
 
-  useEffect(() => {
-    fetchBlocks();
-  }, []);
+  useEffect(() => { fetchBlocks(); }, []);
 
   const fetchBlocks = async () => {
     setBlocksLoading(true);
@@ -53,35 +51,40 @@ export function AdminCatalogManager() {
 
   const isLoading = categoriesLoading || blocksLoading;
 
+  const TAB_ITEMS = [
+    { value: 'overview', label: 'Overview', icon: Layers3 },
+    { value: 'categories', label: 'Categories', icon: Grid3X3 },
+    { value: 'attributes', label: 'Attributes', icon: Blocks },
+  ];
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <Tabs value={subTab} onValueChange={setSubTab}>
-        <TabsList className="w-full grid grid-cols-3">
-          <TabsTrigger value="overview" className="text-xs gap-1">
-            <Layers3 size={12} /> Overview
-          </TabsTrigger>
-          <TabsTrigger value="categories" className="text-xs gap-1">
-            <Grid3X3 size={12} /> Categories
-          </TabsTrigger>
-          <TabsTrigger value="attributes" className="text-xs gap-1">
-            <Blocks size={12} /> Attributes
-          </TabsTrigger>
+        <TabsList className="w-full grid grid-cols-3 bg-muted/60 p-1 rounded-2xl">
+          {TAB_ITEMS.map(tab => {
+            const TabIcon = tab.icon;
+            return (
+              <TabsTrigger key={tab.value} value={tab.value} className="text-xs gap-1.5 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:font-semibold transition-all duration-200">
+                <TabIcon size={12} /> {tab.label}
+              </TabsTrigger>
+            );
+          })}
         </TabsList>
 
         {/* Overview — category cards with linked attribute badges */}
-        <TabsContent value="overview" className="mt-3">
-          <p className="text-xs text-muted-foreground mb-3">
+        <TabsContent value="overview" className="mt-4">
+          <p className="text-xs text-muted-foreground mb-3 font-medium">
             Categories and their linked attribute blocks. Tap a category to expand.
           </p>
 
           {isLoading ? (
             <div className="space-y-2">
-              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
             </div>
           ) : (
             <div className="space-y-2">
               <AnimatePresence initial={false}>
-                {(categories as any[]).map((cat: any) => {
+                {(categories as any[]).map((cat: any, idx: number) => {
                   const linkedBlocks = getBlocksForCategory(cat.category);
                   const isExpanded = expandedCategory === cat.category;
 
@@ -92,21 +95,21 @@ export function AdminCatalogManager() {
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.2 }}
+                      transition={{ duration: 0.2, delay: idx * 0.02 }}
                     >
                       <Card
-                        className="cursor-pointer transition-shadow hover:shadow-md border-border/60"
+                        className="cursor-pointer border-0 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-md)] transition-all duration-300 rounded-2xl"
                         onClick={() => toggleExpand(cat.category)}
                       >
-                        <CardContent className="p-3">
+                        <CardContent className="p-3.5">
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-2.5 min-w-0">
                               <span className="text-lg shrink-0">{cat.icon}</span>
                               <div className="min-w-0">
-                                <p className="font-medium text-sm truncate">
+                                <p className="font-semibold text-sm truncate">
                                   {cat.displayName || cat.display_name}
                                 </p>
-                                <p className="text-[10px] text-muted-foreground">
+                                <p className="text-[10px] text-muted-foreground font-medium">
                                   {linkedBlocks.length} attribute block{linkedBlocks.length !== 1 ? 's' : ''}
                                 </p>
                               </div>
@@ -115,31 +118,23 @@ export function AdminCatalogManager() {
                               {linkedBlocks.length > 0 && (
                                 <div className="flex flex-wrap gap-1">
                                   {linkedBlocks.slice(0, 3).map(b => (
-                                    <Badge
-                                      key={b.id}
-                                      variant="secondary"
-                                      className="text-[9px] px-1.5 py-0.5 h-auto"
-                                    >
+                                    <Badge key={b.id} variant="secondary" className="text-[9px] px-1.5 py-0.5 h-auto rounded-md">
                                       {b.icon} {b.display_name}
                                     </Badge>
                                   ))}
                                   {linkedBlocks.length > 3 && (
-                                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0.5 h-auto">
-                                      +{linkedBlocks.length - 3} more
+                                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0.5 h-auto rounded-md">
+                                      +{linkedBlocks.length - 3}
                                     </Badge>
                                   )}
                                 </div>
                               )}
-                              <motion.div
-                                animate={{ rotate: isExpanded ? 180 : 0 }}
-                                transition={{ duration: 0.2 }}
-                              >
+                              <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
                                 <ChevronDown size={14} className="text-muted-foreground" />
                               </motion.div>
                             </div>
                           </div>
 
-                          {/* Expanded: show block details */}
                           <AnimatePresence>
                             {isExpanded && (
                               <motion.div
@@ -149,28 +144,28 @@ export function AdminCatalogManager() {
                                 transition={{ duration: 0.25 }}
                                 className="overflow-hidden"
                               >
-                                <div className="mt-3 pt-3 border-t border-border/40 space-y-1.5">
+                                <div className="mt-3 pt-3 border-t border-border/30 space-y-1.5">
                                   {linkedBlocks.length === 0 ? (
                                     <p className="text-xs text-muted-foreground italic">
                                       No attribute blocks linked to this category yet.
                                     </p>
                                   ) : (
-                                    linkedBlocks.map((block, idx) => (
+                                    linkedBlocks.map((block, bidx) => (
                                       <motion.div
                                         key={block.id}
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: idx * 0.05, duration: 0.15 }}
-                                        className="flex items-center gap-2 p-1.5 rounded-md bg-muted/30"
+                                        transition={{ delay: bidx * 0.05, duration: 0.15 }}
+                                        className="flex items-center gap-2 p-2 rounded-xl bg-muted/30"
                                       >
                                         <span className="text-sm shrink-0">{block.icon || '📦'}</span>
                                         <div className="min-w-0 flex-1">
-                                          <p className="text-xs font-medium truncate">{block.display_name}</p>
+                                          <p className="text-xs font-semibold truncate">{block.display_name}</p>
                                           {block.description && (
                                             <p className="text-[10px] text-muted-foreground line-clamp-1">{block.description}</p>
                                           )}
                                         </div>
-                                        <Badge variant="outline" className="text-[8px] shrink-0">
+                                        <Badge variant="outline" className="text-[8px] shrink-0 rounded-md">
                                           {block.renderer_type}
                                         </Badge>
                                       </motion.div>
@@ -191,13 +186,13 @@ export function AdminCatalogManager() {
         </TabsContent>
 
         {/* Categories sub-tab */}
-        <TabsContent value="categories" className="mt-3 space-y-4">
+        <TabsContent value="categories" className="mt-4 space-y-4">
           <CategoryManager />
           <SubcategoryManager />
         </TabsContent>
 
         {/* Attributes sub-tab */}
-        <TabsContent value="attributes" className="mt-3">
+        <TabsContent value="attributes" className="mt-4">
           <AdminAttributeBlockManager />
         </TabsContent>
       </Tabs>

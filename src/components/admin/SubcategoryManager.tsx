@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
@@ -19,6 +20,7 @@ import { toast } from 'sonner';
 import { Loader2, Plus, Edit2, Trash2, Tag } from 'lucide-react';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { friendlyError } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 interface Subcategory {
   id: string;
@@ -137,18 +139,22 @@ export function SubcategoryManager() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Tag size={18} />
-          Subcategory Management
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Card className="border-0 shadow-[var(--shadow-card)] rounded-2xl">
+      <CardContent className="p-5 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center">
+            <Tag size={16} className="text-violet-600" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold">Subcategory Management</h3>
+            <p className="text-[10px] text-muted-foreground">Manage subcategories within each category</p>
+          </div>
+        </div>
+
         {/* Filter by category */}
         <div className="flex items-center gap-3">
           <Select value={selectedConfigId} onValueChange={setSelectedConfigId}>
-            <SelectTrigger className="flex-1">
+            <SelectTrigger className="flex-1 rounded-xl">
               <SelectValue placeholder="All categories" />
             </SelectTrigger>
             <SelectContent>
@@ -158,56 +164,60 @@ export function SubcategoryManager() {
               ))}
             </SelectContent>
           </Select>
-          <Button size="sm" onClick={() => { resetForm(); setIsDialogOpen(true); }}>
-            <Plus size={14} className="mr-1" /> Add
+          <Button size="sm" onClick={() => { resetForm(); setIsDialogOpen(true); }} className="rounded-xl font-semibold gap-1.5">
+            <Plus size={13} /> Add
           </Button>
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>
+          <div className="flex justify-center py-10"><Loader2 className="animate-spin text-muted-foreground" /></div>
         ) : subcategories.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-6">
-            No subcategories yet. Add one to help buyers filter within categories.
-          </p>
+          <div className="text-center py-10">
+            <div className="w-12 h-12 rounded-2xl bg-muted mx-auto mb-3 flex items-center justify-center">
+              <Tag size={20} className="text-muted-foreground/40" />
+            </div>
+            <p className="text-sm text-muted-foreground font-medium">No subcategories yet</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Add one to help buyers filter within categories.</p>
+          </div>
         ) : (
           <div className="space-y-2">
-            {subcategories.map(sub => (
-              <div key={sub.id} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                <span className="text-lg">{sub.icon || '📂'}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{sub.display_name}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {getCategoryName(sub.category_config_id)} · {sub.slug}
-                  </p>
+            {subcategories.map((sub, idx) => (
+              <motion.div key={sub.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.02 }}>
+                <div className="flex items-center gap-3 p-3 bg-card border border-border/30 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 group">
+                  <span className="text-lg">{sub.icon || '📂'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">{sub.display_name}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {getCategoryName(sub.category_config_id)} · <span className="font-mono">{sub.slug}</span>
+                    </p>
+                  </div>
+                  {!sub.is_active && (
+                    <Badge variant="secondary" className="text-[10px] rounded-md">Inactive</Badge>
+                  )}
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => openEdit(sub)}>
+                    <Edit2 size={13} />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-xl text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setDeleteTarget(sub)}>
+                    <Trash2 size={13} />
+                  </Button>
                 </div>
-                {!sub.is_active && (
-                  <span className="text-[10px] text-muted-foreground bg-muted-foreground/10 px-1.5 py-0.5 rounded">Inactive</span>
-                )}
-                <Button variant="ghost" size="sm" onClick={() => openEdit(sub)}>
-                  <Edit2 size={14} />
-                </Button>
-                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleteTarget(sub)}>
-                  <Trash2 size={14} />
-                </Button>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}
 
         {/* Add/Edit Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={(o) => { if (!o) resetForm(); setIsDialogOpen(o); }}>
-          <DialogContent>
+          <DialogContent className="rounded-2xl">
             <DialogHeader>
-              <DialogTitle>{editingSub ? 'Edit Subcategory' : 'Add Subcategory'}</DialogTitle>
+              <DialogTitle className="font-bold">{editingSub ? 'Edit Subcategory' : 'Add Subcategory'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               {!editingSub && (
                 <div className="space-y-2">
-                  <Label>Parent Category *</Label>
+                  <Label className="text-xs font-semibold">Parent Category *</Label>
                   <Select value={selectedConfigId} onValueChange={setSelectedConfigId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
+                    <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select category" /></SelectTrigger>
                     <SelectContent>
                       {configs.map(c => (
                         <SelectItem key={c.id} value={c.id}>{c.icon} {c.displayName}</SelectItem>
@@ -217,7 +227,7 @@ export function SubcategoryManager() {
                 </div>
               )}
               <div className="space-y-2">
-                <Label>Display Name *</Label>
+                <Label className="text-xs font-semibold">Display Name *</Label>
                 <Input
                   placeholder="e.g. Dairy Products"
                   value={formData.display_name}
@@ -229,32 +239,33 @@ export function SubcategoryManager() {
                       slug: editingSub ? formData.slug : name.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
                     });
                   }}
+                  className="rounded-xl"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Slug</Label>
-                  <Input value={formData.slug} onChange={e => setFormData({ ...formData, slug: e.target.value })} />
+                  <Label className="text-xs font-semibold">Slug</Label>
+                  <Input value={formData.slug} onChange={e => setFormData({ ...formData, slug: e.target.value })} className="rounded-xl font-mono text-xs" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Icon (emoji)</Label>
-                  <Input placeholder="🥛" value={formData.icon} onChange={e => setFormData({ ...formData, icon: e.target.value })} />
+                  <Label className="text-xs font-semibold">Icon (emoji)</Label>
+                  <Input placeholder="🥛" value={formData.icon} onChange={e => setFormData({ ...formData, icon: e.target.value })} className="rounded-xl" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label>Display Order</Label>
-                  <Input type="number" value={formData.display_order} onChange={e => setFormData({ ...formData, display_order: e.target.value })} />
+                  <Label className="text-xs font-semibold">Display Order</Label>
+                  <Input type="number" value={formData.display_order} onChange={e => setFormData({ ...formData, display_order: e.target.value })} className="rounded-xl" />
                 </div>
                 <div className="flex items-center gap-2 pt-6">
                   <Switch checked={formData.is_active} onCheckedChange={c => setFormData({ ...formData, is_active: c })} />
-                  <Label>Active</Label>
+                  <Label className="text-xs font-medium">Active</Label>
                 </div>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={isSaving}>
+              <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-xl">Cancel</Button>
+              <Button onClick={handleSave} disabled={isSaving} className="rounded-xl font-semibold">
                 {isSaving && <Loader2 className="animate-spin mr-1" size={14} />}
                 {editingSub ? 'Save' : 'Create'}
               </Button>
@@ -264,14 +275,14 @@ export function SubcategoryManager() {
 
         {/* Delete confirmation */}
         <AlertDialog open={!!deleteTarget} onOpenChange={o => !o && setDeleteTarget(null)}>
-          <AlertDialogContent>
+          <AlertDialogContent className="rounded-2xl">
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete "{deleteTarget?.display_name}"?</AlertDialogTitle>
+              <AlertDialogTitle className="font-bold">Delete "{deleteTarget?.display_name}"?</AlertDialogTitle>
               <AlertDialogDescription>Products using this subcategory will lose their subcategory assignment.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+              <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground rounded-xl">Delete</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
