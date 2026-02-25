@@ -7,6 +7,7 @@ import { ContactSellerModal } from './ContactSellerModal';
 import { ProductEnquirySheet } from './ProductEnquirySheet';
 import { ReportSheet } from '@/components/report/ReportSheet';
 import { ProductAttributeBlocks } from './ProductAttributeBlocks';
+import { PriceHistoryChart } from './PriceHistoryChart';
 import { Plus, Minus, Store, MapPin, Home, Clock, Truck, Users, Zap, RotateCcw, ChevronRight, ChevronDown, Shield, Flag } from 'lucide-react';
 import { useProductDetail, ProductDetail } from '@/hooks/useProductDetail';
 import { hapticImpact } from '@/lib/haptics';
@@ -111,6 +112,10 @@ export function ProductDetailSheet({ product, open, onOpenChange, categoryIcon, 
                 {product.delivery_note && <p className="text-xs text-muted-foreground italic">— {product.delivery_note}</p>}
                 {product.description && <div><h4 className="text-xs font-bold text-foreground mb-1">Highlights</h4><p className="text-xs text-muted-foreground leading-relaxed">{product.description}</p></div>}
                 <ProductAttributeBlocks specifications={d.loadedSpecs ?? product.specifications} />
+                <PriceHistoryChart
+                  productId={product.product_id}
+                  priceStableSince={(product as any).price_stable_since}
+                />
                 {d.trustSnapshot && (d.trustSnapshot.completed_orders > 0 || d.trustSnapshot.avg_response_min > 0) && (
                   <div className="grid grid-cols-3 gap-2">
                     {d.trustSnapshot.completed_orders > 0 && <div className="bg-muted rounded-xl p-2.5 text-center"><Users size={14} className="mx-auto text-primary mb-1" /><p className="text-sm font-bold text-foreground">{d.trustSnapshot.completed_orders}</p><p className="text-[9px] text-muted-foreground">Orders</p></div>}

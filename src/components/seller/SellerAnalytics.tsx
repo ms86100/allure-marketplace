@@ -1,7 +1,8 @@
-import { useSellerAnalytics } from '@/hooks/queries/useSellerAnalytics';
+import { useSellerAnalytics, useSellerDemandStats } from '@/hooks/queries/useSellerAnalytics';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart3, Users, TrendingUp, XCircle, Clock } from 'lucide-react';
+import { BarChart3, Users, TrendingUp, XCircle, Clock, Eye, ArrowRightLeft, Percent } from 'lucide-react';
 
 interface SellerAnalyticsProps {
   sellerId: string;
@@ -9,6 +10,8 @@ interface SellerAnalyticsProps {
 
 export function SellerAnalytics({ sellerId }: SellerAnalyticsProps) {
   const { data, isLoading } = useSellerAnalytics(sellerId);
+  const { data: demandStats, isLoading: demandLoading } = useSellerDemandStats(sellerId);
+  const settings = useSystemSettings();
 
   if (isLoading) {
     return (
@@ -68,6 +71,45 @@ export function SellerAnalytics({ sellerId }: SellerAnalyticsProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Demand Stats (from RPC) */}
+      {demandStats && !demandLoading && (
+        <Card>
+          <CardContent className="p-3">
+            <p className="text-xs font-semibold text-muted-foreground mb-2">30-Day Intelligence</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="text-center">
+                <Users size={14} className="mx-auto text-primary mb-1" />
+                <p className="text-sm font-bold">{demandStats.active_buyers_in_society}</p>
+                <p className="text-[9px] text-muted-foreground">Active Buyers</p>
+              </div>
+              <div className="text-center">
+                <Eye size={14} className="mx-auto text-muted-foreground mb-1" />
+                <p className="text-sm font-bold">{demandStats.view_count}</p>
+                <p className="text-[9px] text-muted-foreground">Views</p>
+              </div>
+              <div className="text-center">
+                <ArrowRightLeft size={14} className="mx-auto text-accent mb-1" />
+                <p className="text-sm font-bold">{demandStats.conversion_rate}%</p>
+                <p className="text-[9px] text-muted-foreground">Conversion</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Commission Display */}
+      {settings.platformFeePercent > 0 && (
+        <Card className="border-primary/20">
+          <CardContent className="p-3 flex items-center gap-3">
+            <Percent size={16} className="text-primary shrink-0" />
+            <div>
+              <p className="text-sm font-semibold">{settings.platformFeePercent}% platform fee</p>
+              <p className="text-[10px] text-muted-foreground">Applied on each completed order</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Top Products */}
       {data.topProducts.length > 0 && (

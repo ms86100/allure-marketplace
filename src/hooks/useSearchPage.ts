@@ -230,6 +230,15 @@ export function useSearchPage() {
     setIsLoading(true);
     setHasSearched(true);
 
+    // Log search term for demand intelligence (debounced, only meaningful queries)
+    if (term.length >= 3 && effectiveSocietyId) {
+      supabase.from('search_demand_log').insert({
+        society_id: effectiveSocietyId,
+        search_term: term.trim().toLowerCase(),
+        category: selectedCategory || null,
+      }).then(() => {});
+    }
+
     try {
       let products: ProductSearchResult[] = [];
 

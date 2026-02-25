@@ -3461,6 +3461,48 @@ export type Database = {
         }
         Relationships: []
       }
+      price_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          new_price: number
+          old_price: number
+          product_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_price: number
+          old_price: number
+          product_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_price?: number
+          old_price?: number
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_history_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "price_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           accepts_preorders: boolean
@@ -3500,6 +3542,7 @@ export type Database = {
           prep_time_minutes: number | null
           price: number
           price_per_unit: string | null
+          price_stable_since: string | null
           rental_period_type: string | null
           secondary_images: string[] | null
           seller_id: string
@@ -3554,6 +3597,7 @@ export type Database = {
           prep_time_minutes?: number | null
           price: number
           price_per_unit?: string | null
+          price_stable_since?: string | null
           rental_period_type?: string | null
           secondary_images?: string[] | null
           seller_id: string
@@ -3608,6 +3652,7 @@ export type Database = {
           prep_time_minutes?: number | null
           price?: number
           price_per_unit?: string | null
+          price_stable_since?: string | null
           rental_period_type?: string | null
           secondary_images?: string[] | null
           seller_id?: string
@@ -4165,6 +4210,38 @@ export type Database = {
           },
           {
             foreignKeyName: "reviews_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      search_demand_log: {
+        Row: {
+          category: string | null
+          id: string
+          search_term: string
+          searched_at: string
+          society_id: string
+        }
+        Insert: {
+          category?: string | null
+          id?: string
+          search_term: string
+          searched_at?: string
+          society_id: string
+        }
+        Update: {
+          category?: string | null
+          id?: string
+          search_term?: string
+          searched_at?: string
+          society_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "search_demand_log_society_id_fkey"
             columns: ["society_id"]
             isOneToOne: false
             referencedRelation: "societies"
@@ -6672,6 +6749,7 @@ export type Database = {
           unique_buyers: number
         }[]
       }
+      get_seller_demand_stats: { Args: { _seller_id: string }; Returns: Json }
       get_seller_trust_snapshot: {
         Args: { _seller_id: string }
         Returns: {
@@ -6699,6 +6777,14 @@ export type Database = {
           flat_number: string
           person_name: string
           status: string
+        }[]
+      }
+      get_unmet_demand: {
+        Args: { _seller_categories?: string[]; _society_id: string }
+        Returns: {
+          last_searched: string
+          search_count: number
+          search_term: string
         }[]
       }
       get_user_auth_context: { Args: { _user_id: string }; Returns: Json }

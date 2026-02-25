@@ -24,6 +24,7 @@ import { OrderFilters, OrderFilter } from '@/components/seller/OrderFilters';
 import { SellerOrderCard } from '@/components/seller/SellerOrderCard';
 import { CouponManager } from '@/components/seller/CouponManager';
 import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
+import { DemandInsights } from '@/components/seller/DemandInsights';
 import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCounts } from '@/hooks/queries/useSellerOrders';
 
 export default function SellerDashboardPage() {
@@ -233,6 +234,9 @@ export default function SellerDashboardPage() {
         <div className="space-y-3">
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">Analytics</p>
           <SellerAnalytics sellerId={sellerProfile.id} />
+          {sellerProfile.society_id && (
+            <DemandInsights societyId={sellerProfile.society_id} />
+          )}
         </div>
 
         {/* Orders Section */}

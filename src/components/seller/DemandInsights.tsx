@@ -1,0 +1,62 @@
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { TrendingUp, Search } from 'lucide-react';
+import { formatDistanceToNowStrict } from 'date-fns';
+
+interface DemandInsightsProps {
+  societyId: string;
+}
+
+export function DemandInsights({ societyId }: DemandInsightsProps) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['unmet-demand', societyId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_unmet_demand', {
+        _society_id: societyId,
+      });
+      if (error) throw error;
+      return (data || []) as { search_term: string; search_count: number; last_searched: string }[];
+    },
+    enabled: !!societyId,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  if (isLoading) {
+    return <Skeleton className="h-24 w-full rounded-xl" />;
+  }
+
+  if (!data || data.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-3">
+        <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+          <TrendingUp size={12} className="text-primary" /> What buyers are searching for
+        </p>
+        <div className="space-y-2">
+          {data.slice(0, 5).map((item) => (
+            <div key={item.search_term} className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2 truncate">
+                <Search size={12} className="text-muted-foreground shrink-0" />
+                <span className="truncate">"{item.search_term}"</span>
+              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs font-semibold text-primary">{item.search_count} searches</span>
+                <span className="text-[10px] text-muted-foreground">
+                  {formatDistanceToNowStrict(new Date(item.last_searched), { addSuffix: true })}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-2 italic">
+          No seller in your society offers these items yet — opportunity!
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
