@@ -252,7 +252,7 @@ export default function WorkerJobsPage() {
                       )}
                       <Badge
                         variant={isOwnSociety ? 'default' : 'secondary'}
-                        className={`text-[10px] ${isOwnSociety ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+                        className={`text-[10px] ${isOwnSociety ? 'bg-success hover:bg-success/90' : 'bg-info hover:bg-info/90 text-primary-foreground'}`}
                       >
                         {isOwnSociety ? 'Your Society' : societyName}
                       </Badge>

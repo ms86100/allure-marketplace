@@ -100,18 +100,19 @@ export default function NotificationsPage() {
 
   return (
     <AppLayout showHeader={false}>
-      <div className="p-4 safe-top">
-        <Link to="/profile" className="flex items-center gap-2 text-muted-foreground mb-6">
-          <ArrowLeft size={20} />
-          <span>Back to Profile</span>
-        </Link>
-
-        <div className="mb-6">
-          <h1 className="text-xl font-bold">Notification Settings</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Choose what notifications you want to receive
-          </p>
+      <div className="safe-top">
+        {/* Sticky header */}
+        <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 flex items-center gap-3">
+          <Link to="/profile" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0">
+            <ArrowLeft size={18} />
+          </Link>
+          <div>
+            <h1 className="text-lg font-bold">Notification Settings</h1>
+            <p className="text-xs text-muted-foreground">Choose what notifications you want to receive</p>
+          </div>
         </div>
+
+        <div className="p-4">
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -146,6 +147,7 @@ export default function NotificationsPage() {
         <p className="text-center text-xs text-muted-foreground mt-8">
           Your preferences are synced across all your devices.
         </p>
+        </div>
       </div>
     </AppLayout>
   );

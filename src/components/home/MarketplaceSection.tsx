@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
@@ -198,12 +198,12 @@ function ProductListings({
               <span className="text-base">{cat.icon}</span>
               {cat.displayName}
             </h3>
-            <a
-              href={`#/category/${cat.parentGroup}?sub=${cat.category}`}
+            <Link
+              to={`/category/${cat.category}`}
               className="text-[11px] font-bold text-primary flex items-center gap-0.5"
             >
               see all <ChevronRight size={12} />
-            </a>
+            </Link>
           </div>
           <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1 snap-x snap-mandatory">
             {cat.products.slice(0, 8).map(product => (

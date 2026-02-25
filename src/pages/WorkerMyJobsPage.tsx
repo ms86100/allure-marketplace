@@ -16,9 +16,9 @@ import { FeatureGate } from '@/components/ui/FeatureGate';
 import { useCurrency } from '@/hooks/useCurrency';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  accepted: { label: 'Active', color: 'bg-blue-100 text-blue-800' },
-  completed: { label: 'Completed', color: 'bg-green-100 text-green-800' },
-  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-800' },
+  accepted: { label: 'Active', color: 'bg-info/20 text-info' },
+  completed: { label: 'Completed', color: 'bg-success/20 text-success' },
+  cancelled: { label: 'Cancelled', color: 'bg-destructive/20 text-destructive' },
 };
 
 export default function WorkerMyJobsPage() {

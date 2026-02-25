@@ -27,10 +27,10 @@ const TYPE_ICONS: Record<string, typeof Users> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  visitor: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  delivery: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
-  resident: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  worker: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+  visitor: 'bg-info/15 text-info',
+  delivery: 'bg-warning/15 text-warning',
+  resident: 'bg-success/15 text-success',
+  worker: 'bg-primary/15 text-primary',
 };
 
 export function GuardGateLogTab({ societyId }: Props) {

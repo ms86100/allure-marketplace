@@ -189,9 +189,9 @@ export function DraftProductManager({
 
       {/* Success encouragement after first product */}
       {products.length > 0 && products.length <= 2 && !isAdding && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
-          <CheckCircle2 size={16} className="text-green-600 flex-shrink-0" />
-          <p className="text-xs text-green-700 dark:text-green-400">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
+          <CheckCircle2 size={16} className="text-success flex-shrink-0" />
+          <p className="text-xs text-success">
             {products.length === 1
               ? "Great start! Add more items or continue to review."
               : "You're on your way! Add more or continue when ready."}
@@ -230,7 +230,7 @@ export function DraftProductManager({
                     {product.mrp && product.mrp > product.price && (
                       <>
                         <span className="text-xs text-muted-foreground line-through">{formatPrice(product.mrp)}</span>
-                        <span className="text-[10px] font-bold text-green-600 bg-green-500/10 px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] font-bold text-success bg-success/10 px-1.5 py-0.5 rounded">
                           {product.discount_percentage}% OFF
                         </span>
                       </>
@@ -305,9 +305,9 @@ export function DraftProductManager({
 
             {/* Auto-computed discount display */}
             {computedDiscount !== null && computedDiscount > 0 && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
-                <Percent size={14} className="text-green-600" />
-                <span className="text-sm font-semibold text-green-600">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
+                <Percent size={14} className="text-success" />
+                <span className="text-sm font-semibold text-success">
                   {computedDiscount}% OFF
                 </span>
                 <span className="text-xs text-muted-foreground">

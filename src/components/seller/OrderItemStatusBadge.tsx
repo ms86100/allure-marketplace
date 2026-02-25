@@ -2,9 +2,9 @@ import { cn } from '@/lib/utils';
 
 export const ITEM_STATUS_CONFIG = {
   pending: { label: 'Pending', color: 'bg-muted text-muted-foreground' },
-  accepted: { label: 'Accepted', color: 'bg-blue-100 text-blue-700' },
+  accepted: { label: 'Accepted', color: 'bg-info/20 text-info' },
   preparing: { label: 'Preparing', color: 'bg-warning/20 text-warning' },
-  ready: { label: 'Ready', color: 'bg-info/20 text-info' },
+  ready: { label: 'Ready', color: 'bg-success/20 text-success' },
   delivered: { label: 'Delivered', color: 'bg-success/20 text-success' },
   cancelled: { label: 'Cancelled', color: 'bg-destructive/20 text-destructive' },
 } as const;

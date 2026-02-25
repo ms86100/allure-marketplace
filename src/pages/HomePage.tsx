@@ -42,8 +42,18 @@ export default function HomePage() {
   if (!profile) {
     return (
       <AppLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-pulse text-primary text-xl font-bold">Loading...</div>
+        <div className="px-4 py-6 space-y-5">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="w-24 h-9 rounded-full bg-muted animate-pulse shrink-0" />
+            ))}
+          </div>
+          <div className="h-36 rounded-2xl bg-muted animate-pulse" />
+          <div className="grid grid-cols-2 gap-3">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="aspect-[3/2] rounded-2xl bg-muted animate-pulse" />
+            ))}
+          </div>
         </div>
       </AppLayout>
     );
