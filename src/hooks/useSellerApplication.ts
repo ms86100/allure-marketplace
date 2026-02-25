@@ -62,6 +62,16 @@ export function useSellerApplication() {
   const [acceptedDeclaration, setAcceptedDeclaration] = useState(false);
   const [licenseStatus, setLicenseStatus] = useState<string | null>(null);
 
+  // Reload products from DB
+  const reloadProducts = useCallback(async (sellerId: string) => {
+    try {
+      const { data: prods } = await supabase.from('products').select('*').eq('seller_id', sellerId);
+      setDraftProducts(prods || []);
+    } catch (err) {
+      console.error('Error reloading products:', err);
+    }
+  }, []);
+
   // Check for existing seller profile or draft
   useEffect(() => {
     const checkExisting = async () => {
@@ -91,8 +101,7 @@ export function useSellerApplication() {
               profile_image_url: (draft as any).profile_image_url || null,
               cover_image_url: (draft as any).cover_image_url || null,
             }));
-            const { data: prods } = await supabase.from('products').select('*').eq('seller_id', draft.id);
-            setDraftProducts(prods || []);
+            await reloadProducts(draft.id);
             setStep(3);
           }
         }
@@ -103,7 +112,7 @@ export function useSellerApplication() {
       }
     };
     checkExisting();
-  }, [user]);
+  }, [user, reloadProducts]);
 
   // Check group conflict
   useEffect(() => {
@@ -208,7 +217,23 @@ export function useSellerApplication() {
   };
 
   const handleProceedToSettings = async () => { const id = await saveDraft(); if (id) setStep(4); };
-  const handleProceedToProducts = async () => { const id = await saveDraft(); if (id) setStep(5); };
+  const handleProceedToProducts = async () => {
+    const id = await saveDraft();
+    if (id) {
+      // Always reload products from DB when entering step 5
+      await reloadProducts(id);
+      setStep(5);
+    }
+  };
+
+  // Navigate back with auto-save when a draft exists
+  const handleStepBack = async (targetStep: number) => {
+    // Auto-save draft if going back from steps where data may have changed
+    if (draftSellerId && step >= 3) {
+      await saveDraft();
+    }
+    setStep(targetStep);
+  };
 
   const handleSaveDraftAndExit = async () => {
     if (step >= 3) await saveDraft();
@@ -249,6 +274,15 @@ export function useSellerApplication() {
     } finally { setIsLoading(false); }
   };
 
+  // Safe group selection: only clear categories when changing to a different group
+  const handleGroupSelect = (group: string) => {
+    if (group !== selectedGroup) {
+      setSelectedGroup(group);
+      setFormData(f => ({ ...f, categories: [] }));
+    }
+    setTimeout(() => setStep(2), 350);
+  };
+
   const selectedGroupInfo = parentGroupInfos.find(g => g.value === selectedGroup);
   const selectedGroupRow = groups.find(g => g.slug === selectedGroup);
 
@@ -259,6 +293,7 @@ export function useSellerApplication() {
     licenseStatus, setLicenseStatus, parentGroupInfos, groups, groupedConfigs,
     selectedGroupInfo, selectedGroupRow, handleCategoryChange, toggleOperatingDay,
     saveDraft, handleProceedToSettings, handleProceedToProducts, handleSaveDraftAndExit,
-    handleSubmit, setExistingSeller, setDraftSellerId,
+    handleSubmit, setExistingSeller, setDraftSellerId, handleStepBack, handleGroupSelect,
+    reloadProducts,
   };
 }

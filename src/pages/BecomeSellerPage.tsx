@@ -74,7 +74,7 @@ export default function BecomeSellerPage() {
     licenseStatus, setLicenseStatus, parentGroupInfos, groups, groupedConfigs,
     selectedGroupInfo, selectedGroupRow, handleCategoryChange, toggleOperatingDay,
     handleProceedToSettings, handleProceedToProducts, handleSaveDraftAndExit, handleSubmit,
-    setExistingSeller, setDraftSellerId,
+    setExistingSeller, setDraftSellerId, handleStepBack, handleGroupSelect,
   } = app;
 
   const fulfillmentLabel = FULFILLMENT_OPTIONS.find(o => o.value === formData.fulfillment_mode)?.label || formData.fulfillment_mode;
@@ -168,7 +168,7 @@ export default function BecomeSellerPage() {
             <div className="grid grid-cols-2 gap-3">
               <AnimatePresence>
                 {parentGroupInfos.map(({ value, label, icon, color }) => (
-                  <motion.button key={value} layout whileTap={{ scale: 0.97 }} onClick={() => { setSelectedGroup(value); setFormData({ ...formData, categories: [] }); setTimeout(() => setStep(2), 350); }}
+                  <motion.button key={value} layout whileTap={{ scale: 0.97 }} onClick={() => handleGroupSelect(value)}
                     className={cn('flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center', selectedGroup === value ? 'border-primary bg-primary/5 scale-[1.03]' : 'hover:border-primary/50 hover:bg-muted/50')}>
                     <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center text-2xl', color)}>{icon}</div>
                     <span className="font-medium text-sm">{label}</span>
@@ -183,7 +183,7 @@ export default function BecomeSellerPage() {
         {/* Step 2: Select Sub-categories */}
         {step === 2 && selectedGroup && (
           <div className="space-y-5">
-            <button onClick={() => setStep(1)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change category</button>
+            <button onClick={() => handleStepBack(1)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change category</button>
             <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
               <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center text-2xl', selectedGroupInfo?.color)}>{selectedGroupInfo?.icon}</div>
               <div><h3 className="font-semibold">{selectedGroupInfo?.label}</h3><p className="text-xs text-muted-foreground">{selectedGroupInfo?.description}</p></div>
@@ -197,7 +197,7 @@ export default function BecomeSellerPage() {
         {/* Step 3: Business Details */}
         {step === 3 && (
           <div className="space-y-5">
-            <button onClick={() => setStep(2)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change categories</button>
+            <button onClick={() => handleStepBack(2)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change categories</button>
             <div className="space-y-2"><Label htmlFor="business_name">Business Name *</Label><Input id="business_name" placeholder={groups.find(g => g.slug === selectedGroup)?.placeholder_hint || "e.g., Your Store Name"} value={formData.business_name} onChange={(e) => setFormData({ ...formData, business_name: e.target.value })} /></div>
             <div className="space-y-2"><Label htmlFor="description">Description</Label><Textarea id="description" placeholder="Tell customers about what you offer..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} /></div>
             <div className="space-y-2"><Label>Availability Hours</Label><div className="grid grid-cols-2 gap-3"><div><Label htmlFor="start" className="text-xs text-muted-foreground">Opens at</Label><Input id="start" type="time" value={formData.availability_start} onChange={(e) => setFormData({ ...formData, availability_start: e.target.value })} /></div><div><Label htmlFor="end" className="text-xs text-muted-foreground">Closes at</Label><Input id="end" type="time" value={formData.availability_end} onChange={(e) => setFormData({ ...formData, availability_end: e.target.value })} /></div></div></div>
@@ -221,7 +221,7 @@ export default function BecomeSellerPage() {
         {/* Step 4: Store Settings */}
         {step === 4 && (
           <div className="space-y-5">
-            <button onClick={() => setStep(3)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store details</button>
+            <button onClick={() => handleStepBack(3)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store details</button>
             <div className="border rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-2"><Truck size={16} className="text-primary" /><h3 className="font-semibold text-sm">Fulfillment Mode</h3></div>
               <RadioGroup value={formData.fulfillment_mode} onValueChange={(value) => setFormData({ ...formData, fulfillment_mode: value })} className="space-y-2">
@@ -266,7 +266,7 @@ export default function BecomeSellerPage() {
         )}
         {step === 5 && draftSellerId && (
           <div className="space-y-5">
-            <button onClick={() => setStep(4)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store settings</button>
+            <button onClick={() => handleStepBack(4)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store settings</button>
             <DraftProductManager sellerId={draftSellerId} categories={formData.categories} products={draftProducts} onProductsChange={setDraftProducts} />
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Review everything and submit for approval</p>
             <Button className="w-full" onClick={() => setStep(6)} disabled={draftProducts.length === 0}>Review & Submit<ChevronRight size={16} className="ml-1" /></Button>
@@ -276,7 +276,7 @@ export default function BecomeSellerPage() {
         {/* Step 6: Review & Submit */}
         {step === 6 && (
           <div className="space-y-5">
-            <button onClick={() => setStep(5)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit products</button>
+            <button onClick={() => handleStepBack(5)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit products</button>
             <div className="bg-muted rounded-lg p-4 space-y-3">
               <h4 className="font-semibold">Application Summary</h4>
               <div className="space-y-2 text-sm">
