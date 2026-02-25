@@ -49,14 +49,35 @@ export function FeaturedBanners() {
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
 
-  // Auto-scroll
+  // Auto-scroll with pause on user interaction (#9)
+  const [userInteracting, setUserInteracting] = useState(false);
   useEffect(() => {
-    if (banners.length <= 1) return;
+    if (banners.length <= 1 || userInteracting) return;
     const interval = setInterval(() => {
       setActiveIndex(prev => (prev + 1) % banners.length);
     }, 4000);
     return () => clearInterval(interval);
-  }, [banners.length]);
+  }, [banners.length, userInteracting]);
+
+  useEffect(() => {
+    const container = document.getElementById('banner-carousel');
+    if (!container) return;
+    let resumeTimeout: ReturnType<typeof setTimeout>;
+    const handleTouchStart = () => {
+      setUserInteracting(true);
+      clearTimeout(resumeTimeout);
+    };
+    const handleTouchEnd = () => {
+      resumeTimeout = setTimeout(() => setUserInteracting(false), 8000);
+    };
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchend', handleTouchEnd, { passive: true });
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchend', handleTouchEnd);
+      clearTimeout(resumeTimeout);
+    };
+  }, []);
 
   useEffect(() => {
     const container = document.getElementById('banner-carousel');

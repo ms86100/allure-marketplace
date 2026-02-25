@@ -32,7 +32,8 @@ export function useCartPage() {
 
   const firstSeller = sellerGroups[0]?.items[0]?.product?.seller;
   const acceptsCod = firstSeller?.accepts_cod ?? true;
-  const acceptsUpi = !!(firstSeller as any)?.accepts_upi && !!(firstSeller as any)?.upi_id;
+  // Disable UPI for multi-seller carts — only the first order would be charged (#2)
+  const acceptsUpi = sellerGroups.length <= 1 && !!(firstSeller as any)?.accepts_upi && !!(firstSeller as any)?.upi_id;
   const hasUrgentItem = items.some((item) => (item.product as any)?.is_urgent);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const maxPrepTime = items.reduce((max, item) => {
@@ -86,6 +87,12 @@ export function useCartPage() {
 
   const handlePlaceOrderInner = async () => {
     if (!user || !profile || sellerGroups.length === 0) return;
+
+    // #6: Validate delivery address before allowing order placement
+    if (fulfillmentType === 'delivery' && (!profile.block || !profile.flat_number)) {
+      toast.error('Please update your profile with block and flat number before placing a delivery order.');
+      return;
+    }
 
     for (const group of sellerGroups) {
       const minOrder = (group.items[0]?.product?.seller as any)?.minimum_order_amount;
@@ -148,6 +155,7 @@ export function useCartPage() {
     try {
       const orderIds = await createOrdersForAllSellers('pending');
       if (orderIds.length === 0) throw new Error('Failed to create orders');
+      await clearCart();
       await refresh();
       hapticNotification('success');
       if (orderIds.length === 1) {
@@ -180,6 +188,7 @@ export function useCartPage() {
       if (!confirmed) toast.info('Payment is being verified. Your order will update shortly.');
       else toast.success('Payment successful! Order placed.');
     }
+    await clearCart();
     await refresh();
     navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
     setPendingOrderIds([]);
@@ -187,8 +196,20 @@ export function useCartPage() {
 
   const handleRazorpayFailed = async () => {
     setShowRazorpayCheckout(false);
+    // #12: Cancel orphaned orders on payment failure
+    if (pendingOrderIds.length > 0) {
+      try {
+        await supabase
+          .from('orders')
+          .update({ status: 'cancelled' } as any)
+          .in('id', pendingOrderIds)
+          .eq('payment_status', 'pending');
+      } catch (err) {
+        console.error('Failed to cancel unpaid orders:', err);
+      }
+    }
     setPendingOrderIds([]);
-    toast.error('Payment was not completed. Check your order status.');
+    toast.error('Payment was not completed. Your order has been cancelled.');
   };
 
   return {

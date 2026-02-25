@@ -38,7 +38,7 @@ export function AppLayout({
       )}
       <main className={cn('pb-24', className)}>{children}</main>
       <NavigatorBackButton />
-      <FloatingCartBar />
+      {showCart && <FloatingCartBar />}
       {showNav && <BottomNav />}
     </div>
   );

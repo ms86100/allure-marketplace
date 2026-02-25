@@ -16,7 +16,12 @@ export default function NotificationInboxPage() {
 
   const handleTap = (n: typeof notifications[0]) => {
     if (!n.is_read) markRead.mutate(n.id);
-    if (n.reference_path) navigate(n.reference_path);
+    if (n.reference_path) {
+      // #11: Validate reference_path starts with /
+      if (n.reference_path.startsWith('/')) {
+        navigate(n.reference_path);
+      }
+    }
   };
 
   const unreadCount = notifications.filter(n => !n.is_read).length;

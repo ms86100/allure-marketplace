@@ -32,13 +32,14 @@ interface ProductDetailSheetProps {
   product: ProductDetail | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSelectProduct?: (product: any) => void;
   categoryIcon?: string;
   categoryName?: string;
 }
 
 export { type ProductDetail };
 
-export function ProductDetailSheet({ product, open, onOpenChange, categoryIcon, categoryName }: ProductDetailSheetProps) {
+export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduct, categoryIcon, categoryName }: ProductDetailSheetProps) {
   const d = useProductDetail(product, open);
   const ml = useMarketplaceLabels();
 
@@ -63,13 +64,7 @@ export function ProductDetailSheet({ product, open, onOpenChange, categoryIcon, 
             ) : (
               <div className="w-full h-full flex items-center justify-center"><span className="text-6xl">{categoryIcon || '🛍️'}</span></div>
             )}
-            {product.image_url && (
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
-                <div className="w-5 h-1.5 rounded-full bg-foreground/80" />
-                <div className="w-1.5 h-1.5 rounded-full bg-foreground/30" />
-                <div className="w-1.5 h-1.5 rounded-full bg-foreground/30" />
-              </div>
-            )}
+            {/* Pagination dots removed — single image only (#5) */}
           </div>
 
           <div className="p-4 space-y-3">
@@ -162,14 +157,20 @@ export function ProductDetailSheet({ product, open, onOpenChange, categoryIcon, 
               <h4 className="text-xs font-bold text-foreground mb-2 uppercase tracking-wide">Similar in {categoryName || 'this category'}</h4>
               <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
                 {d.similarProducts.map((sp) => (
-                  <div key={sp.id} className="shrink-0 w-28">
+                  <button
+                    key={sp.id}
+                    className="shrink-0 w-28 text-left"
+                    onClick={() => {
+                      onSelectProduct?.(sp);
+                    }}
+                  >
                     <div className="w-28 h-28 rounded-xl bg-muted overflow-hidden mb-1.5">
                       {sp.image_url ? <img src={sp.image_url} alt={sp.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl">🛍️</div>}
                     </div>
                     <p className="text-[11px] font-medium line-clamp-1">{sp.name}</p>
                     <p className="text-[11px] text-muted-foreground">{sp.seller?.business_name}</p>
                     {sp.price > 0 && <p className="text-xs font-bold">{d.formatPrice(sp.price)}</p>}
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>

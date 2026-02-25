@@ -175,7 +175,7 @@ export default function CartPage() {
               <><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deliver to</p><p className="text-sm font-medium mt-0.5">{c.profile?.name} — {[c.profile?.block, c.profile?.flat_number].filter(Boolean).join(', ')}</p><p className="text-xs text-muted-foreground">{c.society?.name || 'Your Society'}</p></>
             )}
           </div>
-          <ChevronRight size={16} className="text-muted-foreground" />
+          {/* #7: Removed misleading ChevronRight — address card is not interactive */}
         </div>
 
         {c.sellerGroups.length > 1 && (<p className="text-xs text-muted-foreground text-center mt-4 px-4">Your cart has items from {c.sellerGroups.length} sellers. Separate orders will be created for each.</p>)}
@@ -189,11 +189,15 @@ export default function CartPage() {
         {/* Neighborhood Guarantee */}
         <div className="mx-4 mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50">
           <span className="text-sm">{ml.label('label_neighborhood_guarantee_emoji')}</span>
-          <p className="text-[10px] text-muted-foreground">{ml.label('label_neighborhood_guarantee_badge').replace('Neighborhood Guarantee', `<span class="font-semibold text-foreground">${ml.label('label_neighborhood_guarantee')}</span>`)
-            // Since we can't use dangerouslySetInnerHTML cleanly, we do a simpler approach:
-            .split(ml.label('label_neighborhood_guarantee'))
-            .reduce((acc, part, i) => i === 0 ? part : acc, ml.label('label_neighborhood_guarantee_badge'))
-          }</p>
+          <p className="text-[10px] text-muted-foreground">
+            {(() => {
+              const badge = ml.label('label_neighborhood_guarantee_badge');
+              const guarantee = ml.label('label_neighborhood_guarantee');
+              const parts = badge.split(guarantee);
+              if (parts.length < 2) return badge;
+              return <>{parts[0]}<span className="font-semibold text-foreground">{guarantee}</span>{parts[1]}</>;
+            })()}
+          </p>
         </div>
       </div>
 

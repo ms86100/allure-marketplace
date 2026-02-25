@@ -26,6 +26,7 @@ export function useAppLifecycle() {
             queryClient.invalidateQueries({ queryKey: ['system-settings-raw'] });
             queryClient.invalidateQueries({ queryKey: ['system-settings-core'] });
             queryClient.invalidateQueries({ queryKey: ['cart-count'] });
+            queryClient.invalidateQueries({ queryKey: ['cart-items'] });
             queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
             queryClient.invalidateQueries({ queryKey: ['products-by-category'] });
           }
