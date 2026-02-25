@@ -1,80 +1,33 @@
 
 
-# Feature Entitlement Bypass: Root Cause & Fix
+# Hide Society Tab When No Features Are Enabled
 
-## Root Cause
+## Problem
+After the strict entitlement fix, societies without a package assignment have all features disabled. However, the "Society" tab in the bottom navigation is still visible, leading residents to a page with no functional content.
 
-The database function `get_effective_society_features` contains this fallback logic on line 47 of the live function:
+## Solution
+Add a conditional check in `BottomNav` that hides the Society tab when the society has zero enabled features. The `useEffectiveFeatures` hook already provides the full feature list with `is_enabled` status.
 
-```sql
--- No builder assigned = default enabled; builder assigned but feature not in package = disabled
-ELSE (_builder_id IS NULL)
+## Implementation
+
+### File: `src/components/layout/BottomNav.tsx`
+
+**Change**: Filter out the Society nav item (`/society`) when no features are enabled for the current society.
+
+Logic:
+```
+const hasAnyFeature = features.some(f => f.is_enabled);
 ```
 
-This expression evaluates to `true` when no builder is assigned to the society. Since Maple Gardens Residency has:
-- **No builder assigned** (`builder_societies` returns NULL)
-- **No package assigned** (consequently NULL)
-- **No `is_core` flags** (all 26 features have `is_core = false`)
-- **No society overrides**
+Then in the `visibleItems` filter, additionally exclude the Society tab when `hasAnyFeature` is false.
 
-The function falls through to `ELSE (_builder_id IS NULL)` which returns `true` for every feature. All 26 features are returned as `is_enabled: true, source: 'default'`.
+The resident nav items array already marks Society without a `featureKey`, so the filtering needs a small addition: tag the Society item with a special marker (e.g., `requiresAnyFeature: true`) or handle it inline in the filter.
 
-This was an intentional "backward compatibility" decision from the original implementation — the rationale was "societies without a builder get everything by default." However, this directly contradicts the strict package-driven entitlement model.
+**Approach**: Inline filter — if `to === '/society'` and no features are enabled, exclude it. This avoids changing the nav item type definition.
 
-## Current Resolution Flow (Broken)
+### File: `src/components/home/SocietyQuickLinks.tsx`
 
-```text
-Platform Features (26 features, all is_core=false)
-  → Builder lookup: NULL (no builder assigned)
-    → Package lookup: skipped
-      → Override lookup: no overrides
-        → Fallback: (_builder_id IS NULL) = TRUE
-          → All features enabled ← THIS IS THE BUG
-```
+**Change**: Also hide the "Your Society" quick links section on the home page when no features are enabled. The component already returns `null` when `visibleLinks.length === 0`, but since the feature check now returns all-disabled, this should already work. Will verify.
 
-## Correct Resolution Flow
-
-```text
-Platform Features (26 features)
-  → Core features: always enabled
-  → Override exists: use override value
-  → Package assigned + feature in package: use package value
-  → Everything else: DISABLED (false)
-```
-
-## Fix
-
-One line change in the database function:
-
-```sql
--- BEFORE (permissive fallback):
-ELSE (_builder_id IS NULL)
-
--- AFTER (strict entitlement):
-ELSE false
-```
-
-This means:
-- Features only become enabled through one of three paths: `is_core = true`, a society override, or inclusion in an assigned package
-- Societies without a builder and without overrides will have zero non-core features enabled
-- Admins can still use society overrides to selectively enable features for unassigned societies
-
-## Impact Assessment
-
-**Maple Gardens Residency** currently has no builder, no package, and no overrides. After this fix, all 26 features will become disabled. To restore access, one of the following must happen:
-1. Assign a builder to the society and assign a package to that builder
-2. Create society-level overrides for specific features
-3. Mark certain features as `is_core = true` in `platform_features` if they should be universally available
-
-## Recommendation
-
-Before deploying the fix, the admin should decide which features (if any) should be universally available without a package. Candidates for `is_core = true` might include `marketplace` and `bulletin` as baseline features. Everything else should require a package assignment.
-
-## Files to Modify
-
-| File | Change |
-|---|---|
-| New migration SQL | `CREATE OR REPLACE FUNCTION get_effective_society_features` — change `ELSE (_builder_id IS NULL)` to `ELSE false` |
-
-No frontend changes are needed. The function signature and return type remain identical.
+### No other files modified.
 
