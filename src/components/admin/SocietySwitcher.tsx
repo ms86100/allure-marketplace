@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Building2 } from 'lucide-react';
 
 interface SocietyOption {
@@ -12,6 +13,7 @@ interface SocietyOption {
 export function SocietySwitcher() {
   const { isAdmin, isBuilderMember, managedBuilderIds, effectiveSocietyId, setViewAsSociety, profile } = useAuth();
   const [societies, setSocieties] = useState<SocietyOption[]>([]);
+  const [pendingSwitch, setPendingSwitch] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSocieties();
@@ -46,10 +48,11 @@ export function SocietySwitcher() {
       <Select
         value={effectiveSocietyId || 'all'}
         onValueChange={(val) => {
-          if (val === 'my' || val === 'all') {
-            setViewAsSociety(null);
-          } else {
-            setViewAsSociety(val);
+          const targetId = val === 'my' || val === 'all' ? null : val;
+          const currentId = effectiveSocietyId === profile?.society_id ? null : effectiveSocietyId;
+          // If switching to a different society, show confirmation
+          if (targetId !== currentId) {
+            setPendingSwitch(val);
           }
         }}
       >
@@ -69,6 +72,37 @@ export function SocietySwitcher() {
             ))}
         </SelectContent>
       </Select>
+
+      {/* C3: Confirmation dialog for society switching */}
+      <AlertDialog open={!!pendingSwitch} onOpenChange={(open) => { if (!open) setPendingSwitch(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Switch Society View?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to view{' '}
+              <strong>
+                {pendingSwitch === 'my' || pendingSwitch === 'all' || pendingSwitch === profile?.society_id
+                  ? 'your home society'
+                  : societies.find(s => s.id === pendingSwitch)?.name || 'another society'}
+              </strong>.
+              Your cart and active orders remain in your home society.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (pendingSwitch === 'my' || pendingSwitch === 'all') {
+                setViewAsSociety(null);
+              } else {
+                setViewAsSociety(pendingSwitch!);
+              }
+              setPendingSwitch(null);
+            }}>
+              Switch
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -19,6 +19,7 @@ import { friendlyError } from '@/lib/utils';
 import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { useCurrency } from '@/hooks/useCurrency';
+import { OrderProgressOverlay } from '@/components/checkout/OrderProgressOverlay';
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ export default function CartPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [fulfillmentType, setFulfillmentType] = useState<'self_pickup' | 'delivery'>('self_pickup');
   const [deliveryFee, setDeliveryFee] = useState(0);
+  const [orderStep, setOrderStep] = useState<'validating' | 'creating' | 'confirming'>('validating');
   const settings = useSystemSettings();
   const { formatPrice, currencySymbol } = useCurrency();
 
@@ -105,6 +107,7 @@ export default function CartPage() {
 
     // Pre-checkout: validate product availability
     setIsPlacingOrder(true);
+    setOrderStep('validating');
     try {
       const productIds = items.map(i => i.product_id);
       const { data: freshProducts, error: freshError } = await supabase
@@ -137,7 +140,7 @@ export default function CartPage() {
         setIsPlacingOrder(false);
         return;
       }
-      // isPlacingOrder already set above
+      setOrderStep('creating');
       try {
         const orderIds = await createOrdersForAllSellers('pending');
         if (orderIds.length === 0) throw new Error('Failed to create orders');
@@ -152,7 +155,7 @@ export default function CartPage() {
       return;
     }
 
-    // isPlacingOrder already set above
+    setOrderStep('creating');
     try {
       const orderIds = await createOrdersForAllSellers('pending');
       if (orderIds.length === 0) throw new Error('Failed to create orders');
@@ -555,6 +558,9 @@ export default function CartPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Order Progress Overlay */}
+      <OrderProgressOverlay isVisible={isPlacingOrder} step={orderStep} />
 
       {/* Razorpay Checkout */}
       {pendingOrderIds.length > 0 && (

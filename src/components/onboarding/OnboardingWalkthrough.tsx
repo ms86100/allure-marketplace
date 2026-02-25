@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ShoppingBag, Users, MapPin, Shield, X, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSystemSettings } from '@/hooks/useSystemSettings';
 
 export interface OnboardingSlide {
   icon: LucideIcon;
@@ -43,8 +44,32 @@ const DEFAULT_SLIDES: OnboardingSlide[] = [
   },
 ];
 
+// Icon name to component map for DB-driven slides
+const ICON_MAP: Record<string, LucideIcon> = {
+  Users, ShoppingBag, MapPin, Shield,
+};
+
 export function OnboardingWalkthrough({ onComplete, slides: customSlides }: OnboardingWalkthroughProps) {
-  const slides = customSlides || DEFAULT_SLIDES;
+  const settings = useSystemSettings();
+
+  // E3: Parse DB-driven slides from landingSlidesJson if available
+  const dbSlides = useMemo<OnboardingSlide[] | null>(() => {
+    if (!settings.landingSlidesJson) return null;
+    try {
+      const parsed = JSON.parse(settings.landingSlidesJson);
+      if (!Array.isArray(parsed) || parsed.length === 0) return null;
+      return parsed.map((s: any) => ({
+        icon: ICON_MAP[s.icon] || Users,
+        title: s.title || '',
+        description: s.description || '',
+        color: s.color || 'bg-primary/10 text-primary',
+      }));
+    } catch {
+      return null;
+    }
+  }, [settings.landingSlidesJson]);
+
+  const slides = customSlides || dbSlides || DEFAULT_SLIDES;
   const [currentSlide, setCurrentSlide] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);

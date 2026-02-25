@@ -48,9 +48,36 @@ export function friendlyError(error: unknown): string {
   if (lower.includes('storage') && lower.includes('quota')) {
     return 'Storage limit reached. Please free up space and try again.';
   }
+  if (lower.includes('stock_validation_failed') || lower.includes('items are unavailable')) {
+    return 'Some items in your cart are no longer available. Please review your cart.';
+  }
+  if (lower.includes('insufficient') || lower.includes('balance')) {
+    return 'Insufficient balance. Please try a different payment method.';
+  }
+  if (lower.includes('permission') || lower.includes('forbidden') || lower.includes('403')) {
+    return "You don't have permission for this action.";
+  }
+  if (lower.includes('invalid') && lower.includes('phone')) {
+    return 'Please enter a valid phone number.';
+  }
+  if (lower.includes('invalid') && lower.includes('email')) {
+    return 'Please enter a valid email address.';
+  }
+  if (lower.includes('file') && (lower.includes('large') || lower.includes('size'))) {
+    return 'File is too large. Please choose a smaller file.';
+  }
+  if (lower.includes('user_already_exists') || lower.includes('user already registered')) {
+    return 'An account with this email already exists. Try logging in instead.';
+  }
+  if (lower.includes('weak_password') || lower.includes('password')) {
+    return 'Password is too weak. Use at least 8 characters with mixed case and numbers.';
+  }
+  if (lower.includes('server') || lower.includes('500') || lower.includes('internal')) {
+    return 'Server error. Please try again in a moment.';
+  }
 
   // Fallback: return original if it looks user-friendly (short, no technical jargon)
-  if (msg.length > 0 && msg.length < 120 && !lower.includes('error') && !lower.includes('exception')) {
+  if (msg.length > 0 && msg.length < 120 && !lower.includes('error') && !lower.includes('exception') && !lower.includes('unexpected')) {
     return msg;
   }
 
