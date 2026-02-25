@@ -23,7 +23,7 @@ import { UserPlus, Users, Shield, AlertTriangle, Settings } from 'lucide-react';
 import { ModuleSearchBar } from '@/components/search/ModuleSearchBar';
 
 export default function WorkforceManagementPage() {
-  const { user, profile, effectiveSocietyId, isSocietyAdmin, isAdmin } = useAuth();
+  const { user, profile, effectiveSocietyId, isSocietyAdmin, isAdmin, isBuilderMember } = useAuth();
   const queryClient = useQueryClient();
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('active');
@@ -105,7 +105,7 @@ export default function WorkforceManagementPage() {
   const suspendedCount = workers.filter(w => w.status === 'suspended').length;
   const blacklistedCount = workers.filter(w => w.status === 'blacklisted').length;
 
-  const canManage = isSocietyAdmin || isAdmin;
+  const canManage = isSocietyAdmin || isAdmin || isBuilderMember;
 
   return (
     <AppLayout headerTitle="Workforce" showLocation={false}>
