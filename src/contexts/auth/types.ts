@@ -15,6 +15,8 @@ export interface AuthContextType {
   isAdmin: boolean;
   isSocietyAdmin: boolean;
   isBuilderMember: boolean;
+  isSecurityOfficer: boolean;
+  isWorker: boolean;
   societyAdminRole: SocietyAdmin | null;
   managedBuilderIds: string[];
   signOut: () => Promise<void>;
@@ -35,6 +37,8 @@ export interface AuthState {
   sellerProfiles: SellerProfile[];
   currentSellerId: string | null;
   isLoading: boolean;
+  isSecurityOfficer: boolean;
+  isWorker: boolean;
   societyAdminRole: SocietyAdmin | null;
   managedBuilderIds: string[];
   viewAsSocietyId: string | null;
@@ -50,6 +54,8 @@ export const initialAuthState: AuthState = {
   sellerProfiles: [],
   currentSellerId: null,
   isLoading: true,
+  isSecurityOfficer: false,
+  isWorker: false,
   societyAdminRole: null,
   managedBuilderIds: [],
   viewAsSocietyId: null,

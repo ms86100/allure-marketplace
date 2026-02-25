@@ -57,6 +57,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const invalidate = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: [...CART_QUERY_KEY, user?.id] });
+    queryClient.invalidateQueries({ queryKey: ['cart-count', user?.id] });
   }, [queryClient, user?.id]);
 
   const itemCount = useMemo(

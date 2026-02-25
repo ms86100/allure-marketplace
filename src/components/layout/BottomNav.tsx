@@ -4,9 +4,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useEffectiveFeatures } from '@/hooks/useEffectiveFeatures';
-import { useSecurityOfficer } from '@/hooks/useSecurityOfficer';
-import { useWorkerRole } from '@/hooks/useWorkerRole';
-import { useCart } from '@/hooks/useCart';
+import { useCartCount } from '@/hooks/useCartCount';
 import { useAuth } from '@/contexts/AuthContext';
 import type { FeatureKey } from '@/hooks/useEffectiveFeatures';
 
@@ -33,11 +31,8 @@ const workerNavItems: { to: string; icon: typeof Briefcase; label: string }[] = 
 function BottomNavInner() {
   const location = useLocation();
   const { isFeatureEnabled, isLoading } = useEffectiveFeatures();
-  const { isAdmin, isSocietyAdmin, isBuilderMember, roles } = useAuth();
-  const isPureBuyer = roles.length <= 1 && roles[0] === 'buyer';
-  const { isSecurityOfficer } = useSecurityOfficer(!isPureBuyer);
-  const { isWorker } = useWorkerRole(!isPureBuyer && roles.includes('worker'));
-  const { itemCount } = useCart();
+  const { isAdmin, isSocietyAdmin, isBuilderMember, roles, isSecurityOfficer, isWorker } = useAuth();
+  const itemCount = useCartCount();
   const { selectionChanged } = useHaptics();
 
   const isPrimaryRoleUser = isAdmin || isSocietyAdmin || isBuilderMember;

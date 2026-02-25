@@ -169,22 +169,9 @@ export function paginationRange(page: number, pageSize: number) {
   return { start: page * pageSize, end: (page + 1) * pageSize - 1 };
 }
 
-// ── Notification Title ──────────────────────────────────────────────────────
-export function getOrderNotifTitle(status: string, role: 'buyer' | 'seller'): string | null {
-  if (role === 'seller') {
-    if (status === 'placed') return '🆕 New Order Received!';
-    if (status === 'cancelled') return '❌ Order Cancelled';
-    return null;
-  }
-  const map: Record<string, string> = {
-    accepted: '✅ Order Accepted!', preparing: '👨‍🍳 Order Being Prepared',
-    ready: '🎉 Order Ready!', picked_up: '📦 Order Picked Up',
-    delivered: '🚚 Order Delivered', completed: '⭐ Order Completed',
-    cancelled: '❌ Order Cancelled', quoted: '💰 Quote Received',
-    scheduled: '📅 Booking Confirmed',
-  };
-  return map[status] || null;
-}
+// E5: Notification titles are now centralized in src/lib/order-notification-titles.ts
+// Re-export from the single source of truth to keep tests in sync with DB trigger
+export { getOrderNotifTitle } from '@/lib/order-notification-titles';
 
 // ── Haversine Distance ──────────────────────────────────────────────────────
 export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

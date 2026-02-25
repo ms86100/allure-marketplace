@@ -55,6 +55,8 @@ export function useAuthState() {
                 sellerProfiles: retrySellers,
                 currentSellerId: retrySellers.length > 0 ? retrySellers[0].id : null,
                 managedBuilderIds: (retryCtx.builder_ids as string[]) || [],
+                isSecurityOfficer: !!retryCtx.is_security_officer,
+                isWorker: !!retryCtx.is_worker,
               }));
               return;
             }
@@ -83,6 +85,8 @@ export function useAuthState() {
           sellerProfiles: sellers,
           currentSellerId: newSellerId,
           managedBuilderIds: (ctx.builder_ids as string[]) || [],
+          isSecurityOfficer: !!ctx.is_security_officer,
+          isWorker: !!ctx.is_worker,
         };
       });
     } catch (error) {
