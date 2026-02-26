@@ -38,7 +38,7 @@ export default function OrderDetailPage() {
     : ['placed', 'accepted', 'preparing', 'ready'];
 
   return (
-    <AppLayout showHeader={false} showNav={!o.isSellerView || order.status === 'completed' || order.status === 'cancelled'}>
+    <AppLayout showHeader={false} showNav={(!o.isSellerView || order.status === 'completed' || order.status === 'cancelled') && !o.isChatOpen}>
       <div className="pb-28">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
