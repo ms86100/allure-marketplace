@@ -1,152 +1,144 @@
 
 
-# Buyer Journey Regression & Readiness Audit
+# Buyer Journey Regression & Readiness Audit — Round 2
+
+This audit was performed after the 14-issue fix round. It covers the same buyer journey scope, focusing on new regressions introduced by fixes and previously undetected issues.
 
 ---
 
-## Summary
-
-After a thorough code-level audit of every buyer-facing flow (home, discovery, product detail, cart, checkout, payment, orders, notifications), I identified **14 issues** across functional, UX, and data integrity categories. None require new features -- all are corrections to existing behavior.
-
----
-
-## Issue #1
-**Scenario:** Buyer places a COD order successfully. Cart is not cleared after navigation.
-**Expected:** Cart should be empty after successful order placement.
-**Actual:** `useCartPage.handlePlaceOrderInner` calls `await refresh()` (which only invalidates the query) but never calls `clearCart()`. The `create_multi_vendor_orders` RPC may delete cart items server-side, but there is no guarantee. If the RPC does not clear the cart, the buyer sees stale items.
-**Failure Type:** Functional
-**Root Cause:** Missing explicit `clearCart()` call after successful COD order creation (line 151 of `useCartPage.ts`). The `refresh()` call only invalidates the cache -- if the server-side RPC does not delete cart_items rows, items persist.
-**Proposed Fix:** Add `await clearCart()` after `await refresh()` in the COD success path (line 151) and in `handleRazorpaySuccess` (line 183). Alternatively, confirm the `create_multi_vendor_orders` RPC deletes cart items and rely on `refresh()`.
+## Issue #1 — CategoryGroupPage: No Product Detail Sheet on Tap
+**Scenario:** Buyer navigates to Home → taps "See all" on a category → taps a product card on CategoryGroupPage.
+**Expected:** Product detail sheet opens (same behavior as Home page).
+**Actual:** `CategoryGroupPage.tsx` line 248 passes `onNavigate={navigate}` but does NOT pass `onTap` to `ProductListingCard`. Without `onTap`, `handleCardClick` (ProductListingCard line 160-164) falls back to `onNavigate('/seller/{seller_id}')`, navigating to the seller page instead of showing the product detail.
+**Failure Type:** Functional — inconsistent product tap behavior
+**Root Cause:** `CategoryGroupPage` does not implement a `handleProductTap` callback or render a `ProductDetailSheet`, unlike `SearchPage` and `MarketplaceSection`.
+**Proposed Fix:** Add `selectedProduct` / `detailOpen` state and a `ProductDetailSheet` to `CategoryGroupPage`, matching the pattern used in `SearchPage` and `MarketplaceSection`. Pass `onTap={handleProductTap}` to each `ProductListingCard`.
 
 ---
 
-## Issue #2
-**Scenario:** Buyer selects "Pay Online (UPI)" for a multi-seller cart with 2+ sellers.
-**Expected:** Either each seller gets a separate Razorpay order, or the user is informed that online payment is only available for single-seller carts.
-**Actual:** `RazorpayCheckout` receives `orderId={c.pendingOrderIds[0]}` and `sellerId={c.sellerGroups[0]?.sellerId}` -- only the first order/seller. The second seller's order remains unpaid with `payment_status = 'pending'` forever.
-**Failure Type:** Functional -- payment correctness
-**Root Cause:** `CartPage.tsx` line 237 only passes the first order ID to Razorpay. Multi-seller UPI payment is incomplete.
-**Proposed Fix:** Either (a) iterate through each order and present sequential Razorpay checkouts, or (b) disable UPI for multi-seller carts and show an informational message, similar to how coupons are disabled for multi-seller carts (line 153-154 of CartPage).
+## Issue #2 — MarketplaceSection: `onSelectProduct` Not Passed to ProductDetailSheet
+**Scenario:** Buyer opens a product detail sheet from Home page → scrolls to "Similar Products" → taps one.
+**Expected:** The detail sheet updates to show the tapped similar product.
+**Actual:** `MarketplaceSection.tsx` renders `<ProductDetailSheet>` at line 156 but does NOT pass `onSelectProduct`. In `ProductDetailSheet.tsx` line 163, `onSelectProduct?.(sp)` fires but there is no handler, so nothing happens. The similar products section is dead UI despite the `onClick` being added in the prior fix.
+**Failure Type:** Regression — fix was incomplete
+**Root Cause:** The prior fix (#4) added an `onClick` handler in `ProductDetailSheet` that calls `onSelectProduct`, but `MarketplaceSection` (the primary consumer) never passes this prop. Same issue in `SearchPage`.
+**Proposed Fix:** In `MarketplaceSection.tsx`, pass `onSelectProduct={(sp) => { setSelectedProduct({...formatted sp...}); }}` to `ProductDetailSheet`. Same for `SearchPage`.
 
 ---
 
-## Issue #3
-**Scenario:** Buyer adds a product with `approval_status = 'pending'` to the cart via Home page product listings.
-**Expected:** Only approved products should be purchasable.
-**Actual:** The `useProductsByCategory` query likely filters `approval_status = 'approved'`, but the pre-checkout validation (line 110-112 of `useCartPage.ts`) correctly rejects pending products. However, if a product's status changes to pending AFTER being added to cart, the buyer gets a confusing error at checkout time instead of being warned earlier.
-**Failure Type:** UX
-**Root Cause:** No real-time or periodic validation of cart item availability.
-**Proposed Fix:** Add a visual indicator on cart items whose products are no longer available/approved, detected at cart render time via the existing query data.
+## Issue #3 — ReorderLastOrder Clears Entire Cart Without Warning
+**Scenario:** Buyer has items in cart → visits Home page → taps "Reorder from [Seller]".
+**Expected:** Items are added to existing cart, or buyer is warned the cart will be replaced.
+**Actual:** `ReorderLastOrder.tsx` line 80 executes `await supabase.from('cart_items').delete().eq('user_id', user.id)` — this deletes ALL existing cart items without any confirmation dialog or warning.
+**Failure Type:** Data integrity / UX — destructive action without consent
+**Root Cause:** Line 80 performs a hard delete of all cart items before inserting reorder items. No confirmation step.
+**Proposed Fix:** Either (a) merge reorder items into the existing cart (upsert), or (b) show an `AlertDialog` warning the buyer that their current cart will be replaced before proceeding.
 
 ---
 
-## Issue #4
-**Scenario:** Buyer taps on a similar product in the `ProductDetailSheet` similar products row.
-**Expected:** The detail sheet should update to show the tapped similar product.
-**Actual:** Similar products are rendered as plain `<div>` elements with no click handler. They are not tappable. Dead UI.
-**Failure Type:** Functional -- dead CTA
-**Root Cause:** `ProductDetailSheet.tsx` lines 165-174 render similar products without any `onClick` handler.
-**Proposed Fix:** Add an `onClick` handler to each similar product that updates the `product` prop or opens a new detail sheet for that product.
+## Issue #4 — FavoritesPage Filters Out Cross-Society Sellers
+**Scenario:** Buyer enables "Nearby societies" in search → favorites a seller from another community → visits Favorites page.
+**Expected:** The favorited seller appears in the list.
+**Actual:** `FavoritesPage.tsx` line 41 filters favorites with `(!profile?.society_id || s.society_id === profile.society_id)`. This explicitly excludes sellers from other societies, even though the buyer intentionally favorited them via cross-society discovery.
+**Failure Type:** Data inconsistency — favorites lost
+**Root Cause:** Hard filter at line 41 excludes cross-society sellers.
+**Proposed Fix:** Remove the `society_id` filter from line 41, or add a separate section for "Nearby Favorites" showing cross-society sellers.
 
 ---
 
-## Issue #5
-**Scenario:** Buyer views product detail sheet and sees image pagination dots (3 dots).
-**Expected:** Multiple product images with swipe navigation, or a single image with no dots.
-**Actual:** The dots are hardcoded (lines 67-72 of `ProductDetailSheet.tsx`) -- always showing 3 dots regardless of actual image count. There is only ever 1 image. This is misleading.
-**Failure Type:** UX -- misleading UI
-**Root Cause:** Hardcoded pagination indicators with no carousel logic.
-**Proposed Fix:** Remove the pagination dots entirely since products only have a single `image_url` field, or conditionally render them only when multiple images exist.
+## Issue #5 — Header Society Dropdown: ChevronDown Implies Interaction, No Action
+**Scenario:** Buyer taps the society name with the chevron-down indicator in the Header.
+**Expected:** A dropdown opens to show society details or switch context.
+**Actual:** `Header.tsx` lines 101-111 render a `<button>` with `ChevronDown` but the `onClick` only calls `selectionChanged()` (haptic feedback). No dropdown, no navigation, no action. Dead button.
+**Failure Type:** UX — misleading interactive element
+**Root Cause:** The button handler only triggers haptics with no functional action.
+**Proposed Fix:** Either remove the `ChevronDown` icon and change to a non-interactive `<div>`, or add a sheet/popover showing society info. For non-admin buyers, removing the chevron is the simplest fix.
 
 ---
 
-## Issue #6
-**Scenario:** Buyer views the address section on the checkout page with no block/flat set in profile.
-**Expected:** Graceful handling or prompt to add address.
-**Actual:** `CartPage.tsx` line 175 renders `{c.profile?.name} — ` followed by empty string from `[c.profile?.block, c.profile?.flat_number].filter(Boolean).join(', ')`. The delivery address in the order will also be empty (line 59 of `useCartPage.ts`), leading to orders with no delivery information.
-**Failure Type:** Functional -- data integrity
-**Root Cause:** No validation that the buyer has a complete delivery address before allowing order placement.
-**Proposed Fix:** Add a guard in `handlePlaceOrderInner` that checks for non-empty `profile.block` and `profile.flat_number` when `fulfillmentType === 'delivery'`, and show a toast directing the buyer to update their profile.
+## Issue #6 — Cart Query Key Mismatch in useAppLifecycle
+**Scenario:** Buyer resumes app from background on the cart page.
+**Expected:** Cart items refresh.
+**Actual:** `useAppLifecycle.ts` invalidates `queryKey: ['cart-items']` but `useCart.tsx` uses `queryKey: ['cart-items', user?.id]` (line 39). The invalidation at the base key `['cart-items']` should match as a prefix, but this depends on React Query's `exact` default (which is `false`). This should work correctly. However, examining further, `useAppLifecycle` does NOT have access to `user?.id`, so if the query client has multiple keys with different user IDs cached (unlikely but possible), it would invalidate all of them — which is actually the correct behavior.
+**Failure Type:** Not a bug — CONFIRMED WORKING. Skipping.
 
 ---
 
-## Issue #7
-**Scenario:** Buyer taps the address card (ChevronRight indicator) on the checkout page.
-**Expected:** Opens an address edit sheet or navigates to profile to update address.
-**Actual:** The address card (lines 169-179 of CartPage) has a `ChevronRight` icon suggesting it is tappable, but there is no `onClick` handler or `Link` wrapper. It is a non-interactive element styled as interactive.
-**Failure Type:** UX -- misleading CTA
-**Root Cause:** Missing navigation/click handler on the address card.
-**Proposed Fix:** Either wrap the address card in a `Link to="/profile"` or remove the `ChevronRight` icon to avoid implying interactivity.
+## Issue #7 — Payment Method Defaults to COD Even When Seller Only Accepts UPI
+**Scenario:** Buyer adds product from a seller that only accepts UPI (accepts_cod=false) → goes to cart.
+**Expected:** UPI should be pre-selected or COD should be disabled.
+**Actual:** `useCartPage.ts` line 19 initializes `paymentMethod` to `'cod'`. If `acceptsCod` is `false`, the COD option in `PaymentMethodSelector` is visually disabled (line 67-68) but the internal state is still `'cod'`. The buyer must manually switch to UPI. If they tap "Place Order" without switching, the order goes through as COD despite the seller not accepting it — because `handlePlaceOrderInner` doesn't validate the payment method against seller capabilities.
+**Failure Type:** Functional — payment method bypass
+**Root Cause:** No validation that the selected `paymentMethod` matches what the seller accepts before order creation.
+**Proposed Fix:** Add a guard at the top of `handlePlaceOrderInner`: if `paymentMethod === 'cod' && !acceptsCod`, show a toast and return. Additionally, auto-select UPI if COD is not accepted in the initial state.
 
 ---
 
-## Issue #8
-**Scenario:** Buyer resumes the app from background (iOS/Android) while on the cart page.
-**Expected:** Cart data refreshes to reflect any server-side changes.
-**Actual:** `useAppLifecycle.ts` invalidates `cart-count` but does NOT invalidate the main `cart-items` query key. The cart count badge updates, but the actual cart page data may be stale.
-**Failure Type:** Real-time issue -- stale data on resume
-**Root Cause:** `useAppLifecycle.ts` line 14 invalidates `['cart-count']` but not `['cart-items']`.
-**Proposed Fix:** Add `queryClient.invalidateQueries({ queryKey: ['cart-items'] })` to the `appStateChange` handler in `useAppLifecycle.ts`.
+## Issue #8 — Confirm Dialog Shows Empty Address for Self-Pickup
+**Scenario:** Buyer selects "Self Pickup" → taps "Place Order" → Confirm dialog opens.
+**Expected:** Shows pickup location clearly.
+**Actual:** `CartPage.tsx` line 228 renders the fulfillment info in the confirm dialog. For `self_pickup`, it shows `{c.sellerGroups[0]?.sellerName || 'Seller'}`. For `delivery`, it renders `${c.profile?.block}, ${c.profile?.flat_number}`. If the buyer's profile has no block/flat, this renders `undefined, undefined`.
+**Failure Type:** UX — displays raw undefined values
+**Root Cause:** Template literal doesn't handle null/undefined profile fields.
+**Proposed Fix:** Use the same pattern as the address card: `[c.profile?.block, c.profile?.flat_number].filter(Boolean).join(', ') || 'Not set'`.
 
 ---
 
-## Issue #9
-**Scenario:** Buyer's `FeaturedBanners` carousel auto-scrolls. Buyer manually scrolls and releases.
-**Expected:** Auto-scroll pauses or resets after manual interaction.
-**Actual:** The auto-scroll interval (line 55-58 of `FeaturedBanners.tsx`) runs continuously at 4s. After manual scroll sets `activeIndex` via the scroll handler, the interval immediately overrides it on the next tick, causing a "fighting" effect where the carousel jumps.
-**Failure Type:** UX regression
-**Root Cause:** Auto-scroll interval does not pause on user interaction.
-**Proposed Fix:** Clear the interval on user touch/scroll start, and restart it after a delay (e.g., 8s) after the last user interaction.
+## Issue #9 — OrderDetailPage: Seller Phone Link May Be Null
+**Scenario:** Buyer views an order detail → taps the phone icon to call the seller.
+**Expected:** Opens phone dialer with seller's number.
+**Actual:** `OrderDetailPage.tsx` line 135 renders `<a href={tel:${...sellerProfile?.phone}}>`. If `sellerProfile` is null (which happens when the seller profile join fails or the seller doesn't have phone set), the href becomes `tel:undefined`, which opens the dialer with "undefined" as the number.
+**Failure Type:** Functional — broken phone link
+**Root Cause:** No null check on phone number before rendering the tel link.
+**Proposed Fix:** Conditionally render the phone button only when `sellerProfile?.phone` or `buyer?.phone` is truthy.
 
 ---
 
-## Issue #10
-**Scenario:** Buyer taps "Neighborhood Guarantee" text at the bottom of the checkout page.
-**Expected:** Readable, meaningful text about the guarantee.
-**Actual:** `CartPage.tsx` lines 192-196 contain broken string manipulation logic. The `.split()` / `.reduce()` chain does not produce the intended bold-text result. Instead it falls back to the raw label string, which may contain a placeholder pattern like `{Neighborhood Guarantee}` that renders literally.
-**Failure Type:** UX -- broken copy rendering
-**Root Cause:** Complex string manipulation attempting to emulate `dangerouslySetInnerHTML` without actually doing it.
-**Proposed Fix:** Simplify by rendering the label as plain text, or use a proper React-based approach to bold the guarantee name (e.g., split the string and wrap the guarantee name in a `<span className="font-semibold">`).
+## Issue #10 — SearchPage: showCart={false} but FloatingCartBar Still Hides Correctly
+**Scenario:** Buyer navigates to SearchPage which sets `showCart={false}`.
+**Expected:** No FloatingCartBar shown on search page.
+**Actual:** After the prior fix (#14), `AppLayout` now conditionally renders `FloatingCartBar` based on `showCart`. SearchPage passes `showCart={false}`. This is CONFIRMED WORKING.
+**Failure Type:** Not a bug — CONFIRMED FIXED. Skipping.
 
 ---
 
-## Issue #11
-**Scenario:** Buyer taps a notification in NotificationInboxPage that has a `reference_path`.
-**Expected:** Navigates to the referenced page (e.g., order detail).
-**Actual:** The notification is marked as read and navigation occurs, but no loading indicator is shown. If the `reference_path` is invalid or points to a non-existent route, the buyer sees a 404 page with no way to understand what happened.
-**Failure Type:** UX -- silent failure
-**Root Cause:** No validation of `reference_path` before navigation.
-**Proposed Fix:** Wrap navigation in a try-catch or validate that the path starts with a known route prefix before calling `navigate()`.
+## Issue #11 — CategoryGroupPage Shows "Become a Seller" CTA to Buyers
+**Scenario:** Buyer browses a category with no products → sees "No items found" empty state.
+**Expected:** Appropriate empty state for a buyer.
+**Actual:** `CategoryGroupPage.tsx` line 264 shows a "Become a Seller" button in the empty state. This is confusing for buyers who are just browsing. It should only appear if relevant context warrants it (e.g., the user is already on a seller onboarding path).
+**Failure Type:** UX — inappropriate CTA for buyer context
+**Root Cause:** Empty state copy targets sellers rather than buyers.
+**Proposed Fix:** Change the CTA to "Browse other categories" or "Go back to Home", or conditionally show "Become a Seller" only if the user is not already a seller.
 
 ---
 
-## Issue #12
-**Scenario:** Buyer places a UPI order, payment fails, and taps "Cancel" on the failure screen.
-**Expected:** The pending unpaid order is cancelled or clearly shown as unpaid in the orders list.
-**Actual:** `handleRazorpayFailed` (line 188-192 of `useCartPage.ts`) clears `pendingOrderIds` and shows a toast, but does NOT cancel the order in the database. The order remains in `status = 'placed'` with `payment_status = 'pending'` indefinitely, until the auto-cancel cron picks it up (which could be hours later).
-**Failure Type:** Functional -- orphaned order
-**Root Cause:** No immediate order cancellation on payment failure.
-**Proposed Fix:** Call an update to set `status = 'cancelled'` for the pending order IDs when the buyer explicitly cancels after payment failure. Alternatively, set a shorter auto-cancel window for UPI orders specifically.
+## Issue #12 — Order Detail: `payment_type` Used Instead of `payment_method`
+**Scenario:** Buyer views order detail for a COD order.
+**Expected:** Shows "Cash on Delivery" correctly.
+**Actual:** `OrderDetailPage.tsx` line 100 checks `order.payment_type === 'cod'`. The database field used in `useCartPage` is `payment_method` (line 62). If the orders table column is named `payment_method` but the code reads `payment_type`, this could show incorrect payment info. Need to verify the actual DB column name.
+**Failure Type:** Potential data inconsistency
+**Root Cause:** Possible field name mismatch between what's written (payment_method) and what's read (payment_type).
+**Proposed Fix:** Verify the actual column name in the orders table schema. If `payment_method`, change `order.payment_type` to `order.payment_method` in OrderDetailPage.
 
 ---
 
-## Issue #13
-**Scenario:** Buyer views the Orders page and switches to "Received" tab (if they are also a seller).
-**Expected:** Only seller-view concerns.
-**Actual:** The seller tab uses `currentSellerId` from `useAuth()`. If a user has multiple seller profiles, only the "current" one is shown. There is no switcher on this page. The buyer-who-is-also-a-seller may miss orders from their other store.
-**Failure Type:** Data inconsistency
-**Root Cause:** `OrdersPage.tsx` line 211 uses `currentSellerId` without providing a seller switcher.
-**Proposed Fix:** Either show orders from ALL seller profiles, or add the `SellerSwitcher` component to the "Received" tab header.
+## Issue #13 — No Loading/Disabled State on Reorder Button During Processing
+**Scenario:** Buyer taps "Reorder" on an order card or the home page reorder strip.
+**Expected:** Button shows loading state to prevent double-tap.
+**Actual:** `ReorderLastOrder.tsx` correctly disables the button with `isLoading` state. However, `ReorderButton` (used in OrderCard and OrderDetailPage) — need to verify it also has loading protection. The `ReorderButton` is wrapped in `onClick={(e) => e.preventDefault()}` at `OrdersPage.tsx` line 83, which prevents navigation from the Link, but the reorder button itself needs independent loading state.
+**Failure Type:** Potential — needs verification
+**Root Cause:** If `ReorderButton` doesn't manage its own loading state, double-taps could create duplicate cart entries.
+**Proposed Fix:** Ensure `ReorderButton` has an internal `isLoading` state that disables the button during the async operation.
 
 ---
 
-## Issue #14
-**Scenario:** Buyer's `FloatingCartBar` overlaps with the `BottomNav` on pages where both are visible.
-**Expected:** The floating cart bar sits above the bottom nav without overlap.
-**Actual:** `FloatingCartBar.tsx` positions itself at `bottom-[calc(4rem+env(safe-area-inset-bottom))]` (line 26). `BottomNav.tsx` has `pb-[env(safe-area-inset-bottom)]` plus the nav height. On devices where the actual safe area is larger than expected, or with certain font scaling, there can be slight overlap or a gap. Additionally, `AppLayout.tsx` always renders `FloatingCartBar` (line 41) even when `showCart={false}` is passed -- the cart bar renders regardless because `FloatingCartBar` manages its own visibility, but `AppLayout` renders it unconditionally outside the `showCart` guard.
-**Failure Type:** UX -- layout inconsistency
-**Root Cause:** `FloatingCartBar` is always rendered in `AppLayout` regardless of `showCart` prop.
-**Proposed Fix:** Conditionally render `FloatingCartBar` in `AppLayout` based on the `showCart` prop: `{showCart && <FloatingCartBar />}`.
+## Issue #14 — Pre-checkout Validation Swallows Errors
+**Scenario:** Buyer places order → pre-checkout validation (product availability check) fails due to network error.
+**Expected:** Order placement is blocked with a clear error message.
+**Actual:** `useCartPage.ts` lines 129-131: the `catch` block only logs the error (`console.error`) but does NOT return or block the order. Execution continues to the COD/UPI order creation logic, meaning orders can be placed even if the availability check failed entirely.
+**Failure Type:** Functional — validation bypass on network error
+**Root Cause:** Missing `return` or `setIsPlacingOrder(false)` in the catch block of the pre-checkout validation.
+**Proposed Fix:** Add `setIsPlacingOrder(false); return;` in the catch block at line 130, or at minimum show a toast warning the buyer that validation could not be completed and ask them to retry.
 
 ---
 
@@ -154,8 +146,7 @@ After a thorough code-level audit of every buyer-facing flow (home, discovery, p
 
 | Priority | Issues |
 |----------|--------|
-| **P0 - Blocks payment** | #2 (multi-seller UPI), #12 (orphaned order on UPI failure) |
-| **P1 - Data integrity** | #1 (cart not cleared), #6 (empty delivery address), #8 (stale cart on resume) |
-| **P2 - UX regressions** | #4 (dead similar products), #5 (fake pagination dots), #7 (dead address CTA), #9 (carousel fighting), #10 (broken guarantee text), #14 (FloatingCartBar always visible) |
-| **P3 - Minor** | #3 (pending product in cart), #11 (invalid notification path), #13 (missing seller switcher on orders) |
+| **P0 — Blocks correctness** | #7 (payment method bypass), #14 (validation swallowed) |
+| **P1 — Functional gaps** | #1 (no detail sheet on category page), #2 (similar products dead), #3 (reorder clears cart), #9 (null phone link) |
+| **P2 — UX issues** | #4 (favorites filter), #5 (dead society button), #8 (undefined in confirm dialog), #11 (wrong CTA), #12 (payment_type field) |
 
