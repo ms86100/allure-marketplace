@@ -42,40 +42,54 @@ async function ensurePreferences() {
  * and localStorage on web.
  */
 class CapacitorStorage implements SupportedStorage {
+  private withTimeout<T>(promise: Promise<T>, ms = 5000, fallback: T): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((resolve) => setTimeout(() => {
+        console.warn('[CapacitorStorage] Native bridge call timed out after', ms, 'ms — using fallback');
+        resolve(fallback);
+      }, ms)),
+    ]);
+  }
+
   async getItem(key: string): Promise<string | null> {
     if (!Capacitor.isNativePlatform()) {
       return localStorage.getItem(key);
     }
     const prefs = await ensurePreferences();
     if (!prefs) return localStorage.getItem(key);
-    const { value } = await prefs.get({ key });
-    return value;
+    try {
+      const { value } = await this.withTimeout(prefs.get({ key }), 3000, { value: localStorage.getItem(key) });
+      return value;
+    } catch (e) {
+      console.warn('[CapacitorStorage] getItem failed, falling back to localStorage:', e);
+      return localStorage.getItem(key);
+    }
   }
 
   async setItem(key: string, value: string): Promise<void> {
-    if (!Capacitor.isNativePlatform()) {
-      localStorage.setItem(key, value);
-      return;
-    }
+    // Always write to localStorage as a safety net
+    try { localStorage.setItem(key, value); } catch (_) { /* quota exceeded, ignore */ }
+    if (!Capacitor.isNativePlatform()) return;
     const prefs = await ensurePreferences();
-    if (!prefs) {
-      localStorage.setItem(key, value);
-      return;
+    if (!prefs) return;
+    try {
+      await this.withTimeout(prefs.set({ key, value }), 3000, undefined);
+    } catch (e) {
+      console.warn('[CapacitorStorage] setItem failed:', e);
     }
-    await prefs.set({ key, value });
   }
 
   async removeItem(key: string): Promise<void> {
-    if (!Capacitor.isNativePlatform()) {
-      localStorage.removeItem(key);
-      return;
-    }
+    try { localStorage.removeItem(key); } catch (_) { /* ignore */ }
+    if (!Capacitor.isNativePlatform()) return;
     const prefs = await ensurePreferences();
-    if (!prefs) {
-      localStorage.removeItem(key);
-      return;
+    if (!prefs) return;
+    try {
+      await this.withTimeout(prefs.remove({ key }), 3000, undefined);
+    } catch (e) {
+      console.warn('[CapacitorStorage] removeItem failed:', e);
     }
-    await prefs.remove({ key });
   }
 }
 

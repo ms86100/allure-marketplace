@@ -152,6 +152,14 @@ export function useAuthPage() {
     const { email: trimmedEmail, password: validatedPassword } = validation.data;
     setEmail(trimmedEmail);
     setIsLoading(true);
+
+    // Safety timeout: ensure spinner clears even if a native bridge call hangs
+    const safetyTimer = setTimeout(() => {
+      console.warn('[Auth] Login safety timeout triggered — clearing spinner');
+      setIsLoading(false);
+      toast.error('Login is taking too long. Please check your connection and try again.');
+    }, 20000);
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password: validatedPassword });
       if (error) throw error;
@@ -171,7 +179,10 @@ export function useAuthPage() {
       } else {
         toast.error(friendlyError(error));
       }
-    } finally { setIsLoading(false); }
+    } finally {
+      clearTimeout(safetyTimer);
+      setIsLoading(false);
+    }
   };
 
   const handlePasswordReset = async () => {
