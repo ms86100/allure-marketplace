@@ -7,6 +7,7 @@ import { OrderItem } from '@/types/database';
 import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ReorderButtonProps {
   orderItems: OrderItem[];
@@ -25,6 +26,7 @@ export function ReorderButton({
 }: ReorderButtonProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleReorder = async () => {
@@ -107,6 +109,8 @@ export function ReorderButton({
       }
 
       toast.success('Items added to cart!');
+      queryClient.invalidateQueries({ queryKey: ['cart-items'] });
+      queryClient.invalidateQueries({ queryKey: ['cart-count'] });
       navigate('/cart');
     } catch (error) {
       console.error('Error reordering:', error);

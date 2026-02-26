@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Minus, Plus, Clock, Store, MapPin, Bell, ChevronRight, Trash2, ShieldCheck } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -18,12 +18,13 @@ import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 export default function CartPage() {
   const c = useCartPage();
   const ml = useMarketplaceLabels();
+  const navigate = useNavigate();
 
   if (c.items.length === 0) {
     return (
       <AppLayout showHeader={false}>
         <div className="p-4 safe-top">
-          <Link to="/" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted mb-6"><ArrowLeft size={18} /></Link>
+          <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted mb-6"><ArrowLeft size={18} /></button>
           <div className="text-center py-16">
             <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center"><span className="text-4xl">🛒</span></div>
             <h2 className="text-lg font-bold mb-1">Your cart is empty</h2>
@@ -41,7 +42,7 @@ export default function CartPage() {
 
   return (
     <AppLayout showHeader={false} showNav={false}>
-      <div className="pb-44">
+      <div className="pb-52">
         {/* Sticky Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
           <Link to="/" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></Link>
@@ -159,7 +160,7 @@ export default function CartPage() {
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Bill Details</h3>
           <div className="space-y-2 text-sm">
             {c.sellerGroups.map((group) => (<div key={group.sellerId} className="flex justify-between"><span className="text-muted-foreground truncate mr-2">{group.sellerName}</span><span className="font-medium">{c.formatPrice(group.subtotal)}</span></div>))}
-            {c.appliedCoupon && (<div className="flex justify-between text-primary"><span>Coupon ({c.appliedCoupon.code})</span><span>-{c.formatPrice(c.appliedCoupon.discountAmount)}</span></div>)}
+            {c.appliedCoupon && (<div className="flex justify-between text-primary"><span>Coupon ({c.appliedCoupon.code})</span><span>-{c.formatPrice(Math.min(c.appliedCoupon.discountAmount, c.totalAmount))}</span></div>)}
             <div className="flex justify-between"><span className="text-muted-foreground">Delivery Fee</span><span className={`font-medium ${c.effectiveDeliveryFee === 0 ? 'text-primary' : ''}`}>{c.fulfillmentType === 'delivery' ? (c.effectiveDeliveryFee === 0 ? 'FREE' : c.formatPrice(c.effectiveDeliveryFee)) : 'Self Pickup'}</span></div>
             <div className="border-t border-border pt-2 mt-1 flex justify-between font-bold"><span>To Pay</span><span>{c.formatPrice(c.finalAmount)}</span></div>
           </div>
@@ -235,7 +236,7 @@ export default function CartPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <OrderProgressOverlay isVisible={c.isPlacingOrder} step={c.orderStep} />
+      <OrderProgressOverlay isVisible={c.isPlacingOrder} step={c.orderStep} onCancel={() => { /* Allow escape after timeout — state reset handled by useCartPage */ }} />
 
       {c.pendingOrderIds.length > 0 && (
         <RazorpayCheckout isOpen={c.showRazorpayCheckout} onClose={() => c.handleRazorpayFailed()} orderId={c.pendingOrderIds[0]} amount={c.finalAmount} sellerId={c.sellerGroups[0]?.sellerId || ''} sellerName={c.sellerGroups[0]?.sellerName || 'Seller'} customerName={c.profile?.name || ''} customerEmail={c.user?.email || ''} customerPhone={c.profile?.phone || ''} onPaymentSuccess={c.handleRazorpaySuccess} onPaymentFailed={c.handleRazorpayFailed} />

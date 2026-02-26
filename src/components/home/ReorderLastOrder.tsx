@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface LastOrder {
   id: string;
@@ -19,6 +20,7 @@ interface LastOrder {
 export function ReorderLastOrder() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { formatPrice } = useCurrency();
   const ml = useMarketplaceLabels();
   const [lastOrder, setLastOrder] = useState<LastOrder | null>(null);
@@ -102,6 +104,8 @@ export function ReorderLastOrder() {
         toast.info(`${unavailableCount} item(s) were unavailable and skipped`);
       }
       toast.success(ml.label('label_reorder_success'));
+      queryClient.invalidateQueries({ queryKey: ['cart-items'] });
+      queryClient.invalidateQueries({ queryKey: ['cart-count'] });
       navigate('/cart');
     } catch {
       toast.error('Failed to reorder');

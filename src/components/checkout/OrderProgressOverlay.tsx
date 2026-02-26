@@ -1,10 +1,12 @@
-import { memo } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { Loader2, CheckCircle, ShoppingCart, CreditCard, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface OrderProgressOverlayProps {
   isVisible: boolean;
   step: 'validating' | 'creating' | 'confirming';
+  onCancel?: () => void;
 }
 
 const STEPS = [
@@ -13,7 +15,20 @@ const STEPS = [
   { key: 'confirming', icon: CreditCard, label: 'Confirming payment…' },
 ] as const;
 
-function OrderProgressOverlayInner({ isVisible, step }: OrderProgressOverlayProps) {
+const TIMEOUT_MS = 30_000;
+
+function OrderProgressOverlayInner({ isVisible, step, onCancel }: OrderProgressOverlayProps) {
+  const [showTimeout, setShowTimeout] = useState(false);
+
+  useEffect(() => {
+    if (!isVisible) {
+      setShowTimeout(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowTimeout(true), TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [isVisible]);
+
   if (!isVisible) return null;
 
   const currentIdx = STEPS.findIndex(s => s.key === step);
@@ -54,9 +69,20 @@ function OrderProgressOverlayInner({ isVisible, step }: OrderProgressOverlayProp
             );
           })}
         </div>
-        <p className="text-xs text-muted-foreground text-center mt-4">
-          Please don't close this screen
-        </p>
+        {showTimeout ? (
+          <div className="mt-4 text-center space-y-2">
+            <p className="text-xs text-warning font-medium">This is taking longer than expected.</p>
+            {onCancel && (
+              <Button variant="outline" size="sm" onClick={onCancel}>
+                Go Back
+              </Button>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground text-center mt-4">
+            Please don't close this screen
+          </p>
+        )}
       </div>
     </div>
   );
