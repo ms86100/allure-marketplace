@@ -217,7 +217,7 @@ export default function SellerDetailPage() {
   const operatingDays = seller.operating_days || DAYS_OF_WEEK;
 
   return (
-    <AppLayout showHeader={false} showNav={cartCount === 0}>
+    <AppLayout showHeader={false} showNav={cartCount === 0} showCart={false}>
       {/* Cover Image */}
       <div className="relative h-56">
         {seller.cover_image_url ? (
@@ -567,6 +567,24 @@ export default function SellerDetailPage() {
         product={selectedProduct}
         open={detailOpen}
         onOpenChange={setDetailOpen}
+        onSelectProduct={(sp) => {
+          const catConfig = allCategoryConfigs.find(c => c.category === sp.category);
+          setSelectedProduct({
+            product_id: sp.id,
+            product_name: sp.name,
+            price: sp.price,
+            image_url: sp.image_url,
+            is_veg: sp.is_veg ?? true,
+            category: sp.category,
+            description: sp.description || null,
+            seller_id: sp.seller_id,
+            seller_name: sp.seller?.business_name || seller!.business_name,
+            seller_rating: seller!.rating,
+            seller_reviews: seller!.total_reviews,
+            _catIcon: catConfig?.icon || '🛍️',
+            _catName: catConfig?.displayName || sp.category,
+          });
+        }}
         categoryIcon={selectedProduct ? allCategoryConfigs.find(c => c.category === selectedProduct.category)?.icon : undefined}
         categoryName={selectedProduct ? allCategoryConfigs.find(c => c.category === selectedProduct.category)?.displayName : undefined}
       />

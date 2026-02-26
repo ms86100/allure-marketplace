@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentMethod } from '@/types/database';
@@ -31,9 +31,18 @@ export function useCartPage() {
   const finalAmount = (appliedCoupon ? Math.max(0, totalAmount - appliedCoupon.discountAmount) : totalAmount) + effectiveDeliveryFee;
 
   const firstSeller = sellerGroups[0]?.items[0]?.product?.seller;
-  const acceptsCod = firstSeller?.accepts_cod ?? true;
+  // #11: For multi-seller carts, ALL sellers must accept COD
+  const acceptsCod = sellerGroups.length > 1
+    ? sellerGroups.every(g => g.items[0]?.product?.seller?.accepts_cod ?? true)
+    : (firstSeller?.accepts_cod ?? true);
   // Disable UPI for multi-seller carts — only the first order would be charged (#2)
   const acceptsUpi = sellerGroups.length <= 1 && !!(firstSeller as any)?.accepts_upi && !!(firstSeller as any)?.upi_id;
+
+  // #3: Auto-select available payment method
+  useEffect(() => {
+    if (!acceptsCod && acceptsUpi) setPaymentMethod('upi');
+    else if (acceptsCod && !acceptsUpi) setPaymentMethod('cod');
+  }, [acceptsCod, acceptsUpi]);
   const hasUrgentItem = items.some((item) => (item.product as any)?.is_urgent);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const maxPrepTime = items.reduce((max, item) => {

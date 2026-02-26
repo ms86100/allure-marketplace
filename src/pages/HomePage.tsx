@@ -6,7 +6,7 @@ import { VerificationPendingScreen } from '@/components/onboarding/VerificationP
 import { MarketplaceSection } from '@/components/home/MarketplaceSection';
 import { ReorderLastOrder } from '@/components/home/ReorderLastOrder';
 import { SocietyQuickLinks } from '@/components/home/SocietyQuickLinks';
-import { FeaturedBanners } from '@/components/home/FeaturedBanners';
+// FeaturedBanners rendered inside MarketplaceSection
 import { CommunityTeaser } from '@/components/home/CommunityTeaser';
 import { useAuth } from '@/contexts/AuthContext';
 import { PartyPopper, X, ArrowRight } from 'lucide-react';
@@ -98,8 +98,7 @@ export default function HomePage() {
           </motion.div>
         )}
 
-        {/* ═══ FEATURED BANNERS ═══ */}
-        <FeaturedBanners />
+        {/* FeaturedBanners rendered inside MarketplaceSection — removed here to avoid duplicates (#5) */}
 
         {/* ═══ REORDER LAST ORDER ═══ */}
         <ReorderLastOrder />
