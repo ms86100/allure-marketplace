@@ -42,7 +42,7 @@ export function useCartPage() {
   useEffect(() => {
     if (!acceptsCod && acceptsUpi) setPaymentMethod('upi');
     else if (acceptsCod && !acceptsUpi) setPaymentMethod('cod');
-  }, [acceptsCod, acceptsUpi]);
+  }, [acceptsCod, acceptsUpi, setPaymentMethod]);
   const hasUrgentItem = items.some((item) => (item.product as any)?.is_urgent);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const maxPrepTime = items.reduce((max, item) => {
@@ -241,5 +241,6 @@ export function useCartPage() {
     effectiveDeliveryFee, finalAmount, acceptsCod, acceptsUpi,
     hasUrgentItem, itemCount, maxPrepTime,
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed,
+    cancelPlacingOrder: () => setIsPlacingOrder(false),
   };
 }

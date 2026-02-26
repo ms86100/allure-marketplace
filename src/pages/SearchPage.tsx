@@ -238,10 +238,7 @@ function ProductGridByCategory({ products, categoryMap, categoryConfigs, marketp
 // ── Empty States ──
 function EmptyState({ browseBeyond, onEnableBrowseBeyond }: { browseBeyond?: boolean; onEnableBrowseBeyond?: () => void }) {
   const navigate = useNavigate();
-  const suggestedCategories = [
-    { slug: 'groceries', label: '🛒 Groceries' }, { slug: 'home_food', label: '🍱 Home Food' },
-    { slug: 'snacks', label: '🍿 Snacks' }, { slug: 'beauty', label: '💄 Beauty' },
-  ];
+  const suggestedCategories: { slug: string; label: string }[] = [];
   return (
     <div className="text-center py-12 space-y-4">
       <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center"><SearchIcon size={28} className="text-muted-foreground" /></div>

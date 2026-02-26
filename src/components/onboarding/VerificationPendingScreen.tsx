@@ -8,7 +8,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useAuth } from '@/contexts/AuthContext';
 import { Clock, Users, Shield, Building2, ShieldCheck, Activity, HelpCircle, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
 
 interface PreviewData {
   queuePosition: number;
@@ -19,8 +18,7 @@ interface PreviewData {
 }
 
 export function VerificationPendingScreen() {
-  const { profile } = useAuth();
-  const queryClient = useQueryClient();
+  const { profile, refreshProfile } = useAuth();
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -34,11 +32,10 @@ export function VerificationPendingScreen() {
       .single();
     if (data?.verification_status === 'approved') {
       toast.success('🎉 You have been verified! Welcome to your community.');
-      // #9: Invalidate auth/profile queries instead of hard reload
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
-      queryClient.invalidateQueries({ queryKey: ['auth'] });
+      // Re-fetch auth context so React re-renders with updated status
+      await refreshProfile();
     }
-  }, [profile?.id, queryClient]);
+  }, [profile?.id, refreshProfile]);
 
   useEffect(() => {
     if (!profile?.society_id) {

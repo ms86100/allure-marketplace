@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -153,9 +153,21 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
     }
   }, [type, userId, sellerId]);
 
+  // Refetch on mount and when navigating back to this page
+  const location = useLocation();
+  const lastPathRef = useRef(location.pathname);
+
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    // Re-fetch when the route is revisited (e.g. navigating back from order detail)
+    if (lastPathRef.current === location.pathname) {
+      fetchOrders();
+    }
+    lastPathRef.current = location.pathname;
+  }, [location.key]); // location.key changes on every navigation
 
   const loadMore = () => {
     if (orders.length > 0 && hasMore) {

@@ -41,11 +41,11 @@ export default function CartPage() {
     .replace('{suffix}', c.sellerGroups.length !== 1 ? 'es' : '');
 
   return (
-    <AppLayout showHeader={false} showNav={false}>
+    <AppLayout showHeader={false} showNav={false} showCart={false}>
       <div className="pb-52">
         {/* Sticky Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
-          <Link to="/" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></Link>
+          <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></button>
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold">Checkout</h1>
             <p className="text-xs text-muted-foreground">Shipment of {c.itemCount} item{c.itemCount !== 1 ? 's' : ''}</p>
@@ -236,7 +236,7 @@ export default function CartPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <OrderProgressOverlay isVisible={c.isPlacingOrder} step={c.orderStep} onCancel={() => { /* Allow escape after timeout — state reset handled by useCartPage */ }} />
+      <OrderProgressOverlay isVisible={c.isPlacingOrder} step={c.orderStep} onCancel={() => { c.cancelPlacingOrder(); }} />
 
       {c.pendingOrderIds.length > 0 && (
         <RazorpayCheckout isOpen={c.showRazorpayCheckout} onClose={() => c.handleRazorpayFailed()} orderId={c.pendingOrderIds[0]} amount={c.finalAmount} sellerId={c.sellerGroups[0]?.sellerId || ''} sellerName={c.sellerGroups[0]?.sellerName || 'Seller'} customerName={c.profile?.name || ''} customerEmail={c.user?.email || ''} customerPhone={c.profile?.phone || ''} onPaymentSuccess={c.handleRazorpaySuccess} onPaymentFailed={c.handleRazorpayFailed} />

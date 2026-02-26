@@ -81,7 +81,7 @@ export default function CategoryGroupPage() {
   const { data: topSellers = [] } = useQuery({
     queryKey: ['category-sellers', category, effectiveSocietyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('seller_profiles')
         .select(`*, profile:profiles!seller_profiles_user_id_fkey(name, block)`)
         .eq('verification_status', 'approved')
@@ -89,10 +89,16 @@ export default function CategoryGroupPage() {
         .order('rating', { ascending: false })
         .limit(10);
 
+      if (effectiveSocietyId) {
+        query = query.eq('society_id', effectiveSocietyId);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
       return (data as any) || [];
     },
-    enabled: !!category,
+    enabled: !!category && !!effectiveSocietyId,
   });
 
   const displayProducts = useMemo(() => {

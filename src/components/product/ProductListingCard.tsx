@@ -236,11 +236,16 @@ function ProductListingCardInner({
       <div className="relative">
         <div className="relative aspect-[4/3] rounded-t-xl overflow-hidden product-image-bg">
           <img
-            src={product.image_url || `https://picsum.photos/seed/${product.id}/400/300`}
+            src={product.image_url || undefined}
             alt={product.name}
-            className={cn("w-full h-full", product.image_url ? "object-contain p-2" : "object-cover")}
+            className={cn("w-full h-full", product.image_url ? "object-contain p-2" : "hidden")}
             loading="lazy"
           />
+          {!product.image_url && (
+            <div className="w-full h-full flex items-center justify-center bg-muted">
+              <span className="text-3xl">{placeholderEmoji}</span>
+            </div>
+          )}
 
           {isOutOfStock && (
             <div className="absolute inset-0 bg-background/60 flex items-center justify-center">

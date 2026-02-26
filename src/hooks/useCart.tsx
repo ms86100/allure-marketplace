@@ -196,6 +196,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         .delete()
         .eq('user_id', user.id);
       if (error) throw error;
+      // Sync cart-count query with cleared state
+      queryClient.setQueryData(['cart-count', user?.id], 0);
     } catch (error) {
       queryClient.setQueryData([...CART_QUERY_KEY, user?.id], prev);
       console.error('Error clearing cart:', error);
