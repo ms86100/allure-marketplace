@@ -18,6 +18,7 @@ import { initializeMedianBridge } from "@/lib/median";
 import { useDeepLinks } from "@/hooks/useDeepLinks";
 import { useSecurityOfficer } from "@/hooks/useSecurityOfficer";
 import { useAppLifecycle } from "@/hooks/useAppLifecycle";
+import { useBuyerOrderAlerts } from "@/hooks/useBuyerOrderAlerts";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Lazy-loaded pages for code splitting
@@ -241,6 +242,9 @@ function NavigationHandler() {
 
   // Invalidate critical queries on mobile app foreground resume
   useAppLifecycle();
+
+  // Real-time buyer order status alerts (toast + haptic)
+  useBuyerOrderAlerts();
   
   return null;
 }
