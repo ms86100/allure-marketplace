@@ -1,127 +1,257 @@
 
 
-## End-to-End Audit: Three Critical Issues Found
+# P0 Production Incident: Full System Audit Report
+
+**Reporting as:** Developer, Product Manager, QA Lead, and Business Owner — simultaneously.
 
 ---
 
-### Issue 1: Blank Screen on TestFlight (iOS Native)
+## 1. Customer Reality (No Sugarcoating)
 
-**Root Cause Analysis:**
+### Where Users Get Frustrated
 
-The `initializeCapacitorPlugins()` in `src/lib/capacitor.ts` runs before React mounts (bootstrap pattern in `main.tsx`). If any part of this initialization throws an unhandled error, the entire `bootstrap()` promise rejects silently — React never mounts, producing a blank screen.
+**Moment 1: App Install → Blank White Screen (P0)**
+The user installs via TestFlight. The app opens. Nothing renders. A white screen. No error message, no loading indicator, no retry button. The user has zero recourse. They delete the app. This has happened across multiple builds.
 
-Specific failure points identified:
+**Why it persists:** The fallback in `main.tsx` (line 55-59) waits 8 seconds before showing a fallback. But if the crash happens *inside* React's render tree (e.g., a context provider throws), the root element has children (the ErrorBoundary component itself is mounted), so `rootLooksEmpty()` returns `false` — the fallback never fires. The screen stays white indefinitely.
 
-1. **Line 30-43** (`capacitor.ts`): The manual session restore block parses `import.meta.env.VITE_SUPABASE_URL` to derive a storage key. If the URL parsing fails or `capacitorStorage.getItem()` returns malformed JSON, `JSON.parse(raw)` throws inside a `try/catch` that only logs a warning — this part is safe.
+**Moment 2: Verification Limbo**
+After signup, if the society admin has not approved the user, `VerificationPendingScreen` renders. But there is no way for the user to log out, change society, or edit their submitted details. They are permanently stuck until an admin acts. The only escape is "Contact support" — a link to `/help` which itself requires authentication.
 
-2. **Line 15-16**: `(supabase.auth as any).storage = capacitorStorage` — This patches the Supabase auth storage. However, `supabase.auth.getSession()` (called later in `useAuthState.ts` line 163) expects synchronous `getItem` from storage. The `CapacitorStorage.getItem()` is **async** (returns `Promise<string | null>`). Supabase JS v2's GoTrueClient **does** support async storage, but only if it was configured at client creation time. Patching `.storage` after creation may cause the internal `_loadSession()` to receive a Promise where it expects a string, leading to a silent failure or crash.
+**Moment 3: Cart Confusion**
+User taps "Add to Cart" on a product detail sheet. Previously it navigated to cart (confusing). The fix now keeps the sheet open, but the quantity stepper appears with no visual feedback — no toast, no animation, no "Added!" confirmation. The user does not know if the action worked.
 
-3. **No global unhandled rejection handler**: `App.tsx` has no `unhandledrejection` listener. If the bootstrap or any early async operation fails, there's no safety net — blank screen.
+**Moment 4: Seller Dashboard — Sound Alarm With No Warning**
+A seller receives a new order. The app plays a two-tone square-wave alarm at 880Hz and 660Hz, repeating every 3 seconds with haptic vibration. There is no volume control, no snooze, no way to configure this. If the seller is in a meeting or sleeping, the alarm is intrusive and cannot be silenced except by tapping "Dismiss" — which requires unlocking the phone, finding the app, and interacting with the overlay.
 
-**Fix Plan:**
-
-**File: `src/main.tsx`** — Wrap `bootstrap()` in try/catch with a visible fallback:
-- If `initializeCapacitorPlugins()` throws, still mount the React app (skip the Capacitor initialization gracefully)
-- Add a DOM-level fallback message if even React mount fails
-
-**File: `src/App.tsx`** — Add a global `unhandledrejection` listener in the `App` component's `useEffect` (as recommended in the stack overflow pattern) to catch any floating promises and show a toast instead of crashing.
-
-**File: `src/lib/capacitor.ts`** — Make the session restore more defensive:
-- Wrap the entire `initializeCapacitorPlugins` body in a top-level try/catch so no single plugin failure prevents the rest from running
-- Specifically, isolate the `StatusBar`, `Keyboard`, and `SplashScreen` calls so one failure doesn't block others (already done individually, but the storage patch at the top is not isolated from the rest)
+**Moment 5: Realtime Notifications Are Invisible on Background**
+`useBuyerOrderAlerts` only works while the app is in the foreground and the React component tree is mounted. If the buyer closes the app, they receive no notification about order acceptance. The push notification system exists (`PushNotificationProvider`) but there is no evidence that the backend triggers push notifications when order status changes — the only notification path is the in-app Realtime listener.
 
 ---
 
-### Issue 2: Product Details Not Visible by Default
+## 2. QA / Tester Findings (End-to-End)
 
-**Root Cause:**
+### Test 1: Fresh Install → Login → Home
 
-In `src/hooks/useProductDetail.ts` line 39, `showDetails` is initialized to `true`. However, in `src/components/product/ProductDetailSheet.tsx` line 96-98, the toggle button reads:
+| Step | Expected | Actual | Severity |
+|---|---|---|---|
+| Open app from TestFlight | See landing/auth page | White screen | **P0** |
+| Root cause | ErrorBoundary catches render errors | ErrorBoundary is a class component wrapping the entire tree. If `AuthProvider` or any hook inside it throws during initial render, the error boundary catches it — but `import.meta.env.DEV` is false in production, so the error details are hidden. The user sees "Something went wrong" with no context | P0 |
+| Secondary cause | Capacitor storage patch | `(supabase.auth as any).storage = capacitorStorage` patches storage AFTER client creation. The Supabase client's `GoTrueClient._loadSession()` may have already started with `localStorage`. The race condition: `onAuthStateChange` fires before the storage swap completes | P0 |
 
-```tsx
-<button onClick={() => d.setShowDetails(!d.showDetails)}>
-  View product details
-  <ChevronDown className={d.showDetails ? 'rotate-180' : ''} />
-</button>
-```
+### Test 2: Signup Flow
 
-The section at lines 101-128 is conditionally rendered with `{d.showDetails && (...)}`. So the content IS shown by default (`showDetails=true`), but the button text always says **"View product details"** — it never changes to "Hide product details". This creates confusion because:
-- The chevron rotates (pointing up when open) but the text stays static
-- On first glance, the user sees "View product details" and thinks they need to tap it to see details, when the details are already visible below
+| Step | Expected | Actual | Severity |
+|---|---|---|---|
+| Select society → Enter profile → Submit | Account created, verification pending screen | Works correctly | — |
+| Verification pending → Logout | Can log out and try different society | No logout button on verification screen | **P1** |
+| Verification pending → 60s poll | Auto-refreshes status | Works, but `fetchPreviewData` on line 53 uses `profile!.society_id` — if `profile.society_id` is null (user didn't select a society), this crashes | **P1** |
 
-The real UX problem: The toggle text is misleading. It should say "Hide details" when expanded and "View details" when collapsed.
+### Test 3: Browse → Product Detail → Add to Cart
 
-**Fix Plan:**
+| Step | Expected | Actual | Severity |
+|---|---|---|---|
+| Open product detail sheet | Details visible by default | Details visible, toggle says "Hide product details" (fixed) | — |
+| Tap "Add to Cart" | Item added, stepper appears | Item added, stepper appears, NO confirmation feedback | **P2** |
+| Tap stepper minus to 0 | Item removed from cart | Works | — |
 
-**File: `src/components/product/ProductDetailSheet.tsx`** line 96-98:
-- Change button text to be dynamic: `{d.showDetails ? 'Hide product details' : 'View product details'}`
-- Keep `showDetails` default as `true` so details are visible on open (current correct behavior)
+### Test 4: Checkout → Order Placement
 
----
+| Step | Expected | Actual | Severity |
+|---|---|---|---|
+| Cart → Checkout | See order summary | Works | — |
+| Place order (COD) | Order created, cart cleared, redirected | Works — calls `create_multi_vendor_orders` RPC | — |
+| Place order (UPI) | Razorpay opens | Razorpay only works if seller has `upi_id` configured. If not, button is disabled — but no explanation why | **P2** |
 
-### Issue 3: Add to Cart Navigates Away Instead of Adding
+### Test 5: Seller Receives Order
 
-**Root Cause:**
+| Step | Expected | Actual | Severity |
+|---|---|---|---|
+| Order placed by buyer | Seller gets alert | Only if seller has SellerDashboardPage open (Realtime subscription active) | **P1** |
+| Seller navigates away from dashboard | Alert should still fire | Realtime channel is unmounted — no alert | **P1** |
+| Seller accepts order | Buyer gets toast | Only if buyer has the app in foreground | **P1** |
 
-In `src/hooks/useProductDetail.ts` lines 82-94, `handleAdd` does this for cart actions:
+### Test 6: Seller Onboarding
 
-```tsx
-addItem({...product...});
-onOpenChange?.(false);  // closes the sheet
-navigate('/cart');       // navigates to cart page
-```
+| Step | Expected | Actual | Severity |
+|---|---|---|---|
+| Apply to become seller | Application submitted | Works | — |
+| Admin approves | Seller can access dashboard | Works, but requires full page refresh to pick up new role (Realtime on `user_roles` handles this) | — |
+| Seller adds first product | Product listed | Works, but no guidance on required fields; product goes to `pending` approval status and seller gets no feedback about approval timeline | **P2** |
 
-Every time a user taps "Add to Cart" on the product detail sheet, it:
-1. Adds the item to cart
-2. Closes the sheet
-3. **Forcefully navigates to `/cart`**
+### Reproducible Bugs
 
-This is wrong behavior for an "Add to Cart" button. The expected behavior is:
-- Add the item to cart
-- Show the quantity stepper (already works if the sheet stays open)
-- Let the user continue browsing
+1. **White screen on native** — P0, reproducible on every TestFlight build
+2. **`useNewOrderAlert` only active on seller dashboard** — P1, alert does not fire if seller is on any other page
+3. **`useBuyerOrderAlerts` only works in foreground** — P1, no push notification fallback
+4. **Verification screen has no logout** — P1
 
-The `navigate('/cart')` and `onOpenChange?.(false)` should only happen for a "Buy Now" action, not for "Add to Cart".
+### Silent Failures
 
-Additionally, for non-cart actions (book, request_service, etc.), the `ProductCard` and `ProductGridCard` components correctly route to `onTap` or open enquiry sheets. But the `ProductDetailSheet`'s `handleAdd` conflates "add to cart" with "buy now" by always navigating away.
+1. `capacitor.ts` line 13: `(supabase.auth as any).storage = capacitorStorage` — If this assignment doesn't take effect (GoTrueClient has already initialized its internal storage reference), auth on native silently uses localStorage (non-persistent on iOS). No error logged.
+2. `useAuthState.ts` line 163: `supabase.auth.getSession()` — On native, if the storage swap failed, this returns null session even when the user has valid credentials in Preferences. Silent session loss.
+3. `main.tsx` line 53: `createRoot(rootElement).render(<App />)` — If `App` throws during render, React calls the ErrorBoundary's `componentDidCatch`. But the fallback UI is rendered inside `#root`, so `rootLooksEmpty()` returns false. The 8-second timeout never fires. If the ErrorBoundary's OWN render throws (e.g., missing CSS, broken import), the screen is blank forever.
 
-**Fix Plan:**
+### Regression Risks
 
-**File: `src/hooks/useProductDetail.ts`** — Modify `handleAdd`:
-- For `add_to_cart`: Add item, do NOT close sheet, do NOT navigate. The stepper will appear automatically since `quantity` updates reactively.
-- For `buy_now`: Add item, close sheet, navigate to `/cart` (this is the correct "buy now" flow).
-- For non-cart actions (`book`, `request_service`, `contact_seller`, etc.): Current behavior is correct (opens enquiry/contact sheets).
-
-```
-// Proposed logic:
-if (actionType === 'contact_seller') { setContactOpen(true); return; }
-if (!isCartAction) { setEnquiryOpen(true); return; }
-hapticImpact('medium');
-addItem({...});
-if (actionType === 'buy_now') {
-  onOpenChange?.(false);
-  navigate('/cart');
-}
-// For 'add_to_cart': do nothing extra — stepper appears in-place
-```
+1. Every new hook added to `App.tsx` or `AppRoutes` that calls `useAuth()` is a potential crash point during the auth loading phase
+2. The `queryClient` is defined at module scope (line 94) — if two instances of App are mounted (HMR race), stale cache can bleed
+3. `drop_console: mode === "production"` in `vite.config.ts` line 61 — ALL console.error/warn stripped in production. This means the fallback guards in `main.tsx` that log errors will be silently swallowed. The user sees a blank screen and the developer sees nothing.
 
 ---
 
-### Summary of Changes
+## 3. Developer Honesty Check
 
-| File | Change | Risk |
-|---|---|---|
-| `src/main.tsx` | Wrap bootstrap in try/catch, add DOM fallback | Low |
-| `src/App.tsx` | Add global `unhandledrejection` safety net | Low |
-| `src/lib/capacitor.ts` | Isolate storage patch in its own try/catch, prevent cascade failures | Low |
-| `src/hooks/useProductDetail.ts` | Remove navigate/close for `add_to_cart`, keep only for `buy_now` | Medium |
-| `src/components/product/ProductDetailSheet.tsx` | Dynamic toggle text for details section | Low |
+### Fragile Code Paths
 
-### Testing Required After Implementation
+1. **Auth Storage Swap (capacitor.ts:13)** — Patching `supabase.auth.storage` after client creation is a hack. The Supabase `GoTrueClient` constructor reads `storage` once during initialization and stores an internal reference. Mutating the public property later may not affect the internal `_storage` field. This is the #1 suspect for blank screens on native.
 
-1. **TestFlight blank screen**: Install via TestFlight, verify app loads. Kill and reopen. Verify session persists.
-2. **Product detail sheet**: Open any product card → details section should be visible by default with "Hide product details" text. Tap to collapse → text changes to "View product details".
-3. **Add to Cart flow**: Tap "Add to Cart" on detail sheet → item count stepper should appear in-place, sheet stays open. User can increment/decrement. Sheet does NOT close.
-4. **Buy Now flow**: For products with `buy_now` action type → tapping "Buy Now" should close sheet and navigate to cart.
-5. **Book/Request/Contact flows**: Tapping "Book Now", "Request Service", or "Contact Seller" should open the appropriate enquiry/contact sheet, not add to cart.
+2. **Module-scope QueryClient (App.tsx:94)** — The `QueryClient` is created outside of React's lifecycle. If the module is re-evaluated (hot reload, error recovery), a new client is created but old subscriptions reference the stale one.
+
+3. **Auth State Race (useAuthState.ts:140-168)** — Both `onAuthStateChange` and `getSession()` can trigger `fetchProfile`. The `profileFetchedFor` ref prevents double-fetches for the same user, but if `onAuthStateChange` fires with a user BEFORE `getSession()` resolves, and then `getSession()` fires again, the profile is not re-fetched (ref already set). This is correct behavior — but if the first `fetchProfile` fails silently (network error), the profile stays null forever. There's no retry mechanism.
+
+4. **Production Console Stripping** — `drop_console: mode === "production"` in terser config strips ALL `console.error` calls. This means:
+   - `main.tsx` fallback guards log nothing
+   - `ErrorBoundary.componentDidCatch` logs nothing
+   - All `try/catch` blocks that only log errors become completely silent
+   - This is actively making debugging impossible on production builds
+
+### Hidden Dependencies
+
+- `useNewOrderAlert` depends on `sellerId` which comes from `useAuth().currentSellerId` — but this is only set after profile fetch completes. If auth is loading, `sellerId` is null, and the Realtime subscription is never created. If auth finishes after the seller dashboard mounts, the `useEffect` re-runs — but there's a window where orders can arrive undetected.
+
+- `useBuyerOrderAlerts` depends on `user.id` from `useAuth()`. If the user's session expires mid-use, the channel is cleaned up but no reconnection happens on re-auth.
+
+### What Shortcuts Were Taken
+
+1. Storage swap via property mutation instead of proper client configuration
+2. Alert system only runs on a single page (seller dashboard) instead of globally
+3. No push notification integration for order status changes — relying entirely on in-app Realtime
+4. `import.meta.env.DEV` checks in error boundaries hide all error details in production — including from the user
+5. No structured error reporting (no Sentry, no LogRocket, no crash analytics)
+
+---
+
+## 4. Product & UX Failures
+
+### Flows That Require Too Many Steps
+
+1. **Seller onboarding**: Apply → Wait for admin approval → Get approved → Navigate to seller dashboard → Add products → Wait for product approval → Products go live. Five wait-and-check steps with no progress indicator or timeline.
+
+2. **User signup**: Enter email/password → Select society (search or create) → GPS verify → Enter profile details → Submit → Wait for verification. Six steps with a GPS check that can fail silently (`gpsStatus: 'unavailable'`).
+
+### Actions That Don't Give Feedback
+
+1. "Add to Cart" — no toast, no animation, just a quiet stepper appearance
+2. Order status change by seller — no confirmation sound/animation on the seller's side
+3. Profile update — depends on individual page implementation
+
+### Features That Exist But Are Not Discoverable
+
+1. **Society Quick Links** (`SocietyQuickLinks`) — rendered on home page but content depends on feature flags. If no features are enabled, the section is empty (invisible).
+2. **Trust Directory** (`/directory`) — accessible only via profile menu or deep link. Not in bottom nav, not in quick links.
+3. **Dispute System** (`/disputes`) — exists, fully built, but no entry point from order detail page unless the user knows the URL.
+4. **Group Buys** (`/group-buys`) — page exists, route exists, no navigation leads to it.
+
+### Inconsistent Behavior Across Roles
+
+1. Bottom nav changes based on role (resident vs security vs worker) but with no transition or explanation. A user who is both a resident and a security officer sees security nav only if they're not an admin — confusing.
+2. Seller dashboard alert overlay covers the entire screen. If a seller is also a buyer and receives a buyer notification at the same time, the seller overlay blocks all interaction.
+
+---
+
+## 5. Business Impact Assessment
+
+### Trust
+
+- **White screen = zero trust.** A user who downloads the app, sees nothing, and has to "reopen" it will uninstall immediately. The app has ONE chance to make a first impression on TestFlight testers.
+- **Silent notification failures** mean sellers miss orders and buyers think sellers are ignoring them. Both parties lose trust in the platform.
+
+### Churn Points
+
+1. Verification pending screen with no logout — user is trapped
+2. Seller gets no orders because alert only works on one page
+3. Buyer gets no status updates when app is backgrounded
+
+### Monetization Blockers
+
+1. UPI payments only work if seller has configured `upi_id` — no onboarding prompt for this
+2. No delivery fee transparency — `effectiveDeliveryFee` is calculated silently, user sees final amount without breakdown (actually shown, but only when delivery mode is selected)
+3. Coupon system exists but is seller-managed — no platform-level promotions
+
+### Revenue Risk
+
+If sellers don't hear order alerts, they don't fulfill orders. If orders aren't fulfilled, buyers don't reorder. The entire marketplace flywheel depends on instant seller notification — and right now it only works on one page in one app state.
+
+---
+
+## 6. Hard Truth Summary
+
+**If this app were released publicly today:**
+
+### Users Would Complain About First:
+"The app doesn't open" — blank white screen on first install.
+
+### Would Cause 1-Star Reviews:
+1. Blank screen on open (P0)
+2. "I placed an order and the seller never responded" (because alerts only work on dashboard)
+3. "I can't log out" (verification pending screen)
+
+### Would Completely Block Adoption:
+1. Blank screen prevents ANY user from using the app
+2. Sellers not receiving alerts prevents ANY order from being fulfilled
+3. No push notifications means the app only works while actively open
+
+---
+
+## 7. Actionable Fix Plan (No New Features)
+
+### P0: Must Fix Before Any Release
+
+| # | Issue | File(s) | Fix |
+|---|---|---|---|
+| 1 | **Console stripping in production** | `vite.config.ts` | Remove `drop_console: mode === "production"` — this silently swallows ALL error logging, making the blank screen impossible to debug. At minimum, keep `console.error` and `console.warn`. |
+| 2 | **Auth storage swap race condition** | `src/integrations/supabase/client.ts`, `src/lib/capacitor.ts` | Stop patching `supabase.auth.storage` after creation. Instead, configure the Supabase client to use `capacitorStorage` from the start. In `client.ts`, conditionally pass `capacitorStorage` as the `storage` option during `createClient()`. Remove the runtime patch from `capacitor.ts`. |
+| 3 | **Blank screen fallback never triggers** | `src/main.tsx` | The `rootLooksEmpty()` check fails when ErrorBoundary renders its fallback UI (root has children). Replace the 8-second check with a `MutationObserver` that watches for actual meaningful content, or set a data attribute on the root when the app successfully renders its first route. |
+| 4 | **ErrorBoundary hides errors in production** | `src/components/ErrorBoundary.tsx` | The error details are hidden behind `import.meta.env.DEV`. In production, users see "Something went wrong" with zero context. Add a generic but useful message like "Error code: [first 8 chars of error message hash]" and a "Copy error details" button for support. |
+
+### P1: Fix Before Scaling Users
+
+| # | Issue | File(s) | Fix |
+|---|---|---|---|
+| 5 | **Seller alerts only work on dashboard** | `src/hooks/useNewOrderAlert.ts` | Move `useNewOrderAlert` to a global component inside `AuthProvider` (like `useBuyerOrderAlerts`), gated on `isSeller && currentSellerId`. This ensures alerts fire on ANY page. |
+| 6 | **Buyer notifications only work in foreground** | `src/hooks/useBuyerOrderAlerts.ts` | This requires a backend trigger: when `orders.status` changes, fire a push notification via the existing `send-push-notification` edge function. The in-app toast is a bonus, not the primary channel. |
+| 7 | **Verification screen has no logout** | `src/components/onboarding/VerificationPendingScreen.tsx` | Add a "Log out" button at the bottom. Call `signOut()` from auth context. |
+| 8 | **`fetchProfile` has no retry on failure** | `src/contexts/auth/useAuthState.ts` | If `fetchProfile` fails (network error), `profile` stays null. The home page shows a skeleton forever. Add a single retry with exponential backoff, or show an explicit "Could not load your profile — tap to retry" UI. |
+
+### P2: Must Track, Can Wait
+
+| # | Issue | File(s) | Fix |
+|---|---|---|---|
+| 9 | "Add to Cart" gives no feedback | `src/hooks/useProductDetail.ts` | Add `toast('Added to cart', { icon: '🛒', duration: 1500 })` after `addItem()` for `add_to_cart` action type. |
+| 10 | Disputes not discoverable from order detail | `src/pages/OrderDetailPage.tsx` | Add "Report a Problem" button on completed/cancelled orders that links to `/disputes`. |
+| 11 | Group Buys page has no navigation entry | `src/components/home/SocietyQuickLinks.tsx` or BottomNav | Add entry point if feature is enabled. |
+| 12 | Seller alarm has no volume/snooze control | `src/hooks/useNewOrderAlert.ts` | Add a "Snooze 5 min" option to the overlay, and respect device silent mode. |
+| 13 | No crash analytics | Global | Integrate a lightweight error reporter (even a simple edge function that logs errors to a `crash_reports` table). |
+
+### Constraints Met
+- No new features proposed — all fixes address existing broken or incomplete flows
+- No redesign — all changes are surgical
+- All backward compatible — no API changes, no schema changes except optional crash_reports table
+
+---
+
+## Accountability Statement
+
+**Why this was not caught earlier:**
+1. The `drop_console` setting meant production errors were invisible
+2. Testing was done in the web sandbox (Lovable preview), never on native production builds
+3. The auth storage swap was designed for a synchronous storage API but uses an async adapter — this mismatch was never tested on a real iOS device
+4. Alert features were tested by verifying Realtime works on the same page — cross-page and background scenarios were never validated
+
+**What permanent guardrails must be added:**
+1. Never strip `console.error` in production builds
+2. Add a startup health check that sets a `data-app-ready` attribute on `#root` — the fallback timer checks for this attribute, not child count
+3. Test every Codemagic build by opening the app cold on a device before distributing
+4. Add a `/_health` diagnostic screen accessible via deep link that shows: auth state, storage type, session presence, network status, and feature flags — so blank-screen issues can be diagnosed without dev tools
 
