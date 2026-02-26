@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils';
 
-export type OrderFilter = 'all' | 'today' | 'pending' | 'preparing' | 'ready' | 'completed';
+export type OrderFilter = 'all' | 'today' | 'enquiries' | 'pending' | 'preparing' | 'ready' | 'completed';
 
 interface OrderFiltersProps {
   currentFilter: OrderFilter;
@@ -8,6 +8,7 @@ interface OrderFiltersProps {
   counts: {
     all: number;
     today: number;
+    enquiries: number;
     pending: number;
     preparing: number;
     ready: number;
@@ -19,6 +20,7 @@ export function OrderFilters({ currentFilter, onFilterChange, counts }: OrderFil
   const filters: { value: OrderFilter; label: string }[] = [
     { value: 'all', label: `All (${counts.all})` },
     { value: 'today', label: `Today (${counts.today})` },
+    { value: 'enquiries', label: `Enquiries (${counts.enquiries})` },
     { value: 'pending', label: `Pending (${counts.pending})` },
     { value: 'preparing', label: `Preparing (${counts.preparing})` },
     { value: 'ready', label: `Ready (${counts.ready})` },

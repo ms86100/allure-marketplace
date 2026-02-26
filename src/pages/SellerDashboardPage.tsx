@@ -249,7 +249,7 @@ export default function SellerDashboardPage() {
             <OrderFilters
               currentFilter={orderFilter}
               onFilterChange={setOrderFilter}
-              counts={filterCounts || { all: 0, today: 0, pending: 0, preparing: 0, ready: 0, completed: 0 }}
+              counts={filterCounts || { all: 0, today: 0, enquiries: 0, pending: 0, preparing: 0, ready: 0, completed: 0 }}
             />
           </div>
 

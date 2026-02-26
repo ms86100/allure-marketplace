@@ -10,6 +10,7 @@ interface SellerDashboardStats {
   preparingOrders: number;
   readyOrders: number;
   todayOrders: number;
+  enquiryOrders: number;
   totalEarnings: number;
   todayEarnings: number;
   weekEarnings: number;
@@ -51,6 +52,8 @@ export function useSellerOrderStats(sellerId: string | null) {
       let todayEarnings = 0;
       let weekEarnings = 0;
 
+      let enquiryOrders = 0;
+
       for (const row of rows) {
         totalOrders++;
         const amt = Number(row.total_amount) || 0;
@@ -73,6 +76,10 @@ export function useSellerOrderStats(sellerId: string | null) {
             readyOrders++;
             pendingOrders++;
             break;
+          case 'enquired':
+          case 'quoted':
+            enquiryOrders++;
+            break;
           case 'cancelled':
             break;
           default:
@@ -91,13 +98,14 @@ export function useSellerOrderStats(sellerId: string | null) {
         preparingOrders,
         readyOrders,
         todayOrders,
+        enquiryOrders,
         totalEarnings,
         todayEarnings,
         weekEarnings,
       };
     },
     enabled: !!sellerId,
-    staleTime: 10_000, // 10s — prevents refetch on every tab switch
+    staleTime: 10_000,
   });
 }
 
@@ -112,6 +120,7 @@ export function useSellerOrderFilterCounts(sellerId: string | null) {
     queryFn: () => ({
       all: stats?.totalOrders || 0,
       today: stats?.todayOrders || 0,
+      enquiries: stats?.enquiryOrders || 0,
       pending: stats?.pendingOrders || 0,
       preparing: stats?.preparingOrders || 0,
       ready: stats?.readyOrders || 0,
@@ -139,6 +148,9 @@ export function useSellerOrdersInfinite(sellerId: string | null, filter: string 
       switch (filter) {
         case 'today':
           query = query.gte('created_at', today.toISOString());
+          break;
+        case 'enquiries':
+          query = query.in('status', ['enquired', 'quoted']);
           break;
         case 'pending':
           query = query.in('status', ['placed', 'accepted']);

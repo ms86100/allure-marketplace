@@ -87,6 +87,35 @@ export function ProductEnquirySheet({
 
     setIsLoading(true);
     try {
+      // Resolve seller's user_id (chat_messages.receiver_id must be a user UUID, not seller_profiles.id)
+      const { data: sellerData } = await supabase
+        .from('seller_profiles')
+        .select('user_id')
+        .eq('id', sellerId)
+        .single();
+
+      const sellerUserId = sellerData?.user_id;
+      if (!sellerUserId) throw new Error('Could not resolve seller user');
+
+      // Fetch buyer contact details to share with seller
+      const { data: buyerProfile } = await supabase
+        .from('profiles')
+        .select('name, phone, email')
+        .eq('id', user.id)
+        .single();
+
+      const buyerName = buyerProfile?.name || 'Customer';
+      const buyerPhone = buyerProfile?.phone || '';
+      const buyerEmail = buyerProfile?.email || user.email || '';
+
+      // Build contact block for the chat message
+      const contactLines: string[] = [];
+      if (buyerPhone) contactLines.push(`📞 ${buyerPhone}`);
+      if (buyerEmail) contactLines.push(`📧 ${buyerEmail}`);
+      const contactBlock = contactLines.length > 0
+        ? `\n\n--- Contact Details ---\n${contactLines.join('\n')}`
+        : '';
+
       // Create an enquiry order
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -103,14 +132,23 @@ export function ProductEnquirySheet({
 
       if (orderError) throw orderError;
 
-      // Create initial chat message
+      // Create order_item linking enquiry to specific product
+      await supabase.from('order_items').insert({
+        order_id: order.id,
+        product_id: productId,
+        product_name: productName,
+        quantity: 1,
+        unit_price: price || 0,
+      });
+
+      // Create initial chat message with buyer details, using seller's user_id as receiver
       const { error: chatError } = await supabase
         .from('chat_messages')
         .insert({
           order_id: order.id,
           sender_id: user.id,
-          receiver_id: sellerId,
-          message_text: `Hi! I'd like to ${meta.title.toLowerCase()} for "${productName}".\n\n${message}`,
+          receiver_id: sellerUserId,
+          message_text: `Hi! I'd like to ${meta.title.toLowerCase()} for "${productName}".\n\n${message}${contactBlock}`,
         });
 
       if (chatError) throw chatError;
