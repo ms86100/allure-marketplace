@@ -153,64 +153,36 @@ export function useAuthPage() {
     setEmail(trimmedEmail);
     setIsLoading(true);
 
-    // Safety timeout: ensure spinner clears even if a native bridge call hangs
-    let loginPhase: 'signInWithPassword' | 'profileQuery' | 'postProfileDecision' = 'signInWithPassword';
-    const safetyTimer = setTimeout(() => {
-      console.error('[Auth:Login] Global timeout after 20s', { phase: loginPhase });
-      setIsLoading(false);
-      toast.error(`Login stalled at ${loginPhase} after 20s. Native session storage did not complete in time. Please retry.`, { duration: 9000 });
-    }, 20000);
-
     try {
-      console.log('[Auth:Login] Attempt metadata', {
-        provider: 'password',
-        emailDomain: trimmedEmail.includes('@') ? trimmedEmail.split('@')[1] : 'invalid',
-      });
-      console.log('[Auth:Login] Step 1: signInWithPassword start', Date.now());
       const { data, error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password: validatedPassword });
-      console.log('[Auth:Login] Step 2: signInWithPassword done', Date.now());
-      loginPhase = 'profileQuery';
       if (error) throw error;
       recordSuccess();
 
-      console.log('[Auth:Login] Step 3: profile query start', Date.now());
+      // Quick profile check with 5s timeout — if it hangs, navigate anyway
       const profileResult = await Promise.race([
-        supabase.from('profiles').select('*').eq('id', data.user?.id).single(),
+        supabase.from('profiles').select('id').eq('id', data.user?.id).single(),
         new Promise<{ data: null; error: string }>(resolve =>
-          setTimeout(() => {
-            console.warn('[Auth:Login] Profile query timed out after 5s');
-            resolve({ data: null, error: 'profile_query_timeout' });
-          }, 5000)
+          setTimeout(() => resolve({ data: null, error: 'timeout' }), 5000)
         ),
       ]);
-      console.log('[Auth:Login] Step 4: profile query done', Date.now());
 
-      const profile = profileResult.data;
-      loginPhase = 'postProfileDecision';
-      if (profile) {
-        console.log('[Auth:Login] Step 5: navigating to home', Date.now());
-        toast.success('Welcome back!');
-        navigate('/');
-      } else if (profileResult.error === 'profile_query_timeout') {
-        // Profile query hung — trust onAuthStateChange to load profile, navigate anyway
-        console.warn('[Auth:Login] Profile query timed out, navigating anyway (session is valid)');
+      if (profileResult.data || profileResult.error === 'timeout') {
         toast.success('Welcome back!');
         navigate('/');
       } else {
         await supabase.auth.signOut();
-        toast.error('Your account setup is incomplete. Please sign up again with a new account, or contact support.', { duration: 8000 });
+        toast.error('Your account setup is incomplete. Please sign up again or contact support.', { duration: 8000 });
       }
     } catch (error: any) {
       recordFailure();
-      if (error.message.includes('Email not confirmed')) {
-        toast.error('Your email is not verified yet. Please check your inbox and click the verification link before logging in.', { duration: 6000 });
-      } else if (error.message.includes('Invalid login')) {
-        toast.error('Invalid email or password. If you just signed up, please verify your email first by clicking the link we sent to your inbox.', { duration: 6000 });
+      if (error.message?.includes('Email not confirmed')) {
+        toast.error('Your email is not verified yet. Please check your inbox and click the verification link.', { duration: 6000 });
+      } else if (error.message?.includes('Invalid login')) {
+        toast.error('Invalid email or password. If you just signed up, please verify your email first.', { duration: 6000 });
       } else {
         toast.error(friendlyError(error));
       }
     } finally {
-      clearTimeout(safetyTimer);
       setIsLoading(false);
     }
   };

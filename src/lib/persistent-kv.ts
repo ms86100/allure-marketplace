@@ -23,8 +23,7 @@ export function getFlag(key: string): boolean {
 /** Write a string to both localStorage and persistent native storage. */
 export function setString(key: string, value: string): void {
   localStorage.setItem(key, value);
-  // Fire-and-forget — capacitorStorage is async but we don't need to await
-  capacitorStorage.setItem(key, value).catch(() => {});
+  capacitorStorage.setItem(key, value);
 }
 
 /** Write a boolean flag. */
@@ -35,7 +34,7 @@ export function setFlag(key: string, value: boolean): void {
 /** Remove a key from both stores. */
 export function removeKey(key: string): void {
   localStorage.removeItem(key);
-  capacitorStorage.removeItem(key).catch(() => {});
+  capacitorStorage.removeItem(key);
 }
 
 /**
