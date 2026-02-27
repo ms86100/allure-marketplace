@@ -38,7 +38,10 @@ export function useAuthState() {
         const { data: userData } = await supabase.auth.getUser();
         if (userData?.user) {
           const meta = userData.user.user_metadata || {};
-          const { error: insertError } = await supabase.from('profiles').insert({
+          const sanitizedSocietyId = meta.society_id && meta.society_id !== 'pending'
+            && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(meta.society_id)
+            ? meta.society_id : null;
+          const { error: insertError } = await supabase.from('profiles').upsert({
             id: userId,
             email: userData.user.email || '',
             name: meta.name || meta.full_name || 'User',
@@ -46,8 +49,8 @@ export function useAuthState() {
             flat_number: meta.flat_number || '',
             block: meta.block || '',
             phase: meta.phase || null,
-            society_id: meta.society_id || null,
-          });
+            society_id: sanitizedSocietyId,
+          }, { onConflict: 'id' });
           if (!insertError) {
             await supabase.from('user_roles').insert({ user_id: userId, role: 'buyer' });
             const { data: retryData } = await supabase.rpc('get_user_auth_context', { _user_id: userId });

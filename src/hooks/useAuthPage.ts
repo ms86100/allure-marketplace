@@ -305,7 +305,7 @@ export function useAuthPage() {
         email, password,
         options: {
           emailRedirectTo: redirectUrl,
-          data: { name: profileData.name, phone: `${settings.defaultCountryCode}${profileData.phone}`, flat_number: profileData.flat_number, block: profileData.block, phase: profileData.phase, society_id: selectedSociety.id }
+          data: { name: profileData.name, phone: `${settings.defaultCountryCode}${profileData.phone}`, flat_number: profileData.flat_number, block: profileData.block, phase: profileData.phase, society_id: selectedSociety.id !== 'pending' ? selectedSociety.id : null }
         },
       });
       if (error) throw error;
@@ -341,11 +341,11 @@ export function useAuthPage() {
           return;
         }
 
-        const { error: profileError } = await supabase.from('profiles').insert({
+        const { error: profileError } = await supabase.from('profiles').upsert({
           id: data.user.id, email, phone: `${settings.defaultCountryCode}${profileData.phone}`, name: profileData.name,
           flat_number: profileData.flat_number, block: profileData.block,
           phase: profileData.phase || null, society_id: finalSocietyId,
-        });
+        }, { onConflict: 'id' });
 
         if (profileError) {
           console.error('Profile insert error:', profileError);
