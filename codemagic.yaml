@@ -160,6 +160,22 @@ workflows:
           # Add NSPhotoLibraryAddUsageDescription for @capacitor/camera save functionality
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'Sociva needs access to save photos to your library.'" App/Info.plist 2>/dev/null || true
           echo "Added NSPhotoLibraryAddUsageDescription to Info.plist"
+
+          # Add NSPhotoLibraryUsageDescription (required by Apple - read access)
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Sociva needs access to your photo library to select and upload photos.'" App/Info.plist 2>/dev/null || true
+          echo "Added NSPhotoLibraryUsageDescription to Info.plist"
+
+          # Add NSLocationWhenInUseUsageDescription
+          /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string 'Sociva uses your location to show nearby services and societies.'" App/Info.plist 2>/dev/null || true
+          echo "Added NSLocationWhenInUseUsageDescription to Info.plist"
+
+          # Add NSLocationAlwaysAndWhenInUseUsageDescription
+          /usr/libexec/PlistBuddy -c "Add :NSLocationAlwaysAndWhenInUseUsageDescription string 'Sociva uses your location to show nearby services and societies, even in the background.'" App/Info.plist 2>/dev/null || true
+          echo "Added NSLocationAlwaysAndWhenInUseUsageDescription to Info.plist"
+
+          # Add NSCameraUsageDescription
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Sociva needs camera access to take photos for your profile, listings, and reports.'" App/Info.plist 2>/dev/null || true
+          echo "Added NSCameraUsageDescription to Info.plist"
       - name: Set up code signing
         script: |
           keychain initialize
@@ -395,6 +411,22 @@ workflows:
           # Add NSPhotoLibraryAddUsageDescription for @capacitor/camera save functionality
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'Sociva needs access to save photos to your library.'" App/Info.plist 2>/dev/null || true
           echo "Added NSPhotoLibraryAddUsageDescription to Info.plist"
+
+          # Add NSPhotoLibraryUsageDescription (required by Apple - read access)
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Sociva needs access to your photo library to select and upload photos.'" App/Info.plist 2>/dev/null || true
+          echo "Added NSPhotoLibraryUsageDescription to Info.plist"
+
+          # Add NSLocationWhenInUseUsageDescription
+          /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string 'Sociva uses your location to show nearby services and societies.'" App/Info.plist 2>/dev/null || true
+          echo "Added NSLocationWhenInUseUsageDescription to Info.plist"
+
+          # Add NSLocationAlwaysAndWhenInUseUsageDescription
+          /usr/libexec/PlistBuddy -c "Add :NSLocationAlwaysAndWhenInUseUsageDescription string 'Sociva uses your location to show nearby services and societies, even in the background.'" App/Info.plist 2>/dev/null || true
+          echo "Added NSLocationAlwaysAndWhenInUseUsageDescription to Info.plist"
+
+          # Add NSCameraUsageDescription
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Sociva needs camera access to take photos for your profile, listings, and reports.'" App/Info.plist 2>/dev/null || true
+          echo "Added NSCameraUsageDescription to Info.plist"
 
       - name: Set up iOS code signing
         script: |
