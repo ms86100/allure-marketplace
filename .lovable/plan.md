@@ -1,155 +1,78 @@
 
 
-## PRE-PRODUCTION DEFECT AUDIT — Post-Fix Verification
+## Root Cause Analysis: Push Notifications Not Working on iOS
 
----
+### The Problem
 
-### P0 — GO-LIVE BLOCKERS
+The `device_tokens` table is empty (verified: 0 rows) despite the app being rebuilt and notifications being granted. The notification queue IS working — `notification_queue` and `user_notifications` tables show processed entries (e.g., "New Order Received!"). But `send-push-notification` finds 0 device tokens, so push delivery silently fails.
 
----
+### TRUE Root Cause: Missing AppDelegate.swift Forwarding Methods
 
-#### DEFECT 1: Existing orders have `delivery_handled_by = NULL` — data not backfilled
+**This is a native iOS bridge issue, not a code bug.**
 
-**Who:** Seller, Rider, Admin
-**Scenario:** 9 active orders exist with `delivery_handled_by = NULL`. If seller marks one `ready`, the trigger `trg_auto_assign_delivery` sees `COALESCE(NULL, 'seller') != 'platform'` and correctly skips. However, `process-settlements` checks `delivery_handled_by != 'platform'` and treats them as non-platform, which is correct. **But** the `validate_settlement_release` DB trigger (see Defect 5) will still block them.
-**Status:** RPC fix deployed. New orders will have correct values. Existing orders need a one-time backfill migration.
-**Severity:** P0
+The Capacitor Push Notifications plugin requires two methods in `AppDelegate.swift` to forward the APNs device token to the JavaScript layer:
 
-**Fix:**
-- New migration: `UPDATE orders SET delivery_handled_by = CASE WHEN fulfillment_type = 'delivery' THEN COALESCE((SELECT CASE WHEN sp.fulfillment_mode IN ('seller_delivery','pickup_and_seller_delivery') THEN 'seller' ELSE 'platform' END FROM seller_profiles sp WHERE sp.id = orders.seller_id), 'seller') ELSE NULL END WHERE delivery_handled_by IS NULL AND status NOT IN ('cancelled','completed','delivered');`
-- Do NOT touch: RPC function, triggers
+```text
+AppDelegate.swift (REQUIRED by @capacitor/push-notifications):
 
----
+func application(_ application: UIApplication,
+  didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+    NotificationCenter.default.post(
+      name: .capacitorDidRegisterForRemoteNotifications,
+      object: deviceToken)
+}
 
-#### DEFECT 2: `validate_settlement_release` trigger blocks settlements for self-pickup/seller-delivery orders
+func application(_ application: UIApplication,
+  didFailToRegisterForRemoteNotificationsWithError error: Error) {
+    NotificationCenter.default.post(
+      name: .capacitorDidFailToRegisterForRemoteNotifications,
+      object: error)
+}
+```
 
-**Who:** Seller, Admin
-**Scenario:** Self-pickup order reaches `completed` → `trg_create_settlement_on_delivery` creates a settlement → cooldown passes → `process-settlements` edge function correctly skips delivery check → tries to update `settlement_status` to `eligible` → **DB trigger `validate_settlement_release` fires** → queries `delivery_assignments` → no row exists → **RAISE EXCEPTION 'Cannot settle: delivery not confirmed'** → settlement permanently blocked
-**Observed:** The edge function fix (Defect 5 from previous audit) is correct, but the DB trigger `validate_settlement_release` was never updated. It still unconditionally requires a `delivery_assignments` row with status `delivered`.
-**Expected:** Self-pickup and seller-delivery orders should pass the settlement release validation
-**Root cause:** `validate_settlement_release` trigger was not updated alongside the edge function fix
-**Severity:** P0
+**Without these methods:**
+1. `PushNotifications.register()` calls iOS to request an APNs token (succeeds)
+2. iOS returns the token to `AppDelegate.didRegisterForRemoteNotifications...`
+3. But nobody forwards it to Capacitor's notification center
+4. The `registration` event in JavaScript **never fires**
+5. Token is never captured, never saved to `device_tokens`
+6. All push notifications fail with "No device tokens found for user"
 
-**Fix:**
-- New migration: `CREATE OR REPLACE FUNCTION validate_settlement_release()` — add a check: look up the order's `fulfillment_type` and `delivery_handled_by`. If `fulfillment_type = 'self_pickup'` or `delivery_handled_by != 'platform'`, skip the delivery_assignments check and verify order status is `completed` or `delivered` instead.
-- Do NOT touch: payment verification logic, settlement status transitions, the edge function
+The `codemagic.yaml` CI pipeline correctly:
+- Adds Push Notifications entitlement (aps-environment: production)
+- Adds Background Modes (remote-notification, fetch)
+- Copies GoogleService-Info.plist
 
----
+But it does **NOT** modify `AppDelegate.swift` to add the required forwarding methods.
 
-#### DEFECT 3: COD orders never have `payment_status = 'paid'` — settlements always fail payment check
+### Why There's No Buzzing When App Is Closed/Background
 
-**Who:** Seller
-**Scenario:** All 10 COD orders in DB have `payment_status: 'pending'` in `payment_records`. When settlement processing reaches the payment verification step (both edge function line 97-107 and `validate_settlement_release` trigger), it checks `payment_status != 'paid'` → fails with "Payment not confirmed". There is NO code path that ever marks a COD `payment_records` row as `paid`.
-**Observed:** COD payment records are created with status `pending` and never updated
-**Expected:** When a COD order is delivered/completed, the payment record should be marked `paid`
-**Root cause:** Missing wiring — no trigger or handler marks COD payments as confirmed upon delivery/completion
-**Severity:** P0
+Background and closed-app notifications are delivered via FCM push. Since there are 0 device tokens, FCM has no destination to send to. The in-app buzzing (`useNewOrderAlert`) only works when the app is in the foreground and uses Supabase Realtime + polling — it cannot work when the app is closed.
 
-**Fix:**
-- New migration: Add logic to `trg_create_settlement_on_delivery` (or create a new trigger) that, when an order transitions to `delivered`/`completed` AND `payment_type = 'cod'`, updates the corresponding `payment_records` row to `payment_status = 'paid'`.
-- Do NOT touch: Razorpay webhook handler, UPI payment flow
+### Fix Plan
 
----
+**Single change: Add a Codemagic build step that injects the required AppDelegate.swift methods.**
 
-#### DEFECT 4: Zero device tokens — push notifications cannot be delivered
+This modifies `codemagic.yaml` to add a script step (in both `ios-release` and `release-all` workflows) that uses `sed` to inject the two required methods into the Capacitor-generated `AppDelegate.swift` file after `npx cap sync ios`.
 
-**Who:** All users
-**Scenario:** `device_tokens` table has 0 rows. All push notifications fail silently.
-**Status:** Code is correct. Requires native app rebuild by user.
-**Severity:** P0 (requires user action)
+**Files changed:**
+- `codemagic.yaml` — Add build script step "Patch AppDelegate for Push Notifications" after the "Add iOS platform" step in both iOS workflows
 
-**Fix:** No code change. User must rebuild native app (`npx cap sync` + `npx cap run ios/android`).
+**What the script does:**
+- Locates `ios/App/App/AppDelegate.swift`
+- Injects the two required forwarding methods before the closing brace of the class
+- Only injects if not already present (idempotent)
 
----
+**What is NOT touched:**
+- No changes to `usePushNotifications.ts` (client code is correct)
+- No changes to `PushNotificationProvider.tsx`
+- No changes to edge functions
+- No changes to database tables or RLS policies
+- No changes to `capacitor.config.ts`
 
-### P1 — MUST-FIX BEFORE SCALE
-
----
-
-#### DEFECT 5: Razorpay webhook processes only first order in multi-vendor UPI cart
-
-**Who:** Buyer, Seller
-**Status:** Mitigated — UPI is disabled for multi-seller carts (line 52 of useCartPage.ts). Present but fragile.
-**Severity:** P1 (mitigated)
-
-**Fix:** Add code comment documenting the limitation. No logic change needed.
-
----
-
-#### DEFECT 6: 3 spurious `delivery_assignments` exist for pre-fix orders
-
-**Who:** Rider
-**Scenario:** 3 delivery assignments were created before the trigger fix was deployed, for orders that may be seller-delivery. Riders may receive notifications for orders they shouldn't handle.
-**Severity:** P1
-
-**Fix:**
-- One-time data cleanup migration: Delete `delivery_assignments` where the order's `delivery_handled_by` is not `platform` (after backfill from Defect 1).
-
----
-
-### P2 — QUALITY
-
----
-
-#### DEFECT 7: `handleRazorpaySuccess` still calls `clearCart()` (line 253)
-
-**Who:** Buyer
-**Scenario:** UPI payment succeeds → `handleRazorpaySuccess` calls `await clearCart()` → redundant DELETE since RPC already cleared cart
-**Severity:** P2
-
-**Fix:** Remove `await clearCart()` from `handleRazorpaySuccess` in `useCartPage.ts` line 253. Keep `await refresh()`.
-
----
-
-### RISK AREAS
-
-| Area | Status | Risk |
-|---|---|---|
-| `delivery_handled_by` on existing orders | **Present but not backfilled** | 9 active orders have NULL values |
-| `validate_settlement_release` trigger | **Present but not updated** | Blocks ALL non-platform-delivery settlements at DB level |
-| COD payment confirmation | **Missing entirely** | COD orders can never be settled — payment_status stays `pending` forever |
-| Push notification delivery | **Present but inactive** (0 device tokens) | Requires native app rebuild |
-| Multi-vendor UPI | **Present but intentionally disabled** | Fragile guard |
-| Spurious delivery assignments | **Present, 3 orphaned rows** | May confuse riders |
-
----
-
-### GO-LIVE RISK SUMMARY
-
-**P0 Blockers (4):**
-1. Existing orders need `delivery_handled_by` backfilled — 9 active orders affected
-2. `validate_settlement_release` trigger blocks self-pickup/seller-delivery settlements at DB level
-3. COD payment records never marked as `paid` — ALL COD settlements will fail
-4. Zero device tokens — push notifications non-functional (requires native rebuild)
-
-**P1 Must-Fix (2):**
-5. 3 spurious delivery assignments need cleanup
-6. Multi-vendor UPI fragility (mitigated but undocumented)
-
-**P2 Quality (1):**
-7. Redundant `clearCart()` in UPI success handler
-
----
-
-### VERDICT
-
-**❌ Not safe for go-live** without fixing Defects 1-3.
-
-Even with the previous round of fixes deployed, **no seller can ever receive a settlement** for any COD order because:
-- COD `payment_records` are never marked `paid` (Defect 3)
-- `validate_settlement_release` trigger blocks non-delivery settlements (Defect 2)
-- Existing orders have NULL `delivery_handled_by` (Defect 1)
-
-These are three compounding blockers on the settlement path. All three must be resolved via database migrations before any seller can be paid.
-
-### Implementation Plan
-
-**Migration 1: Backfill existing orders + fix validate_settlement_release + auto-confirm COD payments**
-- UPDATE existing orders to set `delivery_handled_by` based on seller's `fulfillment_mode`
-- CREATE OR REPLACE `validate_settlement_release` to handle self-pickup/seller-delivery orders
-- Add COD auto-confirmation: when order reaches `delivered`/`completed` and `payment_type = 'cod'`, mark `payment_records.payment_status = 'paid'` (add to `trg_create_settlement_on_delivery` or new trigger)
-- Clean up 3 spurious `delivery_assignments`
-
-**Client-side fix:**
-- Remove redundant `clearCart()` from `handleRazorpaySuccess` in `useCartPage.ts`
+After this fix is deployed and the app is rebuilt via Codemagic, the flow will be:
+1. App opens → user signs in → `usePushNotifications` calls `PushNotifications.register()`
+2. iOS requests APNs token → AppDelegate forwards to Capacitor bridge
+3. `registration` event fires → token saved to `device_tokens`
+4. Push notifications now work for foreground, background, and closed app states
 
