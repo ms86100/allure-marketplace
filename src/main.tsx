@@ -38,14 +38,36 @@ function appDidNotMount() {
   return !!root && !root.hasAttribute("data-app-mounted");
 }
 
+// Auto-reload on stale chunk errors (dynamic import failures after deploy)
+function isChunkError(error: unknown): boolean {
+  const msg = String(error);
+  return msg.includes('Failed to fetch dynamically imported module') ||
+         msg.includes('Loading chunk') ||
+         msg.includes('Loading CSS chunk');
+}
+
 // Logging-only global guards — they do NOT destroy the React tree.
-// React's ErrorBoundary handles render errors. The 10-second timeout
-// below is the sole safety net for complete mount failure.
 window.addEventListener("error", (event) => {
+  if (isChunkError(event.error || event.message)) {
+    const reloaded = sessionStorage.getItem('chunk-reload');
+    if (!reloaded) {
+      sessionStorage.setItem('chunk-reload', '1');
+      window.location.reload();
+      return;
+    }
+  }
   console.error("[Bootstrap] Unhandled error:", event.error || event.message);
 });
 
 window.addEventListener("unhandledrejection", (event) => {
+  if (isChunkError(event.reason)) {
+    const reloaded = sessionStorage.getItem('chunk-reload');
+    if (!reloaded) {
+      sessionStorage.setItem('chunk-reload', '1');
+      window.location.reload();
+      return;
+    }
+  }
   console.error("[Bootstrap] Unhandled rejection:", event.reason);
 });
 
@@ -70,6 +92,7 @@ async function bootstrap() {
 
   // Successful boot — reset crash counter
   sessionStorage.removeItem('boot-fails');
+  sessionStorage.removeItem('chunk-reload');
 
   // Safety net: if the app hasn't signalled it mounted within 10s, show fallback
   window.setTimeout(() => {
