@@ -30,14 +30,20 @@ import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCount
 import { useNewOrderAlert } from '@/hooks/useNewOrderAlert';
 
 export default function SellerDashboardPage() {
-  const { user, sellerProfiles, currentSellerId } = useAuth();
+  const { user, sellerProfiles = [], currentSellerId } = useAuth();
   const settings = useSystemSettings();
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [orderFilter, setOrderFilter] = useState<OrderFilter>('all');
+  const [renderError, setRenderError] = useState<string | null>(null);
 
-  const activeSellerId = currentSellerId || (sellerProfiles.length > 0 ? sellerProfiles[0].id : null);
+  const activeSellerId = currentSellerId || (Array.isArray(sellerProfiles) && sellerProfiles.length > 0 ? sellerProfiles[0].id : null);
   const { pendingAlert, dismiss: dismissAlert } = useNewOrderAlert(activeSellerId);
+
+  // Debug: log auth state for seller dashboard
+  useEffect(() => {
+    console.log('[SellerDashboard] Auth state:', { userId: user?.id, sellerProfilesCount: sellerProfiles?.length, activeSellerId, currentSellerId });
+  }, [user, sellerProfiles, activeSellerId, currentSellerId]);
 
   // Fetch seller profile
   useEffect(() => {
@@ -50,16 +56,22 @@ export default function SellerDashboardPage() {
 
   const fetchSellerProfile = async (sellerId: string) => {
     setIsLoadingProfile(true);
+    setRenderError(null);
     try {
-      const { data: profile } = await supabase
+      const { data: profile, error } = await supabase
         .from('seller_profiles')
         .select('*')
         .eq('id', sellerId)
         .single();
 
+      if (error) {
+        console.error('[SellerDashboard] Profile fetch error:', error);
+        setRenderError(`Failed to load profile: ${error.message}`);
+      }
       setSellerProfile(profile ? (profile as SellerProfile) : null);
     } catch (error) {
-      console.error('Error fetching seller profile:', error);
+      console.error('[SellerDashboard] Unexpected error:', error);
+      setRenderError(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setIsLoadingProfile(false);
     }
@@ -118,6 +130,18 @@ export default function SellerDashboardPage() {
           <Skeleton className="h-24 w-full rounded-xl" />
           <Skeleton className="h-32 w-full rounded-xl" />
           <Skeleton className="h-48 w-full rounded-xl" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (renderError) {
+    return (
+      <AppLayout headerTitle="Seller Dashboard" showLocation={false}>
+        <div className="p-4 text-center py-12">
+          <p className="text-destructive mb-2">Something went wrong</p>
+          <p className="text-xs text-muted-foreground mb-4">{renderError}</p>
+          <Button onClick={() => activeSellerId && fetchSellerProfile(activeSellerId)}>Try Again</Button>
         </div>
       </AppLayout>
     );
