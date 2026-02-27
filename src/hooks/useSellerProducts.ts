@@ -176,10 +176,16 @@ export function useSellerProducts() {
                   formData.image_url !== ep.image_url ||
                   formData.action_type !== (ep.action_type || 'add_to_cart') ||
                   formData.subcategory_id !== (ep.subcategory_id || '');
+                // For approved sellers, edits don't need re-approval
+                const sellerApproved = (sellerProfile as any)?.verification_status === 'approved';
+                if (sellerApproved) return ep.approval_status === 'rejected' && contentChanged ? 'pending' : ep.approval_status;
                 return contentChanged ? 'pending' : ep.approval_status;
               })(),
             }
-          : { approval_status: 'draft' }),
+          : {
+              // Auto-approve products for already-approved sellers
+              approval_status: (sellerProfile as any)?.verification_status === 'approved' ? 'approved' : 'draft',
+            }),
       };
       if (editingProduct) {
         const { error } = await supabase.from('products').update(productData as any).eq('id', editingProduct.id);

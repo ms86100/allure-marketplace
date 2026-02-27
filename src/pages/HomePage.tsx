@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { OnboardingWalkthrough, useOnboarding } from '@/components/onboarding/OnboardingWalkthrough';
 import { VerificationPendingScreen } from '@/components/onboarding/VerificationPendingScreen';
@@ -14,21 +14,32 @@ import { motion } from 'framer-motion';
 import { getString, setString, restoreKeyIfMissing } from '@/lib/persistent-kv';
 
 export default function HomePage() {
-  const { user, profile, isApproved, isSeller, sellerProfiles } = useAuth();
+  const { user, profile, isApproved, isSeller, sellerProfiles, refreshProfile } = useAuth();
+  const navigate = useNavigate();
   const { showOnboarding, hasChecked, completeOnboarding } = useOnboarding(user?.id);
   const [showSellerCongrats, setShowSellerCongrats] = useState(false);
 
+  // Refresh profile when congrats banner should show (ensures roles are up-to-date)
   useEffect(() => {
     if (isSeller && sellerProfiles?.some((s: any) => s.verification_status === 'approved') && user) {
       const key = `seller_congrats_seen_${user.id}`;
-      // Restore from persistent storage on native before checking
       restoreKeyIfMissing(key).then(() => {
         if (!getString(key)) {
+          // Refresh profile to ensure roles are current
+          refreshProfile();
           setShowSellerCongrats(true);
         }
       });
     }
   }, [isSeller, sellerProfiles, user]);
+
+  const handleAddProducts = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault();
+    dismissCongrats();
+    // Refresh to ensure isSeller is true before navigating
+    await refreshProfile();
+    navigate('/seller/products');
+  }, [refreshProfile, navigate]);
 
   const dismissCongrats = () => {
     if (user) {
@@ -92,7 +103,7 @@ export default function HomePage() {
                 </p>
                 <Link
                   to="/seller/products"
-                  onClick={dismissCongrats}
+                  onClick={handleAddProducts}
                   className="inline-flex items-center gap-1 mt-2.5 text-xs font-bold bg-primary-foreground/20 px-3 py-1.5 rounded-lg hover:bg-primary-foreground/30 transition-colors"
                 >
                   Add Products <ArrowRight size={12} />

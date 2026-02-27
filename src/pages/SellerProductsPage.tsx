@@ -88,7 +88,7 @@ export default function SellerProductsPage() {
 
         <h1 className="text-xl font-bold mb-4">Your Products ({sp.products.length})</h1>
 
-        {sp.products.some(p => (p as any).approval_status === 'draft') && (
+        {sp.products.some(p => (p as any).approval_status === 'draft') && (sp.sellerProfile as any)?.verification_status !== 'approved' && (
           <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-xl flex items-center justify-between">
             <div><p className="text-sm font-medium">{sp.products.filter(p => (p as any).approval_status === 'draft').length} draft product(s) ready</p><p className="text-xs text-muted-foreground">Submit for admin review to make them visible to buyers</p></div>
             <Button size="sm" onClick={async () => { const draftIds = sp.products.filter(p => (p as any).approval_status === 'draft').map(p => p.id); const { error } = await supabase.from('products').update({ approval_status: 'pending' } as any).in('id', draftIds); if (error) { toast.error('Failed to submit'); return; } toast.success(`${draftIds.length} product(s) submitted for approval`); if (sp.sellerProfile) sp.fetchData(sp.sellerProfile.id); }}><Send size={14} className="mr-1" />Submit All for Approval</Button>
@@ -125,8 +125,8 @@ export default function SellerProductsPage() {
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <Button size="sm" variant="outline" onClick={() => sp.openEditDialog(product)}><Edit size={14} className="mr-1" />Edit</Button>
                         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => sp.setDeleteTarget(product)}><Trash2 size={14} /></Button>
-                        {approvalStatus === 'draft' && <Button size="sm" variant="secondary" onClick={async () => { const { error } = await supabase.from('products').update({ approval_status: 'pending' } as any).eq('id', product.id); if (error) { toast.error('Failed to submit'); return; } toast.success('Submitted for approval'); if (sp.sellerProfile) sp.fetchData(sp.sellerProfile.id); }}><Send size={14} className="mr-1" />Submit</Button>}
-                        {showPendingHint && <span className="text-xs text-muted-foreground italic">Under review — edits are still allowed</span>}
+                        {approvalStatus === 'draft' && (sp.sellerProfile as any)?.verification_status !== 'approved' && <Button size="sm" variant="secondary" onClick={async () => { const { error } = await supabase.from('products').update({ approval_status: 'pending' } as any).eq('id', product.id); if (error) { toast.error('Failed to submit'); return; } toast.success('Submitted for approval'); if (sp.sellerProfile) sp.fetchData(sp.sellerProfile.id); }}><Send size={14} className="mr-1" />Submit</Button>}
+                        {showPendingHint && (sp.sellerProfile as any)?.verification_status !== 'approved' && <span className="text-xs text-muted-foreground italic">Under review — edits are still allowed</span>}
                       </div>
                     </div>
                     <div className="flex flex-col items-center gap-1"><Switch checked={product.is_available} onCheckedChange={() => sp.toggleAvailability(product)} /><span className="text-[10px] text-muted-foreground">{product.is_available ? 'In Stock' : 'Out'}</span></div>

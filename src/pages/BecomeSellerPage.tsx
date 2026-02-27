@@ -74,7 +74,7 @@ export default function BecomeSellerPage() {
     licenseStatus, setLicenseStatus, parentGroupInfos, groups, groupedConfigs,
     selectedGroupInfo, selectedGroupRow, handleCategoryChange, toggleOperatingDay,
     handleProceedToSettings, handleProceedToProducts, handleSaveDraftAndExit, handleSubmit,
-    setExistingSeller, setDraftSellerId, handleStepBack, handleGroupSelect,
+    setExistingSeller, setDraftSellerId, handleStepBack, handleGroupSelect, submissionComplete,
   } = app;
 
   const fulfillmentLabel = FULFILLMENT_OPTIONS.find(o => o.value === formData.fulfillment_mode)?.label || formData.fulfillment_mode;
@@ -84,8 +84,36 @@ export default function BecomeSellerPage() {
     return <AppLayout showHeader={false} showNav={false}><div className="flex items-center justify-center min-h-[100dvh]"><Loader2 className="animate-spin" size={32} /></div></AppLayout>;
   }
 
+  // ─── Submission Success Screen ──────────────────────────────────────────────
+  if (submissionComplete) {
+    return (
+      <AppLayout showHeader={false} showNav={false}>
+        <div className="p-4 safe-top flex flex-col items-center justify-center min-h-[80dvh] text-center">
+          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.4 }}>
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-success/20 flex items-center justify-center">
+              <CheckCircle2 className="text-success" size={40} />
+            </div>
+            <h1 className="text-2xl font-bold mb-2">Application Submitted!</h1>
+            <p className="text-muted-foreground mb-2 max-w-xs mx-auto">
+              Your store <strong>{formData.business_name}</strong> has been submitted for admin review.
+            </p>
+            <p className="text-sm text-muted-foreground mb-8 max-w-xs mx-auto">
+              You'll receive a notification once your store is approved. This usually takes less than 24 hours.
+            </p>
+            <Link to="/">
+              <Button size="lg" className="w-full max-w-xs">
+                <ArrowRight size={16} className="mr-2" />Go to Home
+              </Button>
+            </Link>
+          </motion.div>
+        </div>
+      </AppLayout>
+    );
+  }
+
   if (existingSeller && selectedGroup) {
     const isRejected = (existingSeller as any).verification_status === 'rejected';
+    const isPendingReview = (existingSeller as any).verification_status === 'pending';
     return (
       <AppLayout showHeader={false} showNav={false}>
         <div className="p-4 safe-top">
@@ -102,13 +130,24 @@ export default function BecomeSellerPage() {
                   <Button variant="outline" className="w-full" onClick={() => { setSelectedGroup(null); setExistingSeller(null); setStep(1); }}>Choose Different Category</Button>
                 </div>
               </>
+            ) : isPendingReview ? (
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-warning/20 flex items-center justify-center"><Clock className="text-warning" size={32} /></div>
+                <h1 className="text-2xl font-bold mb-2">Under Review</h1>
+                <p className="text-muted-foreground mb-2">Your store <strong>{existingSeller.business_name}</strong> is currently being reviewed by our admin team.</p>
+                <p className="text-sm text-muted-foreground mb-6">You'll be notified once it's approved. This usually takes less than 24 hours.</p>
+                <div className="space-y-3">
+                  <Link to="/"><Button className="w-full" size="lg"><ArrowRight size={16} className="mr-2" />Go to Home</Button></Link>
+                  <Button variant="outline" className="w-full" onClick={() => { setSelectedGroup(null); setExistingSeller(null); setStep(1); }}>Register Another Category</Button>
+                </div>
+              </>
             ) : (
               <>
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-success/20 flex items-center justify-center"><Store className="text-success" size={32} /></div>
                 <h1 className="text-2xl font-bold mb-2">Already Registered!</h1>
                 <p className="text-muted-foreground mb-6">You already have a business in this category: <strong>{existingSeller.business_name}</strong></p>
                 <div className="space-y-3">
-                  <Button className="w-full" size="lg" onClick={() => window.location.href = '#/seller/settings'}><Settings size={18} className="mr-2" />Edit {existingSeller.business_name}</Button>
+                  <Link to="/seller/settings"><Button className="w-full" size="lg"><Settings size={18} className="mr-2" />Edit {existingSeller.business_name}</Button></Link>
                   <Button variant="outline" className="w-full" onClick={() => { setSelectedGroup(null); setExistingSeller(null); setStep(1); }}>Choose Different Category</Button>
                 </div>
               </>

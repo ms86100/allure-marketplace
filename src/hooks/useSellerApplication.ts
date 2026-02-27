@@ -52,6 +52,7 @@ export function useSellerApplication() {
   const { groupedConfigs } = useCategoryConfigs();
 
   const [isLoading, setIsLoading] = useState(false);
+  const [submissionComplete, setSubmissionComplete] = useState(false);
   const [isCheckingExisting, setIsCheckingExisting] = useState(true);
   const [existingSeller, setExistingSeller] = useState<{ id: string; business_name: string; verification_status?: string } | null>(null);
   const [draftSellerId, setDraftSellerId] = useState<string | null>(null);
@@ -267,7 +268,7 @@ export function useSellerApplication() {
       await refreshProfile();
       localStorage.setItem('seller_onboarding_completed', 'true');
       toast.success('Application submitted! Awaiting admin approval.');
-      navigate('/profile');
+      setSubmissionComplete(true);
     } catch (error: any) {
       console.error('Error submitting application:', error);
       toast.error(friendlyError(error));
@@ -294,6 +295,6 @@ export function useSellerApplication() {
     selectedGroupInfo, selectedGroupRow, handleCategoryChange, toggleOperatingDay,
     saveDraft, handleProceedToSettings, handleProceedToProducts, handleSaveDraftAndExit,
     handleSubmit, setExistingSeller, setDraftSellerId, handleStepBack, handleGroupSelect,
-    reloadProducts,
+    reloadProducts, submissionComplete,
   };
 }

@@ -218,7 +218,8 @@ export function SellerApplicationReview() {
                                     </div>
                                     {statusBadge(prod.approval_status)}
                                   </div>
-                                  {prod.approval_status === 'pending' && (
+                                  {/* Only show per-product approve/reject when seller is already approved */}
+                                  {prod.approval_status === 'pending' && seller.verification_status === 'approved' && (
                                     <>
                                       {s.productRejectingId === prod.id ? (
                                         <div className="space-y-2 pt-1.5 border-t border-border/30">
@@ -253,6 +254,9 @@ export function SellerApplicationReview() {
                       {/* Action Buttons */}
                       {isPending && (
                         <div className="pt-3 border-t border-border/30 space-y-2.5">
+                          <p className="text-[10px] text-muted-foreground bg-muted/60 rounded-lg px-3 py-2">
+                            ℹ️ Approving the seller will also approve all their pending products and licenses.
+                          </p>
                           {s.rejectingId === seller.id ? (
                             <div className="space-y-2.5">
                               <Textarea placeholder="Rejection reason (will be shared with seller)..." value={s.rejectionNote} onChange={(e) => s.setRejectionNote(e.target.value)} rows={2} className="rounded-xl" />
@@ -265,7 +269,7 @@ export function SellerApplicationReview() {
                             </div>
                           ) : (
                             <div className="flex gap-2">
-                              <Button size="sm" variant="outline" className="text-destructive flex-1 rounded-xl font-semibold" onClick={() => s.setRejectingId(seller.id)} disabled={!!s.actionId}><X size={14} className="mr-1" /> Reject Seller</Button>
+                              <Button size="sm" variant="outline" className="text-destructive flex-1 rounded-xl font-semibold" onClick={() => s.setRejectingId(seller.id)} disabled={!!s.actionId}><X size={14} className="mr-1" /> Reject</Button>
                               <Button size="sm" className="flex-1 rounded-xl font-semibold shadow-sm" onClick={() => s.updateSellerStatus(seller, 'approved')} disabled={!!s.actionId}>
                                 {s.actionId === seller.id && <Loader2 size={14} className="animate-spin mr-1" />}<Check size={14} className="mr-1" /> Approve Seller
                               </Button>
