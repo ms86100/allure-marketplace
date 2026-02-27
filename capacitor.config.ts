@@ -68,7 +68,7 @@ const config: CapacitorConfig = {
   // iOS-specific configuration
   ios: {
     scheme: 'sociva',
-    contentInset: 'automatic',
+    contentInset: 'never',
     preferredContentMode: 'mobile',
     plistOverrides: {
       ITSAppUsesNonExemptEncryption: false,

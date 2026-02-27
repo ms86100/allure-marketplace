@@ -57,7 +57,7 @@ function HeaderInner({
         'sticky top-0 z-40 bg-background border-b border-border',
         className
       )}>
-        <div className="px-4 pt-1 pb-2 safe-top">
+        <div className="px-4 pt-[max(0.25rem,env(safe-area-inset-top))] pb-2">
           {/* Top row: always show branding + actions */}
           <div className="flex items-start justify-between">
             <div className="min-w-0 flex-1">
