@@ -33,13 +33,15 @@ const MIN_POLL_MS = 3000;
 const MAX_POLL_MS = 30000;
 const BACKOFF_FACTOR = 1.5;
 const SNOOZE_MS = 60000;
+const LOOKBACK_MS = 5 * 60 * 1000; // 5 minutes
 
 export function useNewOrderAlert(sellerId: string | null) {
   const queryClient = useQueryClient();
   const [pendingAlert, setPendingAlert] = useState<NewOrder | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastSeenAtRef = useRef<string>(new Date().toISOString());
+  // Look back 5 minutes to catch orders placed while the app was closed
+  const lastSeenAtRef = useRef<string>(new Date(Date.now() - LOOKBACK_MS).toISOString());
   const pollDelayRef = useRef(MIN_POLL_MS);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seenIdsRef = useRef<Set<string>>(new Set());
@@ -178,7 +180,8 @@ export function useNewOrderAlert(sellerId: string | null) {
       }
     };
 
-    pollTimerRef.current = setTimeout(poll, MIN_POLL_MS);
+    // Immediate poll on mount to catch orders from while app was closed
+    pollTimerRef.current = setTimeout(poll, 0);
 
     return () => {
       cancelled = true;
