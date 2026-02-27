@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { X, AlertTriangle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface OrderCancellationProps {
@@ -35,6 +36,7 @@ export function OrderCancellation({ orderId, orderStatus, onCancelled }: OrderCa
   const [reason, setReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuth();
 
   // Can only cancel before "preparing" status
   const canCancel = ['placed', 'accepted'].includes(orderStatus);
@@ -65,7 +67,8 @@ export function OrderCancellation({ orderId, orderStatus, onCancelled }: OrderCa
           status: 'cancelled',
           rejection_reason: `Cancelled by buyer: ${finalReason}`,
         })
-        .eq('id', orderId);
+        .eq('id', orderId)
+        .eq('buyer_id', user?.id);
 
       if (error) throw error;
 

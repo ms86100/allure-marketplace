@@ -250,6 +250,8 @@ export function useCartPage() {
       if (!confirmed) toast.info('Payment is being verified. Your order will update shortly.');
       else toast.success('Payment successful! Order placed.');
     }
+    // Trigger immediate push notification to seller (fire-and-forget) — matches COD path
+    supabase.functions.invoke('process-notification-queue').catch(() => {});
     // RPC already clears cart atomically — only refresh client state
     await refresh();
     navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
