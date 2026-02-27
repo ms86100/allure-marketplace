@@ -256,21 +256,20 @@ export function useAuthPage() {
     setSignupStep('profile');
   };
 
-  const verifyGpsLocation = () => {
+  const verifyGpsLocation = async () => {
     if (!selectedSociety?.latitude || !selectedSociety?.longitude) { setGpsStatus('unavailable'); return; }
-    if (!navigator.geolocation) { setGpsStatus('unavailable'); toast.error('GPS is not supported on this device'); return; }
     setGpsStatus('loading');
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const dist = haversineDistance(position.coords.latitude, position.coords.longitude, Number(selectedSociety.latitude), Number(selectedSociety.longitude));
-        setGpsDistance(Math.round(dist));
-        const radius = selectedSociety.geofence_radius_meters || 500;
-        if (dist <= radius) { setGpsStatus('verified'); toast.success('Location verified!'); }
-        else { setGpsStatus('failed'); toast.error(`You appear to be ${Math.round(dist)}m away.`); }
-      },
-      () => { setGpsStatus('failed'); toast.error('Unable to access your location.'); },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    try {
+      const { getCurrentPosition } = await import('@/lib/native-location');
+      const pos = await getCurrentPosition();
+      const dist = haversineDistance(pos.latitude, pos.longitude, Number(selectedSociety.latitude), Number(selectedSociety.longitude));
+      setGpsDistance(Math.round(dist));
+      const radius = selectedSociety.geofence_radius_meters || 500;
+      if (dist <= radius) { setGpsStatus('verified'); toast.success('Location verified!'); }
+      else { setGpsStatus('failed'); toast.error(`You appear to be ${Math.round(dist)}m away.`); }
+    } catch {
+      setGpsStatus('failed'); toast.error('Unable to access your location.');
+    }
   };
 
   const handleRequestNewSociety = () => {

@@ -1,14 +1,15 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Upload, X, Loader2, Camera, ImageIcon } from 'lucide-react';
 import { cn, friendlyError } from '@/lib/utils';
+import { Capacitor } from '@capacitor/core';
 
 interface ImageUploadProps {
   value?: string | null;
   onChange: (url: string | null) => void;
-  folder: string; // e.g., 'products', 'sellers', 'profiles'
+  folder: string;
   userId: string;
   className?: string;
   aspectRatio?: 'square' | 'video' | 'portrait';
@@ -53,52 +54,16 @@ export function ImageUpload({
     });
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Only JPG, PNG, or WebP images are allowed');
-      return;
-    }
-
-    // Validate file size (2MB for products, 5MB otherwise)
-    const maxSize = folder === 'products' ? 2 * 1024 * 1024 : 5 * 1024 * 1024;
-    const maxLabel = folder === 'products' ? '2MB' : '5MB';
-    if (file.size > maxSize) {
-      toast.error(`Image must be less than ${maxLabel}`);
-      return;
-    }
-
-    // Validate dimensions for product images
-    if (folder === 'products') {
-      const valid = await validateImageDimensions(file, 400, 400, 4000, 4000);
-      if (!valid) return;
-    }
-
+  const uploadBlob = useCallback(async (blob: Blob) => {
     setIsUploading(true);
     try {
-      // Generate unique filename
-      const ext = file.name.split('.').pop();
+      const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
       const fileName = `${userId}/${folder}/${Date.now()}.${ext}`;
-
-      // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('app-images')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
+        .upload(fileName, blob, { cacheControl: '3600', upsert: false, contentType: blob.type || 'image/jpeg' });
       if (error) throw error;
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('app-images')
-        .getPublicUrl(data.path);
-
+      const { data: urlData } = supabase.storage.from('app-images').getPublicUrl(data.path);
       onChange(urlData.publicUrl);
       toast.success('Image uploaded successfully');
     } catch (error: any) {
@@ -106,18 +71,50 @@ export function ImageUpload({
       toast.error(friendlyError(error));
     } finally {
       setIsUploading(false);
-      // Reset input
-      if (inputRef.current) {
-        inputRef.current.value = '';
-      }
     }
+  }, [userId, folder, onChange]);
+
+  const handleNativePick = useCallback(async () => {
+    try {
+      const { pickOrCaptureImage } = await import('@/lib/native-media');
+      const blob = await pickOrCaptureImage();
+      if (blob) await uploadBlob(blob);
+    } catch (err: any) {
+      if (err?.message?.includes('cancelled') || err?.message?.includes('canceled')) return;
+      console.error('Native pick error:', err);
+      toast.error('Failed to select image');
+    }
+  }, [uploadBlob]);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Only JPG, PNG, or WebP images are allowed');
+      return;
+    }
+
+    const maxSize = folder === 'products' ? 2 * 1024 * 1024 : 5 * 1024 * 1024;
+    const maxLabel = folder === 'products' ? '2MB' : '5MB';
+    if (file.size > maxSize) {
+      toast.error(`Image must be less than ${maxLabel}`);
+      return;
+    }
+
+    if (folder === 'products') {
+      const valid = await validateImageDimensions(file, 400, 400, 4000, 4000);
+      if (!valid) return;
+    }
+
+    await uploadBlob(file);
+    if (inputRef.current) inputRef.current.value = '';
   };
 
   const handleRemove = async () => {
     if (!value) return;
-
     try {
-      // Extract path from URL
       const url = new URL(value);
       const pathMatch = url.pathname.match(/\/app-images\/(.+)$/);
       if (pathMatch) {
@@ -126,8 +123,15 @@ export function ImageUpload({
     } catch (e) {
       console.log('Could not delete old image');
     }
-
     onChange(null);
+  };
+
+  const handlePickImage = () => {
+    if (Capacitor.isNativePlatform()) {
+      handleNativePick();
+    } else {
+      inputRef.current?.click();
+    }
   };
 
   return (
@@ -143,29 +147,12 @@ export function ImageUpload({
 
       {value ? (
         <div className={cn('relative rounded-lg overflow-hidden border border-border max-h-48', aspectClasses[aspectRatio])}>
-          <img
-            src={value}
-            alt="Uploaded"
-            className="w-full h-full object-cover"
-          />
+          <img src={value} alt="Uploaded" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => inputRef.current?.click()}
-              disabled={isUploading}
-            >
-              <Camera size={16} className="mr-1" />
-              Change
+            <Button type="button" size="sm" variant="secondary" onClick={handlePickImage} disabled={isUploading}>
+              <Camera size={16} className="mr-1" /> Change
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="destructive"
-              onClick={handleRemove}
-              disabled={isUploading}
-            >
+            <Button type="button" size="sm" variant="destructive" onClick={handleRemove} disabled={isUploading}>
               <X size={16} />
             </Button>
           </div>
@@ -178,7 +165,7 @@ export function ImageUpload({
       ) : (
         <button
           type="button"
-          onClick={() => inputRef.current?.click()}
+          onClick={handlePickImage}
           disabled={isUploading}
           className={cn(
             'w-full rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 transition-colors',

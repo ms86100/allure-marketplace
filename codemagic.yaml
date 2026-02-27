@@ -104,7 +104,10 @@ SWIFT
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string remote-notification" App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:1 string fetch" App/Info.plist
           echo "Added Background Modes (remote-notification, fetch) to Info.plist"
-          
+
+          # Add NSPhotoLibraryAddUsageDescription for @capacitor/camera save functionality
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'Sociva needs access to save photos to your library.'" App/Info.plist 2>/dev/null || true
+          echo "Added NSPhotoLibraryAddUsageDescription to Info.plist"
       - name: Set up code signing
         script: |
           keychain initialize
@@ -283,6 +286,10 @@ SWIFT
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string remote-notification" App/Info.plist
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:1 string fetch" App/Info.plist
           echo "Added Background Modes (remote-notification, fetch) to Info.plist"
+
+          # Add NSPhotoLibraryAddUsageDescription for @capacitor/camera save functionality
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryAddUsageDescription string 'Sociva needs access to save photos to your library.'" App/Info.plist 2>/dev/null || true
+          echo "Added NSPhotoLibraryAddUsageDescription to Info.plist"
 
       - name: Set up iOS code signing
         script: |

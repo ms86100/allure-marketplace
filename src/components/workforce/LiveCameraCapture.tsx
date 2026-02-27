@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Camera, RotateCcw, Check } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 
 interface LiveCameraCaptureProps {
   onCapture: (imageBlob: Blob) => void;
@@ -13,8 +14,28 @@ export function LiveCameraCapture({ onCapture, capturedPreview, onClear }: LiveC
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+
+  const handleNativeCapture = useCallback(async () => {
+    setIsCapturing(true);
+    try {
+      const { capturePhotoFromCamera } = await import('@/lib/native-media');
+      const blob = await capturePhotoFromCamera();
+      if (blob) onCapture(blob);
+    } catch (err) {
+      console.error('Native camera error:', err);
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [onCapture]);
 
   const startCamera = useCallback(async () => {
+    // On native platforms, use the native camera plugin
+    if (Capacitor.isNativePlatform()) {
+      handleNativeCapture();
+      return;
+    }
+    // Web fallback
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: 640, height: 480 },
@@ -28,7 +49,7 @@ export function LiveCameraCapture({ onCapture, capturedPreview, onClear }: LiveC
     } catch (err) {
       console.error('Camera access denied:', err);
     }
-  }, []);
+  }, [handleNativeCapture]);
 
   // Cleanup camera on unmount
   useEffect(() => {
@@ -93,10 +114,13 @@ export function LiveCameraCapture({ onCapture, capturedPreview, onClear }: LiveC
     <button
       type="button"
       onClick={startCamera}
+      disabled={isCapturing}
       className="w-full h-48 rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 hover:border-primary/50 transition-colors bg-muted/30"
     >
       <Camera size={32} className="text-muted-foreground" />
-      <span className="text-sm text-muted-foreground">Tap to capture live photo</span>
+      <span className="text-sm text-muted-foreground">
+        {isCapturing ? 'Opening camera...' : 'Tap to capture live photo'}
+      </span>
       <span className="text-[10px] text-muted-foreground/70">Gallery upload not allowed</span>
     </button>
   );

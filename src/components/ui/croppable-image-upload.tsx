@@ -1,10 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Camera, X, Loader2, ImageIcon } from 'lucide-react';
 import { cn, friendlyError } from '@/lib/utils';
 import { ImageCropDialog } from './image-crop-dialog';
+import { Capacitor } from '@capacitor/core';
 
 interface CroppableImageUploadProps {
   value?: string | null;
@@ -14,7 +15,7 @@ interface CroppableImageUploadProps {
   className?: string;
   aspectRatio?: 'square' | 'video' | 'portrait';
   placeholder?: string;
-  cropAspect?: number; // width/height e.g. 1 for square, 16/9 for cover
+  cropAspect?: number;
 }
 
 export function CroppableImageUpload({
@@ -39,6 +40,41 @@ export function CroppableImageUpload({
     portrait: 'aspect-[3/4]',
   };
 
+  const handleUploadBlob = useCallback(async (blob: Blob) => {
+    setIsUploading(true);
+    try {
+      const fileName = `${userId}/${folder}/${Date.now()}.jpg`;
+      const { data, error } = await supabase.storage
+        .from('app-images')
+        .upload(fileName, blob, { cacheControl: '3600', upsert: false, contentType: 'image/jpeg' });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from('app-images').getPublicUrl(data.path);
+      onChange(urlData.publicUrl);
+      toast.success('Image uploaded successfully');
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error(friendlyError(error));
+    } finally {
+      setIsUploading(false);
+    }
+  }, [userId, folder, onChange]);
+
+  const handleNativePick = useCallback(async () => {
+    try {
+      const { pickOrCaptureImage } = await import('@/lib/native-media');
+      const blob = await pickOrCaptureImage();
+      if (blob) {
+        // Show crop dialog with the native image
+        const objectUrl = URL.createObjectURL(blob);
+        setCropSrc(objectUrl);
+      }
+    } catch (err: any) {
+      if (err?.message?.includes('cancelled') || err?.message?.includes('canceled')) return;
+      console.error('Native pick error:', err);
+      toast.error('Failed to select image');
+    }
+  }, []);
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -55,33 +91,14 @@ export function CroppableImageUpload({
       return;
     }
 
-    // Show crop dialog
     const objectUrl = URL.createObjectURL(file);
     setCropSrc(objectUrl);
-
     if (inputRef.current) inputRef.current.value = '';
   };
 
   const handleCropComplete = async (blob: Blob) => {
     setCropSrc(null);
-    setIsUploading(true);
-    try {
-      const fileName = `${userId}/${folder}/${Date.now()}.jpg`;
-      const { data, error } = await supabase.storage
-        .from('app-images')
-        .upload(fileName, blob, { cacheControl: '3600', upsert: false, contentType: 'image/jpeg' });
-
-      if (error) throw error;
-
-      const { data: urlData } = supabase.storage.from('app-images').getPublicUrl(data.path);
-      onChange(urlData.publicUrl);
-      toast.success('Image uploaded successfully');
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      toast.error(friendlyError(error));
-    } finally {
-      setIsUploading(false);
-    }
+    await handleUploadBlob(blob);
   };
 
   const handleRemove = async () => {
@@ -96,6 +113,14 @@ export function CroppableImageUpload({
       console.log('Could not delete old image');
     }
     onChange(null);
+  };
+
+  const handlePickImage = () => {
+    if (Capacitor.isNativePlatform()) {
+      handleNativePick();
+    } else {
+      inputRef.current?.click();
+    }
   };
 
   return (
@@ -113,7 +138,7 @@ export function CroppableImageUpload({
         <div className={cn('relative rounded-lg overflow-hidden border border-border max-h-48', aspectClasses[aspectRatio])}>
           <img src={value} alt="Uploaded" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-            <Button type="button" size="sm" variant="secondary" onClick={() => inputRef.current?.click()} disabled={isUploading}>
+            <Button type="button" size="sm" variant="secondary" onClick={handlePickImage} disabled={isUploading}>
               <Camera size={16} className="mr-1" /> Change
             </Button>
             <Button type="button" size="sm" variant="destructive" onClick={handleRemove} disabled={isUploading}>
@@ -129,7 +154,7 @@ export function CroppableImageUpload({
       ) : (
         <button
           type="button"
-          onClick={() => inputRef.current?.click()}
+          onClick={handlePickImage}
           disabled={isUploading}
           className={cn(
             'w-full rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 transition-colors',
