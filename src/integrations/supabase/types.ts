@@ -44,6 +44,56 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_review_log: {
+        Row: {
+          confidence: number
+          created_at: string
+          decision: string
+          id: string
+          input_snapshot: Json | null
+          model_used: string | null
+          reason: string | null
+          rule_hits: Json | null
+          society_id: string | null
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          decision: string
+          id?: string
+          input_snapshot?: Json | null
+          model_used?: string | null
+          reason?: string | null
+          rule_hits?: Json | null
+          society_id?: string | null
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          decision?: string
+          id?: string
+          input_snapshot?: Json | null
+          model_used?: string | null
+          reason?: string | null
+          rule_hits?: Json | null
+          society_id?: string | null
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_review_log_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attribute_block_library: {
         Row: {
           block_type: string

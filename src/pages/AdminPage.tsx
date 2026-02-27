@@ -12,12 +12,13 @@ import { PaymentStatus } from '@/types/database';
 import {
   Check, X, Users, Store, Package, Star, Award, Eye, EyeOff,
   DollarSign, Flag, Building2, TrendingUp, ShieldCheck, CreditCard,
-  Layers, Settings2, LayoutGrid, AlertCircle, Megaphone, Navigation,
+  Layers, Settings2, LayoutGrid, AlertCircle, Megaphone, Navigation, Bot,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { ApiKeySettings } from '@/components/admin/ApiKeySettings';
 import { AppNavigator } from '@/components/admin/AppNavigator';
+import { AdminAIReviewLog } from '@/components/admin/AdminAIReviewLog';
 import { SellerApplicationReview } from '@/components/admin/SellerApplicationReview';
 import { AdminProductApprovals } from '@/components/admin/AdminProductApprovals';
 import { AdminDisputesTab } from '@/components/admin/AdminDisputesTab';
@@ -87,6 +88,7 @@ const TAB_CONFIG = [
   { value: 'featured', label: 'Featured', icon: Megaphone },
   { value: 'features', label: 'Features', icon: Layers },
   { value: 'settings', label: 'Settings', icon: Settings2 },
+  { value: 'ai-review', label: 'AI Review', icon: Bot },
   { value: 'navigator', label: 'Navigate', icon: Navigation },
 ];
 
@@ -464,6 +466,11 @@ export default function AdminPage() {
               <ApiKeySettings />
               <PurgeDataButton />
               <ResetAndSeedButton />
+            </TabsContent>
+
+            {/* ── AI REVIEW ── */}
+            <TabsContent value="ai-review" className="mt-5">
+              <AdminAIReviewLog />
             </TabsContent>
 
             {/* ── NAVIGATOR ── */}
