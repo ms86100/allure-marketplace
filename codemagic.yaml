@@ -123,6 +123,54 @@ workflows:
           cp ios-config/GoogleService-Info.plist ios/App/App/GoogleService-Info.plist
           echo "GoogleService-Info.plist copied to iOS project"
 
+      - name: Inject Firebase pods into Podfile
+        script: |
+          cd ios/App
+          if ! grep -q "FirebaseMessaging" Podfile; then
+            sed -i '' "/target 'App' do/a\\
+            pod 'FirebaseMessaging'
+          " Podfile
+            echo "✅ Added FirebaseMessaging pod to Podfile"
+          else
+            echo "ℹ️ FirebaseMessaging already in Podfile — skipping"
+          fi
+          pod install
+
+      - name: Inject FirebaseApp.configure() into AppDelegate
+        script: |
+          APPDELEGATE="ios/App/App/AppDelegate.swift"
+          if ! grep -q "import Firebase" "$APPDELEGATE"; then
+            sed -i '' '1s/^/import Firebase\n/' "$APPDELEGATE"
+            echo "✅ Added 'import Firebase' to AppDelegate"
+          fi
+          if ! grep -q "FirebaseApp.configure" "$APPDELEGATE"; then
+            sed -i '' '/func application.*didFinishLaunchingWithOptions/,/{/ {
+              /^.*{$/a\
+                  FirebaseApp.configure()
+            }' "$APPDELEGATE"
+            echo "✅ Added FirebaseApp.configure() to AppDelegate"
+          else
+            echo "ℹ️ FirebaseApp.configure() already present — skipping"
+          fi
+
+      - name: Add GoogleService-Info.plist to Xcode build target
+        script: |
+          cd ios/App
+          if ! grep -q "GoogleService-Info.plist" App.xcodeproj/project.pbxproj; then
+            ruby -e "
+              require 'xcodeproj'
+              project = Xcodeproj::Project.open('App.xcodeproj')
+              target = project.targets.first
+              group = project.main_group.find_subpath('App', true)
+              ref = group.new_file('../App/GoogleService-Info.plist')
+              target.resources_build_phase.add_file_reference(ref)
+              project.save
+            "
+            echo "✅ Added GoogleService-Info.plist to Xcode build target"
+          else
+            echo "ℹ️ GoogleService-Info.plist already in Xcode project — skipping"
+          fi
+
       - name: Update iOS project settings
         script: |
           cd ios/App
@@ -377,7 +425,55 @@ workflows:
         script: |
           cp ios-config/GoogleService-Info.plist ios/App/App/GoogleService-Info.plist
           echo "GoogleService-Info.plist copied to iOS project"
-          
+
+      - name: Inject Firebase pods into Podfile
+        script: |
+          cd ios/App
+          if ! grep -q "FirebaseMessaging" Podfile; then
+            sed -i '' "/target 'App' do/a\\
+            pod 'FirebaseMessaging'
+          " Podfile
+            echo "✅ Added FirebaseMessaging pod to Podfile"
+          else
+            echo "ℹ️ FirebaseMessaging already in Podfile — skipping"
+          fi
+          pod install
+
+      - name: Inject FirebaseApp.configure() into AppDelegate
+        script: |
+          APPDELEGATE="ios/App/App/AppDelegate.swift"
+          if ! grep -q "import Firebase" "$APPDELEGATE"; then
+            sed -i '' '1s/^/import Firebase\n/' "$APPDELEGATE"
+            echo "✅ Added 'import Firebase' to AppDelegate"
+          fi
+          if ! grep -q "FirebaseApp.configure" "$APPDELEGATE"; then
+            sed -i '' '/func application.*didFinishLaunchingWithOptions/,/{/ {
+              /^.*{$/a\
+                  FirebaseApp.configure()
+            }' "$APPDELEGATE"
+            echo "✅ Added FirebaseApp.configure() to AppDelegate"
+          else
+            echo "ℹ️ FirebaseApp.configure() already present — skipping"
+          fi
+
+      - name: Add GoogleService-Info.plist to Xcode build target
+        script: |
+          cd ios/App
+          if ! grep -q "GoogleService-Info.plist" App.xcodeproj/project.pbxproj; then
+            ruby -e "
+              require 'xcodeproj'
+              project = Xcodeproj::Project.open('App.xcodeproj')
+              target = project.targets.first
+              group = project.main_group.find_subpath('App', true)
+              ref = group.new_file('../App/GoogleService-Info.plist')
+              target.resources_build_phase.add_file_reference(ref)
+              project.save
+            "
+            echo "✅ Added GoogleService-Info.plist to Xcode build target"
+          else
+            echo "ℹ️ GoogleService-Info.plist already in Xcode project — skipping"
+          fi
+
       - name: Update iOS project settings
         script: |
           cd ios/App
