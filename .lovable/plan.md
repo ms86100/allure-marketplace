@@ -1,99 +1,89 @@
 
 
-# Root Cause: "Failed to update order" on Accept
+# Problem: Raw APNs Tokens Instead of FCM Tokens
 
-## The Bug
+The Codemagic pipeline copies `GoogleService-Info.plist` into the iOS directory, but **never installs the Firebase SDK**. Without `FirebaseMessaging` in the Podfile and `FirebaseApp.configure()` in `AppDelegate.swift`, Capacitor's `PushNotifications.register()` returns raw APNs hex tokens (e.g., `891FFF772D...`) instead of FCM registration tokens (e.g., `dXXXXX:APA91b...`).
 
-The `validate_order_status_transition` trigger references `p.transaction_type` from the `products` table. **That column does not exist on `products` — it exists on `category_config`.**
+The edge function sends via FCM HTTP v1 API, which requires FCM tokens. That is why FCM rejects with `INVALID_ARGUMENT` — the token format is wrong.
 
-Every single order status update (accept, prepare, ready, etc.) hits this trigger, the SQL query fails with `column p.transaction_type does not exist`, and the entire UPDATE is rejected. The frontend catches this as "Failed to update order."
+**This is NOT currently implemented.** The pipeline only copies the plist file but never integrates Firebase into the native build.
 
-This is not conditional. It fails for ALL orders — self-delivery, buyer pickup, delivery partner, doesn't matter. The trigger crashes before it even gets to sort order or actor validation.
+## Changes Required
 
-## The Fix
+### 1. Update `codemagic.yaml` — add Firebase SDK injection steps
 
-**One line change in the trigger:** replace `p.transaction_type` with `cc.transaction_type`.
+In both the `ios-release` and `release-all` workflows, add two new script steps **after** "Copy Firebase config" and **before** "Update iOS project settings":
 
-Migration SQL:
-```sql
-CREATE OR REPLACE FUNCTION public.validate_order_status_transition()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  _category text;
-  _txn_type text;
-  _parent_group text;
-  _current_sort int;
-  _new_sort int;
-  _new_actor text;
-BEGIN
-  IF NEW.status = 'cancelled' THEN RETURN NEW; END IF;
-  IF OLD.status IS NOT DISTINCT FROM NEW.status THEN RETURN NEW; END IF;
-
-  SELECT p.category, cc.transaction_type, cc.parent_group
-    INTO _category, _txn_type, _parent_group
-    FROM public.products p
-    JOIN public.category_config cc ON cc.category = p.category
-    JOIN public.order_items oi ON oi.product_id = p.id
-    WHERE oi.order_id = NEW.id
-    LIMIT 1;
-
-  SELECT sort_order INTO _current_sort
-    FROM public.category_status_flows
-    WHERE parent_group = _parent_group
-      AND transaction_type = _txn_type
-      AND status_key = OLD.status;
-
-  SELECT sort_order, actor INTO _new_sort, _new_actor
-    FROM public.category_status_flows
-    WHERE parent_group = _parent_group
-      AND transaction_type = _txn_type
-      AND status_key = NEW.status;
-
-  IF _current_sort IS NULL OR _new_sort IS NULL THEN
-    RETURN NEW;
-  END IF;
-
-  IF _new_sort != _current_sort + 1 THEN
-    RAISE EXCEPTION 'Invalid status transition from % to % (sort % -> %)',
-      OLD.status, NEW.status, _current_sort, _new_sort;
-  END IF;
-
-  IF _new_actor IN ('delivery', 'system') THEN
-    IF coalesce(current_setting('app.delivery_sync', true), '') != 'true'
-       AND current_setting('role', true) != 'service_role' THEN
-      RAISE EXCEPTION 'Status "%" can only be set by the delivery system, not directly', NEW.status;
-    END IF;
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
+**Step A: Inject Firebase pods into Podfile**
+```bash
+cd ios/App
+# Add Firebase pods if not already present
+if ! grep -q "FirebaseMessaging" Podfile; then
+  sed -i '' "/target 'App' do/a\\
+  pod 'FirebaseMessaging'
+" Podfile
+  echo "✅ Added FirebaseMessaging pod to Podfile"
+fi
+pod install
 ```
 
-## Interim Behavior After Fix (No Delivery Partner)
-
-Once fixed, the food flow is: `placed(1) → accepted(2) → preparing(3) → ready(4) → picked_up(5) → on_the_way(6) → delivered(7) → completed(8)`.
-
-- **Seller accepting:** `placed→accepted` (sort 1→2, actor=seller) — **will work**.
-- **Seller advancing to preparing, ready:** sort 2→3→4, all actor=seller — **will work**.
-- **Seller advancing past ready:** `picked_up` has actor=`delivery`, so the UI's `getNextStatusForActor` returns `null` — seller sees no "next" button. The actor enforcement trigger also blocks direct API calls.
-
-For self-delivery/buyer-pickup without a delivery partner, the seller is currently **stuck at `ready`**. There is no path to `completed` because `picked_up`, `on_the_way`, `delivered`, `completed` are all delivery/system actors.
-
-**This is the second issue that needs resolution.** The flow seeded in `category_status_flows` assumes a delivery partner always exists. For self-delivery or buyer-pickup, the seller needs to be able to go `ready → completed` directly.
-
-### Proposed approach for the interim state
-
-Add a **self-fulfillment food flow** by adding rows to `category_status_flows` with a different transaction_type (e.g., `self_fulfillment`) that skips delivery steps:
-
-```
-placed(1, buyer) → accepted(2, seller) → preparing(3, seller) → ready(4, seller) → completed(5, seller)
+**Step B: Inject `FirebaseApp.configure()` into AppDelegate.swift**
+```bash
+APPDELEGATE="ios/App/App/AppDelegate.swift"
+# Add import Firebase at top
+if ! grep -q "import Firebase" "$APPDELEGATE"; then
+  sed -i '' '1s/^/import Firebase\n/' "$APPDELEGATE"
+  echo "✅ Added 'import Firebase' to AppDelegate"
+fi
+# Add FirebaseApp.configure() in didFinishLaunching
+if ! grep -q "FirebaseApp.configure" "$APPDELEGATE"; then
+  sed -i '' '/func application.*didFinishLaunchingWithOptions/,/{/ {
+    /^.*{$/a\
+        FirebaseApp.configure()
+  }' "$APPDELEGATE"
+  echo "✅ Added FirebaseApp.configure() to AppDelegate"
+fi
 ```
 
-Then the `useOrderDetail` hook resolves which transaction_type to use based on `fulfillment_type` on the order (self_pickup / seller_delivery → `self_fulfillment`; delivery_partner → `cart_purchase`).
+**Step C: Add GoogleService-Info.plist to Xcode build target**
 
-This keeps the existing delivery flow intact while unblocking sellers who don't use platform delivery.
+The file is copied but not added to the Xcode project's build resources. Add a script step:
+```bash
+cd ios/App
+# Add GoogleService-Info.plist to Xcode project resources if not already referenced
+if ! grep -q "GoogleService-Info.plist" App.xcodeproj/project.pbxproj; then
+  ruby -e "
+    require 'xcodeproj'
+    project = Xcodeproj::Project.open('App.xcodeproj')
+    target = project.targets.first
+    group = project.main_group.find_subpath('App', true)
+    ref = group.new_file('../App/GoogleService-Info.plist')
+    target.resources_build_phase.add_file_reference(ref)
+    project.save
+  "
+  echo "✅ Added GoogleService-Info.plist to Xcode build target"
+fi
+```
+
+### 2. Order of operations in the pipeline
+
+The final script order for the iOS section should be:
+1. Install dependencies
+2. Build web app
+3. Add iOS platform / cap sync
+4. Patch AppDelegate for push forwarding methods (existing)
+5. Add Privacy Manifest (existing)
+6. Copy Firebase config (existing)
+7. **NEW: Inject Firebase pods + pod install**
+8. **NEW: Inject FirebaseApp.configure() into AppDelegate**
+9. **NEW: Add GoogleService-Info.plist to Xcode target**
+10. Update iOS project settings (existing)
+11. Add iOS capabilities (existing)
+12. ... rest unchanged
+
+### What this fixes
+
+Once Firebase SDK is integrated, `PushNotifications.register()` will return proper FCM tokens. The edge function will then successfully deliver push notifications via FCM HTTP v1 API.
+
+No changes to the TypeScript code, edge functions, or database are needed. This is purely a native build configuration fix.
 
