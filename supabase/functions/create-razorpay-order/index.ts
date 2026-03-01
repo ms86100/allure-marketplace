@@ -96,9 +96,9 @@ serve(async (req) => {
       .single();
 
     if (orderError || !order) {
-      console.error('Order not found:', orderError);
+      console.error('Order not found or unauthorized:', orderError);
       return new Response(
-        JSON.stringify({ error: 'Order not found' }),
+        JSON.stringify({ error: 'Order not found or you are not authorized' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

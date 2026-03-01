@@ -138,6 +138,12 @@ export function useCartPage() {
   const handlePlaceOrderInner = async () => {
     if (!user || !profile || sellerGroups.length === 0) return;
 
+    // C6: Offline guard — prevent order placement when network is down
+    if (!navigator.onLine) {
+      toast.error("You're offline. Please check your connection and try again.");
+      return;
+    }
+
     // #6: Validate delivery address before allowing order placement
     if (fulfillmentType === 'delivery' && (!profile.block || !profile.flat_number)) {
       toast.error('Please update your profile with block and flat number before placing a delivery order.');

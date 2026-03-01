@@ -14,6 +14,10 @@ const corsHeaders = {
  * 3. Records execution results to test_results table
  */
 
+
+
+
+
 const RUN_ID = `seed_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 const PASSWORD = "SeedUser2026!";
 
@@ -315,6 +319,14 @@ function makeResult(module: string, test: string, outcome: string, details?: any
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // C4: Block in production unless explicitly allowed
+  if (!Deno.env.get("ALLOW_TEST_FUNCTIONS")) {
+    return new Response(
+      JSON.stringify({ error: "Test functions are disabled in this environment" }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;

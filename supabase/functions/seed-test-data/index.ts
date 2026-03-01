@@ -13,6 +13,14 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // C4: Block in production unless explicitly allowed
+    if (!Deno.env.get("ALLOW_TEST_FUNCTIONS")) {
+      return new Response(
+        JSON.stringify({ error: "Test functions are disabled in this environment" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Rate limit — 5 per hour (uses IP since this may not have auth)
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
     const { allowed } = await checkRateLimit(`seed:${clientIp}`, 5, 3600);

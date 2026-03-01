@@ -125,14 +125,28 @@ serve(async (req) => {
         );
       }
 
-      // Duplicate webhook guard: check if this razorpay_payment_id was already processed
-      const { data: existingPayment } = await supabase
+      // C5: Atomic duplicate guard — claim the payment record in a single UPDATE
+      // Only succeeds if razorpay_payment_id is still NULL (first webhook wins)
+      const { data: claimedRows, error: claimError } = await supabase
         .from('payment_records')
-        .select('id')
-        .eq('razorpay_payment_id', razorpayPaymentId)
-        .maybeSingle();
+        .update({
+          payment_status: 'paid',
+          transaction_reference: razorpayPaymentId,
+          razorpay_payment_id: razorpayPaymentId,
+        })
+        .eq('order_id', orderId)
+        .is('razorpay_payment_id', null)
+        .select('id');
 
-      if (existingPayment) {
+      if (claimError) {
+        console.error('Error claiming payment record:', claimError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to update payment record' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!claimedRows || claimedRows.length === 0) {
         console.log(`Duplicate webhook for payment ${razorpayPaymentId}, skipping`);
         return new Response(
           JSON.stringify({ already_processed: true }),
@@ -153,25 +167,8 @@ serve(async (req) => {
 
       if (orderError) {
         console.error('Error updating order:', orderError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to update order' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
       }
 
-      // Update payment record with razorpay_payment_id for dedup + event_id for replay protection
-      const { error: paymentError } = await supabase
-        .from('payment_records')
-        .update({
-          payment_status: 'paid',
-          transaction_reference: razorpayPaymentId,
-          razorpay_payment_id: razorpayPaymentId,
-        })
-        .eq('order_id', orderId);
-
-      if (paymentError) {
-        console.error('Error updating payment record:', paymentError);
-      }
 
       console.log(`Order ${orderId} marked as paid`);
     } else if (event === 'payment.failed') {

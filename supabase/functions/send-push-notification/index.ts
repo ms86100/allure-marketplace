@@ -180,6 +180,16 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // C3: Only allow service-role callers (internal edge functions)
+    const authHeader = req.headers.get("Authorization");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!authHeader || authHeader !== `Bearer ${serviceRoleKey}`) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized — service role required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const serviceAccountJson = Deno.env.get("FIREBASE_SERVICE_ACCOUNT");
     if (!serviceAccountJson) {
       throw new Error("FIREBASE_SERVICE_ACCOUNT not configured");

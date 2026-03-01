@@ -23,13 +23,30 @@ app.post("/", async (c) => {
 
     // Find orders that have passed their auto_cancel_at time and are still in 'placed' status
     const now = new Date().toISOString();
+    const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
-    const { data: expiredOrders, error: fetchError } = await supabase
+    // Query 1: Urgent orders past auto_cancel_at
+    const { data: urgentExpired, error: urgentErr } = await supabase
       .from("orders")
       .select("id, buyer_id, seller_id, total_amount")
       .eq("status", "placed")
       .not("auto_cancel_at", "is", null)
       .lt("auto_cancel_at", now);
+
+    // Query 2: Orphaned UPI/online orders — payment_status=pending, non-COD, older than 15 min
+    const { data: orphanedUpi, error: orphanErr } = await supabase
+      .from("orders")
+      .select("id, buyer_id, seller_id, total_amount")
+      .eq("status", "placed")
+      .eq("payment_status", "pending")
+      .neq("payment_method", "cod")
+      .lt("created_at", fifteenMinAgo);
+
+    const fetchError = urgentErr || orphanErr;
+    const expiredOrders = [
+      ...(urgentExpired || []),
+      ...(orphanedUpi || []),
+    ].filter((order, idx, arr) => arr.findIndex(o => o.id === order.id) === idx);
 
     if (fetchError) {
       console.error("Error fetching expired orders:", fetchError);
