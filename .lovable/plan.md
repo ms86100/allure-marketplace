@@ -1,129 +1,180 @@
 
 
-# Plan: Address Critical Gaps in Order Delivery System
+# Production Readiness Audit: Delivery Tracking & Order Status System
 
-## Gap Analysis Summary
-
-After reviewing the full codebase, here are the confirmed gaps:
-
-1. **GAP 1 (Status Sync):** CONFIRMED. No trigger or function syncs `delivery_assignments.status` changes back to `orders.status`. The two tables can drift. The `update-delivery-location` edge function updates `delivery_assignments` fields but never touches `orders.status`.
-
-2. **GAP 2 (Delivery Partner App):** The edge function `update-delivery-location` exists and accepts GPS data, but NO client code anywhere calls it. The existing rider dashboard needs a background location sender.
-
-3. **GAP 3 (Background Location):** `native-location.ts` only does one-shot `getCurrentPosition()`. No `watchPosition` or background tracking loop exists.
-
-4. **GAP 4 (ETA Accuracy):** Edge function uses raw Haversine × speed. No state-based overrides for edge cases (speed=0, high inaccuracy, GPS stale).
-
-5. **GAP 5 (Seller Abuse):** No timeout rules for seller delays or stalled riders. No auto-escalation.
+## 1. COMPONENT-BY-COMPONENT ASSESSMENT
 
 ---
 
-## Implementation Steps
+### A. Order & Delivery Status System
 
-### Step 1: Delivery → Order Status Sync Trigger (Database Migration)
+**Status transition enforcement (`validate_order_status_transition`):**
+Two versions exist in migrations. The newer one (20260301) replaces the older (20260222). The newer version uses `category_status_flows` and enforces `_new_sort = _current_sort + 1`. It correctly allows cancellation from any state.
 
-Create a trigger on `delivery_assignments` that auto-syncs status changes to `orders.status`:
+**Backwards compatibility escape hatch is too wide:** If `_current_sort` or `_new_sort` is NULL (status not in flow config), the trigger returns NEW — allowing the transition. This means any status NOT seeded in `category_status_flows` can be freely set, bypassing all validation.
 
-```sql
-CREATE OR REPLACE FUNCTION sync_delivery_to_order_status()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-  IF OLD.status IS NOT DISTINCT FROM NEW.status THEN RETURN NEW; END IF;
+**Sync trigger (`sync_delivery_to_order_status`):**
+- `picked_up`: updates orders where `status = 'ready'` → sort 4→5 ✅ passes validation
+- `at_gate`: updates orders where `status = 'picked_up'` → maps to `on_the_way`, sort 5→6 ✅
+- `delivered`: updates orders `WHERE id = NEW.order_id` — **NO status precondition filter**. If somehow order is at `ready` (sort 4) and delivery jumps to `delivered`, this tries sort 4→7 — **blocked by validation trigger** (4+1 ≠ 7). So it fails silently — order stays at `ready` while delivery says `delivered`. **This is a P0 data drift bug.**
 
-  -- Mapping: delivery_assignments.status → orders.status
-  CASE NEW.status
-    WHEN 'picked_up' THEN
-      UPDATE orders SET status = 'picked_up' WHERE id = NEW.order_id AND status = 'ready';
-    WHEN 'at_gate' THEN
-      UPDATE orders SET status = 'on_the_way' WHERE id = NEW.order_id AND status = 'picked_up';
-    WHEN 'delivered' THEN
-      UPDATE orders SET status = 'delivered' WHERE id = NEW.order_id;
-  END CASE;
-
-  RETURN NEW;
-END; $$;
-
-CREATE TRIGGER trg_sync_delivery_to_order
-  AFTER UPDATE ON delivery_assignments
-  FOR EACH ROW EXECUTE FUNCTION sync_delivery_to_order_status();
-```
-
-This establishes: delivery phase source of truth = `delivery_assignments.status`, which auto-propagates to `orders.status` via trigger. Seller never touches delivery statuses (enforced by `validate_order_status_transition`).
-
-**Note:** The `validate_order_status_transition` trigger runs as `SECURITY DEFINER` so the sync trigger's UPDATE on orders will pass through it. The category_status_flows already define `picked_up` and `on_the_way` as `actor = 'delivery'`, so the transition validation allows it since it only checks sort_order sequence, not actor. This is correct — actor filtering happens at the UI/API level, not the DB trigger level.
-
-### Step 2: Background Location Tracking for Rider App
-
-Create `src/hooks/useBackgroundLocationTracking.ts`:
-- Uses `Capacitor.isNativePlatform()` check
-- On native: uses `@capacitor/geolocation` `watchPosition` with `enableHighAccuracy: true`
-- On web: uses `navigator.geolocation.watchPosition` as fallback
-- Sends location to `update-delivery-location` edge function every 10 seconds (throttled)
-- Handles permission denied gracefully with toast
-- Returns `{ isTracking, startTracking, stopTracking, permissionDenied }`
-
-Integrate into the rider delivery screen (wherever rider manages active delivery) — start tracking when assignment status is `picked_up`, stop on `delivered`/`failed`.
-
-### Step 3: ETA State-Based Overrides in Edge Function
-
-Update `supabase/functions/update-delivery-location/index.ts`:
-- If `speed_kmh < 2` and `distance < 200m` → ETA = 1 (arriving)
-- If `speed_kmh < 2` and `distance > 200m` → use default 15km/h speed, don't spike ETA
-- If `accuracy_meters > 100` → skip ETA update, keep previous value
-- Add proximity state labels in response: `proximity: 'at_doorstep' | 'arriving' | 'nearby' | 'en_route'`
-- Add `stale` flag: if last update was >3 min ago, mark in `delivery_assignments`
-
-### Step 4: Seller/Rider Timeout & Escalation Rules (Database + Edge Function)
-
-**Database migration:**
-- Add `ready_at timestamptz` column to `orders` (set via trigger when status becomes `ready`)
-- Add `stalled_notified boolean DEFAULT false` to `delivery_assignments`
-
-**Modify `update-delivery-location` edge function:**
-- If no location update received for 3+ minutes during active delivery and `stalled_notified = false`: insert notification to buyer ("Delivery partner may be delayed"), set `stalled_notified = true`
-
-**New pg_cron job or edge function (called periodically):**
-- Check orders stuck at `ready` for >15 min with no delivery assignment → notify admin
-- Check `delivery_assignments` in `assigned` status for >10 min with no `picked_up` → notify seller + admin
-
-### Step 5: Google Maps Failure Handling
-
-Update `LiveDeliveryTracker.tsx`:
-- Wrap Google Maps in error boundary
-- If Maps API fails to load or key is missing → show text-only fallback (distance + ETA + rider info, no map)
-- Map is enhancement, not requirement — all tracking data already displays without it
-- The current `LiveDeliveryTracker` already works as text-only (no map is rendered yet), so this is already handled
-
-### Step 6: Status Vocabulary Normalization
-
-No DB changes needed. The system correctly separates:
-- **System statuses** (`delivery_assignments.status`): `picked_up`, `at_gate`, `delivered`
-- **Order statuses** (`orders.status`): `picked_up`, `on_the_way`, `delivered`
-- **UI labels**: Already mapped via `order_status_config` table and `DELIVERY_STATUS_CONFIG` in `DeliveryStatusCard.tsx`
-
-Document the mapping in code comments. `at_gate` (delivery) → `on_the_way` (order) → UI shows "At Your Gate" via delivery card.
+**Seller constraint enforcement:**
+- `getNextStatusForActor` correctly returns `null` when next step's actor ≠ 'seller'
+- For food flow, after `ready` (sort 4, actor=seller), next is `picked_up` (actor=delivery) → seller sees no next button ✅
+- DB trigger does NOT check actor — it only checks sort order sequence. A seller could theoretically call `supabase.from('orders').update({status:'picked_up'})` directly and it would pass (sort 4→5, +1 valid). **Actor enforcement is UI-only, not DB-enforced.**
 
 ---
 
-## Files to Create/Modify
+### B. GPS Location Tracking
 
-| Action | File |
-|--------|------|
-| Create | Migration: `sync_delivery_to_order_status` trigger + `ready_at` / `stalled_notified` columns |
-| Create | `src/hooks/useBackgroundLocationTracking.ts` |
-| Modify | `supabase/functions/update-delivery-location/index.ts` — ETA overrides, stale detection |
-| Modify | `src/components/delivery/LiveDeliveryTracker.tsx` — Maps error boundary |
-| Modify | Rider delivery screen — integrate background tracking hook |
+**`update-delivery-location` edge function:**
+- Uses `SUPABASE_SERVICE_ROLE_KEY` — bypasses RLS ✅ for inserts
+- **NO AUTHENTICATION CHECK.** `verify_jwt = false` in config.toml AND no `getClaims()` or auth header validation in code. **Anyone with the function URL and a valid assignment_id can inject fake GPS coordinates.** This is a **P0 security vulnerability.**
+- No rate limiting beyond the client-side 10s throttle
+- No validation that the caller is the assigned delivery partner
 
-## Answers to Your Specific Questions
+**`delivery_locations` table:**
+- RLS enabled, SELECT restricted to buyer/seller of the order ✅
+- No INSERT policy for authenticated users — relies on edge function (service role) ✅
+- Realtime enabled ✅
 
-1. **Source of truth:** `orders.status` pre-delivery and post-delivery. `delivery_assignments.status` during delivery, auto-synced to `orders.status` via DB trigger.
+**`useBackgroundLocationTracking` hook:**
+- Throttles to 10s ✅
+- Handles permission denied gracefully ✅
+- Converts m/s → km/h correctly ✅
+- Auto-starts on `picked_up`, auto-stops on `delivered`/`failed`/`cancelled` ✅
+- Cleanup on unmount ✅
 
-2. **Which app sends GPS:** The rider/delivery partner uses the same app (it's a web app with Capacitor). The rider dashboard will call the `update-delivery-location` edge function using `watchPosition`.
+---
 
-3. **Background location:** Capacitor `@capacitor/geolocation` `watchPosition` on native. On web, standard `watchPosition`. If permission denied → tracking degrades to manual status updates only.
+### C. Buyer Live Tracking Experience
 
-4. **Abuse prevention:** Timeout rules at DB level. Orders stuck at `ready` >15 min → admin alert. Riders idle >10 min → admin alert. Stalled delivery (no GPS for 3 min) → buyer notification.
+**`LiveDeliveryTracker.tsx`:**
+- Text-only display (no Google Maps embed actually rendered) — this is acceptable for v1
+- Shows ETA badge, distance, proximity messages, rider info, phone link ✅
+- Last-seen staleness indicator when >3 min ✅
+- Graceful: no map = no crash ✅
+- **No error boundary wrapping** — a runtime error in this component could crash the order detail page
 
-5. **Maps API failure:** `LiveDeliveryTracker` already renders text-only (ETA, distance, rider info). Map embed is additive. Error boundary ensures graceful fallback.
+**`useDeliveryTracking` hook:**
+- Subscribes to Realtime on `delivery_assignments` for status/ETA/distance ✅
+- Subscribes to Realtime on `delivery_locations` for live GPS ✅
+- Initial fetch on mount ✅
+- Cleanup on unmount ✅
+- **Queries `rider_name`, `rider_phone`, `rider_photo_url`** — these columns may not exist on `delivery_assignments`. The existing schema has `partner_id` referencing a user, not denormalized name/phone fields. This will return null silently (no crash) but rider info will never display.
+
+---
+
+### D. Notifications & Buyer Awareness
+
+**Status-driven notifications (`enqueue_order_status_notification`):**
+- Triggers on `orders` UPDATE/INSERT ✅
+- The newer version (20260301) adds templates for `on_the_way`, `arrived`, `assigned` ✅
+
+**Proximity notifications (edge function):**
+- Idempotency check: queries `notification_queue` for existing `delivery_proximity` notification before inserting ✅
+- Stale detection: checks `last_location_at` gap >3 min, marks `stalled_notified = true` to avoid spam ✅
+- Calls `process-notification-queue` fire-and-forget ✅
+
+**Gap:** The `enqueue_order_status_notification` fires on `orders.status` changes. When the sync trigger updates `orders.status` to `picked_up` or `on_the_way`, this will correctly fire notifications. But if the sync trigger's `delivered` case fails silently (P0 bug above), the buyer never gets a "delivered" notification from the order status trigger.
+
+---
+
+### E. Scheduling & Automation
+
+**pg_cron:**
+- No cron job exists for stall detection or timeout escalation. The `ready_at` column was added but no scheduled function checks for stuck orders.
+- Stale detection only runs passively — when a new GPS update arrives, it checks the gap. If GPS stops entirely, no detection occurs.
+
+---
+
+## 2. PRODUCTION READINESS EVALUATION
+
+| Category | Verdict | Reasoning |
+|----------|---------|-----------|
+| **A. Safety & Abuse Prevention** | **PARTIALLY** | Seller cannot advance past `ready` in UI, but DB trigger does not enforce actor — a direct API call can bypass. Edge function has zero auth — anyone can inject fake GPS. |
+| **B. Data Integrity & Consistency** | **PARTIALLY** | The `delivered` sync case has no status precondition, causing silent failure and drift between `delivery_assignments` and `orders`. Backwards-compat NULL escape allows uncontrolled transitions for unmapped statuses. |
+| **C. Real-Time Reliability** | **YES** | Realtime subscriptions are correctly set up. UI degrades to text-only gracefully. Last-seen indicator handles stale data. |
+| **D. Notification Correctness** | **PARTIALLY** | Proximity notifications are idempotent. But if `delivered` sync fails silently, buyer misses the delivered notification. |
+| **E. Scale & Load Risk** | **YES** | 10s throttle bounds updates per delivery. No unbounded loops. Realtime channels are scoped per assignment. |
+
+---
+
+## 3. GAP IDENTIFICATION
+
+### P0 — Production Blockers
+
+**GAP 1: Edge function has zero authentication**
+- Component: `supabase/functions/update-delivery-location/index.ts`
+- The function accepts any request with a valid `assignment_id`. No JWT validation, no caller identity check. Anyone can spoof rider location, manipulate ETA, and trigger fake proximity notifications to buyers.
+- Impact: Complete trust violation. Fake "at doorstep" notifications. GPS data integrity destroyed.
+
+**GAP 2: `delivered` sync trigger missing status precondition**
+- Component: `sync_delivery_to_order_status` trigger, line 13-14
+- The `delivered` case does `UPDATE orders SET status = 'delivered' WHERE id = NEW.order_id` without checking current order status. If order is not at `on_the_way` (e.g., still at `ready` because `picked_up`/`on_the_way` syncs failed), the validation trigger blocks it silently. Order stays stuck while delivery shows `delivered`.
+- Impact: Buyer never sees delivery complete. Order stuck permanently. No error surfaced.
+
+### P1 — Serious Issues
+
+**GAP 3: Actor not enforced at DB level**
+- Component: `validate_order_status_transition` trigger
+- The trigger validates sort_order sequence but not actor. A seller making a direct Supabase client call (bypassing the UI) can advance to `picked_up` or `delivered` as long as it's the next sort_order step.
+- Impact: Seller abuse possible via direct API. Mitigated by UI constraints but not secure.
+
+**GAP 4: `rider_name`/`rider_phone`/`rider_photo_url` columns may not exist**
+- Component: `useDeliveryTracking.ts` initial fetch query
+- The hook queries these columns from `delivery_assignments`. If they don't exist in the schema, the query won't fail but returns null — rider info section in `LiveDeliveryTracker` will always be empty.
+- Impact: Buyer never sees who is delivering. Reduced trust.
+
+### P2 — Operational Gaps
+
+**GAP 5: No active stall detection when GPS stops entirely**
+- Component: Missing cron job
+- Stale detection only triggers when a NEW GPS update arrives and checks the previous gap. If GPS stops completely, no mechanism detects or alerts.
+- Impact: Delivery can silently stall with no buyer notification.
+
+---
+
+## 4. MINIMAL CORRECTIVE ACTIONS
+
+### Fix 1 (P0): Add authentication to edge function
+- **What must change:** Add `getClaims()` check at the top of `update-delivery-location/index.ts`. Validate that `data.claims.sub` matches `assignment.partner_id`.
+- **What must NOT change:** The ETA calculation, proximity logic, notification logic — all stay as-is.
+- **Why unavoidable:** Without this, any anonymous user can inject fake GPS data and trigger notifications to buyers.
+
+### Fix 2 (P0): Add status precondition to `delivered` sync case
+- **What must change:** In `sync_delivery_to_order_status`, change line 13-14 from:
+  `UPDATE orders SET status = 'delivered' WHERE id = NEW.order_id;`
+  to:
+  `UPDATE orders SET status = 'delivered' WHERE id = NEW.order_id AND status = 'on_the_way';`
+- **What must NOT change:** The trigger structure, the other cases — all stay as-is.
+- **Why unavoidable:** Without this, delivered status can silently fail to sync, leaving orders permanently stuck.
+
+### Fix 3 (P1): Add actor check to DB validation trigger
+- **What must change:** In `validate_order_status_transition`, after the sort_order check, add: if `_new_actor` in (`delivery`, `system`) and the caller is not service_role, raise exception.
+- **What must NOT change:** Sort order validation, cancellation bypass, backwards-compat — all stay as-is.
+- **Why:** Prevents seller from bypassing UI constraints via direct API calls.
+
+---
+
+## 5. FINAL VERDICT
+
+**❌ Not safe for production** — due to two P0 gaps:
+
+1. The edge function accepting unauthenticated GPS injections is a critical security hole that would allow any user to fake delivery locations and trigger misleading notifications.
+2. The `delivered` sync trigger can silently fail, leaving orders permanently stuck in an intermediate state with no error surfaced to any party.
+
+**Conditions to reach ⚠️ Conditionally Ready:**
+- Fix 1 and Fix 2 applied (minimal, targeted changes)
+- Manual verification that `rider_name`/`rider_phone` columns exist (or accept empty rider info at launch)
+
+**Known limitations accepted at launch (post-fixes):**
+- No Google Maps visual — text-only tracking (acceptable for v1)
+- No active stall detection cron — only passive detection on next GPS update
+- Actor enforcement is UI-level only (P1 risk accepted if direct API abuse is unlikely in gated community context)
+- No timeout escalation for stuck-at-ready orders (operational, not safety-critical)
+
+**Residual risk ownership:**
+- Platform ops team must monitor `delivery_assignments` vs `orders` status alignment manually until active cron monitoring is added
+- GPS accuracy issues handled gracefully (skip ETA when >100m accuracy) — acceptable
 
