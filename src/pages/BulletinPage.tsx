@@ -109,19 +109,20 @@ export default function BulletinPage() {
     fetchHelpRequests();
   }, [fetchPosts, fetchMostDiscussed, fetchUserVotes, fetchHelpRequests]);
 
-  // Realtime
+  // Realtime — BULLETIN-01 FIX: filter by society_id to avoid cross-society triggers
   useEffect(() => {
+    if (!effectiveSocietyId) return;
     const channel = supabase
-      .channel('bulletin-feed')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bulletin_posts' }, () => {
+      .channel(`bulletin-feed-${effectiveSocietyId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bulletin_posts', filter: `society_id=eq.${effectiveSocietyId}` }, () => {
         fetchPosts(); fetchMostDiscussed();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bulletin_comments' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bulletin_comments' }, () => {
         fetchPosts(); fetchMostDiscussed();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [fetchPosts, fetchMostDiscussed]);
+  }, [effectiveSocietyId, fetchPosts, fetchMostDiscussed]);
 
   const handleUpvote = async (postId: string) => {
     if (!user) return;

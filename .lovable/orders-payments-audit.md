@@ -240,3 +240,29 @@
 - **Problem**: `location.key` dependency causes both buyer and seller order lists to re-fetch on tab switch
 - **Impact**: Extra API calls; no data corruption
 - **Status**: Documented — requires UX decision on caching strategy
+
+---
+
+## QA Round 5 — Community + Admin + Notifications
+
+### BULLETIN-01 — Realtime channel not filtered by society_id ✅ FIXED
+- **Severity**: P1
+- **Problem**: `BulletinPage.tsx` realtime subscription listened to ALL bulletin_posts changes across all societies
+- **Impact**: Unnecessary API calls for every user on every post in any society; potential cross-society data leak if RLS misconfigured
+- **Fix**: Added `filter: society_id=eq.${effectiveSocietyId}` to the realtime channel; also scoped channel name per society
+
+### BULLETIN-02 — Stale comment_count after adding comment ✅ FIXED
+- **Severity**: P2
+- **Problem**: `PostDetailSheet.tsx` showed stale "Comments (X)" header after adding a comment
+- **Fix**: Mutate `post.comment_count` locally after successful comment insert
+
+### BULLETIN-03 — Help request self-response not server-guarded (DOCUMENTED)
+- **Severity**: P3
+- **Problem**: No server-side check preventing author from responding to own help request
+- **Impact**: UI prevents it; low risk
+- **Status**: Documented — would need RLS policy or trigger
+
+### NOTIFY-01 — Notification inbox pagination (NOT_REPRODUCIBLE)
+- **Severity**: P2 (downgraded)
+- **Problem**: Initially appeared to load all notifications, but `useNotifications` already has `.limit(50)`
+- **Status**: Mitigated — 50 most recent shown; older ones not shown but no crash or data loss
