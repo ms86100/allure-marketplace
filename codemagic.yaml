@@ -25,11 +25,16 @@ workflows:
         CAPACITOR_ENV: "production"
       node: 22
       xcode: latest
-      cocoapods: default
+      cocoapods: 1.16.2
 
     scripts:
       - name: Install dependencies
         script: npm install --legacy-peer-deps
+
+      - name: Pin CocoaPods for linker stability
+        script: |
+          gem install cocoapods -v 1.16.2 --no-document
+          pod --version
 
       - name: Build web app
         script: npm run build
@@ -289,12 +294,17 @@ workflows:
         CAPACITOR_ENV: "production"
       node: 22
       xcode: latest
-      cocoapods: default
+      cocoapods: 1.16.2
       java: 17
 
     scripts:
       - name: Install dependencies
         script: npm install --legacy-peer-deps
+
+      - name: Pin CocoaPods for linker stability
+        script: |
+          gem install cocoapods -v 1.16.2 --no-document
+          pod --version
 
       - name: Build web app
         script: npm run build
