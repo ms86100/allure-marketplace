@@ -271,6 +271,20 @@ workflows:
           echo "Setting build number to $BUILD_NUMBER"
           agvtool new-version -all $BUILD_NUMBER
 
+      - name: Verify push entitlement exists
+        script: |
+          if ! grep -q "aps-environment" ios/App/App/App.entitlements; then
+            echo "ERROR: Push Notifications entitlement missing from App.entitlements"
+            exit 1
+          fi
+
+      - name: Verify AppDelegate push registration
+        script: |
+          if ! grep -q "didRegisterForRemoteNotificationsWithDeviceToken" ios/App/App/AppDelegate.swift; then
+            echo "ERROR: AppDelegate missing APNs token forwarding"
+            exit 1
+          fi
+
       - name: Build iOS app
         script: |
           cd ios/App
@@ -278,6 +292,18 @@ workflows:
             --workspace "App.xcworkspace" \
             --scheme "App" \
             --config "Release"
+
+      - name: Validate IPA push entitlement
+        script: |
+          cd ios/App/build/ios/ipa
+          IPA=$(ls *.ipa | head -n 1)
+          mkdir -p /tmp/ipa-check && cd /tmp/ipa-check
+          unzip -qo "$(find /Users -path '*/build/ios/ipa/*.ipa' | head -1)" 2>/dev/null || true
+          if ! grep -r "aps-environment" Payload/ 2>/dev/null; then
+            echo "ERROR: Final IPA missing aps-environment entitlement"
+            exit 1
+          fi
+          echo "=== IPA push entitlement verified ==="
 
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
@@ -581,6 +607,20 @@ workflows:
           echo "Setting build number to $BUILD_NUMBER"
           agvtool new-version -all $BUILD_NUMBER
 
+      - name: Verify push entitlement exists (release-all)
+        script: |
+          if ! grep -q "aps-environment" ios/App/App/App.entitlements; then
+            echo "ERROR: Push Notifications entitlement missing from App.entitlements"
+            exit 1
+          fi
+
+      - name: Verify AppDelegate push registration (release-all)
+        script: |
+          if ! grep -q "didRegisterForRemoteNotificationsWithDeviceToken" ios/App/App/AppDelegate.swift; then
+            echo "ERROR: AppDelegate missing APNs token forwarding"
+            exit 1
+          fi
+
       - name: Build iOS IPA
         script: |
           cd ios/App
@@ -588,6 +628,17 @@ workflows:
             --workspace "App.xcworkspace" \
             --scheme "App" \
             --config "Release"
+
+      - name: Validate IPA push entitlement (release-all)
+        script: |
+          cd /tmp && mkdir -p ipa-check-all && cd ipa-check-all
+          IPA=$(find /Users -path '*/build/ios/ipa/*.ipa' | head -1)
+          unzip -qo "$IPA" 2>/dev/null || true
+          if ! grep -r "aps-environment" Payload/ 2>/dev/null; then
+            echo "ERROR: Final IPA missing aps-environment entitlement"
+            exit 1
+          fi
+          echo "=== IPA push entitlement verified ==="
 
       - name: Add Android platform
         script: |

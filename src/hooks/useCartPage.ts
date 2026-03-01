@@ -140,6 +140,16 @@ export function useCartPage() {
   const handlePlaceOrderInner = async () => {
     if (!user || !profile || sellerGroups.length === 0) return;
 
+    // Block self-orders — prevent buying from your own store
+    const selfSellerGroup = sellerGroups.find(g => {
+      const sellerUserId = (g.items[0]?.product?.seller as any)?.user_id;
+      return sellerUserId && sellerUserId === user.id;
+    });
+    if (selfSellerGroup) {
+      toast.error("You cannot place an order from your own store.");
+      return;
+    }
+
     // C6: Offline guard — prevent order placement when network is down
     if (!navigator.onLine) {
       toast.error("You're offline. Please check your connection and try again.");

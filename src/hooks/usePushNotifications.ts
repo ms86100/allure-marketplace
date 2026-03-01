@@ -508,18 +508,13 @@ export function usePushNotifications() {
         const stage = await getPushStage();
         console.log(`[Push] Push stage: ${stage}`);
 
-        if (stage === 'none') {
-          // First login — mark as deferred, don't prompt
-          await setPushStage('deferred');
-          console.log('[Push] First login — deferred push prompt until first order');
-          return;
+        if (stage !== 'full') {
+          // First launch or deferred — upgrade to full and prompt immediately
+          await setPushStage('full');
+          console.log('[Push] Upgrading to full stage — requesting permission now');
         }
 
-        if (stage === 'full') {
-          // User has been through the full prompt flow before — register normally
-          attemptRegistration();
-        }
-        // 'deferred' — do nothing, wait for explicit trigger (first order)
+        attemptRegistration();
       }, 500);
     }
 
