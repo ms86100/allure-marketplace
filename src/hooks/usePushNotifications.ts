@@ -6,6 +6,7 @@ import { IdentityContext } from '@/contexts/auth/contexts';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { hapticNotification } from '@/lib/haptics';
+import { getPushStage, setPushStage } from '@/lib/pushPermissionStage';
 
 type RegistrationState = 'idle' | 'registering' | 'registered' | 'permission_denied' | 'failed';
 
@@ -496,10 +497,26 @@ export function usePushNotifications() {
       }
     })();
 
-    // Trigger registration if user is ready
+    // ── Provisional strategy: on first login, defer the prompt ──
+    // Only auto-attempt registration if we're already in 'full' stage.
+    // If stage is 'none' or 'deferred', just set up listeners (no permission prompt).
     if (user) {
-      setTimeout(() => {
-        attemptRegistration();
+      setTimeout(async () => {
+        const stage = await getPushStage();
+        console.log(`[Push] Push stage: ${stage}`);
+
+        if (stage === 'none') {
+          // First login — mark as deferred, don't prompt
+          await setPushStage('deferred');
+          console.log('[Push] First login — deferred push prompt until first order');
+          return;
+        }
+
+        if (stage === 'full') {
+          // User has been through the full prompt flow before — register normally
+          attemptRegistration();
+        }
+        // 'deferred' — do nothing, wait for explicit trigger (first order)
       }, 500);
     }
 
@@ -538,10 +555,23 @@ export function usePushNotifications() {
     })();
   }, [user]);
 
+  /**
+   * Explicitly request full notification permission (call on first order).
+   * Upgrades stage from 'deferred' → 'full' and triggers the OS prompt.
+   */
+  const requestFullPermission = useCallback(async () => {
+    console.log('[Push] requestFullPermission called — upgrading to full stage');
+    await setPushStage('full');
+    registrationStateRef.current = 'idle';
+    retryCountRef.current = 0;
+    await attemptRegistration();
+  }, [attemptRegistration]);
+
   return {
     token,
     permissionStatus,
     registerPushNotifications: attemptRegistration,
+    requestFullPermission,
     removeTokenFromDatabase,
   };
 }

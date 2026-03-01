@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Capacitor } from '@capacitor/core';
+import { setPushStage } from '@/lib/pushPermissionStage';
 
 interface NotificationPreferences {
   orders: boolean;
@@ -192,6 +193,7 @@ export default function NotificationsPage() {
 
                 if (result.receive === 'granted') {
                   await PushNotifications.register();
+                  await setPushStage('full');
                   toast.success('Notifications enabled. Your device is now registered.');
                 }
               } catch {
