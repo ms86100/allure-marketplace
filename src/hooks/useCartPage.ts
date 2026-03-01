@@ -10,10 +10,12 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { hapticImpact, hapticNotification, hapticSelection } from '@/lib/haptics';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 export function useCartPage() {
   const navigate = useNavigate();
   const { user, profile, society } = useAuth();
+  const { requestFullPermission } = usePushNotifications();
   const { items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, refresh, addItem, isLoading } = useCart();
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
@@ -221,9 +223,10 @@ export function useCartPage() {
     try {
       const orderIds = await createOrdersForAllSellers('pending');
       if (orderIds.length === 0) throw new Error('Failed to create orders');
-      // DEFECT 9 FIX: RPC already clears cart atomically, just refresh UI
       await refresh();
       hapticNotification('success');
+      // Trigger full push permission on first order (Zomato-style deferred prompt)
+      requestFullPermission().catch(() => {});
       // Trigger immediate push notification to seller (fire-and-forget)
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (orderIds.length === 1) {
