@@ -89,7 +89,11 @@ export function PostDetailSheet({ post, open, onOpenChange, onVote }: PostDetail
       toast({ title: 'Failed to comment', variant: 'destructive' });
     } else {
       setNewComment('');
-      fetchComments();
+      await fetchComments();
+      // BULLETIN-02 FIX: Update comment_count on the post so the header stays in sync
+      if (post) {
+        post.comment_count = (post.comment_count || 0) + 1;
+      }
     }
     setSending(false);
   };
