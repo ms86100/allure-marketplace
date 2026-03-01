@@ -53,8 +53,33 @@ serve(async (req) => {
   }
 
   try {
+    // GAP 1 FIX: Authenticate the caller
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // Verify JWT and extract user ID
+    const authClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const callerId = claimsData.claims.sub;
+
     const supabase = createClient(supabaseUrl, serviceKey);
 
     const { assignment_id, latitude, longitude, speed_kmh, heading, accuracy_meters } = await req.json();
@@ -83,6 +108,14 @@ serve(async (req) => {
     if (['delivered', 'failed', 'cancelled'].includes(assignment.status)) {
       return new Response(JSON.stringify({ error: 'Delivery is no longer active' }), {
         status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // GAP 1 FIX: Validate caller is the assigned delivery partner
+    if (assignment.partner_id && assignment.partner_id !== callerId) {
+      return new Response(JSON.stringify({ error: 'Forbidden: not assigned partner' }), {
+        status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
