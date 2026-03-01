@@ -39,43 +39,22 @@ workflows:
           npx cap add ios || true
           npx cap sync ios
 
-      - name: Install Firebase SDK via CocoaPods
+      - name: Add Firebase pods to Capacitor Podfile
         script: |
           cd ios/App
-          # Force CocoaPods package manager
-          cat > Podfile << 'PODFILE'
-          platform :ios, '14.0'
-          use_frameworks!
-
-          target 'App' do
-            # Capacitor pods
-            pod 'Capacitor', :path => '../../node_modules/@capacitor/core'
-            pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/core'
-            pod 'CapacitorApp', :path => '../../node_modules/@capacitor/app'
-            pod 'CapacitorCamera', :path => '../../node_modules/@capacitor/camera'
-            pod 'CapacitorGeolocation', :path => '../../node_modules/@capacitor/geolocation'
-            pod 'CapacitorHaptics', :path => '../../node_modules/@capacitor/haptics'
-            pod 'CapacitorKeyboard', :path => '../../node_modules/@capacitor/keyboard'
-            pod 'CapacitorPreferences', :path => '../../node_modules/@capacitor/preferences'
-            pod 'CapacitorPushNotifications', :path => '../../node_modules/@capacitor/push-notifications'
-            pod 'CapacitorSplashScreen', :path => '../../node_modules/@capacitor/splash-screen'
-            pod 'CapacitorStatusBar', :path => '../../node_modules/@capacitor/status-bar'
-            pod 'CapacitorFirebaseMessaging', :path => '../../node_modules/@capacitor-firebase/messaging'
-            pod 'CapacitorRateApp', :path => '../../node_modules/capacitor-rate-app'
-
-            # Firebase
-            pod 'FirebaseCore'
-            pod 'FirebaseMessaging'
+          # cap sync already generated a Podfile — inject Firebase pods into it
+          ruby - << 'RUBY'
+          podfile = File.read('Podfile')
+          unless podfile.include?('FirebaseCore')
+            # Insert Firebase pods right before the first 'end' that closes the target block
+            podfile.sub!(/^(\s*end\s*)$/m, "  pod 'FirebaseCore'\n  pod 'FirebaseMessaging'\n\\1")
+            File.write('Podfile', podfile)
+            puts "✅ Firebase pods injected into Podfile"
+          else
+            puts "ℹ️  Firebase pods already present"
           end
-
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-              end
-            end
-          end
-          PODFILE
+          RUBY
+          cat Podfile
           pod install
 
       - name: Patch AppDelegate for Firebase + Capacitor
@@ -308,40 +287,20 @@ workflows:
           npx cap add ios || true
           npx cap sync ios
 
-      - name: Install Firebase SDK via CocoaPods
+      - name: Add Firebase pods to Capacitor Podfile
         script: |
           cd ios/App
-          cat > Podfile << 'PODFILE'
-          platform :ios, '14.0'
-          use_frameworks!
-
-          target 'App' do
-            pod 'Capacitor', :path => '../../node_modules/@capacitor/core'
-            pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/core'
-            pod 'CapacitorApp', :path => '../../node_modules/@capacitor/app'
-            pod 'CapacitorCamera', :path => '../../node_modules/@capacitor/camera'
-            pod 'CapacitorGeolocation', :path => '../../node_modules/@capacitor/geolocation'
-            pod 'CapacitorHaptics', :path => '../../node_modules/@capacitor/haptics'
-            pod 'CapacitorKeyboard', :path => '../../node_modules/@capacitor/keyboard'
-            pod 'CapacitorPreferences', :path => '../../node_modules/@capacitor/preferences'
-            pod 'CapacitorPushNotifications', :path => '../../node_modules/@capacitor/push-notifications'
-            pod 'CapacitorSplashScreen', :path => '../../node_modules/@capacitor/splash-screen'
-            pod 'CapacitorStatusBar', :path => '../../node_modules/@capacitor/status-bar'
-            pod 'CapacitorFirebaseMessaging', :path => '../../node_modules/@capacitor-firebase/messaging'
-            pod 'CapacitorRateApp', :path => '../../node_modules/capacitor-rate-app'
-
-            pod 'FirebaseCore'
-            pod 'FirebaseMessaging'
+          ruby - << 'RUBY'
+          podfile = File.read('Podfile')
+          unless podfile.include?('FirebaseCore')
+            podfile.sub!(/^(\s*end\s*)$/m, "  pod 'FirebaseCore'\n  pod 'FirebaseMessaging'\n\\1")
+            File.write('Podfile', podfile)
+            puts "✅ Firebase pods injected into Podfile"
+          else
+            puts "ℹ️  Firebase pods already present"
           end
-
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-              end
-            end
-          end
-          PODFILE
+          RUBY
+          cat Podfile
           pod install
 
       - name: Patch AppDelegate for Firebase + Capacitor
