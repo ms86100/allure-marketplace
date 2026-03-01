@@ -152,7 +152,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const removeItem = useCallback(async (productId: string) => {
     if (!user) return;
     const prev = queryClient.getQueryData([...CART_QUERY_KEY, user?.id]) as any[] || [];
+    const removedItem = prev.find((item: any) => item.product_id === productId);
+    const removedQty = removedItem?.quantity || 0;
     setOptimistic(old => old.filter(item => item.product_id !== productId));
+    // CHECKOUT-01 FIX: Sync cart-count badge on remove
+    queryClient.setQueryData(['cart-count', user?.id], (old: number | undefined) => Math.max(0, (old || 0) - removedQty));
 
     try {
       const { error } = await supabase
@@ -162,11 +166,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         .eq('product_id', productId);
       if (error) throw error;
       toast.success('Removed from cart');
+      invalidate();
     } catch (error) {
       queryClient.setQueryData([...CART_QUERY_KEY, user?.id], prev);
+      queryClient.setQueryData(['cart-count', user?.id], (old: number | undefined) => (old || 0) + removedQty);
       handleApiError(error, 'Failed to remove item');
     }
-  }, [user, setOptimistic, queryClient]);
+  }, [user, setOptimistic, queryClient, invalidate]);
 
   const updateQuantity = useCallback(async (productId: string, quantity: number) => {
     if (!user) return;
@@ -175,9 +181,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const cappedQuantity = Math.min(quantity, 99);
 
     const prev = queryClient.getQueryData([...CART_QUERY_KEY, user?.id]) as any[] || [];
+    const oldItem = prev.find((item: any) => item.product_id === productId);
+    const qtyDelta = cappedQuantity - (oldItem?.quantity || 0);
     setOptimistic(old => old.map(item =>
       item.product_id === productId ? { ...item, quantity: cappedQuantity } : item
     ));
+    // CHECKOUT-03 FIX: Sync cart-count badge on quantity change
+    if (qtyDelta !== 0) {
+      queryClient.setQueryData(['cart-count', user?.id], (old: number | undefined) => Math.max(0, (old || 0) + qtyDelta));
+    }
 
     try {
       const { error } = await supabase
@@ -188,6 +200,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
     } catch (error) {
       queryClient.setQueryData([...CART_QUERY_KEY, user?.id], prev);
+      if (qtyDelta !== 0) {
+        queryClient.setQueryData(['cart-count', user?.id], (old: number | undefined) => Math.max(0, (old || 0) - qtyDelta));
+      }
       handleApiError(error, 'Failed to update quantity');
     }
   }, [user, setOptimistic, removeItem, queryClient]);

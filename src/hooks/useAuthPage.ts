@@ -221,20 +221,8 @@ export function useAuthPage() {
     }
     const trimmedEmail = validation.data.email;
     setEmail(trimmedEmail);
-    setIsLoading(true);
-
-    try {
-      // B5 FIX: Removed direct profiles table email lookup to prevent email enumeration.
-      // Duplicate detection now relies on Supabase auth's own error at signup time
-      // and the profile upsert's unique constraint (idx_profiles_email_unique).
-      // The RLS policy on profiles allows SELECT for approved users, which means
-      // an unauthenticated attacker could enumerate registered emails via the old check.
-    } catch (err) {
-      console.warn('[Signup] Validation failed:', err);
-    } finally {
-      setIsLoading(false);
-    }
-
+    // B5 FIX: Removed direct profiles table email lookup to prevent email enumeration.
+    // Duplicate detection relies on Supabase auth's own error at signup time.
     setSignupStep('society');
   };
 

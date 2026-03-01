@@ -274,20 +274,8 @@ export function useCartPage() {
       setPendingOrderIds([]);
       return;
     }
-    // #12: Cancel orphaned orders on payment failure
-    if (pendingOrderIds.length > 0) {
-      try {
-        await supabase
-          .from('orders')
-          .update({ status: 'cancelled' } as any)
-          .in('id', pendingOrderIds)
-          .eq('payment_status', 'pending')
-          .eq('buyer_id', user.id);
-      } catch (err) {
-        console.error('Failed to cancel unpaid orders:', err);
-      }
-    }
-    // C4: Re-check order status — webhook may have marked it paid during the race window
+    // CHECKOUT-02 FIX: Check payment status FIRST — webhook may have already marked it paid
+    // Only cancel if still pending, to avoid cancelling a paid order
     if (pendingOrderIds.length > 0) {
       const { data: recheckOrder } = await supabase
         .from('orders')
@@ -300,6 +288,17 @@ export function useCartPage() {
         navigate(`/orders/${pendingOrderIds[0]}`);
         setPendingOrderIds([]);
         return;
+      }
+      // Only cancel after confirming order is still unpaid
+      try {
+        await supabase
+          .from('orders')
+          .update({ status: 'cancelled' } as any)
+          .in('id', pendingOrderIds)
+          .eq('payment_status', 'pending')
+          .eq('buyer_id', user.id);
+      } catch (err) {
+        console.error('Failed to cancel unpaid orders:', err);
       }
     }
     setPendingOrderIds([]);

@@ -189,3 +189,27 @@
 ### D4 — delete-user-account sequential deletion (DOCUMENTED)
 - **Problem**: No dedicated delete-user-account edge function found; reset-and-seed-scenario deletes sequentially
 - **Status**: Only used in dev/testing, not user-facing
+
+---
+
+## QA Round 3 — Findings
+
+### CHECKOUT-01 — removeItem doesn't sync cart-count badge ✅ FIXED
+- **Severity**: P2
+- **Problem**: `useCart.tsx` `removeItem` didn't update the `cart-count` query, causing stale badge in BottomNav
+- **Fix**: Added optimistic `cart-count` decrement on remove, with rollback in catch block
+
+### CHECKOUT-02 — handleRazorpayFailed cancel-before-check race condition ✅ FIXED
+- **Severity**: P1
+- **Problem**: `useCartPage.ts` cancelled orders THEN checked if they were paid — webhook could mark paid between cancel and check, but the `.eq('payment_status', 'pending')` guard on cancel protects the DB. However the UX flow was confusing.
+- **Fix**: Reversed the order — check payment status FIRST, then cancel only if still pending. Eliminates race window entirely.
+
+### CHECKOUT-03 — updateQuantity doesn't sync cart-count badge ✅ FIXED
+- **Severity**: P2
+- **Problem**: `useCart.tsx` `updateQuantity` didn't update the `cart-count` query
+- **Fix**: Added optimistic `cart-count` delta update with rollback in catch block
+
+### AUTH-01 — Dead code in handleCredentialsNext ✅ FIXED
+- **Severity**: P3
+- **Problem**: Empty try/catch with `setIsLoading(true)` causing a flash — leftover from B5 fix
+- **Fix**: Removed dead code; `setSignupStep('society')` called directly
