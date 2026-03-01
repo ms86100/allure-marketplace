@@ -39,14 +39,16 @@ workflows:
           npx cap add ios || true
           npx cap sync ios
           cd ios/App
-          # Capacitor 8 defaults to SPM — remove SPM artifacts and create Podfile
+          # Capacitor 8 defaults to SPM — remove ALL SPM artifacts before switching to CocoaPods
           rm -f Package.swift .package.resolved
           rm -rf .build
+          rm -rf App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
           # Generate Podfile with all Capacitor plugins + Firebase
+          # CRITICAL: Capacitor 8 requires iOS 16.0 minimum
           cat > Podfile << 'PODFILE'
           require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
 
-          platform :ios, '14.0'
+          platform :ios, '16.0'
           use_frameworks!
 
           # workaround to avoid Xcode caching of Pods that requires
@@ -190,6 +192,8 @@ workflows:
         script: |
           cd ios/App
           sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = .*;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" App.xcodeproj/project.pbxproj
+          # Set deployment target to 16.0 to match Capacitor 8 requirement
+          sed -i '' "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 16.0/g" App.xcodeproj/project.pbxproj
 
       - name: Set up code signing
         script: |
@@ -310,10 +314,11 @@ workflows:
           cd ios/App
           rm -f Package.swift .package.resolved
           rm -rf .build
+          rm -rf App.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
           cat > Podfile << 'PODFILE'
           require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
 
-          platform :ios, '14.0'
+          platform :ios, '16.0'
           use_frameworks!
 
           install! 'cocoapods', :disable_input_output_paths => true
@@ -447,6 +452,7 @@ workflows:
         script: |
           cd ios/App
           sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = .*;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" App.xcodeproj/project.pbxproj
+          sed -i '' "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 16.0/g" App.xcodeproj/project.pbxproj
 
       - name: Set up iOS code signing
         script: |
