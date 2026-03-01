@@ -1,40 +1,77 @@
 
-# Production Risk Assessment — Post-Fix Status
 
-## FIXES APPLIED
+# Plan: Stateful, Bounded Push Token Registration
 
-### P0 Fix 1: partner_id FK mismatch → RESOLVED
-- Added `rider_id UUID REFERENCES delivery_partner_pool(id)` to `delivery_assignments`
-- `DeliveryPartnerDashboardPage.tsx` now writes to `rider_id` (not `partner_id`) when a native rider accepts
-- `partner_id` remains for 3PL provider assignment (its original purpose)
+## Single file change: `src/hooks/usePushNotifications.ts`
 
-### P0 Fix 2: GPS auth identity mismatch → RESOLVED
-- Added `user_id UUID REFERENCES auth.users(id)` to `delivery_partner_pool`
-- On first dashboard load, rider's `user_id` is auto-linked to their pool record (matched by phone)
-- Edge function now: authenticates via `getUser()`, looks up `rider_id` → pool → `user_id`, compares against `auth.uid()`
-- Replaced broken `getClaims()` with standard `getUser()` pattern
+### What changes
 
-### P1 Fix 3: Sync trigger silent failures → RESOLVED
-- Sync trigger now uses `GET DIAGNOSTICS` to check row count after each UPDATE
-- When 0 rows affected (order not at expected status), logs `RAISE WARNING` + inserts audit record into `delivery_tracking_logs`
-- Added `set_config('app.delivery_sync', 'true', true)` flag to bypass actor enforcement in validation trigger
+**1. Add registration state machine (in-memory only)**
 
-### P1 Fix 4: Category flow fallback mismatch → RESOLVED
-- `useOrderDetail` now derives `parent_group` from `order_items → products → category_config` when `seller.primary_group` is null
-- This matches the exact same derivation path used by the DB validation trigger
-- UI and DB now always agree on which flow to enforce
+```typescript
+type RegistrationState = 'idle' | 'registering' | 'registered' | 'permission_denied' | 'failed';
+```
 
-### P2 Fix 5: SECURITY DEFINER vs service_role → RESOLVED
-- Validation trigger now checks `app.delivery_sync` session flag (set by sync trigger) in addition to `service_role`
-- Sync trigger sets this flag before its UPDATE calls, allowing delivery/system actor transitions to pass through
+Track via `useRef<RegistrationState>('idle')` — no re-renders, no persistence, purely internal.
 
-## REMAINING ACCEPTED RISKS
+**2. Replace `registerPushNotifications` with sequential, verifiable flow**
 
-| Risk | Severity | Accepted? |
-|------|----------|-----------|
-| No active stall detection when GPS stops entirely | P2 | Yes — passive detection on next update is acceptable for v1 |
-| No Google Maps visual — text-only tracking | P2 | Yes — acceptable for v1 |
-| No timeout escalation for stuck-at-ready orders | P2 | Yes — operational, not safety-critical |
+New `attemptRegistration()` function:
+- If state is `registered` or `failed` or `permission_denied` → return immediately (no-op)
+- Set state → `registering`
+- Check permission → if denied, set state → `permission_denied`, return
+- If granted, call `PushNotifications.register()`
+- Start a **watchdog timer** (5 seconds)
+- If `registration` event fires before timer → cancel timer, set state → `registered`
+- If timer expires and no token → increment retry counter, retry (up to 3)
+- After 3 retries with no token → set state → `failed`, emit diagnostic log, stop
 
-## VERDICT: ⚠️ Conditionally Ready
-All P0 and P1 blockers resolved. System is testable and functional for production with accepted P2 risks.
+**3. Watchdog timer mechanics**
+
+- The `registration` listener already exists and calls `setToken()`
+- Add a ref `watchdogTimerRef` — after each `register()` call, set a 5s timeout
+- In the `registration` listener callback: clear the watchdog, set state → `registered`
+- In the `registrationError` listener: clear the watchdog, set state → `failed` immediately (no retries for hard errors)
+- On watchdog expiry: if `retryCount < 3`, call `attemptRegistration()` again; else mark `failed`
+
+**4. Foreground resume retry — conditional only**
+
+Add `App.addListener('appStateChange')`:
+- On `isActive === true`:
+  - If `state === 'failed'` → do nothing (hard stop respected)
+  - If `state === 'permission_denied'` → re-check permission (user may have toggled in Settings), if now granted → reset state to `idle`, attempt registration
+  - If `state === 'idle'` or `state === 'registering'` and `token` is null and `user` exists → call `attemptRegistration()`
+
+**5. Terminal diagnostic log**
+
+When state transitions to `failed`, emit one structured log:
+
+```typescript
+console.error('[Push][DIAG] Registration permanently failed', {
+  userId: userRef.current?.id ?? 'unknown',
+  platform: Capacitor.getPlatform(),
+  permissionStatus: permissionStatus,
+  retriesAttempted: retryCountRef.current,
+  lastError: lastErrorRef.current,
+  timestamp: new Date().toISOString(),
+});
+```
+
+Also capture the `registrationError` event payload in `lastErrorRef` so the diagnostic includes APNs/FCM error details if available.
+
+### What does NOT change
+
+- `saveTokenToDatabase` — untouched
+- `removeTokenFromDatabase` — untouched
+- Foreground notification handler (toast + haptic + sound) — untouched
+- `pushNotificationActionPerformed` handler — untouched
+- Retry-on-user-available effect (`user && token` → save) — untouched
+- Diagnostic query effect — untouched
+- No backend, RLS, schema, or UI changes
+
+### Cleanup
+
+- Remove the current bare `registerPushNotifications()` call in the main effect
+- Replace with `attemptRegistration()` guarded by state checks
+- `App` listener cleanup added to the effect's return function
+
