@@ -59,7 +59,6 @@ export function OrderCancellation({ orderId, orderStatus, onCancelled }: OrderCa
     }
 
     setIsSubmitting(true);
-    const previousStatus = orderStatus;
     try {
       const { error } = await supabase
         .from('orders')

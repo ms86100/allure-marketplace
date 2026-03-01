@@ -419,8 +419,12 @@ async function handleWebhook(req: Request, db: any) {
       }).then(() => {}, () => {});
       return jsonResponse({ error: 'Invalid webhook signature' }, 401);
     }
+  } else {
+    // DELIVERY-01 FIX: Reject webhooks entirely when no secret is configured
+    // This prevents unauthenticated delivery status manipulation in production
+    console.error('3PL webhook secret not configured — rejecting webhook');
+    return jsonResponse({ error: 'Webhook authentication not configured' }, 503);
   }
-  // If no secret configured, allow (backward compat during setup)
 
   let body: any;
   try {

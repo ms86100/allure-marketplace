@@ -66,11 +66,13 @@ export function ReorderButton({
         .filter(item => item.product_id)
         .map(item => item.product_id);
 
+      // ORDER-01 FIX: Also check approval_status to prevent reordering suspended/rejected products
       const { data: availableProducts } = await supabase
         .from('products')
         .select('id, price, seller_id')
         .in('id', productIds)
-        .eq('is_available', true);
+        .eq('is_available', true)
+        .eq('approval_status', 'approved');
 
       if (!availableProducts || availableProducts.length === 0) {
         toast.error('None of these items are currently available');

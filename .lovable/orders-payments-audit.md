@@ -213,3 +213,30 @@
 - **Severity**: P3
 - **Problem**: Empty try/catch with `setIsLoading(true)` causing a flash — leftover from B5 fix
 - **Fix**: Removed dead code; `setSignupStep('society')` called directly
+
+---
+
+## QA Round 4 — Orders + Delivery + Reviews
+
+### ORDER-01 — ReorderButton doesn't check approval_status ✅ FIXED
+- **Severity**: P1
+- **Problem**: `ReorderButton.tsx` only checked `is_available` when fetching products for reorder, not `approval_status`
+- **Impact**: Suspended/rejected products could be added to cart via reorder, failing at checkout
+- **Fix**: Added `.eq('approval_status', 'approved')` to the products query
+
+### ORDER-02 — OrderCancellation unused variable ✅ FIXED
+- **Severity**: P3
+- **Problem**: `previousStatus` declared but never used in `OrderCancellation.tsx`
+- **Fix**: Removed dead variable
+
+### DELIVERY-01 — Webhook allows unsigned requests when no secret configured ✅ FIXED
+- **Severity**: P1
+- **Problem**: `manage-delivery/index.ts` webhook handler fell through to allow any request when no `3pl_webhook_secret` was set
+- **Impact**: Any unauthenticated request could change delivery statuses in production
+- **Fix**: Changed fallback from "allow" to "reject with 503" when no secret is configured
+
+### ORDER-03 — OrderList re-fetches on tab switches (DOCUMENTED)
+- **Severity**: P2
+- **Problem**: `location.key` dependency causes both buyer and seller order lists to re-fetch on tab switch
+- **Impact**: Extra API calls; no data corruption
+- **Status**: Documented — requires UX decision on caching strategy
