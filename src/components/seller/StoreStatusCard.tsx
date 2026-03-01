@@ -1,7 +1,7 @@
 import { Switch } from '@/components/ui/switch';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
 import { SellerProfile } from '@/types/database';
-import { Clock, Store } from 'lucide-react';
+import { Clock, Store, CheckCircle2 } from 'lucide-react';
 
 interface StoreStatusCardProps {
   sellerProfile: SellerProfile;
@@ -47,10 +47,15 @@ export function StoreStatusCard({ sellerProfile, sellerProfiles, onToggleAvailab
                 </span>
               )}
             </div>
-            <p className="text-sm text-muted-foreground capitalize">
-              {(sellerProfile as any).primary_group?.replace('_', ' ') || 'General'} •{' '}
-              {sellerProfile.is_available ? '🟢 Open' : '🔴 Closed'}
-            </p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-accent">
+                <CheckCircle2 size={12} />
+                Store is live
+              </span>
+              <span className="text-xs text-muted-foreground">
+                •{' '}{sellerProfile.is_available ? '🟢 Open' : '🔴 Closed'}
+              </span>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
