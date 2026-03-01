@@ -224,23 +224,13 @@ export function useAuthPage() {
     setIsLoading(true);
 
     try {
-      // Early duplicate check: try signing up with a dummy call to see if user exists
-      // We check profiles table for the email (public read for matching)
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', trimmedEmail)
-        .maybeSingle();
-
-      if (existingProfile) {
-        toast.error('This email is already registered. Please sign in instead.', { duration: 5000 });
-        setAuthMode('login');
-        setSignupStep('credentials');
-        return;
-      }
+      // B5 FIX: Removed direct profiles table email lookup to prevent email enumeration.
+      // Duplicate detection now relies on Supabase auth's own error at signup time
+      // and the profile upsert's unique constraint (idx_profiles_email_unique).
+      // The RLS policy on profiles allows SELECT for approved users, which means
+      // an unauthenticated attacker could enumerate registered emails via the old check.
     } catch (err) {
-      // If check fails, proceed anyway — the final signup will catch duplicates
-      console.warn('[Signup] Early email check failed:', err);
+      console.warn('[Signup] Validation failed:', err);
     } finally {
       setIsLoading(false);
     }
@@ -340,8 +330,9 @@ export function useAuthPage() {
           return;
         }
 
+        // A6 FIX: Use auth response email (Supabase-normalized/lowercased) instead of component state
         const { error: profileError } = await supabase.from('profiles').upsert({
-          id: data.user.id, email, phone: `${settings.defaultCountryCode}${profileData.phone}`, name: profileData.name,
+          id: data.user.id, email: data.user.email ?? email, phone: `${settings.defaultCountryCode}${profileData.phone}`, name: profileData.name,
           flat_number: profileData.flat_number, block: profileData.block,
           phase: profileData.phase || null, society_id: finalSocietyId,
         }, { onConflict: 'id' });

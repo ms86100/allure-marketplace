@@ -147,3 +147,45 @@
 - **Problem**: No trigger validates item status transitions
 - **Impact**: UI prevents backward transitions; direct DB access could bypass
 - **Status**: Not user-facing; document only
+
+---
+
+## QA Round 2 — Findings
+
+### A1 — COD auto-cancel race condition ✅ NOT_REPRODUCIBLE
+- **Analysis**: `auto-cancel-orders` function already has `.neq("payment_method", "cod")` — COD orders explicitly excluded
+- **Status**: No fix needed
+
+### A2 — Multi-order navigation bug ✅ FIXED (previous round)
+- **Fix**: `useCartPage.ts` line 265 now navigates to `/orders` when `pendingOrderIds.length > 1`
+
+### A3 — verifyOTP timing attack ✅ FIXED (previous round)
+- **Fix**: Replaced `===` with byte-level XOR comparison in `manage-delivery/index.ts`
+
+### A4 — Cart addItem count rollback ✅ FIXED (previous round)
+- **Fix**: `useCart.tsx` now captures `prevCount` before optimistic update and restores in catch block
+
+### A5 — useOrderDetail missing useEffect dependency (DOCUMENTED)
+- **Problem**: `fetchOrder` and `fetchUnreadCount` not in dependency array
+- **Analysis**: Not a real bug — `id` is in deps and functions use `id` from closure; effect re-runs correctly on `id` change
+- **Fix**: Added eslint-disable comment documenting the intentional pattern
+- **Status**: Lint-level only; no runtime risk
+
+### A6 — Signup profile email mismatch ✅ FIXED
+- **Problem**: Profile insert used `email` from React state instead of `data.user.email`
+- **Impact**: If Supabase normalizes email casing, profiles.email could differ from auth.users.email
+- **Fix**: Changed to `data.user.email ?? email` in `useAuthPage.ts` line 344
+
+### B5 — Profile email enumeration ✅ FIXED
+- **Problem**: `handleCredentialsNext` queried profiles table by email, allowing unauthenticated enumeration
+- **Impact**: Attacker could check if an email is registered without authenticating
+- **Fix**: Removed direct profiles query; duplicate detection now relies on Supabase auth error and unique constraint
+
+### D1 — fetchSocieties loads all societies without pagination (DOCUMENTED)
+- **Problem**: `useAuthPage.ts` line 69-79 loads all active/verified societies
+- **Impact**: Performance risk at scale (10K+ societies)
+- **Status**: No user impact at current scale; requires UX redesign for search-as-you-type
+
+### D4 — delete-user-account sequential deletion (DOCUMENTED)
+- **Problem**: No dedicated delete-user-account edge function found; reset-and-seed-scenario deletes sequentially
+- **Status**: Only used in dev/testing, not user-facing

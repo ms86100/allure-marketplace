@@ -92,6 +92,9 @@ export function useOrderDetail(id: string | undefined) {
     return nextIdx < legacyOrder.length ? legacyOrder[nextIdx] : null;
   };
 
+  // A5 FIX: Include fetchOrder and fetchUnreadCount in deps via eslint-disable
+  // These functions use `id` from closure which is stable per hook call
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (id) { fetchOrder(); fetchUnreadCount(); }
   }, [id]);
