@@ -43,17 +43,18 @@ export default function PushDebugPage() {
     const platform = Capacitor.getPlatform();
     try {
       if (platform === 'ios') {
-        // Use Capacitor App plugin to open app settings via URL scheme
-        const { App } = await import('@capacitor/app');
-        // This is the standard iOS URL scheme to open the app's own settings page
-        await (App as any).openUrl({ url: 'app-settings:' });
+        // 'app-settings:' is Apple's documented URL scheme to open the app's own Settings page.
+        // We use the Capacitor bridge to ensure it opens outside the WebView.
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url: 'app-settings:' });
         return;
       }
-      // Android: try native-settings plugin
+      // Android: native-settings plugin (needs cap sync)
       const { NativeSettings, AndroidSettings, IOSSettings } = await import('capacitor-native-settings');
       await NativeSettings.open({ optionIOS: IOSSettings.App, optionAndroid: AndroidSettings.AppNotification });
     } catch (e) {
-      toast.error('Go to Settings → Sociva → Notifications manually to enable.');
+      // Fallback: instruct user manually
+      toast.error('Go to Settings → Sociva → Notifications to enable.');
     }
   };
 
