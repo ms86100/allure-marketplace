@@ -701,23 +701,35 @@ export function usePushNotificationsInternal() {
               at: new Date().toISOString(),
             });
 
-            if (resumePermission === 'granted' && userRef.current) {
-              setPermissionStatus('granted');
-
+            if (userRef.current) {
+              // CRITICAL FIX: Always try reconcileRuntimeToken on resume when
+              // user is logged in, regardless of permission status. On iOS,
+              // checkPermissions() is unreliable and can return 'prompt' even
+              // when notifications are enabled.
               if (!tokenRef.current) {
                 const reconciled = await reconcileRuntimeToken('app_resume_missing_runtime_token');
                 if (reconciled) {
                   console.log('[Push] Runtime token reconciled on resume');
+                  setPermissionStatus('granted');
                   return;
                 }
               }
 
-              registrationStateRef.current = 'idle';
-              retryCountRef.current = 0;
-              console.log('[Push] Permission granted on resume — attempting registration');
-              attemptRegistration();
-            } else if (resumePermission === 'denied') {
-              setPermissionStatus('denied');
+              if (resumePermission === 'granted') {
+                setPermissionStatus('granted');
+                registrationStateRef.current = 'idle';
+                retryCountRef.current = 0;
+                console.log('[Push] Permission granted on resume — attempting registration');
+                attemptRegistration();
+              } else if (resumePermission === 'denied') {
+                setPermissionStatus('denied');
+              } else {
+                // 'prompt' but stage might be 'full' — try register anyway
+                pushLog('warn', 'Resume: permission=prompt, trying register() as fallback');
+                registrationStateRef.current = 'idle';
+                retryCountRef.current = 0;
+                attemptRegistration();
+              }
             }
           } catch (err) {
             console.error('[Push] appStateChange listener exception:', err);
@@ -743,18 +755,31 @@ export function usePushNotificationsInternal() {
             const p = await PN.checkPermissions();
             loginPerm = p.receive;
           }
-          if (loginPerm === 'granted') {
-            pushLog('info', 'Stage full + permission granted — reconciling runtime token');
-            const reconciled = await reconcileRuntimeToken('login_stage_full');
-            if (!reconciled) {
-              pushLog('warn', 'Runtime token reconciliation failed on login — falling back to register()');
-              registrationStateRef.current = 'idle';
-              retryCountRef.current = 0;
-              attemptRegistration();
-            }
+          pushLog('info', `Stage full, checkPermissions=${loginPerm}`, { platform });
+
+          // CRITICAL FIX: On iOS, checkPermissions() can return 'prompt' even
+          // when notifications ARE enabled. Always try reconcileRuntimeToken
+          // first when stage is 'full' — FCM.getToken() works regardless of
+          // what the Capacitor permission API reports.
+          const reconciled = await reconcileRuntimeToken('login_stage_full');
+          if (reconciled) {
+            pushLog('info', 'Token reconciled on login (bypassed permission gate)');
+            setPermissionStatus('granted');
+          } else if (loginPerm === 'granted') {
+            setPermissionStatus('granted');
+            pushLog('warn', 'Reconciliation failed but permission granted — falling back to register()');
+            registrationStateRef.current = 'idle';
+            retryCountRef.current = 0;
+            attemptRegistration();
+          } else if (loginPerm === 'denied') {
+            setPermissionStatus('denied');
+            pushLog('warn', 'Permission denied — waiting for user action');
           } else {
-            pushLog('warn', `Stage full but permission ${loginPerm} — waiting for user action`);
-            setPermissionStatus(loginPerm === 'denied' ? 'denied' : 'prompt');
+            // Still 'prompt' and reconciliation failed — try register() anyway
+            pushLog('warn', `Permission=${loginPerm} + reconcile failed — attempting register() as last resort`);
+            registrationStateRef.current = 'idle';
+            retryCountRef.current = 0;
+            attemptRegistration();
           }
         } else if (stage === 'none' || stage === 'deferred') {
           pushLog('info', 'First login — auto-requesting notification permission');
