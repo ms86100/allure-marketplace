@@ -6,7 +6,7 @@ import { usePushNotifications } from '@/contexts/PushNotificationContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, RefreshCw, CheckCircle2, XCircle, Trash2, Bell, Save } from 'lucide-react';
+import { Loader2, RefreshCw, CheckCircle2, XCircle, Trash2, Bell, Save, Settings } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { flushPushLogs } from '@/lib/pushLogger';
@@ -36,6 +36,20 @@ export default function PushDebugPage() {
       toast.success('Permission requested — check status above');
     } catch (e) {
       toast.error('Permission request failed: ' + String(e));
+    }
+  };
+
+  const handleOpenSettings = async () => {
+    try {
+      const { NativeSettings, AndroidSettings, IOSSettings } = await import('capacitor-native-settings');
+      const platform = Capacitor.getPlatform();
+      if (platform === 'ios') {
+        await NativeSettings.open({ optionIOS: IOSSettings.App, optionAndroid: AndroidSettings.ApplicationDetails });
+      } else if (platform === 'android') {
+        await NativeSettings.open({ optionIOS: IOSSettings.App, optionAndroid: AndroidSettings.AppNotification });
+      }
+    } catch (e) {
+      toast.error('Could not open settings: ' + String(e));
     }
   };
 
@@ -160,6 +174,9 @@ export default function PushDebugPage() {
         <CardContent className="space-y-2">
           <Button onClick={handleRequestPermission} variant="outline" className="w-full">
             <Bell className="mr-2" size={16} /> Request Permission
+          </Button>
+          <Button onClick={handleOpenSettings} variant="outline" className="w-full">
+            <Settings className="mr-2" size={16} /> Open App Settings (enable notifications)
           </Button>
           <Button onClick={handleRegister} variant="outline" className="w-full">
             <RefreshCw className="mr-2" size={16} /> Trigger Registration
