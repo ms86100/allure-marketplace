@@ -50,20 +50,13 @@ export function EmergencyBroadcastSheet() {
 
       if (error) throw error;
 
-      // Send push to ALL members of the target society
+      // Send push to ALL members of the target society (routes through notification queue)
       await notifySocietyMembers(
         targetSocietyId,
         `${emoji} ${title.trim()}`,
         body.trim(),
         { type: 'broadcast', category }
       );
-
-      // Trigger notification queue processing immediately
-      try {
-        await supabase.functions.invoke('process-notification-queue');
-      } catch (e) {
-        console.warn('Queue processing trigger failed (will retry via cron):', e);
-      }
 
       toast.success('Broadcast sent to all residents');
       setTitle('');

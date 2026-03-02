@@ -1,6 +1,60 @@
 import { supabase } from '@/integrations/supabase/client';
 
 /**
+ * Enqueue push notifications for a list of user IDs via notification_queue,
+ * then trigger the process-notification-queue edge function (which has service role access).
+ */
+async function enqueueAndProcess(
+  targets: { id: string }[],
+  title: string,
+  body: string,
+  data?: Record<string, string>
+): Promise<void> {
+  if (targets.length === 0) return;
+
+  const type = data?.type || 'general';
+
+  // 1. Write to notification_queue (processed by edge function with service role)
+  const queueRows = targets.map(t => ({
+    user_id: t.id,
+    title,
+    body,
+    type,
+    reference_path: data?.path || null,
+    payload: data ? (data as Record<string, unknown>) : {},
+  }));
+
+  const { error: queueError } = await supabase
+    .from('notification_queue')
+    .insert(queueRows as any);
+
+  if (queueError) {
+    console.error('Failed to enqueue notifications:', queueError);
+  }
+
+  // 2. Also write persistent in-app notifications
+  const notifRows = targets.map(t => ({
+    user_id: t.id,
+    title,
+    body,
+    type,
+    reference_path: data?.path || null,
+    reference_id: data?.reference_id || null,
+  }));
+
+  supabase.from('user_notifications').insert(notifRows as any).then(({ error }) => {
+    if (error) console.error('Failed to write notifications:', error);
+  });
+
+  // 3. Trigger queue processing (runs with service role internally)
+  try {
+    await supabase.functions.invoke('process-notification-queue');
+  } catch (e) {
+    console.warn('Queue processing trigger failed (will retry via cron):', e);
+  }
+}
+
+/**
  * Notify all society members via push notification
  * Also writes to user_notifications table for persistent inbox
  */
@@ -24,26 +78,7 @@ export async function notifySocietyMembers(
       ? members.filter(m => m.id !== excludeUserId)
       : members;
 
-    // Write persistent notifications to inbox
-    const notificationRows = targets.map(m => ({
-      user_id: m.id,
-      title,
-      body,
-      type: data?.type || 'general',
-      reference_path: data?.path || null,
-      reference_id: data?.reference_id || null,
-    }));
-
-    supabase.from('user_notifications').insert(notificationRows as any).then(({ error }) => {
-      if (error) console.error('Failed to write notifications:', error);
-    });
-
-    // Fire push notifications
-    for (const member of targets) {
-      supabase.functions.invoke('send-push-notification', {
-        body: { userId: member.id, title, body, data },
-      }).catch(err => console.error('Push failed for', member.id, err));
-    }
+    await enqueueAndProcess(targets, title, body, data);
   } catch (err) {
     console.error('Failed to notify society members:', err);
   }
@@ -76,25 +111,7 @@ export async function notifySocietyAdmins(
 
     if (!adminProfiles) return;
 
-    // Write persistent notifications
-    const notificationRows = adminProfiles.map(a => ({
-      user_id: a.id,
-      title,
-      body,
-      type: data?.type || 'admin',
-      reference_path: data?.path || null,
-      reference_id: data?.reference_id || null,
-    }));
-
-    supabase.from('user_notifications').insert(notificationRows as any).then(({ error }) => {
-      if (error) console.error('Failed to write admin notifications:', error);
-    });
-
-    for (const admin of adminProfiles) {
-      supabase.functions.invoke('send-push-notification', {
-        body: { userId: admin.id, title, body, data },
-      }).catch(err => console.error('Push failed for admin', admin.id, err));
-    }
+    await enqueueAndProcess(adminProfiles, title, body, data);
   } catch (err) {
     console.error('Failed to notify admins:', err);
   }

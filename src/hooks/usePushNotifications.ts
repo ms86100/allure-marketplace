@@ -620,9 +620,12 @@ export function usePushNotificationsInternal() {
 
       // Step 2: Now persist stage and do full registration
       await setPushStage('full');
+      console.log('[Push] Stage set to full — resetting state for attemptRegistration');
       registrationStateRef.current = 'idle';
       retryCountRef.current = 0;
+      console.log('[Push] Calling attemptRegistration from requestFullPermission, state:', registrationStateRef.current);
       await attemptRegistration();
+      console.log('[Push] attemptRegistration completed, state:', registrationStateRef.current, 'token:', tokenRef.current?.substring(0, 20) ?? 'null');
     };
 
     try {
