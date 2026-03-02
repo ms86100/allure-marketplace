@@ -39,7 +39,7 @@ async function generateAccessToken(serviceAccount: FirebaseServiceAccount): Prom
 
   const payload = {
     iss: serviceAccount.client_email,
-    scope: "https://www.googleapis.com/auth/firebase.messaging",
+    scope: "https://www.googleapis.com/auth/cloud-platform",
     aud: serviceAccount.token_uri,
     iat: now,
     exp: exp,
