@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useContext, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { PushNotifications } from '@capacitor/push-notifications';
+// PushNotifications is dynamically imported for Android ONLY.
+// On iOS, @capacitor-firebase/messaging handles everything to avoid APNs swizzling conflicts.
 import { supabase } from '@/integrations/supabase/client';
 import { IdentityContext } from '@/contexts/auth/contexts';
 import { useNavigate } from 'react-router-dom';
@@ -39,6 +40,16 @@ async function getFirebaseMessaging() {
     return FirebaseMessaging;
   } catch (e) {
     console.warn('[Push] @capacitor-firebase/messaging not available:', e);
+    return null;
+  }
+}
+
+async function getPushNotificationsPlugin() {
+  try {
+    const { PushNotifications } = await import('@capacitor/push-notifications');
+    return PushNotifications;
+  } catch (e) {
+    console.warn('[Push] @capacitor/push-notifications not available:', e);
     return null;
   }
 }
@@ -255,17 +266,18 @@ export function usePushNotificationsInternal() {
 
   // ── Android registration ──
   const attemptAndroidRegistration = useCallback(async () => {
+    const PN = await getPushNotificationsPlugin();
+    if (!PN) { markFailed(); return; }
     try {
-      let permStatus = await PushNotifications.checkPermissions();
+      let permStatus = await PN.checkPermissions();
       console.log('[Push][Android] ▶ checkPermissions:', permStatus.receive);
 
       if (permStatus.receive === 'prompt') {
         console.log('[Push][Android] ▶ Calling requestPermissions()…');
-        permStatus = await PushNotifications.requestPermissions();
+        permStatus = await PN.requestPermissions();
         console.log('[Push][Android] ▶ requestPermissions result:', permStatus.receive);
       }
 
-      // FIX A: Same non-terminal treatment for Android
       if (permStatus.receive !== 'granted') {
         const isDenied = permStatus.receive === 'denied';
         setPermissionStatus(isDenied ? 'denied' : 'prompt');
@@ -278,7 +290,7 @@ export function usePushNotificationsInternal() {
       clearWatchdog();
 
       console.log('[Push][Android] ▶ Calling PushNotifications.register()…');
-      await PushNotifications.register();
+      await PN.register();
       console.log('[Push][Android] ✓ register() completed — starting watchdog');
 
       watchdogTimerRef.current = setTimeout(() => {
@@ -381,115 +393,202 @@ export function usePushNotificationsInternal() {
       })();
     }
 
-    // ── Android: listen for 'registration' event ──
+    // ── Android: listen for 'registration' event (dynamic import) ──
     if (platform === 'android') {
-      const registrationListener = PushNotifications.addListener(
-        'registration',
-        async (registrationToken) => {
-          try {
-            const tokenValue = registrationToken?.value;
-            if (!tokenValue || typeof tokenValue !== 'string' || tokenValue.length === 0) {
-              console.error('[Push][Android] registration event — invalid token:', registrationToken);
-              return;
+      (async () => {
+        const PN = await getPushNotificationsPlugin();
+        if (!PN) return;
+
+        const registrationListener = PN.addListener(
+          'registration',
+          async (registrationToken) => {
+            try {
+              const tokenValue = registrationToken?.value;
+              if (!tokenValue || typeof tokenValue !== 'string' || tokenValue.length === 0) {
+                console.error('[Push][Android] registration event — invalid token:', registrationToken);
+                return;
+              }
+
+              console.log('[Push][Android] registration event — token:', tokenValue.substring(0, 20) + '…', 'length:', tokenValue.length);
+
+              if (!isValidFcmToken(tokenValue, 'android')) {
+                console.warn('[Push][Android] Token failed validation — ignoring');
+                return;
+              }
+
+              await handleValidToken(tokenValue);
+            } catch (err) {
+              console.error('[Push][Android] registration listener exception:', err);
             }
+          }
+        );
+        cleanups.push(() => { registrationListener.then(l => l.remove()).catch(() => {}); });
 
-            console.log('[Push][Android] registration event — token:', tokenValue.substring(0, 20) + '…', 'length:', tokenValue.length);
-
-            if (!isValidFcmToken(tokenValue, 'android')) {
-              console.warn('[Push][Android] Token failed validation — ignoring');
-              return;
+        const registrationErrorListener = PN.addListener(
+          'registrationError',
+          (error) => {
+            try {
+              console.error('[Push][Android] registrationError:', JSON.stringify(error));
+              lastErrorRef.current = error;
+              markFailed();
+            } catch (err) {
+              console.error('[Push][Android] registrationError listener exception:', err);
             }
-
-            await handleValidToken(tokenValue);
-          } catch (err) {
-            console.error('[Push][Android] registration listener exception:', err);
           }
-        }
-      );
-      cleanups.push(() => { registrationListener.then(l => l.remove()).catch(() => {}); });
-
-      const registrationErrorListener = PushNotifications.addListener(
-        'registrationError',
-        (error) => {
-          try {
-            console.error('[Push][Android] registrationError:', JSON.stringify(error));
-            lastErrorRef.current = error;
-            markFailed();
-          } catch (err) {
-            console.error('[Push][Android] registrationError listener exception:', err);
-          }
-        }
-      );
-      cleanups.push(() => { registrationErrorListener.then(l => l.remove()).catch(() => {}); });
+        );
+        cleanups.push(() => { registrationErrorListener.then(l => l.remove()).catch(() => {}); });
+      })();
     }
 
-    // ── Foreground notification ──
-    const notificationReceivedListener = PushNotifications.addListener(
-      'pushNotificationReceived',
-      (notification) => {
+    // ── Foreground notification + Action performed ──
+    // iOS: use FirebaseMessaging listeners (avoids APNs swizzling conflict)
+    // Android: use PushNotifications listeners (legacy plugin works fine)
+    if (platform === 'ios') {
+      (async () => {
         try {
-          console.log('[Push] Foreground notification received:', JSON.stringify(notification));
-          hapticNotification('warning');
+          const FM = await getFirebaseMessaging();
+          if (!FM) return;
 
-          try {
-            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            for (let i = 0; i < 3; i++) {
-              const osc = ctx.createOscillator();
-              const gain = ctx.createGain();
-              osc.connect(gain);
-              gain.connect(ctx.destination);
-              osc.frequency.value = i % 2 === 0 ? 880 : 660;
-              osc.type = 'square';
-              const start = ctx.currentTime + i * 0.2;
-              gain.gain.setValueAtTime(0.25, start);
-              gain.gain.exponentialRampToValueAtTime(0.01, start + 0.18);
-              osc.start(start);
-              osc.stop(start + 0.2);
-            }
-            setTimeout(() => ctx.close().catch(() => {}), 1000);
-          } catch (e) {
-            console.warn('[Push] Sound failed:', e);
-          }
+          // Foreground notification
+          const fgListener = await FM.addListener('notificationReceived', (event) => {
+            try {
+              const notification = event.notification;
+              console.log('[Push][iOS] Foreground notification received:', JSON.stringify(notification));
+              hapticNotification('warning');
 
-          const title = notification.title || 'New Notification';
-          const body = notification.body || '';
-          const data = notification.data as Record<string, string> | undefined;
-
-          toast(title, {
-            description: body,
-            duration: 10000,
-            action: data?.orderId
-              ? {
-                  label: 'View',
-                  onClick: () => navigate(`/orders/${data.orderId}`),
+              try {
+                const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                for (let i = 0; i < 3; i++) {
+                  const osc = ctx.createOscillator();
+                  const gain = ctx.createGain();
+                  osc.connect(gain);
+                  gain.connect(ctx.destination);
+                  osc.frequency.value = i % 2 === 0 ? 880 : 660;
+                  osc.type = 'square';
+                  const start = ctx.currentTime + i * 0.2;
+                  gain.gain.setValueAtTime(0.25, start);
+                  gain.gain.exponentialRampToValueAtTime(0.01, start + 0.18);
+                  osc.start(start);
+                  osc.stop(start + 0.2);
                 }
-              : undefined,
-          });
-        } catch (err) {
-          console.error('[Push] pushNotificationReceived listener exception:', err);
-        }
-      }
-    );
-    cleanups.push(() => { notificationReceivedListener.then(l => l.remove()).catch(() => {}); });
+                setTimeout(() => ctx.close().catch(() => {}), 1000);
+              } catch (e) {
+                console.warn('[Push] Sound failed:', e);
+              }
 
-    // Action performed
-    const notificationActionListener = PushNotifications.addListener(
-      'pushNotificationActionPerformed',
-      (notification) => {
-        try {
-          console.log('[Push] Action performed:', JSON.stringify(notification));
-          const data = notification.notification.data;
-          if (data?.orderId) {
-            navigate(`/orders/${data.orderId}`);
-          } else if (data?.type === 'order') {
-            navigate('/orders');
-          }
+              const title = notification?.title || 'New Notification';
+              const body = notification?.body || '';
+              const data = notification?.data as Record<string, string> | undefined;
+
+              toast(title, {
+                description: body,
+                duration: 10000,
+                action: data?.orderId
+                  ? {
+                      label: 'View',
+                      onClick: () => navigate(`/orders/${data.orderId}`),
+                    }
+                  : undefined,
+              });
+            } catch (err) {
+              console.error('[Push][iOS] notificationReceived listener exception:', err);
+            }
+          });
+          cleanups.push(() => fgListener.remove());
+
+          // Action performed (tap on notification)
+          const actionListener = await FM.addListener('notificationActionPerformed', (event) => {
+            try {
+              console.log('[Push][iOS] Action performed:', JSON.stringify(event));
+              const data = event.notification?.data as Record<string, string> | undefined;
+              if (data?.orderId) {
+                navigate(`/orders/${data.orderId}`);
+              } else if (data?.type === 'order') {
+                navigate('/orders');
+              }
+            } catch (err) {
+              console.error('[Push][iOS] notificationActionPerformed listener exception:', err);
+            }
+          });
+          cleanups.push(() => actionListener.remove());
         } catch (err) {
-          console.error('[Push] pushNotificationActionPerformed listener exception:', err);
+          console.error('[Push][iOS] Failed to set up notification listeners:', err);
         }
-      }
-    );
-    cleanups.push(() => { notificationActionListener.then(l => l.remove()).catch(() => {}); });
+      })();
+    } else if (platform === 'android') {
+      (async () => {
+        const PN = await getPushNotificationsPlugin();
+        if (!PN) return;
+
+        // Foreground notification
+        const notificationReceivedListener = PN.addListener(
+          'pushNotificationReceived',
+          (notification) => {
+            try {
+              console.log('[Push][Android] Foreground notification received:', JSON.stringify(notification));
+              hapticNotification('warning');
+
+              try {
+                const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                for (let i = 0; i < 3; i++) {
+                  const osc = ctx.createOscillator();
+                  const gain = ctx.createGain();
+                  osc.connect(gain);
+                  gain.connect(ctx.destination);
+                  osc.frequency.value = i % 2 === 0 ? 880 : 660;
+                  osc.type = 'square';
+                  const start = ctx.currentTime + i * 0.2;
+                  gain.gain.setValueAtTime(0.25, start);
+                  gain.gain.exponentialRampToValueAtTime(0.01, start + 0.18);
+                  osc.start(start);
+                  osc.stop(start + 0.2);
+                }
+                setTimeout(() => ctx.close().catch(() => {}), 1000);
+              } catch (e) {
+                console.warn('[Push] Sound failed:', e);
+              }
+
+              const title = notification.title || 'New Notification';
+              const body = notification.body || '';
+              const data = notification.data as Record<string, string> | undefined;
+
+              toast(title, {
+                description: body,
+                duration: 10000,
+                action: data?.orderId
+                  ? {
+                      label: 'View',
+                      onClick: () => navigate(`/orders/${data.orderId}`),
+                    }
+                  : undefined,
+              });
+            } catch (err) {
+              console.error('[Push][Android] pushNotificationReceived listener exception:', err);
+            }
+          }
+        );
+        cleanups.push(() => { notificationReceivedListener.then(l => l.remove()).catch(() => {}); });
+
+        // Action performed
+        const notificationActionListener = PN.addListener(
+          'pushNotificationActionPerformed',
+          (notification) => {
+            try {
+              console.log('[Push][Android] Action performed:', JSON.stringify(notification));
+              const data = notification.notification.data;
+              if (data?.orderId) {
+                navigate(`/orders/${data.orderId}`);
+              } else if (data?.type === 'order') {
+                navigate('/orders');
+              }
+            } catch (err) {
+              console.error('[Push][Android] pushNotificationActionPerformed listener exception:', err);
+            }
+          }
+        );
+        cleanups.push(() => { notificationActionListener.then(l => l.remove()).catch(() => {}); });
+      })();
+    }
 
     // ── App resume: re-check permission and retry if now granted ──
     let appListenerCleanup: (() => void) | undefined;
@@ -520,8 +619,13 @@ export function usePushNotificationsInternal() {
                 resumePermission = 'prompt';
               }
             } else {
-              const p = await PushNotifications.checkPermissions();
-              resumePermission = p.receive;
+              const PN = await getPushNotificationsPlugin();
+              if (PN) {
+                const p = await PN.checkPermissions();
+                resumePermission = p.receive;
+              } else {
+                resumePermission = 'prompt';
+              }
             }
             console.log(`[Push] Resume permission check: ${resumePermission}`);
 
@@ -568,8 +672,13 @@ export function usePushNotificationsInternal() {
               loginPerm = 'prompt';
             }
           } else {
-            const p = await PushNotifications.checkPermissions();
-            loginPerm = p.receive;
+            const PN = await getPushNotificationsPlugin();
+            if (PN) {
+              const p = await PN.checkPermissions();
+              loginPerm = p.receive;
+            } else {
+              loginPerm = 'prompt';
+            }
           }
           if (loginPerm === 'granted') {
             console.log('[Push] Stage full + permission granted — silent re-registration');
@@ -677,11 +786,16 @@ export function usePushNotificationsInternal() {
         await handleValidToken(fcmToken);
       } else {
         // ── Android: Use PushNotifications (works fine per article) ──
-        let permStatus = await PushNotifications.checkPermissions();
+        const PN = await getPushNotificationsPlugin();
+        if (!PN) {
+          console.error('[Push] PushNotifications plugin not available on Android');
+          return;
+        }
+        let permStatus = await PN.checkPermissions();
         console.log('[Push] requestFullPermission (Android) checkPermissions:', permStatus.receive);
 
         if (permStatus.receive === 'prompt') {
-          permStatus = await PushNotifications.requestPermissions();
+          permStatus = await PN.requestPermissions();
           console.log('[Push] requestFullPermission (Android) requestPermissions:', permStatus.receive);
         }
 

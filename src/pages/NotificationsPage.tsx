@@ -41,11 +41,18 @@ export default function NotificationsPage() {
 
     const checkPermission = async () => {
       try {
-        const { PushNotifications } = await import('@capacitor/push-notifications');
-        const result = await PushNotifications.checkPermissions();
-        setOsPermission(result.receive as 'granted' | 'denied' | 'prompt');
+        const platform = Capacitor.getPlatform();
+        if (platform === 'ios') {
+          const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
+          const result = await FirebaseMessaging.checkPermissions();
+          setOsPermission(result.receive as 'granted' | 'denied' | 'prompt');
+        } else {
+          const { PushNotifications } = await import('@capacitor/push-notifications');
+          const result = await PushNotifications.checkPermissions();
+          setOsPermission(result.receive as 'granted' | 'denied' | 'prompt');
+        }
       } catch {
-        setOsPermission('granted'); // Can't check — don't show banner
+        setOsPermission('granted');
       }
     };
 
@@ -192,8 +199,15 @@ export default function NotificationsPage() {
                 // that triggers the iOS permission popup and APNs registration.
                 await requestFullPermission();
                 // Re-check after request
-                const { PushNotifications } = await import('@capacitor/push-notifications');
-                const result = await PushNotifications.checkPermissions();
+                const platform = Capacitor.getPlatform();
+                let result;
+                if (platform === 'ios') {
+                  const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
+                  result = await FirebaseMessaging.checkPermissions();
+                } else {
+                  const { PushNotifications } = await import('@capacitor/push-notifications');
+                  result = await PushNotifications.checkPermissions();
+                }
                 setOsPermission(result.receive as 'granted' | 'denied' | 'prompt');
                 if (result.receive === 'granted') {
                   toast.success('Notifications enabled!');
