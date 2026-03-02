@@ -113,7 +113,8 @@ export function usePushNotificationsInternal() {
     const platform = Capacitor.getPlatform() as 'ios' | 'android' | 'web';
 
     try {
-      const { error, data } = await supabase
+      // Try upsert first (without .select() which can conflict with RLS)
+      const { error } = await supabase
         .from('device_tokens')
         .upsert(
           {
@@ -123,14 +124,33 @@ export function usePushNotificationsInternal() {
             updated_at: new Date().toISOString(),
           },
           { onConflict: 'user_id,token' }
-        )
-        .select();
+        );
 
       if (error) {
-        console.error('[Push] Token save FAILED:', error.message, error.code, error.details);
-        return false;
+        console.error('[Push] Token upsert FAILED:', error.message, error.code, error.details);
+        // Fallback: try plain insert (in case upsert has issues)
+        console.log('[Push] Attempting fallback INSERT…');
+        const { error: insertErr } = await supabase
+          .from('device_tokens')
+          .insert({
+            user_id: currentUser.id,
+            token: pushToken,
+            platform,
+            updated_at: new Date().toISOString(),
+          });
+        if (insertErr) {
+          // 23505 = unique violation — means the token already exists, which is fine
+          if (insertErr.code === '23505') {
+            console.log('[Push] Token already exists (unique constraint) — OK');
+            return true;
+          }
+          console.error('[Push] Fallback INSERT also failed:', insertErr.message, insertErr.code);
+          return false;
+        }
+        console.log('[Push] Token saved via fallback INSERT');
+        return true;
       }
-      console.log('[Push] Token saved successfully:', data);
+      console.log('[Push] Token saved successfully via upsert');
       return true;
     } catch (err) {
       console.error('[Push] Token save exception:', err);
