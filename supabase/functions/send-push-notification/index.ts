@@ -112,6 +112,7 @@ async function sendFCMNotification(
   data?: Record<string, string>
 ): Promise<{ success: boolean; error?: string }> {
   const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
+  console.log(`[DIAG] FCM URL: ${fcmUrl}, token prefix: ${deviceToken.substring(0, 20)}...`);
 
   const message: Record<string, unknown> = {
     message: {
