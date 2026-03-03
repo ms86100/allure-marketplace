@@ -6,7 +6,13 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { hapticNotification } from '@/lib/haptics';
 import { getPushStage, setPushStage } from '@/lib/pushPermissionStage';
-import { pushLog, setLogUser } from '@/lib/pushLogger';
+import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
+
+/**
+ * BUILD FINGERPRINT — if the device logs this, the bundle is current.
+ * If not, the device is running stale JS.
+ */
+export const PUSH_BUILD_ID = '2026-03-03-B';
 
 /**
  * NEW APPROACH: Uses @capacitor/push-notifications for permissions + registration
@@ -68,7 +74,8 @@ export function usePushNotificationsInternal() {
   const user = identity?.user ?? null;
   const navigate = useNavigate();
 
-  console.log('[Push][INIT] usePushNotifications render — platform:', Capacitor.getPlatform(), 'isNative:', Capacitor.isNativePlatform(), 'userId:', user?.id ?? 'null');
+  // ── BUILD FINGERPRINT LOG (fires on every render — proves bundle version) ──
+  console.log(`[Push][BUILD] BUILD_ID=${PUSH_BUILD_ID} | platform=${Capacitor.getPlatform()} | isNative=${Capacitor.isNativePlatform()} | userId=${user?.id ?? 'null'} | href=${window.location.href} | readyState=${document.readyState} | lastModified=${document.lastModified} | ts=${new Date().toISOString()}`);
 
   const userRef = useRef(user);
   userRef.current = user;
@@ -711,12 +718,18 @@ export function usePushNotificationsInternal() {
 
             console.log(`[Push] App resumed — regState: ${state}, token: ${hasRuntimeToken ? 'yes' : 'null'}, user: ${userRef.current?.id ?? 'null'}`);
             pushLog('info', 'appStateChange active', {
+              buildId: PUSH_BUILD_ID,
               platform,
               regState: state,
               hasToken: hasRuntimeToken,
               userId: userRef.current?.id ?? null,
+              href: window.location.href,
+              readyState: document.readyState,
+              lastModified: document.lastModified,
               at: new Date().toISOString(),
             });
+            // Force-flush immediately so BUILD_ID proof is never lost to buffer
+            flushPushLogs().catch(() => {});
 
             if (state === 'registered') return;
 
@@ -823,6 +836,7 @@ export function usePushNotificationsInternal() {
     // ── Auto-prompt on first login; silent re-register if already granted ──
     if (user) {
       setLogUser(user.id);
+      pushLog('info', `BUILD_FINGERPRINT on login`, { buildId: PUSH_BUILD_ID, platform, href: window.location.href, readyState: document.readyState, lastModified: document.lastModified });
       setTimeout(async () => {
         const stage = await getPushStage();
         pushLog('info', `Push stage on login: ${stage}`, { platform });
