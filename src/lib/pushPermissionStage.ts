@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { pushLog } from './pushLogger';
 
 /**
  * Two-stage push notification permission strategy:
@@ -24,19 +25,22 @@ async function getPrefs() {
 export async function getPushStage(): Promise<PushStage> {
   if (!Capacitor.isNativePlatform()) return 'none';
   try {
-    // Race against a timeout — Preferences.get() can hang on iOS cold start
-    const result = await Promise.race([
-      (async () => {
-        const prefs = await getPrefs();
-        if (!prefs) return 'none' as PushStage;
-        const { value } = await prefs.get({ key: KEY });
-        if (value === 'deferred' || value === 'full') return value;
-        return 'none' as PushStage;
-      })(),
-      new Promise<PushStage>((resolve) => setTimeout(() => resolve('none'), 3000)),
-    ]);
-    return result;
-  } catch {
+    const prefs = await getPrefs();
+    if (!prefs) {
+      console.log("PREFERENCES_PLUGIN_NULL", Date.now());
+      pushLog('warn', 'PREFERENCES_PLUGIN_NULL', { ts: Date.now() });
+      return 'none';
+    }
+    console.log("PREFERENCES_GET_CALLING", Date.now());
+    pushLog('info', 'PREFERENCES_GET_CALLING', { ts: Date.now() });
+    const { value } = await prefs.get({ key: KEY });
+    console.log("PREFERENCES_GET_RESOLVED", Date.now());
+    pushLog('info', 'PREFERENCES_GET_RESOLVED', { ts: Date.now(), value });
+    if (value === 'deferred' || value === 'full') return value;
+    return 'none';
+  } catch (e) {
+    console.log("PREFERENCES_GET_ERROR", Date.now(), e);
+    pushLog('error', 'PREFERENCES_GET_ERROR', { ts: Date.now(), error: String(e) });
     return 'none';
   }
 }
