@@ -12,7 +12,7 @@ import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
  * BUILD FINGERPRINT — if the device logs this, the bundle is current.
  * If not, the device is running stale JS.
  */
-export const PUSH_BUILD_ID = '2026-03-03-B';
+export const PUSH_BUILD_ID = '2026-03-03-C';
 
 /**
  * NEW APPROACH: Uses @capacitor/push-notifications for permissions + registration
@@ -73,6 +73,8 @@ export function usePushNotificationsInternal() {
   const identity = useContext(IdentityContext);
   const user = identity?.user ?? null;
   const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
 
   // ── BUILD FINGERPRINT LOG (fires on every render — proves bundle version) ──
   console.log(`[Push][BUILD] BUILD_ID=${PUSH_BUILD_ID} | platform=${Capacitor.getPlatform()} | isNative=${Capacitor.isNativePlatform()} | userId=${user?.id ?? 'null'} | href=${window.location.href} | readyState=${document.readyState} | lastModified=${document.lastModified} | ts=${new Date().toISOString()}`);
@@ -478,47 +480,47 @@ export function usePushNotificationsInternal() {
       description: body || '',
       duration: 10000,
       action: data?.orderId
-        ? { label: 'View', onClick: () => navigate(`/orders/${data.orderId}`) }
+        ? { label: 'View', onClick: () => navigateRef.current(`/orders/${data.orderId}`) }
         : undefined,
     });
-  }, [navigate]);
+  }, []);
 
   // ── Handle notification tap (shared logic) ──
   const handleNotificationAction = useCallback((data?: Record<string, string>) => {
     // Priority 1: explicit path or reference_path
     if (data?.path) {
-      navigate(data.path);
+      navigateRef.current(data.path);
       return;
     }
     if (data?.reference_path) {
-      navigate(data.reference_path);
+      navigateRef.current(data.reference_path);
       return;
     }
 
     // Priority 2: orderId → order detail
     if (data?.orderId) {
-      navigate(`/orders/${data.orderId}`);
+      navigateRef.current(`/orders/${data.orderId}`);
       return;
     }
 
     // Priority 3: type-specific routing
     const type = data?.type;
     if (type === 'chat' && data?.orderId) {
-      navigate(`/orders/${data.orderId}`);
+      navigateRef.current(`/orders/${data.orderId}`);
     } else if (type === 'order') {
-      navigate('/orders');
+      navigateRef.current('/orders');
     } else if (type === 'visitor') {
-      navigate('/visitors');
+      navigateRef.current('/visitors');
     } else if (type === 'dispute') {
-      navigate('/disputes');
+      navigateRef.current('/disputes');
     } else if (type === 'maintenance') {
-      navigate('/maintenance');
+      navigateRef.current('/maintenance');
     } else if (type === 'bulletin' || type === 'notice') {
-      navigate('/bulletin');
+      navigateRef.current('/bulletin');
     } else {
-      navigate('/notifications');
+      navigateRef.current('/notifications');
     }
-  }, [navigate]);
+  }, []);
 
   // ── Listeners + lifecycle ──
   useEffect(() => {
@@ -838,77 +840,99 @@ export function usePushNotificationsInternal() {
       setLogUser(user.id);
       pushLog('info', `BUILD_FINGERPRINT on login`, { buildId: PUSH_BUILD_ID, platform, href: window.location.href, readyState: document.readyState, lastModified: document.lastModified });
       setTimeout(async () => {
-        const stage = await getPushStage();
-        pushLog('info', `Push stage on login: ${stage}`, { platform });
+        try {
+          const stage = await getPushStage();
+          pushLog('info', `Push stage on login: ${stage}`, { platform });
+          // Force-flush so we can see this log even if app crashes later
+          flushPushLogs().catch(() => {});
 
-        if (stage === 'full') {
-          const PN = await getPushNotificationsPlugin();
-          let loginPerm = 'prompt';
-          if (PN) {
-            const p = await PN.checkPermissions();
-            loginPerm = p.receive;
-          }
-          pushLog('info', `Stage full, checkPermissions=${loginPerm}`, { platform });
+          if (stage === 'full') {
+            const PN = await getPushNotificationsPlugin();
+            let loginPerm = 'prompt';
+            if (PN) {
+              const p = await PN.checkPermissions();
+              loginPerm = p.receive;
+            }
+            pushLog('info', `Stage full, checkPermissions=${loginPerm}`, { platform });
 
-          // CRITICAL FIX: On iOS, checkPermissions() can return 'prompt' even
-          // when notifications ARE enabled. Always try reconcileRuntimeToken
-          // first when stage is 'full' — FCM.getToken() works regardless of
-          // what the Capacitor permission API reports.
-          const reconciled = await reconcileRuntimeToken('login_stage_full');
-          if (reconciled) {
-            pushLog('info', 'Token reconciled on login (bypassed permission gate)');
-            setPermissionStatus('granted');
-          } else if (loginPerm === 'granted') {
-            setPermissionStatus('granted');
-            pushLog('warn', 'Reconciliation failed but permission granted — falling back to register()');
-            registrationStateRef.current = 'idle';
-            retryCountRef.current = 0;
-            attemptRegistration();
-          } else if (loginPerm === 'denied') {
-            setPermissionStatus('denied');
-            pushLog('warn', 'Permission denied — waiting for user action');
-          } else {
-            // Still 'prompt' and reconciliation failed — try register() anyway
-            pushLog('warn', `Permission=${loginPerm} + reconcile failed — attempting register() as last resort`);
-            registrationStateRef.current = 'idle';
-            retryCountRef.current = 0;
-            attemptRegistration();
-          }
+            // CRITICAL FIX: On iOS, checkPermissions() can return 'prompt' even
+            // when notifications ARE enabled. Always try reconcileRuntimeToken
+            // first when stage is 'full' — FCM.getToken() works regardless of
+            // what the Capacitor permission API reports.
+            const reconciled = await reconcileRuntimeToken('login_stage_full');
+            if (reconciled) {
+              pushLog('info', 'Token reconciled on login (bypassed permission gate)');
+              setPermissionStatus('granted');
+            } else if (loginPerm === 'granted') {
+              setPermissionStatus('granted');
+              pushLog('warn', 'Reconciliation failed but permission granted — falling back to register()');
+              registrationStateRef.current = 'idle';
+              retryCountRef.current = 0;
+              attemptRegistration();
+            } else if (loginPerm === 'denied') {
+              setPermissionStatus('denied');
+              pushLog('warn', 'Permission denied — waiting for user action');
+            } else {
+              // Still 'prompt' and reconciliation failed — try register() anyway
+              pushLog('warn', `Permission=${loginPerm} + reconcile failed — attempting register() as last resort`);
+              registrationStateRef.current = 'idle';
+              retryCountRef.current = 0;
+              attemptRegistration();
+            }
 
-          // SAFETY NET: Schedule a delayed reconcile 5s after login.
-          // On cold start the iOS FCM bridge often isn't ready for the
-          // first few seconds, so this catches what the initial attempt misses.
-          if (!tokenRef.current && registrationStateRef.current !== 'registered') {
-            setTimeout(async () => {
-              if (tokenRef.current || registrationStateRef.current === 'registered') return;
-              pushLog('info', 'Login safety-net: delayed reconcile attempt (5s)');
-              const delayedOk = await reconcileRuntimeToken('login_delayed_safety_net');
-              if (delayedOk) {
-                setPermissionStatus('granted');
-                pushLog('info', 'Login safety-net: delayed reconcile SUCCEEDED');
-              } else {
-                pushLog('warn', 'Login safety-net: delayed reconcile also failed — scheduling 10s attempt');
-                // One more attempt at 10s for really slow cold starts
-                setTimeout(async () => {
+            // Force-flush after registration attempts
+            flushPushLogs().catch(() => {});
+
+            // SAFETY NET: Schedule a delayed reconcile 5s after login.
+            if (!tokenRef.current && registrationStateRef.current !== 'registered') {
+              setTimeout(async () => {
+                try {
                   if (tokenRef.current || registrationStateRef.current === 'registered') return;
-                  const lastResort = await reconcileRuntimeToken('login_10s_last_resort');
-                  if (lastResort) {
+                  pushLog('info', 'Login safety-net: delayed reconcile attempt (5s)');
+                  const delayedOk = await reconcileRuntimeToken('login_delayed_safety_net');
+                  if (delayedOk) {
                     setPermissionStatus('granted');
-                    pushLog('info', 'Login 10s last-resort reconcile SUCCEEDED');
+                    pushLog('info', 'Login safety-net: delayed reconcile SUCCEEDED');
                   } else {
-                    pushLog('error', 'Login: all reconcile attempts failed (0.5s, 5s, 10s)');
+                    pushLog('warn', 'Login safety-net: delayed reconcile also failed — scheduling 10s attempt');
+                    setTimeout(async () => {
+                      try {
+                        if (tokenRef.current || registrationStateRef.current === 'registered') return;
+                        const lastResort = await reconcileRuntimeToken('login_10s_last_resort');
+                        if (lastResort) {
+                          setPermissionStatus('granted');
+                          pushLog('info', 'Login 10s last-resort reconcile SUCCEEDED');
+                        } else {
+                          pushLog('error', 'Login: all reconcile attempts failed (0.5s, 5s, 10s)');
+                        }
+                      } catch (err) {
+                        pushLog('error', '10s safety-net crashed', { error: String(err) });
+                      }
+                      flushPushLogs().catch(() => {});
+                    }, 5000);
                   }
-                }, 5000);
-              }
-            }, 5000);
+                } catch (err) {
+                  pushLog('error', '5s safety-net crashed', { error: String(err) });
+                }
+                flushPushLogs().catch(() => {});
+              }, 5000);
+            }
+          } else if (stage === 'none' || stage === 'deferred') {
+            pushLog('info', 'First login — auto-requesting notification permission');
+            await setPushStage('full');
+            registrationStateRef.current = 'idle';
+            retryCountRef.current = 0;
+            await attemptRegistration();
           }
-        } else if (stage === 'none' || stage === 'deferred') {
-          pushLog('info', 'First login — auto-requesting notification permission');
-          await setPushStage('full');
-          registrationStateRef.current = 'idle';
-          retryCountRef.current = 0;
-          await attemptRegistration();
+        } catch (err) {
+          pushLog('error', 'Login registration setTimeout CRASHED', {
+            error: String(err),
+            stack: (err as Error)?.stack?.substring(0, 500) ?? 'no stack',
+            platform,
+          });
         }
+        // Always force-flush at the end
+        flushPushLogs().catch(() => {});
       }, 500);
     }
 
@@ -917,7 +941,7 @@ export function usePushNotificationsInternal() {
       cleanups.forEach(fn => fn());
       appListenerCleanup?.();
     };
-  }, [user, attemptRegistration, handleValidToken, handleForegroundNotification, handleNotificationAction, navigate, clearWatchdog, markFailed, reconcileRuntimeToken]);
+  }, [user, attemptRegistration, handleValidToken, handleForegroundNotification, handleNotificationAction, clearWatchdog, markFailed, reconcileRuntimeToken]);
 
   // ── Retry token save when user becomes available ──
   useEffect(() => {
