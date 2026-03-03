@@ -129,6 +129,20 @@ async function sendFCMNotification(
           sound: "default",
         },
       },
+      // iOS APNs hardening — required for reliable delivery
+      apns: {
+        headers: {
+          "apns-push-type": "alert",
+          "apns-priority": "10",
+        },
+        payload: {
+          aps: {
+            alert: { title, body },
+            sound: "default",
+            badge: 1,
+          },
+        },
+      },
     },
   };
 
