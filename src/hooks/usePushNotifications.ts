@@ -12,7 +12,7 @@ import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
  * BUILD FINGERPRINT — if the device logs this, the bundle is current.
  * If not, the device is running stale JS.
  */
-export const PUSH_BUILD_ID = '2026-03-03-H';
+export const PUSH_BUILD_ID = '2026-03-03-I';
 
 /**
  * NEW APPROACH: Uses @capacitor/push-notifications for permissions + registration
@@ -80,6 +80,22 @@ export function usePushNotificationsInternal() {
   console.log(`[Push][BUILD] BUILD_ID=${PUSH_BUILD_ID} | platform=${Capacitor.getPlatform()} | isNative=${Capacitor.isNativePlatform()} | userId=${user?.id ?? 'null'} | href=${window.location.href} | readyState=${document.readyState} | lastModified=${document.lastModified} | ts=${new Date().toISOString()}`);
 
   const userRef = useRef(user);
+  // ── LIFECYCLE AUDIT: track user object identity across renders ──
+  const prevUserObjRef = useRef<typeof user>(undefined);
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  const renderNum = renderCountRef.current;
+  const userChanged = user !== prevUserObjRef.current;
+  const userIdChanged = user?.id !== prevUserObjRef.current?.id;
+  pushLog('info', 'HOOK_RENDER', {
+    renderNum,
+    userId: user?.id ?? null,
+    userObjChanged: userChanged,
+    userIdChanged,
+    prevUserId: prevUserObjRef.current?.id ?? null,
+    ts: Date.now(),
+  });
+  prevUserObjRef.current = user;
   userRef.current = user;
 
   const registrationStateRef = useRef<RegistrationState>('idle');
@@ -531,8 +547,27 @@ export function usePushNotificationsInternal() {
   useEffect(() => {
     const myId = ++activeInstanceId;
     let tornDown = false;
-    pushLog('info', 'EFFECT_MOUNTED', { myId, userId: user?.id, ts: Date.now() });
-    pushLog('info', 'EFFECT_RENDER', { userId: user?.id, permissionStatus, hasToken: !!tokenRef.current, regState: registrationStateRef.current, ts: Date.now() });
+    pushLog('info', 'EFFECT_MOUNTED', {
+      myId,
+      userId: user?.id,
+      renderNum: renderCountRef.current,
+      ts: Date.now(),
+    });
+    // ── LIFECYCLE AUDIT: log all dependency values to identify which one triggered remount ──
+    pushLog('info', 'EFFECT_DEPS_SNAPSHOT', {
+      myId,
+      hasUser: !!user,
+      userId: user?.id ?? null,
+      // Function refs: log identity via toString length as a proxy (stable callbacks won't change)
+      attemptRegistrationId: attemptRegistration.toString().length,
+      handleValidTokenId: handleValidToken.toString().length,
+      handleFgNotifId: handleForegroundNotification.toString().length,
+      handleNotifActionId: handleNotificationAction.toString().length,
+      clearWatchdogId: clearWatchdog.toString().length,
+      markFailedId: markFailed.toString().length,
+      reconcileId: reconcileRuntimeToken.toString().length,
+      ts: Date.now(),
+    });
     if (myId !== activeInstanceId) {
       console.warn('[Push] Duplicate instance detected — skipping effects');
       return;

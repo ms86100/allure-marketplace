@@ -73,9 +73,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [effectiveSocietyId, !!profile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Memoized sub-context values ───────────────────────
-  const identityValue = useMemo<IdentityContextType>(() => ({
-    user, session, isLoading, signOut, refreshProfile,
-  }), [user, session, isLoading, signOut, refreshProfile]);
+  // ── LIFECYCLE AUDIT: track identity context emissions ──
+  const identityEmitCountRef = React.useRef(0);
+  const prevIdentityDepsRef = React.useRef({ userId: null as string | null, hasSession: false, isLoading: true });
+
+  const identityValue = useMemo<IdentityContextType>(() => {
+    identityEmitCountRef.current += 1;
+    const emitNum = identityEmitCountRef.current;
+    const prev = prevIdentityDepsRef.current;
+    console.log(`[Auth][LIFECYCLE] IdentityContext emission #${emitNum}`, {
+      userId: user?.id ?? null,
+      hasSession: !!session,
+      isLoading,
+      prevUserId: prev.userId,
+      prevHasSession: prev.hasSession,
+      prevIsLoading: prev.isLoading,
+      ts: Date.now(),
+    });
+    prevIdentityDepsRef.current = { userId: user?.id ?? null, hasSession: !!session, isLoading };
+    return { user, session, isLoading, signOut, refreshProfile };
+  }, [user, session, isLoading, signOut, refreshProfile]);
 
   const roleValue = useMemo<RoleContextType>(() => ({
     profile, roles, isApproved, isAdmin, isSocietyAdmin,
