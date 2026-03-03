@@ -68,15 +68,21 @@ export function EnableNotificationsBanner() {
     setLoading(true);
     try {
       await requestFullPermission();
-      // After returning, check if permission is still 'prompt' — means OS prompt never showed
-      // We use a small delay to let state propagate
-      setTimeout(() => {
-        // This will be checked on next render via permissionStatus
-        setLoading(false);
-      }, 500);
     } catch {
-      setLoading(false);
-      setFailedSilently(true);
+      // timeout or error — OS prompt was likely suppressed
+    }
+    setLoading(false);
+    // If permission is still not granted after the call, show the "open settings" fallback
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const result = await PushNotifications.checkPermissions();
+        if (result.receive !== 'granted') {
+          setFailedSilently(true);
+        }
+      } catch {
+        setFailedSilently(true);
+      }
     }
   };
 
