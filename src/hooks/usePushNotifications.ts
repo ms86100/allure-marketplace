@@ -12,7 +12,7 @@ import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
  * BUILD FINGERPRINT — if the device logs this, the bundle is current.
  * If not, the device is running stale JS.
  */
-export const PUSH_BUILD_ID = '2026-03-03-M-DIRECT-FCM';
+export const PUSH_BUILD_ID = '2026-03-03-N-USER-PROMPT-FIX';
 
 /**
  * NEW APPROACH: Uses @capacitor/push-notifications for permissions + registration
@@ -414,22 +414,17 @@ export function usePushNotificationsInternal() {
     pushLog('info', 'AR_PLUGIN_LOADED', { ts: Date.now() });
 
     try {
-      // Step 1: Check permissions
+      // Step 1: Check permissions — NEVER request here (would consume the one-time iOS prompt).
+      // Permission requests must ONLY happen via requestFullPermission (user taps "Turn On").
       pushLog('info', 'AR_CHECK_PERMISSIONS_CALLING', { ts: Date.now() });
-      let permStatus = await PN.checkPermissions();
+      const permStatus = await PN.checkPermissions();
       pushLog('info', 'AR_CHECK_PERMISSIONS_RESULT', { receive: permStatus.receive, ts: Date.now() });
-
-      if (permStatus.receive === 'prompt') {
-        pushLog('info', 'AR_REQUEST_PERMISSIONS_CALLING', { ts: Date.now() });
-        permStatus = await PN.requestPermissions();
-        pushLog('info', 'AR_REQUEST_PERMISSIONS_RESULT', { receive: permStatus.receive, ts: Date.now() });
-      }
 
       if (permStatus.receive !== 'granted') {
         const isDenied = permStatus.receive === 'denied';
         setPermissionStatus(isDenied ? 'denied' : 'prompt');
         registrationStateRef.current = 'idle';
-        pushLog('warn', `Permission not granted (${permStatus.receive})`, { platform });
+        pushLog('info', `Permission not yet granted (${permStatus.receive}) — waiting for user to tap "Turn On"`, { platform });
         return;
       }
 
