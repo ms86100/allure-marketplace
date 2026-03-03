@@ -724,6 +724,75 @@ export type Database = {
           },
         ]
       }
+      campaigns: {
+        Row: {
+          body: string
+          cleaned_count: number
+          completed_at: string | null
+          created_at: string
+          data: Json | null
+          failed_count: number
+          id: string
+          sent_by: string
+          sent_count: number
+          status: string
+          target_platform: string
+          target_society_id: string | null
+          target_user_ids: string[] | null
+          targeted_count: number
+          title: string
+        }
+        Insert: {
+          body: string
+          cleaned_count?: number
+          completed_at?: string | null
+          created_at?: string
+          data?: Json | null
+          failed_count?: number
+          id?: string
+          sent_by: string
+          sent_count?: number
+          status?: string
+          target_platform?: string
+          target_society_id?: string | null
+          target_user_ids?: string[] | null
+          targeted_count?: number
+          title: string
+        }
+        Update: {
+          body?: string
+          cleaned_count?: number
+          completed_at?: string | null
+          created_at?: string
+          data?: Json | null
+          failed_count?: number
+          id?: string
+          sent_by?: string
+          sent_count?: number
+          status?: string
+          target_platform?: string
+          target_society_id?: string | null
+          target_user_ids?: string[] | null
+          targeted_count?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_sent_by_fkey"
+            columns: ["sent_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_target_society_id_fkey"
+            columns: ["target_society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cart_items: {
         Row: {
           created_at: string | null

@@ -6,7 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Store, Users, Building2, AlertCircle, LayoutGrid, Flag,
   CreditCard, Star, Megaphone, Layers, Settings2, Bot, Navigation,
-  Menu, ChevronRight, FileCode,
+  Menu, ChevronRight, FileCode, Send,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -34,6 +34,7 @@ const NAV_GROUPS = [
     label: 'System',
     items: [
       { value: 'features', label: 'Features', icon: Layers },
+      { value: 'campaigns', label: 'Campaigns', icon: Send },
       { value: 'ai-review', label: 'AI Review', icon: Bot },
       { value: 'settings', label: 'Settings', icon: Settings2 },
       { value: 'api-docs', label: 'API Docs', icon: FileCode },
