@@ -12,7 +12,7 @@ import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
  * BUILD FINGERPRINT — if the device logs this, the bundle is current.
  * If not, the device is running stale JS.
  */
-export const PUSH_BUILD_ID = '2026-03-03-N-USER-PROMPT-FIX';
+export const PUSH_BUILD_ID = '2026-03-03-APNS-TOKEN-FIX';
 
 /**
  * NEW APPROACH: Uses @capacitor/push-notifications for permissions + registration
@@ -431,17 +431,9 @@ export function usePushNotificationsInternal() {
       setPermissionStatus('granted');
       clearWatchdog();
 
-      // Step 2: Call PN.register() to ensure APNs registration
-      pushLog('info', 'AR_REGISTER_CALLING', { ts: Date.now() });
-      await PN.register();
-      pushLog('info', 'AR_REGISTER_RETURNED', { ts: Date.now() });
-
-      // Step 3: Platform-specific token retrieval
+      // Step 2: On iOS, set up APNs token listener BEFORE register() so we don't miss the event
       if (platform === 'ios') {
-        // ── iOS: Capture raw APNs token for direct delivery, then get FCM token ──
         pushLog('info', 'AR_IOS_CAPTURING_APNS_TOKEN', { ts: Date.now() });
-
-        // Capture APNs token from the registration event (64-char hex on iOS)
         try {
           const pn = await getPushNotificationsPlugin();
           if (pn) {
@@ -456,7 +448,15 @@ export function usePushNotificationsInternal() {
         } catch (e) {
           pushLog('warn', 'APNS_TOKEN_CAPTURE_FAILED', { error: String(e) });
         }
+      }
 
+      // Step 3: Call PN.register() — fires 'registration' event with APNs token on iOS
+      pushLog('info', 'AR_REGISTER_CALLING', { ts: Date.now() });
+      await PN.register();
+      pushLog('info', 'AR_REGISTER_RETURNED', { ts: Date.now() });
+
+      // Step 4: Platform-specific token retrieval
+      if (platform === 'ios') {
         // Small delay to let the registration event fire and capture APNs token
         await new Promise((r) => setTimeout(r, 500));
 
