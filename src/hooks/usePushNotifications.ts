@@ -150,6 +150,9 @@ export function usePushNotificationsInternal() {
     emitDiagnostic();
   }, [clearWatchdog, emitDiagnostic]);
 
+  // Store captured APNs token for direct delivery
+  const apnsTokenRef = useRef<string | null>(null);
+
   // ── Token persistence ──
   const saveTokenToDatabase = useCallback(async (pushToken: string) => {
     const currentUser = userRef.current;
@@ -161,10 +164,10 @@ export function usePushNotificationsInternal() {
     }
 
     const platform = Capacitor.getPlatform() as 'ios' | 'android' | 'web';
+    const apnsToken = platform === 'ios' ? apnsTokenRef.current : null;
 
     try {
       // Ensure this physical device token belongs to exactly one user.
-      // If the same token exists under another account, re-assign it.
       const { error: cleanupError } = await supabase
         .from('device_tokens')
         .delete()
@@ -175,29 +178,28 @@ export function usePushNotificationsInternal() {
         console.warn('[Push] Cross-user token cleanup warning:', cleanupError.message);
       }
 
+      const upsertData: Record<string, unknown> = {
+        user_id: currentUser.id,
+        token: pushToken,
+        platform,
+        updated_at: new Date().toISOString(),
+      };
+      // Include APNs token for iOS direct delivery
+      if (apnsToken) {
+        upsertData.apns_token = apnsToken;
+        pushLog('info', 'SAVING_APNS_TOKEN', { apnsPrefix: apnsToken.substring(0, 16), fcmPrefix: pushToken.substring(0, 20) });
+      }
+
       const { error } = await supabase
         .from('device_tokens')
-        .upsert(
-          {
-            user_id: currentUser.id,
-            token: pushToken,
-            platform,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'user_id,token' }
-        );
+        .upsert(upsertData as any, { onConflict: 'user_id,token' });
 
       if (error) {
         console.error('[Push] Token upsert FAILED:', error.message, error.code, error.details);
         console.log('[Push] Attempting fallback INSERT…');
         const { error: insertErr } = await supabase
           .from('device_tokens')
-          .insert({
-            user_id: currentUser.id,
-            token: pushToken,
-            platform,
-            updated_at: new Date().toISOString(),
-          });
+          .insert(upsertData as any);
         if (insertErr) {
           if (insertErr.code === '23505') {
             console.log('[Push] Token already exists (unique constraint) — OK');
@@ -209,7 +211,7 @@ export function usePushNotificationsInternal() {
         console.log('[Push] Token saved via fallback INSERT');
         return true;
       }
-      console.log('[Push] Token saved successfully via upsert');
+      console.log('[Push] Token saved successfully via upsert' + (apnsToken ? ` (with APNs token ${apnsToken.substring(0, 16)}…)` : ''));
       return true;
     } catch (err) {
       console.error('[Push] Token save exception:', err);
@@ -441,12 +443,30 @@ export function usePushNotificationsInternal() {
 
       // Step 3: Platform-specific token retrieval
       if (platform === 'ios') {
-        // ── iOS DIRECT PATH: Call FCM.getToken() directly ──
-        // The 'registration' event listener is unreliable on iOS.
-        // Proven: manual "Save FCM Token" button (which calls FCM.getToken() directly) works.
-        // So we do the same thing here, bypassing the event-based flow.
-        pushLog('info', 'AR_IOS_DIRECT_FCM_CALLING', { ts: Date.now() });
+        // ── iOS: Capture raw APNs token for direct delivery, then get FCM token ──
+        pushLog('info', 'AR_IOS_CAPTURING_APNS_TOKEN', { ts: Date.now() });
 
+        // Capture APNs token from the registration event (64-char hex on iOS)
+        try {
+          const pn = await getPushNotificationsPlugin();
+          if (pn) {
+            await pn.addListener('registration', (regToken) => {
+              const raw = regToken.value;
+              if (raw && /^[A-Fa-f0-9]{64}$/.test(raw)) {
+                apnsTokenRef.current = raw;
+                pushLog('info', 'APNS_TOKEN_CAPTURED', { prefix: raw.substring(0, 16), ts: Date.now() });
+              }
+            });
+          }
+        } catch (e) {
+          pushLog('warn', 'APNS_TOKEN_CAPTURE_FAILED', { error: String(e) });
+        }
+
+        // Small delay to let the registration event fire and capture APNs token
+        await new Promise((r) => setTimeout(r, 500));
+
+        // Now get FCM token
+        pushLog('info', 'AR_IOS_DIRECT_FCM_CALLING', { ts: Date.now() });
         const fcm = await getFcmPlugin();
         if (!fcm) {
           pushLog('error', 'AR_IOS_FCM_PLUGIN_MISSING');
@@ -476,7 +496,6 @@ export function usePushNotificationsInternal() {
           } catch (err) {
             pushLog('warn', `AR_IOS_FCM_GETTOKEN_ERROR_${i}`, { error: String(err), ts: Date.now() });
           }
-          // Wait before retry
           if (i < 3) {
             await new Promise((r) => setTimeout(r, i * 1000));
           }
@@ -489,13 +508,16 @@ export function usePushNotificationsInternal() {
             markFailed();
           } else {
             registrationStateRef.current = 'idle';
-            // Retry after delay
             setTimeout(() => attemptRegistration(), 2000);
           }
           return;
         }
 
-        pushLog('info', 'AR_IOS_TOKEN_OBTAINED', { tokenPrefix: fcmToken.substring(0, 20), ts: Date.now() });
+        pushLog('info', 'AR_IOS_TOKEN_OBTAINED', {
+          fcmPrefix: fcmToken.substring(0, 20),
+          apnsPrefix: apnsTokenRef.current?.substring(0, 16) ?? 'none',
+          ts: Date.now(),
+        });
         await handleValidToken(fcmToken);
 
       } else {
