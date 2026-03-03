@@ -12,7 +12,7 @@ import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
  * BUILD FINGERPRINT — if the device logs this, the bundle is current.
  * If not, the device is running stale JS.
  */
-export const PUSH_BUILD_ID = '2026-03-03-I';
+export const PUSH_BUILD_ID = '2026-03-03-J-LIFECYCLE-FIX';
 
 /**
  * NEW APPROACH: Uses @capacitor/push-notifications for permissions + registration
@@ -543,29 +543,42 @@ export function usePushNotificationsInternal() {
     }
   }, []);
 
+  // ── Stable refs for all callbacks used inside the main effect ──
+  // This ensures the effect depends ONLY on user?.id, not on callback identity.
+  const attemptRegistrationRef = useRef(attemptRegistration);
+  attemptRegistrationRef.current = attemptRegistration;
+  const handleValidTokenRef = useRef(handleValidToken);
+  handleValidTokenRef.current = handleValidToken;
+  const handleForegroundNotificationRef = useRef(handleForegroundNotification);
+  handleForegroundNotificationRef.current = handleForegroundNotification;
+  const handleNotificationActionRef = useRef(handleNotificationAction);
+  handleNotificationActionRef.current = handleNotificationAction;
+  const clearWatchdogRef = useRef(clearWatchdog);
+  clearWatchdogRef.current = clearWatchdog;
+  const markFailedRef = useRef(markFailed);
+  markFailedRef.current = markFailed;
+  const reconcileRuntimeTokenRef = useRef(reconcileRuntimeToken);
+  reconcileRuntimeTokenRef.current = reconcileRuntimeToken;
+
   // ── Listeners + lifecycle ──
+  // LIFECYCLE FIX: Depend ONLY on user?.id to prevent effect remounts
+  // when the user object reference changes but the identity hasn't.
+  // All callbacks are accessed via stable refs above.
+  const userId = user?.id ?? null;
   useEffect(() => {
     const myId = ++activeInstanceId;
     let tornDown = false;
     pushLog('info', 'EFFECT_MOUNTED', {
       myId,
-      userId: user?.id,
+      userId,
       renderNum: renderCountRef.current,
       ts: Date.now(),
     });
-    // ── LIFECYCLE AUDIT: log all dependency values to identify which one triggered remount ──
     pushLog('info', 'EFFECT_DEPS_SNAPSHOT', {
       myId,
-      hasUser: !!user,
-      userId: user?.id ?? null,
-      // Function refs: log identity via toString length as a proxy (stable callbacks won't change)
-      attemptRegistrationId: attemptRegistration.toString().length,
-      handleValidTokenId: handleValidToken.toString().length,
-      handleFgNotifId: handleForegroundNotification.toString().length,
-      handleNotifActionId: handleNotificationAction.toString().length,
-      clearWatchdogId: clearWatchdog.toString().length,
-      markFailedId: markFailed.toString().length,
-      reconcileId: reconcileRuntimeToken.toString().length,
+      userId,
+      depsCount: 1,
+      depName: 'userId',
       ts: Date.now(),
     });
     if (myId !== activeInstanceId) {
@@ -605,7 +618,7 @@ export function usePushNotificationsInternal() {
             const fcm = await getFcmPlugin();
             if (!fcm) {
               console.error('[Push][iOS] @capacitor-community/fcm not available — cannot convert token');
-              markFailed();
+              markFailedRef.current();
               return;
             }
 
@@ -632,18 +645,18 @@ export function usePushNotificationsInternal() {
 
             if (!fcmToken) {
               console.error('[Push][iOS] FCM token conversion failed after 3 attempts');
-              markFailed();
+              markFailedRef.current();
               return;
             }
 
-            await handleValidToken(fcmToken);
+            await handleValidTokenRef.current(fcmToken);
           } else {
             // Android: registration event already provides FCM token
             if (!isValidFcmToken(rawToken, 'android')) {
               console.warn('[Push][Android] Token failed validation — ignoring');
               return;
             }
-            await handleValidToken(rawToken);
+            await handleValidTokenRef.current(rawToken);
           }
         } catch (err) {
           console.error(`[Push][${platform}] registration listener exception:`, err);
@@ -663,7 +676,7 @@ export function usePushNotificationsInternal() {
             at: new Date().toISOString(),
           });
           lastErrorRef.current = error;
-          markFailed();
+          markFailedRef.current();
         } catch (err) {
           console.error(`[Push][${platform}] registrationError listener exception:`, err);
         }
@@ -683,7 +696,7 @@ export function usePushNotificationsInternal() {
             appState: document.visibilityState,
             at: new Date().toISOString(),
           });
-          handleForegroundNotification(notification.title || '', notification.body || '', data);
+          handleForegroundNotificationRef.current(notification.title || '', notification.body || '', data);
         } catch (err) {
           console.error(`[Push][${platform}] pushNotificationReceived listener exception:`, err);
         }
@@ -702,7 +715,7 @@ export function usePushNotificationsInternal() {
             appState: document.visibilityState,
             at: new Date().toISOString(),
           });
-          handleNotificationAction(data);
+          handleNotificationActionRef.current(data);
         } catch (err) {
           console.error(`[Push][${platform}] pushNotificationActionPerformed listener exception:`, err);
         }
@@ -749,7 +762,7 @@ export function usePushNotificationsInternal() {
             // Attempt an early runtime reconciliation before logging, to avoid stale "hasToken:false" snapshots.
             if (!hasRuntimeToken && userRef.current) {
               try {
-                const reconciledEarly = await reconcileRuntimeToken('app_resume_prelog');
+                const reconciledEarly = await reconcileRuntimeTokenRef.current('app_resume_prelog');
                 hasRuntimeToken = Boolean(tokenRef.current);
                 if (reconciledEarly) {
                   state = registrationStateRef.current;
@@ -801,7 +814,7 @@ export function usePushNotificationsInternal() {
               // checkPermissions() is unreliable and can return 'prompt' even
               // when notifications are enabled.
               if (!tokenRef.current) {
-                const reconciled = await reconcileRuntimeToken('app_resume_missing_runtime_token');
+                const reconciled = await reconcileRuntimeTokenRef.current('app_resume_missing_runtime_token');
                 if (reconciled) {
                   console.log('[Push] Runtime token reconciled on resume');
                   setPermissionStatus('granted');
@@ -814,7 +827,7 @@ export function usePushNotificationsInternal() {
                 registrationStateRef.current = 'idle';
                 retryCountRef.current = 0;
                 console.log('[Push] Permission granted on resume — attempting registration');
-                attemptRegistration();
+                attemptRegistrationRef.current();
               } else if (resumePermission === 'denied') {
                 setPermissionStatus('denied');
               } else {
@@ -822,7 +835,7 @@ export function usePushNotificationsInternal() {
                 pushLog('warn', 'Resume: permission=prompt, trying register() as fallback');
                 registrationStateRef.current = 'idle';
                 retryCountRef.current = 0;
-                attemptRegistration();
+                attemptRegistrationRef.current();
               }
 
               // SAFETY NET: If still no token after all attempts above,
@@ -832,7 +845,7 @@ export function usePushNotificationsInternal() {
                 setTimeout(async () => {
                   if (tokenRef.current || registrationStateRef.current === 'registered') return;
                   pushLog('info', 'Resume safety-net: delayed reconcile attempt (5s)');
-                  const delayedOk = await reconcileRuntimeToken('app_resume_delayed_safety_net');
+                  const delayedOk = await reconcileRuntimeTokenRef.current('app_resume_delayed_safety_net');
                   if (delayedOk) {
                     setPermissionStatus('granted');
                     pushLog('info', 'Resume safety-net: delayed reconcile SUCCEEDED');
@@ -851,7 +864,7 @@ export function usePushNotificationsInternal() {
                 at: new Date().toISOString(),
               });
               retryCountRef.current = 0;
-              attemptRegistration();
+              attemptRegistrationRef.current();
             }
           } catch (err) {
             console.error('[Push] appStateChange listener exception:', err);
@@ -871,7 +884,7 @@ export function usePushNotificationsInternal() {
                 at: new Date().toISOString(),
               });
               retryCountRef.current = 0;
-              attemptRegistration();
+              attemptRegistrationRef.current();
             }
           }
         });
@@ -882,12 +895,12 @@ export function usePushNotificationsInternal() {
     })();
 
     // ── Auto-prompt on first login; silent re-register if already granted ──
-    if (user) {
-      pushLog('info', 'USER_BLOCK_ENTERED', { userId: user.id, ts: Date.now() });
-      setLogUser(user.id);
+    if (userId) {
+      pushLog('info', 'USER_BLOCK_ENTERED', { userId, ts: Date.now() });
+      setLogUser(userId);
       pushLog('info', `BUILD_FINGERPRINT on login`, { buildId: PUSH_BUILD_ID, platform, href: window.location.href, readyState: document.readyState, lastModified: document.lastModified });
       setTimeout(async () => {
-        pushLog('info', 'LOGIN_SETTIMEOUT_FIRED', { userId: user?.id, tornDown, ts: Date.now() });
+        pushLog('info', 'LOGIN_SETTIMEOUT_FIRED', { userId, tornDown, ts: Date.now() });
         if (tornDown) {
           pushLog('warn', 'EFFECT_TORN_DOWN_BEFORE_REGISTRATION', { myId, ts: Date.now() });
           return;
@@ -913,7 +926,7 @@ export function usePushNotificationsInternal() {
             // when notifications ARE enabled. Always try reconcileRuntimeToken
             // first when stage is 'full' — FCM.getToken() works regardless of
             // what the Capacitor permission API reports.
-            const reconciled = await reconcileRuntimeToken('login_stage_full');
+            const reconciled = await reconcileRuntimeTokenRef.current('login_stage_full');
             if (reconciled) {
               pushLog('info', 'Token reconciled on login (bypassed permission gate)');
               setPermissionStatus('granted');
@@ -922,7 +935,7 @@ export function usePushNotificationsInternal() {
               pushLog('warn', 'Reconciliation failed but permission granted — falling back to register()');
               registrationStateRef.current = 'idle';
               retryCountRef.current = 0;
-              attemptRegistration();
+              attemptRegistrationRef.current();
             } else if (loginPerm === 'denied') {
               setPermissionStatus('denied');
               pushLog('warn', 'Permission denied — waiting for user action');
@@ -931,7 +944,7 @@ export function usePushNotificationsInternal() {
               pushLog('warn', `Permission=${loginPerm} + reconcile failed — attempting register() as last resort`);
               registrationStateRef.current = 'idle';
               retryCountRef.current = 0;
-              attemptRegistration();
+              attemptRegistrationRef.current();
             }
 
             // Force-flush after registration attempts
@@ -943,7 +956,7 @@ export function usePushNotificationsInternal() {
                 try {
                   if (tokenRef.current || registrationStateRef.current === 'registered') return;
                   pushLog('info', 'Login safety-net: delayed reconcile attempt (5s)');
-                  const delayedOk = await reconcileRuntimeToken('login_delayed_safety_net');
+                  const delayedOk = await reconcileRuntimeTokenRef.current('login_delayed_safety_net');
                   if (delayedOk) {
                     setPermissionStatus('granted');
                     pushLog('info', 'Login safety-net: delayed reconcile SUCCEEDED');
@@ -952,7 +965,7 @@ export function usePushNotificationsInternal() {
                     setTimeout(async () => {
                       try {
                         if (tokenRef.current || registrationStateRef.current === 'registered') return;
-                        const lastResort = await reconcileRuntimeToken('login_10s_last_resort');
+                        const lastResort = await reconcileRuntimeTokenRef.current('login_10s_last_resort');
                         if (lastResort) {
                           setPermissionStatus('granted');
                           pushLog('info', 'Login 10s last-resort reconcile SUCCEEDED');
@@ -976,7 +989,7 @@ export function usePushNotificationsInternal() {
             await setPushStage('full');
             registrationStateRef.current = 'idle';
             retryCountRef.current = 0;
-            await attemptRegistration();
+            await attemptRegistrationRef.current();
           }
         } catch (err) {
           pushLog('error', 'Login registration setTimeout CRASHED', {
@@ -994,11 +1007,12 @@ export function usePushNotificationsInternal() {
       tornDown = true;
       pushLog('info', 'EFFECT_CLEANUP', { myId, regState: registrationStateRef.current, hasToken: !!tokenRef.current, ts: Date.now() });
       flushPushLogs().catch(() => {});
-      clearWatchdog();
+      clearWatchdogRef.current();
       cleanups.forEach(fn => fn());
       appListenerCleanup?.();
     };
-  }, [user, attemptRegistration, handleValidToken, handleForegroundNotification, handleNotificationAction, clearWatchdog, markFailed, reconcileRuntimeToken]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   // ── Retry token save when user becomes available ──
   useEffect(() => {
