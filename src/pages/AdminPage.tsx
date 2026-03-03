@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ApiKeySettings } from '@/components/admin/ApiKeySettings';
 import { AppNavigator } from '@/components/admin/AppNavigator';
 import { AdminAIReviewLog } from '@/components/admin/AdminAIReviewLog';
+import { CampaignSender } from '@/components/admin/CampaignSender';
 import { AdminSidebarNav } from '@/components/admin/AdminSidebarNav';
 import { SellerApplicationReview } from '@/components/admin/SellerApplicationReview';
 import { AdminProductApprovals } from '@/components/admin/AdminProductApprovals';
@@ -434,6 +435,7 @@ export default function AdminPage() {
             </div>
           )}
 
+          {admin.activeTab === 'campaigns' && <CampaignSender />}
           {admin.activeTab === 'ai-review' && <AdminAIReviewLog />}
           {admin.activeTab === 'navigator' && <AppNavigator />}
         </div>

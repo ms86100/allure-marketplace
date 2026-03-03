@@ -66,5 +66,8 @@ verify_jwt = false
 [functions.update-delivery-location]
 verify_jwt = false
 
+[functions.send-campaign]
+verify_jwt = false
+
 [functions.test-apns-direct]
 verify_jwt = false
