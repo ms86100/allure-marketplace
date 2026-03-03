@@ -3,6 +3,7 @@ import { IdentityContext } from '@/contexts/auth/contexts';
 import { runPushDiagnostics, printDiagnostics, DiagnosticResult } from '@/lib/pushDiagnostics';
 import { supabase } from '@/integrations/supabase/client';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
+import { PUSH_BUILD_ID } from '@/hooks/usePushNotifications';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -172,9 +173,15 @@ export default function PushDebugPage() {
     <div className="min-h-screen bg-background p-4 pb-24 space-y-4">
       <h1 className="text-xl font-bold">🔔 Push Notification Debug</h1>
       <p className="text-sm text-muted-foreground">
+        <strong>BUILD_ID: {PUSH_BUILD_ID}</strong>
+        <br />
         User: {user?.id?.substring(0, 8) ?? 'not logged in'}…
         <br />
         Hook token: {token ? `${token.substring(0, 20)}…` : 'null'} | Permission: {permissionStatus}
+        <br />
+        href: {window.location.href}
+        <br />
+        lastModified: {document.lastModified}
       </p>
 
       {/* Quick Actions */}
