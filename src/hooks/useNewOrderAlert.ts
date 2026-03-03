@@ -42,6 +42,7 @@ export function useNewOrderAlert(sellerId: string | null) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSeenAtRef = useRef<string | null>(null); // null = first poll fetches ALL actionable
   const pollDelayRef = useRef(MIN_POLL_MS);
+  const mountedAtRef = useRef(new Date().toISOString());
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const dismissedIdsRef = useRef<Set<string>>(new Set());
@@ -172,9 +173,8 @@ export function useNewOrderAlert(sellerId: string | null) {
         if (lastSeenAtRef.current) {
           query = query.gt('created_at', lastSeenAtRef.current);
         } else {
-          // C4: Cap initial poll to last 24h to prevent flooding sellers with ancient orders
-          const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-          query = query.gt('created_at', twentyFourHoursAgo);
+          // Only alert on orders created AFTER this session started
+          query = query.gt('created_at', mountedAtRef.current);
         }
 
         const { data } = await query;
