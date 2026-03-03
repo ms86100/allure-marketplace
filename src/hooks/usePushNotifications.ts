@@ -5,14 +5,14 @@ import { IdentityContext } from '@/contexts/auth/contexts';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { hapticNotification } from '@/lib/haptics';
-import { getPushStage, setPushStage } from '@/lib/pushPermissionStage';
+import { getPushStage, setPushStage, getLastBuildId, setLastBuildId } from '@/lib/pushPermissionStage';
 import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
 
 /**
  * BUILD FINGERPRINT — if the device logs this, the bundle is current.
  * If not, the device is running stale JS.
  */
-export const PUSH_BUILD_ID = '2026-03-03-J-LIFECYCLE-FIX';
+export const PUSH_BUILD_ID = '2026-03-03-K-TOKEN-REFRESH';
 
 /**
  * NEW APPROACH: Uses @capacitor/push-notifications for permissions + registration
@@ -256,7 +256,32 @@ export function usePushNotificationsInternal() {
     clearWatchdog();
     registrationStateRef.current = 'registered';
     retryCountRef.current = 0;
-    pushLog('info', `✓ Valid token obtained: ${tokenValue.substring(0, 20)}…`, { length: tokenValue.length });
+
+    // Compare with existing DB token to detect stale/mismatched tokens
+    const currentUser = userRef.current;
+    let isNewToken = true;
+    if (currentUser) {
+      try {
+        const { data } = await supabase
+          .from('device_tokens')
+          .select('token')
+          .eq('user_id', currentUser.id)
+          .limit(5);
+        const existingTokens = data?.map(r => r.token) ?? [];
+        isNewToken = !existingTokens.includes(tokenValue);
+        pushLog('info', 'TOKEN_COMPARISON', {
+          isNew: isNewToken,
+          runtimePrefix: tokenValue.substring(0, 20),
+          dbTokenCount: existingTokens.length,
+          dbPrefixes: existingTokens.map(t => t.substring(0, 12)),
+          ts: Date.now(),
+        });
+      } catch (e) {
+        pushLog('warn', 'TOKEN_COMPARISON_FAILED', { error: String(e) });
+      }
+    }
+
+    pushLog('info', `✓ Valid token obtained: ${tokenValue.substring(0, 20)}…`, { length: tokenValue.length, isNewToken });
 
     setToken(tokenValue);
     tokenRef.current = tokenValue;
@@ -910,6 +935,36 @@ export function usePushNotificationsInternal() {
           const stage = await getPushStage();
           pushLog('info', 'PUSH_STAGE_RESULT', { stage, ts: Date.now() });
           pushLog('info', `Push stage on login: ${stage}`, { platform });
+
+          // ── BUILD-CHANGE DETECTION: clear stale tokens on new build ──
+          let buildChanged = false;
+          try {
+            const lastBuild = await getLastBuildId();
+            buildChanged = lastBuild !== null && lastBuild !== PUSH_BUILD_ID;
+            pushLog('info', 'BUILD_CHANGE_CHECK', { lastBuild, currentBuild: PUSH_BUILD_ID, changed: buildChanged, ts: Date.now() });
+            if (buildChanged) {
+              pushLog('info', 'BUILD_CHANGED — clearing stale device tokens from DB', { lastBuild, currentBuild: PUSH_BUILD_ID });
+              // Delete all tokens for this user so a fresh one is registered
+              const { error: delErr } = await supabase
+                .from('device_tokens')
+                .delete()
+                .eq('user_id', userId);
+              if (delErr) {
+                pushLog('warn', 'BUILD_CHANGE_TOKEN_DELETE_FAILED', { error: delErr.message });
+              } else {
+                pushLog('info', 'BUILD_CHANGE_TOKEN_DELETE_OK');
+              }
+              // Reset registration state to force fresh registration
+              registrationStateRef.current = 'idle';
+              retryCountRef.current = 0;
+              tokenRef.current = null;
+              setToken(null);
+            }
+            await setLastBuildId(PUSH_BUILD_ID);
+          } catch (buildErr) {
+            pushLog('warn', 'BUILD_CHANGE_CHECK_FAILED', { error: String(buildErr) });
+          }
+
           // Force-flush so we can see this log even if app crashes later
           flushPushLogs().catch(() => {});
 
@@ -989,7 +1044,17 @@ export function usePushNotificationsInternal() {
             await setPushStage('full');
             registrationStateRef.current = 'idle';
             retryCountRef.current = 0;
-            await attemptRegistrationRef.current();
+
+            // Crash-proof logging around first-login registration
+            pushLog('info', 'FIRST_LOGIN_CALLING_ATTEMPT_REGISTRATION', { ts: Date.now() });
+            await flushPushLogs().catch(() => {});
+            try {
+              await attemptRegistrationRef.current();
+              pushLog('info', 'FIRST_LOGIN_ATTEMPT_REGISTRATION_RETURNED', { ts: Date.now() });
+            } catch (regErr) {
+              pushLog('error', 'FIRST_LOGIN_ATTEMPT_REGISTRATION_THREW', { error: String(regErr), ts: Date.now() });
+            }
+            await flushPushLogs().catch(() => {});
           }
         } catch (err) {
           pushLog('error', 'Login registration setTimeout CRASHED', {

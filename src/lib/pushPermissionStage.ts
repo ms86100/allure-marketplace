@@ -71,3 +71,31 @@ export async function setPushStage(stage: PushStage): Promise<void> {
     console.warn('[PushStage] Failed to save stage:', e);
   }
 }
+
+const BUILD_ID_KEY = 'push_last_build_id';
+
+/** Get the last-seen build ID from Preferences. */
+export async function getLastBuildId(): Promise<string | null> {
+  if (!Capacitor.isNativePlatform()) return null;
+  try {
+    const prefs = await getPrefs();
+    if (!prefs) return null;
+    const { value } = await prefs.get({ key: BUILD_ID_KEY });
+    return value;
+  } catch (e) {
+    console.warn('[PushStage] Failed to read build ID:', e);
+    return null;
+  }
+}
+
+/** Save the current build ID to Preferences. */
+export async function setLastBuildId(buildId: string): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const prefs = await getPrefs();
+    if (!prefs) return;
+    await prefs.set({ key: BUILD_ID_KEY, value: buildId });
+  } catch (e) {
+    console.warn('[PushStage] Failed to save build ID:', e);
+  }
+}
