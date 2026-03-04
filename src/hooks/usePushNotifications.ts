@@ -1135,6 +1135,26 @@ export function usePushNotificationsInternal() {
         return;
       }
 
+      // CRITICAL: On iOS, set up APNs token listener BEFORE requesting permission.
+      // When the user taps "Allow", iOS immediately fires the 'registration' event
+      // with the raw 64-char APNs token. If we don't have a listener ready, we miss it
+      // and device_tokens.apns_token stays null → direct APNs delivery fails.
+      if (platform === 'ios') {
+        console.log('[Push] requestFullPermission: Setting up APNs token listener BEFORE permission request');
+        try {
+          await PN.addListener('registration', (regToken) => {
+            const raw = regToken.value;
+            if (raw && /^[A-Fa-f0-9]{64}$/.test(raw)) {
+              apnsTokenRef.current = raw;
+              pushLog('info', 'APNS_TOKEN_CAPTURED_IN_REQUEST_FLOW', { prefix: raw.substring(0, 16), ts: Date.now() });
+              console.log(`[Push] ✓ APNs token captured during permission flow: ${raw.substring(0, 16)}…`);
+            }
+          });
+        } catch (e) {
+          console.warn('[Push] Failed to set up pre-permission APNs listener:', e);
+        }
+      }
+
       // Step 1: Check current permission before requesting
       let permStatus = await PN.checkPermissions();
       console.log(`[Push] requestFullPermission (${platform}) BEFORE checkPermissions:`, permStatus.receive);
@@ -1166,6 +1186,15 @@ export function usePushNotificationsInternal() {
 
       setPermissionStatus('granted');
       await setPushStage('full');
+
+      // On iOS, give the registration event a moment to fire and capture the APNs token
+      // before we try to reconcile/save. The listener was set up above.
+      if (platform === 'ios') {
+        console.log(`[Push] Waiting 800ms for APNs token capture before reconcile…`);
+        await new Promise((r) => setTimeout(r, 800));
+        console.log(`[Push] APNs token after wait: ${apnsTokenRef.current?.substring(0, 16) ?? 'null'}`);
+      }
+
       console.log(`[Push] ✓ Permission granted — reconciling runtime token`);
 
       const reconciled = await reconcileRuntimeToken('request_full_permission');
