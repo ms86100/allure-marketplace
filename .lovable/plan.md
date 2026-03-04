@@ -1,56 +1,50 @@
 
 
-## Confirmed: Periodic Interval Will Use `useRef` + Cleanup
+## Notification Health Check — User-Friendly UI
 
-You're right to flag this. The periodic `setInterval` has **not been implemented yet** — the previous message was a plan only. Here's exactly how it will be implemented safely:
+### What We'll Build
 
-### Implementation Details
+A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
 
-**File:** `src/hooks/usePushNotifications.ts`
+### UI Design
 
-**1. No timer accumulation — interval lives inside the `useEffect` gated on `[userId]` (line 938–1061)**
+**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
 
-The `setInterval` will be created inside this existing effect and cleared in the existing teardown at line 1052. Since this effect already tracks `tornDown` and cleans up via `appListenerCleanup`, the interval cleanup follows the same proven pattern:
+**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
 
-```typescript
-// Inside the userId effect, after the login registration block (~line 1048):
-const periodicInterval = setInterval(() => {
-  if (!userRef.current || !Capacitor.isNativePlatform()) return;
-  reconcileRuntimeTokenRef.current('periodic_check').catch((e) => {
-    pushLog('warn', 'Periodic reconcile failed', { error: String(e) });
-  });
-}, 15 * 60 * 1000);
+| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
+|---|---|---|
+| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
+| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
+| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
+| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
 
-// In the existing teardown (line 1052):
-return () => {
-  tornDown = true;
-  clearInterval(periodicInterval);  // ← added
-  // ... existing cleanup ...
-};
-```
+Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
 
-Because the interval is a **local variable** inside the effect, and React guarantees the cleanup runs before re-running the effect when `userId` changes, multiple timers **cannot accumulate**.
+**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
 
-**2. Resume reconciliation — remove early return on `registered` state (line 836)**
+**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
 
-Change line 836 from:
-```typescript
-if (state === 'registered') return;
-```
-To:
-```typescript
-if (state === 'registered' && userRef.current) {
-  reconcileRuntimeTokenRef.current('resume_check').catch(() => {});
-  return;
-}
-if (state === 'registered') return;
-```
+### Implementation
 
-This ensures token rotation is caught on every app resume, even when already registered.
+**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
+- Renders the trigger button and the bottom sheet
+- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
+- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
+- Provides actionable buttons for failures (Open Settings, Retry Registration)
 
-### Summary
-- **1 file** changed: `src/hooks/usePushNotifications.ts`
-- **~8 lines** added
-- No `useRef` needed — the local `const` inside the effect + React's cleanup guarantee is sufficient and matches the existing cleanup pattern in this file
-- No database or edge function changes
+**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
+- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
+- Consolidates the 7+ technical steps into 4 simple categories
+- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
+
+**3. Update `src/pages/ProfilePage.tsx`**
+- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
+- Keep Push Debug link visible only for admins
+
+**4. Optionally add to `src/pages/NotificationsPage.tsx`**
+- Add a small "Check notification status" link at the top
+
+### No backend changes needed
+The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
 
