@@ -98,7 +98,7 @@ export async function runPushDiagnostics(userId?: string): Promise<DiagnosticRes
     try {
       const { data, error } = await supabase
         .from('device_tokens')
-        .select('id, token, platform, updated_at')
+        .select('id, token, platform, updated_at, apns_token')
         .eq('user_id', userId)
         .order('updated_at', { ascending: false, nullsFirst: false });
       if (error) throw error;
@@ -124,17 +124,32 @@ export async function runPushDiagnostics(userId?: string): Promise<DiagnosticRes
               ? 'Runtime FCM token is persisted for this user'
               : 'Runtime FCM token exists but is NOT persisted for this user',
         });
+
+        // BUG #4 FIX: Validate APNs token presence for iOS (required for direct delivery)
+        const iosTokensWithApns = data?.filter((row) => row.platform === 'ios' && (row as any).apns_token) ?? [];
+        const totalIosTokens = data?.filter((row) => row.platform === 'ios') ?? [];
+        results.push({
+          step: '6c. APNs token in DB (iOS)',
+          ok: iosTokensWithApns.length > 0,
+          detail: totalIosTokens.length === 0
+            ? 'No iOS tokens in DB'
+            : iosTokensWithApns.length === totalIosTokens.length
+              ? `All ${totalIosTokens.length} iOS token(s) have apns_token ✓`
+              : `${iosTokensWithApns.length}/${totalIosTokens.length} iOS tokens have apns_token — direct APNs delivery will fail for the rest`,
+        });
       }
     } catch (e) {
       results.push({ step: '6. device_tokens in DB', ok: false, detail: String(e) });
       if (platform === 'ios') {
         results.push({ step: '6b. Runtime token matches DB (iOS)', ok: false, detail: 'Skipped due to DB query failure' });
+        results.push({ step: '6c. APNs token in DB (iOS)', ok: false, detail: 'Skipped due to DB query failure' });
       }
     }
   } else {
     results.push({ step: '6. device_tokens in DB', ok: false, detail: 'No userId provided — skipped' });
     if (platform === 'ios') {
       results.push({ step: '6b. Runtime token matches DB (iOS)', ok: false, detail: 'No userId provided — skipped' });
+      results.push({ step: '6c. APNs token in DB (iOS)', ok: false, detail: 'No userId provided — skipped' });
     }
   }
 
