@@ -7155,6 +7155,15 @@ export type Database = {
         Args: { _society_id: string; _user_id: string }
         Returns: boolean
       }
+      claim_device_token: {
+        Args: {
+          p_apns_token?: string
+          p_platform: string
+          p_token: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       claim_notification_queue: {
         Args: { batch_size?: number }
         Returns: {

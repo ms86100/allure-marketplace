@@ -12,7 +12,7 @@ import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
  * BUILD FINGERPRINT — if the device logs this, the bundle is current.
  * If not, the device is running stale JS.
  */
-export const PUSH_BUILD_ID = '2026-03-03-APNS-TOKEN-FIX';
+export const PUSH_BUILD_ID = '2026-03-04-CLAIM-TOKEN-RPC';
 
 /**
  * NEW APPROACH: Uses @capacitor/push-notifications for permissions + registration
@@ -167,51 +167,30 @@ export function usePushNotificationsInternal() {
     const apnsToken = platform === 'ios' ? apnsTokenRef.current : null;
 
     try {
-      // Ensure this physical device token belongs to exactly one user.
-      const { error: cleanupError } = await supabase
-        .from('device_tokens')
-        .delete()
-        .eq('token', pushToken)
-        .neq('user_id', currentUser.id);
-
-      if (cleanupError) {
-        console.warn('[Push] Cross-user token cleanup warning:', cleanupError.message);
-      }
-
-      const upsertData: Record<string, unknown> = {
-        user_id: currentUser.id,
-        token: pushToken,
+      // BUG #3 FIX: Use claim_device_token RPC for atomic cross-user cleanup + upsert.
+      // The RPC is SECURITY DEFINER so it can delete tokens belonging to other users
+      // (which RLS would silently block from the client).
+      pushLog('info', 'CLAIM_DEVICE_TOKEN_RPC', {
+        userId: currentUser.id,
+        fcmPrefix: pushToken.substring(0, 20),
+        apnsPrefix: apnsToken?.substring(0, 16) ?? 'null',
         platform,
-        updated_at: new Date().toISOString(),
-      };
-      // Include APNs token for iOS direct delivery
-      if (apnsToken) {
-        upsertData.apns_token = apnsToken;
-        pushLog('info', 'SAVING_APNS_TOKEN', { apnsPrefix: apnsToken.substring(0, 16), fcmPrefix: pushToken.substring(0, 20) });
-      }
+      });
 
-      const { error } = await supabase
-        .from('device_tokens')
-        .upsert(upsertData as any, { onConflict: 'user_id,token' });
+      const { error } = await supabase.rpc('claim_device_token', {
+        p_user_id: currentUser.id,
+        p_token: pushToken,
+        p_platform: platform,
+        p_apns_token: apnsToken,
+      });
 
       if (error) {
-        console.error('[Push] Token upsert FAILED:', error.message, error.code, error.details);
-        console.log('[Push] Attempting fallback INSERT…');
-        const { error: insertErr } = await supabase
-          .from('device_tokens')
-          .insert(upsertData as any);
-        if (insertErr) {
-          if (insertErr.code === '23505') {
-            console.log('[Push] Token already exists (unique constraint) — OK');
-            return true;
-          }
-          console.error('[Push] Fallback INSERT also failed:', insertErr.message, insertErr.code);
-          return false;
-        }
-        console.log('[Push] Token saved via fallback INSERT');
-        return true;
+        console.error('[Push] claim_device_token RPC failed:', error.message, error.code);
+        pushLog('error', 'CLAIM_DEVICE_TOKEN_FAILED', { error: error.message, code: error.code });
+        return false;
       }
-      console.log('[Push] Token saved successfully via upsert' + (apnsToken ? ` (with APNs token ${apnsToken.substring(0, 16)}…)` : ''));
+
+      console.log('[Push] ✓ Token claimed via RPC' + (apnsToken ? ` (APNs: ${apnsToken.substring(0, 16)}…)` : ''));
       return true;
     } catch (err) {
       console.error('[Push] Token save exception:', err);
@@ -431,26 +410,10 @@ export function usePushNotificationsInternal() {
       setPermissionStatus('granted');
       clearWatchdog();
 
-      // Step 2: On iOS, set up APNs token listener BEFORE register() so we don't miss the event
-      if (platform === 'ios') {
-        pushLog('info', 'AR_IOS_CAPTURING_APNS_TOKEN', { ts: Date.now() });
-        try {
-          const pn = await getPushNotificationsPlugin();
-          if (pn) {
-            await pn.addListener('registration', (regToken) => {
-              const raw = regToken.value;
-              if (raw && /^[A-Fa-f0-9]{64}$/.test(raw)) {
-                apnsTokenRef.current = raw;
-                pushLog('info', 'APNS_TOKEN_CAPTURED', { prefix: raw.substring(0, 16), ts: Date.now() });
-              }
-            });
-          }
-        } catch (e) {
-          pushLog('warn', 'APNS_TOKEN_CAPTURE_FAILED', { error: String(e) });
-        }
-      }
+      // BUG #2 FIX: No duplicate registration listener here.
+      // The SINGLE main effect listener handles APNs token capture.
 
-      // Step 3: Call PN.register() — fires 'registration' event with APNs token on iOS
+      // Call PN.register() — fires 'registration' event with APNs token on iOS
       pushLog('info', 'AR_REGISTER_CALLING', { ts: Date.now() });
       await PN.register();
       pushLog('info', 'AR_REGISTER_RETURNED', { ts: Date.now() });
@@ -682,9 +645,15 @@ export function usePushNotificationsInternal() {
           console.log(`[Push][${platform}] registration event — raw token:`, rawToken.substring(0, 20) + '…', 'length:', rawToken.length);
 
           if (platform === 'ios') {
-            // On iOS, the 'registration' event gives us the APNs token.
-            // We need to use @capacitor-community/fcm to get the FCM token.
-            console.log('[Push][iOS] APNs token received — converting to FCM token via FCM.getToken()…');
+            // ── BUG #1 FIX: Capture APNs token IMMEDIATELY in the main listener ──
+            // Previously this ref was only set in duplicate listeners (race condition).
+            if (/^[A-Fa-f0-9]{64}$/.test(rawToken)) {
+              apnsTokenRef.current = rawToken;
+              pushLog('info', 'APNS_TOKEN_CAPTURED_MAIN_LISTENER', { prefix: rawToken.substring(0, 16), ts: Date.now() });
+              console.log(`[Push][iOS] ✓ APNs token captured in main listener: ${rawToken.substring(0, 16)}…`);
+            }
+            // Now convert to FCM token for cross-platform addressing.
+            console.log('[Push][iOS] Converting APNs → FCM token via FCM.getToken()…');
             const fcm = await getFcmPlugin();
             if (!fcm) {
               console.error('[Push][iOS] @capacitor-community/fcm not available — cannot convert token');
@@ -1135,27 +1104,10 @@ export function usePushNotificationsInternal() {
         return;
       }
 
-      // CRITICAL: On iOS, set up APNs token listener BEFORE requesting permission.
-      // When the user taps "Allow", iOS immediately fires the 'registration' event
-      // with the raw 64-char APNs token. If we don't have a listener ready, we miss it
-      // and device_tokens.apns_token stays null → direct APNs delivery fails.
-      if (platform === 'ios') {
-        console.log('[Push] requestFullPermission: Setting up APNs token listener BEFORE permission request');
-        try {
-          await PN.addListener('registration', (regToken) => {
-            const raw = regToken.value;
-            if (raw && /^[A-Fa-f0-9]{64}$/.test(raw)) {
-              apnsTokenRef.current = raw;
-              pushLog('info', 'APNS_TOKEN_CAPTURED_IN_REQUEST_FLOW', { prefix: raw.substring(0, 16), ts: Date.now() });
-              console.log(`[Push] ✓ APNs token captured during permission flow: ${raw.substring(0, 16)}…`);
-            }
-          });
-        } catch (e) {
-          console.warn('[Push] Failed to set up pre-permission APNs listener:', e);
-        }
-      }
+      // BUG #2 FIX: No duplicate registration listener here.
+      // The SINGLE main effect listener captures APNs token.
 
-      // Step 1: Check current permission before requesting
+      // Check current permission
       let permStatus = await PN.checkPermissions();
       console.log(`[Push] requestFullPermission (${platform}) BEFORE checkPermissions:`, permStatus.receive);
 
