@@ -30,6 +30,7 @@ import {
   Bug,
 } from 'lucide-react';
 import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
+import { NotificationHealthCheck } from '@/components/notifications/NotificationHealthCheck';
 import { toast } from 'sonner';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { getFlag, setFlag, getString, removeKey } from '@/lib/persistent-kv';
@@ -109,7 +110,7 @@ export default function ProfilePage() {
     { icon: Bell, label: 'Notifications', to: '/notifications' },
     { icon: HelpCircle, label: 'Help & Guide', to: '/help' },
     ...(isAdmin ? [{ icon: Shield, label: 'Admin Panel', to: '/admin' }] : []),
-    { icon: Bug, label: 'Push Debug', to: '/push-debug' },
+    ...(isAdmin ? [{ icon: Bug, label: 'Push Debug', to: '/push-debug' }] : []),
     { icon: FileText, label: 'Privacy Policy', to: '/privacy-policy' },
     { icon: FileText, label: 'Terms & Conditions', to: '/terms' },
     { icon: FileText, label: 'Community Rules', to: '/community-rules' },
@@ -253,6 +254,7 @@ export default function ProfilePage() {
               </div>
             </Link>
           ))}
+          <NotificationHealthCheck />
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 mt-4 px-1">Legal & Support</p>
           {menuItems.slice(menuItems.findIndex(m => m.label === 'Privacy Policy')).map(({ icon: Icon, label, to }) => (
             <Link key={label} to={to}>
