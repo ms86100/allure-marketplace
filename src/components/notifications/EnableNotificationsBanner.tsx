@@ -15,9 +15,10 @@ export function EnableNotificationsBanner() {
   );
   const [loading, setLoading] = useState(false);
   const [failedSilently, setFailedSilently] = useState(false);
+  const [grantedLocally, setGrantedLocally] = useState(false);
 
   if (!Capacitor.isNativePlatform()) return null;
-  if (permissionStatus === 'granted' || !!token) return null;
+  if (permissionStatus === 'granted' || !!token || grantedLocally) return null;
   if (dismissed && permissionStatus === 'prompt' && !failedSilently) return null;
 
   // If denied, show "Open Settings" variant
@@ -68,7 +69,6 @@ export function EnableNotificationsBanner() {
   const handleTurnOn = async () => {
     setLoading(true);
     try {
-      // Direct call in tap handler — preserves iOS user-gesture context
       const permResult = await PushNotifications.requestPermissions();
 
       if (permResult.receive !== 'granted') {
@@ -76,7 +76,10 @@ export function EnableNotificationsBanner() {
         return;
       }
 
-      // Let requestFullPermission handle register() with listener gate
+      // Immediately hide banner — don't wait for background reconciliation
+      setGrantedLocally(true);
+
+      // Let requestFullPermission handle register() with listener gate (fire-and-forget)
       requestFullPermission().catch(e => console.warn('[Push] Background reconciliation:', e));
     } catch {
       setFailedSilently(true);
