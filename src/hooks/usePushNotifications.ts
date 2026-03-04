@@ -34,6 +34,11 @@ const RECONCILE_GETTOKEN_TIMEOUT_MS = 3000;
 const LOGIN_RECONCILE_TIMEOUT_MS = 5000;
 const PLUGIN_IMPORT_TIMEOUT_MS = 5000;
 const FCM_GETTOKEN_TIMEOUT_MS = 5000;
+const LISTENER_GATE_TIMEOUT_MS = 5000;
+const CHECK_PERMISSIONS_TIMEOUT_MS = 5000;
+const REQUEST_PERMISSIONS_TIMEOUT_MS = 7000;
+const REGISTER_TIMEOUT_MS = 7000;
+const RPC_TIMEOUT_MS = 8000;
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
   return Promise.race([
@@ -159,14 +164,16 @@ export function usePushNotificationsInternal() {
     });
   }, []);
 
-  const markFailed = useCallback(() => {
+  const markFailed = useCallback((reason: string = 'unknown_failure', extra: Record<string, unknown> = {}) => {
     registrationStateRef.current = 'failed';
     clearWatchdog();
     pushLog('error', 'PIPELINE_FAILED', {
+      reason,
       platform: Capacitor.getPlatform(),
       permissionStatus: permissionStatusRef.current,
       retries: retryCountRef.current,
       lastError: String(lastErrorRef.current),
+      ...extra,
     });
     emitDiagnostic();
     flushPushLogs().catch(() => {});
@@ -174,6 +181,45 @@ export function usePushNotificationsInternal() {
 
   // Store captured APNs token for direct delivery
   const apnsTokenRef = useRef<string | null>(null);
+  const finalizationPromiseRef = useRef<Promise<boolean> | null>(null);
+
+  const waitForListenersReady = useCallback(async (source: string) => {
+    pushLog('info', 'LISTENER_GATE_WAIT_START', { source, ts: Date.now() });
+    try {
+      await withTimeout(listenersReadyRef.current, LISTENER_GATE_TIMEOUT_MS, `${source}: listeners gate timed out`);
+      pushLog('info', 'LISTENER_GATE_READY', { source, ts: Date.now() });
+      return true;
+    } catch (e) {
+      pushLog('error', 'LISTENER_GATE_TIMEOUT', { source, error: String(e), ts: Date.now() });
+      return false;
+    }
+  }, []);
+
+  const waitForApnsToken = useCallback(async (source: string) => {
+    const platform = Capacitor.getPlatform();
+    if (platform !== 'ios') return true;
+
+    if (/^[A-Fa-f0-9]{64}$/.test(apnsTokenRef.current ?? '')) {
+      return true;
+    }
+
+    pushLog('warn', 'APNS_MISSING_AT_FINALIZE', { source, ts: Date.now() });
+
+    for (let i = 1; i <= 5; i++) {
+      await new Promise((r) => setTimeout(r, 400));
+      if (/^[A-Fa-f0-9]{64}$/.test(apnsTokenRef.current ?? '')) {
+        pushLog('info', 'APNS_TOKEN_BECAME_AVAILABLE', {
+          source,
+          attempt: i,
+          apnsPrefix: apnsTokenRef.current?.substring(0, 16),
+          ts: Date.now(),
+        });
+        return true;
+      }
+    }
+
+    return false;
+  }, []);
 
   // ── Token persistence ──
   const saveTokenToDatabase = useCallback(async (pushToken: string) => {
@@ -188,36 +234,61 @@ export function usePushNotificationsInternal() {
     const platform = Capacitor.getPlatform() as 'ios' | 'android' | 'web';
     const apnsToken = platform === 'ios' ? apnsTokenRef.current : null;
 
-    try {
-      // BUG #3 FIX: Use claim_device_token RPC for atomic cross-user cleanup + upsert.
-      // The RPC is SECURITY DEFINER so it can delete tokens belonging to other users
-      // (which RLS would silently block from the client).
-      pushLog('info', 'CLAIM_DEVICE_TOKEN_RPC', {
-        userId: currentUser.id,
-        fcmPrefix: pushToken.substring(0, 20),
-        apnsPrefix: apnsToken?.substring(0, 16) ?? 'null',
-        platform,
-      });
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        pushLog('info', 'CLAIM_DEVICE_TOKEN_RPC', {
+          attempt,
+          userId: currentUser.id,
+          fcmPrefix: pushToken.substring(0, 20),
+          apnsPrefix: apnsToken?.substring(0, 16) ?? 'null',
+          platform,
+        });
 
-      const { error } = await supabase.rpc('claim_device_token', {
-        p_user_id: currentUser.id,
-        p_token: pushToken,
-        p_platform: platform,
-        p_apns_token: apnsToken,
-      });
+        const { error } = await withTimeout(
+          (async () => {
+            const result = await supabase.rpc('claim_device_token', {
+              p_user_id: currentUser.id,
+              p_token: pushToken,
+              p_platform: platform,
+              p_apns_token: apnsToken,
+            });
+            return result;
+          })(),
+          RPC_TIMEOUT_MS,
+          `claim_device_token timed out (attempt ${attempt})`
+        );
 
-      if (error) {
-        console.error('[Push] claim_device_token RPC failed:', error.message, error.code);
-        pushLog('error', 'CLAIM_DEVICE_TOKEN_FAILED', { error: error.message, code: error.code });
-        return false;
+        if (!error) {
+          pushLog('info', 'CLAIM_DEVICE_TOKEN_RPC_SUCCESS', {
+            attempt,
+            userId: currentUser.id,
+            fcmPrefix: pushToken.substring(0, 20),
+            apnsPrefix: apnsToken?.substring(0, 16) ?? 'null',
+            platform,
+          });
+          console.log('[Push] ✓ Token claimed via RPC' + (apnsToken ? ` (APNs: ${apnsToken.substring(0, 16)}…)` : ''));
+          return true;
+        }
+
+        pushLog('error', 'CLAIM_DEVICE_TOKEN_FAILED', {
+          attempt,
+          error: error.message,
+          code: error.code,
+        });
+      } catch (err) {
+        pushLog('error', 'CLAIM_DEVICE_TOKEN_FAILED', {
+          attempt,
+          error: String(err),
+          timedOut: String(err).includes('timed out'),
+        });
       }
 
-      console.log('[Push] ✓ Token claimed via RPC' + (apnsToken ? ` (APNs: ${apnsToken.substring(0, 16)}…)` : ''));
-      return true;
-    } catch (err) {
-      console.error('[Push] Token save exception:', err);
-      return false;
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, attempt * 400));
+      }
     }
+
+    return false;
   }, []);
 
   const userIdForCleanupRef = useRef<string | null>(null);
@@ -254,46 +325,88 @@ export function usePushNotificationsInternal() {
     }
   }, []);
 
-  // ── Handle a valid token ──
-  const handleValidToken = useCallback(async (tokenValue: string) => {
-    clearWatchdog();
-    registrationStateRef.current = 'registered';
-    retryCountRef.current = 0;
+  // ── Handle a valid token (single deterministic finalization path) ──
+  const handleValidToken = useCallback(async (tokenValue: string, source: string = 'unknown_source') => {
+    if (finalizationPromiseRef.current) {
+      pushLog('info', 'FINALIZATION_JOIN_EXISTING', { source, ts: Date.now() });
+      return finalizationPromiseRef.current;
+    }
 
-    // Compare with existing DB token to detect stale/mismatched tokens
-    const currentUser = userRef.current;
-    let isNewToken = true;
-    if (currentUser) {
-      try {
-        const { data } = await supabase
-          .from('device_tokens')
-          .select('token')
-          .eq('user_id', currentUser.id)
-          .limit(5);
-        const existingTokens = data?.map(r => r.token) ?? [];
-        isNewToken = !existingTokens.includes(tokenValue);
-        pushLog('info', 'TOKEN_COMPARISON', {
-          isNew: isNewToken,
-          runtimePrefix: tokenValue.substring(0, 20),
-          dbTokenCount: existingTokens.length,
-          dbPrefixes: existingTokens.map(t => t.substring(0, 12)),
-          ts: Date.now(),
-        });
-      } catch (e) {
-        pushLog('warn', 'TOKEN_COMPARISON_FAILED', { error: String(e) });
+    const run = (async () => {
+      clearWatchdog();
+
+      const platform = Capacitor.getPlatform();
+      if (!isValidFcmToken(tokenValue, platform)) {
+        lastErrorRef.current = new Error('invalid_fcm_token');
+        markFailed('invalid_fcm_token', { source, tokenLength: tokenValue?.length ?? 0 });
+        return false;
       }
-    }
 
-    pushLog('info', `✓ Valid token obtained: ${tokenValue.substring(0, 20)}…`, { length: tokenValue.length, isNewToken });
+      const hasValidApns = await waitForApnsToken(source);
+      if (!hasValidApns) {
+        lastErrorRef.current = new Error('apns_missing');
+        markFailed('apns_missing', { source });
+        return false;
+      }
 
-    setToken(tokenValue);
-    tokenRef.current = tokenValue;
+      // Compare with existing DB token to detect stale/mismatched tokens
+      const currentUser = userRef.current;
+      let isNewToken = true;
+      if (currentUser) {
+        try {
+          const { data } = await supabase
+            .from('device_tokens')
+            .select('token')
+            .eq('user_id', currentUser.id)
+            .limit(5);
+          const existingTokens = data?.map(r => r.token) ?? [];
+          isNewToken = !existingTokens.includes(tokenValue);
+          pushLog('info', 'TOKEN_COMPARISON', {
+            source,
+            isNew: isNewToken,
+            runtimePrefix: tokenValue.substring(0, 20),
+            dbTokenCount: existingTokens.length,
+            dbPrefixes: existingTokens.map(t => t.substring(0, 12)),
+            ts: Date.now(),
+          });
+        } catch (e) {
+          pushLog('warn', 'TOKEN_COMPARISON_FAILED', { source, error: String(e) });
+        }
+      }
 
-    const saved = await saveTokenToDatabase(tokenValue);
-    if (!saved) {
-      console.log('[Push] Token save deferred — will retry when user becomes available');
-    }
-  }, [clearWatchdog, saveTokenToDatabase]);
+      setToken(tokenValue);
+      tokenRef.current = tokenValue;
+
+      const saved = await saveTokenToDatabase(tokenValue);
+      if (!saved) {
+        lastErrorRef.current = new Error('rpc_persist_failed');
+        markFailed('rpc_persist_failed', { source });
+        return false;
+      }
+
+      registrationStateRef.current = 'registered';
+      retryCountRef.current = 0;
+      pushLog('info', `✓ Valid token obtained: ${tokenValue.substring(0, 20)}…`, {
+        source,
+        length: tokenValue.length,
+        isNewToken,
+      });
+      pushLog('info', 'PIPELINE_SUCCESS', {
+        source,
+        platform,
+        fcmPrefix: tokenValue.substring(0, 20),
+        apnsPrefix: apnsTokenRef.current?.substring(0, 16) ?? 'none',
+        ts: Date.now(),
+      });
+      flushPushLogs().catch(() => {});
+      return true;
+    })().finally(() => {
+      finalizationPromiseRef.current = null;
+    });
+
+    finalizationPromiseRef.current = run;
+    return run;
+  }, [clearWatchdog, saveTokenToDatabase, markFailed, waitForApnsToken]);
 
   const reconcileRuntimeToken = useCallback(async (reason: string): Promise<boolean> => {
     const platform = Capacitor.getPlatform();
@@ -383,23 +496,16 @@ export function usePushNotificationsInternal() {
     }
 
     const changed = tokenRef.current !== candidate;
-    if (changed) {
-      setToken(candidate);
-      tokenRef.current = candidate;
-    }
 
-    const saved = await saveTokenToDatabase(candidate);
-    if (!saved) {
-      pushLog('error', 'reconcileRuntimeToken failed to persist token', {
+    const finalized = await handleValidToken(candidate, `reconcile_runtime_token:${reason}`);
+    if (!finalized) {
+      pushLog('error', 'reconcileRuntimeToken failed to finalize token', {
         reason,
         platform,
         tokenPrefix: candidate.substring(0, 20),
       });
       return false;
     }
-
-    registrationStateRef.current = 'registered';
-    retryCountRef.current = 0;
 
     pushLog('info', 'reconcileRuntimeToken success', {
       reason,
@@ -409,7 +515,7 @@ export function usePushNotificationsInternal() {
     });
 
     return true;
-  }, [saveTokenToDatabase]);
+  }, [handleValidToken]);
 
   // ── Unified registration (both platforms use PushNotifications) ──
   const attemptRegistration = useCallback(async () => {
@@ -443,27 +549,32 @@ export function usePushNotificationsInternal() {
       // Step 1: Check permissions — NEVER request here (would consume the one-time iOS prompt).
       // Permission requests must ONLY happen via requestFullPermission (user taps "Turn On").
       pushLog('info', 'AR_CHECK_PERMISSIONS_CALLING', { ts: Date.now() });
-      const permStatus = await PN.checkPermissions();
+      const permStatus = await withTimeout(
+        PN.checkPermissions(),
+        CHECK_PERMISSIONS_TIMEOUT_MS,
+        'AR checkPermissions timed out'
+      );
       pushLog('info', 'AR_CHECK_PERMISSIONS_RESULT', { receive: permStatus.receive, ts: Date.now() });
 
       if (permStatus.receive !== 'granted') {
         const isDenied = permStatus.receive === 'denied';
         setPermissionStatus(isDenied ? 'denied' : 'prompt');
-        registrationStateRef.current = 'idle';
-        pushLog('info', `Permission not yet granted (${permStatus.receive}) — waiting for user to tap "Turn On"`, { platform });
+        lastErrorRef.current = new Error(`permission_not_granted:${permStatus.receive}`);
+        markFailed('permission_not_granted', { receive: permStatus.receive, source: 'attempt_registration' });
         return;
       }
 
       setPermissionStatus('granted');
       clearWatchdog();
 
-      // BUG #2 FIX: No duplicate registration listener here.
-      // The SINGLE main effect listener handles APNs token capture.
-
       // Call PN.register() — fires 'registration' event with APNs token on iOS
       pushLog('info', 'AR_REGISTER_CALLING', { ts: Date.now() });
-      await listenersReadyRef.current; // Ensure registration listener is attached before register()
-      await PN.register();
+      await waitForListenersReady('attempt_registration');
+      await withTimeout(
+        PN.register(),
+        REGISTER_TIMEOUT_MS,
+        'AR register() timed out'
+      );
       pushLog('info', 'AR_REGISTER_RETURNED', { ts: Date.now() });
 
       // Step 4: Platform-specific token retrieval
@@ -476,7 +587,7 @@ export function usePushNotificationsInternal() {
         const fcm = await getFcmPlugin();
         if (!fcm) {
           pushLog('error', 'AR_IOS_FCM_PLUGIN_MISSING');
-          markFailed();
+          markFailed('fcm_plugin_missing', { source: 'attempt_registration_ios' });
           return;
         }
         pushLog('info', 'AR_IOS_FCM_PLUGIN_LOADED', { ts: Date.now() });
@@ -511,7 +622,7 @@ export function usePushNotificationsInternal() {
           pushLog('error', 'AR_IOS_FCM_ALL_ATTEMPTS_FAILED');
           retryCountRef.current += 1;
           if (retryCountRef.current >= MAX_RETRIES) {
-            markFailed();
+            markFailed('ios_fcm_gettoken_failed', { source: 'attempt_registration_ios' });
           } else {
             registrationStateRef.current = 'idle';
             setTimeout(() => attemptRegistration(), 2000);
@@ -525,10 +636,7 @@ export function usePushNotificationsInternal() {
           ts: Date.now(),
         });
 
-        await handleValidToken(fcmToken);
-        pushLog('info', 'PIPELINE_SUCCESS', { source: 'attemptRegistration_ios', fcmPrefix: fcmToken.substring(0, 20), apnsPrefix: apnsTokenRef.current?.substring(0, 16) ?? 'none', ts: Date.now() });
-        flushPushLogs().catch(() => {});
-
+        await handleValidToken(fcmToken, 'attemptRegistration_ios');
       } else {
         // ── Android: token arrives via 'registration' event listener ──
         // Set up watchdog in case the event never fires
@@ -541,7 +649,7 @@ export function usePushNotificationsInternal() {
           pushLog('warn', `Android watchdog expired — attempt ${retryCountRef.current}/${MAX_RETRIES}`);
 
           if (retryCountRef.current >= MAX_RETRIES) {
-            markFailed();
+            markFailed('android_watchdog_expired', { source: 'attempt_registration_android' });
           } else {
             registrationStateRef.current = 'idle';
             attemptRegistration();
@@ -551,9 +659,9 @@ export function usePushNotificationsInternal() {
     } catch (err) {
       pushLog('error', 'AR_EXCEPTION', { error: String(err), stack: (err as Error)?.stack?.substring(0, 300), ts: Date.now() });
       lastErrorRef.current = err;
-      markFailed();
+      markFailed('attempt_registration_exception', { source: 'attempt_registration' });
     }
-  }, [clearWatchdog, markFailed, handleValidToken]);
+  }, [clearWatchdog, markFailed, handleValidToken, waitForListenersReady]);
 
   // ── Foreground notification handler (shared logic) ──
   const handleForegroundNotification = useCallback((title: string, body: string, data?: Record<string, string>) => {
@@ -739,18 +847,14 @@ export function usePushNotificationsInternal() {
               return;
             }
 
-            await handleValidTokenRef.current(fcmToken);
-            pushLog('info', 'PIPELINE_SUCCESS', { source: 'registration_listener_ios', fcmPrefix: fcmToken.substring(0, 20), apnsPrefix: apnsTokenRef.current?.substring(0, 16) ?? 'none', ts: Date.now() });
-            flushPushLogs().catch(() => {});
+            await handleValidTokenRef.current(fcmToken, 'registration_listener_ios');
           } else {
             // Android: registration event already provides FCM token
             if (!isValidFcmToken(rawToken, 'android')) {
               console.warn('[Push][Android] Token failed validation — ignoring');
               return;
             }
-            await handleValidTokenRef.current(rawToken);
-            pushLog('info', 'PIPELINE_SUCCESS', { source: 'registration_listener_android', tokenPrefix: rawToken.substring(0, 20), ts: Date.now() });
-            flushPushLogs().catch(() => {});
+            await handleValidTokenRef.current(rawToken, 'registration_listener_android');
           }
         } catch (err) {
           console.error(`[Push][${platform}] registration listener exception:`, err);
@@ -887,7 +991,11 @@ export function usePushNotificationsInternal() {
             flushPushLogs().catch(() => {});
 
             if (state === 'registered' && userRef.current) {
-              reconcileRuntimeTokenRef.current('resume_check').catch(() => {});
+              withTimeout(
+                reconcileRuntimeTokenRef.current('resume_check'),
+                LOGIN_RECONCILE_TIMEOUT_MS,
+                'resume_check reconcile timed out'
+              ).catch(() => {});
               return;
             }
             if (state === 'registered') return;
@@ -896,7 +1004,11 @@ export function usePushNotificationsInternal() {
             const PN = await getPushNotificationsPlugin();
             let resumePermission = 'prompt';
             if (PN) {
-              const p = await PN.checkPermissions();
+              const p = await withTimeout(
+                PN.checkPermissions(),
+                CHECK_PERMISSIONS_TIMEOUT_MS,
+                'resume checkPermissions timed out'
+              );
               resumePermission = p.receive;
             }
             console.log(`[Push] Resume permission check: ${resumePermission}`);
@@ -1180,23 +1292,37 @@ export function usePushNotificationsInternal() {
       if (!PN) {
         console.error('[Push] ✗ PushNotifications plugin not available');
         setPermissionStatus('denied');
+        lastErrorRef.current = new Error('push_plugin_missing');
+        markFailed('push_plugin_missing', { source: 'request_full_permission' });
         return;
       }
 
       // Check current permission — if already granted (banner called requestPermissions
       // directly), skip the prompt and go straight to registration + reconciliation.
-      let permStatus = await PN.checkPermissions();
+      let permStatus = await withTimeout(
+        PN.checkPermissions(),
+        CHECK_PERMISSIONS_TIMEOUT_MS,
+        'requestFullPermission checkPermissions timed out'
+      );
       console.log(`[Push] requestFullPermission (${platform}) checkPermissions:`, permStatus.receive);
 
       if (permStatus.receive === 'prompt') {
         // Only request if still prompt — this path is a fallback;
         // the banner/settings page should have already called requestPermissions() directly.
         console.log(`[Push] requestFullPermission (${platform}) ▶ Calling requestPermissions()`);
-        permStatus = await PN.requestPermissions();
+        permStatus = await withTimeout(
+          PN.requestPermissions(),
+          REQUEST_PERMISSIONS_TIMEOUT_MS,
+          'requestFullPermission requestPermissions timed out'
+        );
         console.log(`[Push] requestFullPermission (${platform}) AFTER requestPermissions:`, permStatus.receive);
       }
 
-      const recheck = await PN.checkPermissions();
+      const recheck = await withTimeout(
+        PN.checkPermissions(),
+        CHECK_PERMISSIONS_TIMEOUT_MS,
+        'requestFullPermission recheck timed out'
+      );
       const finalStatus = recheck.receive;
 
       if (finalStatus !== 'granted') {
@@ -1206,6 +1332,8 @@ export function usePushNotificationsInternal() {
         if (!isDenied) {
           console.error('[Push] ✗✗✗ CRITICAL: Permission still "prompt" after requestPermissions() — OS prompt likely suppressed');
         }
+        lastErrorRef.current = new Error(`permission_not_granted:${finalStatus}`);
+        markFailed('permission_not_granted', { source: 'request_full_permission', receive: finalStatus });
         return;
       }
 
@@ -1215,10 +1343,17 @@ export function usePushNotificationsInternal() {
       if (platform === 'ios') {
         try {
           console.log('[Push] iOS permission granted — calling PN.register() to trigger APNs registration event');
-          await listenersReadyRef.current; // Ensure registration listener is attached before register()
-          await PN.register();
+          await waitForListenersReady('request_full_permission');
+          await withTimeout(
+            PN.register(),
+            REGISTER_TIMEOUT_MS,
+            'requestFullPermission register timed out'
+          );
         } catch (e) {
           console.warn('[Push] PN.register() failed in requestFullPermission:', e);
+          lastErrorRef.current = e;
+          markFailed('request_full_permission_register_failed', { source: 'request_full_permission' });
+          return;
         }
 
         // Give the registration event a moment to fire and capture APNs token.
@@ -1236,12 +1371,18 @@ export function usePushNotificationsInternal() {
       // Fallback: trigger registration — token will arrive via the 'registration' listener
       registrationStateRef.current = 'idle';
       retryCountRef.current = 0;
-      await attemptRegistration();
+      await withTimeout(
+        attemptRegistration(),
+        REGISTER_TIMEOUT_MS + FCM_GETTOKEN_TIMEOUT_MS,
+        'requestFullPermission fallback attemptRegistration timed out'
+      );
     } catch (err) {
       console.error('[Push] requestFullPermission error:', err);
       registrationStateRef.current = 'idle';
+      lastErrorRef.current = err;
+      markFailed('request_full_permission_exception', { source: 'request_full_permission' });
     }
-  }, [attemptRegistration, reconcileRuntimeToken]);
+  }, [attemptRegistration, reconcileRuntimeToken, markFailed, waitForListenersReady]);
 
   return {
     token,
