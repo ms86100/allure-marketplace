@@ -187,8 +187,7 @@ export default function NotificationsPage() {
         {osPermission === 'prompt' && Capacitor.isNativePlatform() && (
           <button
             onClick={async () => {
-              // CRITICAL: Call requestFullPermission directly — no try/catch wrapping
-              // to preserve the user-gesture context iOS requires for the OS prompt.
+              // Keep permission request directly in click flow for iOS gesture context.
               await requestFullPermission();
               // Re-check after request
               try {

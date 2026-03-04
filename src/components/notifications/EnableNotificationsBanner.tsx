@@ -66,9 +66,7 @@ export function EnableNotificationsBanner() {
 
   const handleTurnOn = async () => {
     setLoading(true);
-    // CRITICAL: Call requestFullPermission directly in the click handler
-    // — no try/catch wrapping the permission call itself, to preserve
-    // the user-gesture context that iOS requires for the OS prompt.
+    // Keep permission request directly in click flow for iOS gesture context.
     await requestFullPermission();
     setLoading(false);
 

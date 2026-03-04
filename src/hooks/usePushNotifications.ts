@@ -1187,16 +1187,22 @@ export function usePushNotificationsInternal() {
       setPermissionStatus('granted');
       await setPushStage('full');
 
-      // On iOS, give the registration event a moment to fire and capture the APNs token
-      // before we try to reconcile/save. The listener was set up above.
+      // Match diagnostics flow: explicitly call register() after permission is granted.
+      // This is what triggers the native 'registration' event carrying the raw APNs token.
       if (platform === 'ios') {
-        console.log(`[Push] Waiting 800ms for APNs token capture before reconcile…`);
+        try {
+          console.log('[Push] iOS permission granted — calling PN.register() to trigger APNs registration event');
+          await PN.register();
+        } catch (e) {
+          console.warn('[Push] PN.register() failed in requestFullPermission:', e);
+        }
+
+        // Give the registration event a moment to fire and capture APNs token.
         await new Promise((r) => setTimeout(r, 800));
-        console.log(`[Push] APNs token after wait: ${apnsTokenRef.current?.substring(0, 16) ?? 'null'}`);
+        console.log(`[Push] APNs token after register(): ${apnsTokenRef.current?.substring(0, 16) ?? 'null'}`);
       }
 
       console.log(`[Push] ✓ Permission granted — reconciling runtime token`);
-
       const reconciled = await reconcileRuntimeToken('request_full_permission');
       if (reconciled) {
         console.log('[Push] Runtime token reconciled after permission grant');
