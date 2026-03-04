@@ -187,9 +187,11 @@ export default function NotificationsPage() {
         {osPermission === 'prompt' && Capacitor.isNativePlatform() && (
           <button
             onClick={async () => {
+              // CRITICAL: Call requestFullPermission directly — no try/catch wrapping
+              // to preserve the user-gesture context iOS requires for the OS prompt.
+              await requestFullPermission();
+              // Re-check after request
               try {
-                await requestFullPermission();
-                // Re-check after request — unified PushNotifications for both platforms
                 const { PushNotifications } = await import('@capacitor/push-notifications');
                 const result = await PushNotifications.checkPermissions();
                 setOsPermission(result.receive as 'granted' | 'denied' | 'prompt');
@@ -197,7 +199,7 @@ export default function NotificationsPage() {
                   toast.success('Notifications enabled!');
                 }
               } catch {
-                toast.error('Could not enable notifications. Please try again.');
+                // ignore check errors
               }
             }}
             className="w-full mb-4 flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4 text-left active:scale-[0.98] transition-transform"

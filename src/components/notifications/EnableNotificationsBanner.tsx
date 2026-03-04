@@ -66,13 +66,13 @@ export function EnableNotificationsBanner() {
 
   const handleTurnOn = async () => {
     setLoading(true);
-    try {
-      await requestFullPermission();
-    } catch {
-      // timeout or error — OS prompt was likely suppressed
-    }
+    // CRITICAL: Call requestFullPermission directly in the click handler
+    // — no try/catch wrapping the permission call itself, to preserve
+    // the user-gesture context that iOS requires for the OS prompt.
+    await requestFullPermission();
     setLoading(false);
-    // If permission is still not granted after the call, show the "open settings" fallback
+
+    // After the permission flow completes, check if it was actually granted
     if (Capacitor.isNativePlatform()) {
       try {
         const { PushNotifications } = await import('@capacitor/push-notifications');
