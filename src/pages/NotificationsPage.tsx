@@ -197,10 +197,7 @@ export default function NotificationsPage() {
                   return;
                 }
 
-                // Trigger APNs registration event
-                await PushNotifications.register();
-
-                // Fire-and-forget — don't block UI on long reconciliation chain
+                // Let requestFullPermission handle register() with listener gate
                 requestFullPermission().catch(e => console.warn('[Push] Background reconciliation:', e));
 
                 setOsPermission('granted');
