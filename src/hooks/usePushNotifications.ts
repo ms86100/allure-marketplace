@@ -833,6 +833,10 @@ export function usePushNotificationsInternal() {
             // Force-flush immediately so BUILD_ID proof is never lost to buffer
             flushPushLogs().catch(() => {});
 
+            if (state === 'registered' && userRef.current) {
+              reconcileRuntimeTokenRef.current('resume_check').catch(() => {});
+              return;
+            }
             if (state === 'registered') return;
 
             // Unified permission check via PushNotifications (both platforms)
@@ -1049,8 +1053,17 @@ export function usePushNotificationsInternal() {
       }, 500);
     }
 
+    // Periodic token health check — every 15 minutes
+    const periodicInterval = setInterval(() => {
+      if (!userRef.current || !Capacitor.isNativePlatform()) return;
+      reconcileRuntimeTokenRef.current('periodic_check').catch((e) => {
+        pushLog('warn', 'Periodic reconcile failed', { error: String(e) });
+      });
+    }, 15 * 60 * 1000);
+
     return () => {
       tornDown = true;
+      clearInterval(periodicInterval);
       pushLog('info', 'EFFECT_CLEANUP', { myId, regState: registrationStateRef.current, hasToken: !!tokenRef.current, ts: Date.now() });
       flushPushLogs().catch(() => {});
       clearWatchdogRef.current();
