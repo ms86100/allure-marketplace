@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Bell, X, ExternalLink } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -67,8 +68,6 @@ export function EnableNotificationsBanner() {
   const handleTurnOn = async () => {
     setLoading(true);
     try {
-      const { PushNotifications } = await import('@capacitor/push-notifications');
-
       // Direct call in tap handler — preserves iOS user-gesture context
       const permResult = await PushNotifications.requestPermissions();
 

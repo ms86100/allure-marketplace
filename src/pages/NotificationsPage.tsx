@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Bell, MessageCircle, Tag, Volume2, Loader2, AlertTriangle, ExternalLink } from 'lucide-react';
+import { PushNotifications } from '@capacitor/push-notifications';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -188,8 +189,6 @@ export default function NotificationsPage() {
           <button
             onClick={async () => {
               try {
-                const { PushNotifications } = await import('@capacitor/push-notifications');
-
                 // Direct call in tap handler — preserves iOS user-gesture context
                 const permResult = await PushNotifications.requestPermissions();
 
