@@ -960,7 +960,11 @@ export function usePushNotificationsInternal() {
           }
           pushLog('info', 'PUSH_STAGE_RESULT', { stage, ts: Date.now() });
 
+          // Immediate flush so we can see progress up to this point
+          flushPushLogs().catch(() => {});
+
           // Build-change detection (non-blocking — wrapped in try/catch)
+          pushLog('info', 'BUILD_CHANGE_STARTING', { ts: Date.now() });
           try {
             const lastBuild = await getLastBuildId();
             const buildChanged = lastBuild !== null && lastBuild !== PUSH_BUILD_ID;
@@ -976,12 +980,14 @@ export function usePushNotificationsInternal() {
             pushLog('warn', 'BUILD_CHANGE_CHECK_FAILED — continuing with registration', { error: String(buildErr) });
           }
 
+          pushLog('info', 'STAGE_SET_STARTING', { ts: Date.now() });
           // Ensure stage is set to 'full' for future sessions
           if (stage !== 'full') {
             try { await setPushStage('full'); } catch {}
           }
 
           // Force-flush before registration
+          pushLog('info', 'PRE_REGISTRATION_FLUSH', { ts: Date.now() });
           flushPushLogs().catch(() => {});
 
           // ── ALWAYS attempt registration on login ──
@@ -990,14 +996,20 @@ export function usePushNotificationsInternal() {
           retryCountRef.current = 0;
 
           // First try reconcileRuntimeToken (fast path for iOS)
-          const reconciled = await reconcileRuntimeTokenRef.current('login_always');
-          if (reconciled) {
-            pushLog('info', 'Token reconciled on login');
-            setPermissionStatus('granted');
-          } else {
-            // Fall back to full registration flow
-            pushLog('info', 'Reconcile failed — calling attemptRegistration');
-            await attemptRegistrationRef.current();
+          pushLog('info', 'RECONCILE_STARTING', { ts: Date.now() });
+          try {
+            const reconciled = await reconcileRuntimeTokenRef.current('login_always');
+            pushLog('info', 'RECONCILE_RESULT', { reconciled, ts: Date.now() });
+            if (reconciled) {
+              pushLog('info', 'Token reconciled on login');
+              setPermissionStatus('granted');
+            } else {
+              // Fall back to full registration flow
+              pushLog('info', 'Reconcile failed — calling attemptRegistration');
+              await attemptRegistrationRef.current();
+            }
+          } catch (reconErr) {
+            pushLog('error', 'RECONCILE_CRASHED', { error: String(reconErr), ts: Date.now() });
           }
 
           flushPushLogs().catch(() => {});
