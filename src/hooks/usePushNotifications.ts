@@ -960,38 +960,23 @@ export function usePushNotificationsInternal() {
           }
           pushLog('info', 'PUSH_STAGE_RESULT', { stage, ts: Date.now() });
 
-          // Immediate flush so we can see progress up to this point
-          flushPushLogs().catch(() => {});
+          // ── CRITICAL: Skip ALL Preferences calls before registration ──
+          // On iOS, calling Preferences.get() twice in rapid succession causes
+          // a native bridge deadlock where the second Promise never settles.
+          // getPushStage() already called Preferences.get() above — calling
+          // getLastBuildId() here would hang the entire registration flow.
+          // Build-change detection is deferred to a fire-and-forget background task.
 
-          // Build-change detection (non-blocking — wrapped in try/catch)
-          pushLog('info', 'BUILD_CHANGE_STARTING', { ts: Date.now() });
-          try {
-            const lastBuild = await getLastBuildId();
-            const buildChanged = lastBuild !== null && lastBuild !== PUSH_BUILD_ID;
-            pushLog('info', 'BUILD_CHANGE_CHECK', { lastBuild, currentBuild: PUSH_BUILD_ID, changed: buildChanged, ts: Date.now() });
-            if (buildChanged) {
-              pushLog('info', 'BUILD_CHANGED — clearing stale device tokens from DB');
-              await supabase.from('device_tokens').delete().eq('user_id', userId);
-              tokenRef.current = null;
-              setToken(null);
-            }
-            await setLastBuildId(PUSH_BUILD_ID);
-          } catch (buildErr) {
-            pushLog('warn', 'BUILD_CHANGE_CHECK_FAILED — continuing with registration', { error: String(buildErr) });
-          }
-
-          pushLog('info', 'STAGE_SET_STARTING', { ts: Date.now() });
-          // Ensure stage is set to 'full' for future sessions
+          // Ensure stage is set to 'full' for future sessions (fire-and-forget)
           if (stage !== 'full') {
-            try { await setPushStage('full'); } catch {}
+            setPushStage('full').catch(() => {});
           }
 
           // Force-flush before registration
-          pushLog('info', 'PRE_REGISTRATION_FLUSH', { ts: Date.now() });
+          pushLog('info', 'LOGIN_ALWAYS_REGISTER', { stage, ts: Date.now() });
           flushPushLogs().catch(() => {});
 
           // ── ALWAYS attempt registration on login ──
-          pushLog('info', 'LOGIN_ALWAYS_REGISTER', { stage, ts: Date.now() });
           registrationStateRef.current = 'idle';
           retryCountRef.current = 0;
 
@@ -1013,6 +998,18 @@ export function usePushNotificationsInternal() {
           }
 
           flushPushLogs().catch(() => {});
+
+          // ── Deferred: build-change detection (non-blocking background) ──
+          setTimeout(async () => {
+            try {
+              const lastBuild = await getLastBuildId();
+              const buildChanged = lastBuild !== null && lastBuild !== PUSH_BUILD_ID;
+              pushLog('info', 'BUILD_CHANGE_CHECK_DEFERRED', { lastBuild, currentBuild: PUSH_BUILD_ID, changed: buildChanged });
+              await setLastBuildId(PUSH_BUILD_ID);
+            } catch (e) {
+              pushLog('warn', 'BUILD_CHANGE_CHECK_DEFERRED_FAILED', { error: String(e) });
+            }
+          }, 5000);
 
           // Safety net: delayed reconcile if still no token
           if (!tokenRef.current && (registrationStateRef.current as string) !== 'registered') {

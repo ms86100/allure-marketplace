@@ -25,37 +25,13 @@ async function getPrefs() {
 export async function getPushStage(): Promise<PushStage> {
   if (!Capacitor.isNativePlatform()) return 'none';
   try {
-    // Probe 1: About to call dynamic import
-    console.log("PREFERENCES_IMPORT_CALLING", Date.now());
-    pushLog('info', 'PREFERENCES_IMPORT_CALLING', { ts: Date.now() });
-
     const prefsModule = await import('@capacitor/preferences');
-
-    // Probe 2: Dynamic import resolved
-    console.log("PREFERENCES_IMPORT_RESOLVED", Date.now());
-    pushLog('info', 'PREFERENCES_IMPORT_RESOLVED', { ts: Date.now() });
-
     const prefs = prefsModule.Preferences;
-    if (!prefs) {
-      console.log("PREFERENCES_PLUGIN_NULL", Date.now());
-      pushLog('warn', 'PREFERENCES_PLUGIN_NULL', { ts: Date.now() });
-      return 'none';
-    }
-
-    // Probe 3: About to call get()
-    console.log("PREFERENCES_GET_CALLING", Date.now());
-    pushLog('info', 'PREFERENCES_GET_CALLING', { ts: Date.now() });
-
+    if (!prefs) return 'none';
     const { value } = await prefs.get({ key: KEY });
-
-    // Probe 4: get() resolved
-    console.log("PREFERENCES_GET_RESOLVED", Date.now());
-    pushLog('info', 'PREFERENCES_GET_RESOLVED', { ts: Date.now(), value });
-
     if (value === 'deferred' || value === 'full') return value;
     return 'none';
   } catch (e) {
-    console.log("PREFERENCES_GET_ERROR", Date.now(), e);
     pushLog('error', 'PREFERENCES_GET_ERROR', { ts: Date.now(), error: String(e) });
     return 'none';
   }
