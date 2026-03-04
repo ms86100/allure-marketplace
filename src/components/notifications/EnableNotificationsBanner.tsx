@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 const DISMISSED_KEY = 'notif_banner_dismissed';
 
 export function EnableNotificationsBanner() {
-  const { permissionStatus, requestFullPermission } = usePushNotifications();
+  const { token, permissionStatus, requestFullPermission } = usePushNotifications();
   const [dismissed, setDismissed] = useState(
     () => sessionStorage.getItem(DISMISSED_KEY) === '1'
   );
@@ -17,7 +17,7 @@ export function EnableNotificationsBanner() {
   const [failedSilently, setFailedSilently] = useState(false);
 
   if (!Capacitor.isNativePlatform()) return null;
-  if (permissionStatus === 'granted') return null;
+  if (permissionStatus === 'granted' || !!token) return null;
   if (dismissed && permissionStatus === 'prompt' && !failedSilently) return null;
 
   // If denied, show "Open Settings" variant

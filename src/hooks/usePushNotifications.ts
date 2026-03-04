@@ -30,6 +30,17 @@ type RegistrationState = 'idle' | 'registering' | 'registered' | 'failed';
 
 const MAX_RETRIES = 3;
 const WATCHDOG_TIMEOUT_MS = 20000;
+const RECONCILE_GETTOKEN_TIMEOUT_MS = 3000;
+const LOGIN_RECONCILE_TIMEOUT_MS = 5000;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(timeoutMessage)), ms);
+    }),
+  ]);
+}
 
 /**
  * Reject 64-char hex strings on iOS — these are raw APNs tokens, not FCM.
@@ -285,7 +296,15 @@ export function usePushNotificationsInternal() {
       return false;
     }
 
+    pushLog('info', 'RECONCILE_GET_FCM_PLUGIN_CALLING', { reason, platform, ts: Date.now() });
     const fcm = await getFcmPlugin();
+    pushLog('info', 'RECONCILE_GET_FCM_PLUGIN_RESULT', {
+      reason,
+      platform,
+      hasPlugin: Boolean(fcm),
+      ts: Date.now(),
+    });
+
     if (!fcm) {
       pushLog('warn', 'reconcileRuntimeToken skipped — FCM plugin missing', { reason, platform });
       return false;
@@ -297,8 +316,23 @@ export function usePushNotificationsInternal() {
     // iOS bridge can be transient right after resume/login; retry a few times.
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const result = await fcm.getToken();
+        pushLog('info', 'RECONCILE_GETTOKEN_CALLING', { reason, platform, attempt, ts: Date.now() });
+        const result = await withTimeout(
+          fcm.getToken(),
+          RECONCILE_GETTOKEN_TIMEOUT_MS,
+          'reconcileRuntimeToken getToken timed out'
+        );
         const tokenValue = result.token;
+
+        pushLog('info', 'RECONCILE_GETTOKEN_RESULT', {
+          reason,
+          platform,
+          attempt,
+          tokenPrefix: tokenValue?.substring(0, 20) ?? null,
+          length: tokenValue?.length ?? 0,
+          valid: tokenValue ? isValidFcmToken(tokenValue, platform) : false,
+          ts: Date.now(),
+        });
 
         if (tokenValue && isValidFcmToken(tokenValue, platform)) {
           candidate = tokenValue;
@@ -318,6 +352,8 @@ export function usePushNotificationsInternal() {
           platform,
           attempt,
           error: String(err),
+          timedOut: String(err).includes('timed out'),
+          ts: Date.now(),
         });
       }
 
@@ -987,7 +1023,11 @@ export function usePushNotificationsInternal() {
           // First try reconcileRuntimeToken (fast path for iOS)
           pushLog('info', 'RECONCILE_STARTING', { ts: Date.now() });
           try {
-            const reconciled = await reconcileRuntimeTokenRef.current('login_always');
+            const reconciled = await withTimeout(
+              reconcileRuntimeTokenRef.current('login_always'),
+              LOGIN_RECONCILE_TIMEOUT_MS,
+              'login reconcile timed out'
+            );
             pushLog('info', 'RECONCILE_RESULT', { reconciled, ts: Date.now() });
             if (reconciled) {
               pushLog('info', 'Token reconciled on login');
@@ -998,7 +1038,9 @@ export function usePushNotificationsInternal() {
               await attemptRegistrationRef.current();
             }
           } catch (reconErr) {
-            pushLog('error', 'RECONCILE_CRASHED', { error: String(reconErr), ts: Date.now() });
+            pushLog('error', 'RECONCILE_CRASHED_OR_TIMEOUT', { error: String(reconErr), ts: Date.now() });
+            pushLog('warn', 'Reconcile blocked login flow — forcing attemptRegistration fallback', { ts: Date.now() });
+            await attemptRegistrationRef.current();
           }
 
           flushPushLogs().catch(() => {});
