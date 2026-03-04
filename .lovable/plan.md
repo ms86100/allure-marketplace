@@ -1,65 +1,58 @@
 
 
-## Verified Finding: Listener Ordering Is NOT Guaranteed
+## Finding: Two Unguarded `register()` Calls Remain
 
-The QA reviewer is correct. The `registration` listener can miss the APNs token event because **there is no synchronization gate** before `register()` is called.
+The hook (`usePushNotifications.ts`) is now correctly guarded — both `attemptRegistration` (line 418) and `requestFullPermission` (line 1137) await `listenersReadyRef.current` before calling `register()`.
 
-### Evidence
+**However**, both UI components bypass the hook and call `PushNotifications.register()` directly — without the gate:
 
-**Listeners are attached** inside an async IIFE in the main `useEffect` (line 659-816):
-```
-useEffect → async IIFE → getPushNotificationsPlugin() → PN.addListener("registration", ...) → resolves listenersReadyRef
-```
+| File | Line | Guarded? |
+|------|------|----------|
+| `EnableNotificationsBanner.tsx` | 80 | **No** |
+| `NotificationsPage.tsx` | 201 | **No** |
 
-**But `register()` is called** in two places without awaiting the gate:
-- `attemptRegistration` (line 433): `await PN.register()` — no `await listenersReadyRef.current` beforehand
-- `requestFullPermission` (line 1181): `await PN.register()` — same problem
+These direct calls fire the `registration` event before listeners may be attached, which is the exact race condition we just fixed inside the hook.
 
-**The listener gate exists** (`listenersReadyRef`, lines 107-113) and is resolved at line 812, but it is **never awaited anywhere**. It's dead code.
+### Why These Direct Calls Exist
 
-### Race Condition
+They were added to "preserve iOS user-gesture context." But `register()` does **not** require gesture context — only `requestPermissions()` does. The `requestPermissions()` call on the line above (72/193) correctly preserves the gesture chain. The `register()` call is a separate native bridge operation that doesn't need to be in the same synchronous frame.
 
-```text
-Timeline A (works):
-  useEffect IIFE runs → listeners attached → gate resolved
-  ...later...
-  user taps "Turn On" → requestFullPermission → register() → event fires → listener catches it ✓
+### Fix
 
-Timeline B (fails — what happened to the seller):
-  user taps "Turn On" → requestFullPermission → register() fires IMMEDIATELY
-  useEffect IIFE still loading plugin...
-  registration event fires → NO LISTENER ATTACHED → token lost forever ✗
-```
+**Remove the direct `PushNotifications.register()` calls** from both UI components. The fire-and-forget `requestFullPermission()` already calls `register()` with the listener gate (line 1137-1138). Let it handle registration.
 
-This is especially likely on first launch when the user taps "Turn On" quickly — the effect's async IIFE may still be awaiting `getPushNotificationsPlugin()`.
-
-### Fix Plan
-
-**Change 1: `usePushNotifications.ts` — Await listener gate before `register()`**
-
-In `attemptRegistration` (before line 433), add:
+**`EnableNotificationsBanner.tsx`** — Remove lines 79-80:
 ```typescript
-await listenersReadyRef.current;
+const handleTurnOn = async () => {
+  setLoading(true);
+  try {
+    const permResult = await PushNotifications.requestPermissions();
+    if (permResult.receive !== 'granted') {
+      setFailedSilently(true);
+      return;
+    }
+    // Let requestFullPermission handle register() with listener gate
+    requestFullPermission().catch(e => console.warn('[Push] Background reconciliation:', e));
+  } catch {
+    setFailedSilently(true);
+  } finally {
+    setLoading(false);
+  }
+};
 ```
 
-In `requestFullPermission` (before line 1181), add:
+**`NotificationsPage.tsx`** — Remove lines 200-201, same pattern:
 ```typescript
-await listenersReadyRef.current;
+const permResult = await PushNotifications.requestPermissions();
+if (permResult.receive !== 'granted') {
+  setOsPermission(permResult.receive as 'granted' | 'denied' | 'prompt');
+  return;
+}
+// Let requestFullPermission handle register() with listener gate
+requestFullPermission().catch(e => console.warn('[Push] Background reconciliation:', e));
+setOsPermission('granted');
+toast.success('Notifications enabled!');
 ```
 
-This ensures the `registration` listener is always attached before `register()` fires the APNs token event.
-
-**Change 2: Remove `FCM.getAPNSToken()` fallbacks**
-
-The three fallback blocks added in the last edit (lines 722-735, 335-349, 491-506) are unnecessary if the listener ordering is correct. `FCM.getAPNSToken()` is not a standard API across all `@capacitor-community/fcm` versions and adds fragile complexity. Remove all three blocks.
-
-**Change 3: Keep the UI fire-and-forget pattern**
-
-The `EnableNotificationsBanner.tsx` and `NotificationsPage.tsx` changes from the last edit (fire-and-forget `requestFullPermission()`) are correct and should stay as-is.
-
-### No other changes needed
-
-- The `registration` listener itself (line 666-749) correctly captures `apnsTokenRef.current` when the event fires
-- The `claim_device_token` RPC correctly stores both tokens
-- The edge function correctly uses APNs when the token is present
+Since the static `import { PushNotifications }` is still used for `requestPermissions()`, the import stays. No other files call `register()`.
 
