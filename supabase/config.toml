@@ -1,0 +1,73 @@
+project_id = "rvvctaikytfeyzkwoqxg"
+
+[functions.auto-cancel-orders]
+verify_jwt = false
+
+[functions.create-razorpay-order]
+verify_jwt = false
+
+[functions.razorpay-webhook]
+verify_jwt = false
+
+[functions.send-push-notification]
+verify_jwt = false
+
+[functions.validate-society]
+verify_jwt = false
+
+[functions.auto-archive-bulletin]
+verify_jwt = false
+
+[functions.summarize-thread]
+verify_jwt = false
+
+[functions.process-subscriptions]
+verify_jwt = false
+
+[functions.notify-help-request]
+verify_jwt = false
+
+[functions.daily-society-digest]
+verify_jwt = false
+
+[functions.health]
+verify_jwt = false
+
+[functions.process-notification-queue]
+verify_jwt = false
+
+[functions.archive-old-data]
+verify_jwt = false
+
+[functions.gate-token]
+verify_jwt = false
+
+[functions.seed-test-data]
+verify_jwt = false
+
+[functions.generate-product-image]
+verify_jwt = false
+
+[functions.manage-delivery]
+verify_jwt = false
+
+[functions.save-test-results]
+verify_jwt = false
+
+[functions.reset-and-seed-scenario]
+verify_jwt = false
+
+[functions.seed-integration-test-users]
+verify_jwt = false
+
+[functions.ai-auto-review]
+verify_jwt = false
+
+[functions.update-delivery-location]
+verify_jwt = false
+
+[functions.send-campaign]
+verify_jwt = false
+
+[functions.test-apns-direct]
+verify_jwt = false

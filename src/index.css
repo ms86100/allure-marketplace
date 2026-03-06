@@ -1,96 +1,189 @@
+/* System fonts — SF Pro on iOS, Roboto on Android */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Clean light theme */
+    --background: 0 0% 96%;
+    --foreground: 0 0% 8%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 0 0% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 0 0% 8%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 145 83% 36%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 0 0% 94%;
+    --secondary-foreground: 0 0% 18%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 0 0% 93%;
+    --muted-foreground: 0 0% 42%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 145 83% 36%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 0 0% 89%;
+    --input: 0 0% 89%;
+    --ring: 145 83% 36%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Semantic */
+    --veg: 130 82% 28%;
+    --non-veg: 0 80% 50%;
+    --success: 145 83% 36%;
+    --warning: 38 95% 52%;
+    --info: 210 100% 65%;
+    --favorite: 0 84% 60%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Badge colors */
+    --badge-new: 0 84% 59%;
+    --badge-bought: 195 100% 45%;
+    --badge-discount: 25 100% 70%;
+    --rating-star: 45 100% 49%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Nav accent — orange/peach for active bottom nav */
+    --nav-active: 25 95% 60%;
+    --nav-active-foreground: 0 0% 100%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    /* Product image warm bg */
+    --product-image-bg: 38 50% 95%;
 
-    --sidebar-accent: 240 4.8% 95.9%;
+    /* Category tint colors */
+    --tint-food: 0 0% 95%;
+    --tint-services: 200 30% 95%;
+    --tint-personal: 310 20% 96%;
+    --tint-resale: 38 30% 95%;
+    --tint-events: 260 20% 96%;
+    --tint-default: 0 0% 95%;
 
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(145 83% 36%) 0%, hsl(150 70% 30%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(145 83% 36%) 0%, hsl(150 60% 32%) 100%);
+    --gradient-warm: linear-gradient(135deg, hsl(38 95% 52%) 0%, hsl(20 90% 55%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(145 83% 36% / 0.05) 0%, hsl(0 0% 96%) 60%);
+    --gradient-glass: linear-gradient(135deg, hsl(0 0% 100% / 0.95) 0%, hsl(0 0% 100% / 0.8) 100%);
 
-    --sidebar-border: 220 13% 91%;
+    /* Shadows */
+    --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.04);
+    --shadow-md: 0 4px 12px hsl(0 0% 0% / 0.06);
+    --shadow-lg: 0 12px 32px hsl(0 0% 0% / 0.1);
+    --shadow-card: 0 1px 3px hsl(0 0% 0% / 0.04);
+    --shadow-elevated: 0 8px 24px hsl(0 0% 0% / 0.08);
+    --shadow-glow: 0 0 20px hsl(145 83% 36% / 0.12);
+    --shadow-cta: 0 2px 8px hsl(145 83% 36% / 0.25);
 
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 8%;
+    --sidebar-primary: 145 83% 36%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 94%;
+    --sidebar-accent-foreground: 0 0% 18%;
+    --sidebar-border: 0 0% 89%;
+    --sidebar-ring: 145 83% 36%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Pure dark — #0F0F0F base */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 100%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    /* Card: dark charcoal #242424 */
+    --card: 0 0% 14%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* Primary: Vibrant green #0FA84F */
+    --primary: 145 83% 36%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    /* Secondary: Dark gray surface #2A2A2A */
+    --secondary: 0 0% 17%;
+    --secondary-foreground: 0 0% 82%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 0 0% 17%;
+    --muted-foreground: 0 0% 60%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    /* Accent: Same vibrant green — only for CTAs */
+    --accent: 145 83% 36%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --border: 0 0% 100% / 0.05;
+    --input: 0 0% 17%;
+    --ring: 145 83% 36%;
+
+    --radius: 0.75rem;
+
+    /* Semantic */
+    --veg: 145 83% 36%;
+    --non-veg: 0 75% 50%;
+    --success: 145 83% 36%;
+    --warning: 38 95% 52%;
+    --info: 210 100% 65%;
+    --favorite: 0 84% 60%;
+
+    /* Badge colors */
+    --badge-new: 0 84% 59%;
+    --badge-bought: 195 100% 45%;
+    --badge-discount: 25 100% 70%;
+    --rating-star: 45 100% 49%;
+
+    /* Nav accent — orange/peach */
+    --nav-active: 25 95% 60%;
+    --nav-active-foreground: 0 0% 100%;
+
+    /* Product image — slightly lighter dark */
+    --product-image-bg: 0 0% 18%;
+
+    /* Dark mode tints — subtle */
+    --tint-food: 0 0% 12%;
+    --tint-services: 200 12% 11%;
+    --tint-personal: 310 8% 12%;
+    --tint-resale: 38 12% 11%;
+    --tint-events: 260 8% 12%;
+    --tint-default: 0 0% 11%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(145 83% 36%) 0%, hsl(155 70% 30%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(145 83% 36%) 0%, hsl(150 60% 32%) 100%);
+    --gradient-warm: linear-gradient(135deg, hsl(38 95% 52%) 0%, hsl(20 90% 55%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(145 83% 36% / 0.06) 0%, hsl(0 0% 4%) 60%);
+    --gradient-glass: linear-gradient(135deg, hsl(0 0% 14% / 0.95) 0%, hsl(0 0% 10% / 0.8) 100%);
+
+    /* Shadows */
+    --shadow-sm: 0 1px 3px hsl(0 0% 0% / 0.5);
+    --shadow-md: 0 4px 14px hsl(0 0% 0% / 0.6);
+    --shadow-lg: 0 12px 36px hsl(0 0% 0% / 0.7);
+    --shadow-card: 0 2px 8px hsl(0 0% 0% / 0.4);
+    --shadow-elevated: 0 8px 24px hsl(0 0% 0% / 0.6);
+    --shadow-glow: 0 0 24px hsl(145 83% 36% / 0.2);
+    --shadow-cta: 0 2px 8px hsl(145 83% 36% / 0.3);
+    --shadow-glow-green: 0 0 16px hsl(145 83% 36% / 0.3);
+    --shadow-glow-accent: 0 0 16px hsl(38 95% 52% / 0.3);
+
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 145 83% 36%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 0 0% 17%;
+    --sidebar-accent-foreground: 0 0% 82%;
+    --sidebar-border: 0 0% 100% / 0.05;
+    --sidebar-ring: 145 83% 36%;
   }
 }
 
@@ -99,7 +192,273 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground;
+  html {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    @apply bg-background;
   }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Full-screen viewport handling */
+  html,
+  body {
+    height: 100%;
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    background: hsl(var(--background));
+  }
+
+  @supports not (height: 100dvh) {
+    #root {
+      height: 100vh;
+      min-height: 100vh;
+    }
+  }
+
+  /* Keyboard-aware */
+  input:focus, textarea:focus, select:focus {
+    scroll-margin-bottom: 120px;
+  }
+
+  /* Touch targets */
+  button, a, input, select, textarea {
+    @apply touch-manipulation;
+  }
+
+  /* Tap feedback — snappy 0.98 scale */
+  button:active, a:active, [role="button"]:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease-out;
+  }
+
+  /* Typography: tighter letter spacing on headings */
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+}
+
+@layer utilities {
+  /* Animations */
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  .animate-bounce-in {
+    animation: bounceIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(16px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes slideDown {
+    from { transform: translateY(-16px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes scaleIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes bounceIn {
+    from { transform: scale(0.8); opacity: 0; }
+    50% { transform: scale(1.05); }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  /* Low stock pulse */
+  @keyframes lowStockPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  .animate-low-stock-pulse {
+    animation: lowStockPulse 1.8s ease-in-out infinite;
+  }
+
+  /* Quantity stepper pop */
+  @keyframes stepperPop {
+    0% { transform: scale(0.85); opacity: 0; }
+    60% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .animate-stepper-pop {
+    animation: stepperPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* Gradient text */
+  .text-gradient-primary {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-primary);
+  }
+
+  /* Glass effects */
+  .glass {
+    @apply backdrop-blur-xl;
+    background: var(--gradient-glass);
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .glass-card {
+    @apply backdrop-blur-md rounded-2xl;
+    border: 1px solid hsl(var(--border));
+    background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.8) 100%);
+    box-shadow: var(--shadow-card);
+  }
+
+  .glass-tinted {
+    @apply backdrop-blur-md rounded-2xl;
+    background: linear-gradient(135deg, hsl(var(--card) / 0.85) 0%, hsl(var(--card) / 0.65) 100%);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Neon glow utilities for dark mode */
+  .dark .glow-green {
+    box-shadow: var(--shadow-glow-green);
+  }
+
+  .dark .glow-primary {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .dark .glow-accent {
+    box-shadow: var(--shadow-glow-accent);
+  }
+
+  /* Hide scrollbar */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Safe area padding */
+  .safe-bottom {
+    padding-bottom: constant(safe-area-inset-bottom);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-top {
+    padding-top: constant(safe-area-inset-top);
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* Product image background — warm beige */
+  .product-image-bg {
+    background-color: hsl(var(--product-image-bg));
+  }
+}
+
+/* Accessibility: Large Font Mode */
+html.large-font {
+  font-size: 18px;
+}
+
+html.large-font .text-xs {
+  font-size: 0.875rem;
+}
+
+html.large-font .text-sm {
+  font-size: 1rem;
+}
+
+html.large-font .text-base {
+  font-size: 1.125rem;
+}
+
+html.large-font .text-lg {
+  font-size: 1.25rem;
+}
+
+html.large-font .text-xl {
+  font-size: 1.5rem;
+}
+
+html.large-font .text-2xl {
+  font-size: 1.75rem;
+}
+
+html.large-font button,
+html.large-font a {
+  min-height: 48px;
+}
+
+/* Category collage grid */
+.category-collage {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+}
+
+.category-collage.items-1 > :first-child {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+}
+
+.category-collage.items-2 > :first-child {
+  grid-row: 1 / -1;
+}
+.category-collage.items-2 > :nth-child(2) {
+  grid-row: 1 / -1;
+}
+
+.category-collage.items-3 > :first-child {
+  grid-row: 1 / -1;
+}
+
+/* Sonner close button — move to right side */
+[data-sonner-toast] [data-close-button] {
+  left: auto !important;
+  right: 0 !important;
 }

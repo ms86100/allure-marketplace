@@ -1,0 +1,360 @@
+import { Link } from 'react-router-dom';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
+import { ServiceCategory } from '@/types/categories';
+import { DraftProductManager } from '@/components/seller/DraftProductManager';
+import { LicenseUpload } from '@/components/seller/LicenseUpload';
+import { CroppableImageUpload } from '@/components/ui/croppable-image-upload';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { DAYS_OF_WEEK } from '@/types/database';
+import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe, LayoutGrid, Tags, FileText, Package, CheckCircle2, ArrowRight, Truck, Smartphone, Banknote, Clock, ImageIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useSellerApplication } from '@/hooks/useSellerApplication';
+
+// ─── Sub-category Selector ─────────────────────────────────────────────────
+function SubCategorySelector({ selectedGroup, selectedCategories, onCategorySelect }: {
+  selectedGroup: string;
+  selectedCategories: ServiceCategory[];
+  onCategorySelect: (category: ServiceCategory, selected: boolean) => void;
+}) {
+  const { groupedConfigs, isLoading } = useCategoryConfigs();
+  const categories = groupedConfigs[selectedGroup as keyof typeof groupedConfigs] || [];
+  if (isLoading) return <div className="text-center py-4 text-muted-foreground">Loading categories...</div>;
+  if (categories.length === 0) return <div className="text-center py-4 text-muted-foreground">No categories available</div>;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-muted-foreground">Select your categories:</p>
+      <div className="grid grid-cols-2 gap-2">
+        {categories.map((config) => {
+          const isSelected = selectedCategories.includes(config.category);
+          return (
+            <button key={config.category} onClick={() => onCategorySelect(config.category, !isSelected)}
+              className={cn('flex items-center gap-2 p-3 rounded-lg border transition-all text-left', isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30')}>
+              <span className="text-lg">{config.icon}</span>
+              <span className="text-sm font-medium">{config.displayName}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Constants ──────────────────────────────────────────────────────────────
+const TOTAL_STEPS = 6;
+const STEP_META = [
+  { label: 'Category', icon: LayoutGrid, title: 'What will you offer?', helper: 'This determines your store type and the tools available to you.' },
+  { label: 'Specialize', icon: Tags, title: 'Specialize your store', helper: 'Select the specific categories you\'ll serve. You can add more later.' },
+  { label: 'Store Details', icon: FileText, title: 'Set up your store', helper: 'These details help buyers find and trust your business.' },
+  { label: 'Settings', icon: Settings, title: 'Configure your store', helper: 'Set up how you operate — delivery, payments, and schedule.' },
+  { label: 'Products', icon: Package, title: 'Add your first products', helper: 'Buyers will see these once your store is approved. Start with 1-2 items.' },
+  { label: 'Review', icon: CheckCircle2, title: 'Review and submit', helper: 'Double-check everything. You can edit your store after approval too.' },
+];
+const FULFILLMENT_OPTIONS = [
+  { value: 'self_pickup', label: 'Self Pickup Only', description: 'Customers pick up from your location', icon: Store },
+  { value: 'seller_delivery', label: 'I Deliver', description: 'You deliver to customers', icon: Truck },
+  { value: 'platform_delivery', label: 'Delivery Partner', description: 'Platform delivery partner delivers', icon: Truck },
+  { value: 'pickup_and_seller_delivery', label: 'Pickup + I Deliver', description: 'Buyer can choose pickup or you deliver', icon: Truck },
+  { value: 'pickup_and_platform_delivery', label: 'Pickup + Delivery Partner', description: 'Buyer can choose pickup or delivery partner', icon: Truck },
+];
+
+// ─── Main Page ──────────────────────────────────────────────────────────────
+export default function BecomeSellerPage() {
+  const app = useSellerApplication();
+  const {
+    user, isLoading, isCheckingExisting, groupsLoading, existingSeller, draftSellerId,
+    step, setStep, selectedGroup, setSelectedGroup, formData, setFormData,
+    draftProducts, setDraftProducts, acceptedDeclaration, setAcceptedDeclaration,
+    licenseStatus, setLicenseStatus, parentGroupInfos, groups, groupedConfigs,
+    selectedGroupInfo, selectedGroupRow, handleCategoryChange, toggleOperatingDay,
+    handleProceedToSettings, handleProceedToProducts, handleSaveDraftAndExit, handleSubmit,
+    setExistingSeller, setDraftSellerId, handleStepBack, handleGroupSelect, submissionComplete,
+  } = app;
+
+  const fulfillmentLabel = FULFILLMENT_OPTIONS.find(o => o.value === formData.fulfillment_mode)?.label || formData.fulfillment_mode;
+  const paymentMethods = [formData.accepts_cod && 'COD', formData.accepts_upi && 'UPI'].filter(Boolean).join(', ') || 'None';
+
+  if (isCheckingExisting || groupsLoading) {
+    return <AppLayout showHeader={false} showNav={false}><div className="flex items-center justify-center min-h-[100dvh]"><Loader2 className="animate-spin" size={32} /></div></AppLayout>;
+  }
+
+  // ─── Submission Success Screen ──────────────────────────────────────────────
+  if (submissionComplete) {
+    return (
+      <AppLayout showHeader={false} showNav={false}>
+        <div className="p-4 safe-top flex flex-col items-center justify-center min-h-[80dvh] text-center">
+          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.4 }}>
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-success/20 flex items-center justify-center">
+              <CheckCircle2 className="text-success" size={40} />
+            </div>
+            <h1 className="text-2xl font-bold mb-2">Application Submitted!</h1>
+            <p className="text-muted-foreground mb-2 max-w-xs mx-auto">
+              Your store <strong>{formData.business_name}</strong> has been submitted for admin review.
+            </p>
+            <p className="text-sm text-muted-foreground mb-8 max-w-xs mx-auto">
+              You'll receive a notification once your store is approved. This usually takes less than 24 hours.
+            </p>
+            <Link to="/">
+              <Button size="lg" className="w-full max-w-xs">
+                <ArrowRight size={16} className="mr-2" />Go to Home
+              </Button>
+            </Link>
+          </motion.div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (existingSeller && selectedGroup) {
+    const isRejected = (existingSeller as any).verification_status === 'rejected';
+    const isPendingReview = (existingSeller as any).verification_status === 'pending';
+    return (
+      <AppLayout showHeader={false} showNav={false}>
+        <div className="p-4 safe-top">
+          <Link to="/" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0 mb-6"><ArrowLeft size={18} /></Link>
+          <div className="text-center py-12">
+            {isRejected ? (
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-destructive/20 flex items-center justify-center"><Store className="text-destructive" size={32} /></div>
+                <h1 className="text-2xl font-bold mb-2">Application Not Approved</h1>
+                <p className="text-muted-foreground mb-2">Your seller application for <strong>{existingSeller.business_name}</strong> was not approved.</p>
+                <p className="text-sm text-muted-foreground mb-6">You can update your details and resubmit your application.</p>
+                <div className="space-y-3">
+                  <Button className="w-full" size="lg" onClick={() => { setExistingSeller(null); setDraftSellerId((existingSeller as any).id); setStep(3); }}>Update & Resubmit</Button>
+                  <Button variant="outline" className="w-full" onClick={() => { setSelectedGroup(null); setExistingSeller(null); setStep(1); }}>Choose Different Category</Button>
+                </div>
+              </>
+            ) : isPendingReview ? (
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-warning/20 flex items-center justify-center"><Clock className="text-warning" size={32} /></div>
+                <h1 className="text-2xl font-bold mb-2">Under Review</h1>
+                <p className="text-muted-foreground mb-2">Your store <strong>{existingSeller.business_name}</strong> is currently being reviewed by our admin team.</p>
+                <p className="text-sm text-muted-foreground mb-6">You'll be notified once it's approved. This usually takes less than 24 hours.</p>
+                <div className="space-y-3">
+                  <Link to="/"><Button className="w-full" size="lg"><ArrowRight size={16} className="mr-2" />Go to Home</Button></Link>
+                  <Button variant="outline" className="w-full" onClick={() => { setSelectedGroup(null); setExistingSeller(null); setStep(1); }}>Register Another Category</Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-success/20 flex items-center justify-center"><Store className="text-success" size={32} /></div>
+                <h1 className="text-2xl font-bold mb-2">Already Registered!</h1>
+                <p className="text-muted-foreground mb-6">You already have a business in this category: <strong>{existingSeller.business_name}</strong></p>
+                <div className="space-y-3">
+                  <Link to="/seller/settings"><Button className="w-full" size="lg"><Settings size={18} className="mr-2" />Edit {existingSeller.business_name}</Button></Link>
+                  <Button variant="outline" className="w-full" onClick={() => { setSelectedGroup(null); setExistingSeller(null); setStep(1); }}>Choose Different Category</Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  return (
+    <AppLayout showHeader={false} showNav={false}>
+      <div className="p-4 pb-24 safe-top">
+        {/* Top Bar */}
+        <div className="flex items-center justify-between mb-6">
+          <Link to="/" className="flex items-center gap-2 text-muted-foreground"><span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></span><span>Back</span></Link>
+          {step >= 3 && <Button variant="ghost" size="sm" onClick={handleSaveDraftAndExit} disabled={isLoading}><Save size={14} className="mr-1" />Save Draft</Button>}
+        </div>
+
+        {/* Step Header */}
+        <div className="text-center mb-4">
+          <h1 className="text-2xl font-bold">{STEP_META[step - 1].title}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{STEP_META[step - 1].helper}</p>
+        </div>
+
+        {/* Progress Stepper */}
+        <div className="flex items-center justify-between mb-6 px-0 overflow-x-auto scrollbar-hide gap-1">
+          {STEP_META.map((meta, i) => {
+            const stepNum = i + 1; const Icon = meta.icon;
+            const isCompleted = step > stepNum; const isActive = step === stepNum;
+            return (
+              <div key={meta.label} className="flex flex-col items-center gap-1 min-w-[3rem] flex-1">
+                <div className={cn('w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all text-xs', isCompleted && 'bg-primary text-primary-foreground', isActive && 'bg-primary/20 text-primary ring-2 ring-primary', !isCompleted && !isActive && 'bg-muted text-muted-foreground')}>
+                  {isCompleted ? <CheckCircle2 size={14} /> : <Icon size={12} />}
+                </div>
+                <span className={cn('text-[9px] sm:text-[10px] font-medium text-center leading-tight truncate w-full', isActive ? 'text-primary' : 'text-muted-foreground')}>{meta.label}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Context Breadcrumb */}
+        {step >= 3 && selectedGroupInfo && (
+          <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-muted/60 text-xs">
+            <div className={cn('w-6 h-6 rounded flex items-center justify-center text-sm', selectedGroupInfo.color)}>{selectedGroupInfo.icon}</div>
+            <span className="font-medium">{selectedGroupInfo.label}</span>
+            {formData.categories.length > 0 && (
+              <><ChevronRight size={12} className="text-muted-foreground" /><span className="text-muted-foreground truncate">{formData.categories.map(cat => { const config = (groupedConfigs[selectedGroup as keyof typeof groupedConfigs] || []).find(c => c.category === cat); return config?.displayName || cat; }).join(', ')}</span></>
+            )}
+            {formData.business_name.trim() && step >= 4 && <><span className="text-muted-foreground">|</span><span className="font-medium truncate">"{formData.business_name}"</span></>}
+          </div>
+        )}
+
+        {/* Step 1: Choose Category Group */}
+        {step === 1 && (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-3">
+              <AnimatePresence>
+                {parentGroupInfos.map(({ value, label, icon, color }) => (
+                  <motion.button key={value} layout whileTap={{ scale: 0.97 }} onClick={() => handleGroupSelect(value)}
+                    className={cn('flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center', selectedGroup === value ? 'border-primary bg-primary/5 scale-[1.03]' : 'hover:border-primary/50 hover:bg-muted/50')}>
+                    <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center text-2xl', color)}>{icon}</div>
+                    <span className="font-medium text-sm">{label}</span>
+                    {selectedGroup === value && <motion.span initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-primary font-medium">Great choice! ✨</motion.span>}
+                  </motion.button>
+                ))}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Select Sub-categories */}
+        {step === 2 && selectedGroup && (
+          <div className="space-y-5">
+            <button onClick={() => handleStepBack(1)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change category</button>
+            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+              <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center text-2xl', selectedGroupInfo?.color)}>{selectedGroupInfo?.icon}</div>
+              <div><h3 className="font-semibold">{selectedGroupInfo?.label}</h3><p className="text-xs text-muted-foreground">{selectedGroupInfo?.description}</p></div>
+            </div>
+            <SubCategorySelector selectedGroup={selectedGroup} selectedCategories={formData.categories as ServiceCategory[]} onCategorySelect={handleCategoryChange} />
+            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: You'll name your store and set operating hours</p>
+            <Button className="w-full" onClick={() => setStep(3)} disabled={formData.categories.length === 0}>Continue<ChevronRight size={16} className="ml-1" /></Button>
+          </div>
+        )}
+
+        {/* Step 3: Business Details */}
+        {step === 3 && (
+          <div className="space-y-5">
+            <button onClick={() => handleStepBack(2)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change categories</button>
+            <div className="space-y-2"><Label htmlFor="business_name">Business Name *</Label><Input id="business_name" placeholder={groups.find(g => g.slug === selectedGroup)?.placeholder_hint || "e.g., Your Store Name"} value={formData.business_name} onChange={(e) => setFormData({ ...formData, business_name: e.target.value })} /></div>
+            <div className="space-y-2"><Label htmlFor="description">Description</Label><Textarea id="description" placeholder="Tell customers about what you offer..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} /></div>
+            <div className="space-y-2"><Label>Availability Hours</Label><div className="grid grid-cols-2 gap-3"><div><Label htmlFor="start" className="text-xs text-muted-foreground">Opens at</Label><Input id="start" type="time" value={formData.availability_start} onChange={(e) => setFormData({ ...formData, availability_start: e.target.value })} /></div><div><Label htmlFor="end" className="text-xs text-muted-foreground">Closes at</Label><Input id="end" type="time" value={formData.availability_end} onChange={(e) => setFormData({ ...formData, availability_end: e.target.value })} /></div></div></div>
+            <div className="border rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><Globe className="text-primary" size={20} /><div><p className="font-medium text-sm">Sell beyond my community</p><p className="text-xs text-muted-foreground">Allow buyers from nearby societies to order</p></div></div><Switch checked={formData.sell_beyond_community} onCheckedChange={(checked) => setFormData({ ...formData, sell_beyond_community: checked })} /></div>
+              {formData.sell_beyond_community && <div className="space-y-2 pt-2 border-t"><div className="flex items-center justify-between"><Label className="text-xs text-muted-foreground">Delivery Radius</Label><span className="text-sm font-medium text-primary">{formData.delivery_radius_km} km</span></div><Slider value={[formData.delivery_radius_km]} onValueChange={([v]) => setFormData({ ...formData, delivery_radius_km: v })} min={1} max={10} step={1} /><p className="text-[10px] text-muted-foreground">Buyers within {formData.delivery_radius_km} km of your society can order</p></div>}
+            </div>
+            {selectedGroupRow && (selectedGroupRow as any).requires_license && (
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-2"><Shield size={16} className="text-primary" /><h3 className="font-semibold text-sm">Required License</h3></div>
+                <p className="text-xs text-muted-foreground">Your category requires a verified license before you can proceed.</p>
+                {draftSellerId ? <LicenseUpload sellerId={draftSellerId} groupId={selectedGroupRow.id} isOnboarding={true} onStatusChange={(status) => setLicenseStatus(status)} /> : <p className="text-xs text-muted-foreground italic">Fill in your business name above — license upload will appear once your draft is saved.</p>}
+                {(selectedGroupRow as any).license_mandatory && (!licenseStatus || licenseStatus === 'rejected') && <div className="bg-destructive/10 rounded-lg p-3 text-sm text-destructive flex items-center gap-2"><Shield size={16} />You must upload your {(selectedGroupRow as any).license_type_name || 'Business License'} before continuing.</div>}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Configure delivery, payments, and schedule</p>
+            <Button className="w-full" onClick={handleProceedToSettings} disabled={isLoading || !formData.business_name.trim() || ((selectedGroupRow as any)?.license_mandatory && (!licenseStatus || licenseStatus === 'rejected'))}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Store Settings<ChevronRight size={16} className="ml-1" /></Button>
+          </div>
+        )}
+
+        {/* Step 4: Store Settings */}
+        {step === 4 && (
+          <div className="space-y-5">
+            <button onClick={() => handleStepBack(3)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store details</button>
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2"><Truck size={16} className="text-primary" /><h3 className="font-semibold text-sm">Fulfillment Mode</h3></div>
+              <RadioGroup value={formData.fulfillment_mode} onValueChange={(value) => setFormData({ ...formData, fulfillment_mode: value })} className="space-y-2">
+                {FULFILLMENT_OPTIONS.map((option) => { const Icon = option.icon; return (
+                  <label key={option.value} className={cn('flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all', formData.fulfillment_mode === option.value ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30')}>
+                    <RadioGroupItem value={option.value} /><div className="flex-1"><span className="text-sm font-medium">{option.label}</span><p className="text-xs text-muted-foreground">{option.description}</p></div>
+                  </label>
+                ); })}
+              </RadioGroup>
+              {formData.fulfillment_mode !== 'self_pickup' && (
+                <p className="text-xs text-primary/80 bg-primary/5 rounded-lg p-2">💡 Delivery fee is managed by the platform admin</p>
+              )}
+              {(formData.fulfillment_mode === 'platform_delivery' || formData.fulfillment_mode === 'pickup_and_platform_delivery') && (
+                <p className="text-xs text-muted-foreground bg-muted rounded-lg p-2">🚴 A delivery partner will be auto-assigned when the order is ready</p>
+              )}
+              {(formData.fulfillment_mode === 'seller_delivery' || formData.fulfillment_mode === 'pickup_and_seller_delivery') && <div className="space-y-2 pt-2 border-t"><Label htmlFor="delivery_note" className="text-xs text-muted-foreground">Delivery Note (optional)</Label><Input id="delivery_note" placeholder="e.g., Delivery available within 2 km, after 5 PM only" value={formData.delivery_note} onChange={(e) => setFormData({ ...formData, delivery_note: e.target.value })} /></div>}
+            </div>
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2"><Banknote size={16} className="text-primary" /><h3 className="font-semibold text-sm">Payment Methods</h3></div>
+              <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer"><div className="flex items-center gap-3"><Banknote size={18} className="text-muted-foreground" /><div><span className="text-sm font-medium">Cash on Delivery</span><p className="text-xs text-muted-foreground">Accept cash payments</p></div></div><Switch checked={formData.accepts_cod} onCheckedChange={(checked) => setFormData({ ...formData, accepts_cod: checked })} /></label>
+              <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer"><div className="flex items-center gap-3"><Smartphone size={18} className="text-muted-foreground" /><div><span className="text-sm font-medium">UPI Payment</span><p className="text-xs text-muted-foreground">Accept UPI / digital payments</p></div></div><Switch checked={formData.accepts_upi} onCheckedChange={(checked) => setFormData({ ...formData, accepts_upi: checked })} /></label>
+              {formData.accepts_upi && <div className="space-y-2 pt-2 border-t"><Label htmlFor="upi_id" className="text-xs text-muted-foreground">UPI ID <span className="text-destructive">*</span></Label><Input id="upi_id" placeholder="e.g., yourname@upi" value={formData.upi_id} onChange={(e) => setFormData({ ...formData, upi_id: e.target.value })} className={formData.accepts_upi && !formData.upi_id.trim() ? 'border-destructive' : ''} />{formData.accepts_upi && !formData.upi_id.trim() && <p className="text-xs text-destructive">Required when UPI is enabled</p>}</div>}
+            </div>
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2"><Clock size={16} className="text-primary" /><h3 className="font-semibold text-sm">Operating Days</h3></div>
+              <p className="text-xs text-muted-foreground">Select the days your store is open</p>
+              <div className="flex gap-1.5 flex-wrap">{DAYS_OF_WEEK.map((day) => <button key={day} type="button" onClick={() => toggleOperatingDay(day)} className={cn('px-3 py-2 rounded-lg text-xs font-medium transition-all border', formData.operating_days.includes(day) ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted text-muted-foreground border-border hover:border-muted-foreground/30')}>{day}</button>)}</div>
+              <p className="text-[10px] text-muted-foreground">{formData.operating_days.length === 7 ? 'Open every day' : formData.operating_days.length === 0 ? 'No days selected' : `Open ${formData.operating_days.length} day(s) a week`}</p>
+            </div>
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2"><ImageIcon size={16} className="text-primary" /><h3 className="font-semibold text-sm">Store Images</h3><span className="text-[10px] text-muted-foreground ml-auto">Optional</span></div>
+              <p className="text-xs text-muted-foreground">Add a profile photo and cover image to make your store stand out</p>
+              {user && <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Profile Photo</Label><CroppableImageUpload value={formData.profile_image_url} onChange={(url) => setFormData({ ...formData, profile_image_url: url })} folder="sellers" userId={user.id} aspectRatio="square" placeholder="Profile" cropAspect={1} /></div><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Cover Image</Label><CroppableImageUpload value={formData.cover_image_url} onChange={(url) => setFormData({ ...formData, cover_image_url: url })} folder="sellers" userId={user.id} aspectRatio="video" placeholder="Cover" cropAspect={16 / 9} /></div></div>}
+            </div>
+            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Add at least one product or service to your catalog</p>
+            <Button className="w-full" onClick={handleProceedToProducts} disabled={isLoading || formData.operating_days.length === 0}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Add Products<ChevronRight size={16} className="ml-1" /></Button>
+          </div>
+        )}
+
+        {/* Step 5: Add Products */}
+        {step === 5 && !draftSellerId && (
+          <div className="space-y-5 text-center py-8">
+            <div className="w-16 h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center"><Package size={24} className="text-destructive" /></div>
+            <h3 className="text-lg font-semibold">Unable to load your store</h3>
+            <p className="text-sm text-muted-foreground">Your store draft could not be found. Please go back and try again.</p>
+            <Button variant="outline" onClick={() => setStep(3)}><ArrowLeft size={16} className="mr-1" />Go Back</Button>
+          </div>
+        )}
+        {step === 5 && draftSellerId && (
+          <div className="space-y-5">
+            <button onClick={() => handleStepBack(4)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store settings</button>
+            <DraftProductManager sellerId={draftSellerId} categories={formData.categories} products={draftProducts} onProductsChange={setDraftProducts} />
+            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Review everything and submit for approval</p>
+            <Button className="w-full" onClick={() => setStep(6)} disabled={draftProducts.length === 0}>Review & Submit<ChevronRight size={16} className="ml-1" /></Button>
+          </div>
+        )}
+
+        {/* Step 6: Review & Submit */}
+        {step === 6 && (
+          <div className="space-y-5">
+            <button onClick={() => handleStepBack(5)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit products</button>
+            <div className="bg-muted rounded-lg p-4 space-y-3">
+              <h4 className="font-semibold">Application Summary</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Business</span><span className="font-medium">{formData.business_name}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Category</span><span className="font-medium">{selectedGroupInfo?.label}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Products</span><span className="font-medium">{draftProducts.length} item(s)</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Hours</span><span className="font-medium">{formData.availability_start} – {formData.availability_end}</span></div>
+                <div className="border-t pt-2 mt-2 space-y-2">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Fulfillment</span><span className="font-medium">{fulfillmentLabel}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Payments</span><span className="font-medium">{paymentMethods}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Operating Days</span><span className="font-medium">{formData.operating_days.length === 7 ? 'Every day' : `${formData.operating_days.length} day(s)`}</span></div>
+                  {(formData.profile_image_url || formData.cover_image_url) && <div className="flex justify-between"><span className="text-muted-foreground">Store Images</span><span className="font-medium">{[formData.profile_image_url && 'Profile', formData.cover_image_url && 'Cover'].filter(Boolean).join(' + ')}</span></div>}
+                </div>
+                <div className="border-t pt-2 mt-2"><div className="flex justify-between"><span className="text-muted-foreground">Cross-Society</span><span className="font-medium">{formData.sell_beyond_community ? `Yes (${formData.delivery_radius_km} km)` : 'No'}</span></div></div>
+              </div>
+            </div>
+            {draftSellerId && selectedGroupRow && (selectedGroupRow as any).requires_license && licenseStatus && (
+              <div className={cn('rounded-lg p-3 text-sm flex items-center gap-2', licenseStatus === 'approved' ? 'bg-success/10 text-success' : licenseStatus === 'pending' ? 'bg-warning/10 text-warning' : 'bg-muted/50 text-muted-foreground')}>
+                <Shield size={16} className="flex-shrink-0" /><span>{(selectedGroupRow as any).license_type_name || 'Business License'}: {licenseStatus === 'approved' ? 'Verified ✓' : licenseStatus === 'pending' ? 'Uploaded — awaiting admin verification' : 'Status: ' + licenseStatus}</span>
+              </div>
+            )}
+            <div className="bg-muted rounded-lg p-4 text-sm"><h4 className="font-semibold mb-2">What happens next?</h4><ul className="space-y-1 text-muted-foreground"><li>• Your full application will be reviewed by admin</li><li>• Once approved, your store goes live immediately</li><li>• Start receiving orders from neighbors!</li></ul></div>
+            <div className="border rounded-lg p-4 space-y-3">
+              <h4 className="font-semibold text-sm flex items-center gap-2"><Shield size={16} className="text-primary" />Seller Declaration</h4>
+              <div className="text-xs text-muted-foreground space-y-1"><p>By submitting this application, I declare that:</p><ul className="space-y-0.5 ml-3"><li>• I hold all necessary licenses and registrations</li><li>• I am solely responsible for product/service quality and safety</li><li>• I will comply with all applicable laws and regulations</li><li>• I will handle customer complaints professionally</li><li>• I understand that violations may lead to account suspension</li></ul></div>
+              <label className="flex items-start gap-3 cursor-pointer"><Checkbox checked={acceptedDeclaration} onCheckedChange={(checked) => setAcceptedDeclaration(checked as boolean)} className="mt-0.5" /><span className="text-sm font-medium">I agree to the seller declaration and community guidelines</span></label>
+            </div>
+            <Button className="w-full" size="lg" onClick={handleSubmit} disabled={isLoading || !acceptedDeclaration}>{isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <Send size={18} className="mr-2" />}Submit Application</Button>
+          </div>
+        )}
+      </div>
+    </AppLayout>
+  );
+}
