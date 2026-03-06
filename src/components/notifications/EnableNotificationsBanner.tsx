@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bell, X, ExternalLink } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 const DISMISSED_KEY = 'notif_banner_dismissed';
+const GRANTED_KEY = 'notif_permission_granted';
 
 export function EnableNotificationsBanner() {
   const { token, permissionStatus, requestFullPermission } = usePushNotifications();
@@ -15,7 +16,29 @@ export function EnableNotificationsBanner() {
   );
   const [loading, setLoading] = useState(false);
   const [failedSilently, setFailedSilently] = useState(false);
-  const [grantedLocally, setGrantedLocally] = useState(false);
+  const [grantedLocally, setGrantedLocally] = useState(() => sessionStorage.getItem(GRANTED_KEY) === '1');
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    if (permissionStatus === 'granted' || !!token) {
+      sessionStorage.setItem(GRANTED_KEY, '1');
+      setGrantedLocally(true);
+      return;
+    }
+
+    (async () => {
+      try {
+        const result = await PushNotifications.checkPermissions();
+        if (result.receive === 'granted') {
+          sessionStorage.setItem(GRANTED_KEY, '1');
+          setGrantedLocally(true);
+        }
+      } catch {
+        // no-op
+      }
+    })();
+  }, [permissionStatus, token]);
 
   if (!Capacitor.isNativePlatform()) return null;
   if (permissionStatus === 'granted' || !!token || grantedLocally) return null;
@@ -72,16 +95,19 @@ export function EnableNotificationsBanner() {
       const permResult = await PushNotifications.requestPermissions();
 
       if (permResult.receive !== 'granted') {
+        sessionStorage.removeItem(GRANTED_KEY);
         setFailedSilently(true);
         return;
       }
 
-      // Immediately hide banner — don't wait for background reconciliation
+      // Immediately hide banner on all pages in this session
+      sessionStorage.setItem(GRANTED_KEY, '1');
       setGrantedLocally(true);
 
       // Let requestFullPermission handle register() with listener gate (fire-and-forget)
       requestFullPermission().catch(e => console.warn('[Push] Background reconciliation:', e));
     } catch {
+      sessionStorage.removeItem(GRANTED_KEY);
       setFailedSilently(true);
     } finally {
       setLoading(false);
