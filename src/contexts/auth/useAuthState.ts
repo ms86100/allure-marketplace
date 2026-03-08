@@ -92,7 +92,7 @@ export function useAuthState() {
           profile: ctx.profile as Profile | null,
           society: ctx.society as Society | null,
           societyAdminRole: ctx.society_admin_role as SocietyAdmin | null,
-          roles: (ctx.roles as UserRole[]) || [],
+          roles: ((ctx.roles || []) as any[]).map((r: any) => typeof r === 'string' ? r : r.role) as UserRole[],
           sellerProfiles: sellers,
           currentSellerId: newSellerId,
           managedBuilderIds: (ctx.builder_ids as string[]) || [],
