@@ -2,6 +2,7 @@ import { useParentGroups, ParentGroupInfo } from '@/hooks/useParentGroups';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { hapticSelection } from '@/lib/haptics';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 
 interface ParentGroupTabsProps {
   activeGroup: string | null;
