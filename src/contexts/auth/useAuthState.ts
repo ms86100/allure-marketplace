@@ -62,7 +62,7 @@ export function useAuthState() {
                 profile: retryCtx.profile as Profile | null,
                 society: retryCtx.society as Society | null,
                 societyAdminRole: retryCtx.society_admin_role as SocietyAdmin | null,
-                roles: (retryCtx.roles as UserRole[]) || [],
+                roles: ((retryCtx.roles || []) as any[]).map((r: any) => typeof r === 'string' ? r : r.role) as UserRole[],
                 sellerProfiles: retrySellers,
                 currentSellerId: retrySellers.length > 0 ? retrySellers[0].id : null,
                 managedBuilderIds: (retryCtx.builder_ids as string[]) || [],
