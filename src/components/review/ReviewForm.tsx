@@ -34,7 +34,7 @@ export function ReviewForm({ orderId, sellerId, sellerName, category, onSuccess,
       const { data } = await supabase
         .from('category_config')
         .select('review_dimensions')
-        .eq('category', category)
+        .eq('category', category as any)
         .maybeSingle();
       if (data?.review_dimensions && Array.isArray(data.review_dimensions)) {
         setReviewDimensions(data.review_dimensions as string[]);
