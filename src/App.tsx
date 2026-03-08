@@ -388,6 +388,7 @@ function AppRoutes() {
         <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminPage /></AdminRoute></ProtectedRoute>} />
         <Route path="/test-results" element={<ProtectedRoute><AdminRoute><TestResultsPage /></AdminRoute></ProtectedRoute>} />
         <Route path="/api-docs" element={<ProtectedRoute><AdminRoute><ApiDocsPage /></AdminRoute></ProtectedRoute>} />
+        <Route path="/platform-docs" element={<ProtectedRoute><AdminRoute><DocumentationPage /></AdminRoute></ProtectedRoute>} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/pricing" element={<PricingPage />} />
