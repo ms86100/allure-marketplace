@@ -23,6 +23,7 @@ import {
   Bell,
   Type,
   FileText,
+  BookOpen,
   Camera,
   Repeat,
   Award,
