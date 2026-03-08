@@ -98,6 +98,7 @@ const BuilderInspectionsPage = lazy(() => import("./pages/BuilderInspectionsPage
 const TestResultsPage = lazy(() => import("./pages/TestResultsPage"));
 const CollectiveBuyPage = lazy(() => import("./pages/CollectiveBuyPage"));
 const ApiDocsPage = lazy(() => import("./pages/ApiDocsPage"));
+const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
 
 /**
  * Detect if an error is caused by an expired/invalid auth session.
@@ -387,6 +388,7 @@ function AppRoutes() {
         <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminPage /></AdminRoute></ProtectedRoute>} />
         <Route path="/test-results" element={<ProtectedRoute><AdminRoute><TestResultsPage /></AdminRoute></ProtectedRoute>} />
         <Route path="/api-docs" element={<ProtectedRoute><AdminRoute><ApiDocsPage /></AdminRoute></ProtectedRoute>} />
+        <Route path="/platform-docs" element={<ProtectedRoute><AdminRoute><DocumentationPage /></AdminRoute></ProtectedRoute>} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/pricing" element={<PricingPage />} />
