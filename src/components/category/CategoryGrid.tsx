@@ -3,6 +3,7 @@ import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { ProductCategory } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 
 interface CategoryGridProps {
   selectedCategory?: ProductCategory;
