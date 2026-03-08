@@ -6,6 +6,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Users, Tag, Star, ChevronRight } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 
 interface CategoryImageGridProps {
   parentGroup: string;
