@@ -12,6 +12,7 @@ import { ProductListingCard, ProductWithSeller } from '@/components/product/Prod
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronRight, ShoppingBag, Sparkles, Clock, TrendingUp, Flame } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { motion } from 'framer-motion';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useMarketplaceConfig } from '@/hooks/useMarketplaceConfig';
