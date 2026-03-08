@@ -7,120 +7,222 @@ export function AdminCommunityDocs() {
       <DocHero
         icon={Shield}
         title="Admin & Community"
-        subtitle="Admin panel, society admin, bulletin board, disputes, visitor management, guard kiosk, workforce, reports, and notifications."
+        subtitle="Admin panel with dashboard stats, user/seller/society management, catalog configuration, bulletin board, disputes, visitor management, guard kiosk, workforce, and notification system."
       />
 
-      <DocSection title="Admin Panel (/admin)">
-        <p>The super-admin dashboard with sticky navigation bar and urgency badges for pending tasks. Accessible only to users with admin role.</p>
-        <DocSubSection title="Tabs">
+      {/* ─── AdminPage ─── */}
+      <DocSection title="AdminPage — Platform Administration" id="admin-panel">
+        <p>The /admin route (AdminRoute protected) is the super-admin dashboard with animated stat cards and tabbed navigation via AdminSidebarNav.</p>
+
+        <DocSubSection title="Dashboard Header">
           <DocList items={[
-            'Sellers — Review pending seller applications (approve/reject with full details), manage active sellers, deactivate/reactivate',
-            'Products — Browse all products across sellers, manage catalog',
-            'Services Overview — View all service categories, their configuration, and active listings',
-            'Catalog Manager — Edit category_config: display names, icons, colors, listing types, action types, attribute blocks. Changes auto-propagate to products via database triggers',
-            'Settings — Three partitions: Platform (app name, version, branding), Notifications (push config, template management), System (feature flags, maintenance mode)',
-            'License Configuration — Under Catalog → Licenses: manage required licenses/certifications per category',
+            'Animated header: "Dashboard — Platform overview & management"',
+            'EmergencyBroadcastSheet button — send urgent notifications to all users',
+            'SocietySwitcher — filter admin view to a specific society or view all',
           ]} />
         </DocSubSection>
 
-        <DocInfoCard variant="warning" title="Listing Type Propagation">
-          When an admin changes a category's listing type (e.g., from "cart" to "contact"), a database trigger automatically updates all products in that category. The admin sees a confirmation dialog showing how many products will be affected.
+        <DocSubSection title="Stats Grid">
+          <DocTable
+            headers={['Stat', 'Icon', 'Color']}
+            rows={[
+              ['Users count', 'Users', 'Blue'],
+              ['Sellers count', 'Store', 'Emerald'],
+              ['Orders count', 'Package', 'Amber'],
+              ['Revenue total', 'DollarSign', 'Violet'],
+              ['Societies count', 'Building2', 'Cyan'],
+              ['Reviews count', 'Star', 'Indigo'],
+              ['Pending Reports', 'Flag', 'Rose'],
+            ]}
+          />
+          <p>Each card has hover animation (scale) and staggered entrance delays.</p>
+        </DocSubSection>
+
+        <DocSubSection title="Navigation Tabs (AdminSidebarNav)">
+          <DocTable
+            headers={['Tab', 'Content']}
+            rows={[
+              ['Sellers', 'SellerApplicationReview (pending applications with full details: store info, categories, products, license docs — approve/reject) + AdminProductApprovals (pending product submissions)'],
+              ['Users', 'Pending user registrations — each card shows: name, email, phone, address details, society name. Approve (checkmark) or Reject (X) buttons'],
+              ['Societies', 'All societies list with verified/pending indicators. Toggle verification, edit settings, manage features. Pending count badge'],
+              ['Orders', 'Platform-wide order overview with status filters and search'],
+              ['Payments', 'Payment records with status filtering (pending/completed/failed)'],
+              ['Catalog', 'AdminCatalogManager — edit category_config: display names, icons, colors, listing types (transaction_type), action types, attribute blocks, layout types. Changes auto-propagate to products via DB triggers'],
+              ['Banners', 'AdminBannerManager — manage featured banners shown on home page carousel'],
+              ['Features', 'FeatureManagement — toggle society-level feature flags (visitor management, parking, workforce, delivery, etc.)'],
+              ['Settings', 'PlatformSettingsManager with three partitions: Platform (app name, version, branding, labels), Notifications (push config, templates), System (maintenance mode, rate limits)'],
+              ['Disputes', 'AdminDisputesTab — manage dispute tickets across all societies'],
+              ['AI Review', 'AdminAIReviewLog — view AI moderation decisions with confidence scores and reasoning'],
+              ['Campaigns', 'CampaignSender — create and send targeted push notification campaigns to societies, roles, or individual users'],
+              ['Tools', 'AppNavigator, ApiKeySettings, ResetAndSeedButton, PurgeDataButton, NotificationDiagnostics'],
+            ]}
+          />
+        </DocSubSection>
+
+        <DocInfoCard variant="warning" title="Catalog Listing Type Propagation">
+          When an admin changes a category's transaction_type (e.g., from "cart_purchase" to "contact_only"), the database trigger sync_products_action_type_on_category_tx_change automatically updates ALL products in that category. The admin sees a TransactionTypeConfirmSave dialog showing how many products will be affected.
         </DocInfoCard>
       </DocSection>
 
-      <DocSection title="Builder Portal">
-        <p>For real estate builder teams managing societies under construction:</p>
+      {/* ─── Builder Portal ─── */}
+      <DocSection title="Builder Portal" id="builder-portal">
+        <p>For real estate builder teams managing under-construction societies:</p>
+        <DocTable
+          headers={['Page', 'Route', 'Features']}
+          rows={[
+            ['Builder Dashboard', '/builder', 'Overview of managed societies, post announcements (builder_announcements), construction milestones (construction_milestones), team management'],
+            ['Builder Analytics', '/builder/analytics', 'Construction progress stats, snag statistics (collective_escalations), resident satisfaction metrics'],
+            ['Builder Inspections', '/builder-inspections', 'Inspection checklists, test results, defect tracking'],
+          ]}
+        />
         <DocList items={[
-          'Builder Dashboard (/builder) — Overview of managed societies, announcements, milestones',
-          'Builder Analytics (/builder/analytics) — Construction progress, snag statistics, resident satisfaction',
-          'Builder Inspections (/builder-inspections) — Inspection checklists and results',
-          'Builder announcements — Post updates to specific societies (builder_announcements table)',
-          'Builder members — Team management with role-based access (builder_members table)',
+          'Builder members managed in builder_members table with role-based access',
+          'Builder-society association via builder_societies table',
+          'BuilderRoute guard checks builder membership before granting access',
         ]} />
       </DocSection>
 
-      <DocSection title="Society Admin (/society/admin)">
-        <p>Society-level administration for committee members. Manages resident verification, society settings, feature toggles, and member management. Accessed via SocietyAdminRoute guard.</p>
-      </DocSection>
-
-      <DocSection title="Bulletin Board (/community)">
+      {/* ─── SocietyAdminPage ─── */}
+      <DocSection title="SocietyAdminPage — Society Management" id="society-admin">
+        <p>The /society/admin route (SocietyAdminRoute protected) for committee members:</p>
         <DocList items={[
-          'Categories: general, event, poll, announcement, marketplace',
-          'Create posts with title, body, optional attachments (photos)',
-          'Events — date, location, RSVP tracking (bulletin_rsvps table)',
-          'Polls — multiple options with deadline, vote tracking (bulletin_votes table)',
-          'Pinned posts — admins can pin important announcements',
-          'Comments — threaded discussion on each post (bulletin_comments table)',
-          'Upvote/downvote system with vote counts',
-          'AI summary — optional AI-generated summary for long posts',
-          'Archive system for old posts',
+          'Resident verification: approve/reject pending residents',
+          'Society settings: name, address, auto-approve toggle, max admins limit',
+          'Feature toggles per society',
+          'Member management: view all residents, update roles',
+          'Society admin limit enforced by validate_society_admin_limit() trigger',
         ]} />
       </DocSection>
 
-      <DocSection title="Disputes (/disputes)">
-        <p>Formal complaint and dispute resolution system between residents, sellers, and the society.</p>
+      {/* ─── BulletinPage ─── */}
+      <DocSection title="BulletinPage — Community Board" id="bulletin">
+        <p>The /community route is the community bulletin board.</p>
         <DocList items={[
-          'Submit dispute with category, description, photos, optional anonymity',
-          'SLA deadline auto-calculated based on category',
-          'Status flow: submitted → acknowledged → in_progress → resolved',
-          'Committee notes — private notes visible only to admin/committee members (is_committee_note flag)',
-          'Resolution note recorded when dispute is closed',
-          'dispute_tickets and dispute_comments tables with RLS policies',
+          'Post categories: general, event, poll, announcement, marketplace',
+          'Create post: title, body, category selector, optional photo attachments (attachment_urls array)',
+          'Events: event_date, event_location fields, RSVP tracking (bulletin_rsvps table with status: going/maybe/not_going)',
+          'Polls: poll_options (JSON array), poll_deadline, voting via bulletin_votes table (poll_option_id)',
+          'Pinned posts: is_pinned flag, admins can pin/unpin — pinned posts always show at top',
+          'Comments: threaded discussion (bulletin_comments table), auto-increments comment_count via trigger',
+          'Upvote/downvote: bulletin_votes table with vote_type, auto-updates vote_count via trigger',
+          'AI summary: ai_summary field for auto-generated post summaries',
+          'Archive: is_archived flag for hiding old posts',
+          'Activity logging: log_bulletin_activity() trigger records post creation in society_activity',
         ]} />
       </DocSection>
 
-      <DocSection title="Visitor Management (/visitors)">
-        <p>Residents pre-register expected visitors for smooth gate entry. Visitors receive a time-limited pass. Security can verify at the guard kiosk.</p>
-      </DocSection>
-
-      <DocSection title="Guard Kiosk (/guard-kiosk)">
-        <p>Dedicated security guard interface (SecurityRoute protected). QR code scanning for resident gate entry, visitor verification, delivery partner verification. Logs all entries in the gate entry system.</p>
-      </DocSection>
-
-      <DocSection title="Workforce Management (/workforce)">
+      {/* ─── DisputesPage ─── */}
+      <DocSection title="DisputesPage — Dispute Resolution" id="disputes">
+        <p>The /disputes route handles formal complaints.</p>
         <DocList items={[
-          'Domestic help registry with attendance tracking (domestic_help_attendance table)',
-          'Worker attendance — daily check-in/check-out with timestamp and photo',
-          'Worker leave management — apply, approve/reject leave requests',
-          'Worker salary tracking and payment records',
-          'Worker hire — post job requests, workers can browse and apply (worker_jobs tables)',
-          'My Workers — residents view their assigned domestic workers',
-          'Authorized persons — manage who is allowed entry on behalf of a resident',
+          'Submit dispute: category dropdown (configurable), description textarea, photo upload (photo_urls array), anonymous toggle (is_anonymous)',
+          'SLA deadline auto-calculated based on category (sla_deadline field)',
+          'Status flow: submitted → acknowledged (acknowledged_at timestamp) → in_progress → resolved (resolved_at + resolution_note)',
+          'Committee notes: dispute_comments with is_committee_note flag — private, visible only to admins',
+          'Activity logging: log_dispute_activity() trigger',
+          'Admin view: AdminDisputesTab in admin panel shows all disputes cross-society',
         ]} />
       </DocSection>
 
-      <DocSection title="Society Features">
+      {/* ─── VisitorManagementPage ─── */}
+      <DocSection title="VisitorManagementPage — Visitor Pre-Registration" id="visitors">
+        <p>The /visitors route allows residents to pre-register expected visitors.</p>
         <DocList items={[
-          'Society Dashboard (/society) — Overview of society activities, quick stats',
-          'Society Finances (/society/finances) — Financial overview, dues, payments',
-          'Construction Progress (/society/progress) — Milestone tracking for under-construction societies',
-          'Snag List (/society/snags) — Report and track construction defects',
-          'Society Reports (/society/reports) — Analytics and reports for committee members',
-          'Society Notices (/society/notices) — Official notices from management',
-          'Maintenance (/maintenance) — Maintenance requests and tracking',
-          'Vehicle Parking (/parking) — Parking slot management and allocation',
-          'Payment Milestones (/payment-milestones) — Track construction payment schedules',
+          'Register visitor: name, phone, purpose, expected date/time',
+          'Visitor types configurable per society (get_visitor_types_for_society function): delivery, guest, vendor, etc.',
+          'Time-limited pass generation for visitor entry',
+          'Security verification at guard kiosk',
+          'Visitor history and status tracking',
         ]} />
       </DocSection>
 
-      <DocSection title="Notification System">
+      {/* ─── GuardKioskPage ─── */}
+      <DocSection title="GuardKioskPage — Security Interface" id="guard-kiosk">
+        <p>The /guard-kiosk route (SecurityRoute protected) is the dedicated security guard interface.</p>
+        <DocList items={[
+          'Resident gate entry: QR code scanning for verified residents',
+          'Visitor verification: validate pre-registered visitors',
+          'Delivery partner verification: confirm delivery assignments',
+          'Worker entry validation: validate_worker_entry() function checks active worker status',
+          'Parcel logging: register incoming parcels for residents',
+          'All entries logged in the gate entry system with timestamps',
+        ]} />
+      </DocSection>
+
+      {/* ─── WorkforceManagementPage ─── */}
+      <DocSection title="Workforce Management" id="workforce">
+        <p>The /workforce route (and related sub-pages) manages domestic help and workers.</p>
+        <DocTable
+          headers={['Page', 'Route', 'Features']}
+          rows={[
+            ['Workforce Hub', '/workforce', 'Central management for all worker types'],
+            ['Worker Attendance', '/worker-attendance', 'Daily check-in/check-out with timestamp (domestic_help_attendance table)'],
+            ['My Workers', '/my-workers', 'Residents view their assigned domestic workers'],
+            ['Worker Leave', '/worker-leave', 'Apply, approve/reject leave requests'],
+            ['Worker Salary', '/worker-salary', 'Salary tracking and payment records'],
+            ['Worker Hire', '/worker-hire', 'Post job requests for workers'],
+            ['Create Job Request', '/worker-hire/create', 'Job creation form with requirements and pay'],
+            ['Worker Jobs', '/worker/jobs', 'Workers browse available job requests (WorkerRoute protected)'],
+            ['Worker My Jobs', '/worker/my-jobs', 'Workers view their accepted/completed jobs'],
+            ['Authorized Persons', '/authorized-persons', 'Manage who can enter on resident\'s behalf (authorized_persons table)'],
+          ]}
+        />
+        <DocInfoCard variant="info" title="Worker Job System">
+          <DocList items={[
+            'accept_worker_job() — atomically assigns worker to job request',
+            'complete_worker_job() — marks job as completed',
+            'rate_worker_job() — buyer rates worker after completion',
+          ]} />
+        </DocInfoCard>
+      </DocSection>
+
+      {/* ─── Society Features ─── */}
+      <DocSection title="Society Feature Pages" id="society-features">
+        <DocTable
+          headers={['Page', 'Route', 'Description']}
+          rows={[
+            ['Society Dashboard', '/society', 'Overview of society activities and quick stats'],
+            ['Society Finances', '/society/finances', 'Financial overview, maintenance dues, payments'],
+            ['Construction Progress', '/society/progress', 'Milestone tracking for under-construction societies (construction_milestones table)'],
+            ['Snag List', '/society/snags', 'Report and track construction defects, collective escalation when multiple residents report same issue'],
+            ['Society Reports', '/society/reports', 'Analytics: top products (get_society_top_products), trending items, activity summaries'],
+            ['Society Notices', '/society/notices', 'Official notices from management'],
+            ['Maintenance', '/maintenance', 'Maintenance request submission and tracking'],
+            ['Vehicle Parking', '/parking', 'Parking slot management and allocation'],
+            ['Payment Milestones', '/payment-milestones', 'Construction payment schedules with stages (booking, foundation, slab, etc.)'],
+            ['Gate Entry', '/gate-entry', 'Resident QR code display for gate entry'],
+          ]}
+        />
+      </DocSection>
+
+      {/* ─── Notification System ─── */}
+      <DocSection title="Notification System" id="notifications">
         <DocList items={[
           'Push notifications via Firebase (FCM for Android, APNs for iOS)',
-          'device_tokens table stores per-user, per-platform tokens with APNS support',
-          'notification_queue table for async delivery — edge function processes and sends',
-          'Campaign system (campaigns table) — send targeted notifications to society, role, or individual users',
-          'Notification inbox (/notifications/inbox) — in-app notification center with read/unread status',
-          'NotificationHealthCheck component on profile page monitors push registration status',
+          'device_tokens table: user_id, token, platform (android/ios/web), apns_token',
+          'claim_device_token() function: upserts token with ON CONFLICT handling',
+          'notification_queue table: user_id, type, title, body, reference_path, payload, status, next_retry_at',
+          'claim_notification_queue() function: atomic batch processing (SELECT FOR UPDATE SKIP LOCKED)',
+          'Edge function processes queue and sends via FCM/APNs',
+          'Campaign system (campaigns table): sent_by, target_society_id, target_user_ids, target_platform, title, body, status tracking (targeted_count, sent_count, failed_count, cleaned_count)',
+          'CampaignSender component in admin panel for composing and sending campaigns',
+          'Notification Inbox (/notifications/inbox): in-app notification center with read/unread status',
+          'NotificationHealthCheck on profile page: monitors push registration and shows warnings',
+          'NotificationDiagnostics in admin tools: debug push delivery issues',
         ]} />
       </DocSection>
 
-      <DocSection title="Audit & Security">
+      {/* ─── Audit & Security ─── */}
+      <DocSection title="Audit & Security Architecture" id="audit-security">
         <DocList items={[
-          'audit_log table records all significant actions (create, update, delete) with actor, target, metadata',
-          'audit_log_archive for long-term storage of old audit records',
-          'AI review log (ai_review_log) — tracks AI-assisted moderation decisions with confidence scores',
-          'RLS policies on all tables ensure data isolation between societies',
-          'Role-based route guards: AdminRoute, SellerRoute, SecurityRoute, BuilderRoute, SocietyAdminRoute, ManagementRoute',
+          'audit_log table: action, actor_id, target_type, target_id, society_id, metadata (JSONB)',
+          'audit_log_archive: long-term storage for archived audit records',
+          'ai_review_log: AI moderation decisions with confidence, model_used, rule_hits, input_snapshot',
+          'society_activity: per-society activity feed (log_order_activity, log_bulletin_activity, log_dispute_activity, log_help_request_activity triggers)',
+          'Security audit page (/security/audit): SecurityRoute protected, security event log',
+          'RLS policies on ALL tables ensure society-level data isolation',
+          'Role-based route guards: AdminRoute, SellerRoute, SecurityRoute, BuilderRoute, SocietyAdminRoute, ManagementRoute, WorkerRoute',
+          'Database functions: is_admin(), is_society_admin(), is_security_officer(), is_builder_member(), is_builder_for_society(), can_write_to_society(), can_manage_society(), can_access_feature()',
         ]} />
       </DocSection>
     </div>
