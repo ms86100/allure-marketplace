@@ -1,50 +1,40 @@
 
 
-## Notification Health Check — User-Friendly UI
+## Investigation Result: Documentation Hub is Missing from Codebase
 
-### What We'll Build
+I have thoroughly searched the entire codebase for:
+- `DocumentationPage`, `DocSection`, `DocHero`, `DocInfoCard` — **no matches**
+- `src/components/docs/` directory — **does not exist**
+- `platform-docs`, `PlatformDocs`, `DocumentationHub` — **no matches**
+- Any route referencing documentation — **none found**
 
-A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
+The only docs-related page is `ApiDocsPage.tsx` (Swagger UI for API docs).
 
-### UI Design
+### What Happened
 
-**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
+The documentation hub was built during your March 8 session (visible in the conversation history), but it appears the code was **lost** — likely due to a version restore, a conflicting edit, or a rollback that overwrote those files. The memory entries still reference it, but the actual files no longer exist.
 
-**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
+### Plan: Rebuild the Documentation Hub
 
-| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
-|---|---|---|
-| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
-| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
-| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
-| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
+I will recreate the entire documentation system based on the detailed conversation history you provided.
 
-Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
+**Files to create:**
+- `src/components/docs/DocPrimitives.tsx` — shared components (DocSection, DocHero, DocInfoCard, DocStep, etc.)
+- `src/components/docs/DocsSidebar.tsx` — left sidebar navigation with 5 groups (Getting Started, Marketplace, Selling, Operations, Platform)
+- `src/components/docs/AuthOnboardingDocs.tsx`
+- `src/components/docs/HomeDiscoveryDocs.tsx`
+- `src/components/docs/MarketplaceShoppingDocs.tsx`
+- `src/components/docs/ServiceBookingDocs.tsx`
+- `src/components/docs/SellerToolsDocs.tsx`
+- `src/components/docs/DeliveryLogisticsDocs.tsx`
+- `src/components/docs/AdminCommunityDocs.tsx`
+- `src/pages/DocumentationPage.tsx` — main page with SidebarProvider layout
 
-**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
+**Files to edit:**
+- Route configuration — add `/platform-docs` route
+- Admin profile menu — add Documentation link
 
-**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
+**Layout:** Desktop uses a persistent left sidebar nav; mobile uses a collapsible dropdown. Each module is a storytelling-style manual documenting actual features based on code review of each page.
 
-### Implementation
-
-**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
-- Renders the trigger button and the bottom sheet
-- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
-- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
-- Provides actionable buttons for failures (Open Settings, Retry Registration)
-
-**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
-- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
-- Consolidates the 7+ technical steps into 4 simple categories
-- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
-
-**3. Update `src/pages/ProfilePage.tsx`**
-- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
-- Keep Push Debug link visible only for admins
-
-**4. Optionally add to `src/pages/NotificationsPage.tsx`**
-- Add a small "Check notification status" link at the top
-
-### No backend changes needed
-The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
+**Approach:** I will read the actual page implementations for each module to write accurate, honest documentation — not guessed content.
 
