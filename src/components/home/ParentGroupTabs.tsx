@@ -52,7 +52,7 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
                 : 'bg-card text-foreground border border-border hover:border-primary/30 active:scale-95'
             )}
           >
-            <span className="text-sm leading-none">{tab.icon}</span>
+            <DynamicIcon name={tab.icon} size={14} className="shrink-0" />
             <span>{tab.label}</span>
           </button>
         );

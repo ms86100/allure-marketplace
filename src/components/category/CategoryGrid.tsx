@@ -70,11 +70,11 @@ export function CategoryGrid({
         >
           <div
             className={cn(
-              'w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-sm transition-transform hover:scale-105',
+              'w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm transition-transform hover:scale-105',
               config.color
             )}
           >
-            {config.icon}
+            <DynamicIcon name={config.icon} size={24} />
           </div>
           <span className="text-xs font-medium text-center">{config.displayName}</span>
         </Link>

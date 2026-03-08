@@ -302,7 +302,7 @@ function ProductListings({
         <div key={cat.category}>
           <div className="flex items-center justify-between px-4 mb-3">
             <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
-              <span className="text-base">{cat.icon}</span>
+              <DynamicIcon name={cat.icon} size={16} className="shrink-0" />
               {cat.displayName}
             </h3>
             <Link

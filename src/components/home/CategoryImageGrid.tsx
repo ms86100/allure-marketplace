@@ -64,7 +64,7 @@ function ImageCollage({ images, fallbackIcon, fallbackUrl, alt }: {
   if (images.length === 0) {
     return (
       <div className="absolute inset-0 bg-muted flex items-center justify-center">
-        <span className="text-3xl">{fallbackIcon}</span>
+        <DynamicIcon name={fallbackIcon} size={32} className="text-muted-foreground" />
       </div>
     );
   }
