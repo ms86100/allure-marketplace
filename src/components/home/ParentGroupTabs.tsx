@@ -2,6 +2,7 @@ import { useParentGroups, ParentGroupInfo } from '@/hooks/useParentGroups';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { hapticSelection } from '@/lib/haptics';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 
 interface ParentGroupTabsProps {
   activeGroup: string | null;
@@ -51,7 +52,7 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
                 : 'bg-card text-foreground border border-border hover:border-primary/30 active:scale-95'
             )}
           >
-            <span className="text-sm leading-none">{tab.icon}</span>
+            <DynamicIcon name={tab.icon} size={14} className="shrink-0" />
             <span>{tab.label}</span>
           </button>
         );

@@ -12,6 +12,7 @@ import { ProductListingCard, ProductWithSeller } from '@/components/product/Prod
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronRight, ShoppingBag, Sparkles, Clock, TrendingUp, Flame } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { motion } from 'framer-motion';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useMarketplaceConfig } from '@/hooks/useMarketplaceConfig';
@@ -301,7 +302,7 @@ function ProductListings({
         <div key={cat.category}>
           <div className="flex items-center justify-between px-4 mb-3">
             <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
-              <span className="text-base">{cat.icon}</span>
+              <DynamicIcon name={cat.icon} size={16} className="shrink-0" />
               {cat.displayName}
             </h3>
             <Link

@@ -4,6 +4,7 @@ import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 
 /**
  * Blinkit-style sub-category browse grid.
@@ -58,7 +59,7 @@ export function CategoryBrowseGrid({ activeCategories }: CategoryBrowseGridProps
                 'transition-all group-hover:scale-105 group-hover:shadow-md group-active:scale-95'
               )}
             >
-              <span className="text-[22px]">{cat.icon}</span>
+              <DynamicIcon name={cat.icon} size={22} />
             </div>
             <span className="text-[10px] font-medium text-center leading-tight text-muted-foreground line-clamp-2 max-w-[60px]">
               {cat.displayName}

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +43,8 @@ export { type ProductDetail };
 export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduct, categoryIcon, categoryName }: ProductDetailSheetProps) {
   const d = useProductDetail(product, open, onOpenChange);
   const ml = useMarketplaceLabels();
+  const { session } = useAuth();
+  const currentUserId = session?.user?.id ?? '';
 
   if (!product) return null;
 
@@ -207,7 +210,7 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
         </SheetContent>
       </Sheet>
 
-      {d.actionType === 'contact_seller' && <ContactSellerModal open={d.contactOpen} onOpenChange={d.setContactOpen} sellerName={product.seller_name} phone={product.contact_phone || ''} />}
+      {d.actionType === 'contact_seller' && <ContactSellerModal open={d.contactOpen} onOpenChange={d.setContactOpen} sellerName={product.seller_name} phone={product.contact_phone || ''} sellerId={product.seller_id} buyerId={currentUserId} productId={product.product_id} productName={product.product_name} />}
       {!d.isCartAction && d.actionType !== 'contact_seller' && <ProductEnquirySheet open={d.enquiryOpen} onOpenChange={d.setEnquiryOpen} productId={product.product_id} productName={product.product_name} sellerId={product.seller_id} sellerName={product.seller_name} actionType={d.actionType} price={product.price} />}
       <ReportSheet open={d.reportOpen} onOpenChange={d.setReportOpen} targetType="product" targetId={product.product_id} targetName={product.product_name} />
     </>
