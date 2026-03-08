@@ -143,7 +143,7 @@ export function useCategoryManagerData() {
       const groupCats = categories.filter(c => c.parent_group === addForm.parent_group);
       const maxOrder = groupCats.length > 0 ? Math.max(...groupCats.map(c => c.display_order)) : 0;
       const behaviorFlags = deriveBehaviorFlags(addForm.transaction_type);
-      const { data, error } = await supabase.from('category_config').insert({ category: categoryKey, display_name: addForm.display_name.trim(), icon: addForm.icon.trim(), color: addForm.color, parent_group: addForm.parent_group, display_order: maxOrder + 1, is_active: true, image_url: addForm.image_url || null, transaction_type: addForm.transaction_type, ...behaviorFlags }).select().single();
+      const { data, error } = await supabase.from('category_config').insert({ category: categoryKey as any, display_name: addForm.display_name.trim(), icon: addForm.icon.trim(), color: addForm.color, parent_group: addForm.parent_group, display_order: maxOrder + 1, is_active: true, image_url: addForm.image_url || null, transaction_type: addForm.transaction_type, ...behaviorFlags } as any).select().single();
       if (error) throw error;
       setCategories([...categories, data]);
       queryClient.invalidateQueries({ queryKey: ['category-configs'] });

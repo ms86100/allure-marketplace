@@ -73,7 +73,7 @@ export default function VehicleParkingPage() {
         supabase.from('parking_slots').select('*').eq('society_id', effectiveSocietyId).order('slot_number'),
         supabase.from('parking_violations').select('*').eq('society_id', effectiveSocietyId).order('created_at', { ascending: false }).limit(50),
       ]);
-      setSlots((slotsRes.data as ParkingSlot[]) || []);
+      setSlots((slotsRes.data as unknown as ParkingSlot[]) || []);
       setViolations((violationsRes.data as ParkingViolation[]) || []);
     } catch (error) {
       toast.error('Could not load parking data. Please try again.');
