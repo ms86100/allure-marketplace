@@ -4,6 +4,7 @@ import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 
 /**
  * Blinkit-style sub-category browse grid.
