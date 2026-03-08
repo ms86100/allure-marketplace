@@ -53,7 +53,7 @@ export function useOrderDetail(id: string | undefined) {
       const { data: catConfig } = await supabase
         .from('category_config')
         .select('parent_group')
-        .eq('category', product.category)
+        .eq('category', product.category as any)
         .single();
       if (catConfig?.parent_group) {
         setDerivedParentGroup(catConfig.parent_group);

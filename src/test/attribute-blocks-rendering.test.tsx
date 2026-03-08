@@ -10,7 +10,6 @@
  */
 import { describe, it, expect, vi } from "vitest";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error - screen is available at runtime
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProductAttributeBlocks } from "@/components/product/ProductAttributeBlocks";
