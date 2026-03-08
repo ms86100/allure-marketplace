@@ -48,8 +48,8 @@ export function CategoryGrid({
                 : 'hover:bg-muted'
             )}
           >
-            <div className={cn('w-12 h-12 rounded-full flex items-center justify-center text-2xl', config.color)}>
-              {config.icon}
+            <div className={cn('w-12 h-12 rounded-full flex items-center justify-center', config.color)}>
+              <DynamicIcon name={config.icon} size={24} />
             </div>
             <span className="text-[10px] font-medium text-center leading-tight">
               {config.displayName}
