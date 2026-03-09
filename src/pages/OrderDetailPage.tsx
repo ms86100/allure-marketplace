@@ -11,6 +11,8 @@ import { OrderRejectionDialog } from '@/components/order/OrderRejectionDialog';
 import { DeliveryStatusCard } from '@/components/delivery/DeliveryStatusCard';
 import { LiveDeliveryTracker } from '@/components/delivery/LiveDeliveryTracker';
 import { OrderItemCard } from '@/components/order/OrderItemCard';
+import { AppointmentDetailsCard } from '@/components/order/AppointmentDetailsCard';
+import { useServiceBookingForOrder } from '@/hooks/useServiceBookings';
 import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
@@ -26,6 +28,7 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const o = useOrderDetail(id);
   const [deliveryAssignmentId, setDeliveryAssignmentId] = useState<string | null>(null);
+  const { data: serviceBooking } = useServiceBookingForOrder(o.order?.id);
 
   const order = o.order;
   const orderId = order?.id;
@@ -129,6 +132,9 @@ export default function OrderDetailPage() {
               <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => window.location.reload()} />
             )}
           </div>
+
+          {/* Appointment Details for Service Bookings */}
+          {serviceBooking && <AppointmentDetailsCard booking={serviceBooking} />}
 
           {/* Payment */}
           <div className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between">
