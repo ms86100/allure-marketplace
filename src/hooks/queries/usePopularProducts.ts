@@ -62,6 +62,15 @@ export function useCategoryProducts(parentGroup: string | null, societyId: strin
   const localQuery = useQuery({
     queryKey: ['category-products', parentGroup, societyId],
     queryFn: async (): Promise<ProductWithSeller[]> => {
+      // First get all categories belonging to this parent group
+      const { data: catConfigs } = await supabase
+        .from('category_config')
+        .select('category')
+        .eq('parent_group', parentGroup!);
+
+      const categoryList = (catConfigs || []).map((c: any) => c.category);
+      if (categoryList.length === 0) return [];
+
       let query = supabase
         .from('products')
         .select(`
@@ -72,7 +81,7 @@ export function useCategoryProducts(parentGroup: string | null, societyId: strin
         `)
         .eq('is_available', true)
         .eq('approval_status', 'approved')
-        .eq('seller.primary_group', parentGroup!)
+        .in('category', categoryList)
         .order('is_bestseller', { ascending: false })
         .order('created_at', { ascending: false });
 
