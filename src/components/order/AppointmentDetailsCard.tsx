@@ -2,10 +2,15 @@ import { format } from 'date-fns';
 import { Calendar, Clock, MapPin, CalendarPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SERVICE_STATUS_LABELS } from '@/types/service';
-import type { ServiceBooking } from '@/types/service';
 
 interface AppointmentDetailsCardProps {
-  booking: ServiceBooking;
+  booking: {
+    booking_date: string;
+    start_time: string;
+    end_time: string;
+    location_type: string;
+    status: string;
+  };
 }
 
 const LOCATION_LABELS: Record<string, string> = {
