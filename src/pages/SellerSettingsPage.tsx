@@ -134,7 +134,7 @@ export default function SellerSettingsPage() {
               {(primaryGroup ? groupedConfigs[primaryGroup] || [] : []).map((config) => (
                 <label key={config.category} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${formData.categories.includes(config.category as any) ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted'}`}>
                   <Checkbox checked={formData.categories.includes(config.category as any)} onCheckedChange={(checked) => handleCategoryChange(config.category as any, checked as boolean)} />
-                  <span className="text-lg">{config.icon}</span>
+                  <DynamicIcon name={config.icon} size={18} style={{ color: config.color }} />
                   <span className="text-sm font-medium">{config.displayName}</span>
                 </label>
               ))}
