@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
+import { Mail, MapPin } from 'lucide-react';
 
 export function LandingFooter() {
   const { platformName } = useSystemSettings();
@@ -8,36 +9,44 @@ export function LandingFooter() {
   return (
     <footer className="py-12 bg-card border-t border-border">
       <div className="container mx-auto px-4 lg:px-8">
-        <div className="grid md:grid-cols-3 gap-8 mb-8">
-          <div>
+        <div className="grid md:grid-cols-4 gap-8 mb-8">
+          {/* Brand + mission */}
+          <div className="md:col-span-2">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
                 <span className="text-primary-foreground font-bold text-xs">{platformName.charAt(0)}</span>
               </div>
               <span className="font-bold text-foreground">{platformName}</span>
             </div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              A private, GPS-verified marketplace for residential communities. Connecting neighbors with trusted sellers and services.
+            <p className="text-sm text-muted-foreground leading-relaxed mb-4 max-w-sm">
+              A private, GPS-verified marketplace for residential communities. Empowering neighbors to buy, sell, and access services — fostering trust, convenience, and local entrepreneurship.
             </p>
+            <p className="text-xs text-muted-foreground">Operated by Sociva Technologies · Bangalore, India</p>
           </div>
 
+          {/* Legal */}
           <div>
             <h4 className="font-semibold text-foreground mb-3 text-sm">Legal</h4>
             <div className="space-y-2">
               <Link to="/privacy-policy" className="block text-sm text-muted-foreground hover:text-foreground">Privacy Policy</Link>
               <Link to="/terms" className="block text-sm text-muted-foreground hover:text-foreground">Terms & Conditions</Link>
-              <Link to="/refund-policy" className="block text-sm text-muted-foreground hover:text-foreground">Refund & Cancellation Policy</Link>
+              <Link to="/refund-policy" className="block text-sm text-muted-foreground hover:text-foreground">Refund Policy</Link>
               <Link to="/pricing" className="block text-sm text-muted-foreground hover:text-foreground">Pricing</Link>
             </div>
           </div>
 
+          {/* Contact */}
           <div>
-            <h4 className="font-semibold text-foreground mb-3 text-sm">Product</h4>
-            <div className="space-y-2">
-              <button onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })} className="block text-sm text-muted-foreground hover:text-foreground">Features</button>
-              <button onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })} className="block text-sm text-muted-foreground hover:text-foreground">How It Works</button>
-              <button onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })} className="block text-sm text-muted-foreground hover:text-foreground">About Us</button>
-              <button onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })} className="block text-sm text-muted-foreground hover:text-foreground">Contact</button>
+            <h4 className="font-semibold text-foreground mb-3 text-sm">Contact</h4>
+            <div className="space-y-3">
+              <div className="flex items-start gap-2">
+                <Mail className="text-primary shrink-0 mt-0.5" size={14} />
+                <a href="mailto:support@sociva.in" className="text-sm text-muted-foreground hover:text-foreground break-all">support@sociva.in</a>
+              </div>
+              <div className="flex items-start gap-2">
+                <MapPin className="text-primary shrink-0 mt-0.5" size={14} />
+                <span className="text-sm text-muted-foreground">Bangalore, Karnataka, India</span>
+              </div>
             </div>
           </div>
         </div>
