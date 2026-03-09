@@ -1,11 +1,11 @@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Info, Lightbulb, AlertTriangle, CheckCircle2, LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ReactNode } from 'react';
 
-/* ─── Reusable doc building blocks ─── */
+/* ─── Reusable doc building blocks (supports both old and new API) ─── */
 
-export function DocSection({ title, children }: { title: string; children: ReactNode }) {
+export function DocSection({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
   return (
     <Collapsible defaultOpen>
       <CollapsibleTrigger className="flex items-center gap-1.5 group cursor-pointer mb-2">
@@ -19,11 +19,15 @@ export function DocSection({ title, children }: { title: string; children: React
   );
 }
 
-export function DocHero({ title, description, badges, children }: { title: string; description: string; badges?: string[]; children?: ReactNode }) {
+export function DocHero({ title, description, subtitle, badges, children, icon }: { title: string; description?: string; subtitle?: string; badges?: string[]; children?: ReactNode; icon?: LucideIcon }) {
+  const desc = description || subtitle || '';
   return (
     <div className="bg-gradient-to-br from-primary/10 to-accent/10 rounded-2xl p-5 mb-4">
-      <h2 className="text-lg font-bold text-foreground mb-1">{title}</h2>
-      <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+      <div className="flex items-center gap-3 mb-1">
+        {icon && (() => { const Icon = icon; return <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><Icon className="text-primary" size={22} /></div>; })()}
+        <h2 className="text-lg font-bold text-foreground">{title}</h2>
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
       {badges && (
         <div className="flex flex-wrap gap-2 mt-3">
           {badges.map((b) => (
@@ -48,10 +52,17 @@ export function DocFlowStep({ number, title, desc }: { number: number; title: st
   );
 }
 
-export function DocInfoCard({ title, icon, children }: { title: string; icon?: string; children: ReactNode }) {
+const cardStyles = {
+  info: { icon: Info, color: 'text-blue-600' },
+  tip: { icon: Lightbulb, color: 'text-amber-600' },
+  warning: { icon: AlertTriangle, color: 'text-destructive' },
+  success: { icon: CheckCircle2, color: 'text-green-600' },
+};
+
+export function DocInfoCard({ title, icon, variant, children }: { title: string; icon?: string; variant?: 'info' | 'tip' | 'warning' | 'success'; children: ReactNode }) {
   return (
     <div className="p-3 bg-card border border-border rounded-xl mt-2 mb-2">
-      <p className="text-xs font-semibold text-foreground mb-2">{icon} {title}</p>
+      <p className="text-xs font-semibold text-foreground mb-2">{icon ? `${icon} ` : ''}{title}</p>
       <div className="text-[11px] text-muted-foreground space-y-1">{children}</div>
     </div>
   );
