@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ReorderButton } from '@/components/order/ReorderButton';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
+import { BuyerBookingsCalendar } from '@/components/booking/BuyerBookingsCalendar';
 import { useAuth } from '@/contexts/AuthContext';
 import { Order } from '@/types/database';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
@@ -204,6 +205,9 @@ export default function OrdersPage() {
     <AppLayout headerTitle="Orders">
       <div className="pb-4">
         <div className="px-4 pt-3">
+          {/* ═══ BUYER BOOKINGS CALENDAR ═══ */}
+          <BuyerBookingsCalendar />
+
           {isSeller ? (
             <Tabs defaultValue="buying" className="w-full">
               <TabsList className="w-full mb-3 h-9">

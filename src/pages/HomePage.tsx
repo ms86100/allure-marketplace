@@ -8,6 +8,11 @@ import { ReorderLastOrder } from '@/components/home/ReorderLastOrder';
 import { SocietyQuickLinks } from '@/components/home/SocietyQuickLinks';
 // FeaturedBanners rendered inside MarketplaceSection
 import { CommunityTeaser } from '@/components/home/CommunityTeaser';
+import { BuyAgainRow } from '@/components/home/BuyAgainRow';
+import { UpcomingAppointmentBanner } from '@/components/home/UpcomingAppointmentBanner';
+import { SocietyTrustStrip } from '@/components/home/SocietyTrustStrip';
+import { TrendingInSociety } from '@/components/home/TrendingInSociety';
+import { HomeSearchSuggestions } from '@/components/home/HomeSearchSuggestions';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -61,11 +66,26 @@ export default function HomePage() {
 
         {/* FeaturedBanners rendered inside MarketplaceSection — removed here to avoid duplicates (#5) */}
 
+        {/* ═══ UPCOMING APPOINTMENT ═══ */}
+        <UpcomingAppointmentBanner />
+
         {/* ═══ REORDER LAST ORDER ═══ */}
         <ReorderLastOrder />
 
+        {/* ═══ BUY AGAIN ═══ */}
+        <BuyAgainRow />
+
+        {/* ═══ SOCIETY TRUST STRIP ═══ */}
+        <SocietyTrustStrip />
+
         {/* ═══ SOCIETY QUICK LINKS ═══ */}
         <SocietyQuickLinks />
+
+        {/* ═══ SEARCH SUGGESTIONS ═══ */}
+        <HomeSearchSuggestions />
+
+        {/* ═══ TRENDING IN SOCIETY ═══ */}
+        <TrendingInSociety />
 
         {/* ═══ UNIFIED MARKETPLACE ═══ */}
         <MarketplaceSection />

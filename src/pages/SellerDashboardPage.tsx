@@ -26,6 +26,9 @@ import { CouponManager } from '@/components/seller/CouponManager';
 import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
 import { DemandInsights } from '@/components/seller/DemandInsights';
 import { NewOrderAlertOverlay } from '@/components/seller/NewOrderAlertOverlay';
+import { ServiceBookingStats } from '@/components/seller/ServiceBookingStats';
+import { SellerDayAgenda } from '@/components/seller/SellerDayAgenda';
+import { AvailabilityPromptBanner } from '@/components/seller/AvailabilityPromptBanner';
 import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCounts } from '@/hooks/queries/useSellerOrders';
 import { useNewOrderAlert } from '@/hooks/useNewOrderAlert';
 
@@ -176,8 +179,11 @@ export default function SellerDashboardPage() {
         />
 
         <SellerVisibilityChecklist sellerId={sellerProfile.id} />
+        <AvailabilityPromptBanner sellerId={sellerProfile.id} />
 
-        {/* ── Performance & Earnings ── */}
+        {/* ── Service Bookings ── */}
+        <ServiceBookingStats sellerId={sellerProfile.id} />
+        <SellerDayAgenda sellerId={sellerProfile.id} />
         <div className="space-y-3">
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">Performance</p>
           
