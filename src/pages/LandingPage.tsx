@@ -1,11 +1,12 @@
 import { LandingNav } from '@/components/landing/LandingNav';
 import { LandingHero } from '@/components/landing/LandingHero';
 import { LandingTrustBar } from '@/components/landing/LandingTrustBar';
+import { LandingPainPoints } from '@/components/landing/LandingPainPoints';
 import { LandingFeatures } from '@/components/landing/LandingFeatures';
 import { LandingHowItWorks } from '@/components/landing/LandingHowItWorks';
+import { LandingTestimonials } from '@/components/landing/LandingTestimonials';
 import { LandingPricing } from '@/components/landing/LandingPricing';
-import { LandingAbout } from '@/components/landing/LandingAbout';
-import { LandingContact } from '@/components/landing/LandingContact';
+import { LandingFinalCTA } from '@/components/landing/LandingFinalCTA';
 import { LandingFooter } from '@/components/landing/LandingFooter';
 
 export default function LandingPage() {
@@ -14,11 +15,12 @@ export default function LandingPage() {
       <LandingNav />
       <LandingHero />
       <LandingTrustBar />
+      <LandingPainPoints />
       <LandingFeatures />
       <LandingHowItWorks />
+      <LandingTestimonials />
       <LandingPricing />
-      <LandingAbout />
-      <LandingContact />
+      <LandingFinalCTA />
       <LandingFooter />
     </div>
   );
