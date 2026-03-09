@@ -28,7 +28,7 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const o = useOrderDetail(id);
   const [deliveryAssignmentId, setDeliveryAssignmentId] = useState<string | null>(null);
-  const { data: serviceBooking } = useServiceBookingForOrder(order?.id);
+  const { data: serviceBooking } = useServiceBookingForOrder(o.order?.id);
 
   const order = o.order;
   const orderId = order?.id;
