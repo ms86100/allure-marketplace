@@ -136,12 +136,6 @@ export default function AdminPage() {
           <AdminSidebarNav
             activeTab={admin.activeTab}
             onTabChange={admin.setActiveTab}
-            badges={{
-              sellers: admin.pendingSellers.length,
-              products: 0,
-              users: admin.pendingUsers.length,
-              reports: admin.stats.pendingReports,
-            }}
           />
         </div>
 
