@@ -68,7 +68,7 @@ export function useCategoryManagerData() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedGroupSlug, setSelectedGroupSlug] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<CategoryConfigRow | null>(null);
-  const [editForm, setEditForm] = useState({ display_name: '', icon: '', color: '', image_url: '' as string | null, name_placeholder: '', description_placeholder: '', price_label: '', duration_label: '', show_veg_toggle: false, show_duration_field: false, transaction_type: 'cart_purchase' });
+  const [editForm, setEditForm] = useState({ display_name: '', icon: '', color: '', image_url: '' as string | null, name_placeholder: '', description_placeholder: '', price_label: '', duration_label: '', show_veg_toggle: false, show_duration_field: false, transaction_type: 'cart_purchase', supports_addons: false, supports_recurring: false, supports_staff_assignment: false });
   const [isSaving, setIsSaving] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
