@@ -133,6 +133,9 @@ export default function OrderDetailPage() {
             )}
           </div>
 
+          {/* Appointment Details for Service Bookings */}
+          {serviceBooking && <AppointmentDetailsCard booking={serviceBooking} />}
+
           {/* Payment */}
           <div className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2.5"><CreditCard size={16} className="text-muted-foreground" /><p className="text-sm font-medium">{((order as any).payment_method || (order as any).payment_type) === 'cod' ? 'Cash on Delivery' : 'UPI Payment'}</p></div>
