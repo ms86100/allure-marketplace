@@ -179,8 +179,11 @@ export default function SellerDashboardPage() {
         />
 
         <SellerVisibilityChecklist sellerId={sellerProfile.id} />
+        <AvailabilityPromptBanner sellerId={sellerProfile.id} />
 
-        {/* ── Performance & Earnings ── */}
+        {/* ── Service Bookings ── */}
+        <ServiceBookingStats sellerId={sellerProfile.id} />
+        <SellerDayAgenda sellerId={sellerProfile.id} />
         <div className="space-y-3">
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">Performance</p>
           
