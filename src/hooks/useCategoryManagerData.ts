@@ -28,6 +28,9 @@ export interface CategoryConfigRow {
   show_veg_toggle?: boolean | null;
   show_duration_field?: boolean | null;
   transaction_type?: string;
+  supports_addons?: boolean;
+  supports_recurring?: boolean;
+  supports_staff_assignment?: boolean;
 }
 
 export const LISTING_TYPE_PRESETS = [
