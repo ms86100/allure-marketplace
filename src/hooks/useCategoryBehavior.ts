@@ -97,6 +97,9 @@ export const fetchCategoryConfigs = async (): Promise<CategoryConfig[]> => {
     },
     displayOrder: row.display_order,
     isActive: row.is_active,
+    supportsAddons: row.supports_addons ?? false,
+    supportsRecurring: row.supports_recurring ?? false,
+    supportsStaffAssignment: row.supports_staff_assignment ?? false,
   }));
 };
 

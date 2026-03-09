@@ -9,13 +9,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { ProductImageUpload } from '@/components/ui/product-image-upload';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Trash2, Loader2, Package, Percent, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, Package, Percent, CheckCircle2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { friendlyError } from '@/lib/utils';
 import { AttributeBlockBuilder } from '@/components/seller/AttributeBlockBuilder';
 import { type BlockData } from '@/hooks/useAttributeBlocks';
 import { useCurrency } from '@/hooks/useCurrency';
+import { ServiceFieldsSection, INITIAL_SERVICE_FIELDS, type ServiceFieldsData } from '@/components/seller/ServiceFieldsSection';
+import { InlineAvailabilitySchedule, INITIAL_AVAILABILITY_SCHEDULE, type DayScheduleData } from '@/components/seller/InlineAvailabilitySchedule';
 
 interface DraftProduct {
   id?: string;
@@ -37,6 +39,12 @@ interface DraftProductManagerProps {
   onProductsChange: (products: DraftProduct[]) => void;
 }
 
+function isServiceCategory(category: string, configs: any[]): boolean {
+  if (!category) return false;
+  const config = configs.find((c: any) => c.category === category);
+  return config?.layoutType === 'service';
+}
+
 export function DraftProductManager({
   sellerId,
   categories,
@@ -47,6 +55,8 @@ export function DraftProductManager({
   const [isAdding, setIsAdding] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [attributeBlocks, setAttributeBlocks] = useState<BlockData[]>([]);
+  const [serviceFields, setServiceFields] = useState<ServiceFieldsData>(INITIAL_SERVICE_FIELDS);
+  const [availabilitySchedule, setAvailabilitySchedule] = useState<DayScheduleData[]>(INITIAL_AVAILABILITY_SCHEDULE);
   const { configs } = useCategoryConfigs();
   const { formatPrice, currencySymbol } = useCurrency();
   const [newProduct, setNewProduct] = useState<DraftProduct>({
@@ -68,6 +78,11 @@ export function DraftProductManager({
 
   const showVegToggle = activeConfig?.formHints.showVegToggle ?? false;
   const showDurationField = activeConfig?.formHints.showDurationField ?? false;
+  const isService = useMemo(() => isServiceCategory(newProduct.category, configs), [newProduct.category, configs]);
+
+  const supportsAddons = (activeConfig as any)?.supportsAddons ?? false;
+  const supportsRecurring = (activeConfig as any)?.supportsRecurring ?? false;
+  const supportsStaffAssignment = (activeConfig as any)?.supportsStaffAssignment ?? false;
 
   const requiresPrice = useMemo(() => {
     if (!activeConfig) return true;
@@ -122,6 +137,50 @@ export function DraftProductManager({
 
       if (error) throw error;
 
+      const savedProductId = data.id;
+
+      // Save service listing if service category
+      if (isService && savedProductId) {
+        const { error: slError } = await supabase.from('service_listings').upsert({
+          product_id: savedProductId,
+          service_type: serviceFields.service_type,
+          location_type: serviceFields.location_type,
+          duration_minutes: parseInt(serviceFields.duration_minutes) || 60,
+          buffer_minutes: parseInt(serviceFields.buffer_minutes) || 0,
+          max_bookings_per_slot: parseInt(serviceFields.max_bookings_per_slot) || 1,
+          cancellation_notice_hours: parseInt(serviceFields.cancellation_notice_hours) || 24,
+          rescheduling_notice_hours: parseInt(serviceFields.rescheduling_notice_hours) || 12,
+        } as any, { onConflict: 'product_id' });
+
+        if (slError) {
+          console.error('Service listing upsert failed:', slError);
+          toast.error('Product saved but service settings failed.');
+        }
+
+        // Save availability schedules
+        const activeDays = availabilitySchedule.filter(d => d.is_active);
+        if (activeDays.length > 0) {
+          const scheduleRows = activeDays.map(d => ({
+            seller_id: sellerId,
+            product_id: savedProductId,
+            day_of_week: d.day_of_week,
+            start_time: d.start_time,
+            end_time: d.end_time,
+            is_active: true,
+          }));
+
+          const { error: schedErr } = await supabase
+            .from('service_availability_schedules')
+            .upsert(scheduleRows as any[], {
+              onConflict: 'seller_id,product_id,day_of_week',
+            });
+
+          if (schedErr) {
+            console.error('Availability schedule save failed:', schedErr);
+          }
+        }
+      }
+
       onProductsChange([...products, { ...newProduct, id: data.id, discount_percentage: computedDiscount }]);
       setNewProduct({
         name: '',
@@ -136,6 +195,8 @@ export function DraftProductManager({
       });
       setIsAdding(false);
       setAttributeBlocks([]);
+      setServiceFields(INITIAL_SERVICE_FIELDS);
+      setAvailabilitySchedule(INITIAL_AVAILABILITY_SCHEDULE);
       toast.success('Product added');
     } catch (error: any) {
       console.error('Error adding product:', error);
@@ -209,11 +270,7 @@ export function DraftProductManager({
               <div className="flex items-start gap-3">
                 <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
                   {product.image_url ? (
-                    <img
-                      src={product.image_url}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
                   ) : (
                     <Package size={20} className="text-muted-foreground" />
                   )}
@@ -237,17 +294,10 @@ export function DraftProductManager({
                     )}
                   </div>
                   {product.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                      {product.description}
-                    </p>
+                    <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
                   )}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                  onClick={() => handleRemoveProduct(index)}
-                >
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => handleRemoveProduct(index)}>
                   <Trash2 size={14} />
                 </Button>
               </div>
@@ -283,9 +333,7 @@ export function DraftProductManager({
                   min={0}
                   placeholder={requiresPrice ? '150' : '0 = On request'}
                   value={newProduct.price || ''}
-                  onChange={(e) =>
-                    setNewProduct({ ...newProduct, price: Number(e.target.value) })
-                  }
+                  onChange={(e) => setNewProduct({ ...newProduct, price: Number(e.target.value) })}
                 />
               </div>
               <div className="space-y-2">
@@ -296,9 +344,7 @@ export function DraftProductManager({
                   min={0}
                   placeholder="e.g., 200"
                   value={newProduct.mrp || ''}
-                  onChange={(e) =>
-                    setNewProduct({ ...newProduct, mrp: e.target.value ? Number(e.target.value) : null })
-                  }
+                  onChange={(e) => setNewProduct({ ...newProduct, mrp: e.target.value ? Number(e.target.value) : null })}
                 />
               </div>
             </div>
@@ -307,12 +353,8 @@ export function DraftProductManager({
             {computedDiscount !== null && computedDiscount > 0 && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
                 <Percent size={14} className="text-success" />
-                <span className="text-sm font-semibold text-success">
-                  {computedDiscount}% OFF
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  ({formatPrice(newProduct.mrp! - newProduct.price)} savings)
-                </span>
+                <span className="text-sm font-semibold text-success">{computedDiscount}% OFF</span>
+                <span className="text-xs text-muted-foreground">({formatPrice(newProduct.mrp! - newProduct.price)} savings)</span>
               </div>
             )}
 
@@ -322,15 +364,13 @@ export function DraftProductManager({
                 <select
                   className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
                   value={newProduct.category}
-                  onChange={(e) =>
-                    setNewProduct({ ...newProduct, category: e.target.value })
-                  }
+                  onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
                 >
                   {categories.map((c) => {
                     const catConfig = configs.find(cfg => cfg.category === c);
                     return (
                       <option key={c} value={c}>
-                        {catConfig ? `${catConfig.icon} ${catConfig.displayName}` : c.replace(/_/g, ' ')}
+                        {catConfig ? catConfig.displayName : c.replace(/_/g, ' ')}
                       </option>
                     );
                   })}
@@ -345,13 +385,11 @@ export function DraftProductManager({
                 placeholder={activeConfig?.formHints.descriptionPlaceholder || "Short description..."}
                 rows={2}
                 value={newProduct.description}
-                onChange={(e) =>
-                  setNewProduct({ ...newProduct, description: e.target.value })
-                }
+                onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
               />
             </div>
-            
-            {/* Product Image - now using ProductImageUpload with AI tab */}
+
+            {/* Product Image */}
             <div className="space-y-2">
               <Label className="text-xs">Product Image <span className="text-destructive">*</span></Label>
               {user ? (
@@ -372,9 +410,7 @@ export function DraftProductManager({
               <label className="flex items-center gap-2 cursor-pointer">
                 <Checkbox
                   checked={newProduct.is_veg}
-                  onCheckedChange={(checked) =>
-                    setNewProduct({ ...newProduct, is_veg: checked as boolean })
-                  }
+                  onCheckedChange={(checked) => setNewProduct({ ...newProduct, is_veg: checked as boolean })}
                 />
                 <span className="text-sm">Vegetarian</span>
               </label>
@@ -387,7 +423,37 @@ export function DraftProductManager({
               onChange={setAttributeBlocks}
             />
 
-            {showDurationField && (
+            {/* Service Configuration Section */}
+            {isService && (
+              <>
+                <ServiceFieldsSection data={serviceFields} onChange={setServiceFields} />
+
+                {/* Feature Flags */}
+                <div className="space-y-1 px-3 py-2 bg-muted/50 rounded-lg">
+                  <p className="text-xs font-semibold text-primary">Enabled for this category</p>
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Info size={10} />
+                    <span>Service Add-ons {supportsAddons ? 'enabled' : 'not enabled'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Info size={10} />
+                    <span>Recurring Bookings {supportsRecurring ? 'enabled' : 'not enabled'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Info size={10} />
+                    <span>Staff Assignment {supportsStaffAssignment ? 'enabled' : 'not enabled'}</span>
+                  </div>
+                </div>
+
+                {/* Availability Schedule */}
+                <InlineAvailabilitySchedule
+                  schedule={availabilitySchedule}
+                  onChange={setAvailabilitySchedule}
+                />
+              </>
+            )}
+
+            {showDurationField && !isService && (
               <div className="space-y-2">
                 <Label htmlFor="prod-prep" className="text-xs">{activeConfig?.formHints.durationLabel || 'Prep Time (min)'}</Label>
                 <Input
@@ -396,28 +462,14 @@ export function DraftProductManager({
                   min={1}
                   placeholder="e.g., 30"
                   value={newProduct.prep_time_minutes || ''}
-                  onChange={(e) =>
-                    setNewProduct({ ...newProduct, prep_time_minutes: e.target.value ? Number(e.target.value) : null })
-                  }
+                  onChange={(e) => setNewProduct({ ...newProduct, prep_time_minutes: e.target.value ? Number(e.target.value) : null })}
                 />
               </div>
             )}
 
             <div className="flex gap-2 pt-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => setIsAdding(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                className="flex-1"
-                onClick={handleAddProduct}
-                disabled={isSaving}
-              >
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => setIsAdding(false)}>Cancel</Button>
+              <Button size="sm" className="flex-1" onClick={handleAddProduct} disabled={isSaving}>
                 {isSaving && <Loader2 size={14} className="animate-spin mr-1" />}
                 Save Product
               </Button>
@@ -425,11 +477,7 @@ export function DraftProductManager({
           </CardContent>
         </Card>
       ) : (
-        <Button
-          variant="outline"
-          className="w-full border-dashed"
-          onClick={() => setIsAdding(true)}
-        >
+        <Button variant="outline" className="w-full border-dashed" onClick={() => setIsAdding(true)}>
           <Plus size={16} className="mr-2" />
           Add Product / Service
         </Button>
