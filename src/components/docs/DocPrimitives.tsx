@@ -1,94 +1,108 @@
-import { ReactNode } from 'react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LucideIcon, Info, Lightbulb, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ReactNode } from 'react';
 
-interface DocHeroProps {
-  title: string;
-  subtitle: string;
-  icon?: LucideIcon;
-}
+/* ─── Reusable doc building blocks ─── */
 
-export function DocHero({ title, subtitle, icon: Icon }: DocHeroProps) {
+export function DocSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="mb-8 pb-6 border-b border-border">
-      <div className="flex items-center gap-3 mb-2">
-        {Icon && (
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Icon className="text-primary" size={22} />
-          </div>
-        )}
-        <h1 className="text-2xl font-bold text-foreground">{title}</h1>
-      </div>
-      <p className="text-sm text-muted-foreground mt-2 max-w-2xl">{subtitle}</p>
-    </div>
+    <Collapsible defaultOpen>
+      <CollapsibleTrigger className="flex items-center gap-1.5 group cursor-pointer mb-2">
+        <ChevronDown size={14} className="text-muted-foreground group-data-[state=closed]:rotate-[-90deg] transition-transform" />
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pl-5 pb-4 text-sm text-muted-foreground leading-relaxed space-y-2">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
-interface DocSectionProps {
-  title: string;
-  children: ReactNode;
-  id?: string;
-}
-
-export function DocSection({ title, children, id }: DocSectionProps) {
+export function DocHero({ title, description, badges, children }: { title: string; description: string; badges?: string[]; children?: ReactNode }) {
   return (
-    <section id={id} className="mb-8">
-      <h2 className="text-lg font-semibold text-foreground mb-3 pb-2 border-b border-border/50">{title}</h2>
-      <div className="space-y-3 text-sm text-foreground/80 leading-relaxed">{children}</div>
-    </section>
-  );
-}
-
-interface DocSubSectionProps {
-  title: string;
-  children: ReactNode;
-}
-
-export function DocSubSection({ title, children }: DocSubSectionProps) {
-  return (
-    <div className="mb-4">
-      <h3 className="text-sm font-semibold text-foreground mb-2">{title}</h3>
-      <div className="space-y-2 text-sm text-foreground/80 leading-relaxed">{children}</div>
-    </div>
-  );
-}
-
-interface DocInfoCardProps {
-  variant?: 'info' | 'tip' | 'warning' | 'success';
-  title?: string;
-  children: ReactNode;
-}
-
-const cardStyles = {
-  info: { bg: 'bg-blue-500/5 border-blue-500/20', icon: Info, color: 'text-blue-600' },
-  tip: { bg: 'bg-amber-500/5 border-amber-500/20', icon: Lightbulb, color: 'text-amber-600' },
-  warning: { bg: 'bg-destructive/5 border-destructive/20', icon: AlertTriangle, color: 'text-destructive' },
-  success: { bg: 'bg-green-500/5 border-green-500/20', icon: CheckCircle2, color: 'text-green-600' },
-};
-
-export function DocInfoCard({ variant = 'info', title, children }: DocInfoCardProps) {
-  const style = cardStyles[variant];
-  const Icon = style.icon;
-  return (
-    <div className={cn('rounded-lg border p-3.5', style.bg)}>
-      <div className="flex gap-2.5">
-        <Icon size={16} className={cn('shrink-0 mt-0.5', style.color)} />
-        <div className="text-sm">
-          {title && <p className={cn('font-semibold mb-1', style.color)}>{title}</p>}
-          <div className="text-foreground/80 leading-relaxed">{children}</div>
+    <div className="bg-gradient-to-br from-primary/10 to-accent/10 rounded-2xl p-5 mb-4">
+      <h2 className="text-lg font-bold text-foreground mb-1">{title}</h2>
+      <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+      {badges && (
+        <div className="flex flex-wrap gap-2 mt-3">
+          {badges.map((b) => (
+            <span key={b} className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{b}</span>
+          ))}
         </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+export function DocFlowStep({ number, title, desc }: { number: number; title: string; desc: string }) {
+  return (
+    <div className="flex gap-3 items-start">
+      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-bold text-primary">{number}</div>
+      <div>
+        <p className="text-xs font-semibold text-foreground">{title}</p>
+        <p className="text-[11px] text-muted-foreground">{desc}</p>
       </div>
     </div>
   );
 }
 
-interface DocStepProps {
-  number: number;
-  title: string;
-  children: ReactNode;
+export function DocInfoCard({ title, icon, children }: { title: string; icon?: string; children: ReactNode }) {
+  return (
+    <div className="p-3 bg-card border border-border rounded-xl mt-2 mb-2">
+      <p className="text-xs font-semibold text-foreground mb-2">{icon} {title}</p>
+      <div className="text-[11px] text-muted-foreground space-y-1">{children}</div>
+    </div>
+  );
 }
 
-export function DocStep({ number, title, children }: DocStepProps) {
+export function DocTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
+  return (
+    <div className="overflow-x-auto mt-2">
+      <table className="w-full text-xs border border-border rounded-lg overflow-hidden">
+        <thead>
+          <tr className="bg-muted/50">
+            {headers.map((h, i) => (
+              <th key={i} className="text-left px-3 py-2 font-semibold">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {rows.map((row, i) => (
+            <tr key={i}>
+              {row.map((cell, j) => (
+                <td key={j} className="px-3 py-2">{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function DocBadge({ type }: { type: string }) {
+  const colors: Record<string, string> = {
+    buyer: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    seller: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+    admin: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+    all: 'bg-muted text-muted-foreground',
+    delivery: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+  };
+  return (
+    <span className={cn('text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded-full', colors[type] || colors.all)}>
+      {type}
+    </span>
+  );
+}
+
+// Legacy exports for backward compatibility
+export function DocSubSection({ title, children }: { title: string; children: ReactNode }) {
+  return <DocSection title={title}>{children}</DocSection>;
+}
+
+export function DocStep({ number, title, children }: { number: number; title: string; children: ReactNode }) {
   return (
     <div className="flex gap-3 mb-4">
       <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
@@ -102,11 +116,7 @@ export function DocStep({ number, title, children }: DocStepProps) {
   );
 }
 
-interface DocListProps {
-  items: string[];
-}
-
-export function DocList({ items }: DocListProps) {
+export function DocList({ items }: { items: string[] }) {
   return (
     <ul className="space-y-1.5 ml-1">
       {items.map((item, i) => (
@@ -116,35 +126,5 @@ export function DocList({ items }: DocListProps) {
         </li>
       ))}
     </ul>
-  );
-}
-
-interface DocTableProps {
-  headers: string[];
-  rows: string[][];
-}
-
-export function DocTable({ headers, rows }: DocTableProps) {
-  return (
-    <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-muted/50">
-            {headers.map((h, i) => (
-              <th key={i} className="px-3 py-2 text-left font-semibold text-foreground">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} className="border-t border-border/50">
-              {row.map((cell, j) => (
-                <td key={j} className="px-3 py-2 text-foreground/80">{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
