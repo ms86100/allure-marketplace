@@ -39,7 +39,7 @@ function SubCategorySelector({ selectedGroup, selectedCategories, onCategorySele
           return (
             <button key={config.category} onClick={() => onCategorySelect(config.category, !isSelected)}
               className={cn('flex items-center gap-2 p-3 rounded-lg border transition-all text-left', isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30')}>
-              <span className="text-lg">{config.icon}</span>
+              <DynamicIcon name={config.icon} size={18} />
               <span className="text-sm font-medium">{config.displayName}</span>
             </button>
           );
