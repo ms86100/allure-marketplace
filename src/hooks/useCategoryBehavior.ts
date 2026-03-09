@@ -45,6 +45,9 @@ interface CategoryConfigRow {
   image_aspect_ratio: string;
   image_object_fit: string;
   image_url: string | null;
+  supports_addons: boolean;
+  supports_recurring: boolean;
+  supports_staff_assignment: boolean;
 }
 
 export const fetchCategoryConfigs = async (): Promise<CategoryConfig[]> => {
