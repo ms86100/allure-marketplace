@@ -233,7 +233,7 @@ export function AdminCatalogManager() {
 
         {/* Categories sub-tab */}
         <TabsContent value="categories" className="mt-4 space-y-4">
-          <CategoryManager searchQuery={searchQuery} />
+          <CategoryManager />
           <SubcategoryManager />
         </TabsContent>
 
