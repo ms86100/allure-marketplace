@@ -25,7 +25,8 @@ export function SellerRecommendButton({ sellerId, sellerUserId }: Props) {
     const { data } = await supabase.rpc('get_seller_recommendations', { _seller_id: sellerId });
     if (data && data.length > 0) {
       setCount(Number(data[0].total_count) || 0);
-      setRecommenders(data[0].recommenders || []);
+      const recs = data[0].recommenders;
+      setRecommenders(Array.isArray(recs) ? (recs as { name: string; block?: string }[]) : []);
     }
     if (user) {
       const { data: mine } = await supabase
