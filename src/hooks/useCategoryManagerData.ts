@@ -109,7 +109,7 @@ export function useCategoryManagerData() {
 
   const openEditDialog = (category: CategoryConfigRow) => {
     setEditingCategory(category);
-    setEditForm({ display_name: category.display_name, icon: category.icon, color: category.color, image_url: category.image_url || null, name_placeholder: category.name_placeholder || '', description_placeholder: category.description_placeholder || '', price_label: category.price_label || 'Price', duration_label: category.duration_label || '', show_veg_toggle: category.show_veg_toggle ?? false, show_duration_field: category.show_duration_field ?? false, transaction_type: category.transaction_type || 'cart_purchase' });
+    setEditForm({ display_name: category.display_name, icon: category.icon, color: category.color, image_url: category.image_url || null, name_placeholder: category.name_placeholder || '', description_placeholder: category.description_placeholder || '', price_label: category.price_label || 'Price', duration_label: category.duration_label || '', show_veg_toggle: category.show_veg_toggle ?? false, show_duration_field: category.show_duration_field ?? false, transaction_type: category.transaction_type || 'cart_purchase', supports_addons: category.supports_addons ?? false, supports_recurring: category.supports_recurring ?? false, supports_staff_assignment: category.supports_staff_assignment ?? false });
   };
 
   const saveEditedCategory = async () => {
