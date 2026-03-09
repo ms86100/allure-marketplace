@@ -195,7 +195,7 @@ export default function BecomeSellerPage() {
         {/* Context Breadcrumb */}
         {step >= 3 && selectedGroupInfo && (
           <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-muted/60 text-xs">
-            <div className={cn('w-6 h-6 rounded flex items-center justify-center text-sm', selectedGroupInfo.color)}>{selectedGroupInfo.icon}</div>
+            <div className={cn('w-6 h-6 rounded flex items-center justify-center', selectedGroupInfo.color)}><DynamicIcon name={selectedGroupInfo.icon} size={14} /></div>
             <span className="font-medium">{selectedGroupInfo.label}</span>
             {formData.categories.length > 0 && (
               <><ChevronRight size={12} className="text-muted-foreground" /><span className="text-muted-foreground truncate">{formData.categories.map(cat => { const config = (groupedConfigs[selectedGroup as keyof typeof groupedConfigs] || []).find(c => c.category === cat); return config?.displayName || cat; }).join(', ')}</span></>
