@@ -42,13 +42,22 @@ export default function SearchPage() {
 
   const handleProductTap = (product: ProductWithSeller) => {
     setSelectedProduct({
-      product_id: product.id, product_name: product.name, price: product.price,
-      image_url: product.image_url, is_veg: product.is_veg, category: product.category,
-      description: product.description, prep_time_minutes: product.prep_time_minutes,
-      fulfillment_mode: product.fulfillment_mode, delivery_note: product.delivery_note,
-      action_type: product.action_type, contact_phone: product.contact_phone,
-      seller_id: product.seller_id, seller_name: product.seller_name || 'Seller',
-      seller_rating: product.seller_rating || 0, seller_reviews: product.seller_reviews || 0,
+      product_id: product.id,
+      product_name: product.name,
+      price: product.price,
+      image_url: product.image_url,
+      is_veg: product.is_veg,
+      category: product.category,
+      description: product.description,
+      prep_time_minutes: product.prep_time_minutes,
+      fulfillment_mode: product.fulfillment_mode,
+      delivery_note: product.delivery_note,
+      action_type: product.action_type,
+      contact_phone: product.contact_phone,
+      seller_id: product.seller_id,
+      seller_name: product.seller_name || 'Seller',
+      seller_rating: product.seller_rating || 0,
+      seller_reviews: product.seller_reviews || 0,
       society_name: (product as any).society_name || null,
       distance_km: (product as any).distance_km || null,
       is_same_society: (product as any).is_same_society ?? true,
@@ -59,6 +68,7 @@ export default function SearchPage() {
   return (
     <AppLayout showHeader={false}>
       <div className="pb-24">
+        {/* Sticky search header */}
         <div className="sticky top-0 z-40 bg-background safe-top">
           <div className="px-4 pt-3 pb-2">
             <div className="flex items-center gap-2">
@@ -71,6 +81,7 @@ export default function SearchPage() {
               </div>
             </div>
           </div>
+          {/* Filter bar */}
           <div className="px-4 pb-2">
             <ScrollArea>
               <div className="flex items-center gap-2 pb-1">
@@ -91,6 +102,7 @@ export default function SearchPage() {
         </div>
 
         <div className="px-4">
+          {/* Browse-beyond toggle */}
           <div className="flex items-center justify-between mt-2 mb-2 px-1">
             <button onClick={() => s.setBrowseBeyond(!s.browseBeyond)} className="flex items-center gap-2 text-sm">
               <Globe size={14} className={s.browseBeyond ? 'text-primary' : 'text-muted-foreground'} />
@@ -107,11 +119,18 @@ export default function SearchPage() {
             </div>
           )}
 
-          {!s.isSearchActive && <CommunitySuggestions onSuggestionTap={(term) => s.setQuery(term)} />}
+          {/* Community search suggestions */}
+          {!s.isSearchActive && (
+            <CommunitySuggestions onSuggestionTap={(term) => s.setQuery(term)} />
+          )}
 
+          {/* Category Bubbles */}
           <CategoryBubbleRow categories={s.categoryConfigs.filter(c => s.popularProducts.some(p => p.category === c.category))} selectedCategory={s.selectedCategory} onCategoryTap={s.handleCategoryTap} isLoading={s.categoriesLoading || s.isLoadingPopular} />
+
+          {/* Filter presets */}
           <FilterPresets activePreset={s.activePreset} onPresetSelect={s.handlePresetSelect} />
 
+          {/* Active filter pills */}
           {s.pills.length > 0 && (
             <div className="flex items-center gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
               {s.pills.map((label, i) => <span key={i} className="text-[11px] px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium whitespace-nowrap">{label}</span>)}
@@ -119,23 +138,53 @@ export default function SearchPage() {
             </div>
           )}
 
+          {/* Results */}
           {s.showLoading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 mt-2">{[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-52 w-full rounded-xl" />)}</div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 mt-2">
+              {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-52 w-full rounded-xl" />)}
+            </div>
           ) : s.displayProducts.length > 0 ? (
             <ProductGridByCategory products={s.displayProducts} categoryMap={s.categoryMap} categoryConfigs={s.categoryConfigs} marketplaceConfig={s.mc} badgeConfigs={s.badgeConfigs} showCount={s.isSearchActive} onNavigate={s.navigate} onProductTap={handleProductTap} />
           ) : s.isSearchActive ? (
             <EmptyState browseBeyond={s.browseBeyond} onEnableBrowseBeyond={() => s.setBrowseBeyond(true)} />
-          ) : <EmptyMarketplace />}
+          ) : (
+            <EmptyMarketplace />
+          )}
         </div>
 
-        <ProductDetailSheet product={selectedProduct} open={detailOpen} onOpenChange={setDetailOpen}
-          onSelectProduct={(sp) => { setSelectedProduct({ product_id: sp.id, product_name: sp.name, price: sp.price, image_url: sp.image_url, is_veg: sp.is_veg ?? true, category: sp.category, description: sp.description || null, seller_id: sp.seller_id, seller_name: sp.seller?.business_name || 'Seller', seller_rating: 0, seller_reviews: 0, action_type: sp.action_type }); }} />
+        <ProductDetailSheet
+          product={selectedProduct}
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          onSelectProduct={(sp) => {
+            setSelectedProduct({
+              product_id: sp.id,
+              product_name: sp.name,
+              price: sp.price,
+              image_url: sp.image_url,
+              is_veg: sp.is_veg ?? true,
+              category: sp.category,
+              description: sp.description || null,
+              seller_id: sp.seller_id,
+              seller_name: sp.seller?.business_name || 'Seller',
+              seller_rating: 0,
+              seller_reviews: 0,
+              action_type: sp.action_type,
+            });
+          }}
+        />
       </div>
     </AppLayout>
   );
 }
 
-function CategoryBubbleRow({ categories, selectedCategory, onCategoryTap, isLoading }: { categories: { category: string; displayName: string; icon: string; color: string }[]; selectedCategory: string | null; onCategoryTap: (cat: string) => void; isLoading: boolean }) {
+// ── Category Bubble Row ──
+function CategoryBubbleRow({ categories, selectedCategory, onCategoryTap, isLoading }: {
+  categories: { category: string; displayName: string; icon: string; color: string }[];
+  selectedCategory: string | null;
+  onCategoryTap: (cat: string) => void;
+  isLoading: boolean;
+}) {
   if (isLoading) return <div className="flex gap-2 mb-3 overflow-hidden">{[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-16 w-16 rounded-2xl shrink-0" />)}</div>;
   return (
     <ScrollArea className="mb-3">
@@ -152,27 +201,49 @@ function CategoryBubbleRow({ categories, selectedCategory, onCategoryTap, isLoad
   );
 }
 
-function ProductGridByCategory({ products, categoryMap, categoryConfigs, marketplaceConfig, badgeConfigs, showCount, onNavigate, onProductTap }: { products: ProductSearchResult[]; categoryMap: Record<string, { icon: string; displayName: string; color: string }>; categoryConfigs: { category: string; displayName: string; icon: string; behavior?: any }[]; marketplaceConfig?: MarketplaceConfig; badgeConfigs?: BadgeConfigRow[]; showCount?: boolean; onNavigate?: (path: string) => void; onProductTap?: (product: ProductWithSeller) => void }) {
+// ── Product Grid By Category ──
+function ProductGridByCategory({ products, categoryMap, categoryConfigs, marketplaceConfig, badgeConfigs, showCount, onNavigate, onProductTap }: {
+  products: ProductSearchResult[];
+  categoryMap: Record<string, { icon: string; displayName: string; color: string }>;
+  categoryConfigs: { category: string; displayName: string; icon: string; behavior?: any }[];
+  marketplaceConfig?: MarketplaceConfig;
+  badgeConfigs?: BadgeConfigRow[];
+  showCount?: boolean;
+  onNavigate?: (path: string) => void;
+  onProductTap?: (product: ProductWithSeller) => void;
+}) {
   const { formatPrice } = useCurrency();
-  const grouped = useMemo(() => { const g: Record<string, ProductSearchResult[]> = {}; products.forEach((p) => { const cat = p.category || 'other'; if (!g[cat]) g[cat] = []; g[cat].push(p); }); return g; }, [products]);
+  const grouped = useMemo(() => {
+    const g: Record<string, ProductSearchResult[]> = {};
+    products.forEach((p) => { const cat = p.category || 'other'; if (!g[cat]) g[cat] = []; g[cat].push(p); });
+    return g;
+  }, [products]);
+
   return (
     <div className="mt-2 space-y-5">
       {showCount && <p className="text-xs text-muted-foreground">{products.length} item{products.length !== 1 ? 's' : ''} found</p>}
-      {Object.keys(grouped).map((cat) => { const items = grouped[cat]; const catInfo = categoryMap[cat]; return (
-        <div key={cat}>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-base leading-none"><DynamicIcon name={catInfo?.icon || 'Package'} size={18} /></span>
-            <h3 className="font-bold text-sm text-foreground">{catInfo?.displayName || cat}</h3>
-            <span className="text-xs text-muted-foreground">({items.length})</span>
-            <span className="text-[11px] font-semibold text-accent ml-auto">From {formatPrice(Math.min(...items.map(p => p.price)))}</span>
+      {Object.keys(grouped).map((cat) => {
+        const items = grouped[cat];
+        const catInfo = categoryMap[cat];
+        return (
+          <div key={cat}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-base leading-none"><DynamicIcon name={catInfo?.icon || 'Package'} size={18} /></span>
+              <h3 className="font-bold text-sm text-foreground">{catInfo?.displayName || cat}</h3>
+              <span className="text-xs text-muted-foreground">({items.length})</span>
+              <span className="text-[11px] font-semibold text-accent ml-auto">From {formatPrice(Math.min(...items.map(p => p.price)))}</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+              {items.map((p) => <ProductListingCard key={p.product_id} product={toProductWithSeller(p)} categoryConfigs={categoryConfigs as any} marketplaceConfig={marketplaceConfig} badgeConfigs={badgeConfigs} onNavigate={onNavigate} onTap={onProductTap} />)}
+            </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">{items.map((p) => <ProductListingCard key={p.product_id} product={toProductWithSeller(p)} categoryConfigs={categoryConfigs as any} marketplaceConfig={marketplaceConfig} badgeConfigs={badgeConfigs} onNavigate={onNavigate} onTap={onProductTap} />)}</div>
-        </div>
-      ); })}
+        );
+      })}
     </div>
   );
 }
 
+// ── Empty States ──
 function EmptyState({ browseBeyond, onEnableBrowseBeyond }: { browseBeyond?: boolean; onEnableBrowseBeyond?: () => void }) {
   const navigate = useNavigate();
   const suggestedCategories: { slug: string; label: string }[] = [];
@@ -180,8 +251,14 @@ function EmptyState({ browseBeyond, onEnableBrowseBeyond }: { browseBeyond?: boo
     <div className="text-center py-12 space-y-4">
       <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center"><SearchIcon size={28} className="text-muted-foreground" /></div>
       <div><p className="font-semibold">No results found</p><p className="text-sm text-muted-foreground mt-1">Try different keywords or browse categories</p></div>
-      {!browseBeyond && onEnableBrowseBeyond && <button onClick={onEnableBrowseBeyond} className="text-sm text-primary font-medium hover:underline flex items-center gap-1 mx-auto"><Globe size={14} /> Search nearby societies too</button>}
-      <div className="flex flex-wrap justify-center gap-2 mt-4">{suggestedCategories.map(({ slug, label }) => <button key={slug} onClick={() => navigate(`/category/${slug}`)} className="px-4 py-2 bg-muted rounded-xl text-sm hover:bg-muted/80 transition-colors">{label}</button>)}</div>
+      {!browseBeyond && onEnableBrowseBeyond && (
+        <button onClick={onEnableBrowseBeyond} className="text-sm text-primary font-medium hover:underline flex items-center gap-1 mx-auto"><Globe size={14} /> Search nearby societies too</button>
+      )}
+      <div className="flex flex-wrap justify-center gap-2 mt-4">
+        {suggestedCategories.map(({ slug, label }) => (
+          <button key={slug} onClick={() => navigate(`/category/${slug}`)} className="px-4 py-2 bg-muted rounded-xl text-sm hover:bg-muted/80 transition-colors">{label}</button>
+        ))}
+      </div>
     </div>
   );
 }

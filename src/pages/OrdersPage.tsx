@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ReorderButton } from '@/components/order/ReorderButton';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
+import { RecurringBookingsList } from '@/components/booking/RecurringBookingsList';
 import { BuyerBookingsCalendar } from '@/components/booking/BuyerBookingsCalendar';
 import { useAuth } from '@/contexts/AuthContext';
 import { Order } from '@/types/database';
@@ -31,7 +32,6 @@ function OrderCard({ order, type }: { order: Order; type: 'buyer' | 'seller' }) 
     <Link to={`/orders/${order.id}`} className="block">
       <div className="bg-card border border-border rounded-xl p-3 mb-2.5 active:scale-[0.99] transition-transform">
         <div className="flex items-start gap-3">
-          {/* Seller/Buyer thumbnail */}
           <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-muted">
             {seller?.cover_image_url ? (
               <img src={seller.cover_image_url} alt={seller?.business_name} className="w-full h-full object-cover" />
@@ -50,7 +50,6 @@ function OrderCard({ order, type }: { order: Order; type: 'buyer' | 'seller' }) 
               <ChevronRight size={16} className="text-muted-foreground shrink-0" />
             </div>
 
-            {/* Status + date row */}
             <div className="flex items-center gap-2 mt-0.5">
               {isCompleted && <CheckCircle size={12} className="text-accent shrink-0" />}
               {(order as any).fulfillment_type === 'delivery' && (
@@ -66,7 +65,6 @@ function OrderCard({ order, type }: { order: Order; type: 'buyer' | 'seller' }) 
               </span>
             </div>
 
-            {/* Items + price */}
             <p className="text-xs text-muted-foreground mt-1">
               {items.length} item{items.length > 1 ? 's' : ''} · {formatPrice(order.total_amount)}
             </p>
@@ -79,7 +77,6 @@ function OrderCard({ order, type }: { order: Order; type: 'buyer' | 'seller' }) 
           </div>
         </div>
 
-        {/* Reorder row */}
         {canReorder && (
           <div className="mt-2.5 pt-2.5 border-t border-border flex justify-end" onClick={(e) => e.stopPropagation()}>
             <ReorderButton orderItems={items} sellerId={order.seller_id} variant="outline" size="sm" />
@@ -154,7 +151,6 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
     }
   }, [type, userId, sellerId]);
 
-  // #11: Single effect — track location.key + sellerId directly, avoid fetchOrders in deps
   const location = useLocation();
   const prevKeyRef = useRef(location.key);
 
@@ -205,9 +201,6 @@ export default function OrdersPage() {
     <AppLayout headerTitle="Orders">
       <div className="pb-4">
         <div className="px-4 pt-3">
-          {/* ═══ BUYER BOOKINGS CALENDAR ═══ */}
-          <BuyerBookingsCalendar />
-
           {isSeller ? (
             <Tabs defaultValue="buying" className="w-full">
               <TabsList className="w-full mb-3 h-9">
@@ -215,6 +208,8 @@ export default function OrdersPage() {
                 <TabsTrigger value="selling" className="flex-1 text-xs">Received</TabsTrigger>
               </TabsList>
               <TabsContent value="buying">
+                <BuyerBookingsCalendar />
+                <RecurringBookingsList />
                 <OrderList type="buyer" userId={user.id} />
               </TabsContent>
               <TabsContent value="selling">
@@ -225,7 +220,11 @@ export default function OrdersPage() {
               </TabsContent>
             </Tabs>
           ) : (
-            <OrderList type="buyer" userId={user.id} />
+            <>
+              <BuyerBookingsCalendar />
+              <RecurringBookingsList />
+              <OrderList type="buyer" userId={user.id} />
+            </>
           )}
         </div>
       </div>
