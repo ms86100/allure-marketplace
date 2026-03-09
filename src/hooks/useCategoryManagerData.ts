@@ -28,6 +28,9 @@ export interface CategoryConfigRow {
   show_veg_toggle?: boolean | null;
   show_duration_field?: boolean | null;
   transaction_type?: string;
+  supports_addons?: boolean;
+  supports_recurring?: boolean;
+  supports_staff_assignment?: boolean;
 }
 
 export const LISTING_TYPE_PRESETS = [
@@ -65,7 +68,7 @@ export function useCategoryManagerData() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedGroupSlug, setSelectedGroupSlug] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<CategoryConfigRow | null>(null);
-  const [editForm, setEditForm] = useState({ display_name: '', icon: '', color: '', image_url: '' as string | null, name_placeholder: '', description_placeholder: '', price_label: '', duration_label: '', show_veg_toggle: false, show_duration_field: false, transaction_type: 'cart_purchase' });
+  const [editForm, setEditForm] = useState({ display_name: '', icon: '', color: '', image_url: '' as string | null, name_placeholder: '', description_placeholder: '', price_label: '', duration_label: '', show_veg_toggle: false, show_duration_field: false, transaction_type: 'cart_purchase', supports_addons: false, supports_recurring: false, supports_staff_assignment: false });
   const [isSaving, setIsSaving] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
@@ -106,7 +109,7 @@ export function useCategoryManagerData() {
 
   const openEditDialog = (category: CategoryConfigRow) => {
     setEditingCategory(category);
-    setEditForm({ display_name: category.display_name, icon: category.icon, color: category.color, image_url: category.image_url || null, name_placeholder: category.name_placeholder || '', description_placeholder: category.description_placeholder || '', price_label: category.price_label || 'Price', duration_label: category.duration_label || '', show_veg_toggle: category.show_veg_toggle ?? false, show_duration_field: category.show_duration_field ?? false, transaction_type: category.transaction_type || 'cart_purchase' });
+    setEditForm({ display_name: category.display_name, icon: category.icon, color: category.color, image_url: category.image_url || null, name_placeholder: category.name_placeholder || '', description_placeholder: category.description_placeholder || '', price_label: category.price_label || 'Price', duration_label: category.duration_label || '', show_veg_toggle: category.show_veg_toggle ?? false, show_duration_field: category.show_duration_field ?? false, transaction_type: category.transaction_type || 'cart_purchase', supports_addons: category.supports_addons ?? false, supports_recurring: category.supports_recurring ?? false, supports_staff_assignment: category.supports_staff_assignment ?? false });
   };
 
   const saveEditedCategory = async () => {
@@ -115,7 +118,7 @@ export function useCategoryManagerData() {
     setIsSaving(true);
     try {
       const behaviorFlags = deriveBehaviorFlags(editForm.transaction_type);
-      const { error } = await supabase.from('category_config').update({ display_name: editForm.display_name.trim(), icon: editForm.icon.trim(), color: editForm.color.trim(), image_url: editForm.image_url || null, name_placeholder: editForm.name_placeholder.trim() || null, description_placeholder: editForm.description_placeholder.trim() || null, price_label: editForm.price_label.trim() || 'Price', duration_label: editForm.duration_label.trim() || null, show_veg_toggle: editForm.show_veg_toggle, show_duration_field: editForm.show_duration_field, transaction_type: editForm.transaction_type, ...behaviorFlags }).eq('id', editingCategory.id);
+      const { error } = await supabase.from('category_config').update({ display_name: editForm.display_name.trim(), icon: editForm.icon.trim(), color: editForm.color.trim(), image_url: editForm.image_url || null, name_placeholder: editForm.name_placeholder.trim() || null, description_placeholder: editForm.description_placeholder.trim() || null, price_label: editForm.price_label.trim() || 'Price', duration_label: editForm.duration_label.trim() || null, show_veg_toggle: editForm.show_veg_toggle, show_duration_field: editForm.show_duration_field, transaction_type: editForm.transaction_type, supports_addons: editForm.supports_addons, supports_recurring: editForm.supports_recurring, supports_staff_assignment: editForm.supports_staff_assignment, ...behaviorFlags }).eq('id', editingCategory.id);
       if (error) throw error;
       setCategories(categories.map(c => c.id === editingCategory.id ? { ...c, ...editForm } : c));
       queryClient.invalidateQueries({ queryKey: ['category-configs'] });

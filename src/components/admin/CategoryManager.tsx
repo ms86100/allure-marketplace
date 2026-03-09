@@ -13,8 +13,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Grid3X3, GripVertical, Edit2, Plus, Trash2, Sparkles, ImageIcon } from 'lucide-react';
+import { Loader2, Grid3X3, GripVertical, Edit2, Plus, Trash2, Sparkles, ImageIcon, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { DndContext, closestCenter } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -77,8 +78,8 @@ function SortableSectionItem({ group, groupCats, onToggle, onEdit, onDelete, onA
           <button className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground transition-colors" {...attributes} {...listeners}>
             <GripVertical size={16} />
           </button>
-          <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0', group.color)}>
-            {group.icon}
+          <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', group.color)}>
+            <DynamicIcon name={group.icon} size={20} />
           </div>
           <div>
             <h4 className="font-bold text-sm">{group.name}</h4>
@@ -120,9 +121,16 @@ function SortableCategoryItem({ cat, groupIsActive, onToggle, onEdit, onDelete, 
         {cat.image_url ? (
           <img src={cat.image_url} alt={cat.display_name} className="w-7 h-7 rounded-lg object-cover" />
         ) : (
-          <span className="text-lg">{cat.icon}</span>
+          <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', cat.color)}>
+            <DynamicIcon name={cat.icon} size={16} />
+          </div>
         )}
-        <span className={cn('text-sm font-medium', !cat.is_active && 'text-muted-foreground')}>{cat.display_name}</span>
+        <div className="flex flex-col">
+          <span className={cn('text-sm font-medium', !cat.is_active && 'text-muted-foreground')}>{cat.display_name}</span>
+          <span className="text-[10px] text-muted-foreground">
+            {LISTING_TYPE_PRESETS.find(p => p.value === cat.transaction_type)?.label || cat.transaction_type || 'Product'}
+          </span>
+        </div>
         <span className="text-[10px] text-muted-foreground font-mono">({cat.category})</span>
         {!cat.image_url && <span className="text-[10px] text-amber-500 font-semibold">No image</span>}
       </div>
@@ -191,7 +199,7 @@ export function CategoryManager() {
             </Button>
             {cm.parentGroupInfos.map((group) => (
               <Button key={group.value} variant={cm.selectedGroupSlug === group.value ? 'default' : 'outline'} size="sm" onClick={() => cm.setSelectedGroupSlug(group.value)} className="rounded-xl text-xs h-8 font-semibold shrink-0">
-                <span className="mr-1">{group.icon}</span>{group.label.split(' ')[0]}
+                <DynamicIcon name={group.icon} size={14} className="mr-1" />{group.label.split(' ')[0]}
               </Button>
             ))}
           </div>
@@ -321,6 +329,33 @@ export function CategoryManager() {
                 <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
                   <span className="text-xs font-medium">Show Duration Field</span>
                   <Switch checked={cm.editForm.show_duration_field} onCheckedChange={(v) => cm.setEditForm({ ...cm.editForm, show_duration_field: v })} />
+                </div>
+              </div>
+            </div>
+            {/* Service Features */}
+            <div className="border-t pt-4 mt-2">
+              <Label className="text-xs text-muted-foreground mb-3 block font-bold uppercase tracking-wider">Service Features</Label>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
+                  <div>
+                    <span className="text-xs font-medium">Service Add-ons</span>
+                    <p className="text-[10px] text-muted-foreground">Allow sellers to offer optional extras with this category</p>
+                  </div>
+                  <Switch checked={cm.editForm.supports_addons} onCheckedChange={(v) => cm.setEditForm({ ...cm.editForm, supports_addons: v })} />
+                </div>
+                <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
+                  <div>
+                    <span className="text-xs font-medium">Recurring Booking</span>
+                    <p className="text-[10px] text-muted-foreground">Enable buyers to set up recurring bookings</p>
+                  </div>
+                  <Switch checked={cm.editForm.supports_recurring} onCheckedChange={(v) => cm.setEditForm({ ...cm.editForm, supports_recurring: v })} />
+                </div>
+                <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
+                  <div>
+                    <span className="text-xs font-medium">Staff Assignment</span>
+                    <p className="text-[10px] text-muted-foreground">Allow sellers to assign staff/technicians to bookings</p>
+                  </div>
+                  <Switch checked={cm.editForm.supports_staff_assignment} onCheckedChange={(v) => cm.setEditForm({ ...cm.editForm, supports_staff_assignment: v })} />
                 </div>
               </div>
             </div>
