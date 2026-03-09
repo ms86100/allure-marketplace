@@ -11,6 +11,7 @@ export interface ProductTrustMetric {
 
 export interface SellerTrustSnapshot {
   completed_orders: number;
+  cancelled_orders: number;
   avg_response_min: number;
   repeat_customer_pct: number;
   unique_customers: number;
