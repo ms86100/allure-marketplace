@@ -3,25 +3,18 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import useEmblaCarousel from 'embla-carousel-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useParentGroups, ParentGroupInfo } from '@/hooks/useParentGroups';
+import { useParentGroups } from '@/hooks/useParentGroups';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
-import { 
+import { motion, AnimatePresence } from 'framer-motion';
+import {
   Utensils, ShoppingBag, Wrench, GraduationCap, Package,
   Star, Shield, MapPin, Users, ChevronRight, Sparkles,
-  TrendingUp, BadgeCheck, Lock, Ticket,
+  TrendingUp, BadgeCheck, Lock, Ticket, Heart, Clock,
+  ArrowRight, CheckCircle2,
   type LucideIcon,
 } from 'lucide-react';
 
-interface LandingSlideConfig {
-  key: string;
-  heading: string;
-  subheading?: string;
-  highlight?: string;
-  bullets?: string[];
-  cta?: { label: string; link: string };
-}
-
-const AUTOPLAY_INTERVAL = 8000;
+const AUTOPLAY_INTERVAL = 7000;
 
 function useAutoplay(emblaApi: any, interval: number) {
   useEffect(() => {
@@ -30,7 +23,6 @@ function useAutoplay(emblaApi: any, interval: number) {
     const start = () => { id = setInterval(() => emblaApi.scrollNext(), interval); };
     const stop = () => clearInterval(id);
     start();
-    // Pause on user interaction, resume after
     emblaApi.on('pointerDown', stop);
     emblaApi.on('pointerUp', () => { stop(); start(); });
     return () => { stop(); emblaApi.off('pointerDown', stop); };
@@ -43,29 +35,20 @@ const ICON_MAP: Record<string, LucideIcon> = {
 
 const GROUP_COLORS = [
   'bg-primary/10 text-primary',
-  'bg-secondary/30 text-secondary-foreground',
   'bg-accent/20 text-accent-foreground',
+  'bg-secondary/30 text-secondary-foreground',
   'bg-muted text-muted-foreground',
-  'bg-primary/10 text-primary',
+  'bg-primary/15 text-primary',
   'bg-warning/10 text-warning',
 ];
 
-export default function LandingPage() {
+export default function WelcomeCarousel() {
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
   const [activeSlide, setActiveSlide] = useState(0);
-  const [stats, setStats] = useState({ societies: 0, sellers: 0, categories: 0 });
+  const [stats, setStats] = useState({ societies: 0, sellers: 0, orders: 0 });
   const { parentGroupInfos } = useParentGroups();
   const settings = useSystemSettings();
-  const { platformName, landingSlidesJson } = settings;
-
-  // Parse CMS slides config if available
-  const cmsSlides = useMemo<LandingSlideConfig[] | null>(() => {
-    if (!landingSlidesJson) return null;
-    try {
-      const parsed = JSON.parse(landingSlidesJson);
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
-    } catch { return null; }
-  }, [landingSlidesJson]);
+  const { platformName } = settings;
 
   const displayGroups = useMemo(() => {
     const active = parentGroupInfos.filter(g => g.label);
@@ -88,226 +71,298 @@ export default function LandingPage() {
 
   useEffect(() => {
     async function fetchStats() {
-      const [{ count: sCount }, { count: selCount }, { count: catCount }] = await Promise.all([
+      const [{ count: sCount }, { count: selCount }, { count: ordCount }] = await Promise.all([
         supabase.from('societies').select('*', { count: 'exact', head: true }).eq('is_active', true),
         supabase.from('seller_profiles').select('*', { count: 'exact', head: true }).eq('verification_status', 'approved'),
-        supabase.from('parent_groups').select('*', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('orders').select('*', { count: 'exact', head: true }),
       ]);
-      setStats({ societies: sCount || 0, sellers: selCount || 0, categories: catCount || 0 });
+      setStats({ societies: sCount || 0, sellers: selCount || 0, orders: ordCount || 0 });
     }
     fetchStats();
   }, []);
 
-  // CMS-driven slide renderer
-  const renderCmsSlide = (slide: LandingSlideConfig, index: number) => (
-    <div key={slide.key || index} className="min-h-[100dvh] flex flex-col justify-center items-center text-center px-6 bg-gradient-to-br from-primary/10 via-background to-accent/10">
-      <div className="max-w-sm mx-auto">
-        <h2 className="text-3xl font-bold mb-4">{slide.heading}</h2>
-        {slide.highlight && <p className="text-primary text-xl font-semibold mb-2">{slide.highlight}</p>}
-        {slide.subheading && <p className="text-muted-foreground text-base mb-6">{slide.subheading}</p>}
-        {slide.bullets && slide.bullets.length > 0 && (
-          <div className="space-y-3 mb-6 text-left">
-            {slide.bullets.map((b, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
-                  <ChevronRight className="text-primary" size={14} />
-                </div>
-                <span className="text-sm">{b}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        {slide.cta && (
-          <Link to={slide.cta.link || '/auth'}>
-            <Button size="lg" className="w-full font-semibold">{slide.cta.label}</Button>
-          </Link>
-        )}
-      </div>
-    </div>
-  );
+  const TOTAL_SLIDES = 5;
 
-  const defaultSlides = [
-    // Slide 1: Hero
-    <div key="hero" className="min-h-[100dvh] flex flex-col justify-center items-center text-center px-6 bg-gradient-to-br from-primary/10 via-background to-accent/10">
-      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/15 border border-primary/20 mb-6">
-        <Sparkles className="text-primary" size={16} />
-        <span className="text-sm font-semibold text-primary">Private & Verified</span>
-      </div>
-      <h1 className="text-4xl font-extrabold leading-tight mb-4">
-        Your Society.<br />
-        <span className="text-primary">Your Marketplace.</span>
-      </h1>
-      <p className="text-muted-foreground text-lg max-w-sm mb-8">
-        Buy, sell, and connect with trusted neighbors in your residential community.
-      </p>
-      <div className="flex gap-3">
-        <Link to="/auth">
-          <Button size="lg" className="font-semibold px-8">
-            Join Now <ChevronRight size={18} className="ml-1" />
-          </Button>
-        </Link>
-        <Link to="/auth">
-          <Button size="lg" variant="outline" className="font-semibold">Sign In</Button>
-        </Link>
+  const slides = [
+    // ── Slide 1: Hero ──
+    <div key="hero" className="min-h-[100dvh] flex flex-col justify-center items-center text-center px-6 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-b from-primary/8 via-background to-primary/4" />
+      <div className="absolute top-20 -right-20 w-72 h-72 rounded-full bg-primary/6 blur-[80px]" />
+      <div className="absolute bottom-20 -left-20 w-60 h-60 rounded-full bg-accent/8 blur-[60px]" />
+
+      <div className="relative z-10 max-w-sm mx-auto">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.15, duration: 0.4 }}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/12 border border-primary/20 mb-6"
+        >
+          <Shield className="text-primary" size={14} />
+          <span className="text-xs font-semibold text-primary tracking-wide">Trusted by Families Across India</span>
+        </motion.div>
+
+        <motion.h1
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.5 }}
+          className="text-[2.5rem] leading-[1.1] font-extrabold mb-5 text-foreground tracking-tight"
+        >
+          Shop From{' '}
+          <span className="text-primary">Neighbors</span>
+          <br />You Already Trust
+        </motion.h1>
+
+        <motion.p
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35, duration: 0.4 }}
+          className="text-muted-foreground text-base leading-relaxed mb-8 px-2"
+        >
+          The private marketplace for your residential society — homemade food, daily essentials, services & more.
+        </motion.p>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45, duration: 0.4 }}
+          className="space-y-3"
+        >
+          <Link to="/auth" className="block">
+            <Button size="lg" className="w-full h-14 text-base font-bold shadow-cta rounded-2xl">
+              Join Your Society <ArrowRight size={18} className="ml-2" />
+            </Button>
+          </Link>
+          <Link to="/auth" className="block">
+            <Button variant="outline" size="lg" className="w-full h-12 text-sm font-semibold rounded-2xl">
+              Already a member? Sign In
+            </Button>
+          </Link>
+        </motion.div>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6, duration: 0.4 }}
+          className="mt-5 text-xs text-muted-foreground"
+        >
+          Free forever for buyers · No credit card needed
+        </motion.p>
       </div>
     </div>,
 
-    // Slide 2: Trust & Safety
-    <div key="trust" className="min-h-[100dvh] flex flex-col justify-center px-6 bg-gradient-to-br from-secondary via-background to-secondary/30">
-      <div className="max-w-sm mx-auto">
-        <Shield className="text-primary mb-6" size={48} />
-        <h2 className="text-3xl font-bold mb-4">Only Verified<br />Residents</h2>
-        <p className="text-muted-foreground text-base mb-8">
-          Every member is GPS-verified and community-authenticated. Your community, your safety.
+    // ── Slide 2: Trust & Safety ──
+    <div key="trust" className="min-h-[100dvh] flex flex-col justify-center px-6 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-secondary/40 via-background to-primary/5" />
+
+      <div className="relative z-10 max-w-sm mx-auto">
+        <div className="w-16 h-16 rounded-2xl bg-primary/12 flex items-center justify-center mb-6">
+          <Shield className="text-primary" size={32} />
+        </div>
+
+        <h2 className="text-3xl font-extrabold mb-3 text-foreground leading-tight">
+          A Marketplace<br />Built on <span className="text-primary">Trust</span>
+        </h2>
+        <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
+          Every seller is a verified resident. Every transaction happens between real neighbors — not anonymous strangers.
         </p>
-        <div className="space-y-4">
+
+        <div className="space-y-3">
           {[
-            { icon: MapPin, text: 'GPS location verification at signup' },
-            { icon: Lock, text: 'Society invite code required' },
-            { icon: BadgeCheck, text: 'Verified residential communities' },
-          ].map(({ icon: Icon, text }) => (
-            <div key={text} className="flex items-center gap-3 bg-card p-3 rounded-xl border border-border">
-              <Icon className="text-primary shrink-0" size={20} />
-              <span className="text-sm font-medium">{text}</span>
+            { icon: MapPin, title: 'GPS-Verified Residents', desc: 'Location proof at signup ensures real neighbors only' },
+            { icon: Lock, title: 'Invite-Only Communities', desc: 'Society code required — no outsiders can access' },
+            { icon: BadgeCheck, title: 'Verified Seller Badges', desc: 'Trust scores & review history visible on every profile' },
+          ].map(({ icon: Icon, title, desc }) => (
+            <div key={title} className="flex items-start gap-3.5 bg-card/80 backdrop-blur-sm p-4 rounded-2xl border border-border">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                <Icon className="text-primary" size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">{title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+              </div>
             </div>
           ))}
         </div>
       </div>
     </div>,
 
-    // Slide 3: What You Can Do
-    <div key="categories" className="min-h-[100dvh] flex flex-col justify-center px-6 bg-gradient-to-br from-accent/10 via-background to-primary/5">
-      <div className="max-w-sm mx-auto">
-        <h2 className="text-3xl font-bold mb-2">Everything You Need</h2>
-        <p className="text-muted-foreground mb-6">From your neighbors, for your community.</p>
+    // ── Slide 3: What You Can Do ──
+    <div key="categories" className="min-h-[100dvh] flex flex-col justify-center px-6 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-accent/8 via-background to-primary/4" />
+
+      <div className="relative z-10 max-w-sm mx-auto">
+        <span className="text-xs font-bold text-primary uppercase tracking-widest mb-3 block">One App, Everything</span>
+        <h2 className="text-3xl font-extrabold mb-2 text-foreground leading-tight">
+          From Breakfast to<br />Home Repairs
+        </h2>
+        <p className="text-muted-foreground text-sm mb-6">Browse what your neighbors offer — all within your society gates.</p>
+
         <div className="grid grid-cols-2 gap-3">
           {displayGroups.map(({ icon: Icon, title, desc, color }) => (
-            <div key={title} className="p-4 rounded-xl bg-card border border-border">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${color}`}>
+            <div key={title} className="p-4 rounded-2xl bg-card/80 backdrop-blur-sm border border-border hover:shadow-sm transition-shadow">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2.5 ${color}`}>
                 <Icon size={20} />
               </div>
-              <h3 className="font-semibold text-sm">{title}</h3>
-              <p className="text-xs text-muted-foreground">{desc}</p>
+              <h3 className="font-semibold text-sm text-foreground">{title}</h3>
+              <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{desc}</p>
             </div>
           ))}
         </div>
-      </div>
-    </div>,
 
-    // Slide 4: For Sellers
-    <div key="sellers" className="min-h-[100dvh] flex flex-col justify-center px-6 bg-gradient-to-br from-primary/5 via-background to-accent/10">
-      <div className="max-w-sm mx-auto">
-        <TrendingUp className="text-primary mb-6" size={48} />
-        <h2 className="text-3xl font-bold mb-4">Turn Your Passion<br />Into <span className="text-primary">Income</span></h2>
-        <p className="text-muted-foreground text-base mb-8">
-          Set up your store in minutes. Reach hundreds of neighbors instantly.
+        <p className="text-xs text-muted-foreground text-center mt-5">
+          + More categories added every week
         </p>
-        <div className="space-y-3">
-          {['Zero listing fee to start', 'Built-in coupon & promotion tools', 'Real-time order dashboard', 'UPI & COD payments supported'].map((text) => (
-            <div key={text} className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
-                <ChevronRight className="text-primary" size={14} />
-              </div>
-              <span className="text-sm">{text}</span>
-            </div>
-          ))}
-        </div>
-        <Link to="/auth" className="block mt-8">
-          <Button size="lg" className="w-full font-semibold">Start Selling Today</Button>
-        </Link>
       </div>
     </div>,
 
-    // Slide 5: Social Proof + CTA
-    <div key="social" className="min-h-[100dvh] flex flex-col justify-center px-6 bg-gradient-to-br from-secondary/20 via-background to-primary/10">
-      <div className="max-w-sm mx-auto text-center">
-        <div className="bg-card rounded-2xl p-6 border border-border shadow-sm mb-8">
-          <div className="flex justify-center gap-1 mb-3">
-            {[...Array(5)].map((_, i) => (
-              <Star key={i} className="fill-warning text-warning" size={18} />
-            ))}
-          </div>
-          <p className="text-sm italic text-foreground/80 mb-3">
-            "A marketplace built exclusively for our community — trusted neighbors, verified sellers, all in one place."
-          </p>
-          <p className="text-xs font-medium text-muted-foreground">— The {platformName} Team</p>
+    // ── Slide 4: For Sellers ──
+    <div key="sellers" className="min-h-[100dvh] flex flex-col justify-center px-6 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/8" />
+
+      <div className="relative z-10 max-w-sm mx-auto">
+        <div className="w-16 h-16 rounded-2xl bg-primary/12 flex items-center justify-center mb-6">
+          <TrendingUp className="text-primary" size={32} />
         </div>
 
-        <div className="flex justify-around mb-8 bg-card rounded-xl p-4 border border-border">
-          <div>
-            <p className="text-2xl font-bold text-primary">{stats.societies > 0 ? `${stats.societies}+` : '—'}</p>
-            <p className="text-xs text-muted-foreground">Societies</p>
-          </div>
-          <div className="w-px bg-border" />
-          <div>
-            <p className="text-2xl font-bold text-primary">{stats.sellers > 0 ? `${stats.sellers}+` : '—'}</p>
-            <p className="text-xs text-muted-foreground">Sellers</p>
-          </div>
-          <div className="w-px bg-border" />
-          <div>
-            <p className="text-2xl font-bold text-primary">{stats.categories > 0 ? `${stats.categories}+` : '—'}</p>
-            <p className="text-xs text-muted-foreground">Categories</p>
-          </div>
+        <h2 className="text-3xl font-extrabold mb-3 text-foreground leading-tight">
+          Your Passion.<br /><span className="text-primary">Your Income.</span>
+        </h2>
+        <p className="text-muted-foreground text-sm mb-7 leading-relaxed">
+          Start selling to hundreds of neighbors in minutes — no shop, no marketing budget, no logistics headaches.
+        </p>
+
+        <div className="space-y-3 mb-7">
+          {[
+            { icon: Sparkles, text: 'Zero listing fees to get started' },
+            { icon: Clock, text: 'Set up your store in under 2 minutes' },
+            { icon: Heart, text: 'Coupons, promotions & loyalty tools built-in' },
+            { icon: CheckCircle2, text: 'Real-time order dashboard with instant alerts' },
+          ].map(({ icon: Icon, text }) => (
+            <div key={text} className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Icon className="text-primary" size={15} />
+              </div>
+              <span className="text-sm font-medium text-foreground">{text}</span>
+            </div>
+          ))}
         </div>
 
         <Link to="/auth" className="block">
-          <Button className="w-full h-14 text-base font-semibold" size="lg">
-            Get Started <ChevronRight className="ml-2" size={20} />
+          <Button size="lg" className="w-full h-14 text-base font-bold shadow-cta rounded-2xl">
+            Start Selling Today <ArrowRight size={18} className="ml-2" />
           </Button>
         </Link>
-        <p className="text-xs text-muted-foreground mt-4">
-          <Link to="/auth" className="text-primary hover:underline">Already have an account? Sign in</Link>
+      </div>
+    </div>,
+
+    // ── Slide 5: Social Proof + Final CTA ──
+    <div key="social" className="min-h-[100dvh] flex flex-col justify-center px-6 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/6 via-background to-secondary/20" />
+
+      <div className="relative z-10 max-w-sm mx-auto">
+        <h2 className="text-3xl font-extrabold mb-6 text-foreground text-center leading-tight">
+          Families Love <span className="text-primary">{platformName}</span>
+        </h2>
+
+        {/* Testimonial Card */}
+        <div className="bg-card rounded-2xl p-5 border border-border shadow-sm mb-5">
+          <div className="flex gap-1 mb-3">
+            {[...Array(5)].map((_, i) => (
+              <Star key={i} className="fill-warning text-warning" size={16} />
+            ))}
+          </div>
+          <p className="text-sm text-foreground leading-relaxed italic mb-4">
+            "I order tiffin from my neighbor on the 3rd floor. My kids love the food, and I know exactly who's cooking it. This app changed how we eat."
+          </p>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+              <span className="text-sm font-bold text-primary">PM</span>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground text-sm">Priya M.</p>
+              <p className="text-[11px] text-muted-foreground">Working Parent · Prestige Lakeside</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Stats */}
+        <div className="flex justify-around bg-card rounded-2xl p-4 border border-border mb-6">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-primary tabular-nums">{stats.societies > 0 ? `${stats.societies}+` : '—'}</p>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Societies</p>
+          </div>
+          <div className="w-px bg-border" />
+          <div className="text-center">
+            <p className="text-2xl font-bold text-primary tabular-nums">{stats.sellers > 0 ? `${stats.sellers}+` : '—'}</p>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Verified Sellers</p>
+          </div>
+          <div className="w-px bg-border" />
+          <div className="text-center">
+            <p className="text-2xl font-bold text-primary tabular-nums">{stats.orders > 0 ? `${stats.orders}+` : '—'}</p>
+            <p className="text-[10px] text-muted-foreground font-medium mt-0.5">Orders Placed</p>
+          </div>
+        </div>
+
+        {/* Final CTA */}
+        <Link to="/auth" className="block">
+          <Button size="lg" className="w-full h-14 text-base font-bold shadow-cta rounded-2xl">
+            Get Started — It's Free <ArrowRight size={18} className="ml-2" />
+          </Button>
+        </Link>
+        <p className="text-center mt-4">
+          <Link to="/auth" className="text-sm text-primary font-medium hover:underline">
+            Already have an account? Sign in
+          </Link>
         </p>
       </div>
     </div>,
   ];
 
-  const slides = cmsSlides ? cmsSlides.map(renderCmsSlide) : defaultSlides;
-
   return (
     <div className="min-h-[100dvh] bg-background">
       {/* Carousel */}
       <div className="relative overflow-hidden" ref={emblaRef}>
-        <div className="flex transition-transform duration-500 ease-out">
+        <div className="flex">
           {slides.map((slide, i) => (
             <div key={i} className="min-w-0 shrink-0 grow-0 basis-full">
-              <div className={`transition-opacity duration-500 ${activeSlide === i ? 'opacity-100' : 'opacity-70'}`}>
-                {slide}
-              </div>
+              {slide}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Dot Indicators */}
-      <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 flex gap-2 bg-card/80 backdrop-blur-sm px-4 py-2.5 rounded-full border border-border shadow-lg safe-bottom">
-        {slides.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => emblaApi?.scrollTo(i)}
-            className={`h-2.5 rounded-full transition-all duration-300 ${
-              activeSlide === i ? 'bg-primary w-6' : 'bg-muted-foreground/30 w-2.5'
-            }`}
-          />
-        ))}
+      {/* Dot Indicators — fixed position with safe spacing */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-[calc(env(safe-area-inset-bottom,0px)+20px)] pt-3 pointer-events-none">
+        <div className="flex gap-2 bg-card/90 backdrop-blur-md px-5 py-3 rounded-full border border-border shadow-lg pointer-events-auto">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => emblaApi?.scrollTo(i)}
+              aria-label={`Go to slide ${i + 1}`}
+              className={`h-2.5 rounded-full transition-all duration-300 ${
+                activeSlide === i ? 'bg-primary w-7' : 'bg-muted-foreground/25 w-2.5 hover:bg-muted-foreground/40'
+              }`}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Footer */}
+      {/* Top-right Sign In */}
       <div className="fixed top-4 right-4 z-50">
         <Link to="/auth">
-          <Button size="sm" variant="secondary" className="font-medium shadow-lg">
+          <Button size="sm" variant="secondary" className="font-medium shadow-lg rounded-xl">
             Sign In
           </Button>
         </Link>
       </div>
 
-      {/* Legal Footer */}
-      <div className="fixed bottom-4 left-0 right-0 z-40 flex justify-center gap-4 text-xs text-muted-foreground safe-bottom">
-        <Link to="/privacy-policy" className="hover:text-foreground">Privacy</Link>
-        <span>•</span>
-        <Link to="/terms" className="hover:text-foreground">Terms</Link>
-        <span>•</span>
-        <Link to="/pricing" className="hover:text-foreground">Pricing</Link>
+      {/* Legal Footer — above dots */}
+      <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+60px)] left-0 right-0 z-40 flex justify-center gap-4 text-[10px] text-muted-foreground/60">
+        <Link to="/privacy-policy" className="hover:text-foreground transition-colors">Privacy</Link>
+        <span>·</span>
+        <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+        <span>·</span>
+        <Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
       </div>
     </div>
   );
