@@ -332,6 +332,33 @@ export function CategoryManager() {
                 </div>
               </div>
             </div>
+            {/* Service Features */}
+            <div className="border-t pt-4 mt-2">
+              <Label className="text-xs text-muted-foreground mb-3 block font-bold uppercase tracking-wider">Service Features</Label>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
+                  <div>
+                    <span className="text-xs font-medium">Service Add-ons</span>
+                    <p className="text-[10px] text-muted-foreground">Allow sellers to offer optional extras with this category</p>
+                  </div>
+                  <Switch checked={cm.editForm.supports_addons} onCheckedChange={(v) => cm.setEditForm({ ...cm.editForm, supports_addons: v })} />
+                </div>
+                <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
+                  <div>
+                    <span className="text-xs font-medium">Recurring Booking</span>
+                    <p className="text-[10px] text-muted-foreground">Enable buyers to set up recurring bookings</p>
+                  </div>
+                  <Switch checked={cm.editForm.supports_recurring} onCheckedChange={(v) => cm.setEditForm({ ...cm.editForm, supports_recurring: v })} />
+                </div>
+                <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
+                  <div>
+                    <span className="text-xs font-medium">Staff Assignment</span>
+                    <p className="text-[10px] text-muted-foreground">Allow sellers to assign staff/technicians to bookings</p>
+                  </div>
+                  <Switch checked={cm.editForm.supports_staff_assignment} onCheckedChange={(v) => cm.setEditForm({ ...cm.editForm, supports_staff_assignment: v })} />
+                </div>
+              </div>
+            </div>
             <TransactionTypeConfirmSave
               editingCategory={cm.editingCategory}
               newTransactionType={cm.editForm.transaction_type}
