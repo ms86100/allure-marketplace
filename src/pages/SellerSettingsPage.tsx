@@ -18,6 +18,7 @@ import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknot
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { cn } from '@/lib/utils';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
+import { ServiceAvailabilityManager } from '@/components/seller/ServiceAvailabilityManager';
 import { useSellerSettings } from '@/hooks/useSellerSettings';
 
 function LicenseUploadSection({ sellerId, primaryGroup }: { sellerId: string; primaryGroup: string }) {
