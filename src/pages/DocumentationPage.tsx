@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { BookOpen, KeyRound, Home, ShoppingBag, Store, Truck, Shield, ChevronRight, Calendar } from 'lucide-react';
+import { BookOpen, KeyRound, Home, ShoppingBag, Store, Truck, Shield, Users, ChevronRight, Calendar, Package } from 'lucide-react';
 import { AuthOnboardingDocs } from '@/components/docs/AuthOnboardingDocs';
 import { HomeDiscoveryDocs } from '@/components/docs/HomeDiscoveryDocs';
 import { ServiceBookingDocs } from '@/components/docs/ServiceBookingDocs';
