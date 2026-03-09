@@ -5,8 +5,8 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Store, Users, Building2, AlertCircle, LayoutGrid, Flag,
-  CreditCard, Star, Megaphone, Layers, Settings2, Bot, Navigation,
-  Menu, ChevronRight, FileCode, Send,
+  CreditCard, Star, Megaphone, Layers, Settings2, Bot,
+  Menu, ChevronRight, FileCode, Send, Package, Wrench, MessageSquare,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -14,8 +14,10 @@ const NAV_GROUPS = [
   {
     label: 'Commerce',
     items: [
-      { value: 'sellers', label: 'Sellers & Products', icon: Store },
+      { value: 'sellers', label: 'Sellers', icon: Store },
+      { value: 'products', label: 'Products', icon: Package },
       { value: 'payments', label: 'Payments', icon: CreditCard },
+      { value: 'services', label: 'Services', icon: Wrench },
       { value: 'catalog', label: 'Catalog', icon: LayoutGrid },
       { value: 'featured', label: 'Featured', icon: Megaphone },
     ],
@@ -36,9 +38,9 @@ const NAV_GROUPS = [
       { value: 'features', label: 'Features', icon: Layers },
       { value: 'campaigns', label: 'Campaigns', icon: Send },
       { value: 'ai-review', label: 'AI Review', icon: Bot },
+      { value: 'feedback', label: 'Feedback', icon: MessageSquare },
       { value: 'settings', label: 'Settings', icon: Settings2 },
       { value: 'api-docs', label: 'API Docs', icon: FileCode },
-      { value: 'navigator', label: 'Navigate', icon: Navigation },
     ],
   },
 ];
