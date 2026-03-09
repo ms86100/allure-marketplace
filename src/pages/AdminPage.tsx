@@ -29,13 +29,13 @@ import { SocietySwitcher } from '@/components/admin/SocietySwitcher';
 import { FeatureManagement } from '@/components/admin/FeatureManagement';
 import { PlatformSettingsManager } from '@/components/admin/PlatformSettingsManager';
 import { AdminCatalogManager } from '@/components/admin/AdminCatalogManager';
-import { AdminServiceBookingsTab } from '@/components/admin/AdminServiceBookingsTab';
+import AdminServiceBookingsTab from '@/components/admin/AdminServiceBookingsTab';
 import { AdminBannerManager } from '@/components/admin/AdminBannerManager';
 import { ResetAndSeedButton } from '@/components/admin/ResetAndSeedButton';
 import { PurgeDataButton } from '@/components/admin/PurgeDataButton';
-import { AdminFeedbackViewer } from '@/components/admin/AdminFeedbackViewer';
+import AdminFeedbackViewer from '@/components/admin/AdminFeedbackViewer';
 import { NotificationDiagnostics } from '@/components/admin/NotificationDiagnostics';
-import { OtpSettings } from '@/components/admin/OtpSettings';
+import OtpSettings from '@/components/admin/OtpSettings';
 import { useAdminData } from '@/hooks/useAdminData';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -136,12 +136,6 @@ export default function AdminPage() {
           <AdminSidebarNav
             activeTab={admin.activeTab}
             onTabChange={admin.setActiveTab}
-            badges={{
-              sellers: admin.pendingSellers.length,
-              products: 0,
-              users: admin.pendingUsers.length,
-              reports: admin.stats.pendingReports,
-            }}
           />
         </div>
 
