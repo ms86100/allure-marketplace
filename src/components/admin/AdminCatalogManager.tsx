@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +12,7 @@ import { useSubcategories } from '@/hooks/useSubcategories';
 import { CategoryManager } from '@/components/admin/CategoryManager';
 import { SubcategoryManager } from '@/components/admin/SubcategoryManager';
 import { AdminAttributeBlockManager } from '@/components/admin/AdminAttributeBlockManager';
+import { LicenseConfigSection } from '@/components/admin/LicenseConfigSection';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronRight, Layers3, Grid3X3, Blocks, TreePine, Search, X } from 'lucide-react';
@@ -31,7 +33,7 @@ function matchesQuery(query: string, ...fields: (string | null | undefined)[]): 
 }
 
 export function AdminCatalogManager() {
-  const [subTab, setSubTab] = useState('overview');
+  const [subTab, setSubTab] = useState('categories');
   const [blocks, setBlocks] = useState<AttributeBlock[]>([]);
   const [blocksLoading, setBlocksLoading] = useState(true);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
@@ -115,12 +117,26 @@ export function AdminCatalogManager() {
       .filter(Boolean) as typeof tree;
   }, [parentGroups, categories, subcategories, query, isSearching]);
 
-  const resultCount = isSearching ? filteredCategories.length : 0;
+  // Filtered blocks for attributes tab
+  const filteredBlocksForSearch = useMemo(() => {
+    if (!isSearching) return blocks;
+    return blocks.filter(b =>
+      matchesQuery(query, b.display_name, b.block_type, b.description,
+        ...(b.category_hints || []))
+    );
+  }, [blocks, query, isSearching]);
+
+  const resultCount = useMemo(() => {
+    if (!isSearching) return 0;
+    if (subTab === 'categories') return filteredCategories.length;
+    if (subTab === 'attributes') return filteredBlocksForSearch.length;
+    return filteredCategories.length;
+  }, [isSearching, subTab, filteredCategories, filteredBlocksForSearch]);
 
   const TAB_ITEMS = [
-    { value: 'overview', label: 'Overview', icon: Layers3 },
     { value: 'categories', label: 'Categories', icon: Grid3X3 },
     { value: 'attributes', label: 'Attributes', icon: Blocks },
+    { value: 'licenses', label: 'Licenses', icon: Layers3 },
   ];
 
   return (
@@ -181,7 +197,7 @@ export function AdminCatalogManager() {
               {taxonomyTree.map((group) => (
                 <div key={group.id}>
                   <div className="flex items-center gap-1.5 font-semibold text-foreground">
-                    <span>{group.icon}</span>
+                    <DynamicIcon name={group.icon} size={16} />
                     <span>{group.name}</span>
                     <span className="text-muted-foreground font-normal">(Section)</span>
                   </div>
@@ -192,14 +208,14 @@ export function AdminCatalogManager() {
                     <div key={cat.id} className="ml-5">
                       <div className="flex items-center gap-1.5">
                         <span className="text-muted-foreground">{ci === group.categories.length - 1 ? '└──' : '├──'}</span>
-                        <span>{cat.icon}</span>
+                        <span><DynamicIcon name={cat.icon} size={14} /></span>
                         <span className="font-medium">{cat.displayName || cat.display_name}</span>
                         <span className="text-muted-foreground font-normal">(Category)</span>
                       </div>
                       {cat.subcategories.map((sub: any, si: number) => (
                         <div key={sub.id} className="ml-8 flex items-center gap-1.5">
                           <span className="text-muted-foreground">{si === cat.subcategories.length - 1 ? '└──' : '├──'}</span>
-                          <span>{sub.icon || '📂'}</span>
+                          <span><DynamicIcon name={sub.icon || '📂'} size={12} /></span>
                           <span>{sub.display_name}</span>
                           <span className="text-muted-foreground font-normal">(Sub)</span>
                         </div>
@@ -215,122 +231,6 @@ export function AdminCatalogManager() {
           </CollapsibleContent>
         </Collapsible>
 
-        {/* Overview — category cards with linked attribute badges */}
-        <TabsContent value="overview" className="mt-4">
-          <p className="text-xs text-muted-foreground mb-3 font-medium">
-            Categories and their linked attribute blocks. Tap a category to expand.
-          </p>
-
-          {isLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16 w-full rounded-2xl" />)}
-            </div>
-          ) : filteredCategories.length === 0 && isSearching ? (
-            <p className="text-xs text-muted-foreground italic text-center py-8">No categories match "{searchQuery}"</p>
-          ) : (
-            <div className="space-y-2">
-              <AnimatePresence initial={false}>
-                {filteredCategories.map((cat: any, idx: number) => {
-                  const linkedBlocks = getBlocksForCategory(cat.category);
-                  const isExpanded = expandedCategory === cat.category;
-
-                  return (
-                    <motion.div
-                      key={cat.category}
-                      layout
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.2, delay: idx * 0.02 }}
-                    >
-                      <Card
-                        className="cursor-pointer border-0 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-md)] transition-all duration-300 rounded-2xl"
-                        onClick={() => toggleExpand(cat.category)}
-                      >
-                        <CardContent className="p-3.5">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="text-lg shrink-0">{cat.icon}</span>
-                              <div className="min-w-0">
-                                <p className="font-semibold text-sm truncate">
-                                  {cat.displayName || cat.display_name}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground font-medium">
-                                  {linkedBlocks.length} attribute block{linkedBlocks.length !== 1 ? 's' : ''}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {linkedBlocks.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  {linkedBlocks.slice(0, 3).map(b => (
-                                    <Badge key={b.id} variant="secondary" className="text-[9px] px-1.5 py-0.5 h-auto rounded-md">
-                                      {b.icon} {b.display_name}
-                                    </Badge>
-                                  ))}
-                                  {linkedBlocks.length > 3 && (
-                                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0.5 h-auto rounded-md">
-                                      +{linkedBlocks.length - 3}
-                                    </Badge>
-                                  )}
-                                </div>
-                              )}
-                              <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                                <ChevronDown size={14} className="text-muted-foreground" />
-                              </motion.div>
-                            </div>
-                          </div>
-
-                          <AnimatePresence>
-                            {isExpanded && (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.25 }}
-                                className="overflow-hidden"
-                              >
-                                <div className="mt-3 pt-3 border-t border-border/30 space-y-1.5">
-                                  {linkedBlocks.length === 0 ? (
-                                    <p className="text-xs text-muted-foreground italic">
-                                      No attribute blocks linked to this category yet.
-                                    </p>
-                                  ) : (
-                                    linkedBlocks.map((block, bidx) => (
-                                      <motion.div
-                                        key={block.id}
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: bidx * 0.05, duration: 0.15 }}
-                                        className="flex items-center gap-2 p-2 rounded-xl bg-muted/30"
-                                      >
-                                        <span className="text-sm shrink-0">{block.icon || '📦'}</span>
-                                        <div className="min-w-0 flex-1">
-                                          <p className="text-xs font-semibold truncate">{block.display_name}</p>
-                                          {block.description && (
-                                            <p className="text-[10px] text-muted-foreground line-clamp-1">{block.description}</p>
-                                          )}
-                                        </div>
-                                        <Badge variant="outline" className="text-[8px] shrink-0 rounded-md">
-                                          {block.renderer_type}
-                                        </Badge>
-                                      </motion.div>
-                                    ))
-                                  )}
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            </div>
-          )}
-        </TabsContent>
-
         {/* Categories sub-tab */}
         <TabsContent value="categories" className="mt-4 space-y-4">
           <CategoryManager />
@@ -340,6 +240,11 @@ export function AdminCatalogManager() {
         {/* Attributes sub-tab */}
         <TabsContent value="attributes" className="mt-4">
           <AdminAttributeBlockManager />
+        </TabsContent>
+
+        {/* Licenses sub-tab */}
+        <TabsContent value="licenses" className="mt-4">
+          <LicenseConfigSection />
         </TabsContent>
       </Tabs>
     </div>
