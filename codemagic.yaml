@@ -355,6 +355,14 @@ workflows:
           npx cap add android || true
           npx cap sync android
 
+      - name: Copy custom notification sound (Android)
+        script: |
+          mkdir -p android/app/src/main/res/raw
+          if [ -f "ios-config/gate_bell.mp3" ]; then
+            cp ios-config/gate_bell.mp3 android/app/src/main/res/raw/gate_bell.mp3
+            echo "=== gate_bell.mp3 copied to Android res/raw/ ==="
+          fi
+
       - name: Set Android SDK location
         script: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
