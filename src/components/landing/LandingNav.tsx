@@ -8,8 +8,6 @@ const NAV_LINKS = [
   { label: 'Features', href: '#features' },
   { label: 'How It Works', href: '#how-it-works' },
   { label: 'Pricing', href: '#pricing' },
-  { label: 'About', href: '#about' },
-  { label: 'Contact', href: '#contact' },
 ];
 
 export function LandingNav() {
@@ -32,7 +30,6 @@ export function LandingNav() {
           <span className="font-bold text-lg text-foreground">{platformName}</span>
         </Link>
 
-        {/* Desktop links */}
         <div className="hidden md:flex items-center gap-6">
           {NAV_LINKS.map(l => (
             <button key={l.href} onClick={() => scrollTo(l.href)} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
@@ -46,13 +43,11 @@ export function LandingNav() {
           <Link to="/welcome"><Button size="sm">Get Started</Button></Link>
         </div>
 
-        {/* Mobile menu button */}
         <button className="md:hidden p-2" onClick={() => setOpen(!open)}>
           {open ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
 
-      {/* Mobile menu */}
       {open && (
         <div className="md:hidden border-t border-border bg-card px-4 py-4 space-y-3 animate-slide-down">
           {NAV_LINKS.map(l => (
