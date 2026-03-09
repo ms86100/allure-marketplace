@@ -239,7 +239,7 @@ export function AdminCatalogManager() {
 
         {/* Attributes sub-tab */}
         <TabsContent value="attributes" className="mt-4">
-          <AdminAttributeBlockManager searchQuery={searchQuery} />
+          <AdminAttributeBlockManager />
         </TabsContent>
 
         {/* Licenses sub-tab */}
