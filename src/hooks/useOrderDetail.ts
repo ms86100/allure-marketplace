@@ -38,7 +38,7 @@ export function useOrderDetail(id: string | undefined) {
       if (!data?.product_id) return;
       const { data: product } = await supabase.from('products').select('category').eq('id', data.product_id).single();
       if (!product?.category) return;
-      const { data: catConfig } = await supabase.from('category_config').select('parent_group').eq('category', product.category).single();
+      const { data: catConfig } = await supabase.from('category_config').select('parent_group').eq('category', product.category as any).single();
       if (catConfig?.parent_group) setDerivedParentGroup(catConfig.parent_group);
     })();
   }, [sellerPrimaryGroup, order?.id]);
