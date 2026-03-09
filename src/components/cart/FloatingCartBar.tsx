@@ -36,7 +36,6 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
             whileTap={{ scale: 0.97 }}
           >
             <div className="flex items-center gap-2.5">
-              {/* Product thumbnails */}
               {thumbnails.length > 0 && (
                 <div className="flex -space-x-2">
                   {thumbnails.map((url, i) => (
