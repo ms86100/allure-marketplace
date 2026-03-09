@@ -212,7 +212,7 @@ export default function BecomeSellerPage() {
                 {parentGroupInfos.map(({ value, label, icon, color }) => (
                   <motion.button key={value} layout whileTap={{ scale: 0.97 }} onClick={() => handleGroupSelect(value)}
                     className={cn('flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center', selectedGroup === value ? 'border-primary bg-primary/5 scale-[1.03]' : 'hover:border-primary/50 hover:bg-muted/50')}>
-                    <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center text-2xl', color)}>{icon}</div>
+                    <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', color)}><DynamicIcon name={icon} size={24} /></div>
                     <span className="font-medium text-sm">{label}</span>
                     {selectedGroup === value && <motion.span initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-primary font-medium">Great choice! ✨</motion.span>}
                   </motion.button>
