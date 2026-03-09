@@ -229,6 +229,7 @@ export function ServiceBookingFlow({
       }
 
       if (recurringConfig.enabled && bookingId) {
+        const dayOfWeek = selectedDate ? selectedDate.getDay() : 0;
         const { error: recurErr } = await supabase.from('service_recurring_configs').insert({
           booking_id: bookingId,
           buyer_id: user.id,
@@ -238,6 +239,7 @@ export function ServiceBookingFlow({
           preferred_time: slot.start_time,
           start_date: dateStr,
           end_date: recurringConfig.endDate || null,
+          day_of_week: dayOfWeek,
         });
         if (recurErr) {
           console.error('Failed to save recurring config:', recurErr);
