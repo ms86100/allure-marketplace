@@ -7,7 +7,7 @@ import { VegBadge } from '@/components/ui/veg-badge';
 import { useCart } from '@/hooks/useCart';
 import { ProductActionType } from '@/types/database';
 import { NotifyMeButton } from './NotifyMeButton';
-import { ACTION_CONFIG } from '@/lib/marketplace-constants';
+import { ACTION_CONFIG, deriveActionType } from '@/lib/marketplace-constants';
 import { useCardAnalytics } from '@/hooks/useCardAnalytics';
 import { MARKETPLACE_FALLBACKS, type MarketplaceConfig } from '@/hooks/useMarketplaceConfig';
 import type { BadgeConfigRow } from '@/hooks/useBadgeConfig';

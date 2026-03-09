@@ -87,6 +87,7 @@ export const fetchCategoryConfigs = async (): Promise<CategoryConfig[]> => {
       pricePrefix: row.price_prefix || null,
       placeholderEmoji: row.placeholder_emoji || null,
     },
+    transactionType: (row as any).transaction_type || null,
     imageUrl: row.image_url || null,
     display: {
       supportsBrandDisplay: row.supports_brand_display,

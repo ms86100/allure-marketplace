@@ -70,6 +70,7 @@ export interface CategoryConfig {
   imageUrl: string | null;
   displayOrder: number;
   isActive: boolean;
+  transactionType?: string;
 }
 
 export const DEFAULT_FALLBACK_BEHAVIOR: CategoryBehavior = {
