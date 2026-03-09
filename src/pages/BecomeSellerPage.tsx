@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { ServiceCategory } from '@/types/categories';
 import { DraftProductManager } from '@/components/seller/DraftProductManager';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
 import { CroppableImageUpload } from '@/components/ui/croppable-image-upload';
 import { Slider } from '@/components/ui/slider';
