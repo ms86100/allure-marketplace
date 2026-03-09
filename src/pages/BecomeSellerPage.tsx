@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { ServiceCategory } from '@/types/categories';
 import { DraftProductManager } from '@/components/seller/DraftProductManager';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
 import { CroppableImageUpload } from '@/components/ui/croppable-image-upload';
 import { Slider } from '@/components/ui/slider';
@@ -38,7 +39,7 @@ function SubCategorySelector({ selectedGroup, selectedCategories, onCategorySele
           return (
             <button key={config.category} onClick={() => onCategorySelect(config.category, !isSelected)}
               className={cn('flex items-center gap-2 p-3 rounded-lg border transition-all text-left', isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30')}>
-              <span className="text-lg">{config.icon}</span>
+              <DynamicIcon name={config.icon} size={18} />
               <span className="text-sm font-medium">{config.displayName}</span>
             </button>
           );
@@ -194,7 +195,7 @@ export default function BecomeSellerPage() {
         {/* Context Breadcrumb */}
         {step >= 3 && selectedGroupInfo && (
           <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-muted/60 text-xs">
-            <div className={cn('w-6 h-6 rounded flex items-center justify-center text-sm', selectedGroupInfo.color)}>{selectedGroupInfo.icon}</div>
+            <div className={cn('w-6 h-6 rounded flex items-center justify-center', selectedGroupInfo.color)}><DynamicIcon name={selectedGroupInfo.icon} size={14} /></div>
             <span className="font-medium">{selectedGroupInfo.label}</span>
             {formData.categories.length > 0 && (
               <><ChevronRight size={12} className="text-muted-foreground" /><span className="text-muted-foreground truncate">{formData.categories.map(cat => { const config = (groupedConfigs[selectedGroup as keyof typeof groupedConfigs] || []).find(c => c.category === cat); return config?.displayName || cat; }).join(', ')}</span></>
@@ -211,7 +212,7 @@ export default function BecomeSellerPage() {
                 {parentGroupInfos.map(({ value, label, icon, color }) => (
                   <motion.button key={value} layout whileTap={{ scale: 0.97 }} onClick={() => handleGroupSelect(value)}
                     className={cn('flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center', selectedGroup === value ? 'border-primary bg-primary/5 scale-[1.03]' : 'hover:border-primary/50 hover:bg-muted/50')}>
-                    <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center text-2xl', color)}>{icon}</div>
+                    <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', color)}><DynamicIcon name={icon} size={24} /></div>
                     <span className="font-medium text-sm">{label}</span>
                     {selectedGroup === value && <motion.span initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-primary font-medium">Great choice! ✨</motion.span>}
                   </motion.button>
@@ -226,7 +227,7 @@ export default function BecomeSellerPage() {
           <div className="space-y-5">
             <button onClick={() => handleStepBack(1)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change category</button>
             <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-              <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center text-2xl', selectedGroupInfo?.color)}>{selectedGroupInfo?.icon}</div>
+              <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', selectedGroupInfo?.color)}><DynamicIcon name={selectedGroupInfo?.icon || ''} size={24} /></div>
               <div><h3 className="font-semibold">{selectedGroupInfo?.label}</h3><p className="text-xs text-muted-foreground">{selectedGroupInfo?.description}</p></div>
             </div>
             <SubCategorySelector selectedGroup={selectedGroup} selectedCategories={formData.categories as ServiceCategory[]} onCategorySelect={handleCategoryChange} />
