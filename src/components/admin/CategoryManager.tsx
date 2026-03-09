@@ -121,9 +121,16 @@ function SortableCategoryItem({ cat, groupIsActive, onToggle, onEdit, onDelete, 
         {cat.image_url ? (
           <img src={cat.image_url} alt={cat.display_name} className="w-7 h-7 rounded-lg object-cover" />
         ) : (
-          <span className="text-lg">{cat.icon}</span>
+          <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', cat.color)}>
+            <DynamicIcon name={cat.icon} size={16} />
+          </div>
         )}
-        <span className={cn('text-sm font-medium', !cat.is_active && 'text-muted-foreground')}>{cat.display_name}</span>
+        <div className="flex flex-col">
+          <span className={cn('text-sm font-medium', !cat.is_active && 'text-muted-foreground')}>{cat.display_name}</span>
+          <span className="text-[10px] text-muted-foreground">
+            {LISTING_TYPE_PRESETS.find(p => p.value === cat.transaction_type)?.label || cat.transaction_type || 'Product'}
+          </span>
+        </div>
         <span className="text-[10px] text-muted-foreground font-mono">({cat.category})</span>
         {!cat.image_url && <span className="text-[10px] text-amber-500 font-semibold">No image</span>}
       </div>
