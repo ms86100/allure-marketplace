@@ -66,11 +66,26 @@ export default function HomePage() {
 
         {/* FeaturedBanners rendered inside MarketplaceSection — removed here to avoid duplicates (#5) */}
 
+        {/* ═══ UPCOMING APPOINTMENT ═══ */}
+        <UpcomingAppointmentBanner />
+
         {/* ═══ REORDER LAST ORDER ═══ */}
         <ReorderLastOrder />
 
+        {/* ═══ BUY AGAIN ═══ */}
+        <BuyAgainRow />
+
+        {/* ═══ SOCIETY TRUST STRIP ═══ */}
+        {profile?.society_id && <SocietyTrustStrip societyId={profile.society_id} />}
+
         {/* ═══ SOCIETY QUICK LINKS ═══ */}
         <SocietyQuickLinks />
+
+        {/* ═══ SEARCH SUGGESTIONS ═══ */}
+        {profile?.society_id && <HomeSearchSuggestions societyId={profile.society_id} />}
+
+        {/* ═══ TRENDING IN SOCIETY ═══ */}
+        {profile?.society_id && <TrendingInSociety societyId={profile.society_id} />}
 
         {/* ═══ UNIFIED MARKETPLACE ═══ */}
         <MarketplaceSection />
