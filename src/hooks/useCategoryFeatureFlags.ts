@@ -48,9 +48,9 @@ export function useSellerCategoryFlags(categories: string[]): CategoryFeatureFla
 
     return {
       hasServiceLayout: matched.some(c => c.layoutType === 'service'),
-      supportsAddons: matched.some(c => c.supportsAddons),
-      supportsRecurring: matched.some(c => c.supportsRecurring),
-      supportsStaffAssignment: matched.some(c => c.supportsStaffAssignment),
+      supportsAddons: matched.some(c => (c as any).supportsAddons),
+      supportsRecurring: matched.some(c => (c as any).supportsRecurring),
+      supportsStaffAssignment: matched.some(c => (c as any).supportsStaffAssignment),
       showVegToggle: matched.some(c => c.formHints.showVegToggle),
       showDurationField: matched.some(c => c.formHints.showDurationField),
     };
@@ -60,9 +60,9 @@ export function useSellerCategoryFlags(categories: string[]): CategoryFeatureFla
 function configToFlags(config: CategoryConfig): CategoryFeatureFlags {
   return {
     hasServiceLayout: config.layoutType === 'service',
-    supportsAddons: config.supportsAddons,
-    supportsRecurring: config.supportsRecurring,
-    supportsStaffAssignment: config.supportsStaffAssignment,
+    supportsAddons: (config as any).supportsAddons ?? false,
+    supportsRecurring: (config as any).supportsRecurring ?? false,
+    supportsStaffAssignment: (config as any).supportsStaffAssignment ?? false,
     showVegToggle: config.formHints.showVegToggle,
     showDurationField: config.formHints.showDurationField,
   };
