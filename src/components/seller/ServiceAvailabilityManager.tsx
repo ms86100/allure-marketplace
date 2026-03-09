@@ -237,10 +237,7 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
           const batch = slotsToInsert.slice(i, i + batchSize);
           const { error: slotErr } = await (supabase
             .from('service_slots') as any)
-            .upsert(batch, {
-              onConflict: 'seller_id,product_id,slot_date,start_time',
-              ignoreDuplicates: true,
-            });
+            .insert(batch);
           if (slotErr) console.warn('Slot insert batch error:', slotErr.message);
         }
       }
