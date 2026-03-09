@@ -99,6 +99,7 @@ const TestResultsPage = lazy(() => import("./pages/TestResultsPage"));
 const CollectiveBuyPage = lazy(() => import("./pages/CollectiveBuyPage"));
 const ApiDocsPage = lazy(() => import("./pages/ApiDocsPage"));
 const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
+const AdminServiceBookingsPage = lazy(() => import("./pages/AdminServiceBookingsPage"));
 
 /**
  * Detect if an error is caused by an expired/invalid auth session.
