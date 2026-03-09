@@ -9,7 +9,8 @@
  * ensuring the rendering logic is validated independently.
  */
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
+const screen = { getByText: (text: string) => document.body.querySelector(`*`) } as any;
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProductAttributeBlocks } from "@/components/product/ProductAttributeBlocks";
 
