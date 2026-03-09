@@ -227,7 +227,7 @@ export default function BecomeSellerPage() {
           <div className="space-y-5">
             <button onClick={() => handleStepBack(1)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change category</button>
             <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-              <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center text-2xl', selectedGroupInfo?.color)}>{selectedGroupInfo?.icon}</div>
+              <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', selectedGroupInfo?.color)}><DynamicIcon name={selectedGroupInfo?.icon || ''} size={24} /></div>
               <div><h3 className="font-semibold">{selectedGroupInfo?.label}</h3><p className="text-xs text-muted-foreground">{selectedGroupInfo?.description}</p></div>
             </div>
             <SubCategorySelector selectedGroup={selectedGroup} selectedCategories={formData.categories as ServiceCategory[]} onCategorySelect={handleCategoryChange} />
