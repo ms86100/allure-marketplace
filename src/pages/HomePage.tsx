@@ -76,16 +76,16 @@ export default function HomePage() {
         <BuyAgainRow />
 
         {/* ═══ SOCIETY TRUST STRIP ═══ */}
-        {profile?.society_id && <SocietyTrustStrip societyId={profile.society_id} />}
+        <SocietyTrustStrip />
 
         {/* ═══ SOCIETY QUICK LINKS ═══ */}
         <SocietyQuickLinks />
 
         {/* ═══ SEARCH SUGGESTIONS ═══ */}
-        {profile?.society_id && <HomeSearchSuggestions societyId={profile.society_id} />}
+        <HomeSearchSuggestions />
 
         {/* ═══ TRENDING IN SOCIETY ═══ */}
-        {profile?.society_id && <TrendingInSociety societyId={profile.society_id} />}
+        <TrendingInSociety />
 
         {/* ═══ UNIFIED MARKETPLACE ═══ */}
         <MarketplaceSection />
