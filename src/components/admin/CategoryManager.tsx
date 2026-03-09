@@ -78,8 +78,8 @@ function SortableSectionItem({ group, groupCats, onToggle, onEdit, onDelete, onA
           <button className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground transition-colors" {...attributes} {...listeners}>
             <GripVertical size={16} />
           </button>
-          <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0', group.color)}>
-            {group.icon}
+          <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', group.color)}>
+            <DynamicIcon name={group.icon} size={20} />
           </div>
           <div>
             <h4 className="font-bold text-sm">{group.name}</h4>
