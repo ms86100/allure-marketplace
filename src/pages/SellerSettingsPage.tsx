@@ -241,6 +241,11 @@ export default function SellerSettingsPage() {
             </div>
           </div>
 
+          {/* Service Availability — shown for service-type sellers */}
+          {sellerProfile && primaryGroup && getGroupBySlug(primaryGroup)?.layoutType === 'service' && (
+            <ServiceAvailabilityManager sellerId={sellerProfile.id} />
+          )}
+
           {/* License */}
           {sellerProfile && primaryGroup && <LicenseUploadSection sellerId={sellerProfile.id} primaryGroup={primaryGroup} />}
 
