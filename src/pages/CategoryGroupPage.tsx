@@ -77,8 +77,8 @@ export default function CategoryGroupPage() {
     [allProducts]
   );
   const subCategories = useMemo(
-    () => allSubCategories.filter((c) => activeCategorySet.has(c.category)),
-    [allSubCategories, activeCategorySet]
+    () => allSubCategories.filter((c) => activeCategorySet.has(c.category) || c.category === activeSubCategory),
+    [allSubCategories, activeCategorySet, activeSubCategory]
   );
   const showAllTab = subCategories.length > 1;
 
