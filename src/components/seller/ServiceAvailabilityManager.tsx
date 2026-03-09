@@ -129,7 +129,13 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
   const handleSaveAndGenerate = async () => {
     setIsSaving(true);
     try {
-      // 1. Save schedules
+      // 1. Save schedules — delete+insert pattern (partial unique indexes don't work with upsert)
+      await (supabase
+        .from('service_availability_schedules') as any)
+        .delete()
+        .eq('seller_id', sellerId)
+        .is('product_id', null);
+
       const scheduleRows = schedule.map(s => ({
         seller_id: sellerId,
         product_id: null,
@@ -141,9 +147,7 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
 
       const { error: schedErr } = await (supabase
         .from('service_availability_schedules') as any)
-        .upsert(scheduleRows, {
-          onConflict: 'seller_id,product_id,day_of_week',
-        });
+        .insert(scheduleRows);
 
       if (schedErr) throw schedErr;
 
