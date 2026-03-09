@@ -117,7 +117,7 @@ export default function SellerSettingsPage() {
           {primaryGroup && (
             <div className="bg-muted/50 rounded-xl p-4">
               <div className="flex items-center gap-3">
-                <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center text-2xl', getGroupBySlug(primaryGroup)?.color)}>{getGroupBySlug(primaryGroup)?.icon}</div>
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style={{ backgroundColor: `${getGroupBySlug(primaryGroup)?.color}20` }}><DynamicIcon name={getGroupBySlug(primaryGroup)?.icon || ''} size={24} style={{ color: getGroupBySlug(primaryGroup)?.color }} /></div>
                 <div>
                   <p className="text-xs text-muted-foreground">Your seller category</p>
                   <p className="font-semibold">{getGroupBySlug(primaryGroup)?.label}</p>
