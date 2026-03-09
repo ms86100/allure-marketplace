@@ -199,7 +199,7 @@ export function CategoryManager() {
             </Button>
             {cm.parentGroupInfos.map((group) => (
               <Button key={group.value} variant={cm.selectedGroupSlug === group.value ? 'default' : 'outline'} size="sm" onClick={() => cm.setSelectedGroupSlug(group.value)} className="rounded-xl text-xs h-8 font-semibold shrink-0">
-                <span className="mr-1">{group.icon}</span>{group.label.split(' ')[0]}
+                <DynamicIcon name={group.icon} size={14} className="mr-1" />{group.label.split(' ')[0]}
               </Button>
             ))}
           </div>
