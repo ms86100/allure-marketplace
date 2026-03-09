@@ -11,6 +11,8 @@ import { OrderRejectionDialog } from '@/components/order/OrderRejectionDialog';
 import { DeliveryStatusCard } from '@/components/delivery/DeliveryStatusCard';
 import { LiveDeliveryTracker } from '@/components/delivery/LiveDeliveryTracker';
 import { OrderItemCard } from '@/components/order/OrderItemCard';
+import { AppointmentDetailsCard } from '@/components/order/AppointmentDetailsCard';
+import { useServiceBookingForOrder } from '@/hooks/useServiceBookings';
 import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
