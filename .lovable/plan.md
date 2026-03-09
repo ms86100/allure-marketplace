@@ -1,50 +1,48 @@
 
 
-## Notification Health Check — User-Friendly UI
+## Audit: GitHub vs Lovable Content Parity
 
-### What We'll Build
+### Root Cause
 
-A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
+The bidirectional sync between Lovable and GitHub broke at some point — likely due to a version rollback in Lovable. As a result, changes that were committed to GitHub (by Lovable itself) are no longer reflected in the current Lovable codebase.
 
-### UI Design
+### What Already Matches (from previous sync efforts)
+- `LandingHero.tsx` — matches GitHub
+- `LandingFinalCTA.tsx` — matches GitHub  
+- `LandingNav.tsx` — matches GitHub
+- `LandingPage.tsx` — matches GitHub
+- `LandingFeatures.tsx`, `LandingHowItWorks.tsx`, `LandingTrustBar.tsx`, `LandingPricing.tsx`, `LandingFooter.tsx` — matches GitHub
+- `LandingPainPoints.tsx`, `LandingTestimonials.tsx` — matches GitHub
+- Documentation files (`DocPrimitives`, `DeliveryDocs`, `AdminCommunityDocs`, etc.) — matches GitHub
+- `vercel.json`, `codemagic.yaml`, `index.html` — matches GitHub
 
-**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
+### What Does NOT Match — Critical Drift Found
 
-**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
+**`src/pages/WelcomeCarousel.tsx`** — This is the file the user sees as the "welcome/onboarding" screen. The local version is the OLD pre-revamp version. The GitHub version (commit `f05e63d`) has a completely rewritten UI:
 
-| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
-|---|---|---|
-| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
-| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
-| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
-| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
+| Aspect | Local (Old) | GitHub (Current) |
+|--------|------------|-------------------|
+| Export name | `LandingPage` | `WelcomeCarousel` |
+| Animations | None | `framer-motion` throughout |
+| Imports | `ParentGroupInfo`, `ChevronRight` | `AnimatePresence`, `Heart`, `Clock`, `ArrowRight`, `CheckCircle2` |
+| Autoplay interval | 8000ms | 7000ms |
+| Stats fetched | societies, sellers, categories | societies, sellers, **orders** |
+| CMS slides support | Yes (complex) | Removed (cleaner) |
+| Slide 1 (Hero) | Basic buttons | Motion-animated, larger CTAs, trust badge |
+| Slide 2 (Trust) | Simple icon list | Cards with titles + descriptions |
+| Slide 3 (Categories) | Basic grid | Enhanced with subtitle "One App, Everything" |
+| Slide 4 (Sellers) | `ChevronRight` bullets | Icon-based bullets (Sparkles, Clock, Heart) |
+| Slide 5 (Social) | Generic testimonial | Named testimonial (Priya M.), orders stat |
+| Dot indicators | Fixed `bottom-16` | Safe-area aware `env(safe-area-inset-bottom)` |
+| Carousel container | `transition-transform` class | Clean `flex` only |
+| Legal footer | `bottom-4`, `text-xs` | Safe-area aware, `text-[10px]` |
 
-Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
+### Implementation Plan
 
-**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
+1. **Replace `src/pages/WelcomeCarousel.tsx`** with the exact GitHub version — the complete revamped carousel with framer-motion animations, new slide content, safe-area-aware positioning, and the orders stat instead of categories.
 
-**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
+This is the only file with meaningful content drift remaining. All other files have been verified to match.
 
-### Implementation
-
-**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
-- Renders the trigger button and the bottom sheet
-- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
-- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
-- Provides actionable buttons for failures (Open Settings, Retry Registration)
-
-**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
-- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
-- Consolidates the 7+ technical steps into 4 simple categories
-- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
-
-**3. Update `src/pages/ProfilePage.tsx`**
-- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
-- Keep Push Debug link visible only for admins
-
-**4. Optionally add to `src/pages/NotificationsPage.tsx`**
-- Add a small "Check notification status" link at the top
-
-### No backend changes needed
-The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
+### Post-Fix Status: ~99.5% parity
+The remaining 0.5% is binary assets (e.g., `gate_bell.mp3` sound file) which cannot be synced via code editing.
 
