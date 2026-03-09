@@ -603,6 +603,16 @@ workflows:
             ruby -e "require 'xcodeproj'; project = Xcodeproj::Project.open('App.xcodeproj'); target = project.targets.find { |t| t.name == 'App' }; abort('App target not found') unless target; group = project.main_group.find_subpath('App', true); ref = group.files.find { |f| f.path == 'GoogleService-Info.plist' } || group.new_file('GoogleService-Info.plist'); unless target.resources_build_phase.files_references.any? { |f| f.path == 'GoogleService-Info.plist' }; target.resources_build_phase.add_file_reference(ref, true); end; project.save"
           fi
 
+      - name: Copy custom notification sound
+        script: |
+          if [ -f "ios-config/gate_bell.mp3" ]; then
+            cp ios-config/gate_bell.mp3 ios/App/App/gate_bell.mp3
+          fi
+          if [ -f "ios/App/App/gate_bell.mp3" ]; then
+            cd ios/App
+            ruby -e "require 'xcodeproj'; project = Xcodeproj::Project.open('App.xcodeproj'); target = project.targets.find { |t| t.name == 'App' }; abort('App target not found') unless target; group = project.main_group.find_subpath('App', true); ref = group.files.find { |f| f.path == 'gate_bell.mp3' } || group.new_file('gate_bell.mp3'); unless target.resources_build_phase.files_references.any? { |f| f.path == 'gate_bell.mp3' }; target.resources_build_phase.add_file_reference(ref, true); end; project.save"
+          fi
+
       - name: Update iOS project settings
         script: |
           cd ios/App
