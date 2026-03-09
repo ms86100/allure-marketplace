@@ -1,4 +1,22 @@
-import React, { useEffect, lazy, Suspense } from "react";
+import React, { useEffect, lazy, Suspense, ComponentType } from "react";
+
+// Retry wrapper for lazy imports — handles stale chunks after idle periods
+function lazyWithRetry<T extends ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+  retries = 2,
+): React.LazyExoticComponent<T> {
+  return lazy(() =>
+    factory().catch((err) => {
+      if (retries > 0 && String(err).includes('Failed to fetch dynamically imported module')) {
+        // Cache-bust by appending timestamp to force fresh fetch
+        return new Promise<{ default: T }>((resolve) => {
+          setTimeout(() => resolve(lazyWithRetry(factory, retries - 1) as any), 500);
+        });
+      }
+      throw err;
+    }),
+  );
+}
 import { supabase } from "@/integrations/supabase/client";
 import { IdentityContext as IdentityCtx, SellerContext as SellerCtx } from "@/contexts/auth/contexts";
 
@@ -26,80 +44,79 @@ import { NewOrderAlertOverlay } from "@/components/seller/NewOrderAlertOverlay";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Lazy-loaded pages for code splitting
-const AuthPage = lazy(() => import("./pages/AuthPage"));
-const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
-const HomePage = lazy(() => import("./pages/HomePage"));
-const LandingPage = lazy(() => import("./pages/LandingPage"));
-const WelcomeCarousel = lazy(() => import("./pages/WelcomeCarousel"));
-const RefundPolicyPage = lazy(() => import("./pages/RefundPolicyPage"));
-const SearchPage = lazy(() => import("./pages/SearchPage"));
+const AuthPage = lazyWithRetry(() => import("./pages/AuthPage"));
+const ResetPasswordPage = lazyWithRetry(() => import("./pages/ResetPasswordPage"));
+const HomePage = lazyWithRetry(() => import("./pages/HomePage"));
+const LandingPage = lazyWithRetry(() => import("./pages/LandingPage"));
+const WelcomeCarousel = lazyWithRetry(() => import("./pages/WelcomeCarousel"));
+const RefundPolicyPage = lazyWithRetry(() => import("./pages/RefundPolicyPage"));
+const SearchPage = lazyWithRetry(() => import("./pages/SearchPage"));
 
-const SellerDetailPage = lazy(() => import("./pages/SellerDetailPage"));
-const CartPage = lazy(() => import("./pages/CartPage"));
-const OrdersPage = lazy(() => import("./pages/OrdersPage"));
-const OrderDetailPage = lazy(() => import("./pages/OrderDetailPage"));
-const ProfilePage = lazy(() => import("./pages/ProfilePage"));
-const FavoritesPage = lazy(() => import("./pages/FavoritesPage"));
-const BecomeSellerPage = lazy(() => import("./pages/BecomeSellerPage"));
-const SellerDashboardPage = lazy(() => import("./pages/SellerDashboardPage"));
-const SellerProductsPage = lazy(() => import("./pages/SellerProductsPage"));
-const SellerSettingsPage = lazy(() => import("./pages/SellerSettingsPage"));
-const SellerEarningsPage = lazy(() => import("./pages/SellerEarningsPage"));
-const AdminPage = lazy(() => import("./pages/AdminPage"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
-const TermsPage = lazy(() => import("./pages/TermsPage"));
-const CategoryGroupPage = lazy(() => import("./pages/CategoryGroupPage"));
-const CategoriesPage = lazy(() => import("./pages/CategoriesPage"));
-const PricingPage = lazy(() => import("./pages/PricingPage"));
-const HelpPage = lazy(() => import("./pages/HelpPage"));
-const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
-const CommunityRulesPage = lazy(() => import("./pages/CommunityRulesPage"));
-const PushDebugPage = lazy(() => import("./pages/PushDebugPage"));
-const BulletinPage = lazy(() => import("./pages/BulletinPage"));
-const MySubscriptionsPage = lazy(() => import("./pages/MySubscriptionsPage"));
-const TrustDirectoryPage = lazy(() => import("./pages/TrustDirectoryPage"));
-const DisputesPage = lazy(() => import("./pages/DisputesPage"));
-const SocietyFinancesPage = lazy(() => import("./pages/SocietyFinancesPage"));
-const SocietyProgressPage = lazy(() => import("./pages/SocietyProgressPage"));
-const SnagListPage = lazy(() => import("./pages/SnagListPage"));
-const SocietyDashboardPage = lazy(() => import("./pages/SocietyDashboardPage"));
-const NotificationInboxPage = lazy(() => import("./pages/NotificationInboxPage"));
-const MaintenancePage = lazy(() => import("./pages/MaintenancePage"));
-const SocietyReportPage = lazy(() => import("./pages/SocietyReportPage"));
-const SocietyAdminPage = lazy(() => import("./pages/SocietyAdminPage"));
-const BuilderDashboardPage = lazy(() => import("./pages/BuilderDashboardPage"));
-const BuilderAnalyticsPage = lazy(() => import("./pages/BuilderAnalyticsPage"));
-const VehicleParkingPage = lazy(() => import("./pages/VehicleParkingPage"));
-const VisitorManagementPage = lazy(() => import("./pages/VisitorManagementPage"));
-const PaymentMilestonesPage = lazy(() => import("./pages/PaymentMilestonesPage"));
-const InspectionChecklistPage = lazy(() => import("./pages/InspectionChecklistPage"));
+const SellerDetailPage = lazyWithRetry(() => import("./pages/SellerDetailPage"));
+const CartPage = lazyWithRetry(() => import("./pages/CartPage"));
+const OrdersPage = lazyWithRetry(() => import("./pages/OrdersPage"));
+const OrderDetailPage = lazyWithRetry(() => import("./pages/OrderDetailPage"));
+const ProfilePage = lazyWithRetry(() => import("./pages/ProfilePage"));
+const FavoritesPage = lazyWithRetry(() => import("./pages/FavoritesPage"));
+const BecomeSellerPage = lazyWithRetry(() => import("./pages/BecomeSellerPage"));
+const SellerDashboardPage = lazyWithRetry(() => import("./pages/SellerDashboardPage"));
+const SellerProductsPage = lazyWithRetry(() => import("./pages/SellerProductsPage"));
+const SellerSettingsPage = lazyWithRetry(() => import("./pages/SellerSettingsPage"));
+const SellerEarningsPage = lazyWithRetry(() => import("./pages/SellerEarningsPage"));
+const AdminPage = lazyWithRetry(() => import("./pages/AdminPage"));
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
+const PrivacyPolicyPage = lazyWithRetry(() => import("./pages/PrivacyPolicyPage"));
+const TermsPage = lazyWithRetry(() => import("./pages/TermsPage"));
+const CategoryGroupPage = lazyWithRetry(() => import("./pages/CategoryGroupPage"));
+const CategoriesPage = lazyWithRetry(() => import("./pages/CategoriesPage"));
+const PricingPage = lazyWithRetry(() => import("./pages/PricingPage"));
+const HelpPage = lazyWithRetry(() => import("./pages/HelpPage"));
+const NotificationsPage = lazyWithRetry(() => import("./pages/NotificationsPage"));
+const CommunityRulesPage = lazyWithRetry(() => import("./pages/CommunityRulesPage"));
+const PushDebugPage = lazyWithRetry(() => import("./pages/PushDebugPage"));
+const BulletinPage = lazyWithRetry(() => import("./pages/BulletinPage"));
+const MySubscriptionsPage = lazyWithRetry(() => import("./pages/MySubscriptionsPage"));
+const TrustDirectoryPage = lazyWithRetry(() => import("./pages/TrustDirectoryPage"));
+const DisputesPage = lazyWithRetry(() => import("./pages/DisputesPage"));
+const SocietyFinancesPage = lazyWithRetry(() => import("./pages/SocietyFinancesPage"));
+const SocietyProgressPage = lazyWithRetry(() => import("./pages/SocietyProgressPage"));
+const SnagListPage = lazyWithRetry(() => import("./pages/SnagListPage"));
+const SocietyDashboardPage = lazyWithRetry(() => import("./pages/SocietyDashboardPage"));
+const NotificationInboxPage = lazyWithRetry(() => import("./pages/NotificationInboxPage"));
+const MaintenancePage = lazyWithRetry(() => import("./pages/MaintenancePage"));
+const SocietyReportPage = lazyWithRetry(() => import("./pages/SocietyReportPage"));
+const SocietyAdminPage = lazyWithRetry(() => import("./pages/SocietyAdminPage"));
+const BuilderDashboardPage = lazyWithRetry(() => import("./pages/BuilderDashboardPage"));
+const BuilderAnalyticsPage = lazyWithRetry(() => import("./pages/BuilderAnalyticsPage"));
+const VehicleParkingPage = lazyWithRetry(() => import("./pages/VehicleParkingPage"));
+const VisitorManagementPage = lazyWithRetry(() => import("./pages/VisitorManagementPage"));
+const PaymentMilestonesPage = lazyWithRetry(() => import("./pages/PaymentMilestonesPage"));
+const InspectionChecklistPage = lazyWithRetry(() => import("./pages/InspectionChecklistPage"));
 
-const WorkforceManagementPage = lazy(() => import("./pages/WorkforceManagementPage"));
-const ParcelManagementPage = lazy(() => import("./pages/ParcelManagementPage"));
-const GuardKioskPage = lazy(() => import("./pages/GuardKioskPage"));
-const GateEntryPage = lazy(() => import("./pages/GateEntryPage"));
+const WorkforceManagementPage = lazyWithRetry(() => import("./pages/WorkforceManagementPage"));
+const ParcelManagementPage = lazyWithRetry(() => import("./pages/ParcelManagementPage"));
+const GuardKioskPage = lazyWithRetry(() => import("./pages/GuardKioskPage"));
+const GateEntryPage = lazyWithRetry(() => import("./pages/GateEntryPage"));
 
-const SecurityAuditPage = lazy(() => import("./pages/SecurityAuditPage"));
-const WorkerJobsPage = lazy(() => import("./pages/WorkerJobsPage"));
-const WorkerMyJobsPage = lazy(() => import("./pages/WorkerMyJobsPage"));
-const WorkerHirePage = lazy(() => import("./pages/WorkerHirePage"));
-const CreateJobRequestPage = lazy(() => import("./pages/CreateJobRequestPage"));
-const SocietyNoticesPage = lazy(() => import("./pages/SocietyNoticesPage"));
-const SocietyDeliveriesPage = lazy(() => import("./pages/SocietyDeliveriesPage"));
-const DeliveryPartnerManagementPage = lazy(() => import("./pages/DeliveryPartnerManagementPage"));
-const DeliveryPartnerDashboardPage = lazy(() => import("./pages/DeliveryPartnerDashboardPage"));
-const WorkerAttendancePage = lazy(() => import("./pages/WorkerAttendancePage"));
-const MyWorkersPage = lazy(() => import("./pages/MyWorkersPage"));
-const WorkerLeavePage = lazy(() => import("./pages/WorkerLeavePage"));
-const WorkerSalaryPage = lazy(() => import("./pages/WorkerSalaryPage"));
-const AuthorizedPersonsPage = lazy(() => import("./pages/AuthorizedPersonsPage"));
-const BuilderInspectionsPage = lazy(() => import("./pages/BuilderInspectionsPage"));
-const TestResultsPage = lazy(() => import("./pages/TestResultsPage"));
-const CollectiveBuyPage = lazy(() => import("./pages/CollectiveBuyPage"));
-const ApiDocsPage = lazy(() => import("./pages/ApiDocsPage"));
-const DocumentationPage = lazy(() => import("./pages/DocumentationPage"));
-const AdminServiceBookingsPage = lazy(() => import("./pages/AdminServiceBookingsPage"));
+const SecurityAuditPage = lazyWithRetry(() => import("./pages/SecurityAuditPage"));
+const WorkerJobsPage = lazyWithRetry(() => import("./pages/WorkerJobsPage"));
+const WorkerMyJobsPage = lazyWithRetry(() => import("./pages/WorkerMyJobsPage"));
+const WorkerHirePage = lazyWithRetry(() => import("./pages/WorkerHirePage"));
+const CreateJobRequestPage = lazyWithRetry(() => import("./pages/CreateJobRequestPage"));
+const SocietyNoticesPage = lazyWithRetry(() => import("./pages/SocietyNoticesPage"));
+const SocietyDeliveriesPage = lazyWithRetry(() => import("./pages/SocietyDeliveriesPage"));
+const DeliveryPartnerManagementPage = lazyWithRetry(() => import("./pages/DeliveryPartnerManagementPage"));
+const DeliveryPartnerDashboardPage = lazyWithRetry(() => import("./pages/DeliveryPartnerDashboardPage"));
+const WorkerAttendancePage = lazyWithRetry(() => import("./pages/WorkerAttendancePage"));
+const MyWorkersPage = lazyWithRetry(() => import("./pages/MyWorkersPage"));
+const WorkerLeavePage = lazyWithRetry(() => import("./pages/WorkerLeavePage"));
+const WorkerSalaryPage = lazyWithRetry(() => import("./pages/WorkerSalaryPage"));
+const AuthorizedPersonsPage = lazyWithRetry(() => import("./pages/AuthorizedPersonsPage"));
+const BuilderInspectionsPage = lazyWithRetry(() => import("./pages/BuilderInspectionsPage"));
+const TestResultsPage = lazyWithRetry(() => import("./pages/TestResultsPage"));
+const CollectiveBuyPage = lazyWithRetry(() => import("./pages/CollectiveBuyPage"));
+const ApiDocsPage = lazyWithRetry(() => import("./pages/ApiDocsPage"));
+const DocumentationPage = lazyWithRetry(() => import("./pages/DocumentationPage"));
 
 /**
  * Detect if an error is caused by an expired/invalid auth session.
@@ -114,7 +131,6 @@ function isAuthSessionError(error: unknown): boolean {
     'Auth session missing', 'session_not_found',
   ];
   if (authPatterns.some(p => msg.toLowerCase().includes(p.toLowerCase()))) return true;
-  // PostgREST / Supabase HTTP errors
   if ((error as any)?.code === 'PGRST301') return true;
   if ((error as any)?.status === 401 || (error as any)?.status === 403) return true;
   return false;
@@ -122,13 +138,11 @@ function isAuthSessionError(error: unknown): boolean {
 
 let authRedirectScheduled = false;
 function handleAuthError() {
-  if (authRedirectScheduled) return; // prevent flood
+  if (authRedirectScheduled) return;
   authRedirectScheduled = true;
   toast.error('Your session has expired. Please log in again.');
-  // Sign out and redirect after a brief delay to let toast render
   supabase.auth.signOut().finally(() => {
     window.location.hash = '#/auth';
-    // Reset flag after navigation
     setTimeout(() => { authRedirectScheduled = false; }, 3000);
   });
 }
@@ -156,7 +170,6 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error) => {
-        // Don't retry auth errors — they won't self-heal
         if (isAuthSessionError(error)) return false;
         return failureCount < 1;
       },
@@ -184,7 +197,6 @@ function PageLoadingFallback() {
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
-  
   if (isLoading) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center bg-background">
@@ -192,17 +204,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
-  
   return <>{children}</>;
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAdmin, isLoading } = useAuth();
-  
   if (isLoading) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center bg-background">
@@ -210,17 +219,13 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
   if (!isAdmin) return <Navigate to="/" replace />;
-  
   return <>{children}</>;
 }
 
-// Defense-in-depth: router-level guard for security pages
 function SecurityRoute({ children }: { children: React.ReactNode }) {
   const { isSocietyAdmin, isAdmin, isLoading: authLoading } = useAuth();
   const { isSecurityOfficer, isLoading: officerLoading } = useSecurityOfficer();
-
   if (authLoading || officerLoading) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center bg-background">
@@ -228,15 +233,12 @@ function SecurityRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
   if (!isSocietyAdmin && !isAdmin && !isSecurityOfficer) {
     return <Navigate to="/" replace />;
   }
-
   return <>{children}</>;
 }
 
-// Route guard for society admins
 function SocietyAdminRoute({ children }: { children: React.ReactNode }) {
   const { isSocietyAdmin, isAdmin, isLoading } = useAuth();
   if (isLoading) return <div className="min-h-[100dvh] flex items-center justify-center bg-background"><Skeleton className="h-6 w-32 rounded-lg" /></div>;
@@ -244,7 +246,6 @@ function SocietyAdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Route guard for builder members
 function BuilderRoute({ children }: { children: React.ReactNode }) {
   const { isBuilderMember, isAdmin, isLoading } = useAuth();
   if (isLoading) return <div className="min-h-[100dvh] flex items-center justify-center bg-background"><Skeleton className="h-6 w-32 rounded-lg" /></div>;
@@ -252,7 +253,6 @@ function BuilderRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Route guard for society management pages (society admin, builder, or platform admin)
 function ManagementRoute({ children }: { children: React.ReactNode }) {
   const { isSocietyAdmin, isBuilderMember, isAdmin, isLoading } = useAuth();
   if (isLoading) return <div className="min-h-[100dvh] flex items-center justify-center bg-background"><Skeleton className="h-6 w-32 rounded-lg" /></div>;
@@ -260,7 +260,6 @@ function ManagementRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Route guard for seller-only pages
 function SellerRoute({ children }: { children: React.ReactNode }) {
   const { isSeller, isAdmin, isLoading } = useAuth();
   if (isLoading) return <div className="min-h-[100dvh] flex items-center justify-center bg-background"><Skeleton className="h-6 w-32 rounded-lg" /></div>;
@@ -268,7 +267,6 @@ function SellerRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Route guard for worker-only pages
 function WorkerRoute({ children }: { children: React.ReactNode }) {
   const { roles, isAdmin, isLoading } = useAuth();
   if (isLoading) return <div className="min-h-[100dvh] flex items-center justify-center bg-background"><Skeleton className="h-6 w-32 rounded-lg" /></div>;
@@ -276,28 +274,18 @@ function WorkerRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Median.co SPA Navigation Handler + Deep Links
 function NavigationHandler() {
   const navigate = useNavigate();
-  
-  // Initialize Median bridge for SPA navigation
   useEffect(() => {
     const cleanup = initializeMedianBridge(navigate);
     return cleanup;
   }, [navigate]);
-  
-  // Handle Capacitor deep links
   useDeepLinks();
-
-  // Invalidate critical queries on mobile app foreground resume
   useAppLifecycle();
-
   return null;
 }
 
 function GlobalSellerAlert() {
-  // Use raw useContext with null-safety to avoid fatal crash if AuthProvider
-  // hasn't fully initialized yet (HMR / startup race condition).
   const identity = React.useContext(IdentityCtx);
   const seller = React.useContext(SellerCtx);
   const isSeller = seller?.isSeller ?? false;
@@ -307,7 +295,6 @@ function GlobalSellerAlert() {
   return <NewOrderAlertOverlay orders={pendingAlerts} onDismiss={dismiss} onSnooze={snooze} />;
 }
 
-/** Error boundary that silently swallows GlobalSellerAlert crashes */
 class SafeSellerAlert extends React.Component<
   { children: React.ReactNode },
   { failed: boolean }
@@ -320,13 +307,10 @@ class SafeSellerAlert extends React.Component<
 
 function AppRoutes() {
   const { user, profile } = useAuth();
-
-  // Real-time buyer order status alerts (toast + haptic)
   useBuyerOrderAlerts();
   return (
     <Suspense fallback={<PageLoadingFallback />}>
       <Routes>
-        {/* Landing page for unauthenticated users */}
         <Route path="/welcome" element={user && profile ? <Navigate to="/" replace /> : <WelcomeCarousel />} />
         <Route path="/landing" element={user && profile ? <Navigate to="/" replace /> : <LandingPage />} />
         <Route path="/auth" element={user && profile ? <Navigate to="/" replace /> : <RouteErrorBoundary sectionName="Authentication"><AuthPage /></RouteErrorBoundary>} />
@@ -389,8 +373,7 @@ function AppRoutes() {
         <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminPage /></AdminRoute></ProtectedRoute>} />
         <Route path="/test-results" element={<ProtectedRoute><AdminRoute><TestResultsPage /></AdminRoute></ProtectedRoute>} />
         <Route path="/api-docs" element={<ProtectedRoute><AdminRoute><ApiDocsPage /></AdminRoute></ProtectedRoute>} />
-        <Route path="/platform-docs" element={<ProtectedRoute><AdminRoute><DocumentationPage /></AdminRoute></ProtectedRoute>} />
-        <Route path="/admin/service-bookings" element={<ProtectedRoute><AdminRoute><AdminServiceBookingsPage /></AdminRoute></ProtectedRoute>} />
+        <Route path="/docs" element={<ProtectedRoute><DocumentationPage /></ProtectedRoute>} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/pricing" element={<PricingPage />} />
@@ -406,22 +389,16 @@ function AppRoutes() {
 }
 
 function App() {
-  // Listen for cache-clear event dispatched by signOut
   useEffect(() => {
     const handler = () => queryClient.clear();
     window.addEventListener('app:clear-cache', handler);
     return () => window.removeEventListener('app:clear-cache', handler);
   }, []);
 
-  // Global safety net — only log, don't toast for every rejection.
-  // Auth init, realtime, and network retries produce benign rejections
-  // that should not alarm users.
   useEffect(() => {
     const handleRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
       const msg = reason?.message || String(reason || '');
-
-      // Suppress known benign rejections (auth, network, realtime)
       const benign = [
         'Failed to fetch', 'NetworkError', 'Load failed',
         'JWT expired', 'Auth session missing', 'session_not_found',
@@ -430,17 +407,12 @@ function App() {
         'AuthSessionMissingError', 'AuthApiError',
       ];
       const isBenign = benign.some(p => msg.includes(p));
-
       console.error('[Unhandled Rejection]', reason);
-      // Never show a generic toast — it's not actionable for users.
-      // Specific error handling belongs in the components that trigger the action.
       event.preventDefault();
     };
 
     const handleError = (event: ErrorEvent) => {
       console.error('[Unhandled Error]', event.error || event.message);
-      // Don't toast — ErrorBoundary handles render errors,
-      // and network/script errors shouldn't alarm users.
     };
 
     window.addEventListener('unhandledrejection', handleRejection);
