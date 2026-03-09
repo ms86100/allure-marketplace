@@ -218,7 +218,8 @@ export function ServiceBookingFlow({
           selectedAddons.map(a => ({
             booking_id: bookingId,
             addon_id: a.id,
-            price_at_booking: a.price,
+            addon_name: a.name || 'Add-on',
+            addon_price: a.price,
           }))
         );
         if (addonErr) {
