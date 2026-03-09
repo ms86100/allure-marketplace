@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { useCart } from '@/hooks/useCart';
 import { Product, ProductActionType } from '@/types/database';
-import { ACTION_CONFIG } from '@/lib/marketplace-constants';
+import { ACTION_CONFIG, deriveActionType } from '@/lib/marketplace-constants';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/hooks/useCurrency';
 import { computeStoreStatus, formatStoreClosedMessage } from '@/lib/store-availability';

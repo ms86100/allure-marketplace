@@ -27,3 +27,24 @@ export const SORT_OPTIONS = [
 ] as const;
 
 export type SortKey = (typeof SORT_OPTIONS)[number]['key'];
+
+const TX_TO_ACTION: Record<string, ProductActionType> = {
+  cart_purchase: 'add_to_cart',
+  buy_now: 'buy_now',
+  book_slot: 'book',
+  request_service: 'request_service',
+  request_quote: 'request_quote',
+  contact_seller: 'contact_seller',
+  schedule_visit: 'schedule_visit',
+  make_offer: 'make_offer',
+};
+
+/** Resolve effective action type: product override > category transaction_type > fallback */
+export function deriveActionType(
+  productActionType: string | null | undefined,
+  categoryTransactionType: string | null | undefined,
+): ProductActionType {
+  if (productActionType && productActionType in ACTION_CONFIG) return productActionType as ProductActionType;
+  if (categoryTransactionType && TX_TO_ACTION[categoryTransactionType]) return TX_TO_ACTION[categoryTransactionType];
+  return 'add_to_cart';
+}
