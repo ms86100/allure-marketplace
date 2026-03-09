@@ -23,7 +23,6 @@ import {
   Bell,
   Type,
   FileText,
-  BookOpen,
   Camera,
   Repeat,
   Award,
@@ -45,7 +44,6 @@ export default function ProfilePage() {
   const [isEditingAvatar, setIsEditingAvatar] = useState(false);
   const [showOnboardingFeedback, setShowOnboardingFeedback] = useState(false);
 
-  // Check for post-seller-onboarding feedback prompt
   useEffect(() => {
     if (getString('seller_onboarding_completed') === 'true') {
       setShowOnboardingFeedback(true);
@@ -53,7 +51,6 @@ export default function ProfilePage() {
     }
   }, []);
 
-  // Cached skill badges query — no re-fetch on revisit within staleTime
   const { data: skillBadges = [] } = useQuery({
     queryKey: ['skill-badges', user?.id],
     queryFn: async () => {
@@ -66,7 +63,7 @@ export default function ProfilePage() {
       return data || [];
     },
     enabled: !!user,
-    staleTime: 15 * 60 * 1000, // 15 min — badges rarely change
+    staleTime: 15 * 60 * 1000,
   });
 
   useEffect(() => {
@@ -98,6 +95,7 @@ export default function ProfilePage() {
     { icon: Package, label: 'Orders', to: '/orders', key: 'orders' },
     { icon: Heart, label: 'Favorites', to: '/favorites', key: 'favorites' },
     { icon: Repeat, label: 'Order Again', to: '/orders', key: 'reorder' },
+    ...(isSeller ? [{ icon: Store, label: 'My Store', to: '/seller', key: 'seller' }] : []),
   ];
 
   const menuItems = [
@@ -111,8 +109,8 @@ export default function ProfilePage() {
     { icon: Bell, label: 'Notifications', to: '/notifications' },
     { icon: HelpCircle, label: 'Help & Guide', to: '/help' },
     ...(isAdmin ? [{ icon: Shield, label: 'Admin Panel', to: '/admin' }] : []),
-    ...(isAdmin ? [{ icon: BookOpen, label: 'Platform Docs', to: '/platform-docs' }] : []),
-    ...(isAdmin ? [{ icon: Bug, label: 'Push Debug', to: '/push-debug' }] : []),
+    ...(isAdmin ? [{ icon: FileText, label: 'Platform Docs', to: '/docs' }] : []),
+    { icon: Bug, label: 'Push Debug', to: '/push-debug' },
     { icon: FileText, label: 'Privacy Policy', to: '/privacy-policy' },
     { icon: FileText, label: 'Terms & Conditions', to: '/terms' },
     { icon: FileText, label: 'Community Rules', to: '/community-rules' },
@@ -186,8 +184,8 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Quick Actions - 3 column */}
-        <div className="grid grid-cols-3 gap-2.5 px-4 mt-4">
+        {/* Quick Actions */}
+        <div className={`grid ${quickActions.length > 3 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-2.5 px-4 mt-4`}>
           {quickActions.map(({ icon: Icon, label, to, key }) => (
             <Link key={key} to={to}>
               <div className="bg-card border border-border rounded-xl p-3 flex flex-col items-center gap-1.5 active:scale-[0.97] transition-transform">

@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { useParentGroups } from '@/hooks/useParentGroups';
 import { useCategoryProducts } from '@/hooks/queries/usePopularProducts';
 import { ServiceCategory } from '@/types/categories';
@@ -71,7 +72,6 @@ export default function CategoryGroupPage() {
 
   const { data: nearbyProducts } = useNearbyProducts();
 
-  // Filter sub-categories to only those with at least one product
   const activeCategorySet = useMemo(
     () => new Set(allProducts.map((p) => p.category)),
     [allProducts]
@@ -82,26 +82,37 @@ export default function CategoryGroupPage() {
   );
   const showAllTab = subCategories.length > 1;
 
-  // Extract nearby sellers for this parent group from RPC data
   const { data: topSellers = [] } = useQuery({
     queryKey: ['category-sellers', category, effectiveSocietyId],
     queryFn: async () => {
-      let query = supabase
+      const { data: cats } = await supabase
+        .from('category_config')
+        .select('category')
+        .eq('parent_group', category!);
+
+      const categoryList = (cats || []).map((c: any) => c.category);
+      if (categoryList.length === 0) return [];
+
+      const { data: sellers, error } = await supabase
         .from('seller_profiles')
-        .select(`*, profile:profiles!seller_profiles_user_id_fkey(name, block)`)
+        .select(`
+          *,
+          profile:profiles!seller_profiles_user_id_fkey(name, block),
+          products!products_seller_id_fkey(category)
+        `)
         .eq('verification_status', 'approved')
-        .eq('primary_group', category!)
         .order('rating', { ascending: false })
-        .limit(10);
-
-      if (effectiveSocietyId) {
-        query = query.eq('society_id', effectiveSocietyId);
-      }
-
-      const { data, error } = await query;
+        .limit(20);
 
       if (error) throw error;
-      return (data as any) || [];
+
+      const filtered = (sellers || []).filter((s: any) =>
+        s.products?.some((p: any) => categoryList.includes(p.category))
+      );
+
+      return effectiveSocietyId
+        ? filtered.filter((s: any) => s.society_id === effectiveSocietyId).slice(0, 10)
+        : filtered.slice(0, 10);
     },
     enabled: !!category && !!effectiveSocietyId,
   });
@@ -171,7 +182,6 @@ export default function CategoryGroupPage() {
     );
   }
 
-  // Guard against undefined parentGroup before rendering its properties
   if (!parentGroup) return null;
 
   return (
@@ -179,18 +189,16 @@ export default function CategoryGroupPage() {
       {/* Sticky Header */}
       <div className="sticky top-0 z-30 bg-background safe-top">
         <div className="px-4 pt-1 pb-2">
-          {/* Back + title */}
           <div className="flex items-center gap-2.5 mb-2.5">
             <button onClick={() => navigate(-1)} className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
               <ArrowLeft size={18} className="text-foreground" />
             </button>
             <h1 className="text-base font-bold flex items-center gap-1.5 flex-1 min-w-0">
-              <span>{parentGroup.icon}</span>
+              <DynamicIcon name={parentGroup.icon} size={18} />
               <span className="truncate">{parentGroup.label}</span>
             </h1>
           </div>
 
-          {/* Search */}
           <div className="relative mb-2">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -206,7 +214,6 @@ export default function CategoryGroupPage() {
             )}
           </div>
 
-          {/* Sub-category pills — horizontal scroll */}
           {subCategories.length > 0 && (
             <ScrollArea className="pb-1">
               <div className="flex gap-1.5 pb-1">
@@ -215,8 +222,8 @@ export default function CategoryGroupPage() {
                     onClick={() => handleSubCategorySelect(null)}
                     className={cn(
                       'px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors',
-                      !activeSubCategory 
-                        ? 'bg-foreground text-background border-foreground' 
+                      !activeSubCategory
+                        ? 'bg-foreground text-background border-foreground'
                         : 'bg-background text-foreground border-border'
                     )}
                   >
@@ -229,12 +236,12 @@ export default function CategoryGroupPage() {
                     onClick={() => handleSubCategorySelect(config.category)}
                     className={cn(
                       'px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors flex items-center gap-1',
-                      activeSubCategory === config.category 
-                        ? 'bg-foreground text-background border-foreground' 
+                      activeSubCategory === config.category
+                        ? 'bg-foreground text-background border-foreground'
                         : 'bg-background text-foreground border-border'
                     )}
                   >
-                    <span className="text-xs">{config.icon}</span>
+                    <DynamicIcon name={config.icon} size={12} />
                     {config.displayName}
                   </button>
                 ))}
@@ -244,7 +251,6 @@ export default function CategoryGroupPage() {
           )}
         </div>
 
-        {/* Sort bar */}
         <div className="border-t border-border/40">
           <ScrollArea className="px-4 py-2">
             <div className="flex gap-1.5">
@@ -254,8 +260,8 @@ export default function CategoryGroupPage() {
                   onClick={() => setSortBy(opt.key)}
                   className={cn(
                     'px-3 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap border transition-colors',
-                    sortBy === opt.key 
-                      ? 'bg-primary/10 text-primary border-primary' 
+                    sortBy === opt.key
+                      ? 'bg-primary/10 text-primary border-primary'
                       : 'bg-background text-muted-foreground border-border'
                   )}
                 >
@@ -295,7 +301,9 @@ export default function CategoryGroupPage() {
           </>
         ) : (
           <div className="text-center py-16">
-            <div className="text-4xl mb-4">{parentGroup.icon}</div>
+            <div className="mb-4 flex justify-center">
+              <DynamicIcon name={parentGroup.icon} size={40} className="text-muted-foreground" />
+            </div>
             <h3 className="font-semibold text-sm mb-2">No items found</h3>
             <p className="text-xs text-muted-foreground mb-4">
               {searchQuery ? 'Try a different search' : 'Check back soon for new listings!'}
@@ -308,7 +316,6 @@ export default function CategoryGroupPage() {
           </div>
         )}
 
-        {/* Top Sellers section */}
         {topSellers.length > 0 && !searchQuery && (
           <div className="mt-8">
             <div className="flex items-center gap-2 mb-3">
