@@ -19,16 +19,16 @@ export function AvailabilityPromptBanner({ sellerId }: AvailabilityPromptBannerP
     queryKey: ['availability-prompt', sellerId],
     queryFn: async () => {
       // Check if seller has any service listings
-      const { count: listingCount } = await supabase
-        .from('service_listings')
+      const { count: listingCount } = await (supabase
+        .from('service_listings') as any)
         .select('id', { count: 'exact', head: true })
         .eq('seller_id', sellerId);
 
       if (!listingCount || listingCount === 0) return false;
 
       // Check if seller has any availability schedules
-      const { count: scheduleCount } = await supabase
-        .from('service_availability_schedules')
+      const { count: scheduleCount } = await (supabase
+        .from('service_availability_schedules') as any)
         .select('id', { count: 'exact', head: true })
         .eq('seller_id', sellerId)
         .eq('is_active', true);
