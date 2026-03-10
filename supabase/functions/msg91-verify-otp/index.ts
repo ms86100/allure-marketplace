@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { reqId, otp, country_code = "91" } = await req.json();
+    const { reqId, otp, phone, country_code = "91" } = await req.json();
 
     if (!reqId) {
       return new Response(JSON.stringify({ error: "Please go back and re-enter your phone number." }), { status: 400, headers: jsonHeaders });
@@ -32,6 +32,10 @@ Deno.serve(async (req) => {
 
     if (!otp || !/^\d{4,6}$/.test(otp)) {
       return new Response(JSON.stringify({ error: "Please enter a valid 4-digit OTP." }), { status: 400, headers: jsonHeaders });
+    }
+
+    if (!phone || !/^\d{10}$/.test(phone)) {
+      return new Response(JSON.stringify({ error: "Invalid phone number." }), { status: 400, headers: jsonHeaders });
     }
 
     const authKey = Deno.env.get("MSG91_AUTH_KEY");
@@ -48,10 +52,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ reqId, otp, widgetId, tokenAuth, authkey: authKey }),
     });
     const verifyData = await verifyRes.json();
-    console.log("MSG91 verify response:", JSON.stringify(verifyData));
+    console.log("MSG91 verify response type:", verifyData.type, "code:", verifyData.code);
 
-    // MSG91 Widget API returns: { type: "success", message: "<JWT_ACCESS_TOKEN>" }
-    // or { type: "error", message: "...", code: 705 }
     if (verifyData.type !== "success") {
       return new Response(
         JSON.stringify({ error: getFriendlyError(verifyData.code, verifyData.message) }),
@@ -59,47 +61,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // The access token is in the `message` field (it's a JWT)
-    const accessToken = verifyData.access_token || verifyData.message;
-    if (!accessToken) {
-      return new Response(JSON.stringify({ error: "Verification failed. Please try again." }), { status: 400, headers: jsonHeaders });
-    }
-
-    // ─── 2. Server-side token validation ───
-    const tokenRes = await fetch("https://api.msg91.com/api/v5/widget/verifyAccessToken", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ access_token: accessToken, widgetId, tokenAuth, authkey: authKey }),
-    });
-    const tokenData = await tokenRes.json();
-    console.log("MSG91 token verify response:", JSON.stringify(tokenData));
-
-    if (tokenData.type !== "success") {
-      return new Response(
-        JSON.stringify({ error: "Verification expired. Please request a new OTP." }),
-        { status: 400, headers: jsonHeaders }
-      );
-    }
-
-    // Extract verified phone number
-    const verifiedIdentifier = tokenData.identifier || tokenData.mobile || tokenData.phone;
-    if (!verifiedIdentifier) {
-      console.error("No identifier in token response:", JSON.stringify(tokenData));
-      return new Response(
-        JSON.stringify({ error: "Could not verify your phone number. Please try again." }),
-        { status: 500, headers: jsonHeaders }
-      );
-    }
-
-    // Normalize phone
-    const cleanIdentifier = verifiedIdentifier.replace(/\D/g, "");
-    const mobile = cleanIdentifier.startsWith(country_code)
-      ? cleanIdentifier
-      : `${country_code}${cleanIdentifier}`;
+    // OTP verified successfully — use the phone number from the request
+    // (MSG91 already validated it matches the reqId)
+    const mobile = `${country_code}${phone}`;
     const fullPhone = `+${mobile}`;
     const syntheticEmail = `${mobile}@phone.sociva.app`;
 
-    // ─── 3. Find or create Supabase user ───
+    // ─── 2. Find or create Supabase user ───
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -157,7 +125,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ─── 4. Generate magiclink session ───
+    // ─── 3. Generate magiclink session ───
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: "magiclink",
       email: userEmail,

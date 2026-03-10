@@ -139,7 +139,7 @@ export function useAuthPage() {
             'Content-Type': 'application/json',
             'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
-          body: JSON.stringify({ reqId: otpReqId, otp, country_code: '91' }),
+          body: JSON.stringify({ reqId: otpReqId, otp, phone, country_code: '91' }),
         }
       );
 
