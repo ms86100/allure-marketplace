@@ -1,50 +1,52 @@
 
 
-## Notification Health Check — User-Friendly UI
+# Live Product Preview in Seller Product Editor
 
-### What We'll Build
+## Overview
+Add a real-time preview panel inside the product creation/edit dialog that mirrors how the listing card will appear to buyers, updating instantly as the seller types or changes any field.
 
-A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
+## Approach
 
-### UI Design
+### 1. New Component: `ProductFormPreview`
+- File: `src/components/seller/ProductFormPreview.tsx`
+- Takes the current `formData` (from `useSellerProducts`) and seller profile info
+- Converts `ProductFormData` into a `ProductWithSeller` shape with mock/derived values
+- Renders the existing `ProductListingCard` component in `viewOnly` mode
+- Wraps it in a sticky panel with a "Preview" label and a phone-frame style container
 
-**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
+### 2. Update Dialog Layout in `SellerProductsPage.tsx`
+- Widen the dialog to `sm:max-w-4xl` (from `sm:max-w-2xl`)
+- Split the `DialogContent` into a two-column grid layout:
+  - **Left column**: Existing form fields (unchanged)
+  - **Right column**: Sticky `ProductFormPreview` that scrolls with the form
+- On mobile (narrow screens), the preview collapses into a toggleable floating button at the bottom that opens a small preview overlay
 
-**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
+### 3. Data Mapping (`formData` → `ProductWithSeller`)
+Inside `ProductFormPreview`, a `useMemo` maps form state to card props:
+```
+name        → product.name (or "Product Name" placeholder)
+price       → parseFloat or 0
+mrp         → parseFloat or null
+image_url   → product.image_url
+is_veg      → product.is_veg
+is_bestseller → product.is_bestseller
+category    → product.category
+seller_name → sellerProfile.business_name
+is_available → product.is_available
+prep_time_minutes → parseFloat or null
+accepts_preorders → product.accepts_preorders
+lead_time_hours → parseFloat or null
+stock_quantity → parseFloat or null
+```
 
-| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
-|---|---|---|
-| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
-| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
-| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
-| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
+### 4. Mobile Experience
+- Below `md` breakpoint: form stays full-width, a small floating "Preview" button appears at bottom-right
+- Tapping it shows the preview card in a bottom sheet / overlay
+- This avoids cramping the form on small screens
 
-Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
+## Files Changed
+- **New**: `src/components/seller/ProductFormPreview.tsx`
+- **Edit**: `src/pages/SellerProductsPage.tsx` — widen dialog, add two-column layout with preview panel
 
-**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
-
-**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
-
-### Implementation
-
-**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
-- Renders the trigger button and the bottom sheet
-- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
-- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
-- Provides actionable buttons for failures (Open Settings, Retry Registration)
-
-**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
-- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
-- Consolidates the 7+ technical steps into 4 simple categories
-- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
-
-**3. Update `src/pages/ProfilePage.tsx`**
-- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
-- Keep Push Debug link visible only for admins
-
-**4. Optionally add to `src/pages/NotificationsPage.tsx`**
-- Add a small "Check notification status" link at the top
-
-### No backend changes needed
-The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
+No database changes required. The preview uses existing `ProductListingCard` with synthesized data from form state.
 
