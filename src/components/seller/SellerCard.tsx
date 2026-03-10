@@ -7,6 +7,7 @@ import { SellerProfile, Product } from '@/types/database';
 import { Clock, MapPin, Award, Zap, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/hooks/useCurrency';
+import { computeStoreStatus, formatStoreClosedMessage } from '@/lib/store-availability';
 
 interface SellerCardProps {
   seller: SellerProfile & { profile?: { name: string; block: string }; products?: { price: number }[] };

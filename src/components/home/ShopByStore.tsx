@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Star, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { computeStoreStatus } from '@/lib/store-availability';
 
 export function ShopByStore() {
   const { effectiveSocietyId } = useAuth();
