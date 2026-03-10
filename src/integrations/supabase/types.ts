@@ -1478,6 +1478,7 @@ export type Database = {
           landmark: string | null
           latitude: number | null
           longitude: number | null
+          phase: string | null
           pincode: string | null
           society_id: string | null
           updated_at: string | null
@@ -1496,6 +1497,7 @@ export type Database = {
           landmark?: string | null
           latitude?: number | null
           longitude?: number | null
+          phase?: string | null
           pincode?: string | null
           society_id?: string | null
           updated_at?: string | null
@@ -1514,6 +1516,7 @@ export type Database = {
           landmark?: string | null
           latitude?: number | null
           longitude?: number | null
+          phase?: string | null
           pincode?: string | null
           society_id?: string | null
           updated_at?: string | null
