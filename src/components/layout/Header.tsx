@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { ArrowLeft, Bell, Building, Building2, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Bell, Building, Building2, ShieldCheck, Users, Store, Verified } from 'lucide-react';
 
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { useHaptics } from '@/hooks/useHaptics';
 import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { useUnreadNotificationCount } from '@/hooks/useUnreadNotificationCount';
+import { useSocietyStats } from '@/hooks/useSocietyStats';
 
 interface HeaderProps {
   showCart?: boolean;
