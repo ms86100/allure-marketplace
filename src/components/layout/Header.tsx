@@ -14,6 +14,7 @@ import { useUnreadNotificationCount } from '@/hooks/useUnreadNotificationCount';
 import { useSocietyStats } from '@/hooks/useSocietyStats';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { LocationSelectorSheet } from '@/components/location/LocationSelectorSheet';
+import { useLocationStats } from '@/hooks/queries/useLocationStats';
 
 interface HeaderProps {
   showCart?: boolean;
@@ -47,6 +48,7 @@ function HeaderInner({
   const unreadCount = useUnreadNotificationCount();
   const societyStats = useSocietyStats(effectiveSocietyId, isApproved);
   const { browsingLocation } = useBrowsingLocation();
+  const { data: locationStats } = useLocationStats(browsingLocation?.lat, browsingLocation?.lng);
 
   const displaySociety = effectiveSociety || society;
   const isViewingAs = viewAsSocietyId && (isAdmin || isBuilderMember);
@@ -86,18 +88,6 @@ function HeaderInner({
                       <Verified size={12} className="text-primary shrink-0" />
                     )}
                   </div>
-                  {societyStats && (
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                        <Users size={10} className="text-primary/70 shrink-0" />
-                        <span className="font-semibold">{societyStats.families}</span> families
-                      </span>
-                      <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                        <Store size={10} className="text-primary/70 shrink-0" />
-                        <span className="font-semibold">{societyStats.sellers}</span> sellers
-                      </span>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -152,18 +142,35 @@ function HeaderInner({
             </div>
           </div>
 
-          {/* Browsing location chip — only on home (no title) */}
+          {/* Dynamic location stats chip — only on home (no title) */}
           {!title && browsingLocation && (
             <button
               type="button"
               onClick={() => setLocationSheetOpen(true)}
-              className="flex items-center gap-1.5 mt-1.5 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/15 hover:bg-primary/10 transition-colors max-w-full"
+              className="flex items-center gap-1.5 mt-1.5 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/15 hover:bg-primary/10 transition-colors max-w-full overflow-hidden"
             >
               <MapPin size={12} className="text-primary shrink-0" />
               <span className="text-[11px] font-semibold text-foreground truncate">
                 {browsingLocation.source === 'gps' ? 'Near ' : ''}{browsingLocation.label}
               </span>
-              <ChevronDown size={11} className="text-muted-foreground shrink-0" />
+              {locationStats && (
+                <>
+                  <span className="text-muted-foreground/40 shrink-0">·</span>
+                  <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground whitespace-nowrap">
+                    <Store size={9} className="text-primary/70 shrink-0" />
+                    <span className="font-semibold">{locationStats.sellersNearby}</span> sellers
+                  </span>
+                  {locationStats.ordersToday > 0 && (
+                    <>
+                      <span className="text-muted-foreground/40 shrink-0">·</span>
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        <span className="font-semibold">{locationStats.ordersToday}</span> orders today
+                      </span>
+                    </>
+                  )}
+                </>
+              )}
+              <ChevronDown size={11} className="text-muted-foreground shrink-0 ml-auto" />
             </button>
           )}
 
