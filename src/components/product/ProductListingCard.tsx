@@ -126,9 +126,6 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
           {badges.length > 0 && (<div className="absolute top-1.5 left-1.5 flex flex-col gap-0.5">{badges.map((b, i) => (<Badge key={i} className={cn('text-[7px] leading-none px-1.5 py-0.5 font-bold shadow-sm rounded border-0', b.color)}>{b.label}</Badge>))}</div>)}
           {hasDiscount && discountPct > 0 && (<div className="absolute top-1.5 right-1.5"><span className="bg-badge-discount text-foreground text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">{discountPct}% OFF</span></div>)}
           {showVegBadge && (<div className="absolute bottom-1.5 right-1.5"><VegBadge isVeg={product.is_veg} size="sm" /></div>)}
-          <div className="absolute bottom-1.5 left-1.5">
-            {locationLabel ? (<span className="inline-flex items-center gap-0.5 bg-primary/90 backdrop-blur-sm text-[7px] font-bold text-primary-foreground px-1.5 py-0.5 rounded-full shadow-sm max-w-[85%] truncate"><MapPin size={7} className="shrink-0" />{locationLabel}</span>) : (product as any).is_same_society !== false ? (<span className="inline-flex items-center gap-0.5 bg-primary/90 backdrop-blur-sm text-[7px] font-bold text-primary-foreground px-1.5 py-0.5 rounded-full shadow-sm"><MapPin size={7} className="shrink-0" />{ml.label('label_in_your_society')}</span>) : null}
-          </div>
         </div>
         {!viewOnly && !isOutOfStock && !isStoreClosed && (
           <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10">
@@ -164,6 +161,14 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
           {hasDiscount && (<span className="text-[10px] text-muted-foreground line-through leading-none">MRP {formatPrice(product.mrp!)}</span>)}
         </div>
         {product.price_per_unit && (<span className="text-[9px] text-muted-foreground leading-none mt-0.5">{product.price_per_unit}</span>)}
+        {(locationLabel || (product as any).is_same_society !== false) && (
+          <div className="flex items-center gap-1 mt-1">
+            <MapPin size={9} className="shrink-0 text-primary" />
+            <span className="text-[9px] font-medium text-muted-foreground leading-tight truncate">
+              {locationLabel || ml.label('label_in_your_society')}
+            </span>
+          </div>
+        )}
       </div>
       {viewOnly && (<div className="px-2.5 pb-2.5"><button onClick={(e) => { e.stopPropagation(); onNavigate?.(`/seller/${product.seller_id}`); }} className="w-full border border-primary text-primary font-bold text-[11px] py-1.5 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors">{mc.labels.viewButton}</button></div>)}
       {!viewOnly && isOutOfStock && (<NotifyMeButton productId={product.id} />)}
