@@ -32,6 +32,7 @@ export interface ProductWithSeller {
   completed_order_count?: number; fulfillment_mode?: string | null; delivery_note?: string | null;
   seller_availability_start?: string | null; seller_availability_end?: string | null;
   seller_operating_days?: string[] | null; seller_is_available?: boolean;
+  society_name?: string | null; distance_km?: number | null;
   created_at: string; updated_at: string; [key: string]: any;
 }
 
