@@ -180,9 +180,9 @@ export default function ProfileEditPage() {
               <Input value={profile?.phone || user?.phone || ''} disabled className="mt-1.5 bg-muted/50" />
             </div>
 
-            <Button onClick={handleSaveProfile} disabled={savingProfile} className="w-full h-11 rounded-xl font-semibold">
+            <Button onClick={handleSaveProfile} disabled={savingProfile || !name.trim()} className="w-full h-11 rounded-xl font-semibold">
               {savingProfile ? <Loader2 size={16} className="mr-1 animate-spin" /> : null}
-              Save
+              Save & Go to Home
             </Button>
           </div>
         </div>

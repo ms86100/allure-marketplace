@@ -20,6 +20,16 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { showOnboarding, hasChecked, completeOnboarding } = useOnboarding(user?.id);
 
+  // Auto-redirect to profile edit if profile is incomplete
+  useEffect(() => {
+    if (profile) {
+      const isIncomplete = !profile.name || profile.name === 'User' || !profile.flat_number || !profile.block;
+      if (isIncomplete) {
+        navigate('/profile/edit', { replace: true });
+      }
+    }
+  }, [profile, navigate]);
+
   if (hasChecked && showOnboarding && profile) {
     return <OnboardingWalkthrough onComplete={completeOnboarding} />;
   }

@@ -176,7 +176,15 @@ export function useAuthPage() {
         setStep('society');
       } else {
         toast.success('Welcome back!');
-        navigate('/');
+        // Check if profile is incomplete — redirect to profile edit
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          const { data: prof } = await supabase.from('profiles').select('name, flat_number, block').eq('id', authUser.id).maybeSingle();
+          const isIncomplete = !prof?.name || prof.name === 'User' || !prof.flat_number || !prof.block;
+          navigate(isIncomplete ? '/profile/edit' : '/');
+        } else {
+          navigate('/');
+        }
       }
     } catch {
       // Network error or unexpected failure — never show raw errors
@@ -315,8 +323,8 @@ export function useAuthPage() {
         }
       }
 
-      toast.success('Welcome! Your account is set up.');
-      navigate('/');
+      toast.success('Welcome! Complete your profile to get started.');
+      navigate('/profile/edit');
     } catch (error: any) {
       toast.error(friendlyError(error));
     } finally {
