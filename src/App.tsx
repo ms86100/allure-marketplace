@@ -438,12 +438,14 @@ function App() {
               <GlobalHapticListener />
               <AuthProvider>
                 <NavigationHandler />
-                <CartProvider>
-                  <PushNotificationProvider>
-                    <SafeSellerAlert><GlobalSellerAlert /></SafeSellerAlert>
-                    <AppRoutes />
-                  </PushNotificationProvider>
-                </CartProvider>
+                <BrowsingLocationProvider>
+                  <CartProvider>
+                    <PushNotificationProvider>
+                      <SafeSellerAlert><GlobalSellerAlert /></SafeSellerAlert>
+                      <AppRoutes />
+                    </PushNotificationProvider>
+                  </CartProvider>
+                </BrowsingLocationProvider>
               </AuthProvider>
             </HashRouter>
           </TooltipProvider>

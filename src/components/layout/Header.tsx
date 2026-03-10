@@ -32,9 +32,9 @@ function HeaderInner({
   const navigate = useNavigate();
   const location = useLocation();
   const settings = useSystemSettings();
+  const [locationSheetOpen, setLocationSheetOpen] = useState(false);
 
   const handleBack = useCallback(() => {
-    // If there's real history, go back; otherwise navigate to society dashboard or home
     if (window.history.length > 2) {
       navigate(-1);
     } else {
@@ -46,6 +46,7 @@ function HeaderInner({
   const { selectionChanged } = useHaptics();
   const unreadCount = useUnreadNotificationCount();
   const societyStats = useSocietyStats(effectiveSocietyId, isApproved);
+  const { browsingLocation } = useBrowsingLocation();
 
   const displaySociety = effectiveSociety || society;
   const isViewingAs = viewAsSocietyId && (isAdmin || isBuilderMember);
