@@ -95,9 +95,14 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
 
   if (!product) return null;
 
-  const distanceText = product.distance_km != null
-    ? (product.distance_km < 1 ? ml.label('label_distance_m_format').replace('{distance}', String(Math.round(product.distance_km * 1000))) : ml.label('label_distance_km_format').replace('{distance}', String(product.distance_km)))
-    : product.society_name;
+  const distanceLabel = product.distance_km != null
+    ? (product.distance_km < 1 ? ml.label('label_distance_m_format').replace('{distance}', String(Math.round(product.distance_km * 1000))) : ml.label('label_distance_km_format').replace('{distance}', String(Math.round(product.distance_km * 10) / 10)))
+    : null;
+  const locationText = useMemo(() => {
+    if (product.society_name) return distanceLabel ? `${product.society_name} · ${distanceLabel}` : product.society_name;
+    if (distanceLabel) return `Nearby · ${distanceLabel}`;
+    return null;
+  }, [product.society_name, distanceLabel]);
 
   return (
     <>
