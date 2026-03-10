@@ -130,21 +130,23 @@ export function useAuthPage() {
     }
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('msg91-verify-otp', {
-        body: { reqId: otpReqId, otp, country_code: '91' },
-      });
+      // Use fetch directly for reliable error body parsing
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-verify-otp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ reqId: otpReqId, otp, country_code: '91' }),
+        }
+      );
+      const data = await response.json();
       
-      // Parse error from edge function response
-      if (error) {
-        // Try to get the actual error message from the response
-        let errorMsg = 'OTP verification failed';
-        try {
-          const context = await (error as any)?.context?.json?.();
-          if (context?.error) errorMsg = context.error;
-        } catch { /* ignore parse errors */ }
-        throw new Error(errorMsg);
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'OTP verification failed');
       }
-      if (data?.error) throw new Error(data.error);
 
       const { token_hash, is_new_user } = data;
       setIsNewUser(is_new_user);
