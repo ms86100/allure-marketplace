@@ -173,6 +173,14 @@ export function useAuthPage() {
         return;
       }
 
+      // Request push notification permission right after login
+      // Small delay to let push system initialize with new session
+      setTimeout(() => {
+        requestFullPermission().catch(e => 
+          console.warn('[Auth] Post-login push permission request:', e)
+        );
+      }, 1500);
+
       if (is_new_user) {
         toast.success('Phone verified! Now select your society.');
         setStep('society');
