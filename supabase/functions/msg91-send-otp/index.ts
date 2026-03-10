@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
         JSON.stringify({
           success: true,
           message: resend ? "OTP resent" : "OTP sent",
-          reqId: data.reqId || reqId,
+          reqId: data.reqId || data.message || reqId,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
