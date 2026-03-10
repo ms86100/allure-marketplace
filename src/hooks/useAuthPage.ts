@@ -142,10 +142,19 @@ export function useAuthPage() {
           body: JSON.stringify({ reqId: otpReqId, otp, country_code: '91' }),
         }
       );
-      const data = await response.json();
-      
+
+      let data: any;
+      try {
+        data = await response.json();
+      } catch {
+        toast.error('Something went wrong. Please try again.');
+        return;
+      }
+
       if (!response.ok || data.error) {
-        throw new Error(data.error || 'OTP verification failed');
+        // Show the friendly error from the edge function directly
+        toast.error(data.error || 'Verification failed. Please try again.');
+        return;
       }
 
       const { token_hash, is_new_user } = data;
@@ -156,7 +165,11 @@ export function useAuthPage() {
         token_hash,
         type: 'magiclink',
       });
-      if (verifyError) throw verifyError;
+
+      if (verifyError) {
+        toast.error('Session could not be created. Please try again.');
+        return;
+      }
 
       if (is_new_user) {
         toast.success('Phone verified! Now select your society.');
@@ -165,17 +178,9 @@ export function useAuthPage() {
         toast.success('Welcome back!');
         navigate('/');
       }
-    } catch (error: any) {
-      const msg = (error.message || '').toLowerCase();
-      if (msg.includes('invalid otp') || msg.includes('incorrect')) {
-        toast.error('Incorrect OTP. Please check the code and try again.');
-      } else if (msg.includes('expired') || msg.includes('timeout')) {
-        toast.error('OTP has expired. Please request a new one.');
-      } else if (msg.includes('widgetid')) {
-        toast.error('Verification service error. Please try again later.');
-      } else {
-        toast.error('OTP verification failed. Please try again.');
-      }
+    } catch {
+      // Network error or unexpected failure — never show raw errors
+      toast.error('Connection error. Please check your internet and try again.');
     } finally {
       setIsLoading(false);
     }
