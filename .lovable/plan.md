@@ -1,50 +1,49 @@
+## Plan: Remove Admin Approval Gate — Direct Access After OTP + Society Selection
+
+### Problem
+
+After OTP verification and society selection, new users land on a "Verification Pending" screen waiting for admin approval. You want users to go straight to the homepage.
+
+### Root Cause
+
+1. `handle_new_user()` DB trigger sets `verification_status = 'pending'` by default (only `'approved'` if `auto_approve_residents = true`)
+2. `HomePage.tsx` line 27-28 checks `!isApproved && profile` → shows `VerificationPendingScreen`
+3. `isApproved` in `AuthProvider.tsx` = `profile?.verification_status === 'approved'`
+
+### Changes
+
+**1. Database Migration — Always auto-approve new users**
+
+Update the `handle_new_user()` trigger function to set `verification_status = 'approved'` for all new users, removing the conditional check on `auto_approve_residents`.
+
+```sql
+CREATE OR REPLACE FUNCTION public.handle_new_user() ...
+  -- Change: _verification_status text := 'approved';  (was 'pending')
+  -- Remove the auto_approve_residents conditional block
+```
+
+**2. `src/pages/HomePage.tsx` — Remove verification gate**
+
+- Remove the `VerificationPendingScreen` import
+- Remove the `!isApproved && profile` check (lines 27-29)
+- Change onboarding guard from `isApproved` to `profile` (line 23)
+- Remove `isApproved` from the destructured `useAuth()` call
+
+**3. `src/components/onboarding/OnboardingWalkthrough.tsx` — No changes needed**
+
+The onboarding walkthrough and `useOnboarding` hook work independently of approval status.
+
+### Files Affected
 
 
-## Notification Health Check — User-Friendly UI
+| File                           | Change                                             |
+| ------------------------------ | -------------------------------------------------- |
+| DB trigger `handle_new_user()` | Default to `'approved'` instead of `'pending'`     |
+| `src/pages/HomePage.tsx`       | Remove verification gate, fix onboarding condition |
 
-### What We'll Build
 
-A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
+### What stays
 
-### UI Design
-
-**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
-
-**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
-
-| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
-|---|---|---|
-| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
-| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
-| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
-| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
-
-Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
-
-**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
-
-**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
-
-### Implementation
-
-**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
-- Renders the trigger button and the bottom sheet
-- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
-- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
-- Provides actionable buttons for failures (Open Settings, Retry Registration)
-
-**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
-- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
-- Consolidates the 7+ technical steps into 4 simple categories
-- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
-
-**3. Update `src/pages/ProfilePage.tsx`**
-- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
-- Keep Push Debug link visible only for admins
-
-**4. Optionally add to `src/pages/NotificationsPage.tsx`**
-- Add a small "Check notification status" link at the top
-
-### No backend changes needed
-The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
-
+- `isApproved` flag remains in AuthContext (used by queries to gate data fetching — those continue to work since users will now always be approved)
+- `VerificationPendingScreen` file kept (unused but harmless; can be cleaned up later)
+- Society admin panel's manual approval UI stays (for edge cases or future use)
