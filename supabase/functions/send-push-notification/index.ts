@@ -387,9 +387,9 @@ Deno.serve(async (req) => {
     // Generate FCM access token (needed for Android and iOS fallback)
     const accessToken = await generateAccessToken(serviceAccount);
 
-    // Send to all device tokens — iOS uses direct APNs when apns_token available
+    // Send to deduplicated device tokens — iOS uses direct APNs when apns_token available
     const results = await Promise.all(
-      tokens.map(async (tokenRecord: any) => {
+      deduped.map(async (tokenRecord: any) => {
         let result: { success: boolean; error?: string };
 
         // iOS with stored APNs token → direct APNs delivery (bypasses FCM)
