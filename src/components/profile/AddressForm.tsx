@@ -310,7 +310,7 @@ export function AddressForm({ initial, onSave, onCancel, saving }: AddressFormPr
         <Button variant="outline" onClick={onCancel} className="flex-1 h-11 rounded-xl">Cancel</Button>
         <Button onClick={handleSubmit} disabled={saving} className="flex-1 h-11 rounded-xl font-semibold">
           {saving ? <Loader2 size={16} className="mr-1 animate-spin" /> : null}
-          {form.id ? 'Update Address' : 'Save Address'}
+          {form.id ? 'Update & Continue' : 'Save & Continue'}
         </Button>
       </div>
     </div>

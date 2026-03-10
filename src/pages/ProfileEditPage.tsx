@@ -11,6 +11,7 @@ import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ArrowLeft, Plus, Loader2, MapPin, Phone, User } from 'lucide-react';
+import { useRef } from 'react';
 
 export default function ProfileEditPage() {
   const navigate = useNavigate();
@@ -23,6 +24,7 @@ export default function ProfileEditPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<any>(null);
+  const detailsRef = useRef<HTMLDivElement>(null);
 
   // Auto-open address form if no addresses exist
   const shouldAutoOpen = !addressesLoading && addresses.length === 0 && !showAddressForm;
@@ -39,7 +41,8 @@ export default function ProfileEditPage() {
       }).eq('id', user.id);
       if (error) throw error;
       await refreshProfile();
-      toast.success('Profile updated');
+      toast.success('Profile updated! Redirecting…');
+      navigate('/');
     } catch {
       toast.error('Failed to update profile');
     } finally {
@@ -71,6 +74,11 @@ export default function ProfileEditPage() {
 
     setShowAddressForm(false);
     setEditingAddress(null);
+
+    // Scroll to "Your Details" section
+    setTimeout(() => {
+      detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 300);
   };
 
   const handleEditAddress = (addr: any) => {
@@ -147,7 +155,7 @@ export default function ProfileEditPage() {
         </div>
 
         {/* ═══ SECTION 2: YOUR NAME ═══ */}
-        <div className="px-4 mt-6">
+        <div ref={detailsRef} className="px-4 mt-6">
           <h3 className="text-sm font-semibold text-foreground mb-3">Your Details</h3>
           <div className="rounded-2xl border border-border bg-card p-4 space-y-4">
             {/* Name */}
