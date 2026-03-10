@@ -127,7 +127,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
           {hasDiscount && discountPct > 0 && (<div className="absolute top-1.5 right-1.5"><span className="bg-badge-discount text-foreground text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">{discountPct}% OFF</span></div>)}
           {showVegBadge && (<div className="absolute bottom-1.5 right-1.5"><VegBadge isVeg={product.is_veg} size="sm" /></div>)}
           <div className="absolute bottom-1.5 left-1.5">
-            {distanceLabel ? (<span className="inline-flex items-center gap-0.5 bg-primary/90 backdrop-blur-sm text-[7px] font-bold text-primary-foreground px-1.5 py-0.5 rounded-full shadow-sm"><MapPin size={7} className="shrink-0" />{distanceLabel}</span>) : (product as any).is_same_society !== false ? (<span className="inline-flex items-center gap-0.5 bg-primary/90 backdrop-blur-sm text-[7px] font-bold text-primary-foreground px-1.5 py-0.5 rounded-full shadow-sm"><MapPin size={7} className="shrink-0" />{ml.label('label_in_your_society')}</span>) : null}
+            {locationLabel ? (<span className="inline-flex items-center gap-0.5 bg-primary/90 backdrop-blur-sm text-[7px] font-bold text-primary-foreground px-1.5 py-0.5 rounded-full shadow-sm max-w-[85%] truncate"><MapPin size={7} className="shrink-0" />{locationLabel}</span>) : (product as any).is_same_society !== false ? (<span className="inline-flex items-center gap-0.5 bg-primary/90 backdrop-blur-sm text-[7px] font-bold text-primary-foreground px-1.5 py-0.5 rounded-full shadow-sm"><MapPin size={7} className="shrink-0" />{ml.label('label_in_your_society')}</span>) : null}
           </div>
         </div>
         {!viewOnly && !isOutOfStock && !isStoreClosed && (

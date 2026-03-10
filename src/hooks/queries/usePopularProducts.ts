@@ -133,6 +133,7 @@ export function useCategoryProducts(parentGroup: string | null) {
             seller_operating_days: seller.operating_days || null,
             seller_is_available: seller.is_available ?? true,
             distance_km: seller.distance_km ?? null,
+            society_name: seller.society_name || null,
             created_at: '',
             updated_at: '',
           });
