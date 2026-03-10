@@ -1,39 +1,50 @@
 
 
-## Plan: Clear Building/Society on GPS-based location & Cross-community radius clarification
+## Notification Health Check — User-Friendly UI
 
-### Bug Fix: Clear `building_name` when using "Use Current Location"
+### What We'll Build
 
-**Problem**: When a user selects a society via autocomplete search, the Building/Society field is correctly populated. But if they then use "Use Current Location" and adjust the pin, the old society name persists in the Building/Society field — showing stale data.
+A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
 
-**Fix in `src/components/profile/AddressForm.tsx`**:
+### UI Design
 
-1. In `detectLocation()` (line ~116-136): After getting GPS coordinates, **clear `building_name`** and `searchQuery` so the society field resets. The reverse geocode result will populate `full_address` only.
+**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
 
-2. In `handleMapConfirm()` (line ~139-142): When the map pin is confirmed after a GPS-based flow, do **not** carry over the old `building_name`. Only set `full_address` from the geocoded name.
+**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
 
-The key change: when `detectLocation` is triggered, reset `building_name` to empty and clear the search query, since the user is explicitly choosing a raw GPS location rather than a named society.
+| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
+|---|---|---|
+| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
+| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
+| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
+| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
 
----
+Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
 
-### Answering Your Cross-Community Radius Question
+**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
 
-The cross-community discovery radius **is maintained and working** in the database. Here's how:
+**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
 
-- The `search_nearby_sellers` database function takes a `_radius_km` parameter (default 5 km).
-- It uses the **haversine formula** to calculate distance between the buyer's society coordinates and each seller's society coordinates.
-- A seller appears only if **both** conditions are met:
-  - Distance ≤ the buyer's search radius (`_radius_km`, passed by the app)
-  - Distance ≤ the seller's own `delivery_radius_km` (configured per seller, default 5 km)
-- Additionally, the seller must have `sell_beyond_community = true` and `verification_status = 'approved'`.
+### Implementation
 
-So the system uses the **user's society coordinates** (from the `societies` table) for discovery — not the delivery address coordinates. The delivery address is for fulfillment; the society association drives marketplace discovery.
+**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
+- Renders the trigger button and the bottom sheet
+- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
+- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
+- Provides actionable buttons for failures (Open Settings, Retry Registration)
 
-When a user picks "Use Current Location" instead of searching a society, the address is saved to `delivery_addresses` — but the **society association** on their profile (set during registration) remains unchanged and continues to drive cross-community seller discovery.
+**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
+- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
+- Consolidates the 7+ technical steps into 4 simple categories
+- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
 
-### Files to Change
+**3. Update `src/pages/ProfilePage.tsx`**
+- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
+- Keep Push Debug link visible only for admins
 
-| File | Change |
-|------|--------|
-| `src/components/profile/AddressForm.tsx` | Clear `building_name` and `searchQuery` when `detectLocation` is called; ensure `handleMapConfirm` doesn't carry stale building name from GPS flow |
+**4. Optionally add to `src/pages/NotificationsPage.tsx`**
+- Add a small "Check notification status" link at the top
+
+### No backend changes needed
+The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
 
