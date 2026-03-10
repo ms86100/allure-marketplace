@@ -135,17 +135,18 @@ export default function AuthPage() {
 
                   <div className="flex justify-center">
                     <InputOTP
-                      maxLength={6}
+                      maxLength={4}
                       value={auth.otp}
                       onChange={(value) => auth.setOtp(value)}
                     >
-                      <InputOTPGroup>
-                        <InputOTPSlot index={0} />
-                        <InputOTPSlot index={1} />
-                        <InputOTPSlot index={2} />
-                        <InputOTPSlot index={3} />
-                        <InputOTPSlot index={4} />
-                        <InputOTPSlot index={5} />
+                      <InputOTPGroup className="gap-3">
+                        <InputOTPSlot index={0} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
+                        <InputOTPSlot index={1} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
+                      </InputOTPGroup>
+                      <InputOTPSeparator className="mx-2 text-muted-foreground">—</InputOTPSeparator>
+                      <InputOTPGroup className="gap-3">
+                        <InputOTPSlot index={2} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
+                        <InputOTPSlot index={3} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
                       </InputOTPGroup>
                     </InputOTP>
                   </div>
