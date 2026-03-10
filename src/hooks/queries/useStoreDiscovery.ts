@@ -83,23 +83,37 @@ export function useLocalSellers() {
 
 export function useNearbySocietySellers(radiusKm: number = 5, enabled: boolean = true) {
   const { effectiveSocietyId, isApproved } = useAuth();
+  const { browsingLocation } = useBrowsingLocation();
+
+  const useCoordSearch = browsingLocation && browsingLocation.source !== 'society';
+  const lat = browsingLocation?.lat;
+  const lng = browsingLocation?.lng;
 
   return useQuery({
-    queryKey: ['store-discovery', 'nearby', effectiveSocietyId, radiusKm],
+    queryKey: ['store-discovery', 'nearby', useCoordSearch ? `loc-${lat}-${lng}` : effectiveSocietyId, radiusKm],
     queryFn: async () => {
-      if (!effectiveSocietyId) return [];
+      let data: any[] | null = null;
 
-      const { data, error } = await supabase.rpc('search_nearby_sellers', {
-        _buyer_society_id: effectiveSocietyId,
-        _radius_km: radiusKm,
-      });
-
-      if (error) {
-        console.error('Nearby sellers error:', error);
+      if (useCoordSearch && lat && lng) {
+        const result = await supabase.rpc('search_sellers_by_location' as any, {
+          _lat: lat,
+          _lng: lng,
+          _radius_km: radiusKm,
+        });
+        if (result.error) { console.error('Nearby sellers error:', result.error); return []; }
+        data = result.data;
+      } else if (effectiveSocietyId) {
+        const result = await supabase.rpc('search_nearby_sellers', {
+          _buyer_society_id: effectiveSocietyId,
+          _radius_km: radiusKm,
+        });
+        if (result.error) { console.error('Nearby sellers error:', result.error); return []; }
+        data = result.data;
+      } else {
         return [];
       }
 
-      const sellers = (data as NearbySeller[]) || [];
+      if (!data) return [];
 
       const ALL_BANDS: { label: string; minKm: number; maxKm: number }[] = [
         { label: 'Within 2 km', minKm: 0, maxKm: 2 },
