@@ -57,6 +57,7 @@ const CartPage = lazyWithRetry(() => import("./pages/CartPage"));
 const OrdersPage = lazyWithRetry(() => import("./pages/OrdersPage"));
 const OrderDetailPage = lazyWithRetry(() => import("./pages/OrderDetailPage"));
 const ProfilePage = lazyWithRetry(() => import("./pages/ProfilePage"));
+const ProfileEditPage = lazyWithRetry(() => import("./pages/ProfileEditPage"));
 const FavoritesPage = lazyWithRetry(() => import("./pages/FavoritesPage"));
 const BecomeSellerPage = lazyWithRetry(() => import("./pages/BecomeSellerPage"));
 const SellerDashboardPage = lazyWithRetry(() => import("./pages/SellerDashboardPage"));
