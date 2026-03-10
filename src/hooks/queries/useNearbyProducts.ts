@@ -59,6 +59,11 @@ export function useNearbyProducts() {
             seller_rating: seller.rating || 0,
             fulfillment_mode: null,
             delivery_note: null,
+            seller_availability_start: seller.availability_start || null,
+            seller_availability_end: seller.availability_end || null,
+            seller_operating_days: seller.operating_days || null,
+            seller_is_available: seller.is_available ?? true,
+            distance_km: seller.distance_km ?? null,
             created_at: '',
             updated_at: '',
           });
