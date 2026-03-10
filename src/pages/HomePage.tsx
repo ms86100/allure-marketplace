@@ -20,12 +20,8 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { showOnboarding, hasChecked, completeOnboarding } = useOnboarding(user?.id);
 
-  if (hasChecked && showOnboarding && isApproved) {
+  if (hasChecked && showOnboarding && profile) {
     return <OnboardingWalkthrough onComplete={completeOnboarding} />;
-  }
-
-  if (!isApproved && profile) {
-    return <VerificationPendingScreen />;
   }
 
   if (!profile) {
