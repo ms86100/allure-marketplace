@@ -131,7 +131,7 @@ export function useAuthPage() {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('msg91-verify-otp', {
-        body: { phone, otp, country_code: '91' },
+        body: { reqId: otpReqId, otp, country_code: '91' },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
