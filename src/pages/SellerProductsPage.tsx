@@ -21,6 +21,7 @@ import { BulkProductUpload } from '@/components/seller/BulkProductUpload';
 import { useCurrency } from '@/hooks/useCurrency';
 import { AttributeBlockBuilder } from '@/components/seller/AttributeBlockBuilder';
 import { useSellerProducts } from '@/hooks/useSellerProducts';
+import { ProductFormPreviewPanel, ProductFormPreviewMobile } from '@/components/seller/ProductFormPreview';
 
 export default function SellerProductsPage() {
   const sp = useSellerProducts();
