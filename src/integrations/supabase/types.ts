@@ -1464,6 +1464,78 @@ export type Database = {
           },
         ]
       }
+      delivery_addresses: {
+        Row: {
+          block: string | null
+          building_name: string | null
+          created_at: string
+          flat_number: string
+          floor: string | null
+          full_address: string | null
+          id: string
+          is_default: boolean | null
+          label: string
+          landmark: string | null
+          latitude: number | null
+          longitude: number | null
+          pincode: string | null
+          society_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          block?: string | null
+          building_name?: string | null
+          created_at?: string
+          flat_number?: string
+          floor?: string | null
+          full_address?: string | null
+          id?: string
+          is_default?: boolean | null
+          label?: string
+          landmark?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          pincode?: string | null
+          society_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          block?: string | null
+          building_name?: string | null
+          created_at?: string
+          flat_number?: string
+          floor?: string | null
+          full_address?: string | null
+          id?: string
+          is_default?: boolean | null
+          label?: string
+          landmark?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          pincode?: string | null
+          society_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_addresses_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_addresses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_assignments: {
         Row: {
           assigned_at: string | null
