@@ -103,10 +103,15 @@ export function useAuthPage() {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('msg91-send-otp', {
-        body: { phone, country_code: '91', resend },
+        body: { phone, country_code: '91', resend, reqId: resend ? otpReqId : undefined },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+
+      // Store reqId for verify and resend calls
+      if (data?.reqId) {
+        setOtpReqId(data.reqId);
+      }
 
       setStep('otp');
       setResendCooldown(30);
