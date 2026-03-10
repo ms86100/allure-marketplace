@@ -34,15 +34,16 @@ Deno.serve(async (req) => {
     const widgetId = Deno.env.get("MSG91_WIDGET_ID");
     const tokenAuth = Deno.env.get("MSG91_TOKEN_AUTH");
 
-    // Diagnostic logging (no secret values)
-    console.log("MSG91 config check:", {
-      hasAuthKey: !!authKey,
-      authKeyLength: authKey?.length || 0,
-      hasWidgetId: !!widgetId,
-      widgetIdLength: widgetId?.length || 0,
-      hasTokenAuth: !!tokenAuth,
-      tokenAuthLength: tokenAuth?.length || 0,
-    });
+    // Diagnostic logging (prefix + suffix only, no full values)
+    const debugCred = (val: string | undefined, name: string) => {
+      if (!val) return `${name}: NOT SET`;
+      return `${name}: len=${val.length}, prefix=${val.substring(0, 6)}, suffix=${val.substring(val.length - 4)}`;
+    };
+    console.log("Credential diagnostics:", [
+      debugCred(authKey, "AUTH_KEY"),
+      debugCred(widgetId, "WIDGET_ID"),
+      debugCred(tokenAuth, "TOKEN_AUTH"),
+    ].join(" | "));
 
     if (!authKey || !widgetId || !tokenAuth) {
       console.error("MSG91 Widget credentials not configured");
