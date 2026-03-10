@@ -29,8 +29,8 @@ export default function AdminFeedbackViewer() {
   const { data: feedback = [], isLoading } = useQuery({
     queryKey: ['admin-user-feedback'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('user_feedback' as any)
+      const { data, error } = await (supabase as any)
+        .from('user_feedback')
         .select('*, profile:profiles!user_feedback_user_id_fkey(name, flat_number, block)')
         .order('created_at', { ascending: false })
         .limit(100);
