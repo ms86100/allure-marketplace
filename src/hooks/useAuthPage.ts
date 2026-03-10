@@ -6,6 +6,7 @@ import { friendlyError } from '@/lib/utils';
 import { Society } from '@/types/database';
 import { useAutocomplete, PlaceDetails } from '@/hooks/useGoogleMaps';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
+import { usePushNotifications } from '@/contexts/PushNotificationContext';
 
 export type AuthStep = 'phone' | 'otp' | 'society';
 export type SocietySubStep = 'search' | 'map-confirm' | 'request-form';
@@ -39,6 +40,7 @@ export function useAuthPage() {
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [adjustedCoords, setAdjustedCoords] = useState<{ lat: number; lng: number } | null>(null);
   const settings = useSystemSettings();
+  const { requestFullPermission } = usePushNotifications();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Request form
@@ -170,6 +172,14 @@ export function useAuthPage() {
         toast.error('Session could not be created. Please try again.');
         return;
       }
+
+      // Request push notification permission right after login
+      // Small delay to let push system initialize with new session
+      setTimeout(() => {
+        requestFullPermission().catch(e => 
+          console.warn('[Auth] Post-login push permission request:', e)
+        );
+      }, 1500);
 
       if (is_new_user) {
         toast.success('Phone verified! Now select your society.');
