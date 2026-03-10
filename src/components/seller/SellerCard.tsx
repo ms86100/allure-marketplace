@@ -16,7 +16,13 @@ interface SellerCardProps {
 }
 
 export function SellerCard({ seller, featuredProduct, showFavorite = true }: SellerCardProps) {
-  const isOpen = seller.is_available;
+  const storeAvailability = computeStoreStatus(
+    seller.availability_start,
+    seller.availability_end,
+    seller.operating_days,
+    seller.is_available
+  );
+  const isOpen = storeAvailability.status === 'open';
   const { formatPrice } = useCurrency();
   const profile = seller.profile;
   const isNewSeller = !seller.rating || seller.rating === 0 || seller.total_reviews === 0;
