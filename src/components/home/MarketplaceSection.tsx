@@ -24,6 +24,7 @@ export function MarketplaceSection() {
   const navigate = useNavigate();
   const { user, profile, effectiveSocietyId } = useAuth();
   const ml = useMarketplaceLabels();
+  const { browsingLocation } = useBrowsingLocation();
 
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
