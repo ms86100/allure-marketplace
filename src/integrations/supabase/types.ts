@@ -8231,6 +8231,14 @@ export type Database = {
           source: string
         }[]
       }
+      get_location_stats: {
+        Args: { _lat: number; _lng: number; _radius_km?: number }
+        Returns: {
+          orders_today: number
+          sellers_count: number
+          societies_count: number
+        }[]
+      }
       get_nearby_societies: {
         Args: { _radius_km?: number; _society_id: string }
         Returns: {
