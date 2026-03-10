@@ -1,38 +1,28 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { loginSchema, emailSchema, profileDataSchema, validateForm } from '@/lib/validation-schemas';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { Society } from '@/types/database';
 import { useAutocomplete, PlaceDetails } from '@/hooks/useGoogleMaps';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
-import { useLoginThrottle } from '@/hooks/useLoginThrottle';
 
-export type SignupStep = 'credentials' | 'society' | 'profile' | 'verification';
+export type AuthStep = 'phone' | 'otp' | 'society';
 export type SocietySubStep = 'search' | 'map-confirm' | 'request-form';
-
-export interface ProfileData {
-  name: string;
-  flat_number: string;
-  block: string;
-  phase: string;
-  phone: string;
-}
 
 export function useAuthPage() {
   const navigate = useNavigate();
-  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'reset'>('login');
-  const [signupStep, setSignupStep] = useState<SignupStep>('credentials');
+  const [step, setStep] = useState<AuthStep>('phone');
   const [societySubStep, setSocietySubStep] = useState<SocietySubStep>('search');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [resetEmailSent, setResetEmailSent] = useState(false);
-  const [profileData, setProfileData] = useState<ProfileData>({
-    name: '', flat_number: '', block: '', phase: '', phone: '',
-  });
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+
+  // OTP cooldown
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Society selection state
   const [societies, setSocieties] = useState<Society[]>([]);
@@ -42,9 +32,8 @@ export function useAuthPage() {
   const [inviteCode, setInviteCode] = useState('');
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'verified' | 'failed' | 'unavailable'>('idle');
   const [gpsDistance, setGpsDistance] = useState<number | null>(null);
-  const [ageConfirmed, setAgeConfirmed] = useState(false);
 
-  // Google Places autocomplete state
+  // Google Places autocomplete
   const { predictions, isSearching, searchPlaces, getPlaceDetails, clearPredictions, isLoaded: mapsLoaded } = useAutocomplete();
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [adjustedCoords, setAdjustedCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -53,18 +42,30 @@ export function useAuthPage() {
 
   // Request form
   const [newSocietyData, setNewSocietyData] = useState({ name: '', address: '', city: '', pincode: '', landmark: '', contact: '' });
-
-  // Pending society data for deferred creation after signup
   const [pendingNewSociety, setPendingNewSociety] = useState<{
     name: string; slug: string; address: string; city: string; state: string;
     pincode: string; latitude: number; longitude: number;
   } | null>(null);
 
-  const { isLocked, remainingSeconds, recordFailure, recordSuccess } = useLoginThrottle();
-
   useEffect(() => {
     fetchSocieties();
   }, []);
+
+  // Cooldown timer
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      cooldownRef.current = setInterval(() => {
+        setResendCooldown(prev => {
+          if (prev <= 1) {
+            if (cooldownRef.current) clearInterval(cooldownRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => { if (cooldownRef.current) clearInterval(cooldownRef.current); };
+  }, [resendCooldown]);
 
   const fetchSocieties = async () => {
     setIsLoadingSocieties(true);
@@ -86,6 +87,74 @@ export function useAuthPage() {
       s.address?.toLowerCase().includes(societySearch.toLowerCase())
     )
   );
+
+  // ─── OTP Handlers ───
+
+  const handleSendOtp = async (resend = false) => {
+    if (!phone || phone.length !== 10) {
+      toast.error('Please enter a valid 10-digit phone number');
+      return;
+    }
+    if (!resend && !ageConfirmed) {
+      toast.error('Please confirm you are 18 years or older');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('msg91-send-otp', {
+        body: { phone, country_code: '91', resend },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setStep('otp');
+      setResendCooldown(30);
+      toast.success(resend ? 'OTP resent!' : 'OTP sent to your phone');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to send OTP');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otp || otp.length < 4) {
+      toast.error('Please enter the OTP');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('msg91-verify-otp', {
+        body: { phone, otp, country_code: '91' },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      const { token_hash, is_new_user } = data;
+      setIsNewUser(is_new_user);
+
+      // Establish session using the magic link token
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash,
+        type: 'magiclink',
+      });
+      if (verifyError) throw verifyError;
+
+      if (is_new_user) {
+        toast.success('Phone verified! Now select your society.');
+        setStep('society');
+      } else {
+        toast.success('Welcome back!');
+        navigate('/');
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'OTP verification failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ─── Society Handlers ───
 
   const handleSearchChange = useCallback((value: string) => {
     setSocietySearch(value);
@@ -133,105 +202,8 @@ export function useAuthPage() {
         latitude: details.latitude, longitude: details.longitude,
       });
       setSelectedSociety({ id: 'pending', name, slug, is_active: false, is_verified: false, latitude: details.latitude, longitude: details.longitude, created_at: '', updated_at: '' } as Society);
-      toast.success('Location selected! Continue to complete signup.');
+      toast.success('Location selected! Continue to complete setup.');
     }
-  };
-
-  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
-  const handleLogin = async () => {
-    if (isLocked) {
-      toast.error(`Too many attempts. Please wait ${remainingSeconds}s before trying again.`);
-      return;
-    }
-    const validation = validateForm(loginSchema, { email, password });
-    if ('errors' in validation) {
-      toast.error(Object.values(validation.errors)[0] as string);
-      return;
-    }
-    const { email: trimmedEmail, password: validatedPassword } = validation.data;
-    setEmail(trimmedEmail);
-    setIsLoading(true);
-
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password: validatedPassword });
-      if (error) throw error;
-      recordSuccess();
-
-      // Quick profile check with 5s timeout — if it hangs, navigate anyway
-      // Use rpc to bypass potential RLS timing issues on fresh login
-      const profileResult = await Promise.race([
-        supabase.rpc('get_user_auth_context', { _user_id: data.user?.id }),
-        new Promise<{ data: null; error: string }>(resolve =>
-          setTimeout(() => resolve({ data: null, error: 'timeout' }), 5000)
-        ),
-      ]);
-
-      const ctx = profileResult.data as any;
-      if (ctx?.profile || profileResult.error === 'timeout') {
-        toast.success('Welcome back!');
-        navigate('/');
-      } else {
-        // Don't sign out immediately — the auto-recovery in useAuthState may fix it
-        // Only show a warning, let the auth state listener handle recovery
-        console.warn('[Login] Profile not found via RPC, letting auth state listener attempt recovery');
-        toast.success('Welcome back!');
-        navigate('/');
-      }
-    } catch (error: any) {
-      recordFailure();
-      if (error.message?.includes('Email not confirmed')) {
-        toast.error('Your email is not verified yet. Please check your inbox and click the verification link.', { duration: 6000 });
-      } else if (error.message?.includes('Invalid login')) {
-        toast.error('Invalid email or password. If you just signed up, please verify your email first.', { duration: 6000 });
-      } else {
-        toast.error(friendlyError(error));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handlePasswordReset = async () => {
-    const validation = validateForm(emailSchema, email);
-    if (!validation.success) {
-      toast.error('Please enter a valid email address');
-      return;
-    }
-    const trimmedEmail = validation.data;
-    setEmail(trimmedEmail);
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-        redirectTo: `${window.location.origin}/#/reset-password`,
-      });
-      if (error) throw error;
-      setResetEmailSent(true);
-      toast.success('Password reset email sent! Check your inbox.');
-    } catch (error: any) {
-      toast.error(friendlyError(error));
-    } finally { setIsLoading(false); }
-  };
-
-  const handleCredentialsNext = async () => {
-    const validation = validateForm(loginSchema, { email, password });
-    if ('errors' in validation) {
-      toast.error(Object.values(validation.errors)[0] as string);
-      return;
-    }
-    const trimmedEmail = validation.data.email;
-    setEmail(trimmedEmail);
-    // B5 FIX: Removed direct profiles table email lookup to prevent email enumeration.
-    // Duplicate detection relies on Supabase auth's own error at signup time.
-    setSignupStep('society');
-  };
-
-  const handleSocietyNext = () => {
-    if (!selectedSociety) { toast.error('Please select your society'); return; }
-    if (selectedSociety.invite_code && inviteCode.trim().toLowerCase() !== selectedSociety.invite_code.trim().toLowerCase()) {
-      toast.error('Invalid invite code for this society'); return;
-    }
-    setSignupStep('profile');
   };
 
   const verifyGpsLocation = async () => {
@@ -264,153 +236,110 @@ export function useAuthPage() {
     };
     setPendingNewSociety(pending);
     setSelectedSociety({ id: 'pending', name: newSocietyData.name, slug: pending.slug, is_active: false, is_verified: false, created_at: '', updated_at: '' } as Society);
-    toast.success("Society details saved! Complete signup to submit your request.");
+    toast.success("Society details saved! Continue to finish setup.");
     setSocietySubStep('search');
     setNewSocietyData({ name: '', address: '', city: '', pincode: '', landmark: '', contact: '' });
   };
 
-  const handleSignupComplete = async () => {
-    const profileValidation = validateForm(profileDataSchema, profileData);
-    if ('errors' in profileValidation) {
-      toast.error(Object.values(profileValidation.errors)[0] as string); return;
+  const handleSocietyComplete = async () => {
+    if (!selectedSociety) { toast.error('Please select your society'); return; }
+    if (selectedSociety.invite_code && inviteCode.trim().toLowerCase() !== selectedSociety.invite_code.trim().toLowerCase()) {
+      toast.error('Invalid invite code for this society'); return;
     }
-    if (!selectedSociety) { toast.error('Please select your society first'); setSignupStep('society'); return; }
     setIsLoading(true);
     try {
-      const redirectUrl = `${window.location.origin}/auth`;
-      const { data, error } = await supabase.auth.signUp({
-        email, password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: { name: profileData.name, phone: `${settings.defaultCountryCode}${profileData.phone}`, flat_number: profileData.flat_number, block: profileData.block, phase: profileData.phase, society_id: selectedSociety.id !== 'pending' ? selectedSociety.id : null }
-        },
-      });
-      if (error) throw error;
-      if (data.user) {
-        if (data.user.identities?.length === 0) {
-          toast.error('This email is already registered. Please login instead.');
-          setAuthMode('login'); setSignupStep('credentials'); return;
+      let finalSocietyId = selectedSociety.id;
+
+      if (pendingNewSociety && selectedSociety.id === 'pending') {
+        const { data: validateData, error: validateError } = await supabase.functions.invoke('validate-society', {
+          body: { new_society: pendingNewSociety },
+        });
+        if (validateError) throw validateError;
+        if (validateData?.society?.id) {
+          finalSocietyId = validateData.society.id;
         }
-        let finalSocietyId = selectedSociety.id;
+      }
 
-        if (pendingNewSociety && selectedSociety.id === 'pending') {
-          try {
-            const { data: validateData, error: validateError } = await supabase.functions.invoke('validate-society', {
-              body: { new_society: pendingNewSociety },
-            });
-            if (validateError) throw validateError;
-            if (validateData?.society?.id) {
-              finalSocietyId = validateData.society.id;
-            }
-          } catch (validateErr) {
-            console.warn('Society creation via edge function failed:', validateErr);
-            toast.error('Failed to register society. Please try again.');
-            await supabase.auth.signOut();
-            setIsLoading(false);
-            return;
-          }
-        }
+      if (!finalSocietyId || finalSocietyId === 'pending') {
+        toast.error('Failed to set up your society. Please try again.');
+        setIsLoading(false);
+        return;
+      }
 
-        if (!finalSocietyId || finalSocietyId === 'pending') {
-          toast.error('Failed to set up your society. Please try again.');
-          await supabase.auth.signOut();
-          setIsLoading(false);
-          return;
-        }
+      // Update profile with society_id
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('profiles').update({ society_id: finalSocietyId }).eq('id', user.id);
 
-        // A6 FIX: Use auth response email (Supabase-normalized/lowercased) instead of component state
-        const { error: profileError } = await supabase.from('profiles').upsert({
-          id: data.user.id, email: data.user.email ?? email, phone: `${settings.defaultCountryCode}${profileData.phone}`, name: profileData.name,
-          flat_number: profileData.flat_number, block: profileData.block,
-          phase: profileData.phase || null, society_id: finalSocietyId,
-        }, { onConflict: 'id' });
-
-        if (profileError) {
-          console.error('Profile insert error:', profileError);
-          const msg = profileError.message || '';
-          if (msg.includes('idx_profiles_email_unique') || msg.includes('profiles_email')) {
-            toast.error('This email is already registered. Please login instead.');
-            setAuthMode('login'); setSignupStep('credentials'); setIsLoading(false); return;
-          } else if (msg.includes('idx_profiles_phone_unique') || msg.includes('profiles_phone')) {
-            toast.error('This phone number is already in use by another account.');
-            setIsLoading(false); return;
-          }
-          await supabase.auth.signOut();
-          toast.error('Account setup failed. Please try signing up again. If the problem persists, contact support.', { duration: 8000 });
-          setIsLoading(false);
-          return;
-        }
-
-        await supabase.from('user_roles').insert({ user_id: data.user.id, role: 'buyer' });
-
+        // Validate society if it's an existing one
         if (!pendingNewSociety && selectedSociety.id !== 'pending') {
           try {
             await supabase.functions.invoke('validate-society', {
               body: { society_id: selectedSociety.id },
             });
-          } catch (validateErr) {
-            console.warn('Society validation call failed, will be validated by admin:', validateErr);
+          } catch (e) {
+            console.warn('Society validation call failed:', e);
           }
         }
-        setSignupStep('verification');
-        toast.success('Please check your email to verify your account');
       }
+
+      toast.success('Welcome! Your account is set up.');
+      navigate('/');
     } catch (error: any) {
-      if (error.message.includes('already registered')) {
-        toast.error('This email is already registered. Please login instead.');
-        setAuthMode('login'); setSignupStep('credentials');
-      } else { toast.error(friendlyError(error)); }
-    } finally { setIsLoading(false); }
+      toast.error(friendlyError(error));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const formatPhone = (value: string) => value.replace(/\D/g, '').slice(0, 10);
 
-  const resetSignup = () => {
-    setSignupStep('credentials'); setSocietySubStep('search');
-    setEmail(''); setPassword('');
-    setSelectedSociety(null); setSelectedPlace(null); setAdjustedCoords(null);
-    setInviteCode(''); setGpsStatus('idle'); setGpsDistance(null);
+  const resetFlow = () => {
+    setStep('phone');
+    setSocietySubStep('search');
+    setPhone('');
+    setOtp('');
+    setSelectedSociety(null);
+    setSelectedPlace(null);
+    setAdjustedCoords(null);
+    setInviteCode('');
+    setGpsStatus('idle');
+    setGpsDistance(null);
     setSocietySearch('');
-    setProfileData({ name: '', flat_number: '', block: '', phase: '', phone: '' });
+    setIsNewUser(false);
   };
 
-  const totalSteps = 4;
-  const currentStepNum = signupStep === 'credentials' ? 1 : signupStep === 'society' ? 2 : signupStep === 'profile' ? 3 : 4;
-  const stepLabels = ['Account', 'Society', 'Profile', 'Verify'];
+  const totalSteps = isNewUser ? 3 : 2;
+  const currentStepNum = step === 'phone' ? 1 : step === 'otp' ? 2 : 3;
+  const stepLabels = isNewUser ? ['Phone', 'Verify', 'Society'] : ['Phone', 'Verify'];
 
   const showDbResults = societySearch.length >= 2 && filteredSocieties.length > 0;
   const showGoogleResults = societySearch.length >= 3 && predictions.length > 0 && !selectedSociety;
 
   return {
-    // Auth mode
-    authMode, setAuthMode,
-    // Signup steps
-    signupStep, setSignupStep, societySubStep, setSocietySubStep,
-    // Credentials
-    email, setEmail, password, setPassword, showPassword, setShowPassword,
-    isLoading, resetEmailSent,
-    // Profile
-    profileData, setProfileData,
+    // Step
+    step, setStep, societySubStep, setSocietySubStep,
+    // Phone/OTP
+    phone, setPhone, otp, setOtp,
+    isLoading, isNewUser, ageConfirmed, setAgeConfirmed,
+    resendCooldown,
     // Society
     societies, societySearch, selectedSociety, isLoadingSocieties,
-    inviteCode, setInviteCode, gpsStatus, gpsDistance, ageConfirmed, setAgeConfirmed,
+    inviteCode, setInviteCode, gpsStatus, gpsDistance,
     // Google Maps
     predictions, isSearching, mapsLoaded, selectedPlace,
     // New society
     newSocietyData, setNewSocietyData, pendingNewSociety,
     // Settings
     settings,
-    // Throttle
-    isLocked, remainingSeconds,
     // Computed
     filteredSocieties, showDbResults, showGoogleResults,
     totalSteps, currentStepNum, stepLabels,
     // Handlers
+    handleSendOtp, handleVerifyOtp,
     handleSearchChange, handleSelectDbSociety, handleSelectGooglePlace,
-    validateEmail, handleLogin, handlePasswordReset,
-    handleCredentialsNext, handleSocietyNext, verifyGpsLocation,
-    handleRequestNewSociety, handleSignupComplete,
-    formatPhone, resetSignup,
+    verifyGpsLocation, handleRequestNewSociety, handleSocietyComplete,
+    formatPhone, resetFlow,
   };
 }
 

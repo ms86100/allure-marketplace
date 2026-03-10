@@ -2,13 +2,12 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Mail, ArrowRight, Loader2, Eye, EyeOff, CheckCircle2, User, Search, MapPin, Building2, Plus, ArrowLeft, Key, ShieldCheck, Sparkles, Home } from 'lucide-react';
+import { ArrowRight, Loader2, CheckCircle2, Search, MapPin, Building2, Plus, ArrowLeft, ShieldCheck, Sparkles, Home, Phone, RefreshCw } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { motion, AnimatePresence } from 'framer-motion';
 import authHero from '@/assets/auth-hero.jpg';
-import { PasswordStrengthIndicator } from '@/components/auth/PasswordStrengthIndicator';
 import { useAuthPage } from '@/hooks/useAuthPage';
-import { toast } from 'sonner';
 
 export default function AuthPage() {
   const auth = useAuthPage();
@@ -41,9 +40,9 @@ export default function AuthPage() {
       {/* Main Card */}
       <div className="px-5 pb-8">
         <div className="bg-card rounded-2xl border border-border shadow-lg overflow-hidden">
-          {/* Step Header */}
+          {/* Step Progress */}
           <div className="p-6 pb-4">
-            {auth.authMode === 'signup' && (
+            {auth.step !== 'phone' && (
               <div className="flex items-center gap-1 mb-5">
                 {auth.stepLabels.map((label, i) => (
                   <div key={label} className="flex-1 flex flex-col items-center gap-1">
@@ -53,126 +52,135 @@ export default function AuthPage() {
                 ))}
               </div>
             )}
-            <StepHeader authMode={auth.authMode} signupStep={auth.signupStep} societySubStep={auth.societySubStep} />
+            <StepHeader step={auth.step} societySubStep={auth.societySubStep} />
           </div>
 
           {/* Form Content */}
           <div className="px-6 pb-6 overflow-visible">
             <AnimatePresence mode="wait">
-              {/* Login */}
-              {auth.authMode === 'login' && (
-                <motion.div key="login" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }} className="space-y-4">
+              {/* Step 1: Phone */}
+              {auth.step === 'phone' && (
+                <motion.div key="phone" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <div className="relative">
-                      <Input id="login-email" type="email" placeholder="your@email.com" value={auth.email} onChange={(e) => auth.setEmail(e.target.value)} className="h-12 rounded-xl pr-10" />
-                      {auth.email.length > 0 && auth.validateEmail(auth.email) && <CheckCircle2 size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-primary" />}
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <div className="flex gap-2">
+                      <div className="flex items-center px-3 bg-muted rounded-xl border border-input text-sm font-medium h-12 shrink-0">
+                        {auth.settings.defaultCountryCode}
+                      </div>
+                      <div className="relative flex-1">
+                        <Input
+                          id="phone"
+                          type="tel"
+                          placeholder="10-digit mobile number"
+                          value={auth.phone}
+                          onChange={(e) => auth.setPhone(auth.formatPhone(e.target.value))}
+                          maxLength={10}
+                          className="h-12 rounded-xl pr-10"
+                          autoFocus
+                        />
+                        {auth.phone.length === 10 && (
+                          <CheckCircle2 size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-primary" />
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <div className="relative">
-                      <Input id="login-password" type={auth.showPassword ? 'text' : 'password'} placeholder="Enter your password" value={auth.password} onChange={(e) => auth.setPassword(e.target.value)} className="h-12 rounded-xl pr-12" />
-                      <button type="button" onClick={() => auth.setShowPassword(!auth.showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                        {auth.showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <button type="button" onClick={() => { auth.setAuthMode('reset'); }} className="text-xs text-primary hover:underline">Forgot password?</button>
-                  </div>
-                  {auth.isLocked && (
-                    <div className="text-center p-3 rounded-lg bg-destructive/10 text-destructive text-sm font-medium">
-                      Too many attempts. Try again in {auth.remainingSeconds}s
-                    </div>
-                  )}
-                  <Button onClick={auth.handleLogin} disabled={!auth.email || !auth.password || auth.isLoading || auth.isLocked} className="w-full h-12 rounded-xl text-base font-semibold">
-                    {auth.isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <ArrowRight className="mr-2" size={18} />} Sign In
-                  </Button>
-                  <div className="text-center pt-1">
-                    <button type="button" onClick={() => { auth.setAuthMode('signup'); auth.resetSignup(); }} className="text-sm text-primary font-medium hover:underline">New here? Create an account</button>
-                  </div>
-                </motion.div>
-              )}
 
-              {/* Password Reset */}
-              {auth.authMode === 'reset' && (
-                <motion.div key="reset" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.25 }} className="space-y-4">
-                  {auth.resetEmailSent ? (
-                    <div className="text-center py-4 space-y-4">
-                      <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center"><Mail className="text-primary" size={32} /></div>
-                      <div className="space-y-2">
-                        <p className="font-semibold text-lg">Check your email</p>
-                        <p className="text-sm text-muted-foreground">We've sent a password reset link to:</p>
-                        <p className="text-sm font-semibold text-primary">{auth.email}</p>
-                      </div>
-                      <div className="bg-muted/50 rounded-xl p-3 text-xs text-muted-foreground space-y-1">
-                        <p>📧 Check your inbox and spam folder</p>
-                        <p>🔗 Click the link in the email to reset your password</p>
-                        <p>⏱️ The link expires in 1 hour</p>
-                      </div>
-                      <Button onClick={() => auth.setAuthMode('login')} className="w-full h-12 rounded-xl text-base font-semibold"><ArrowLeft size={16} className="mr-2" /> Back to Login</Button>
-                      <button type="button" onClick={auth.handlePasswordReset} disabled={auth.isLoading} className="text-xs text-primary hover:underline">{auth.isLoading ? 'Sending...' : "Didn't receive it? Resend"}</button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="reset-email">Email</Label>
-                        <Input id="reset-email" type="email" placeholder="your@email.com" value={auth.email} onChange={(e) => auth.setEmail(e.target.value)} className="h-12 rounded-xl" />
-                      </div>
-                      <Button onClick={auth.handlePasswordReset} disabled={!auth.email || auth.isLoading} className="w-full h-12 rounded-xl text-base font-semibold">
-                        {auth.isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <Mail className="mr-2" size={18} />} Send Reset Link
-                      </Button>
-                      <div className="text-center pt-1">
-                        <button type="button" onClick={() => auth.setAuthMode('login')} className="text-sm text-primary font-medium hover:underline">Back to Sign In</button>
-                      </div>
-                    </>
-                  )}
-                </motion.div>
-              )}
-
-              {/* Signup Step 1: Credentials */}
-              {auth.authMode === 'signup' && auth.signupStep === 'credentials' && (
-                <motion.div key="signup-credentials" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <div className="relative">
-                      <Input id="signup-email" type="email" placeholder="your@email.com" value={auth.email} onChange={(e) => auth.setEmail(e.target.value)} className="h-12 rounded-xl pr-10" />
-                      {auth.email.length > 0 && auth.validateEmail(auth.email) && <CheckCircle2 size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-primary" />}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <div className="relative">
-                      <Input id="signup-password" type={auth.showPassword ? 'text' : 'password'} placeholder="Create a password (min 6 chars)" value={auth.password} onChange={(e) => auth.setPassword(e.target.value)} className="h-12 rounded-xl pr-12" />
-                      <button type="button" onClick={() => auth.setShowPassword(!auth.showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                        {auth.showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    </div>
-                    <PasswordStrengthIndicator password={auth.password} />
-                  </div>
                   <div className="flex items-start gap-3 pt-1">
-                    <Checkbox id="age-confirm" checked={auth.ageConfirmed} onCheckedChange={(checked) => auth.setAgeConfirmed(checked === true)} className="mt-0.5" />
+                    <Checkbox
+                      id="age-confirm"
+                      checked={auth.ageConfirmed}
+                      onCheckedChange={(checked) => auth.setAgeConfirmed(checked === true)}
+                      className="mt-0.5"
+                    />
                     <div>
                       <label htmlFor="age-confirm" className="text-xs text-muted-foreground leading-snug">
                         I confirm that I am <strong>18 years of age or older</strong> and agree to the{' '}
                         <a href="#/terms" target="_blank" className="text-primary underline">Terms & Conditions</a> and{' '}
                         <a href="#/privacy-policy" target="_blank" className="text-primary underline">Privacy Policy</a>.
                       </label>
-                      <p className="text-[10px] text-muted-foreground/60 mt-0.5">Required to comply with marketplace regulations</p>
                     </div>
                   </div>
-                  <Button onClick={auth.handleCredentialsNext} disabled={!auth.email || auth.password.length < 6 || !auth.ageConfirmed || auth.isLoading} className="w-full h-12 rounded-xl text-base font-semibold">{auth.isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <ArrowRight className="mr-2" size={18} />} Continue</Button>
-                  <div className="text-center pt-1">
-                    <button type="button" onClick={() => auth.setAuthMode('login')} className="text-sm text-primary font-medium hover:underline">Already have an account? Sign in</button>
+
+                  <Button
+                    onClick={() => auth.handleSendOtp(false)}
+                    disabled={auth.phone.length !== 10 || !auth.ageConfirmed || auth.isLoading}
+                    className="w-full h-12 rounded-xl text-base font-semibold"
+                  >
+                    {auth.isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <ArrowRight className="mr-2" size={18} />}
+                    Send OTP
+                  </Button>
+
+                  <div className="bg-muted/50 rounded-xl p-3 text-xs text-muted-foreground text-center">
+                    <p>📱 We'll send a 6-digit OTP to verify your number</p>
+                    <p className="mt-1 text-muted-foreground/70">Same process for new & existing users</p>
                   </div>
                 </motion.div>
               )}
 
-              {/* Signup Step 2: Society */}
-              {auth.authMode === 'signup' && auth.signupStep === 'society' && (
-                <motion.div key="signup-society" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-4">
-                  <button type="button" onClick={() => auth.setSignupStep('credentials')} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-1"><ArrowLeft size={16} /> Back</button>
+              {/* Step 2: OTP Verification */}
+              {auth.step === 'otp' && (
+                <motion.div key="otp" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5">
+                  <button
+                    type="button"
+                    onClick={() => { auth.setStep('phone'); auth.setOtp(''); }}
+                    className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-1"
+                  >
+                    <ArrowLeft size={16} /> Change number
+                  </button>
+
+                  <div className="text-center space-y-1">
+                    <p className="text-sm text-muted-foreground">OTP sent to</p>
+                    <p className="text-base font-semibold text-foreground">{auth.settings.defaultCountryCode} {auth.phone}</p>
+                  </div>
+
+                  <div className="flex justify-center">
+                    <InputOTP
+                      maxLength={6}
+                      value={auth.otp}
+                      onChange={(value) => auth.setOtp(value)}
+                    >
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+
+                  <Button
+                    onClick={auth.handleVerifyOtp}
+                    disabled={auth.otp.length < 6 || auth.isLoading}
+                    className="w-full h-12 rounded-xl text-base font-semibold"
+                  >
+                    {auth.isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <CheckCircle2 className="mr-2" size={18} />}
+                    Verify & Continue
+                  </Button>
+
+                  <div className="text-center">
+                    {auth.resendCooldown > 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Resend OTP in <span className="font-semibold text-primary">{auth.resendCooldown}s</span>
+                      </p>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => auth.handleSendOtp(true)}
+                        disabled={auth.isLoading}
+                        className="text-sm text-primary font-medium hover:underline inline-flex items-center gap-1"
+                      >
+                        <RefreshCw size={14} /> Resend OTP
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Step 3: Society Selection (new users) */}
+              {auth.step === 'society' && (
+                <motion.div key="society" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-4">
                   <AnimatePresence mode="wait">
                     {auth.societySubStep === 'request-form' && (
                       <motion.div key="request-form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-3">
@@ -190,7 +198,7 @@ export default function AuthPage() {
                             <Input placeholder="Your phone number" value={auth.newSocietyData.contact} onChange={(e) => auth.setNewSocietyData({ ...auth.newSocietyData, contact: e.target.value.replace(/\D/g, '').slice(0, 10) })} maxLength={10} className="flex-1 h-12 rounded-xl" />
                           </div>
                         </div>
-                        <div className="bg-muted/50 rounded-xl p-3 text-xs text-muted-foreground">Your request will be reviewed by our team. We'll contact you once the society is approved and activated.</div>
+                        <div className="bg-muted/50 rounded-xl p-3 text-xs text-muted-foreground">Your request will be reviewed by our team. We'll contact you once the society is approved.</div>
                         <div className="flex gap-2">
                           <Button variant="outline" onClick={() => auth.setSocietySubStep('search')} className="flex-1 h-12 rounded-xl">Back</Button>
                           <Button onClick={auth.handleRequestNewSociety} disabled={auth.isLoading || !auth.newSocietyData.name || !auth.newSocietyData.city || !auth.newSocietyData.pincode || auth.newSocietyData.contact.length !== 10} className="flex-1 h-12 rounded-xl font-semibold">
@@ -260,77 +268,33 @@ export default function AuthPage() {
                             <p className="text-xs text-muted-foreground/70">Search by society name, area, landmark, or pincode</p>
                           </div>
                         )}
-                        <div className="flex gap-2">
-                          <Button variant="outline" onClick={() => auth.setSignupStep('credentials')} className="flex-1 h-12 rounded-xl"><ArrowLeft size={16} className="mr-1" /> Back</Button>
-                          <Button onClick={auth.handleSocietyNext} disabled={!auth.selectedSociety || (auth.selectedSociety.invite_code ? !auth.inviteCode.trim() : false)} className="flex-1 h-12 rounded-xl font-semibold">Continue</Button>
+
+                        {/* Invite code if needed */}
+                        {auth.selectedSociety?.invite_code && (
+                          <div className="space-y-2 pt-1">
+                            <Label>Invite Code</Label>
+                            <Input placeholder="Enter society invite code" value={auth.inviteCode} onChange={(e) => auth.setInviteCode(e.target.value)} className="h-12 rounded-xl" />
+                          </div>
+                        )}
+
+                        {/* Can't find society link */}
+                        <div className="text-center pt-1">
+                          <button type="button" onClick={() => auth.setSocietySubStep('request-form')} className="text-sm text-primary font-medium hover:underline inline-flex items-center gap-1">
+                            <Plus size={14} /> Can't find your society? Request it
+                          </button>
                         </div>
+
+                        <Button
+                          onClick={auth.handleSocietyComplete}
+                          disabled={!auth.selectedSociety || (auth.selectedSociety.invite_code ? !auth.inviteCode.trim() : false) || auth.isLoading}
+                          className="w-full h-12 rounded-xl font-semibold"
+                        >
+                          {auth.isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <ArrowRight className="mr-2" size={18} />}
+                          Complete Setup
+                        </Button>
                       </motion.div>
                     )}
                   </AnimatePresence>
-                </motion.div>
-              )}
-
-              {/* Signup Step 3: Profile */}
-              {auth.authMode === 'signup' && auth.signupStep === 'profile' && (
-                <motion.div key="signup-profile" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-4">
-                  <button type="button" onClick={() => auth.setSignupStep('society')} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-1"><ArrowLeft size={16} /> Back</button>
-                  {auth.selectedSociety && (
-                    <div className="flex items-center gap-2 p-2.5 bg-primary/5 rounded-xl border border-primary/20">
-                      <Building2 size={14} className="text-primary" />
-                      <span className="text-sm font-medium truncate">{auth.selectedSociety.name}</span>
-                      <button onClick={() => auth.setSignupStep('society')} className="ml-auto text-xs text-primary hover:underline shrink-0">Change</button>
-                    </div>
-                  )}
-                  <div className="space-y-2"><Label htmlFor="name">Full Name *</Label><Input id="name" placeholder="Enter your name" value={auth.profileData.name} onChange={(e) => auth.setProfileData({ ...auth.profileData, name: e.target.value })} className="h-12 rounded-xl" /></div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number *</Label>
-                    <div className="flex gap-2">
-                      <div className="flex items-center px-3 bg-muted rounded-xl border border-input text-sm font-medium h-12">{auth.settings.defaultCountryCode}</div>
-                      <Input id="phone" type="tel" placeholder="10-digit number" value={auth.profileData.phone} onChange={(e) => auth.setProfileData({ ...auth.profileData, phone: auth.formatPhone(e.target.value) })} maxLength={10} className="flex-1 h-12 rounded-xl" />
-                    </div>
-                  </div>
-                  <div className="space-y-2"><Label htmlFor="phase">Phase / Wing (optional)</Label><Input id="phase" placeholder="e.g., Phase 1, Wing A" value={auth.profileData.phase} onChange={(e) => auth.setProfileData({ ...auth.profileData, phase: e.target.value })} className="h-12 rounded-xl" /></div>
-                  <div className="space-y-1">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2"><Label htmlFor="block">{auth.settings.addressBlockLabel} *</Label><Input id="block" placeholder="e.g., A, B, T1" value={auth.profileData.block} onChange={(e) => auth.setProfileData({ ...auth.profileData, block: e.target.value })} className="h-12 rounded-xl" /></div>
-                      <div className="space-y-2"><Label htmlFor="flat">{auth.settings.addressFlatLabel} *</Label><Input id="flat" placeholder="e.g., 101" value={auth.profileData.flat_number} onChange={(e) => auth.setProfileData({ ...auth.profileData, flat_number: e.target.value })} className="h-12 rounded-xl" /></div>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground/60 px-1">Used for delivery and identity verification within your society</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => auth.setSignupStep('society')} className="flex-1 h-12 rounded-xl"><ArrowLeft size={16} className="mr-1" /> Back</Button>
-                    <Button onClick={auth.handleSignupComplete} disabled={!auth.profileData.name || !auth.profileData.flat_number || !auth.profileData.block || auth.profileData.phone.length !== 10 || auth.isLoading} className="flex-1 h-12 rounded-xl font-semibold">
-                      {auth.isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : null} Create Account
-                    </Button>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Signup Step 4: Verification */}
-              {auth.authMode === 'signup' && auth.signupStep === 'verification' && (
-                <motion.div key="signup-verification" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.3 }} className="space-y-4">
-                  <div className="text-center py-4 space-y-4">
-                    <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center"><Mail className="text-primary" size={32} /></div>
-                    <div className="space-y-2">
-                      <p className="text-lg font-bold">📧 Check Your Inbox!</p>
-                      <p className="text-sm text-muted-foreground">We've sent a verification link to:</p>
-                      <p className="text-sm font-semibold text-primary">{auth.email}</p>
-                    </div>
-                    <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-left text-sm space-y-2">
-                      <p className="font-bold text-primary">⚠️ Important: You must verify before logging in</p>
-                      <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground">
-                        <li>Open your email inbox (check spam/junk too)</li>
-                        <li>Click the <span className="font-semibold text-foreground">"Confirm your email"</span> link</li>
-                        <li>Come back here and <span className="font-semibold text-foreground">log in</span> with your credentials</li>
-                      </ol>
-                    </div>
-                    <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 text-xs text-destructive font-medium">🚫 You won't be able to log in until you verify your email</div>
-                  </div>
-                  <Button onClick={() => { auth.setAuthMode('login'); auth.resetSignup(); }} className="w-full h-12 rounded-xl text-base font-semibold">I've Verified — Go to Login</Button>
-                  <p className="text-xs text-center text-muted-foreground">
-                    Didn't receive the email?{' '}
-                    <button type="button" onClick={() => toast.info('Check your spam/junk folder. If still missing, try signing up again with the same email.')} className="text-primary hover:underline">Get help</button>
-                  </p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -347,24 +311,17 @@ export default function AuthPage() {
   );
 }
 
-// ── Step Header sub-component ──
-function StepHeader({ authMode, signupStep, societySubStep }: { authMode: string; signupStep: string; societySubStep: string }) {
+// ── Step Header ──
+function StepHeader({ step, societySubStep }: { step: string; societySubStep: string }) {
   const iconClass = "mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-3";
   const configs: Record<string, { icon: React.ReactNode; title: string; subtitle: string }> = {
-    login: { icon: <Sparkles className="text-primary" size={26} />, title: 'Welcome Back', subtitle: 'Sign in to your community' },
-    reset: { icon: <Key className="text-primary" size={26} />, title: 'Reset Password', subtitle: "We'll send you a reset link" },
-    'signup-credentials': { icon: <Mail className="text-primary" size={26} />, title: 'Create Account', subtitle: 'Join your neighborhood community' },
-    'signup-society-search': { icon: <MapPin className="text-primary" size={26} />, title: 'Find Your Society', subtitle: 'Search by name, area, or pincode' },
-    'signup-society-map-confirm': { icon: <MapPin className="text-primary" size={26} />, title: 'Confirm Location', subtitle: 'Verify the pin on the map' },
-    'signup-society-request-form': { icon: <MapPin className="text-primary" size={26} />, title: 'Request Society', subtitle: 'Submit details for admin review' },
-    'signup-profile': { icon: <User className="text-primary" size={26} />, title: 'Your Details', subtitle: 'Almost there!' },
-    'signup-verification': { icon: <CheckCircle2 className="text-primary" size={26} />, title: 'Check Your Email', subtitle: 'Verification sent' },
+    phone: { icon: <Phone className="text-primary" size={26} />, title: 'Welcome', subtitle: 'Enter your phone number to continue' },
+    otp: { icon: <Sparkles className="text-primary" size={26} />, title: 'Verify OTP', subtitle: 'Enter the code sent to your phone' },
+    'society-search': { icon: <MapPin className="text-primary" size={26} />, title: 'Find Your Society', subtitle: 'Search by name, area, or pincode' },
+    'society-request-form': { icon: <MapPin className="text-primary" size={26} />, title: 'Request Society', subtitle: 'Submit details for admin review' },
   };
 
-  const key = authMode === 'signup'
-    ? signupStep === 'society' ? `signup-society-${societySubStep}` : `signup-${signupStep}`
-    : authMode;
-
+  const key = step === 'society' ? `society-${societySubStep}` : step;
   const config = configs[key];
   if (!config) return null;
 
