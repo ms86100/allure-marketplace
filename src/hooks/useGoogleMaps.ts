@@ -6,7 +6,7 @@ const SCRIPT_ID = 'google-maps-script';
 
 let loadPromise: Promise<void> | null = null;
 
-function loadGoogleMapsScript(): Promise<void> {
+export function loadGoogleMapsScript(): Promise<void> {
   if (loadPromise) return loadPromise;
   if ((window as any).google?.maps) return Promise.resolve();
 
