@@ -1,5 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -12,63 +10,85 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { phone, country_code = "91", resend = false } = await req.json();
+    const { phone, country_code = "91", resend = false, reqId } = await req.json();
 
-    // Validate phone
-    if (!phone || !/^\d{10}$/.test(phone)) {
+    // For resend, reqId is required
+    if (resend && !reqId) {
       return new Response(
-        JSON.stringify({ error: "Invalid phone number. Please provide a 10-digit number." }),
+        JSON.stringify({ error: "Missing request ID for resend" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const authKey = Deno.env.get("MSG91_AUTH_KEY");
-    const templateId = Deno.env.get("MSG91_OTP_TEMPLATE_ID");
+    // For initial send, validate phone
+    if (!resend) {
+      if (!phone || !/^\d{10}$/.test(phone)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid phone number. Please provide a 10-digit number." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
-    if (!authKey || !templateId) {
-      console.error("MSG91 credentials not configured");
+    const authKey = Deno.env.get("MSG91_AUTH_KEY");
+    const widgetId = Deno.env.get("MSG91_WIDGET_ID");
+    const tokenAuth = Deno.env.get("MSG91_TOKEN_AUTH");
+
+    if (!authKey || !widgetId || !tokenAuth) {
+      console.error("MSG91 Widget credentials not configured");
       return new Response(
         JSON.stringify({ error: "OTP service not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const mobile = `${country_code}${phone}`;
-
     let response: Response;
+
     if (resend) {
-      const retryUrl = `https://control.msg91.com/api/v5/otp/retry?mobile=${mobile}&retrytype=text`;
-      response = await fetch(retryUrl, {
-        method: "GET",
-        headers: { authkey: authKey },
-      });
-    } else {
-      response = await fetch("https://control.msg91.com/api/v5/otp", {
+      // ─── Retry OTP via Widget API ───
+      response = await fetch("https://api.msg91.com/api/v5/widget/retryOtp", {
         method: "POST",
         headers: {
           authkey: authKey,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          template_id: templateId,
-          mobile: mobile,
-          otp_length: 6,
-          otp_expiry: 10,
+          reqId,
+          retryChannel: 11, // 11 = SMS
+        }),
+      });
+    } else {
+      // ─── Send OTP via Widget API ───
+      const identifier = `${country_code}${phone}`;
+      response = await fetch("https://api.msg91.com/api/v5/widget/sendOtp", {
+        method: "POST",
+        headers: {
+          authkey: authKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          identifier,
+          widgetId,
+          tokenAuth,
         }),
       });
     }
 
     const data = await response.json();
-    console.log("MSG91 send response:", JSON.stringify(data));
+    console.log("MSG91 Widget response:", JSON.stringify(data));
 
     if (data.type === "success" || response.ok) {
       return new Response(
-        JSON.stringify({ success: true, message: resend ? "OTP resent" : "OTP sent" }),
+        JSON.stringify({
+          success: true,
+          message: resend ? "OTP resent" : "OTP sent",
+          reqId: data.reqId || reqId, // Return reqId for subsequent calls
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.error("MSG91 send OTP failed:", data);
+    console.error("MSG91 Widget send OTP failed:", data);
     return new Response(
       JSON.stringify({ error: data.message || "Failed to send OTP. Please try again." }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }

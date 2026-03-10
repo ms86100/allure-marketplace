@@ -23,6 +23,7 @@ export function useAuthPage() {
   // OTP cooldown
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [otpReqId, setOtpReqId] = useState<string | null>(null);
 
   // Society selection state
   const [societies, setSocieties] = useState<Society[]>([]);
