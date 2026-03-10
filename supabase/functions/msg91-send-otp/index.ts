@@ -35,17 +35,28 @@ Deno.serve(async (req) => {
 
     const mobile = `${country_code}${phone}`;
 
-    let url: string;
+    let response: Response;
     if (resend) {
-      url = `https://control.msg91.com/api/v5/otp/retry?mobile=${mobile}&retrytype=text`;
+      const retryUrl = `https://control.msg91.com/api/v5/otp/retry?mobile=${mobile}&retrytype=text`;
+      response = await fetch(retryUrl, {
+        method: "GET",
+        headers: { authkey: authKey },
+      });
     } else {
-      url = `https://control.msg91.com/api/v5/otp?template_id=${templateId}&mobile=${mobile}&otp_length=6`;
+      response = await fetch("https://control.msg91.com/api/v5/otp", {
+        method: "POST",
+        headers: {
+          authkey: authKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          template_id: templateId,
+          mobile: mobile,
+          otp_length: 6,
+          otp_expiry: 10,
+        }),
+      });
     }
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: { authkey: authKey },
-    });
 
     const data = await response.json();
     console.log("MSG91 send response:", JSON.stringify(data));
