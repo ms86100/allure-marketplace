@@ -14,6 +14,7 @@ import { useUnreadNotificationCount } from '@/hooks/useUnreadNotificationCount';
 import { useSocietyStats } from '@/hooks/useSocietyStats';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { LocationSelectorSheet } from '@/components/location/LocationSelectorSheet';
+import { useLocationStats } from '@/hooks/queries/useLocationStats';
 
 interface HeaderProps {
   showCart?: boolean;
