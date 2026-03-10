@@ -88,18 +88,6 @@ function HeaderInner({
                       <Verified size={12} className="text-primary shrink-0" />
                     )}
                   </div>
-                  {societyStats && (
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                        <Users size={10} className="text-primary/70 shrink-0" />
-                        <span className="font-semibold">{societyStats.families}</span> families
-                      </span>
-                      <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                        <Store size={10} className="text-primary/70 shrink-0" />
-                        <span className="font-semibold">{societyStats.sellers}</span> sellers
-                      </span>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
