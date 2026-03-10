@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Loader2, MapPin } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, MapPin, Building2, Phone, User } from 'lucide-react';
 
 export default function ProfileEditPage() {
   const navigate = useNavigate();
@@ -63,6 +63,19 @@ export default function ProfileEditPage() {
     setShowAddressForm(true);
   };
 
+  const handleAddNew = () => {
+    // Smart defaults from society
+    const defaults: any = {};
+    if (society) {
+      defaults.building_name = society.name;
+      if (society.latitude) defaults.latitude = society.latitude;
+      if (society.longitude) defaults.longitude = society.longitude;
+      if (society.pincode) defaults.pincode = society.pincode;
+    }
+    setEditingAddress(Object.keys(defaults).length > 0 ? defaults : null);
+    setShowAddressForm(true);
+  };
+
   return (
     <AppLayout headerTitle="Edit Profile" showNav={false}>
       <div className="pb-8">
@@ -73,56 +86,75 @@ export default function ProfileEditPage() {
           </button>
         </div>
 
-        {/* Personal Info */}
+        {/* ═══ SECTION 1: YOUR DETAILS ═══ */}
         <div className="px-4 mt-4">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Personal Information</h3>
-          <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Your Details</h3>
+          <div className="rounded-2xl border border-border bg-card p-4 space-y-4">
+            {/* Name */}
             <div>
-              <Label htmlFor="name" className="text-xs">Full Name *</Label>
-              <Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className="mt-1" />
+              <Label htmlFor="name" className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <User size={12} /> Full Name
+              </Label>
+              <Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className="mt-1.5" />
             </div>
+
+            {/* Phone (read-only) */}
             <div>
-              <Label className="text-xs">Phone</Label>
-              <Input value={profile?.phone || user?.phone || ''} disabled className="mt-1 bg-muted" />
+              <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Phone size={12} /> Phone
+              </Label>
+              <Input value={profile?.phone || user?.phone || ''} disabled className="mt-1.5 bg-muted/50" />
             </div>
+
+            {/* Society (read-only chip) */}
+            <div>
+              <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Building2 size={12} /> Society
+              </Label>
+              {society ? (
+                <div className="mt-1.5 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/5 border border-primary/15 text-sm font-medium text-foreground">
+                  <Building2 size={14} className="text-primary" />
+                  {society.name}
+                </div>
+              ) : (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Society will be assigned based on your delivery address
+                </p>
+              )}
+            </div>
+
+            {/* Unit details */}
+            <div className="pt-1 border-t border-border/50">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-2">Your Unit</p>
+              <div className="grid grid-cols-3 gap-2.5">
+                <div>
+                  <Label htmlFor="flat" className="text-xs">Flat No.</Label>
+                  <Input id="flat" value={flatNumber} onChange={e => setFlatNumber(e.target.value)} placeholder="A-201" className="mt-1" />
+                </div>
+                <div>
+                  <Label htmlFor="block" className="text-xs">Block</Label>
+                  <Input id="block" value={block} onChange={e => setBlock(e.target.value)} placeholder="B" className="mt-1" />
+                </div>
+                <div>
+                  <Label htmlFor="phase" className="text-xs">Phase</Label>
+                  <Input id="phase" value={phase} onChange={e => setPhase(e.target.value)} placeholder="Phase 2" className="mt-1" />
+                </div>
+              </div>
+            </div>
+
+            <Button onClick={handleSaveProfile} disabled={savingProfile} className="w-full h-11 rounded-xl font-semibold">
+              {savingProfile ? <Loader2 size={16} className="mr-1 animate-spin" /> : null}
+              Save
+            </Button>
           </div>
         </div>
 
-        {/* Society Address */}
+        {/* ═══ SECTION 2: DELIVERY ADDRESSES ═══ */}
         <div className="px-4 mt-6">
-          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Society Address</h3>
-          <div className="space-y-3">
-            <div>
-              <Label className="text-xs">Society</Label>
-              <Input value={society?.name || 'Not assigned'} disabled className="mt-1 bg-muted" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label htmlFor="flat" className="text-xs">Flat Number *</Label>
-                <Input id="flat" value={flatNumber} onChange={e => setFlatNumber(e.target.value)} placeholder="e.g. A-201" className="mt-1" />
-              </div>
-              <div>
-                <Label htmlFor="block" className="text-xs">Block / Tower</Label>
-                <Input id="block" value={block} onChange={e => setBlock(e.target.value)} placeholder="e.g. B" className="mt-1" />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="phase" className="text-xs">Phase / Wing</Label>
-              <Input id="phase" value={phase} onChange={e => setPhase(e.target.value)} placeholder="e.g. Phase 2" className="mt-1" />
-            </div>
-          </div>
-          <Button onClick={handleSaveProfile} disabled={savingProfile} className="w-full mt-4 h-11 rounded-xl font-semibold">
-            {savingProfile ? <Loader2 size={16} className="mr-1 animate-spin" /> : null}
-            Save Profile
-          </Button>
-        </div>
-
-        {/* Delivery Addresses */}
-        <div className="px-4 mt-8">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Delivery Addresses</h3>
+            <h3 className="text-sm font-semibold text-foreground">Delivery Addresses</h3>
             {!showAddressForm && (
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-primary" onClick={() => { setEditingAddress(null); setShowAddressForm(true); }}>
+              <Button variant="ghost" size="sm" className="h-7 text-xs text-primary" onClick={handleAddNew}>
                 <Plus size={14} className="mr-1" /> Add New
               </Button>
             )}
@@ -144,7 +176,7 @@ export default function ProfileEditPage() {
               <MapPin size={24} className="mx-auto text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">No delivery addresses yet</p>
               <p className="text-xs text-muted-foreground mt-0.5">Add one for faster checkout</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => setShowAddressForm(true)}>
+              <Button variant="outline" size="sm" className="mt-3" onClick={handleAddNew}>
                 <Plus size={14} className="mr-1" /> Add Address
               </Button>
             </div>
