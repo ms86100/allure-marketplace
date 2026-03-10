@@ -76,6 +76,7 @@ Deno.serve(async (req) => {
         identifier,
         widgetId,
         tokenAuth,
+        authkey: authKey,
       };
       console.log("MSG91 Widget sendOtp request body (no secrets):", {
         identifier,
