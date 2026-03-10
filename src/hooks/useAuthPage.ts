@@ -40,6 +40,7 @@ export function useAuthPage() {
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [adjustedCoords, setAdjustedCoords] = useState<{ lat: number; lng: number } | null>(null);
   const settings = useSystemSettings();
+  const { requestFullPermission } = usePushNotifications();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Request form
