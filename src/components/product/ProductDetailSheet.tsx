@@ -154,7 +154,7 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
                   <p className="font-semibold text-sm text-foreground truncate">{product.seller_name}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     {d.isNewSeller ? <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">New Seller</Badge> : null}
-                    {product.is_same_society ? (<span className="flex items-center gap-0.5 text-[10px] text-accent font-medium"><Home size={10} /> {ml.label('label_your_neighbor')}</span>) : (<span className="flex items-center gap-0.5 text-[10px] text-muted-foreground"><MapPin size={10} />{distanceText}</span>)}
+                    {locationText ? (<span className="flex items-center gap-0.5 text-[10px] text-muted-foreground"><MapPin size={10} />{locationText}</span>) : product.is_same_society ? (<span className="flex items-center gap-0.5 text-[10px] text-accent font-medium"><Home size={10} /> {ml.label('label_your_neighbor')}</span>) : null}
                     {(product as any).last_active_at && (<span className="flex items-center gap-0.5 text-[10px] text-muted-foreground"><Clock size={9} />{formatSellerLastActive((product as any).last_active_at, ml)}</span>)}
                   </div>
                 </div>
