@@ -67,7 +67,6 @@ export default function CategoryGroupPage() {
 
   const { data: allProducts = [], isLoading: productsLoading } = useCategoryProducts(
     category || null,
-    effectiveSocietyId
   );
 
   const { data: nearbyProducts } = useNearbyProducts();
