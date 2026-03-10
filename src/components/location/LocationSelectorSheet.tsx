@@ -51,8 +51,12 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
     try {
       const pos = await getCurrentPosition();
 
-      // Reverse geocode for a meaningful label
+      // Ensure Google Maps is loaded for reverse geocoding
       let label = `${pos.latitude.toFixed(4)}, ${pos.longitude.toFixed(4)}`;
+      try {
+        await loadGoogleMapsScript();
+      } catch { /* proceed with coordinate fallback */ }
+
       if ((window as any).google?.maps) {
         try {
           const geocoder = new google.maps.Geocoder();
