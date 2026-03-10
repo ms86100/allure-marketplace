@@ -154,7 +154,16 @@ export function useAuthPage() {
         navigate('/');
       }
     } catch (error: any) {
-      toast.error(error.message || 'OTP verification failed');
+      const msg = (error.message || '').toLowerCase();
+      if (msg.includes('invalid otp') || msg.includes('incorrect')) {
+        toast.error('Incorrect OTP. Please check the code and try again.');
+      } else if (msg.includes('expired') || msg.includes('timeout')) {
+        toast.error('OTP has expired. Please request a new one.');
+      } else if (msg.includes('widgetid')) {
+        toast.error('Verification service error. Please try again later.');
+      } else {
+        toast.error('OTP verification failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
