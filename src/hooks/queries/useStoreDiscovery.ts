@@ -152,7 +152,7 @@ export function useNearbySocietySellers(radiusKm: number = 5, enabled: boolean =
 
       return bands;
     },
-    enabled: !!isApproved && !!effectiveSocietyId && enabled,
+    enabled: !!isApproved && !!(useCoordSearch ? (lat && lng) : effectiveSocietyId) && enabled,
     staleTime: jitteredStaleTime(10 * 60_000), // 10 min — nearby sellers don't change often
   });
 }
