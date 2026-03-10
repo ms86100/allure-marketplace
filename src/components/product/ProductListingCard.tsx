@@ -100,10 +100,17 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
   const variantText = product.unit_type ? (product.price_per_unit || product.unit_type) : (product.serving_size || null);
 
   const distanceLabel = useMemo(() => {
-    const distKm = (product as any).distance_km;
-    if (distKm != null) return distKm < 1 ? ml.label('label_distance_m_format').replace('{distance}', String(Math.round(distKm * 1000))) : ml.label('label_distance_km_format').replace('{distance}', String(distKm));
+    const distKm = product.distance_km ?? (product as any).distance_km;
+    if (distKm != null) return distKm < 1 ? ml.label('label_distance_m_format').replace('{distance}', String(Math.round(distKm * 1000))) : ml.label('label_distance_km_format').replace('{distance}', String(Math.round(distKm * 10) / 10));
     return null;
-  }, [(product as any).distance_km, ml]);
+  }, [product.distance_km, (product as any).distance_km, ml]);
+
+  const locationLabel = useMemo(() => {
+    const socName = product.society_name ?? (product as any).society_name;
+    if (socName) return distanceLabel ? `${socName} · ${distanceLabel}` : socName;
+    if (distanceLabel) return `Nearby · ${distanceLabel}`;
+    return null;
+  }, [product.society_name, (product as any).society_name, distanceLabel]);
 
   const activityLabel = useMemo(() => { if (!(product as any).last_active_at) return ''; return formatSellerActivity((product as any).last_active_at, ml); }, [(product as any).last_active_at, ml]);
   const onTimeBadgeMinOrders = ml.threshold('on_time_badge_min_orders');
