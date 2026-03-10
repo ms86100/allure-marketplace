@@ -6,6 +6,7 @@ import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrowsingLocation, BrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { getCurrentPosition } from '@/lib/native-location';
+import { loadGoogleMapsScript } from '@/hooks/useGoogleMaps';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
