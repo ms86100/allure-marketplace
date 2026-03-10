@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { OnboardingWalkthrough, useOnboarding } from '@/components/onboarding/OnboardingWalkthrough';
-import { VerificationPendingScreen } from '@/components/onboarding/VerificationPendingScreen';
+
 import { MarketplaceSection } from '@/components/home/MarketplaceSection';
 import { ReorderLastOrder } from '@/components/home/ReorderLastOrder';
 import { BuyAgainRow } from '@/components/home/BuyAgainRow';
