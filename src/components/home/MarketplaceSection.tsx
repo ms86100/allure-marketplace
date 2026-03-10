@@ -118,7 +118,7 @@ export function MarketplaceSection() {
 
       {!activeGroup && popularNearYou.length > (discoveryMinProducts || 3) && (
         <DiscoveryRow
-          title={ml.label('label_discovery_popular')}
+          title={browsingLocation?.label ? `${ml.label('label_discovery_popular')} · ${browsingLocation.label}` : ml.label('label_discovery_popular')}
           icon={<Flame size={14} className="text-destructive" />}
           products={popularNearYou}
           onProductTap={handleProductTap}
