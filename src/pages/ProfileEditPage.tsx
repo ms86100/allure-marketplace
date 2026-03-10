@@ -74,7 +74,11 @@ export default function ProfileEditPage() {
 
     setShowAddressForm(false);
     setEditingAddress(null);
-  };
+
+    // Scroll to "Your Details" section
+    setTimeout(() => {
+      detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 300);
 
   const handleEditAddress = (addr: any) => {
     setEditingAddress(addr);
