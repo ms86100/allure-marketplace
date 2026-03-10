@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { ArrowLeft, Bell, Building, Building2, ShieldCheck, Users, Store, Verified } from 'lucide-react';
+import { ArrowLeft, Bell, Building, Building2, ShieldCheck, Users, Store, Verified, MapPin, ChevronDown } from 'lucide-react';
 
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { useUnreadNotificationCount } from '@/hooks/useUnreadNotificationCount';
 import { useSocietyStats } from '@/hooks/useSocietyStats';
+import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
+import { LocationSelectorSheet } from '@/components/location/LocationSelectorSheet';
 
 interface HeaderProps {
   showCart?: boolean;
@@ -30,9 +32,9 @@ function HeaderInner({
   const navigate = useNavigate();
   const location = useLocation();
   const settings = useSystemSettings();
+  const [locationSheetOpen, setLocationSheetOpen] = useState(false);
 
   const handleBack = useCallback(() => {
-    // If there's real history, go back; otherwise navigate to society dashboard or home
     if (window.history.length > 2) {
       navigate(-1);
     } else {
@@ -44,6 +46,7 @@ function HeaderInner({
   const { selectionChanged } = useHaptics();
   const unreadCount = useUnreadNotificationCount();
   const societyStats = useSocietyStats(effectiveSocietyId, isApproved);
+  const { browsingLocation } = useBrowsingLocation();
 
   const displaySociety = effectiveSociety || society;
   const isViewingAs = viewAsSocietyId && (isAdmin || isBuilderMember);
@@ -149,6 +152,21 @@ function HeaderInner({
             </div>
           </div>
 
+          {/* Browsing location chip — only on home (no title) */}
+          {!title && browsingLocation && (
+            <button
+              type="button"
+              onClick={() => setLocationSheetOpen(true)}
+              className="flex items-center gap-1.5 mt-1.5 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/15 hover:bg-primary/10 transition-colors max-w-full"
+            >
+              <MapPin size={12} className="text-primary shrink-0" />
+              <span className="text-[11px] font-semibold text-foreground truncate">
+                {browsingLocation.source === 'gps' ? 'Near ' : ''}{browsingLocation.label}
+              </span>
+              <ChevronDown size={11} className="text-muted-foreground shrink-0" />
+            </button>
+          )}
+
           {/* Search bar - only on home (no title) */}
           {!title && (
             <Link to="/search" className="block mt-2">
@@ -162,6 +180,8 @@ function HeaderInner({
             </Link>
           )}
         </div>
+
+        <LocationSelectorSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} />
 
         {/* Breadcrumb bar - shown when title is present */}
         {title && (
