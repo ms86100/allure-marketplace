@@ -162,6 +162,9 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
+            <Link to="/profile/edit" className="shrink-0">
+              <Button variant="ghost" size="sm" className="h-8 text-xs text-primary">Edit</Button>
+            </Link>
           </div>
 
           {profile?.verification_status === 'approved' && (

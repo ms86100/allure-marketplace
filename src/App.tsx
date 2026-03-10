@@ -57,6 +57,7 @@ const CartPage = lazyWithRetry(() => import("./pages/CartPage"));
 const OrdersPage = lazyWithRetry(() => import("./pages/OrdersPage"));
 const OrderDetailPage = lazyWithRetry(() => import("./pages/OrderDetailPage"));
 const ProfilePage = lazyWithRetry(() => import("./pages/ProfilePage"));
+const ProfileEditPage = lazyWithRetry(() => import("./pages/ProfileEditPage"));
 const FavoritesPage = lazyWithRetry(() => import("./pages/FavoritesPage"));
 const BecomeSellerPage = lazyWithRetry(() => import("./pages/BecomeSellerPage"));
 const SellerDashboardPage = lazyWithRetry(() => import("./pages/SellerDashboardPage"));
@@ -325,6 +326,7 @@ function AppRoutes() {
         <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
         <Route path="/orders/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/profile/edit" element={<ProtectedRoute><ProfileEditPage /></ProtectedRoute>} />
         <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
         <Route path="/subscriptions" element={<ProtectedRoute><MySubscriptionsPage /></ProtectedRoute>} />
         <Route path="/directory" element={<ProtectedRoute><TrustDirectoryPage /></ProtectedRoute>} />
