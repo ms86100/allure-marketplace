@@ -1136,10 +1136,10 @@ export function usePushNotificationsInternal() {
           // getLastBuildId() here would hang the entire registration flow.
           // Build-change detection is deferred to a fire-and-forget background task.
 
-          // Ensure stage is set to 'full' for future sessions (fire-and-forget)
-          if (stage !== 'full') {
-            setPushStage('full').catch(() => {});
-          }
+          // NOTE: Do NOT set stage to 'full' here — that should only happen
+          // after the user explicitly grants permission (e.g. via cart checkout
+          // or the EnableNotificationsBanner). Setting it prematurely prevents
+          // future permission prompts from appearing.
 
           // Force-flush before registration
           pushLog('info', 'LOGIN_ALWAYS_REGISTER', { stage, ts: Date.now() });

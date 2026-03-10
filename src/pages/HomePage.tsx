@@ -47,22 +47,32 @@ export default function HomePage() {
   return (
     <AppLayout>
       <div className="pb-6">
-        {/* ═══ INCOMPLETE PROFILE BANNER ═══ */}
-        {profile && !profile.flat_number && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mx-4 mt-3 flex items-center gap-3 rounded-2xl bg-destructive/5 border border-destructive/15 p-3.5"
-          >
-            <div className="w-8 h-8 rounded-xl bg-destructive/10 flex items-center justify-center shrink-0">
-              <AlertCircle size={16} className="text-destructive" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground">Complete your profile to enable delivery orders.</p>
-            </div>
-            <Link to="/profile/edit" className="text-xs font-bold text-primary shrink-0 hover:underline">Update</Link>
-          </motion.div>
-        )}
+        {/* ═══ PROFILE COMPLETION BANNER ═══ */}
+        {profile && (() => {
+          const missing: string[] = [];
+          if (!profile.name) missing.push('name');
+          if (!profile.flat_number) missing.push('flat number');
+          if (!profile.block) missing.push('block/tower');
+          if (missing.length === 0) return null;
+          const pct = Math.round(((3 - missing.length) / 3) * 100);
+          const hint = `Add your ${missing[0]} to continue`;
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mx-4 mt-3 rounded-2xl bg-primary/5 border border-primary/15 p-3.5"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-foreground">Profile {pct}% complete</p>
+                <Link to="/profile/edit" className="text-xs font-bold text-primary shrink-0 hover:underline">Update</Link>
+              </div>
+              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6 }} className="h-full rounded-full bg-primary" />
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1.5">{hint}</p>
+            </motion.div>
+          );
+        })()}
 
         {/* ═══ DISCOVER ═══ */}
         <HomeSearchSuggestions />
