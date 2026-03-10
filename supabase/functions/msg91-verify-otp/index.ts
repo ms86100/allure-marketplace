@@ -60,10 +60,9 @@ Deno.serve(async (req) => {
     const tokenRes = await fetch("https://api.msg91.com/api/v5/widget/verifyAccessToken", {
       method: "POST",
       headers: {
-        authkey: authKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ access_token: verifyData.access_token }),
+      body: JSON.stringify({ access_token: verifyData.access_token, widgetId, tokenAuth, authkey: authKey }),
     });
     const tokenData = await tokenRes.json();
     console.log("MSG91 Widget token verify response:", JSON.stringify(tokenData));
