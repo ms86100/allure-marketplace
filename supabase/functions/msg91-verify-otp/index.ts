@@ -50,8 +50,12 @@ Deno.serve(async (req) => {
     console.log("MSG91 Widget verify response:", JSON.stringify(verifyData));
 
     if (verifyData.type !== "success" || !verifyData.access_token) {
+      // MSG91 sometimes returns the reqId JWT as the message — never forward raw tokens
+      const friendlyMsg = (verifyData.type === "error" && verifyData.message && verifyData.message.length < 100)
+        ? verifyData.message
+        : "Invalid or expired OTP. Please try again.";
       return new Response(
-        JSON.stringify({ error: verifyData.message || "Invalid or expired OTP" }),
+        JSON.stringify({ error: friendlyMsg }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
