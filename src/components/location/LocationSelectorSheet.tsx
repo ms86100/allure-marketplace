@@ -50,24 +50,26 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
     try {
       const pos = await getCurrentPosition();
 
-      // Reverse geocode for label
-      let label = 'Current Location';
+      // Reverse geocode for a meaningful label
+      let label = `${pos.latitude.toFixed(4)}, ${pos.longitude.toFixed(4)}`;
       if ((window as any).google?.maps) {
         try {
           const geocoder = new google.maps.Geocoder();
           const result = await new Promise<string>((resolve) => {
             geocoder.geocode({ location: { lat: pos.latitude, lng: pos.longitude } }, (results, status) => {
               if (status === 'OK' && results?.[0]) {
+                const premise = results[0].address_components?.find(c => c.types.includes('premise'))?.long_name;
                 const sublocality = results[0].address_components?.find(c => c.types.includes('sublocality_level_1'))?.long_name;
                 const neighborhood = results[0].address_components?.find(c => c.types.includes('neighborhood'))?.long_name;
-                resolve(sublocality || neighborhood || results[0].formatted_address.split(',')[0]);
+                const locality = results[0].address_components?.find(c => c.types.includes('locality'))?.long_name;
+                resolve(premise || sublocality || neighborhood || locality || results[0].formatted_address.split(',').slice(0, 2).join(', '));
               } else {
-                resolve('Current Location');
+                resolve(`${pos.latitude.toFixed(4)}, ${pos.longitude.toFixed(4)}`);
               }
             });
           });
           label = result;
-        } catch { /* use fallback label */ }
+        } catch { /* use coordinate fallback */ }
       }
 
       setBrowsingLocation({
