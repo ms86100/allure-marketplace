@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MapPin, Navigation, Loader2, Home, Briefcase, Tag } from 'lucide-react';
+import { MapPin, Navigation, Loader2, Home, Briefcase, Tag, Search, X } from 'lucide-react';
 import { getCurrentPosition } from '@/lib/native-location';
 import { GoogleMapConfirm } from '@/components/auth/GoogleMapConfirm';
+import { useAutocomplete } from '@/hooks/useGoogleMaps';
 import { toast } from 'sonner';
 
 interface AddressData {
@@ -19,6 +20,7 @@ interface AddressData {
   latitude: number | null;
   longitude: number | null;
   pincode: string;
+  phase: string;
   is_default: boolean;
 }
 
@@ -48,12 +50,65 @@ export function AddressForm({ initial, onSave, onCancel, saving }: AddressFormPr
     latitude: initial?.latitude ?? null,
     longitude: initial?.longitude ?? null,
     pincode: initial?.pincode || '',
+    phase: initial?.phase || '',
     is_default: initial?.is_default ?? false,
   });
   const [detecting, setDetecting] = useState(false);
   const [showMap, setShowMap] = useState(false);
 
+  // Autocomplete state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showResults, setShowResults] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const { predictions, isSearching, searchPlaces, getPlaceDetails, clearPredictions, isLoaded } = useAutocomplete();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
   const update = (key: keyof AddressData, value: any) => setForm(f => ({ ...f, [key]: value }));
+
+  // Debounced search
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (value.length < 3) {
+      clearPredictions();
+      setShowResults(false);
+      return;
+    }
+    debounceRef.current = setTimeout(() => {
+      searchPlaces(value);
+      setShowResults(true);
+    }, 300);
+  }, [searchPlaces, clearPredictions]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleSelectPlace = async (placeId: string) => {
+    setShowResults(false);
+    const details = await getPlaceDetails(placeId);
+    if (!details) {
+      toast.error('Could not get place details');
+      return;
+    }
+    setForm(f => ({
+      ...f,
+      latitude: details.latitude,
+      longitude: details.longitude,
+      full_address: details.formattedAddress,
+      building_name: details.name || f.building_name,
+      pincode: details.pincode || f.pincode,
+    }));
+    setSearchQuery(details.name || details.formattedAddress);
+    setShowMap(true);
+  };
 
   const detectLocation = async () => {
     setDetecting(true);
@@ -130,6 +185,61 @@ export function AddressForm({ initial, onSave, onCancel, saving }: AddressFormPr
         </div>
       </div>
 
+      {/* Google Maps Autocomplete Search */}
+      <div ref={searchRef} className="relative">
+        <Label className="text-xs text-muted-foreground uppercase tracking-wide">Search Society / Location</Label>
+        <div className="relative mt-1.5">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={e => handleSearchChange(e.target.value)}
+            placeholder="Search your society, area, or landmark…"
+            className="pl-9 pr-9 h-11"
+            disabled={!isLoaded}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => { setSearchQuery(''); clearPredictions(); setShowResults(false); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Predictions Dropdown */}
+        {showResults && predictions.length > 0 && (
+          <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-lg max-h-60 overflow-y-auto">
+            {predictions.map(p => (
+              <button
+                key={p.placeId}
+                type="button"
+                onClick={() => handleSelectPlace(p.placeId)}
+                className="w-full text-left px-3 py-2.5 hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0"
+              >
+                <p className="text-sm font-medium text-foreground truncate">{p.mainText}</p>
+                <p className="text-xs text-muted-foreground truncate">{p.secondaryText}</p>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {showResults && isSearching && (
+          <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-xl shadow-lg p-4 flex items-center justify-center gap-2">
+            <Loader2 size={14} className="animate-spin text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Searching…</span>
+          </div>
+        )}
+      </div>
+
+      {/* Divider */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1 border-t border-border" />
+        <span className="text-[11px] text-muted-foreground uppercase tracking-wide">or</span>
+        <div className="flex-1 border-t border-border" />
+      </div>
+
       {/* GPS Detect */}
       <Button
         variant="outline"
@@ -174,14 +284,20 @@ export function AddressForm({ initial, onSave, onCancel, saving }: AddressFormPr
           <Input id="block" value={form.block} onChange={e => update('block', e.target.value)} placeholder="e.g. B" className="mt-1" />
         </div>
         <div>
-          <Label htmlFor="pincode" className="text-xs">Pincode</Label>
-          <Input id="pincode" value={form.pincode} onChange={e => update('pincode', e.target.value)} placeholder="e.g. 400001" className="mt-1" maxLength={6} />
+          <Label htmlFor="phase" className="text-xs">Phase</Label>
+          <Input id="phase" value={form.phase} onChange={e => update('phase', e.target.value)} placeholder="e.g. Phase 2" className="mt-1" />
         </div>
       </div>
 
-      <div>
-        <Label htmlFor="building" className="text-xs">Building / Society Name</Label>
-        <Input id="building" value={form.building_name} onChange={e => update('building_name', e.target.value)} placeholder="e.g. Sunshine Residency" className="mt-1" />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label htmlFor="building" className="text-xs">Building / Society</Label>
+          <Input id="building" value={form.building_name} onChange={e => update('building_name', e.target.value)} placeholder="e.g. Sunshine Residency" className="mt-1" />
+        </div>
+        <div>
+          <Label htmlFor="pincode" className="text-xs">Pincode</Label>
+          <Input id="pincode" value={form.pincode} onChange={e => update('pincode', e.target.value)} placeholder="e.g. 400001" className="mt-1" maxLength={6} />
+        </div>
       </div>
 
       <div>
