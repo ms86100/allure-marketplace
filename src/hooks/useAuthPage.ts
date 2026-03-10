@@ -23,6 +23,7 @@ export function useAuthPage() {
   // OTP cooldown
   const [resendCooldown, setResendCooldown] = useState(0);
   const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [otpReqId, setOtpReqId] = useState<string | null>(null);
 
   // Society selection state
   const [societies, setSocieties] = useState<Society[]>([]);
@@ -102,10 +103,15 @@ export function useAuthPage() {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('msg91-send-otp', {
-        body: { phone, country_code: '91', resend },
+        body: { phone, country_code: '91', resend, reqId: resend ? otpReqId : undefined },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+
+      // Store reqId for verify and resend calls
+      if (data?.reqId) {
+        setOtpReqId(data.reqId);
+      }
 
       setStep('otp');
       setResendCooldown(30);
@@ -125,7 +131,7 @@ export function useAuthPage() {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('msg91-verify-otp', {
-        body: { phone, otp, country_code: '91' },
+        body: { reqId: otpReqId, otp, country_code: '91' },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -299,6 +305,7 @@ export function useAuthPage() {
     setSocietySubStep('search');
     setPhone('');
     setOtp('');
+    setOtpReqId(null);
     setSelectedSociety(null);
     setSelectedPlace(null);
     setAdjustedCoords(null);

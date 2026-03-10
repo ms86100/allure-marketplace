@@ -12,11 +12,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { phone, otp, country_code = "91" } = await req.json();
+    const { reqId, otp, country_code = "91" } = await req.json();
 
-    if (!phone || !/^\d{10}$/.test(phone)) {
+    if (!reqId) {
       return new Response(
-        JSON.stringify({ error: "Invalid phone number" }),
+        JSON.stringify({ error: "Missing request ID" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -36,27 +36,65 @@ Deno.serve(async (req) => {
       );
     }
 
-    const mobile = `${country_code}${phone}`;
-    const fullPhone = `+${mobile}`;
-    const syntheticEmail = `${mobile}@phone.sociva.app`;
-
-    // ─── 1. Verify OTP with MSG91 ───
-    const verifyUrl = `https://control.msg91.com/api/v5/otp/verify?otp=${otp}&mobile=${mobile}`;
-    const verifyRes = await fetch(verifyUrl, {
-      method: "GET",
-      headers: { authkey: authKey },
+    // ─── 1. Verify OTP via Widget API ───
+    const verifyRes = await fetch("https://api.msg91.com/api/v5/widget/verifyOtp", {
+      method: "POST",
+      headers: {
+        authkey: authKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ reqId, otp }),
     });
     const verifyData = await verifyRes.json();
-    console.log("MSG91 verify response:", JSON.stringify(verifyData));
+    console.log("MSG91 Widget verify response:", JSON.stringify(verifyData));
 
-    if (verifyData.type !== "success") {
+    if (verifyData.type !== "success" || !verifyData.access_token) {
       return new Response(
         JSON.stringify({ error: verifyData.message || "Invalid or expired OTP" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // ─── 2. OTP verified — find or create Supabase user ───
+    // ─── 2. Server-side token validation ───
+    const tokenRes = await fetch("https://api.msg91.com/api/v5/widget/verifyAccessToken", {
+      method: "POST",
+      headers: {
+        authkey: authKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ access_token: verifyData.access_token }),
+    });
+    const tokenData = await tokenRes.json();
+    console.log("MSG91 Widget token verify response:", JSON.stringify(tokenData));
+
+    if (tokenData.type !== "success") {
+      return new Response(
+        JSON.stringify({ error: "Token verification failed. Please try again." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Extract verified phone number from token response
+    // The identifier comes back as the phone number used during sendOtp (e.g. "91XXXXXXXXXX")
+    const verifiedIdentifier = tokenData.identifier || tokenData.mobile || tokenData.phone;
+    if (!verifiedIdentifier) {
+      console.error("No identifier in token response:", JSON.stringify(tokenData));
+      return new Response(
+        JSON.stringify({ error: "Could not determine verified phone number" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Normalize: ensure it starts with country code, then format as +CCXXXXXXXXXX
+    const cleanIdentifier = verifiedIdentifier.replace(/\D/g, "");
+    const mobile = cleanIdentifier.startsWith(country_code)
+      ? cleanIdentifier
+      : `${country_code}${cleanIdentifier}`;
+    const phone = mobile.slice(country_code.length); // 10-digit phone
+    const fullPhone = `+${mobile}`;
+    const syntheticEmail = `${mobile}@phone.sociva.app`;
+
+    // ─── 3. OTP verified — find or create Supabase user ───
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -92,10 +130,8 @@ Deno.serve(async (req) => {
       });
 
       if (createError) {
-        // Might already exist with synthetic email (previous OTP attempt that didn't complete)
         if (createError.message?.includes("already") || createError.message?.includes("duplicate")) {
           console.log("User exists with synthetic email, treating as existing user");
-          // Find via profiles or auth
           const { data: profileByEmail } = await adminClient
             .from("profiles")
             .select("id")
@@ -105,8 +141,6 @@ Deno.serve(async (req) => {
           if (profileByEmail) {
             isNewUser = false;
           } else {
-            // Profile might not have been created yet — still treat as new-ish user
-            // but the auth user exists, so generateLink will work
             isNewUser = true;
           }
         } else {
@@ -117,7 +151,6 @@ Deno.serve(async (req) => {
           );
         }
       } else if (newUser?.user) {
-        // Successfully created — insert profile and role
         const userId = newUser.user.id;
 
         const { error: profileError } = await adminClient.from("profiles").upsert(
@@ -135,7 +168,6 @@ Deno.serve(async (req) => {
           console.warn("Profile upsert warning:", profileError.message);
         }
 
-        // Insert buyer role (ignore duplicate)
         const { error: roleError } = await adminClient
           .from("user_roles")
           .insert({ user_id: userId, role: "buyer" });
@@ -147,7 +179,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ─── 3. Generate magiclink to establish client session ───
+    // ─── 4. Generate magiclink to establish client session ───
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: "magiclink",
       email: userEmail,
