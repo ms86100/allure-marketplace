@@ -60,7 +60,7 @@ export default function HomePage() {
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-foreground">Complete your profile to enable delivery orders.</p>
             </div>
-            <Link to="/profile" className="text-xs font-bold text-primary shrink-0 hover:underline">Update</Link>
+            <Link to="/profile/edit" className="text-xs font-bold text-primary shrink-0 hover:underline">Update</Link>
           </motion.div>
         )}
 
