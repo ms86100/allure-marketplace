@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
