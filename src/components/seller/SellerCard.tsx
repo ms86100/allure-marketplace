@@ -47,7 +47,13 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
           )}
           {!isOpen && (
             <div className="absolute inset-0 bg-background/70 backdrop-blur-[2px] flex items-center justify-center">
-              <span className="text-foreground font-medium text-sm">Currently Closed</span>
+              <span className="text-foreground font-medium text-sm">
+                {storeAvailability.status === 'paused'
+                  ? 'Store Paused'
+                  : storeAvailability.status === 'closed_today'
+                    ? 'Closed Today'
+                    : formatStoreClosedMessage(storeAvailability) || 'Currently Closed'}
+              </span>
             </div>
           )}
           
