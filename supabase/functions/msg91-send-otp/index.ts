@@ -64,7 +64,10 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           reqId,
-          retryChannel: 11, // 11 = SMS
+          retryChannel: 11,
+          authkey: authKey,
+          widgetId,
+          tokenAuth,
         }),
       });
       data = await retryRes.json();
