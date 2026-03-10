@@ -79,6 +79,7 @@ export default function ProfileEditPage() {
     setTimeout(() => {
       detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 300);
+  };
 
   const handleEditAddress = (addr: any) => {
     setEditingAddress(addr);
