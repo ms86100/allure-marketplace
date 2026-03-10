@@ -161,6 +161,14 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
           {hasDiscount && (<span className="text-[10px] text-muted-foreground line-through leading-none">MRP {formatPrice(product.mrp!)}</span>)}
         </div>
         {product.price_per_unit && (<span className="text-[9px] text-muted-foreground leading-none mt-0.5">{product.price_per_unit}</span>)}
+        {(locationLabel || (product as any).is_same_society !== false) && (
+          <div className="flex items-center gap-1 mt-1">
+            <MapPin size={9} className="shrink-0 text-primary" />
+            <span className="text-[9px] font-medium text-muted-foreground leading-tight truncate">
+              {locationLabel || ml.label('label_in_your_society')}
+            </span>
+          </div>
+        )}
       </div>
       {viewOnly && (<div className="px-2.5 pb-2.5"><button onClick={(e) => { e.stopPropagation(); onNavigate?.(`/seller/${product.seller_id}`); }} className="w-full border border-primary text-primary font-bold text-[11px] py-1.5 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors">{mc.labels.viewButton}</button></div>)}
       {!viewOnly && isOutOfStock && (<NotifyMeButton productId={product.id} />)}
