@@ -305,6 +305,7 @@ export function useAuthPage() {
     setSocietySubStep('search');
     setPhone('');
     setOtp('');
+    setOtpReqId(null);
     setSelectedSociety(null);
     setSelectedPlace(null);
     setAdjustedCoords(null);
