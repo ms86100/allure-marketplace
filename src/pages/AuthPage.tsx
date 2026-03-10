@@ -142,9 +142,6 @@ export default function AuthPage() {
                       <InputOTPGroup className="gap-3">
                         <InputOTPSlot index={0} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
                         <InputOTPSlot index={1} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
-                      </InputOTPGroup>
-                      <InputOTPSeparator className="mx-2 text-muted-foreground">—</InputOTPSeparator>
-                      <InputOTPGroup className="gap-3">
                         <InputOTPSlot index={2} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
                         <InputOTPSlot index={3} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
                       </InputOTPGroup>
@@ -153,7 +150,7 @@ export default function AuthPage() {
 
                   <Button
                     onClick={auth.handleVerifyOtp}
-                    disabled={auth.otp.length < 6 || auth.isLoading}
+                    disabled={auth.otp.length < 4 || auth.isLoading}
                     className="w-full h-12 rounded-xl text-base font-semibold"
                   >
                     {auth.isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <CheckCircle2 className="mr-2" size={18} />}
