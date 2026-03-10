@@ -152,6 +152,21 @@ function HeaderInner({
             </div>
           </div>
 
+          {/* Browsing location chip — only on home (no title) */}
+          {!title && browsingLocation && (
+            <button
+              type="button"
+              onClick={() => setLocationSheetOpen(true)}
+              className="flex items-center gap-1.5 mt-1.5 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/15 hover:bg-primary/10 transition-colors max-w-full"
+            >
+              <MapPin size={12} className="text-primary shrink-0" />
+              <span className="text-[11px] font-semibold text-foreground truncate">
+                {browsingLocation.source === 'gps' ? 'Near ' : ''}{browsingLocation.label}
+              </span>
+              <ChevronDown size={11} className="text-muted-foreground shrink-0" />
+            </button>
+          )}
+
           {/* Search bar - only on home (no title) */}
           {!title && (
             <Link to="/search" className="block mt-2">
@@ -165,6 +180,8 @@ function HeaderInner({
             </Link>
           )}
         </div>
+
+        <LocationSelectorSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} />
 
         {/* Breadcrumb bar - shown when title is present */}
         {title && (
