@@ -1,117 +1,84 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { jitteredStaleTime } from '@/lib/query-utils';
 
 /**
- * Fetches trending products in the user's society based on recent order velocity.
- * Uses server-side RPC for efficient computation.
+ * Fetches trending products based on recent order velocity.
+ * Uses society-based RPC when society is available, otherwise falls back
+ * to coordinate-based discovery so users without a society still see content.
  */
 export function useTrendingProducts(limit = 10) {
   const { effectiveSocietyId } = useAuth();
+  const { browsingLocation } = useBrowsingLocation();
+
+  const lat = browsingLocation?.lat;
+  const lng = browsingLocation?.lng;
+  const hasCoords = !!(lat && lng);
 
   return useQuery({
-    queryKey: ['trending-products', effectiveSocietyId, limit],
+    queryKey: ['trending-products', effectiveSocietyId, lat, lng, limit],
     queryFn: async (): Promise<ProductWithSeller[]> => {
-      const { data, error } = await supabase.rpc('get_trending_products_by_society', {
-        _society_id: effectiveSocietyId!,
-        _limit: limit,
-      });
+      // If we have a society, use the society-based trending RPC (order-velocity based)
+      if (effectiveSocietyId) {
+        const { data, error } = await supabase.rpc('get_trending_products_by_society', {
+          _society_id: effectiveSocietyId,
+          _limit: limit,
+        });
 
-      if (error) {
-        console.warn('[TrendingProducts] RPC error, falling back to client query:', error.message);
-        return fallbackClientQuery(effectiveSocietyId!, limit);
+        if (!error && data && data.length > 0) {
+          return data.map((p: any) => ({
+            id: p.id, name: p.name, description: p.description, price: p.price,
+            image_url: p.image_url, category: p.category, is_veg: p.is_veg,
+            is_available: p.is_available, is_bestseller: p.is_bestseller,
+            is_recommended: p.is_recommended, is_urgent: p.is_urgent,
+            seller_id: p.seller_id, created_at: p.created_at, updated_at: p.updated_at,
+            seller_name: p.seller_business_name || 'Seller',
+            seller_rating: p.seller_rating || 0,
+            completed_order_count: p.seller_completed_order_count || 0,
+            last_active_at: p.seller_last_active_at || null,
+            fulfillment_mode: p.seller_fulfillment_mode || null,
+            delivery_note: p.seller_delivery_note || null,
+            seller_availability_start: p.seller_availability_start || null,
+            seller_availability_end: p.seller_availability_end || null,
+            seller_operating_days: p.seller_operating_days || null,
+            seller_is_available: p.seller_is_available ?? true,
+            _orderCount: p.order_count || 0,
+          }));
+        }
       }
 
-      if (!data || data.length === 0) return [];
+      // Fallback: coordinate-based discovery for users without a society
+      if (hasCoords) {
+        const { data, error } = await supabase.rpc('search_sellers_by_location', {
+          _lat: lat!, _lng: lng!, _radius_km: 3,
+        });
+        if (error || !data) return [];
 
-      return data.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        price: p.price,
-        image_url: p.image_url,
-        category: p.category,
-        is_veg: p.is_veg,
-        is_available: p.is_available,
-        is_bestseller: p.is_bestseller,
-        is_recommended: p.is_recommended,
-        is_urgent: p.is_urgent,
-        seller_id: p.seller_id,
-        created_at: p.created_at,
-        updated_at: p.updated_at,
-        seller_name: p.seller_business_name || 'Seller',
-        seller_rating: p.seller_rating || 0,
-        completed_order_count: p.seller_completed_order_count || 0,
-        last_active_at: p.seller_last_active_at || null,
-        fulfillment_mode: p.seller_fulfillment_mode || null,
-        delivery_note: p.seller_delivery_note || null,
-        seller_availability_start: p.seller_availability_start || null,
-        seller_availability_end: p.seller_availability_end || null,
-        seller_operating_days: p.seller_operating_days || null,
-        seller_is_available: p.seller_is_available ?? true,
-        _orderCount: p.order_count || 0,
-      }));
+        const products: ProductWithSeller[] = [];
+        (data as any[]).forEach((seller) => {
+          (seller.matching_products || []).forEach((p: any) => {
+            if (!products.some(x => x.id === p.id)) {
+              products.push({
+                id: p.id, name: p.name, description: null, price: p.price,
+                image_url: p.image_url, category: p.category || '', is_veg: p.is_veg ?? true,
+                is_available: true, is_bestseller: false, is_recommended: false, is_urgent: false,
+                seller_id: seller.seller_id, created_at: '', updated_at: '',
+                seller_name: seller.business_name || 'Seller',
+                seller_rating: seller.rating || 0,
+                fulfillment_mode: null, delivery_note: null,
+              } as ProductWithSeller);
+            }
+          });
+        });
+        return products.slice(0, limit);
+      }
+
+      return [];
     },
-    enabled: !!effectiveSocietyId,
+    enabled: !!effectiveSocietyId || hasCoords,
     staleTime: jitteredStaleTime(5 * 60 * 1000),
   });
-}
-
-/** Fallback if RPC not yet available */
-async function fallbackClientQuery(societyId: string, limit: number): Promise<ProductWithSeller[]> {
-  const { data: orderData } = await supabase
-    .from('order_items')
-    .select(`product_id, order:orders!inner(society_id, created_at, status)`)
-    .eq('order.society_id', societyId)
-    .neq('order.status', 'cancelled')
-    .gte('order.created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-    .limit(200);
-
-  if (!orderData?.length) return [];
-
-  const productCounts = new Map<string, number>();
-  for (const item of orderData) {
-    const pid = item.product_id;
-    if (pid) productCounts.set(pid, (productCounts.get(pid) || 0) + 1);
-  }
-
-  const topProductIds = [...productCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([id]) => id);
-
-  if (topProductIds.length === 0) return [];
-
-  const { data: products } = await supabase
-    .from('products')
-    .select(`*, seller:seller_profiles!products_seller_id_fkey(
-      id, business_name, rating, society_id, verification_status,
-      fulfillment_mode, delivery_note, availability_start, availability_end,
-      operating_days, is_available, completed_order_count, last_active_at
-    )`)
-    .in('id', topProductIds)
-    .eq('is_available', true)
-    .eq('approval_status', 'approved');
-
-  if (!products) return [];
-
-  return products
-    .filter((p: any) => p.seller?.verification_status === 'approved')
-    .map((p: any) => ({
-      ...p,
-      seller_name: p.seller?.business_name || 'Seller',
-      seller_rating: p.seller?.rating || 0,
-      completed_order_count: p.seller?.completed_order_count || 0,
-      last_active_at: p.seller?.last_active_at || null,
-      fulfillment_mode: p.seller?.fulfillment_mode || null,
-      delivery_note: p.seller?.delivery_note || null,
-      seller_availability_start: p.seller?.availability_start || null,
-      seller_availability_end: p.seller?.availability_end || null,
-      seller_operating_days: p.seller?.operating_days || null,
-      seller_is_available: p.seller?.is_available ?? true,
-      _orderCount: productCounts.get(p.id) || 0,
-    }))
-    .sort((a: any, b: any) => (b._orderCount || 0) - (a._orderCount || 0));
 }

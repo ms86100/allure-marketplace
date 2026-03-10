@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { useCart } from '@/hooks/useCart';
 import { FilterState, defaultFilters } from '@/components/search/SearchFilters';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
@@ -53,18 +54,26 @@ function useDebounce<T>(value: T, delay: number): T {
   return d;
 }
 
-const mapProduct = (p: any, isSameSociety = true): ProductSearchResult => ({
-  product_id: p.id, product_name: p.name, price: p.price, image_url: p.image_url, is_veg: p.is_veg,
-  category: p.category, description: p.description || null, prep_time_minutes: p.prep_time_minutes || null,
-  fulfillment_mode: p.seller?.fulfillment_mode || null, delivery_note: p.seller?.delivery_note || null,
-  action_type: p.action_type || null, contact_phone: p.contact_phone || null, mrp: p.mrp || null,
-  discount_percentage: p.discount_percentage || null, seller_id: p.seller?.id || p.seller_id,
-  seller_name: p.seller?.business_name || '', seller_rating: p.seller?.rating || 0,
-  seller_reviews: p.seller?.total_reviews || 0, society_name: null, distance_km: null, is_same_society: isSameSociety,
-});
+/** Map a seller row from search_sellers_by_location RPC into ProductSearchResult[] */
+function mapSellerRpcProducts(seller: any): ProductSearchResult[] {
+  const products: ProductSearchResult[] = [];
+  (seller.matching_products || []).forEach((p: any) => {
+    products.push({
+      product_id: p.id, product_name: p.name, price: p.price, image_url: p.image_url,
+      is_veg: p.is_veg, category: p.category, description: null, prep_time_minutes: null,
+      fulfillment_mode: null, delivery_note: null, action_type: p.action_type || 'add_to_cart',
+      contact_phone: p.contact_phone || null, mrp: p.mrp || null, discount_percentage: p.discount_percentage || null,
+      seller_id: seller.seller_id, seller_name: seller.business_name || '', seller_rating: seller.rating || 0,
+      seller_reviews: seller.total_reviews || 0, society_name: seller.society_name || null,
+      distance_km: seller.distance_km || null, is_same_society: (seller.distance_km ?? 99) < 0.5,
+    });
+  });
+  return products;
+}
 
 export function useSearchPage() {
   const { user, effectiveSocietyId, profile } = useAuth();
+  const { browsingLocation } = useBrowsingLocation();
   const navigate = useNavigate();
   const { items: cartItems, addItem, updateQuantity } = useCart();
   const [searchParams] = useSearchParams();
@@ -73,6 +82,10 @@ export function useSearchPage() {
   const { badges: badgeConfigs } = useBadgeConfig();
   const settings = useSystemSettings();
   const { formatPrice, currencySymbol } = useCurrency();
+
+  const lat = browsingLocation?.lat;
+  const lng = browsingLocation?.lng;
+  const hasCoords = !!(lat && lng);
 
   const categoryMap = useMemo(() => {
     const m: Record<string, { icon: string; displayName: string; color: string; supportsCart?: boolean; enquiryOnly?: boolean; requiresTimeSlot?: boolean }> = {};
@@ -100,26 +113,24 @@ export function useSearchPage() {
   const setBrowseBeyond = useCallback((val: boolean) => { setBrowseBeyondLocal(val); persistPreference('browse_beyond_community', val); }, [persistPreference]);
   const setSearchRadius = useCallback((val: number) => { setSearchRadiusLocal(val); persistPreference('search_radius_km', val); }, [persistPreference]);
 
+  // Popular products — coordinate-based via search_sellers_by_location RPC
   const { data: popularProducts = [], isLoading: isLoadingPopular } = useQuery({
-    queryKey: ['search-popular-products', effectiveSocietyId, browseBeyond, searchRadius],
+    queryKey: ['search-popular-products', lat, lng, browseBeyond, searchRadius],
     queryFn: async (): Promise<ProductSearchResult[]> => {
-      let q = supabase.from('products').select('id, name, price, description, prep_time_minutes, image_url, is_veg, category, seller_id, action_type, contact_phone, mrp, discount_percentage, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status, fulfillment_mode, delivery_note)').eq('is_available', true).eq('approval_status', 'approved').eq('seller.verification_status', 'approved').order('created_at', { ascending: false }).limit(30);
-      if (effectiveSocietyId) q = q.eq('seller.society_id', effectiveSocietyId);
-      const nearbyPromise = (browseBeyond && effectiveSocietyId) ? supabase.rpc('search_nearby_sellers', { _buyer_society_id: effectiveSocietyId, _radius_km: searchRadius, _search_term: null, _category: null }) : Promise.resolve({ data: null, error: null });
-      const [{ data }, nearbyResult] = await Promise.all([q, nearbyPromise]);
-      const mapped: ProductSearchResult[] = (data || []).map((p: any) => mapProduct(p, true));
-      if (nearbyResult.data && !nearbyResult.error) {
-        (nearbyResult.data as any[]).forEach((seller: any) => {
-          (seller.matching_products || []).forEach((p: any) => {
-            if (!mapped.some(x => x.product_id === p.id)) {
-              mapped.push({ product_id: p.id, product_name: p.name, price: p.price, image_url: p.image_url, is_veg: p.is_veg, category: p.category, description: null, prep_time_minutes: null, fulfillment_mode: null, delivery_note: null, action_type: p.action_type || 'add_to_cart', contact_phone: p.contact_phone || null, mrp: p.mrp || null, discount_percentage: p.discount_percentage || null, seller_id: seller.seller_id, seller_name: seller.business_name || '', seller_rating: seller.rating || 0, seller_reviews: seller.total_reviews || 0, society_name: seller.society_name || null, distance_km: seller.distance_km || null, is_same_society: false });
-            }
-          });
+      const radius = browseBeyond ? searchRadius : 2;
+      const { data, error } = await supabase.rpc('search_sellers_by_location', {
+        _lat: lat!, _lng: lng!, _radius_km: radius,
+      });
+      if (error || !data) return [];
+      const mapped: ProductSearchResult[] = [];
+      (data as any[]).forEach((seller) => {
+        mapSellerRpcProducts(seller).forEach((p) => {
+          if (!mapped.some(x => x.product_id === p.product_id)) mapped.push(p);
         });
-      }
+      });
       return mapped;
     },
-    enabled: !!effectiveSocietyId,
+    enabled: hasCoords,
     staleTime: jitteredStaleTime(3 * 60 * 1000),
   });
 
@@ -143,6 +154,7 @@ export function useSearchPage() {
     abortRef.current = controller;
     setIsLoading(true); setHasSearched(true);
 
+    // Log search demand (best-effort, still society-scoped)
     if (term.length >= 3 && effectiveSocietyId) {
       supabase.from('search_demand_log').insert({ society_id: effectiveSocietyId, search_term: term.trim().toLowerCase(), category: selectedCategory || null }).then(() => {});
     }
@@ -150,44 +162,45 @@ export function useSearchPage() {
     try {
       let products: ProductSearchResult[] = [];
       const effectiveCategories = selectedCategory ? [selectedCategory, ...filters.categories.filter(c => c !== selectedCategory)] : filters.categories;
+      const radius = browseBeyond ? searchRadius : 2;
 
-      if (term.length >= 2) {
-        const searchTerm = `%${term.trim()}%`;
-        let productQ = supabase.from('products').select('id, name, price, description, prep_time_minutes, image_url, is_veg, category, seller_id, action_type, contact_phone, mrp, brand, unit_type, price_per_unit, stock_quantity, tags, discount_percentage, delivery_time_text, serving_size, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status, fulfillment_mode, delivery_note)').eq('is_available', true).eq('approval_status', 'approved').eq('seller.verification_status', 'approved').or(`name.ilike.${searchTerm},description.ilike.${searchTerm},brand.ilike.${searchTerm},category.ilike.${searchTerm}`).order('created_at', { ascending: false }).limit(80);
-        if (effectiveSocietyId && !browseBeyond) productQ = productQ.eq('seller.society_id', effectiveSocietyId);
-        if (effectiveCategories.length > 0) productQ = productQ.in('category', effectiveCategories);
+      if (term.length >= 2 && hasCoords) {
+        // Primary: coordinate-based RPC search
+        const rpcPromise = supabase.rpc('search_sellers_by_location', {
+          _lat: lat!, _lng: lng!, _radius_km: radius,
+          _search_term: term.trim(),
+          _category: selectedCategory || (effectiveCategories.length === 1 ? effectiveCategories[0] : null),
+        });
 
-        let sellerQ = supabase.from('products').select('id, name, price, description, prep_time_minutes, image_url, is_veg, category, seller_id, action_type, contact_phone, mrp, discount_percentage, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status, fulfillment_mode, delivery_note)').eq('is_available', true).eq('approval_status', 'approved').eq('seller.verification_status', 'approved').ilike('seller.business_name' as any, searchTerm).order('created_at', { ascending: false }).limit(30);
-        if (effectiveSocietyId && !browseBeyond) sellerQ = sellerQ.eq('seller.society_id', effectiveSocietyId);
+        const { data: rpcData, error: rpcError } = await rpcPromise;
 
-        const nearbyPromise = (browseBeyond && effectiveSocietyId)
-          ? supabase.rpc('search_nearby_sellers', { _buyer_society_id: effectiveSocietyId, _radius_km: searchRadius, _search_term: term.trim(), _category: selectedCategory || (effectiveCategories.length === 1 ? effectiveCategories[0] : null) }).then(res => res, () => ({ data: null, error: null }))
-          : Promise.resolve({ data: null, error: null });
-
-        const [productResult, sellerResult, nearbyResult] = await Promise.all([productQ, sellerQ, nearbyPromise]);
-
-        if (productResult.data) productResult.data.forEach((p: any) => { const isSame = !browseBeyond || (effectiveSocietyId ? p.seller?.society_id === effectiveSocietyId : true); products.push(mapProduct(p, isSame)); });
-        if (sellerResult.data) { const existingIds = new Set(products.map(p => p.product_id)); sellerResult.data.forEach((p: any) => { if (!existingIds.has(p.id)) products.push(mapProduct(p, true)); }); }
-        if (nearbyResult.data && !nearbyResult.error) {
-          const existingIds = new Set(products.map(p => p.product_id));
-          (nearbyResult.data as any[]).forEach((seller: any) => {
-            (seller.matching_products || []).forEach((p: any) => {
-              if (!existingIds.has(p.id)) {
-                existingIds.add(p.id);
-                products.push({ product_id: p.id, product_name: p.name, price: p.price, image_url: p.image_url, is_veg: p.is_veg, category: p.category, description: null, prep_time_minutes: null, fulfillment_mode: null, delivery_note: null, action_type: p.action_type || 'add_to_cart', contact_phone: p.contact_phone || null, mrp: p.mrp || null, discount_percentage: p.discount_percentage || null, seller_id: seller.seller_id, seller_name: seller.business_name || '', seller_rating: seller.rating || 0, seller_reviews: seller.total_reviews || 0, society_name: seller.society_name || null, distance_km: seller.distance_km || null, is_same_society: false });
+        if (!rpcError && rpcData) {
+          const existingIds = new Set<string>();
+          (rpcData as any[]).forEach((seller) => {
+            mapSellerRpcProducts(seller).forEach((p) => {
+              if (!existingIds.has(p.product_id)) {
+                existingIds.add(p.product_id);
+                products.push(p);
               }
             });
           });
         }
-      } else if (selectedCategory || effectiveCategories.length > 0) {
-        let q = supabase.from('products').select('id, name, price, description, prep_time_minutes, image_url, is_veg, category, seller_id, action_type, contact_phone, mrp, discount_percentage, seller:seller_profiles!inner(id, business_name, rating, total_reviews, society_id, verification_status, fulfillment_mode, delivery_note)').eq('is_available', true).eq('approval_status', 'approved').eq('seller.verification_status', 'approved').order('created_at', { ascending: false }).limit(50);
-        if (effectiveSocietyId && !browseBeyond) q = q.eq('seller.society_id', effectiveSocietyId);
+      } else if ((selectedCategory || effectiveCategories.length > 0) && hasCoords) {
+        // Category-only filter (no search term) — use RPC with category filter
         const targetCategory = selectedCategory || effectiveCategories[0];
-        if (targetCategory) q = q.eq('category', targetCategory);
-        const { data } = await q;
-        if (data) data.forEach((p: any) => products.push(mapProduct(p)));
+        const { data: rpcData, error: rpcError } = await supabase.rpc('search_sellers_by_location', {
+          _lat: lat!, _lng: lng!, _radius_km: radius,
+          _category: targetCategory || null,
+        });
+
+        if (!rpcError && rpcData) {
+          (rpcData as any[]).forEach((seller) => {
+            mapSellerRpcProducts(seller).forEach((p) => products.push(p));
+          });
+        }
       }
 
+      // Apply client-side filters
       let filtered = products;
       if (filters.minRating > 0) filtered = filtered.filter((p) => p.seller_rating >= filters.minRating);
       if (filters.isVeg === true) filtered = filtered.filter((p) => p.is_veg === true);
