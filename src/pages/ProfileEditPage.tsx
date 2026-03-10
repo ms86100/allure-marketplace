@@ -24,6 +24,7 @@ export default function ProfileEditPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<any>(null);
+  const detailsRef = useRef<HTMLDivElement>(null);
 
   // Auto-open address form if no addresses exist
   const shouldAutoOpen = !addressesLoading && addresses.length === 0 && !showAddressForm;
