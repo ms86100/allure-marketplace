@@ -194,7 +194,9 @@ export default function CartPage() {
               <><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deliver to</p><p className="text-sm font-medium mt-0.5">{c.profile?.name} — {[c.profile?.block, c.profile?.flat_number].filter(Boolean).join(', ')}</p><p className="text-xs text-muted-foreground">{c.society?.name || 'Your Society'}</p></>
             )}
           </div>
-          {/* #7: Removed misleading ChevronRight — address card is not interactive */}
+          {c.fulfillmentType !== 'self_pickup' && (
+            <Link to="/profile/edit" className="text-xs text-primary font-semibold shrink-0">Change</Link>
+          )}
         </div>
 
         {c.sellerGroups.length > 1 && (<p className="text-xs text-muted-foreground text-center mt-4 px-4">Your cart has items from {c.sellerGroups.length} sellers. Separate orders will be created for each.</p>)}
