@@ -32,6 +32,7 @@ export interface ProductWithSeller {
   completed_order_count?: number; fulfillment_mode?: string | null; delivery_note?: string | null;
   seller_availability_start?: string | null; seller_availability_end?: string | null;
   seller_operating_days?: string[] | null; seller_is_available?: boolean;
+  society_name?: string | null; distance_km?: number | null;
   created_at: string; updated_at: string; [key: string]: any;
 }
 
@@ -99,10 +100,17 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
   const variantText = product.unit_type ? (product.price_per_unit || product.unit_type) : (product.serving_size || null);
 
   const distanceLabel = useMemo(() => {
-    const distKm = (product as any).distance_km;
-    if (distKm != null) return distKm < 1 ? ml.label('label_distance_m_format').replace('{distance}', String(Math.round(distKm * 1000))) : ml.label('label_distance_km_format').replace('{distance}', String(distKm));
+    const distKm = product.distance_km ?? (product as any).distance_km;
+    if (distKm != null) return distKm < 1 ? ml.label('label_distance_m_format').replace('{distance}', String(Math.round(distKm * 1000))) : ml.label('label_distance_km_format').replace('{distance}', String(Math.round(distKm * 10) / 10));
     return null;
-  }, [(product as any).distance_km, ml]);
+  }, [product.distance_km, (product as any).distance_km, ml]);
+
+  const locationLabel = useMemo(() => {
+    const socName = product.society_name ?? (product as any).society_name;
+    if (socName) return distanceLabel ? `${socName} · ${distanceLabel}` : socName;
+    if (distanceLabel) return `Nearby · ${distanceLabel}`;
+    return null;
+  }, [product.society_name, (product as any).society_name, distanceLabel]);
 
   const activityLabel = useMemo(() => { if (!(product as any).last_active_at) return ''; return formatSellerActivity((product as any).last_active_at, ml); }, [(product as any).last_active_at, ml]);
   const onTimeBadgeMinOrders = ml.threshold('on_time_badge_min_orders');
@@ -119,7 +127,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
           {hasDiscount && discountPct > 0 && (<div className="absolute top-1.5 right-1.5"><span className="bg-badge-discount text-foreground text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">{discountPct}% OFF</span></div>)}
           {showVegBadge && (<div className="absolute bottom-1.5 right-1.5"><VegBadge isVeg={product.is_veg} size="sm" /></div>)}
           <div className="absolute bottom-1.5 left-1.5">
-            {distanceLabel ? (<span className="inline-flex items-center gap-0.5 bg-primary/90 backdrop-blur-sm text-[7px] font-bold text-primary-foreground px-1.5 py-0.5 rounded-full shadow-sm"><MapPin size={7} className="shrink-0" />{distanceLabel}</span>) : (product as any).is_same_society !== false ? (<span className="inline-flex items-center gap-0.5 bg-primary/90 backdrop-blur-sm text-[7px] font-bold text-primary-foreground px-1.5 py-0.5 rounded-full shadow-sm"><MapPin size={7} className="shrink-0" />{ml.label('label_in_your_society')}</span>) : null}
+            {locationLabel ? (<span className="inline-flex items-center gap-0.5 bg-primary/90 backdrop-blur-sm text-[7px] font-bold text-primary-foreground px-1.5 py-0.5 rounded-full shadow-sm max-w-[85%] truncate"><MapPin size={7} className="shrink-0" />{locationLabel}</span>) : (product as any).is_same_society !== false ? (<span className="inline-flex items-center gap-0.5 bg-primary/90 backdrop-blur-sm text-[7px] font-bold text-primary-foreground px-1.5 py-0.5 rounded-full shadow-sm"><MapPin size={7} className="shrink-0" />{ml.label('label_in_your_society')}</span>) : null}
           </div>
         </div>
         {!viewOnly && !isOutOfStock && !isStoreClosed && (
@@ -176,5 +184,5 @@ function formatSellerActivity(lastActiveAt: string, ml: ReturnType<typeof useMar
 }
 
 export const ProductListingCard = memo(ProductListingCardInner, (prev, next) => {
-  return prev.product.id === next.product.id && prev.product.is_available === next.product.is_available && prev.product.price === next.product.price && prev.product.stock_quantity === next.product.stock_quantity && prev.product.seller_is_available === next.product.seller_is_available && prev.product.seller_availability_start === next.product.seller_availability_start && prev.product.seller_availability_end === next.product.seller_availability_end && prev.layout === next.layout && prev.viewOnly === next.viewOnly && prev.className === next.className && prev.categoryConfigs === next.categoryConfigs && prev.marketplaceConfig === next.marketplaceConfig && prev.badgeConfigs === next.badgeConfigs && prev.socialProofCount === next.socialProofCount;
+  return prev.product.id === next.product.id && prev.product.is_available === next.product.is_available && prev.product.price === next.product.price && prev.product.stock_quantity === next.product.stock_quantity && prev.product.seller_is_available === next.product.seller_is_available && prev.product.seller_availability_start === next.product.seller_availability_start && prev.product.seller_availability_end === next.product.seller_availability_end && prev.product.distance_km === next.product.distance_km && prev.product.society_name === next.product.society_name && prev.layout === next.layout && prev.viewOnly === next.viewOnly && prev.className === next.className && prev.categoryConfigs === next.categoryConfigs && prev.marketplaceConfig === next.marketplaceConfig && prev.badgeConfigs === next.badgeConfigs && prev.socialProofCount === next.socialProofCount;
 });
