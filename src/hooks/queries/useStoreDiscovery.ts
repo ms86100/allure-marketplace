@@ -113,7 +113,7 @@ export function useNearbySocietySellers(radiusKm: number = 5, enabled: boolean =
         return [];
       }
 
-      if (!data) return [];
+      const sellers = (data as NearbySeller[]) || [];
 
       const ALL_BANDS: { label: string; minKm: number; maxKm: number }[] = [
         { label: 'Within 2 km', minKm: 0, maxKm: 2 },
