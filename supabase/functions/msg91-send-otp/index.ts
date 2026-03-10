@@ -59,7 +59,6 @@ Deno.serve(async (req) => {
       const retryRes = await fetch("https://api.msg91.com/api/v5/widget/retryOtp", {
         method: "POST",
         headers: {
-          authkey: authKey,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
