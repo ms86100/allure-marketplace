@@ -38,7 +38,7 @@ export function ShopByStore() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('seller_profiles')
-        .select('id, business_name, profile_image_url, cover_image_url, rating, total_reviews, primary_group, is_featured, products!inner(id)')
+        .select('id, business_name, profile_image_url, cover_image_url, rating, total_reviews, primary_group, is_featured, availability_start, availability_end, operating_days, is_available, products!inner(id)')
         .eq('verification_status', 'approved')
         .eq('is_available', true)
         .eq('society_id', effectiveSocietyId!)
