@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
@@ -23,6 +24,7 @@ export function MarketplaceSection() {
   const navigate = useNavigate();
   const { user, profile, effectiveSocietyId } = useAuth();
   const ml = useMarketplaceLabels();
+  const { browsingLocation } = useBrowsingLocation();
 
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -116,7 +118,7 @@ export function MarketplaceSection() {
 
       {!activeGroup && popularNearYou.length > (discoveryMinProducts || 3) && (
         <DiscoveryRow
-          title={ml.label('label_discovery_popular')}
+          title={browsingLocation?.label ? `${ml.label('label_discovery_popular')} · ${browsingLocation.label}` : ml.label('label_discovery_popular')}
           icon={<Flame size={14} className="text-destructive" />}
           products={popularNearYou}
           onProductTap={handleProductTap}

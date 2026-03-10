@@ -93,11 +93,18 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
   const isStoreClosed = isStoreCheckPending || isStoreUnknown || storeAvailability.status !== 'open';
   const storeClosedMsg = isStoreCheckPending ? 'Checking store availability…' : isStoreUnknown ? 'Store unavailable right now' : isStoreClosed ? formatStoreClosedMessage(storeAvailability) : '';
 
+  const distanceLabel = product?.distance_km != null
+    ? (product.distance_km < 1 ? ml.label('label_distance_m_format').replace('{distance}', String(Math.round(product.distance_km * 1000))) : ml.label('label_distance_km_format').replace('{distance}', String(Math.round(product.distance_km * 10) / 10)))
+    : null;
+  const locationText = useMemo(() => {
+    if (!product) return null;
+    if (product.society_name) return distanceLabel ? `${product.society_name} · ${distanceLabel}` : product.society_name;
+    if (distanceLabel) return `Nearby · ${distanceLabel}`;
+    return null;
+  }, [product?.society_name, distanceLabel]);
+
   if (!product) return null;
 
-  const distanceText = product.distance_km != null
-    ? (product.distance_km < 1 ? ml.label('label_distance_m_format').replace('{distance}', String(Math.round(product.distance_km * 1000))) : ml.label('label_distance_km_format').replace('{distance}', String(product.distance_km)))
-    : product.society_name;
 
   return (
     <>
@@ -149,7 +156,7 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
                   <p className="font-semibold text-sm text-foreground truncate">{product.seller_name}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     {d.isNewSeller ? <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">New Seller</Badge> : null}
-                    {product.is_same_society ? (<span className="flex items-center gap-0.5 text-[10px] text-accent font-medium"><Home size={10} /> {ml.label('label_your_neighbor')}</span>) : (<span className="flex items-center gap-0.5 text-[10px] text-muted-foreground"><MapPin size={10} />{distanceText}</span>)}
+                    {locationText ? (<span className="flex items-center gap-0.5 text-[10px] text-muted-foreground"><MapPin size={10} />{locationText}</span>) : product.is_same_society ? (<span className="flex items-center gap-0.5 text-[10px] text-accent font-medium"><Home size={10} /> {ml.label('label_your_neighbor')}</span>) : null}
                     {(product as any).last_active_at && (<span className="flex items-center gap-0.5 text-[10px] text-muted-foreground"><Clock size={9} />{formatSellerLastActive((product as any).last_active_at, ml)}</span>)}
                   </div>
                 </div>
