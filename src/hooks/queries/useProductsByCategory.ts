@@ -1,9 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { jitteredStaleTime } from '@/lib/query-utils';
-// Fix #5: Nearby products decoupled — caller merges externally if needed
+import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 
 interface CategoryGroup {
   category: string;
@@ -13,13 +12,21 @@ interface CategoryGroup {
   products: ProductWithSeller[];
 }
 
+/**
+ * Coordinate-based product discovery grouped by category.
+ * Uses search_sellers_by_location RPC with browsingLocation lat/lng.
+ */
 export function useProductsByCategory(limit = 50) {
-  const { effectiveSocietyId } = useAuth();
+  const { browsingLocation } = useBrowsingLocation();
   const queryClient = useQueryClient();
+  const lat = browsingLocation?.lat;
+  const lng = browsingLocation?.lng;
 
   const localQuery = useQuery({
-    queryKey: ['products-by-category', effectiveSocietyId, limit],
+    queryKey: ['products-by-category', lat, lng, limit],
     queryFn: async (): Promise<CategoryGroup[]> => {
+      if (!lat || !lng) return [];
+
       let configs: any[] | undefined = queryClient.getQueryData(['category-configs']);
 
       const configPromise = configs
@@ -31,52 +38,18 @@ export function useProductsByCategory(limit = 50) {
             .order('display_order')
             .then(({ data }) => data || []);
 
-      // Fix #16: Select only columns needed for card rendering
-      let query = supabase
-        .from('products')
-        .select(`
-          id, name, price, image_url, category, is_veg, is_available,
-          is_bestseller, is_recommended, is_urgent, action_type, contact_phone,
-          mrp, discount_percentage, brand, unit_type, price_per_unit,
-          stock_quantity, serving_size, delivery_time_text, tags,
-          prep_time_minutes, lead_time_hours, accepts_preorders,
-          seller_id, created_at, updated_at,
-          seller:seller_profiles!products_seller_id_fkey(
-            id, business_name, rating, society_id, verification_status, fulfillment_mode, delivery_note, last_active_at, on_time_delivery_pct, completed_order_count
-          )
-        `)
-        .eq('is_available', true)
-        .eq('approval_status', 'approved')
-        .order('is_bestseller', { ascending: false })
-        .order('updated_at', { ascending: false })
-        .limit(limit);
+      // Use coordinate-based RPC
+      const rpcPromise = supabase.rpc('search_sellers_by_location' as any, {
+        _lat: lat,
+        _lng: lng,
+        _radius_km: 10,
+      });
 
-      if (effectiveSocietyId) {
-        query = query.eq('seller.society_id', effectiveSocietyId);
-      }
+      const [resolvedConfigs, rpcResult] = await Promise.all([configPromise, rpcPromise]);
 
-      const [resolvedConfigs, { data: products, error }] = await Promise.all([
-        configPromise,
-        query,
-      ]);
+      if (rpcResult.error) throw rpcResult.error;
 
-      if (error) throw error;
-
-      const approved = (products || [])
-        .filter((p: any) => p.seller?.verification_status === 'approved')
-        .map((p: any) => ({
-          ...p,
-          seller_name: p.seller?.business_name || 'Seller',
-          seller_rating: p.seller?.rating || 0,
-          seller_id: p.seller_id,
-          fulfillment_mode: p.seller?.fulfillment_mode || null,
-          delivery_note: p.seller?.delivery_note || null,
-          last_active_at: p.seller?.last_active_at || null,
-          on_time_delivery_pct: p.seller?.on_time_delivery_pct ?? null,
-          completed_order_count: p.seller?.completed_order_count ?? 0,
-        }));
-
-      // Build config map for grouping
+      // Build config map
       const configMap = new Map(
         (resolvedConfigs || []).map((c: any) => [
           c.category,
@@ -84,41 +57,58 @@ export function useProductsByCategory(limit = 50) {
         ])
       );
 
-      return { approved, configMap } as any;
+      // Flatten seller → products
+      const allProducts: ProductWithSeller[] = [];
+      for (const seller of (rpcResult.data || []) as any[]) {
+        const items = seller.matching_products;
+        if (!Array.isArray(items)) continue;
+        for (const p of items) {
+          allProducts.push({
+            ...p,
+            seller_id: seller.seller_id,
+            seller_name: seller.business_name || 'Seller',
+            seller_rating: seller.rating || 0,
+            is_available: true,
+            is_bestseller: false,
+            is_recommended: false,
+            is_urgent: false,
+            description: null,
+            fulfillment_mode: null,
+            delivery_note: null,
+            created_at: '',
+            updated_at: '',
+          });
+        }
+      }
+
+      // Group by category
+      const grouped: Record<string, ProductWithSeller[]> = {};
+      for (const product of allProducts) {
+        const cat = product.category;
+        if (!grouped[cat]) grouped[cat] = [];
+        if (grouped[cat].length < limit) grouped[cat].push(product);
+      }
+
+      const result: CategoryGroup[] = [];
+      for (const [category, items] of Object.entries(grouped)) {
+        const cfg = configMap.get(category);
+        result.push({
+          category,
+          parentGroup: cfg?.parent_group || category,
+          displayName: cfg?.display_name || category,
+          icon: cfg?.icon || '📦',
+          products: items,
+        });
+      }
+
+      return result;
     },
-    enabled: !!effectiveSocietyId,
-    staleTime: jitteredStaleTime(10 * 60 * 1000), // 10 min — product list is moderately dynamic
+    enabled: !!(lat && lng),
+    staleTime: jitteredStaleTime(10 * 60 * 1000),
   });
-
-  // Post-process: group by category (nearby products merged externally by caller)
-  const rawData = localQuery.data as any;
-  let result: CategoryGroup[] = [];
-
-  if (rawData?.approved) {
-    const allProducts = rawData.approved;
-    const configMap: Map<string, any> = rawData.configMap;
-
-    const grouped: Record<string, ProductWithSeller[]> = {};
-    for (const product of allProducts) {
-      const cat = product.category;
-      if (!grouped[cat]) grouped[cat] = [];
-      grouped[cat].push(product);
-    }
-
-    for (const [category, items] of Object.entries(grouped)) {
-      const cfg = configMap.get(category);
-      result.push({
-        category,
-        parentGroup: cfg?.parent_group || category,
-        displayName: cfg?.display_name || category,
-        icon: cfg?.icon || '📦',
-        products: items,
-      });
-    }
-  }
 
   return {
     ...localQuery,
-    data: result,
+    data: localQuery.data || [],
   };
 }

@@ -41,75 +41,78 @@ export interface SocietyGroup {
   sellersByGroup: Record<string, NearbySeller[]>;
 }
 
+/**
+ * Coordinate-based "local" sellers within ~2 km of browsingLocation.
+ * Replaces the old society_id–based query.
+ */
 export function useLocalSellers() {
-  const { effectiveSocietyId, isApproved } = useAuth();
+  const { isApproved } = useAuth();
+  const { browsingLocation } = useBrowsingLocation();
+  const lat = browsingLocation?.lat;
+  const lng = browsingLocation?.lng;
 
   return useQuery({
-    queryKey: ['store-discovery', 'local', effectiveSocietyId],
+    queryKey: ['store-discovery', 'local', lat, lng],
     queryFn: async () => {
-      if (!effectiveSocietyId) return {};
+      if (!lat || !lng) return {};
 
-      const { data, error } = await supabase
-        .from('seller_profiles')
-        .select('id, business_name, profile_image_url, rating, total_reviews, primary_group, categories, is_featured, products!inner(id)')
-        .eq('society_id', effectiveSocietyId)
-        .eq('verification_status', 'approved')
-        .eq('is_available', true)
-        .eq('products.is_available', true)
-        .eq('products.approval_status', 'approved')
-        .order('is_featured', { ascending: false })
-        .order('rating', { ascending: false })
-        .limit(20);
+      const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
+        _lat: lat,
+        _lng: lng,
+        _radius_km: 2, // hyper-local
+      });
 
       if (error) {
         console.error('Local sellers error:', error);
         return {};
       }
 
-      // Strip joined products and group by primary_group
-      const cleaned = (data || []).map(({ products, ...rest }: any) => rest);
+      // Group by primary_group, same shape as before
       const grouped: Record<string, LocalSeller[]> = {};
-      for (const seller of cleaned) {
+      for (const seller of (data || []) as any[]) {
         const group = seller.primary_group || 'Other';
         if (!grouped[group]) grouped[group] = [];
-        grouped[group].push(seller as LocalSeller);
+        grouped[group].push({
+          id: seller.seller_id,
+          business_name: seller.business_name,
+          profile_image_url: seller.profile_image_url,
+          rating: seller.rating || 0,
+          total_reviews: seller.total_reviews || 0,
+          primary_group: seller.primary_group,
+          categories: seller.categories,
+          is_featured: seller.is_featured || false,
+        });
       }
       return grouped;
     },
-    enabled: !!isApproved && !!effectiveSocietyId,
-    staleTime: jitteredStaleTime(10 * 60_000), // 10 min — sellers don't change often
+    enabled: !!isApproved && !!(lat && lng),
+    staleTime: jitteredStaleTime(10 * 60_000),
   });
 }
 
+/**
+ * Coordinate-based nearby sellers grouped by distance band.
+ * Always uses search_sellers_by_location with browsingLocation.
+ */
 export function useNearbySocietySellers(radiusKm: number = 5, enabled: boolean = true) {
-  const { effectiveSocietyId, isApproved } = useAuth();
+  const { isApproved } = useAuth();
   const { browsingLocation } = useBrowsingLocation();
-
-  const useCoordSearch = browsingLocation && browsingLocation.source !== 'society';
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
 
   return useQuery({
-    queryKey: ['store-discovery', 'nearby', useCoordSearch ? `loc-${lat}-${lng}` : effectiveSocietyId, radiusKm],
+    queryKey: ['store-discovery', 'nearby', lat, lng, radiusKm],
     queryFn: async () => {
-      let data: any[] | null = null;
+      if (!lat || !lng) return [];
 
-      if (useCoordSearch && lat && lng) {
-        const result = await supabase.rpc('search_sellers_by_location' as any, {
-          _lat: lat,
-          _lng: lng,
-          _radius_km: radiusKm,
-        });
-        if (result.error) { console.error('Nearby sellers error:', result.error); return []; }
-        data = result.data;
-      } else if (effectiveSocietyId) {
-        const result = await supabase.rpc('search_nearby_sellers', {
-          _buyer_society_id: effectiveSocietyId,
-          _radius_km: radiusKm,
-        });
-        if (result.error) { console.error('Nearby sellers error:', result.error); return []; }
-        data = result.data;
-      } else {
+      const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
+        _lat: lat,
+        _lng: lng,
+        _radius_km: radiusKm,
+      });
+
+      if (error) {
+        console.error('Nearby sellers error:', error);
         return [];
       }
 
@@ -127,7 +130,6 @@ export function useNearbySocietySellers(radiusKm: number = 5, enabled: boolean =
           s => s.distance_km >= band.minKm && s.distance_km < band.maxKm
         );
 
-        // Group by society
         const societyMap: Record<string, { distanceKm: number; sellers: NearbySeller[] }> = {};
         for (const s of bandSellers) {
           const key = s.society_name;
@@ -152,7 +154,7 @@ export function useNearbySocietySellers(radiusKm: number = 5, enabled: boolean =
 
       return bands;
     },
-    enabled: !!isApproved && !!(useCoordSearch ? (lat && lng) : effectiveSocietyId) && enabled,
-    staleTime: jitteredStaleTime(10 * 60_000), // 10 min — nearby sellers don't change often
+    enabled: !!isApproved && !!(lat && lng) && enabled,
+    staleTime: jitteredStaleTime(10 * 60_000),
   });
 }

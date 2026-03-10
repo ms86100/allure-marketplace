@@ -1,53 +1,64 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { useNearbyProducts, mergeProducts } from './useNearbyProducts';
+import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 
+/**
+ * Popular products discovered via coordinate-based search.
+ * Uses search_sellers_by_location with browsingLocation lat/lng.
+ */
 export function usePopularProducts(limit = 12) {
-  const { effectiveSocietyId } = useAuth();
+  const { browsingLocation } = useBrowsingLocation();
   const { data: nearbyProducts } = useNearbyProducts();
+  const lat = browsingLocation?.lat;
+  const lng = browsingLocation?.lng;
 
   const localQuery = useQuery({
-    queryKey: ['popular-products', effectiveSocietyId, limit],
+    queryKey: ['popular-products', lat, lng, limit],
     queryFn: async (): Promise<ProductWithSeller[]> => {
-      let query = supabase
-        .from('products')
-        .select(`
-          *,
-          seller:seller_profiles!products_seller_id_fkey(
-            id, business_name, rating, society_id, verification_status, fulfillment_mode, delivery_note
-          )
-        `)
-        .eq('is_available', true)
-        .eq('approval_status', 'approved')
-        .order('is_bestseller', { ascending: false })
-        .order('updated_at', { ascending: false })
-        .limit(limit);
+      if (!lat || !lng) return [];
 
-      if (effectiveSocietyId) {
-        query = query.eq('seller.society_id', effectiveSocietyId);
+      // Use coordinate-based RPC to find sellers, then extract products
+      const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
+        _lat: lat,
+        _lng: lng,
+        _radius_km: 5, // popular = within 5km
+      });
+
+      if (error) throw error;
+      if (!data || data.length === 0) return [];
+
+      const products: ProductWithSeller[] = [];
+      for (const seller of data as any[]) {
+        const items = seller.matching_products;
+        if (!Array.isArray(items)) continue;
+        for (const p of items) {
+          products.push({
+            ...p,
+            seller_id: seller.seller_id,
+            seller_name: seller.business_name || 'Seller',
+            seller_rating: seller.rating || 0,
+            is_available: true,
+            is_bestseller: false,
+            is_recommended: false,
+            is_urgent: false,
+            description: null,
+            fulfillment_mode: null,
+            delivery_note: null,
+            created_at: '',
+            updated_at: '',
+          });
+        }
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-
-      return (data || [])
-        .filter((p: any) => p.seller?.verification_status === 'approved')
-        .map((p: any) => ({
-          ...p,
-          seller_name: p.seller?.business_name || 'Seller',
-          seller_rating: p.seller?.rating || 0,
-          seller_id: p.seller_id,
-          fulfillment_mode: p.seller?.fulfillment_mode || null,
-          delivery_note: p.seller?.delivery_note || null,
-        }));
+      // Sort: bestsellers first, then by name; limit
+      return products.slice(0, limit);
     },
-    enabled: !!effectiveSocietyId,
+    enabled: !!(lat && lng),
     staleTime: 5 * 60 * 1000,
   });
 
-  // Merge local + nearby, return same react-query shape
   const merged = mergeProducts(localQuery.data || [], nearbyProducts);
 
   return {
@@ -56,13 +67,21 @@ export function usePopularProducts(limit = 12) {
   };
 }
 
-export function useCategoryProducts(parentGroup: string | null, societyId: string | null) {
+/**
+ * Products for a specific parentGroup, coordinate-based.
+ */
+export function useCategoryProducts(parentGroup: string | null) {
   const { data: nearbyProducts } = useNearbyProducts();
+  const { browsingLocation } = useBrowsingLocation();
+  const lat = browsingLocation?.lat;
+  const lng = browsingLocation?.lng;
 
   const localQuery = useQuery({
-    queryKey: ['category-products', parentGroup, societyId],
+    queryKey: ['category-products', parentGroup, lat, lng],
     queryFn: async (): Promise<ProductWithSeller[]> => {
-      // First get all categories belonging to this parent group
+      if (!lat || !lng) return [];
+
+      // Get categories for this parent group
       const { data: catConfigs } = await supabase
         .from('category_config')
         .select('category')
@@ -71,50 +90,49 @@ export function useCategoryProducts(parentGroup: string | null, societyId: strin
       const categoryList = (catConfigs || []).map((c: any) => c.category);
       if (categoryList.length === 0) return [];
 
-      let query = supabase
-        .from('products')
-        .select(`
-          *,
-          seller:seller_profiles!products_seller_id_fkey(
-            id, business_name, rating, society_id, verification_status, primary_group, fulfillment_mode, delivery_note
-          )
-        `)
-        .eq('is_available', true)
-        .eq('approval_status', 'approved')
-        .in('category', categoryList)
-        .order('is_bestseller', { ascending: false })
-        .order('created_at', { ascending: false });
+      // Use coordinate-based RPC with category filter
+      // We call once per category since the RPC accepts a single _category
+      // For efficiency, call without category filter and filter client-side
+      const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
+        _lat: lat,
+        _lng: lng,
+        _radius_km: 10,
+      });
 
-      if (societyId) {
-        query = query.eq('seller.society_id', societyId);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
+      if (!data || data.length === 0) return [];
 
-      return (data || []).filter((p: any) => p.seller?.verification_status === 'approved').map((p: any) => ({
-        ...p,
-        seller_name: p.seller?.business_name || 'Seller',
-        seller_rating: p.seller?.rating || 0,
-        seller_id: p.seller_id,
-        fulfillment_mode: p.seller?.fulfillment_mode || null,
-        delivery_note: p.seller?.delivery_note || null,
-      }));
+      const categorySet = new Set(categoryList);
+      const products: ProductWithSeller[] = [];
+
+      for (const seller of data as any[]) {
+        const items = seller.matching_products;
+        if (!Array.isArray(items)) continue;
+        for (const p of items) {
+          if (!categorySet.has(p.category)) continue;
+          products.push({
+            ...p,
+            seller_id: seller.seller_id,
+            seller_name: seller.business_name || 'Seller',
+            seller_rating: seller.rating || 0,
+            is_available: true,
+            is_bestseller: false,
+            is_recommended: false,
+            is_urgent: false,
+            description: null,
+            fulfillment_mode: null,
+            delivery_note: null,
+            created_at: '',
+            updated_at: '',
+          });
+        }
+      }
+      return products;
     },
-    enabled: !!parentGroup,
+    enabled: !!parentGroup && !!(lat && lng),
     staleTime: 3 * 60 * 1000,
   });
 
-  // Filter nearby products to match the requested parentGroup
-  // We need category_config to map product categories → parent groups, but
-  // the RPC doesn't return parent_group. Instead we filter by the seller's
-  // primary_group which is already encoded in the nearby data via the RPC's
-  // seller row. We can't do that here directly, so we include ALL nearby
-  // products and let the caller filter by category if needed.
-  // Actually, the nearby data doesn't have primary_group per product, so
-  // we'll just merge all and the caller (CategoryGroupPage) already filters
-  // by sub-category. This is acceptable since the RPC already filters by
-  // approved sellers with products.
   const merged = mergeProducts(localQuery.data || [], nearbyProducts);
 
   return {

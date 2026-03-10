@@ -6,49 +6,32 @@ import { jitteredStaleTime } from '@/lib/query-utils';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 
 /**
- * Shared hook that calls `search_sellers_by_location` RPC (coordinate-based)
- * or falls back to `search_nearby_sellers` (society-based) and returns
- * a flat, deduplicated list of cross-society products.
+ * Coordinate-based discovery hook. Always uses search_sellers_by_location
+ * with browsingLocation lat/lng. Returns a flat, deduplicated product list.
  */
 export function useNearbyProducts() {
-  const { effectiveSocietyId, profile } = useAuth();
+  const { profile } = useAuth();
   const { browsingLocation } = useBrowsingLocation();
 
   const browseBeyond = profile?.browse_beyond_community !== false;
   const searchRadius = profile?.search_radius_km ?? 10;
-
-  // Use coordinate-based search when browsing location has an override (GPS or address)
-  const useCoordSearch = browsingLocation && browsingLocation.source !== 'society';
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
 
   return useQuery({
-    queryKey: ['store-discovery', 'nearby-products', useCoordSearch ? `loc-${lat}-${lng}` : effectiveSocietyId, searchRadius],
+    queryKey: ['store-discovery', 'nearby-products', lat, lng, searchRadius],
     queryFn: async (): Promise<ProductWithSeller[]> => {
-      let data: any[] | null = null;
+      if (!lat || !lng) return [];
 
-      if (useCoordSearch && lat && lng) {
-        // Coordinate-based discovery
-        const result = await supabase.rpc('search_sellers_by_location' as any, {
-          _lat: lat,
-          _lng: lng,
-          _radius_km: searchRadius,
-        });
-        if (result.error) throw result.error;
-        data = result.data;
-      } else if (effectiveSocietyId) {
-        // Society-based discovery (fallback)
-        const result = await supabase.rpc('search_nearby_sellers', {
-          _buyer_society_id: effectiveSocietyId,
-          _radius_km: searchRadius,
-        });
-        if (result.error) throw result.error;
-        data = result.data;
-      }
+      const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
+        _lat: lat,
+        _lng: lng,
+        _radius_km: searchRadius,
+      });
 
+      if (error) throw error;
       if (!data || data.length === 0) return [];
 
-      // Flatten: each seller row has a `matching_products` JSONB array
       const products: ProductWithSeller[] = [];
       for (const seller of data as any[]) {
         const items = seller.matching_products;
@@ -83,7 +66,7 @@ export function useNearbyProducts() {
       }
       return products;
     },
-    enabled: browseBeyond && !!(useCoordSearch ? (lat && lng) : effectiveSocietyId),
+    enabled: browseBeyond && !!(lat && lng),
     staleTime: jitteredStaleTime(10 * 60 * 1000),
   });
 }
