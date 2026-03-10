@@ -29,7 +29,9 @@ Deno.serve(async (req) => {
     }
 
     const authKey = Deno.env.get("MSG91_AUTH_KEY");
-    if (!authKey) {
+    const widgetId = Deno.env.get("MSG91_WIDGET_ID");
+    const tokenAuth = Deno.env.get("MSG91_TOKEN_AUTH");
+    if (!authKey || !widgetId || !tokenAuth) {
       return new Response(
         JSON.stringify({ error: "OTP service not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -40,10 +42,9 @@ Deno.serve(async (req) => {
     const verifyRes = await fetch("https://api.msg91.com/api/v5/widget/verifyOtp", {
       method: "POST",
       headers: {
-        authkey: authKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ reqId, otp }),
+      body: JSON.stringify({ reqId, otp, widgetId, tokenAuth, authkey: authKey }),
     });
     const verifyData = await verifyRes.json();
     console.log("MSG91 Widget verify response:", JSON.stringify(verifyData));
