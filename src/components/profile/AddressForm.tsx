@@ -114,8 +114,10 @@ export function AddressForm({ initial, onSave, onCancel, saving }: AddressFormPr
     setDetecting(true);
     try {
       const pos = await getCurrentPosition();
-      update('latitude', pos.latitude);
-      update('longitude', pos.longitude);
+      // Clear stale society/building data from previous autocomplete selection
+      setForm(f => ({ ...f, latitude: pos.latitude, longitude: pos.longitude, building_name: '' }));
+      setSearchQuery('');
+      clearPredictions();
       setShowMap(true);
 
       // Reverse geocode
