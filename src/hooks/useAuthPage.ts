@@ -6,6 +6,7 @@ import { friendlyError } from '@/lib/utils';
 import { Society } from '@/types/database';
 import { useAutocomplete, PlaceDetails } from '@/hooks/useGoogleMaps';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
+import { usePushNotifications } from '@/contexts/PushNotificationContext';
 
 export type AuthStep = 'phone' | 'otp' | 'society';
 export type SocietySubStep = 'search' | 'map-confirm' | 'request-form';
