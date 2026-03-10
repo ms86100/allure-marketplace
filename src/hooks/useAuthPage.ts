@@ -133,7 +133,17 @@ export function useAuthPage() {
       const { data, error } = await supabase.functions.invoke('msg91-verify-otp', {
         body: { reqId: otpReqId, otp, country_code: '91' },
       });
-      if (error) throw error;
+      
+      // Parse error from edge function response
+      if (error) {
+        // Try to get the actual error message from the response
+        let errorMsg = 'OTP verification failed';
+        try {
+          const context = await (error as any)?.context?.json?.();
+          if (context?.error) errorMsg = context.error;
+        } catch { /* ignore parse errors */ }
+        throw new Error(errorMsg);
+      }
       if (data?.error) throw new Error(data.error);
 
       const { token_hash, is_new_user } = data;
