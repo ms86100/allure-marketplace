@@ -323,8 +323,8 @@ export function useAuthPage() {
         }
       }
 
-      toast.success('Welcome! Your account is set up.');
-      navigate('/');
+      toast.success('Welcome! Complete your profile to get started.');
+      navigate('/profile/edit');
     } catch (error: any) {
       toast.error(friendlyError(error));
     } finally {
