@@ -155,7 +155,7 @@ export default function ProfileEditPage() {
         </div>
 
         {/* ═══ SECTION 2: YOUR NAME ═══ */}
-        <div className="px-4 mt-6">
+        <div ref={detailsRef} className="px-4 mt-6">
           <h3 className="text-sm font-semibold text-foreground mb-3">Your Details</h3>
           <div className="rounded-2xl border border-border bg-card p-4 space-y-4">
             {/* Name */}
