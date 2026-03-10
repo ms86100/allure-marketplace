@@ -34,6 +34,16 @@ Deno.serve(async (req) => {
     const widgetId = Deno.env.get("MSG91_WIDGET_ID");
     const tokenAuth = Deno.env.get("MSG91_TOKEN_AUTH");
 
+    // Diagnostic logging (no secret values)
+    console.log("MSG91 config check:", {
+      hasAuthKey: !!authKey,
+      authKeyLength: authKey?.length || 0,
+      hasWidgetId: !!widgetId,
+      widgetIdLength: widgetId?.length || 0,
+      hasTokenAuth: !!tokenAuth,
+      tokenAuthLength: tokenAuth?.length || 0,
+    });
+
     if (!authKey || !widgetId || !tokenAuth) {
       console.error("MSG91 Widget credentials not configured");
       return new Response(
@@ -42,11 +52,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    let response: Response;
+    let data: any;
 
     if (resend) {
       // ─── Retry OTP via Widget API ───
-      response = await fetch("https://api.msg91.com/api/v5/widget/retryOtp", {
+      const retryRes = await fetch("https://api.msg91.com/api/v5/widget/retryOtp", {
         method: "POST",
         headers: {
           authkey: authKey,
@@ -57,38 +67,48 @@ Deno.serve(async (req) => {
           retryChannel: 11, // 11 = SMS
         }),
       });
+      data = await retryRes.json();
+      console.log("MSG91 Widget retry response:", JSON.stringify(data));
     } else {
       // ─── Send OTP via Widget API ───
       const identifier = `${country_code}${phone}`;
-      response = await fetch("https://api.msg91.com/api/v5/widget/sendOtp", {
+      const requestBody = {
+        identifier,
+        widgetId,
+        tokenAuth,
+      };
+      console.log("MSG91 Widget sendOtp request body (no secrets):", {
+        identifier,
+        widgetIdPrefix: widgetId.substring(0, 6) + "...",
+        tokenAuthPrefix: tokenAuth.substring(0, 6) + "...",
+      });
+
+      const sendRes = await fetch("https://api.msg91.com/api/v5/widget/sendOtp", {
         method: "POST",
         headers: {
           authkey: authKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          identifier,
-          widgetId,
-          tokenAuth,
-        }),
+        body: JSON.stringify(requestBody),
       });
+      data = await sendRes.json();
+      console.log("MSG91 Widget send response:", JSON.stringify(data));
     }
 
-    const data = await response.json();
-    console.log("MSG91 Widget response:", JSON.stringify(data));
-
-    if (data.type === "success" || response.ok) {
+    // Strictly check for success — do NOT use response.ok as fallback
+    if (data.type === "success") {
       return new Response(
         JSON.stringify({
           success: true,
           message: resend ? "OTP resent" : "OTP sent",
-          reqId: data.reqId || reqId, // Return reqId for subsequent calls
+          reqId: data.reqId || reqId,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.error("MSG91 Widget send OTP failed:", data);
+    // Error from MSG91
+    console.error("MSG91 Widget OTP failed:", JSON.stringify(data));
     return new Response(
       JSON.stringify({ error: data.message || "Failed to send OTP. Please try again." }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
