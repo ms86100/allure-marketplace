@@ -48,6 +48,7 @@ function HeaderInner({
   const unreadCount = useUnreadNotificationCount();
   const societyStats = useSocietyStats(effectiveSocietyId, isApproved);
   const { browsingLocation } = useBrowsingLocation();
+  const { data: locationStats } = useLocationStats(browsingLocation?.lat, browsingLocation?.lng);
 
   const displaySociety = effectiveSociety || society;
   const isViewingAs = viewAsSocietyId && (isAdmin || isBuilderMember);
