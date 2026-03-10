@@ -1,50 +1,50 @@
 
 
-## Notification Health Check — User-Friendly UI
+## Investigation Summary
 
-### What We'll Build
+The edge function works and MSG91 returns `{"type":"success"}` with a `request_id`, but the MSG91 SendOTP Logs panel shows "Nothing Here." This means MSG91 is accepting the HTTP request but **not actually processing it as an OTP send**. This is a known MSG91 behavior when the template ID doesn't match or the request format is wrong.
 
-A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
+## Root Cause (most likely)
 
-### UI Design
+The current code uses a **GET** request. MSG91's newer OTP API versions require **POST with JSON body**. The GET endpoint may silently accept and drop requests with mismatched templates.
 
-**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
+## Plan
 
-**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
+### 1. Update `msg91-send-otp` edge function
+- Switch from **GET** to **POST** with JSON body for the send request
+- Send body: `{ template_id, mobile, otp_length: 6 }`
+- Keep retry/resend as GET (that endpoint is GET-only)
 
-| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
-|---|---|---|
-| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
-| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
-| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
-| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
+### 2. Verify template ID
+- Ask user to double-check the `MSG91_OTP_TEMPLATE_ID` secret value matches exactly what's shown in MSG91 dashboard (Templates section)
 
-Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
+## Code Change
 
-**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
+**`supabase/functions/msg91-send-otp/index.ts`** — Change the send block:
 
-**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
+```typescript
+// BEFORE (GET — silently fails)
+url = `https://control.msg91.com/api/v5/otp?template_id=${templateId}&mobile=${mobile}&otp_length=6`;
+const response = await fetch(url, { method: "GET", headers: { authkey: authKey } });
 
-### Implementation
+// AFTER (POST with JSON body)
+const response = await fetch("https://control.msg91.com/api/v5/otp", {
+  method: "POST",
+  headers: {
+    authkey: authKey,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    template_id: templateId,
+    mobile: mobile,
+    otp_length: 6,
+    otp_expiry: 10,
+  }),
+});
+```
 
-**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
-- Renders the trigger button and the bottom sheet
-- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
-- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
-- Provides actionable buttons for failures (Open Settings, Retry Registration)
+Retry/resend path stays as GET (unchanged).
 
-**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
-- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
-- Consolidates the 7+ technical steps into 4 simple categories
-- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
-
-**3. Update `src/pages/ProfilePage.tsx`**
-- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
-- Keep Push Debug link visible only for admins
-
-**4. Optionally add to `src/pages/NotificationsPage.tsx`**
-- Add a small "Check notification status" link at the top
-
-### No backend changes needed
-The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
+### 3. User action needed
+- Confirm the `MSG91_OTP_TEMPLATE_ID` secret value is correct (copy-paste from MSG91 dashboard → SendOTP → Templates → your template's ID)
 
