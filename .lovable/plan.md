@@ -1,50 +1,53 @@
 
 
-## Notification Health Check — User-Friendly UI
+## Plan: Move All Discovery to Coordinate-Based (lat/lng)
 
-### What We'll Build
+You're right — tying discovery to `society_id` is a legacy constraint. Users without a society (or with a society missing coordinates) get zero results. The `browsingLocation` context already resolves lat/lng for every user, so all marketplace queries should use it as the primary input.
 
-A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
+### What Changes
 
-### UI Design
+**Principle**: Every marketplace discovery hook switches from `effectiveSocietyId` to `browsingLocation.lat/lng`. The `search_sellers_by_location` RPC becomes the single discovery engine. The old `search_nearby_sellers` (society-based) is kept as-is but no longer called from the frontend.
 
-**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
+### Affected Hooks (6 files)
 
-**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
+1. **`useLocalSellers`** — Currently filters `seller_profiles.society_id = effectiveSocietyId`. Replace with a call to `search_sellers_by_location` using `browsingLocation` lat/lng with a small radius (~2 km) to find "local" sellers. Group results by `primary_group` as before.
 
-| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
-|---|---|---|
-| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
-| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
-| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
-| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
+2. **`useNearbySocietySellers`** — Already has coordinate branch but falls back to society-based RPC. Remove the society fallback; always use `search_sellers_by_location` with `browsingLocation` lat/lng.
 
-Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
+3. **`useNearbyProducts`** — Same pattern: remove society-based fallback, always use coordinate search.
 
-**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
+4. **`usePopularProducts`** — Currently filters by `seller.society_id`. Switch to using `browsingLocation` lat/lng via the RPC or by filtering products from sellers within radius.
 
-**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
+5. **`useCategoryProducts`** — Same as above; remove `societyId` filter, use coordinate-based discovery.
 
-### Implementation
+6. **`useProductsByCategory`** — Same pattern.
 
-**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
-- Renders the trigger button and the bottom sheet
-- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
-- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
-- Provides actionable buttons for failures (Open Settings, Retry Registration)
+7. **`useSearchPage`** — Replace `search_nearby_sellers` calls with `search_sellers_by_location` using `browsingLocation`.
 
-**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
-- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
-- Consolidates the 7+ technical steps into 4 simple categories
-- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
+### Enabled Conditions
 
-**3. Update `src/pages/ProfilePage.tsx`**
-- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
-- Keep Push Debug link visible only for admins
+All hooks currently gate on `!!effectiveSocietyId`. This changes to `!!(browsingLocation?.lat && browsingLocation?.lng)`, which is resolved from the fallback chain (override → default address → society coordinates).
 
-**4. Optionally add to `src/pages/NotificationsPage.tsx`**
-- Add a small "Check notification status" link at the top
+### RPC Enhancement
 
-### No backend changes needed
-The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
+Update `search_sellers_by_location` to accept an optional `_local_radius_km` parameter (default 2) for the "local sellers" use case, so we can distinguish "hyper-local" from "nearby" without a separate query pattern.
+
+### What Stays Society-Based
+
+Community features (bulletin, help requests, gate entry, society admin) remain tied to `society_id` — no change there.
+
+### Migration for Missing Data
+
+Run a one-time backfill for "Shriram Greenfield" society coordinates so existing sellers become discoverable immediately. Coordinates: approximately `13.0717, 77.7538` (from your GPS session) — confirm or provide exact values.
+
+### Summary of Changes
+
+```text
+Before:  effectiveSocietyId → search_nearby_sellers (society RPC)
+After:   browsingLocation.lat/lng → search_sellers_by_location (coordinate RPC)
+
+Hooks affected: 6-7 files
+DB changes: 1 migration (backfill society coords)
+RPC changes: None required (search_sellers_by_location already supports all params)
+```
 
