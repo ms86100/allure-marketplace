@@ -41,7 +41,8 @@ export default function ProfileEditPage() {
       }).eq('id', user.id);
       if (error) throw error;
       await refreshProfile();
-      toast.success('Profile updated');
+      toast.success('Profile updated! Redirecting…');
+      navigate('/');
     } catch {
       toast.error('Failed to update profile');
     } finally {
