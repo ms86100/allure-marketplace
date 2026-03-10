@@ -39,10 +39,11 @@ function HeaderInner({
       navigate('/society');
     }
   }, [navigate]);
-  const { profile, isApproved, society, user, viewAsSocietyId, effectiveSociety, setViewAsSociety, isAdmin, isBuilderMember } = useAuth();
+  const { profile, isApproved, society, user, viewAsSocietyId, effectiveSociety, effectiveSocietyId, setViewAsSociety, isAdmin, isBuilderMember } = useAuth();
   const { itemCount } = useCart();
   const { selectionChanged } = useHaptics();
   const unreadCount = useUnreadNotificationCount();
+  const societyStats = useSocietyStats(effectiveSocietyId, isApproved);
 
   const displaySociety = effectiveSociety || society;
   const isViewingAs = viewAsSocietyId && (isAdmin || isBuilderMember);
