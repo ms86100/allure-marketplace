@@ -369,6 +369,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Deduplicate iOS tokens: same apns_token means same physical device,
+    // keep only the most recently updated row per apns_token.
+    const seenApns = new Set<string>();
+    const deduped = tokens.filter((t: any) => {
+      if (t.platform === "ios" && t.apns_token) {
+        if (seenApns.has(t.apns_token)) return false;
+        seenApns.add(t.apns_token);
+      }
+      return true;
+    });
+
+    if (deduped.length < tokens.length) {
+      console.log(`[Push] Deduplicated ${tokens.length} tokens → ${deduped.length} (removed ${tokens.length - deduped.length} duplicate iOS devices)`);
+    }
+
     // Generate FCM access token (needed for Android and iOS fallback)
     const accessToken = await generateAccessToken(serviceAccount);
 
