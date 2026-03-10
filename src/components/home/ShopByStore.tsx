@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Star, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { computeStoreStatus } from '@/lib/store-availability';
 
 export function ShopByStore() {
   const { effectiveSocietyId } = useAuth();
@@ -37,7 +38,7 @@ export function ShopByStore() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('seller_profiles')
-        .select('id, business_name, profile_image_url, cover_image_url, rating, total_reviews, primary_group, is_featured, products!inner(id)')
+        .select('id, business_name, profile_image_url, cover_image_url, rating, total_reviews, primary_group, is_featured, availability_start, availability_end, operating_days, is_available, products!inner(id)')
         .eq('verification_status', 'approved')
         .eq('is_available', true)
         .eq('society_id', effectiveSocietyId!)
@@ -78,17 +79,26 @@ export function ShopByStore() {
 
       <div className="relative">
         <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1">
-          {sellers.map((seller: any) => (
+          {sellers.map((seller: any) => {
+            const availability = computeStoreStatus(
+              seller.availability_start,
+              seller.availability_end,
+              seller.operating_days,
+              seller.is_available
+            );
+            const isClosed = availability.status !== 'open';
+            return (
             <div
               key={seller.id}
               onClick={() => navigate(`/seller/${seller.id}`)}
               className={cn(
                 'shrink-0 w-24 rounded-2xl overflow-hidden cursor-pointer',
                 'bg-card border border-border/30',
-                'transition-all duration-200 hover:shadow-md hover:scale-[1.03] active:scale-95'
+                'transition-all duration-200 hover:shadow-md hover:scale-[1.03] active:scale-95',
+                isClosed && 'opacity-60 grayscale-[30%]'
               )}
             >
-              <div className="h-16 flex items-center justify-center p-2 bg-muted/50">
+              <div className="relative h-16 flex items-center justify-center p-2 bg-muted/50">
                 {seller.profile_image_url || seller.cover_image_url ? (
                   <img
                     src={seller.profile_image_url || seller.cover_image_url}
@@ -99,6 +109,13 @@ export function ShopByStore() {
                 ) : (
                   <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
                     <Store className="text-muted-foreground" size={22} />
+                  </div>
+                )}
+                {isClosed && (
+                  <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
+                    <span className="text-[8px] font-semibold text-muted-foreground">
+                      {availability.status === 'closed_today' ? 'Closed today' : 'Closed'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -116,7 +133,8 @@ export function ShopByStore() {
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
         <div className="absolute right-0 top-0 bottom-1 w-8 pointer-events-none bg-gradient-to-l from-background to-transparent" />
       </div>

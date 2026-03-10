@@ -7,6 +7,7 @@ import { SellerProfile, Product } from '@/types/database';
 import { Clock, MapPin, Award, Zap, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/hooks/useCurrency';
+import { computeStoreStatus, formatStoreClosedMessage } from '@/lib/store-availability';
 
 interface SellerCardProps {
   seller: SellerProfile & { profile?: { name: string; block: string }; products?: { price: number }[] };
@@ -15,7 +16,13 @@ interface SellerCardProps {
 }
 
 export function SellerCard({ seller, featuredProduct, showFavorite = true }: SellerCardProps) {
-  const isOpen = seller.is_available;
+  const storeAvailability = computeStoreStatus(
+    seller.availability_start,
+    seller.availability_end,
+    seller.operating_days,
+    seller.is_available
+  );
+  const isOpen = storeAvailability.status === 'open';
   const { formatPrice } = useCurrency();
   const profile = seller.profile;
   const isNewSeller = !seller.rating || seller.rating === 0 || seller.total_reviews === 0;
@@ -40,7 +47,13 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
           )}
           {!isOpen && (
             <div className="absolute inset-0 bg-background/70 backdrop-blur-[2px] flex items-center justify-center">
-              <span className="text-foreground font-medium text-sm">Currently Closed</span>
+              <span className="text-foreground font-medium text-sm">
+                {storeAvailability.status === 'paused'
+                  ? 'Store Paused'
+                  : storeAvailability.status === 'closed_today'
+                    ? 'Closed Today'
+                    : formatStoreClosedMessage(storeAvailability) || 'Currently Closed'}
+              </span>
             </div>
           )}
           
