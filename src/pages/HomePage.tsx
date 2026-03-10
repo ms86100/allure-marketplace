@@ -12,7 +12,7 @@ import { HomeSearchSuggestions } from '@/components/home/HomeSearchSuggestions';
 import { CommunityTeaser } from '@/components/home/CommunityTeaser';
 import { UpcomingAppointmentBanner } from '@/components/home/UpcomingAppointmentBanner';
 import { useAuth } from '@/contexts/AuthContext';
-import { AlertCircle } from 'lucide-react';
+
 import { motion } from 'framer-motion';
 
 export default function HomePage() {
