@@ -51,30 +51,45 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
     try {
       const pos = await getCurrentPosition();
 
-      // Ensure Google Maps is loaded for reverse geocoding
-      let label = `${pos.latitude.toFixed(4)}, ${pos.longitude.toFixed(4)}`;
+      // Use Places API nearbySearch (which IS enabled) instead of Geocoder (which is NOT)
+      let label = '';
       try {
         await loadGoogleMapsScript();
-      } catch { /* proceed with coordinate fallback */ }
+      } catch { /* proceed with fallback */ }
 
-      if ((window as any).google?.maps) {
+      if ((window as any).google?.maps?.places) {
         try {
-          const geocoder = new google.maps.Geocoder();
+          // Create a temporary hidden div for PlacesService
+          const div = document.createElement('div');
+          const service = new google.maps.places.PlacesService(div);
           const result = await new Promise<string>((resolve) => {
-            geocoder.geocode({ location: { lat: pos.latitude, lng: pos.longitude } }, (results, status) => {
-              if (status === 'OK' && results?.[0]) {
-                const premise = results[0].address_components?.find(c => c.types.includes('premise'))?.long_name;
-                const sublocality = results[0].address_components?.find(c => c.types.includes('sublocality_level_1'))?.long_name;
-                const neighborhood = results[0].address_components?.find(c => c.types.includes('neighborhood'))?.long_name;
-                const locality = results[0].address_components?.find(c => c.types.includes('locality'))?.long_name;
-                resolve(premise || sublocality || neighborhood || locality || results[0].formatted_address.split(',').slice(0, 2).join(', '));
-              } else {
-                resolve(`${pos.latitude.toFixed(4)}, ${pos.longitude.toFixed(4)}`);
+            service.nearbySearch(
+              {
+                location: { lat: pos.latitude, lng: pos.longitude },
+                rankBy: google.maps.places.RankBy.DISTANCE,
+                type: 'point_of_interest',
+              },
+              (results, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK && results?.[0]) {
+                  resolve(results[0].name || results[0].vicinity || '');
+                } else {
+                  resolve('');
+                }
               }
-            });
+            );
           });
-          label = result;
-        } catch { /* use coordinate fallback */ }
+          if (result) label = result;
+        } catch { /* fallback below */ }
+      }
+
+      // If Places API also failed, try to match against user's saved addresses
+      if (!label) {
+        const nearbyAddr = addresses.find(a =>
+          a.latitude && a.longitude &&
+          Math.abs(a.latitude - pos.latitude) < 0.005 &&
+          Math.abs(a.longitude - pos.longitude) < 0.005
+        );
+        label = nearbyAddr?.building_name || nearbyAddr?.label || `${pos.latitude.toFixed(4)}, ${pos.longitude.toFixed(4)}`;
       }
 
       setBrowsingLocation({
