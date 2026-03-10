@@ -16,7 +16,7 @@ import { AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function HomePage() {
-  const { user, profile, isApproved, isSeller, sellerProfiles, refreshProfile } = useAuth();
+  const { user, profile, isSeller, sellerProfiles, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { showOnboarding, hasChecked, completeOnboarding } = useOnboarding(user?.id);
 
