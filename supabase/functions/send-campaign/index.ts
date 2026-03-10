@@ -371,7 +371,18 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[Campaign] ${campaignId} targeting ${allTokens.length} devices`);
+    // Deduplicate iOS tokens: same apns_token = same physical device
+    const seenApns = new Set<string>();
+    allTokens = allTokens.filter((t: any) => {
+      if (t.platform === "ios" && t.apns_token) {
+        const key = `${t.user_id}:${t.apns_token}`;
+        if (seenApns.has(key)) return false;
+        seenApns.add(key);
+      }
+      return true;
+    });
+
+    console.log(`[Campaign] ${campaignId} targeting ${allTokens.length} devices (after dedup)`);
 
     // Update targeted count
     await adminClient
