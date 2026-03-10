@@ -125,7 +125,7 @@ export function useAuthPage() {
 
   const handleVerifyOtp = async () => {
     if (!otp || otp.length < 4) {
-      toast.error('Please enter the OTP');
+      toast.error('Please enter the 4-digit OTP');
       return;
     }
     setIsLoading(true);

@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowRight, Loader2, CheckCircle2, Search, MapPin, Building2, Plus, ArrowLeft, ShieldCheck, Sparkles, Home, Phone, RefreshCw } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator } from '@/components/ui/input-otp';
 import { motion, AnimatePresence } from 'framer-motion';
 import authHero from '@/assets/auth-hero.jpg';
 import { useAuthPage } from '@/hooks/useAuthPage';
@@ -135,17 +135,18 @@ export default function AuthPage() {
 
                   <div className="flex justify-center">
                     <InputOTP
-                      maxLength={6}
+                      maxLength={4}
                       value={auth.otp}
                       onChange={(value) => auth.setOtp(value)}
                     >
-                      <InputOTPGroup>
-                        <InputOTPSlot index={0} />
-                        <InputOTPSlot index={1} />
-                        <InputOTPSlot index={2} />
-                        <InputOTPSlot index={3} />
-                        <InputOTPSlot index={4} />
-                        <InputOTPSlot index={5} />
+                      <InputOTPGroup className="gap-3">
+                        <InputOTPSlot index={0} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
+                        <InputOTPSlot index={1} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
+                      </InputOTPGroup>
+                      <InputOTPSeparator className="mx-2 text-muted-foreground">—</InputOTPSeparator>
+                      <InputOTPGroup className="gap-3">
+                        <InputOTPSlot index={2} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
+                        <InputOTPSlot index={3} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
                       </InputOTPGroup>
                     </InputOTP>
                   </div>
