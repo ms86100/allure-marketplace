@@ -55,6 +55,14 @@ export function UpiDeepLinkCheckout({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (isOpen && !sellerUpiId) {
+      toast.error('Seller UPI ID is not configured. Please contact the seller.');
+      onPaymentFailed();
+      onClose();
+    }
+  }, [isOpen, sellerUpiId]);
+
   const handlePayNow = () => {
     window.open(upiLink, '_blank');
     // After a brief delay, show the confirmation step
