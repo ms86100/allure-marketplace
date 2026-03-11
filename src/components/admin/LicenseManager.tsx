@@ -134,13 +134,16 @@ export function LicenseManager() {
             ? `Your ${licenseType} has been verified. You're all set!`
             : `Your ${licenseType} was rejected.${adminNotes.trim() ? ` Reason: ${adminNotes.trim()}` : ' Please re-upload a valid document.'}`;
 
-          await supabase.from('user_notifications').insert({
+          const { error: notifError } = await supabase.from('user_notifications').insert({
             user_id: sellerData.user_id,
             title: notifTitle,
             body: notifBody,
             type: status === 'approved' ? 'license_approved' : 'license_rejected',
             is_read: false,
           });
+          if (notifError) {
+            console.error('Failed to insert license notification:', notifError);
+          }
 
           sendPushNotification({
             userId: sellerData.user_id,
