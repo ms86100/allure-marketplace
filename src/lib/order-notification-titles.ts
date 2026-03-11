@@ -18,12 +18,17 @@ export const ORDER_NOTIF_TITLES_BUYER: Record<string, string> = {
   quoted: '💰 Quote Received',
   scheduled: '📅 Booking Confirmed',
   in_progress: '🔧 Service In Progress',
+  confirmed: '✅ Booking Confirmed',
+  no_show: '🚫 Marked as No-Show',
+  returned: '↩️ Order Returned',
 };
 
 export const ORDER_NOTIF_TITLES_SELLER: Record<string, string> = {
   placed: '🆕 New Order Received!',
   enquired: '📋 New Booking Request!',
   cancelled: '❌ Order Cancelled',
+  requested: '📩 New Service Request!',
+  no_show: '🚫 Customer No-Show',
 };
 
 export function getOrderNotifTitle(status: string, role: 'buyer' | 'seller'): string | null {

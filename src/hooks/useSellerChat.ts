@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -11,9 +11,13 @@ interface Message {
   created_at: string;
 }
 
+const CHAT_NOTIF_THROTTLE_MS = 60_000; // 1 minute
+
 export function useSellerChat(buyerId: string | undefined, sellerId: string | undefined, productId: string | undefined) {
   const qc = useQueryClient();
   const [conversationId, setConversationId] = useState<string | null>(null);
+  // Track last notification time per recipient to throttle
+  const lastNotifRef = useRef<Record<string, number>>({});
 
   // Get or create conversation
   const getOrCreate = useCallback(async () => {
@@ -91,14 +95,21 @@ export function useSellerChat(buyerId: string | undefined, sellerId: string | un
       // Determine recipient for notification
       const recipientId = senderId === buyerId ? sellerId : buyerId;
       if (recipientId) {
-        await supabase.from('notification_queue').insert({
-          user_id: recipientId,
-          type: 'chat',
-          title: '💬 New message',
-          body: text.slice(0, 100),
-          reference_path: `/orders`,
-          payload: { type: 'seller_chat', conversationId: cid },
-        });
+        const now = Date.now();
+        const lastSent = lastNotifRef.current[recipientId] || 0;
+
+        // Only send notification if throttle window has passed
+        if (now - lastSent >= CHAT_NOTIF_THROTTLE_MS) {
+          lastNotifRef.current[recipientId] = now;
+          await supabase.from('notification_queue').insert({
+            user_id: recipientId,
+            type: 'chat',
+            title: '💬 New message',
+            body: text.slice(0, 100),
+            reference_path: `/orders`,
+            payload: { type: 'seller_chat', conversationId: cid },
+          });
+        }
       }
     },
     onSuccess: () => {
