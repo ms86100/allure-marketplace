@@ -219,6 +219,9 @@ export function SubcategoryManager() {
       duration_label: sub.duration_label || '',
       show_veg_toggle: sub.show_veg_toggle,
       show_duration_field: sub.show_duration_field,
+      supports_addons: (sub as any).supports_addons ?? null,
+      supports_recurring: (sub as any).supports_recurring ?? null,
+      supports_staff_assignment: (sub as any).supports_staff_assignment ?? null,
     });
     setCreateConfigId(sub.category_config_id);
     setIsDialogOpen(true);
