@@ -106,7 +106,7 @@ export function BrowsingLocationProvider({ children }: { children: React.ReactNo
     }
 
     applyLocation(loc);
-  }, [applyLocation, queryClient]);
+  }, [applyLocation, queryClient, user?.id]);
 
   const confirmLocationChange = useCallback(() => {
     if (!pendingLocationChange) return;
