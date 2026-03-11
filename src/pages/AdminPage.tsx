@@ -24,6 +24,7 @@ import { SellerApplicationReview } from '@/components/admin/SellerApplicationRev
 import { AdminProductApprovals } from '@/components/admin/AdminProductApprovals';
 
 import { AdminDisputesTab } from '@/components/admin/AdminDisputesTab';
+import { AdminAnalyticsTab } from '@/components/admin/AdminAnalyticsTab';
 import { EmergencyBroadcastSheet } from '@/components/admin/EmergencyBroadcastSheet';
 import { SocietySwitcher } from '@/components/admin/SocietySwitcher';
 import { FeatureManagement } from '@/components/admin/FeatureManagement';
