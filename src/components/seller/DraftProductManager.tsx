@@ -141,28 +141,46 @@ export function DraftProductManager({
     }
 
     setIsSaving(true);
+    const isEditing = editingIndex !== null;
+    const existingId = isEditing ? products[editingIndex]?.id : undefined;
+
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .insert({
-          seller_id: sellerId,
-          name: newProduct.name.trim(),
-          price: newProduct.price || 0,
-          mrp: newProduct.mrp && newProduct.mrp > 0 ? newProduct.mrp : null,
-          description: newProduct.description.trim() || null,
-          category: newProduct.category,
-          is_veg: newProduct.is_veg,
-          image_url: newProduct.image_url.trim() || null,
-          is_available: true,
-          prep_time_minutes: newProduct.prep_time_minutes || null,
-          specifications: attributeBlocks.length > 0 ? { blocks: attributeBlocks } : null,
-        } as any)
-        .select()
-        .single();
+      const productPayload = {
+        seller_id: sellerId,
+        name: newProduct.name.trim(),
+        price: newProduct.price || 0,
+        mrp: newProduct.mrp && newProduct.mrp > 0 ? newProduct.mrp : null,
+        description: newProduct.description.trim() || null,
+        category: newProduct.category,
+        is_veg: newProduct.is_veg,
+        image_url: newProduct.image_url.trim() || null,
+        is_available: true,
+        prep_time_minutes: newProduct.prep_time_minutes || null,
+        specifications: attributeBlocks.length > 0 ? { blocks: attributeBlocks } : null,
+      };
 
-      if (error) throw error;
+      let savedProductId: string;
 
-      const savedProductId = data.id;
+      if (isEditing && existingId) {
+        // Update existing product
+        const { data, error } = await supabase
+          .from('products')
+          .update(productPayload as any)
+          .eq('id', existingId)
+          .select()
+          .single();
+        if (error) throw error;
+        savedProductId = data.id;
+      } else {
+        // Insert new product
+        const { data, error } = await supabase
+          .from('products')
+          .insert(productPayload as any)
+          .select()
+          .single();
+        if (error) throw error;
+        savedProductId = data.id;
+      }
 
       // Save service listing if service category
       if (isService && savedProductId) {
@@ -206,25 +224,19 @@ export function DraftProductManager({
         }
       }
 
-      onProductsChange([...products, { ...newProduct, id: data.id, discount_percentage: computedDiscount }]);
-      setNewProduct({
-        name: '',
-        price: 0,
-        mrp: null,
-        discount_percentage: null,
-        description: '',
-        category: categories[0] || '',
-        is_veg: true,
-        image_url: '',
-        prep_time_minutes: null,
-      });
-      setIsAdding(false);
-      setAttributeBlocks([]);
-      setServiceFields(INITIAL_SERVICE_FIELDS);
-      setAvailabilitySchedule(INITIAL_AVAILABILITY_SCHEDULE);
-      toast.success('Product added');
+      if (isEditing) {
+        const updated = [...products];
+        updated[editingIndex] = { ...newProduct, id: savedProductId, discount_percentage: computedDiscount };
+        onProductsChange(updated);
+        toast.success('Product updated');
+      } else {
+        onProductsChange([...products, { ...newProduct, id: savedProductId, discount_percentage: computedDiscount }]);
+        toast.success('Product added');
+      }
+
+      resetForm();
     } catch (error: any) {
-      console.error('Error adding product:', error);
+      console.error('Error saving product:', error);
       toast.error(friendlyError(error));
     } finally {
       setIsSaving(false);
