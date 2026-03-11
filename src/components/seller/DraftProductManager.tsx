@@ -360,9 +360,14 @@ export function DraftProductManager({
                     <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
                   )}
                 </div>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => handleRemoveProduct(index)}>
-                  <Trash2 size={14} />
-                </Button>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" onClick={() => handleEditProduct(index)}>
+                    <Pencil size={14} />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => handleRemoveProduct(index)}>
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
