@@ -40,6 +40,9 @@ interface Subcategory {
   duration_label: string | null;
   show_veg_toggle: boolean | null;
   show_duration_field: boolean | null;
+  supports_addons: boolean | null;
+  supports_recurring: boolean | null;
+  supports_staff_assignment: boolean | null;
 }
 
 interface OpenSubcategoryCreateEventDetail {
@@ -71,12 +74,16 @@ interface SubcategoryFormData {
   duration_label: string;
   show_veg_toggle: boolean | null;
   show_duration_field: boolean | null;
+  supports_addons: boolean | null;
+  supports_recurring: boolean | null;
+  supports_staff_assignment: boolean | null;
 }
 
 const INITIAL_FORM: SubcategoryFormData = {
   display_name: '', slug: '', icon: '', display_order: '0', is_active: true,
   image_url: '', color: '', name_placeholder: '', description_placeholder: '',
   price_label: '', duration_label: '', show_veg_toggle: null, show_duration_field: null,
+  supports_addons: null, supports_recurring: null, supports_staff_assignment: null,
 };
 
 function GenerateSubcategoryImageButton({ name, subcategoryId, parentCategoryName, imageUrl, onImageGenerated }: {
@@ -212,6 +219,9 @@ export function SubcategoryManager() {
       duration_label: sub.duration_label || '',
       show_veg_toggle: sub.show_veg_toggle,
       show_duration_field: sub.show_duration_field,
+      supports_addons: (sub as any).supports_addons ?? null,
+      supports_recurring: (sub as any).supports_recurring ?? null,
+      supports_staff_assignment: (sub as any).supports_staff_assignment ?? null,
     });
     setCreateConfigId(sub.category_config_id);
     setIsDialogOpen(true);
@@ -244,6 +254,9 @@ export function SubcategoryManager() {
         duration_label: formData.duration_label.trim() || null,
         show_veg_toggle: formData.show_veg_toggle,
         show_duration_field: formData.show_duration_field,
+        supports_addons: formData.supports_addons,
+        supports_recurring: formData.supports_recurring,
+        supports_staff_assignment: formData.supports_staff_assignment,
       };
       if (editingSub) {
         const { error } = await supabase.from('subcategories').update(payload).eq('id', editingSub.id);
@@ -519,6 +532,56 @@ export function SubcategoryManager() {
                       <Select
                         value={formData.show_duration_field === null ? 'inherit' : formData.show_duration_field ? 'yes' : 'no'}
                         onValueChange={(v) => setFormData({ ...formData, show_duration_field: v === 'inherit' ? null : v === 'yes' })}
+                      >
+                        <SelectTrigger className="w-28 h-8 rounded-lg text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="inherit">Inherit</SelectItem>
+                          <SelectItem value="yes">Yes</SelectItem>
+                          <SelectItem value="no">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Service Feature Toggles ── */}
+                <div className="border-t pt-4 mt-2">
+                  <Label className="text-xs text-muted-foreground mb-3 block font-bold uppercase tracking-wider">Service Features</Label>
+                  <p className="text-[10px] text-muted-foreground mb-3">Override parent category service settings. "Inherit" uses the parent's value.</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
+                      <span className="text-xs font-medium">Service Add-ons</span>
+                      <Select
+                        value={formData.supports_addons === null ? 'inherit' : formData.supports_addons ? 'yes' : 'no'}
+                        onValueChange={(v) => setFormData({ ...formData, supports_addons: v === 'inherit' ? null : v === 'yes' })}
+                      >
+                        <SelectTrigger className="w-28 h-8 rounded-lg text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="inherit">Inherit</SelectItem>
+                          <SelectItem value="yes">Yes</SelectItem>
+                          <SelectItem value="no">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
+                      <span className="text-xs font-medium">Recurring Booking</span>
+                      <Select
+                        value={formData.supports_recurring === null ? 'inherit' : formData.supports_recurring ? 'yes' : 'no'}
+                        onValueChange={(v) => setFormData({ ...formData, supports_recurring: v === 'inherit' ? null : v === 'yes' })}
+                      >
+                        <SelectTrigger className="w-28 h-8 rounded-lg text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="inherit">Inherit</SelectItem>
+                          <SelectItem value="yes">Yes</SelectItem>
+                          <SelectItem value="no">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
+                      <span className="text-xs font-medium">Staff Assignment</span>
+                      <Select
+                        value={formData.supports_staff_assignment === null ? 'inherit' : formData.supports_staff_assignment ? 'yes' : 'no'}
+                        onValueChange={(v) => setFormData({ ...formData, supports_staff_assignment: v === 'inherit' ? null : v === 'yes' })}
                       >
                         <SelectTrigger className="w-28 h-8 rounded-lg text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
