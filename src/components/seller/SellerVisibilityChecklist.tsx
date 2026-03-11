@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSellerHealth, SellerHealthCheck } from '@/hooks/queries/useSellerHealth';
 import { Card } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { CheckCircle2, AlertTriangle, XCircle, Info, ShieldCheck, ChevronRight, ShieldAlert, Package, Globe, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SetSocietyLocationSheet } from './SetSocietyLocationSheet';
 
 const STATUS_CONFIG = {
   pass: { icon: CheckCircle2, color: 'text-success', bg: 'bg-success/10' },
@@ -22,9 +24,15 @@ const GROUP_CONFIG = {
   quality: { label: 'Store Quality', icon: Sparkles, description: 'Improves buyer trust & conversion' },
 } as const;
 
-function CheckItem({ check }: { check: SellerHealthCheck }) {
+function CheckItem({ check, onSpecialAction }: { check: SellerHealthCheck; onSpecialAction?: (route: string) => void }) {
   const config = STATUS_CONFIG[check.status];
   const Icon = config.icon;
+
+  const handleAction = () => {
+    if (check.actionRoute?.startsWith('#') && onSpecialAction) {
+      onSpecialAction(check.actionRoute);
+    }
+  };
 
   return (
     <div className={cn('flex items-start gap-3 p-2.5 rounded-lg', config.bg)}>
@@ -33,19 +41,26 @@ function CheckItem({ check }: { check: SellerHealthCheck }) {
         <p className="text-xs font-medium">{check.label}</p>
         <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{check.message}</p>
         {check.actionLabel && check.actionRoute && (
-          <Link to={check.actionRoute}>
-            <Button variant="link" size="sm" className="h-auto p-0 mt-1 text-[10px] gap-1">
+          check.actionRoute.startsWith('#') ? (
+            <Button variant="link" size="sm" className="h-auto p-0 mt-1 text-[10px] gap-1" onClick={handleAction}>
               {check.actionLabel}
               <ChevronRight size={10} />
             </Button>
-          </Link>
+          ) : (
+            <Link to={check.actionRoute}>
+              <Button variant="link" size="sm" className="h-auto p-0 mt-1 text-[10px] gap-1">
+                {check.actionLabel}
+                <ChevronRight size={10} />
+              </Button>
+            </Link>
+          )
         )}
       </div>
     </div>
   );
 }
 
-function CheckGroup({ groupKey, checks }: { groupKey: keyof typeof GROUP_CONFIG; checks: SellerHealthCheck[] }) {
+function CheckGroup({ groupKey, checks, onSpecialAction }: { groupKey: keyof typeof GROUP_CONFIG; checks: SellerHealthCheck[]; onSpecialAction?: (route: string) => void }) {
   if (checks.length === 0) return null;
   const config = GROUP_CONFIG[groupKey];
   const GroupIcon = config.icon;
@@ -58,7 +73,7 @@ function CheckGroup({ groupKey, checks }: { groupKey: keyof typeof GROUP_CONFIG;
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{config.label}</span>
       </div>
       {checks.map(check => (
-        <CheckItem key={check.key} check={check} />
+        <CheckItem key={check.key} check={check} onSpecialAction={onSpecialAction} />
       ))}
     </div>
   );
@@ -66,6 +81,7 @@ function CheckGroup({ groupKey, checks }: { groupKey: keyof typeof GROUP_CONFIG;
 
 export function SellerVisibilityChecklist({ sellerId }: { sellerId: string }) {
   const { data, isLoading } = useSellerHealth(sellerId);
+  const [locationSheetOpen, setLocationSheetOpen] = useState(false);
 
   if (isLoading) {
     return <Skeleton className="h-16 w-full rounded-xl" />;
@@ -94,49 +110,58 @@ export function SellerVisibilityChecklist({ sellerId }: { sellerId: string }) {
   discoveryChecks.sort(sortByStatus);
   qualityChecks.sort(sortByStatus);
 
+  const handleSpecialAction = (route: string) => {
+    if (route === '#set-society-location') {
+      setLocationSheetOpen(true);
+    }
+  };
+
   return (
-    <Drawer>
-      <DrawerTrigger asChild>
-        <Card className={cn(
-          'p-3 cursor-pointer border',
-          isFullyVisible ? 'border-success/30' : criticalBlockers > 0 ? 'border-destructive/30' : 'border-warning/30'
-        )}>
-          <div className="flex items-center gap-3 mb-2">
-            <ShieldCheck size={18} className={cn(
-              'shrink-0',
-              isFullyVisible ? 'text-success' : criticalBlockers > 0 ? 'text-destructive' : 'text-warning'
-            )} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold">Store Health</p>
-                <span className="text-[10px] text-muted-foreground">{passCount}/{totalChecks} passed</span>
+    <>
+      <Drawer>
+        <DrawerTrigger asChild>
+          <Card className={cn(
+            'p-3 cursor-pointer border',
+            isFullyVisible ? 'border-success/30' : criticalBlockers > 0 ? 'border-destructive/30' : 'border-warning/30'
+          )}>
+            <div className="flex items-center gap-3 mb-2">
+              <ShieldCheck size={18} className={cn(
+                'shrink-0',
+                isFullyVisible ? 'text-success' : criticalBlockers > 0 ? 'text-destructive' : 'text-warning'
+              )} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold">Store Health</p>
+                  <span className="text-[10px] text-muted-foreground">{passCount}/{totalChecks} passed</span>
+                </div>
               </div>
+              <ChevronRight size={14} className="text-muted-foreground shrink-0" />
             </div>
-            <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+            <Progress value={percentage} className="h-1.5" />
+            {issues.length > 0 && (
+              <p className="text-[10px] text-warning mt-1.5 truncate">
+                ⚠ {issues.length} issue{issues.length > 1 ? 's' : ''}: {issues.map(i => i.label).join(' · ')}
+              </p>
+            )}
+            {isFullyVisible && (
+              <p className="text-[10px] text-success mt-1.5">✓ All checks passed</p>
+            )}
+          </Card>
+        </DrawerTrigger>
+        <DrawerContent className="max-h-[85vh]">
+          <DrawerHeader className="pb-2">
+            <DrawerTitle className="text-base">Store Visibility Checklist</DrawerTitle>
+            <p className="text-xs text-muted-foreground">{passCount}/{totalChecks} checks passed · {percentage}% complete</p>
+          </DrawerHeader>
+          <div className="px-4 pb-6 space-y-4 overflow-y-auto">
+            <CheckGroup groupKey="critical" checks={criticalChecks} onSpecialAction={handleSpecialAction} />
+            <CheckGroup groupKey="products" checks={productChecks} onSpecialAction={handleSpecialAction} />
+            <CheckGroup groupKey="discovery" checks={discoveryChecks} onSpecialAction={handleSpecialAction} />
+            <CheckGroup groupKey="quality" checks={qualityChecks} onSpecialAction={handleSpecialAction} />
           </div>
-          <Progress value={percentage} className="h-1.5" />
-          {issues.length > 0 && (
-            <p className="text-[10px] text-warning mt-1.5 truncate">
-              ⚠ {issues.length} issue{issues.length > 1 ? 's' : ''}: {issues.map(i => i.label).join(' · ')}
-            </p>
-          )}
-          {isFullyVisible && (
-            <p className="text-[10px] text-success mt-1.5">✓ All checks passed</p>
-          )}
-        </Card>
-      </DrawerTrigger>
-      <DrawerContent className="max-h-[85vh]">
-        <DrawerHeader className="pb-2">
-          <DrawerTitle className="text-base">Store Visibility Checklist</DrawerTitle>
-          <p className="text-xs text-muted-foreground">{passCount}/{totalChecks} checks passed · {percentage}% complete</p>
-        </DrawerHeader>
-        <div className="px-4 pb-6 space-y-4 overflow-y-auto">
-          <CheckGroup groupKey="critical" checks={criticalChecks} />
-          <CheckGroup groupKey="products" checks={productChecks} />
-          <CheckGroup groupKey="discovery" checks={discoveryChecks} />
-          <CheckGroup groupKey="quality" checks={qualityChecks} />
-        </div>
-      </DrawerContent>
-    </Drawer>
+        </DrawerContent>
+      </Drawer>
+      <SetSocietyLocationSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} sellerId={sellerId} />
+    </>
   );
 }

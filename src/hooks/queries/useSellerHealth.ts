@@ -173,7 +173,7 @@ export function useSellerHealth(sellerId: string | null) {
       if (society?.latitude != null && society?.longitude != null) {
         checks.push({ key: 'society_coords', label: 'Society location set', status: 'pass', message: 'Your society has valid coordinates for distance-based discovery.', group: 'discovery' });
       } else {
-        checks.push({ key: 'society_coords', label: 'Society location missing', status: 'fail', message: 'Your society has no coordinates. Cross-society buyers cannot find you. Contact your society admin.', group: 'discovery' });
+        checks.push({ key: 'society_coords', label: 'Society location missing', status: 'fail', message: 'Your society has no coordinates. Cross-society buyers cannot find you.', actionLabel: 'Set Location', actionRoute: '#set-society-location', group: 'discovery' });
       }
 
       if (profile.sell_beyond_community) {
