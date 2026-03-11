@@ -508,6 +508,7 @@ export function DraftProductManager({
 
         {/* Mobile floating preview */}
         <ProductFormPreviewMobile formData={previewFormData} sellerProfile={null} />
+        </>
       ) : (
         <Button variant="outline" className="w-full border-dashed" onClick={() => setIsAdding(true)}>
           <Plus size={16} className="mr-2" />
