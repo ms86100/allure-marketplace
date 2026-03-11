@@ -4,22 +4,22 @@ import { useRef } from 'react';
 
 const PAINS = [
   {
-    icon: ShieldAlert,
-    pain: 'Ordering from unknown sellers?',
-    solution: 'Every seller on the platform is a GPS-verified resident of your society. No strangers. No fraud.',
-    color: 'bg-destructive/10 text-destructive',
+    icon: ChefHat,
+    pain: "Mrs. Sharma's dal makhani is legendary. But she's not on Zomato.",
+    solution: "The best home-cooked food in your society has no delivery app listing. Here, every home kitchen finally has a storefront — and you're the first customer.",
+    color: 'bg-primary/10 text-primary',
   },
   {
     icon: Truck,
-    pain: 'Paying delivery fees for items 2 floors away?',
-    solution: 'Your neighbor delivers to your doorstep — within the same compound. Zero logistics overhead.',
+    pain: "You've called 5 plumbers from Google. None showed up.",
+    solution: "The electrician in A-block and the carpenter in Tower 3 are verified residents. They live 2 minutes away. They can't ghost you — you'll see them in the elevator.",
     color: 'bg-warning/10 text-warning',
   },
   {
-    icon: ChefHat,
-    pain: 'Your neighbor makes amazing food but has no platform?',
-    solution: 'Any resident can list products, home-cooked meals, or services in minutes. No marketing costs.',
-    color: 'bg-primary/10 text-primary',
+    icon: ShieldAlert,
+    pain: 'Your kid needs math help. The retired professor lives in C-block.',
+    solution: "Tutors, yoga instructors, music teachers — they're already your neighbors. No strangers entering your home. No background-check anxiety.",
+    color: 'bg-destructive/10 text-destructive',
   },
 ];
 
