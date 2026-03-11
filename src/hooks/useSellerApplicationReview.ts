@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logAudit } from '@/lib/audit';
 import { useCurrency } from '@/hooks/useCurrency';
+import { sendPushNotification } from '@/lib/notifications';
 
 export interface SellerApplication {
   id: string;

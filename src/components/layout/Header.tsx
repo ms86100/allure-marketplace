@@ -116,7 +116,18 @@ function HeaderInner({
                   </Button>
                 </Link>
               )}
-              {isApproved && (
+              {isSeller && (
+                <Link to="/seller/dashboard">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-9 w-9 rounded-full bg-secondary text-foreground border border-border hover:bg-muted"
+                  >
+                    <Store size={16} />
+                  </Button>
+                </Link>
+              )}
+              {user && (
                 <>
                   <Link to="/notifications/inbox">
                     <Button 

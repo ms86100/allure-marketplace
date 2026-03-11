@@ -115,6 +115,41 @@ export function LicenseManager() {
           admin_notes: adminNotes.trim() || null,
         } as any)
         .eq('id', licenseId);
+
+      // Notify the seller
+      const sub = submissions.find(s => s.id === licenseId);
+      if (sub) {
+        const { data: sellerData } = await supabase
+          .from('seller_profiles')
+          .select('user_id')
+          .eq('id', sub.seller_id)
+          .single();
+
+        if (sellerData?.user_id) {
+          const licenseType = sub.license_type || 'license';
+          const notifTitle = status === 'approved'
+            ? `✅ Your ${licenseType} has been verified!`
+            : `❌ Your ${licenseType} was rejected`;
+          const notifBody = status === 'approved'
+            ? `Your ${licenseType} has been verified. You're all set!`
+            : `Your ${licenseType} was rejected.${adminNotes.trim() ? ` Reason: ${adminNotes.trim()}` : ' Please re-upload a valid document.'}`;
+
+          await supabase.from('user_notifications').insert({
+            user_id: sellerData.user_id,
+            title: notifTitle,
+            body: notifBody,
+            type: status === 'approved' ? 'license_approved' : 'license_rejected',
+            is_read: false,
+          });
+
+          sendPushNotification({
+            userId: sellerData.user_id,
+            title: notifTitle,
+            body: notifBody,
+          }).catch(() => {});
+        }
+      }
+
       toast.success(`License ${status}`);
       setAdminNotes('');
       fetchData();
