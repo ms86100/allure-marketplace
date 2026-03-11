@@ -118,6 +118,8 @@ export function useCategoryProducts(parentGroup: string | null) {
         if (!Array.isArray(items)) continue;
         for (const p of items) {
           if (!categorySet.has(p.category)) continue;
+          if (seenIds.has(p.id)) continue;
+          seenIds.add(p.id);
           products.push({
             ...p,
             seller_id: seller.seller_id,
