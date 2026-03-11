@@ -269,11 +269,11 @@ export function UpiDeepLinkCheckout({
           {/* Step 4: Success */}
           {step === 'done' && (
             <div className="text-center space-y-4 py-8">
-              <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <CheckCircle className="text-emerald-500" size={48} />
+              <div className="w-20 h-20 mx-auto rounded-full bg-accent/10 flex items-center justify-center">
+                <CheckCircle className="text-accent" size={48} />
               </div>
               <div>
-                <p className="font-semibold text-emerald-600">Payment Submitted!</p>
+                <p className="font-semibold text-accent">Payment Submitted!</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   Seller will verify and confirm your payment
                 </p>

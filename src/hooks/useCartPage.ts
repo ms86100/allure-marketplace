@@ -182,7 +182,12 @@ export function useCartPage() {
       try {
         const orderIds = await createOrdersForAllSellers('pending');
         if (orderIds.length === 0) throw new Error('Failed to create orders');
-        setPendingOrderIds(orderIds); setShowRazorpayCheckout(true);
+        setPendingOrderIds(orderIds);
+        if (paymentMode.isUpiDeepLink) {
+          setShowUpiDeepLink(true);
+        } else {
+          setShowRazorpayCheckout(true);
+        }
       } catch (error: any) { console.error('Error creating orders:', error); toast.error(friendlyError(error)); }
       finally { setIsPlacingOrder(false); }
       return;
