@@ -128,9 +128,25 @@ export default function BecomeSellerPage() {
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-destructive/20 flex items-center justify-center"><Store className="text-destructive" size={32} /></div>
                 <h1 className="text-2xl font-bold mb-2">Application Not Approved</h1>
                 <p className="text-muted-foreground mb-2">Your seller application for <strong>{existingSeller.business_name}</strong> was not approved.</p>
+                {(existingSeller as any).rejection_note && (
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 mb-4 text-left">
+                    <p className="text-xs font-semibold text-destructive mb-1">Admin Feedback:</p>
+                    <p className="text-sm text-foreground">{(existingSeller as any).rejection_note}</p>
+                  </div>
+                )}
                 <p className="text-sm text-muted-foreground mb-6">You can update your details and resubmit your application.</p>
                 <div className="space-y-3">
-                  <Button className="w-full" size="lg" onClick={() => { setExistingSeller(null); setDraftSellerId((existingSeller as any).id); setStep(3); }}>Update & Resubmit</Button>
+                  <Button className="w-full" size="lg" onClick={async () => {
+                    // Load existing data into form before navigating to edit
+                    const { data: fullSeller } = await supabase.from('seller_profiles').select('*').eq('id', (existingSeller as any).id).single();
+                    if (fullSeller) {
+                      loadSellerDataIntoForm(fullSeller);
+                      await reloadProducts(fullSeller.id);
+                    }
+                    setExistingSeller(null);
+                    setDraftSellerId((existingSeller as any).id);
+                    setStep(3);
+                  }}>Update & Resubmit</Button>
                   <Button variant="outline" className="w-full" onClick={() => { setSelectedGroup(null); setExistingSeller(null); setStep(1); }}>Choose Different Category</Button>
                 </div>
               </>
