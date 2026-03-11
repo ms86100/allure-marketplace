@@ -18,6 +18,7 @@ import { type BlockData } from '@/hooks/useAttributeBlocks';
 import { useCurrency } from '@/hooks/useCurrency';
 import { ServiceFieldsSection, INITIAL_SERVICE_FIELDS, type ServiceFieldsData } from '@/components/seller/ServiceFieldsSection';
 import { InlineAvailabilitySchedule, INITIAL_AVAILABILITY_SCHEDULE, type DayScheduleData } from '@/components/seller/InlineAvailabilitySchedule';
+import { ProductFormPreviewPanel, ProductFormPreviewMobile } from '@/components/seller/ProductFormPreview';
 
 interface DraftProduct {
   id?: string;
