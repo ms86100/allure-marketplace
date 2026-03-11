@@ -111,7 +111,7 @@ export function SellerVisibilityChecklist({ sellerId }: { sellerId: string }) {
   qualityChecks.sort(sortByStatus);
 
   const handleSpecialAction = (route: string) => {
-    if (route === '#set-society-location') {
+    if (route === '#set-society-location' || route === '#set-store-location') {
       setLocationSheetOpen(true);
     }
   };
