@@ -40,6 +40,9 @@ interface Subcategory {
   duration_label: string | null;
   show_veg_toggle: boolean | null;
   show_duration_field: boolean | null;
+  supports_addons: boolean | null;
+  supports_recurring: boolean | null;
+  supports_staff_assignment: boolean | null;
 }
 
 interface OpenSubcategoryCreateEventDetail {
