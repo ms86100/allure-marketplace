@@ -6,20 +6,20 @@ const STEPS = [
   {
     icon: MapPin,
     step: '1',
-    title: 'Verify Your Address',
-    desc: 'Sign up and verify your residence through GPS. Takes 30 seconds.',
+    title: 'Prove You Live Here',
+    desc: "GPS verifies you're a real resident. No outsiders, no fake profiles — just families who share your compound.",
   },
   {
     icon: Search,
     step: '2',
-    title: 'Browse Your Society',
-    desc: 'Explore products, food, and services listed by your verified neighbors.',
+    title: 'Discover Hidden Gems',
+    desc: "Find the home baker in Tower B, the yoga teacher in A-block, the uncle who repairs everything. They've always been here — now you can find them.",
   },
   {
     icon: ShoppingBag,
     step: '3',
-    title: 'Order & Receive',
-    desc: 'Pay via UPI or cash. Your neighbor delivers — right to your door.',
+    title: 'Order From Someone You Trust',
+    desc: "No anonymous rider. No mystery kitchen. Your neighbor makes it, your neighbor delivers it. You'll probably thank them in the elevator.",
   },
 ];
 
