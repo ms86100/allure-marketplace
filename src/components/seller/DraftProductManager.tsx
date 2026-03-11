@@ -332,6 +332,7 @@ export function DraftProductManager({
 
       {/* Add New Product Form */}
       {isAdding ? (
+        <>
         <div className="flex gap-6 items-start">
           <Card className="border-primary/30 flex-1 min-w-0">
             <CardContent className="p-4 space-y-3">
