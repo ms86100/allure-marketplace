@@ -96,8 +96,14 @@ export default function SellerDetailPage() {
         return;
       }
 
-      // Society scoping: allow same-society or cross-society based on seller's sell_beyond flag
-      if (effectiveSocietyId && sellerData.society_id && sellerData.society_id !== effectiveSocietyId && !sellerData.sell_beyond_community) {
+      // Society scoping: commercial sellers always visible; society_resident follows sell_beyond rule
+      if (
+        effectiveSocietyId &&
+        sellerData.society_id &&
+        sellerData.society_id !== effectiveSocietyId &&
+        !sellerData.sell_beyond_community &&
+        sellerData.seller_type !== 'commercial'
+      ) {
         setSeller(null);
         return;
       }
@@ -105,24 +111,44 @@ export default function SellerDetailPage() {
       setSeller(sellerData);
       setProducts((productsRes.data || []) as Product[]);
 
-      // Calculate distance from buyer's society to seller's society
-      if (effectiveSocietyId && sellerData.society?.latitude && sellerData.society?.longitude) {
-        try {
-          const { data: buyerSociety } = await supabase
-            .from('societies')
-            .select('latitude, longitude')
-            .eq('id', effectiveSocietyId)
-            .single();
+      // Calculate distance: prefer direct seller coords, fall back to society coords
+      const sellerLat = sellerData.latitude ?? sellerData.society?.latitude;
+      const sellerLng = sellerData.longitude ?? sellerData.society?.longitude;
 
-          if (buyerSociety?.latitude && buyerSociety?.longitude) {
+      if (sellerLat && sellerLng) {
+        try {
+          // Try browsing location from localStorage first, then buyer's society
+          let buyerLat: number | null = null;
+          let buyerLng: number | null = null;
+
+          try {
+            const browsing = JSON.parse(localStorage.getItem('sociva_browsing_location') || 'null');
+            if (browsing?.lat && browsing?.lng) {
+              buyerLat = browsing.lat;
+              buyerLng = browsing.lng;
+            }
+          } catch { /* ignore */ }
+
+          // Fallback to buyer's society coordinates
+          if (!buyerLat && !buyerLng && effectiveSocietyId) {
+            const { data: buyerSociety } = await supabase
+              .from('societies')
+              .select('latitude, longitude')
+              .eq('id', effectiveSocietyId)
+              .single();
+            buyerLat = buyerSociety?.latitude ?? null;
+            buyerLng = buyerSociety?.longitude ?? null;
+          }
+
+          if (buyerLat && buyerLng) {
             const toRad = (deg: number) => (deg * Math.PI) / 180;
             const R = 6371;
-            const dLat = toRad(sellerData.society.latitude - buyerSociety.latitude);
-            const dLon = toRad(sellerData.society.longitude - buyerSociety.longitude);
+            const dLat = toRad(sellerLat - buyerLat);
+            const dLon = toRad(sellerLng - buyerLng);
             const a =
               Math.sin(dLat / 2) ** 2 +
-              Math.cos(toRad(buyerSociety.latitude)) *
-                Math.cos(toRad(sellerData.society.latitude)) *
+              Math.cos(toRad(buyerLat)) *
+                Math.cos(toRad(sellerLat)) *
                 Math.sin(dLon / 2) ** 2;
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             setDistanceKm(Math.round(R * c * 10) / 10);
