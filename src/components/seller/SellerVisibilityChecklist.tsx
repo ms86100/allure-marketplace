@@ -58,7 +58,6 @@ function CheckItem({ check, onSpecialAction }: { check: SellerHealthCheck; onSpe
       </div>
     </div>
   );
-  );
 }
 
 function CheckGroup({ groupKey, checks, onSpecialAction }: { groupKey: keyof typeof GROUP_CONFIG; checks: SellerHealthCheck[]; onSpecialAction?: (route: string) => void }) {
