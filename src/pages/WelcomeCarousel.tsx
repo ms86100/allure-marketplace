@@ -98,7 +98,7 @@ export default function WelcomeCarousel() {
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/12 border border-primary/20 mb-6"
         >
           <Shield className="text-primary" size={14} />
-          <span className="text-xs font-semibold text-primary tracking-wide">Trusted by Families Across India</span>
+          <span className="text-xs font-semibold text-primary tracking-wide">Only From Verified Neighbors</span>
         </motion.div>
 
         <motion.h1
