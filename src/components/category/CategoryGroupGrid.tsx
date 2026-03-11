@@ -6,6 +6,7 @@ import { ServiceCategory } from '@/types/categories';
 import { cn } from '@/lib/utils';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 
 interface CategoryGroupGridProps {
   variant?: 'compact' | 'expanded' | 'selection';
@@ -60,7 +61,7 @@ export function CategoryGroupGrid({
                 'bg-muted/60 border border-border/30'
               )}
             >
-              {icon}
+              <DynamicIcon name={icon} size={24} />
             </div>
             <span className="text-[10px] font-medium text-center leading-tight text-foreground line-clamp-2 max-w-[64px]">
               {label}
@@ -83,7 +84,7 @@ export function CategoryGroupGrid({
             >
               <div className="flex items-center gap-3">
                 <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-lg', color)}>
-                  {icon}
+                  <DynamicIcon name={icon} size={18} />
                 </div>
                 <div className="text-left">
                   <h3 className="font-semibold">{label}</h3>
@@ -105,7 +106,7 @@ export function CategoryGroupGrid({
                     to={`/category/${value}?sub=${config.category}`}
                     className="flex flex-col items-center gap-1 p-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
                   >
-                    <span className="text-xl">{config.icon}</span>
+                    <DynamicIcon name={config.icon} size={20} />
                     <span className="text-xs font-medium text-center">{config.displayName}</span>
                   </Link>
                 ))}
@@ -134,7 +135,7 @@ export function CategoryGroupGrid({
               )}
             >
               <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center text-lg', color)}>
-                {icon}
+                <DynamicIcon name={icon} size={20} />
               </div>
               <span className="font-medium text-sm">{label}</span>
             </button>
@@ -158,7 +159,7 @@ export function CategoryGroupGrid({
                         : 'border-border hover:border-muted-foreground/30'
                     )}
                   >
-                    <span className="text-lg">{config.icon}</span>
+                    <DynamicIcon name={config.icon} size={18} />
                     <span className="text-sm font-medium">{config.displayName}</span>
                   </button>
                 );

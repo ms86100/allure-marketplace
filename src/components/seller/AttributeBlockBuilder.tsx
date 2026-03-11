@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2, Puzzle } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import {
   DndContext,
   closestCenter,
@@ -139,7 +140,7 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
                   onClick={() => addBlock(block)}
                   className="w-full flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors text-left"
                 >
-                  <span className="text-lg shrink-0">{block.icon || '📋'}</span>
+                  <DynamicIcon name={block.icon || 'ClipboardList'} size={18} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">{block.display_name}</p>
                     <p className="text-xs text-muted-foreground line-clamp-1">{block.description}</p>
@@ -186,7 +187,7 @@ function SortableBlock({ block, libBlock, isExpanded, onToggle, onRemove, onData
         <button {...attributes} {...listeners} className="cursor-grab text-muted-foreground hover:text-foreground">
           <GripVertical size={14} />
         </button>
-        <span className="text-sm">{libBlock.icon || '📋'}</span>
+        <DynamicIcon name={libBlock.icon || 'ClipboardList'} size={14} />
         <button onClick={onToggle} className="flex-1 text-left">
           <span className="text-xs font-medium text-foreground">{libBlock.display_name}</span>
           {hasData && <span className="ml-1.5 text-[9px] text-primary">●</span>}

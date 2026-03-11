@@ -9,6 +9,7 @@ import {
   Check, X, Loader2, Store, Package, FileText, Eye, Clock,
   ChevronDown, ChevronUp, MapPin, Phone, Calendar, CreditCard, Truck,
 } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { format } from 'date-fns';
 import { useSellerApplicationReview } from '@/hooks/useSellerApplicationReview';
 import { AdminProductApprovals } from './AdminProductApprovals';
@@ -186,7 +187,7 @@ function SellerCard({ seller, s, idx }: { seller: any; s: ReturnType<typeof useS
                     <div key={lic.id} className="bg-muted/40 rounded-xl p-2.5 flex items-center justify-between gap-2">
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs">{(lic as any).group?.icon}</span>
+                          <DynamicIcon name={(lic as any).group?.icon || 'FileText'} size={14} />
                           <span className="text-xs font-semibold truncate">{lic.license_type}</span>
                           {statusBadge(lic.status)}
                         </div>

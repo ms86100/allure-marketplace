@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Loader2, Plus, Edit2, Trash2, Tag, RefreshCw, Sparkles, ImageIcon } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { friendlyError, cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 
@@ -172,7 +173,7 @@ export function SubcategoryManager() {
 
   const getCategoryName = (configId: string) => {
     const c = allConfigs.find(cfg => cfg.id === configId);
-    return c ? `${c.icon} ${c.display_name}` : configId;
+    return c ? c.display_name : configId;
   };
 
   const getParentCategoryName = (configId: string) => {
@@ -305,7 +306,7 @@ export function SubcategoryManager() {
             <SelectContent>
               <SelectItem value="all">All categories</SelectItem>
               {allConfigs.map(c => (
-                <SelectItem key={c.id} value={c.id}>{c.icon} {c.display_name}</SelectItem>
+                <SelectItem key={c.id} value={c.id}><span className="inline-flex items-center gap-1.5"><DynamicIcon name={c.icon} size={14} /> {c.display_name}</span></SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -335,7 +336,7 @@ export function SubcategoryManager() {
                   {sub.image_url ? (
                     <img src={sub.image_url} alt={sub.display_name} className="w-8 h-8 rounded-lg object-cover" />
                   ) : (
-                    <span className="text-lg">{sub.icon || '📂'}</span>
+                    <DynamicIcon name={sub.icon || 'FolderOpen'} size={18} />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{sub.display_name}</p>

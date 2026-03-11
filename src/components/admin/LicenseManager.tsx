@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Check, X, FileText, Eye, Clock, Shield } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { sendPushNotification } from '@/lib/notifications';
@@ -188,7 +189,7 @@ export function LicenseManager() {
             {groups.map((group) => (
               <div key={group.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className="text-lg">{group.icon}</span>
+                  <DynamicIcon name={group.icon} size={18} />
                   <div className="min-w-0">
                     <p className="font-medium text-sm">{group.name}</p>
                     {group.requires_license && group.license_type_name && (
@@ -246,7 +247,7 @@ export function LicenseManager() {
                 <p className="font-medium text-sm">{(sub as any).seller?.business_name}</p>
                 <p className="text-xs text-muted-foreground">{(sub as any).seller?.profile?.name}</p>
                 <div className="flex items-center gap-1 mt-0.5">
-                  <span className="text-xs">{(sub as any).group?.icon}</span>
+                  <DynamicIcon name={(sub as any).group?.icon || 'FileText'} size={14} />
                   <span className="text-[10px] text-muted-foreground">{sub.license_type}</span>
                 </div>
                 {sub.license_number && (
