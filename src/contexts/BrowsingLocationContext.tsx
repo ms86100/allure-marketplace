@@ -96,8 +96,8 @@ export function BrowsingLocationProvider({ children }: { children: React.ReactNo
     if (loc && current && loc.lat && loc.lng && current.lat && current.lng) {
       const dist = distanceKm(current.lat, current.lng, loc.lat, loc.lng);
       if (dist > CART_CLEAR_THRESHOLD_KM) {
-        // Check if cart has items
-        const cartData = queryClient.getQueryData<any[]>(['cart-items']);
+        // Check if cart has items using the correct query key shape
+        const cartData = queryClient.getQueryData<any[]>(['cart-items', user?.id]);
         if (cartData && cartData.length > 0) {
           setPendingLocationChange(loc);
           return;
