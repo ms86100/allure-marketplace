@@ -26,14 +26,10 @@ export function SellerPaymentConfirmation({
   const handleConfirm = async (received: boolean) => {
     setIsUpdating(true);
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({
-          payment_status: received ? 'paid' : 'disputed',
-          payment_confirmed_by_seller: received,
-          payment_confirmed_at: new Date().toISOString(),
-        } as any)
-        .eq('id', orderId);
+      const { error } = await supabase.rpc('verify_seller_payment', {
+        _order_id: orderId,
+        _received: received,
+      });
 
       if (error) throw error;
 

@@ -79,13 +79,10 @@ export function UpiDeepLinkCheckout({
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({
-          upi_transaction_ref: trimmed,
-          payment_status: 'buyer_confirmed',
-        } as any)
-        .eq('id', orderId);
+      const { error } = await supabase.rpc('confirm_upi_payment', {
+        _order_id: orderId,
+        _upi_transaction_ref: trimmed,
+      });
 
       if (error) throw error;
 
