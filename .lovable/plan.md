@@ -1,50 +1,72 @@
 
 
-## Notification Health Check — User-Friendly UI
+# UPI Payment Module — Second Bug Audit
 
-### What We'll Build
+## Issues Found: 2 Real Bugs, 1 Edge Case
 
-A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
+---
 
-### UI Design
+### BUG 1 — MEDIUM: Wrong Column Name in Auto-Cancel Query 2
 
-**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
+**File**: `supabase/functions/auto-cancel-orders/index.ts`, line 43
 
-**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
+**Problem**: Query 2 filters with `.neq("payment_method", "cod")` but the `orders` table column is `payment_type` (confirmed in schema types and original migration). `payment_method` does not exist on the `orders` table.
 
-| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
-|---|---|---|
-| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
-| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
-| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
-| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
+**Impact**: With the service role client, PostgREST will either return a 400 error (killing the entire auto-cancel function) or silently ignore the filter — causing **COD orders to be cancelled after 15 minutes** too, not just UPI orders. Either way, this is a silent failure that breaks the orphan cleanup logic.
 
-Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
+**Fix**: Change `.neq("payment_method", "cod")` to `.neq("payment_type", "cod")`.
 
-**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
+---
 
-**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
+### BUG 2 — LOW-MEDIUM: Empty UPI ID Silently Breaks Checkout
 
-### Implementation
+**File**: `src/pages/CartPage.tsx`, line 289
 
-**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
-- Renders the trigger button and the bottom sheet
-- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
-- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
-- Provides actionable buttons for failures (Open Settings, Retry Registration)
+**Problem**: The `sellerUpiId` prop is computed as `(c.sellerGroups[0]?.items[0]?.product?.seller as any)?.upi_id || ''`. If the seller has `accepts_upi: true` but `upi_id` is empty/null (data inconsistency), the UPI deep link becomes `upi://pay?pa=&pn=...` — which will either silently fail or open the UPI app with no payee.
 
-**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
-- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
-- Consolidates the 7+ technical steps into 4 simple categories
-- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
+The `acceptsUpi` check at line 57 of `useCartPage.ts` does verify `!!(firstSeller as any)?.upi_id`, so this path should be blocked. However, there's a timing gap: cart data is cached, and a seller could remove their UPI ID between cache refresh and checkout. The fallback `|| ''` silently passes an empty string instead of showing an error.
 
-**3. Update `src/pages/ProfilePage.tsx`**
-- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
-- Keep Push Debug link visible only for admins
+**Fix**: Add a guard in `UpiDeepLinkCheckout` — if `sellerUpiId` is empty, show an error toast and prevent proceeding.
 
-**4. Optionally add to `src/pages/NotificationsPage.tsx`**
-- Add a small "Check notification status" link at the top
+---
 
-### No backend changes needed
-The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
+### EDGE CASE — Seller Confirmation Banner Disappears After Page Reload
+
+**File**: `src/pages/OrderDetailPage.tsx`, line 161
+
+**Problem**: When the seller confirms/disputes, `onConfirmed={() => window.location.reload()}` is called. This works, but if the order query in `useOrderDetail` doesn't include the new `payment_confirmed_by_seller` column in its SELECT, the banner would reappear on every reload. Let me verify this is handled...
+
+Actually, the query uses `(order as any).payment_confirmed_by_seller`, and the cart query uses `seller_profiles(*)` which fetches all columns. The order detail query likely also fetches `*` from orders. The `as any` casts bypass type checking but should work at runtime since the column exists. This is **not a bug** — just a type-safety gap.
+
+---
+
+## Summary
+
+| # | Issue | Severity | Silent Failure? |
+|---|-------|----------|----------------|
+| 1 | Wrong column `payment_method` → should be `payment_type` in auto-cancel Query 2 | **Medium** | Yes — COD orders may get wrongly cancelled, or entire function fails |
+| 2 | Empty UPI ID fallback to `''` creates broken deep link | **Low-Medium** | Yes — broken payment link with no error |
+
+## Recommended Fixes
+
+**Fix 1** — In `supabase/functions/auto-cancel-orders/index.ts`, line 43:
+```typescript
+// Change:
+.neq("payment_method", "cod")
+// To:
+.neq("payment_type", "cod")
+```
+
+**Fix 2** — In `UpiDeepLinkCheckout.tsx`, add a guard at the start of the component:
+```typescript
+useEffect(() => {
+  if (isOpen && !sellerUpiId) {
+    toast.error('Seller UPI ID is not configured. Please contact the seller.');
+    onPaymentFailed();
+    onClose();
+  }
+}, [isOpen, sellerUpiId]);
+```
+
+Both are quick one-line fixes. No database migration needed.
 
