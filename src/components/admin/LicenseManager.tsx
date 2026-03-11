@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Check, X, FileText, Eye, Clock, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { sendPushNotification } from '@/lib/notifications';
 
 interface GroupConfig {
   id: string;
