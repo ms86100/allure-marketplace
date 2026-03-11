@@ -10,13 +10,13 @@ import { useGoogleMaps, useAutocomplete } from '@/hooks/useGoogleMaps';
 import { MapPin, Navigation, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface SetSocietyLocationSheetProps {
+interface SetStoreLocationSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sellerId: string;
 }
 
-export function SetSocietyLocationSheet({ open, onOpenChange, sellerId }: SetSocietyLocationSheetProps) {
+export function SetStoreLocationSheet({ open, onOpenChange, sellerId }: SetStoreLocationSheetProps) {
   const [step, setStep] = useState<'pick' | 'confirm'>('pick');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -66,23 +66,19 @@ export function SetSocietyLocationSheet({ open, onOpenChange, sellerId }: SetSoc
   const handleConfirm = async (lat: number, lng: number) => {
     setSaving(true);
     try {
-      const { error } = await supabase.rpc('set_my_society_coordinates', {
+      const { error } = await supabase.rpc('set_my_store_coordinates', {
         p_lat: lat,
         p_lng: lng,
+        p_source: 'manual',
       } as any);
       if (error) throw error;
-      toast.success('Society location set successfully!');
+      toast.success('Store location set successfully!');
       queryClient.invalidateQueries({ queryKey: ['seller-health', sellerId] });
       onOpenChange(false);
       setStep('pick');
       setCoords(null);
     } catch (err: any) {
-      const msg = err.message || 'Failed to save location';
-      if (msg.includes('No society assigned')) {
-        toast.error('Your store doesn\'t have a society linked yet. Please update your store settings first.', { duration: 5000 });
-      } else {
-        toast.error(msg);
-      }
+      toast.error(err.message || 'Failed to save location');
     } finally {
       setSaving(false);
     }
@@ -107,19 +103,18 @@ export function SetSocietyLocationSheet({ open, onOpenChange, sellerId }: SetSoc
     <Drawer open={open} onOpenChange={handleOpenChange}>
       <DrawerContent className="max-h-[85vh]">
         <DrawerHeader className="pb-2">
-          <DrawerTitle className="text-base">Set Society Location</DrawerTitle>
+          <DrawerTitle className="text-base">Set Store Location</DrawerTitle>
           <p className="text-xs text-muted-foreground">
-            {step === 'pick' ? 'Search for your society or use your current location' : 'Drag the pin to adjust the exact location'}
+            {step === 'pick' ? 'Search for your store location or use GPS' : 'Drag the pin to adjust the exact location'}
           </p>
         </DrawerHeader>
         <div className="px-4 pb-6">
           {step === 'pick' && (
             <div className="space-y-3">
-              {/* Search input */}
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search your society or area..."
+                  placeholder="Search your store location or area..."
                   value={searchInput}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-9 h-12 rounded-xl"
@@ -130,7 +125,6 @@ export function SetSocietyLocationSheet({ open, onOpenChange, sellerId }: SetSoc
                 )}
               </div>
 
-              {/* Predictions list */}
               {predictions.length > 0 && (
                 <div className="border border-border rounded-xl overflow-hidden divide-y divide-border max-h-48 overflow-y-auto">
                   {predictions.map((p) => (
@@ -150,14 +144,12 @@ export function SetSocietyLocationSheet({ open, onOpenChange, sellerId }: SetSoc
                 </div>
               )}
 
-              {/* Divider */}
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-border" />
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider">or</span>
                 <div className="flex-1 h-px bg-border" />
               </div>
 
-              {/* GPS button */}
               <Button
                 variant="outline"
                 onClick={handleUseCurrentLocation}
@@ -173,7 +165,7 @@ export function SetSocietyLocationSheet({ open, onOpenChange, sellerId }: SetSoc
               </Button>
               <p className="text-[10px] text-muted-foreground text-center">
                 <MapPin size={10} className="inline mr-1" />
-                Make sure you are at or near your society when using this option
+                Make sure you are at or near your store when using this option
               </p>
             </div>
           )}
@@ -182,7 +174,7 @@ export function SetSocietyLocationSheet({ open, onOpenChange, sellerId }: SetSoc
             <GoogleMapConfirm
               latitude={coords.lat}
               longitude={coords.lng}
-              name="Society Location"
+              name="Store Location"
               onConfirm={(lat, lng) => handleConfirm(lat, lng)}
               onBack={handleBack}
             />

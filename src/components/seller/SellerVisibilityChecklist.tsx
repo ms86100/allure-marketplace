@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { CheckCircle2, AlertTriangle, XCircle, Info, ShieldCheck, ChevronRight, ShieldAlert, Package, Globe, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { SetSocietyLocationSheet } from './SetSocietyLocationSheet';
+import { SetStoreLocationSheet } from './SetStoreLocationSheet';
 
 const STATUS_CONFIG = {
   pass: { icon: CheckCircle2, color: 'text-success', bg: 'bg-success/10' },
@@ -111,7 +111,7 @@ export function SellerVisibilityChecklist({ sellerId }: { sellerId: string }) {
   qualityChecks.sort(sortByStatus);
 
   const handleSpecialAction = (route: string) => {
-    if (route === '#set-society-location') {
+    if (route === '#set-society-location' || route === '#set-store-location') {
       setLocationSheetOpen(true);
     }
   };
@@ -161,7 +161,7 @@ export function SellerVisibilityChecklist({ sellerId }: { sellerId: string }) {
           </div>
         </DrawerContent>
       </Drawer>
-      <SetSocietyLocationSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} sellerId={sellerId} />
+      <SetStoreLocationSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} sellerId={sellerId} />
     </>
   );
 }

@@ -29,7 +29,7 @@ export function useSellerHealth(sellerId: string | null) {
       const [profileRes, productRes, licenseRes, categoryRes, groupRes] = await Promise.all([
         supabase
           .from('seller_profiles')
-          .select('verification_status, is_available, sell_beyond_community, delivery_radius_km, primary_group, categories, society_id, description, profile_image_url, cover_image_url, availability_start, availability_end, operating_days, societies:societies!seller_profiles_society_id_fkey(latitude, longitude)')
+          .select('verification_status, is_available, sell_beyond_community, delivery_radius_km, primary_group, categories, society_id, description, profile_image_url, cover_image_url, availability_start, availability_end, operating_days, latitude, longitude, seller_type, societies:societies!seller_profiles_society_id_fkey(latitude, longitude)')
           .eq('id', sellerId)
           .single(),
         supabase
@@ -166,19 +166,24 @@ export function useSellerHealth(sellerId: string | null) {
       }
 
       // ═══════════════════════════════════════
-      // DISCOVERY — Cross-society reach
+      // DISCOVERY — Location & cross-society reach
       // ═══════════════════════════════════════
 
       const society = profile.societies;
-      if (!profile.society_id) {
-        checks.push({ key: 'society_coords', label: 'No society linked', status: 'fail', message: 'Your store is not linked to a society. Update your store settings to select one.', actionLabel: 'Update Settings', actionRoute: '/seller/settings', group: 'discovery' });
-      } else if (society?.latitude != null && society?.longitude != null) {
-        checks.push({ key: 'society_coords', label: 'Society location set', status: 'pass', message: 'Your society has valid coordinates for distance-based discovery.', group: 'discovery' });
+      const hasSellerCoords = profile.latitude != null && profile.longitude != null;
+      const hasSocietyCoords = society?.latitude != null && society?.longitude != null;
+      const isCommercial = profile.seller_type === 'commercial';
+
+      if (hasSellerCoords || hasSocietyCoords) {
+        checks.push({ key: 'store_location', label: 'Store location configured', status: 'pass', message: hasSellerCoords ? 'Your store has direct coordinates for discovery.' : 'Location derived from your society.', group: 'discovery' });
       } else {
-        checks.push({ key: 'society_coords', label: 'Society location missing', status: 'fail', message: 'Your society has no coordinates. Cross-society buyers cannot find you.', actionLabel: 'Set Location', actionRoute: '#set-society-location', group: 'discovery' });
+        checks.push({ key: 'store_location', label: 'Store location not configured', status: 'fail', message: 'Buyers cannot find you without a location. Set your store coordinates.', actionLabel: 'Set Store Location', actionRoute: '#set-store-location', group: 'discovery' });
       }
 
-      if (profile.sell_beyond_community) {
+      if (isCommercial) {
+        // Commercial sellers don't need society-related discovery checks
+        checks.push({ key: 'cross_society', label: 'Commercial seller', status: 'pass', message: 'Visible to all buyers within your delivery radius.', group: 'discovery' });
+      } else if (profile.sell_beyond_community) {
         checks.push({ key: 'cross_society', label: 'Cross-society selling enabled', status: 'pass', message: `Visible to buyers within ${profile.delivery_radius_km || 5} km.`, group: 'discovery' });
       } else {
         checks.push({ key: 'cross_society', label: 'Cross-society selling disabled', status: 'info', message: 'Enable "Sell beyond community" to reach buyers in nearby societies.', actionLabel: 'Update Settings', actionRoute: '/seller/settings', group: 'discovery' });
