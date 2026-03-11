@@ -2,6 +2,8 @@ import { format } from 'date-fns';
 import { Calendar, Clock, MapPin, CalendarPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SERVICE_STATUS_LABELS } from '@/types/service';
+import { addToCalendar } from '@/lib/calendar';
+import { toast } from 'sonner';
 
 interface AppointmentDetailsCardProps {
   booking: {
