@@ -1,76 +1,121 @@
 
 
-# Post-Migration Audit: Critical Issues Assessment
+# UPI Deep Link Payment System with Seller Confirmation
 
-After a deep scan of the entire codebase (150+ TS/TSX files, 89 SQL migrations, all edge functions, all RPCs, all triggers), here is the honest verdict.
+## What We're Building
 
----
+An interim payment system using UPI deep links (direct to seller's UPI ID) with dual-confirmation verification (buyer declares + seller confirms), controlled by an admin toggle that can switch to Razorpay when ready.
 
-## Critical Issues Found: **0 High-Risk / Production-Breaking**
+## Architecture
 
-The core migration is complete and backward compatible. All discovery RPCs use `LEFT JOIN` + `COALESCE`. All frontend discovery hooks consume `search_sellers_by_location` with coordinate parameters. No production-breaking gaps remain.
+```text
+Admin Toggle: payment_gateway_mode = "upi_deep_link" | "razorpay"
 
-## Remaining Issues Found: **4 Low-Medium Risk** (cosmetic/edge-case, not production-breaking)
+When upi_deep_link:
+  Buyer → UPI deep link (upi://pay?pa=seller@upi&am=250&tn=ORD_abc123)
+       → Returns to app → Declares "I paid" + enters UTR
+       → Seller gets notification → Confirms "Payment received"
+       → Order proceeds
 
----
+When razorpay:
+  Existing Razorpay flow (unchanged)
+```
 
-### Issue 1: `useSellersByCategory` — Dead Code with Society Filter
-- **File**: `src/hooks/queries/useSellersByCategory.ts`
-- **Problem**: Filters products by `seller.society_id` (line 50). However, this hook is **never imported or used** in any component — confirmed zero TSX references.
-- **Risk**: None (dead code). But if ever re-activated, it would exclude commercial sellers.
-- **Fix**: Delete the file or convert to coordinate-based filtering if needed later.
+## Database Changes (1 migration)
 
-### Issue 2: `useCommunitySearchSuggestions` — Society-Scoped Search Suggestions
-- **File**: `src/hooks/queries/useCommunitySearchSuggestions.ts`
-- **RPC**: `get_society_search_suggestions(_society_id)`
-- **Problem**: Search suggestions ("People in your society also searched for...") are scoped to `effectiveSocietyId`. Users without a society see no suggestions. Users browsing a different location still see their home society's suggestions.
-- **Risk**: Low — cosmetic. Suggestions are a UX enhancement, not core functionality.
-- **Fix (future)**: Convert RPC to accept lat/lng and aggregate search demand within radius, similar to what was done for `get_society_order_stats`.
+1. **Add `payment_gateway_mode` to `admin_settings`** — insert row with key `payment_gateway_mode`, value `upi_deep_link`, `is_active = true`
+2. **Add columns to `orders` table**:
+   - `upi_transaction_ref text` — UTR/transaction ID from buyer
+   - `payment_confirmed_by_seller boolean default null` — seller's confirmation
+   - `payment_confirmed_at timestamptz` — when seller confirmed
+3. **Update `payment_status` handling** — add `buyer_confirmed` as a recognized status in the frontend `PaymentStatus` type and labels
 
-### Issue 3: `DemandInsights` — Society-Scoped Unmet Demand for Sellers
-- **File**: `src/components/seller/DemandInsights.tsx`
-- **RPC**: `get_unmet_demand(_society_id)`
-- **Problem**: Shows sellers what buyers in their society are searching for. Commercial sellers without a `society_id` will see no demand insights.
-- **Risk**: Low — seller analytics feature, not buyer-facing. Commercial sellers can still operate; they just miss this insight.
-- **Fix (future)**: Update `get_unmet_demand` to accept optional lat/lng and search within radius when society_id is null.
+No new tables needed. No storage bucket needed (no screenshot upload — UTR + dual confirmation is sufficient per your approved approach).
 
-### Issue 4: `reset-and-seed-scenario` Edge Function — Uses `search_nearby_sellers` RPC
-- **File**: `supabase/functions/reset-and-seed-scenario/index.ts`, line 634
-- **Problem**: Calls `search_nearby_sellers` (the OLD society-based RPC) for buyer discovery verification. This is a **test/seed function only**, not production logic.
-- **Risk**: None for production. Seed function may fail validation step if old RPC is eventually dropped.
-- **Fix (future)**: Update to call `search_sellers_by_location` instead.
+## Implementation Plan
 
----
+### 1. New Hook: `usePaymentMode`
+- Reads `payment_gateway_mode` from `admin_settings` table
+- Returns `{ mode: 'upi_deep_link' | 'razorpay', isLoading }`
+- Cached with React Query
 
-## Verified Safe — No Issues
+### 2. New Component: `UpiDeepLinkCheckout.tsx`
+Bottom sheet (same pattern as `RazorpayCheckout.tsx`) with 3 states:
 
-| System | Status | Notes |
-|--------|--------|-------|
-| `search_sellers_by_location` RPC | Safe | LEFT JOIN + COALESCE + commercial bypass |
-| `get_location_stats` RPC | Safe | LEFT JOIN + COALESCE |
-| `create_multi_vendor_orders` RPC | Safe | LEFT JOIN + COALESCE for radius check |
-| `SellerDetailPage.tsx` | Safe | COALESCE coords + commercial bypass (already fixed) |
-| `update-delivery-location` edge fn | Safe | Order delivery coords as primary destination (already fixed) |
-| `get_seller_demand_stats` RPC | Safe | IF/ELSE branching for commercial (already fixed) |
-| `search_demand_log` RLS | Safe | Commercial seller bypass (already fixed) |
-| `useSellerHealth` | Safe | COALESCE logic, commercial bypass |
-| `useSocialProof` / `get_society_order_stats` | Safe | Radius-based counting (already fixed) |
-| All 7 discovery hooks | Safe | All use `search_sellers_by_location` |
-| All 75+ community module files | Safe | Use `society_id` for organizational scope, unrelated to discovery |
-| All RLS policies | Safe | Community-scoped, discovery RPCs use SECURITY DEFINER |
-| All notification triggers | Safe | Fire on order/review events, no society matching |
-| `set_order_society_id` trigger | Safe | Allows null for commercial sellers |
-| `log_order_activity` trigger | Safe | EXCEPTION handler prevents crashes on null society_id |
-| Seller onboarding | Safe | Already allows null society_id |
-| `ProfileEditPage` address defaults | Safe | Uses society coords for form pre-fill only |
-| `BrowsingLocationContext` | Safe | Fallback chain: override → address → society |
-| Auth/signup GPS check | Safe | Validates proximity to selected society during registration, not discovery |
+**State 1 — Pay**: Shows order amount, seller name, QR code (using existing `qrcode.react`), and "Pay with UPI" button that opens `upi://pay?pa={seller_upi}&pn={seller_name}&am={amount}&cu=INR&tn=ORD_{order_id_short}`
 
----
+**State 2 — Confirm**: After returning from UPI app: "Did you complete the payment?" with three buttons (Yes / Pay Again / Cancel). On "Yes" → show UTR input field (required, 12-char alphanumeric validation).
 
-## Verdict
+**State 3 — Done**: Success state. Updates order `payment_status` to `buyer_confirmed` and stores `upi_transaction_ref`.
 
-**There are no critical issues.** The migration is complete, additive, and fully backward compatible. The 4 remaining items are all low-risk cosmetic/analytics gaps that affect only edge-case UX for commercial sellers — none can break production functionality.
+### 3. Modify `useCartPage.ts`
+- Import `usePaymentMode`
+- When `paymentMethod === 'upi'`:
+  - If mode is `upi_deep_link` → open `UpiDeepLinkCheckout` sheet (new state: `showUpiDeepLink`)
+  - If mode is `razorpay` → existing Razorpay flow (unchanged)
+- Add `handleUpiDeepLinkSuccess` handler that navigates to order page
+- Add `showUpiDeepLink` / `setShowUpiDeepLink` to returned state
 
-No implementation needed.
+### 4. Modify `CartPage.tsx`
+- Import `UpiDeepLinkCheckout`
+- Conditionally render `UpiDeepLinkCheckout` OR `RazorpayCheckout` based on payment mode
+- Pass seller's `upi_id` from `sellerGroups[0]` to the UPI sheet
+
+### 5. New Component: `SellerPaymentConfirmation.tsx`
+Banner shown on `OrderDetailPage.tsx` when:
+- `isSellerView === true`
+- `payment_status === 'buyer_confirmed'`
+- `payment_confirmed_by_seller` is null
+
+Shows: "Buyer claims UPI payment of ₹{amount}. UTR: {ref}. Verify in your bank app and confirm."
+
+Two buttons: "Payment Received ✓" / "Not Received ✗"
+- Received → updates `payment_status = 'paid'`, `payment_confirmed_by_seller = true`, `payment_confirmed_at = now()`
+- Not Received → updates `payment_status = 'disputed'`, `payment_confirmed_by_seller = false`
+
+### 6. Modify `OrderDetailPage.tsx`
+- Import and render `SellerPaymentConfirmation` in the payment card section
+- Show UTR reference in the payment card for both buyer and seller views when available
+
+### 7. Admin Toggle in `CredentialsManager.tsx`
+Add a new tab or card at the top of the Payment tab:
+- "Payment Mode" toggle: UPI Deep Link ↔ Payment Gateway
+- Reads/writes `payment_gateway_mode` in `admin_settings`
+- When Razorpay keys are not configured, show note that gateway mode requires keys first
+
+### 8. Update `PaymentMethodSelector.tsx`
+- When mode is `upi_deep_link`, change UPI description to "Pay directly via UPI app" instead of "Pay via Razorpay"
+- Dynamic label based on payment mode
+
+### 9. Update Types
+- `PaymentStatus` in `types/database.ts`: add `'buyer_confirmed' | 'disputed'`
+- `PAYMENT_STATUS_LABELS`: add labels for new statuses
+
+### 10. Notification Trigger
+Add a database trigger or handle in the `UpiDeepLinkCheckout` success handler:
+- When buyer confirms → insert into `notification_queue` for seller: "Payment confirmation needed for Order #{short_id}"
+- When seller confirms/disputes → insert notification for buyer
+
+## What Stays Unchanged
+- `RazorpayCheckout.tsx` — untouched, conditionally rendered
+- `useRazorpay.ts` — untouched
+- `create-razorpay-order` edge function — untouched
+- COD flow — completely unaffected
+- `create_multi_vendor_orders` RPC — no changes needed
+- Multi-seller cart logic — UPI deep link only works for single-seller carts (same constraint as current Razorpay UPI)
+
+## File Summary
+
+| File | Action |
+|------|--------|
+| DB migration | Add columns + admin setting |
+| `src/hooks/usePaymentMode.ts` | Create |
+| `src/components/payment/UpiDeepLinkCheckout.tsx` | Create |
+| `src/components/payment/SellerPaymentConfirmation.tsx` | Create |
+| `src/hooks/useCartPage.ts` | Modify — branch on payment mode |
+| `src/pages/CartPage.tsx` | Modify — render UPI sheet conditionally |
+| `src/pages/OrderDetailPage.tsx` | Modify — show UTR + seller confirmation |
+| `src/components/admin/CredentialsManager.tsx` | Modify — add payment mode toggle |
+| `src/components/payment/PaymentMethodSelector.tsx` | Modify — dynamic UPI label |
+| `src/types/database.ts` | Modify — add payment status types |
 
