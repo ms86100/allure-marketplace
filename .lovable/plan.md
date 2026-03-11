@@ -1,50 +1,77 @@
 
 
-## Notification Health Check — User-Friendly UI
+# Analysis: Society System Architecture & Location Setting UX
 
-### What We'll Build
+## Audit Findings
 
-A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
+### Why Society Name Matters — Deep Dependency Analysis
 
-### UI Design
+The `societies` table is a **core entity** — not just a label. It serves as the hub for:
 
-**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
+1. **Community features** — Bulletin posts, help requests, disputes, snag tickets, gate entries, finances, worker management — ALL scoped by `society_id`. Without a society, a resident cannot participate in any community feature.
 
-**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
+2. **Marketplace discovery** — The `search_sellers_by_location` function joins `seller_profiles → societies` to get coordinates. Sellers without a `society_id` are **invisible** in all discovery queries.
 
-| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
-|---|---|---|
-| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
-| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
-| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
-| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
+3. **Order processing** — `create_multi_vendor_orders` reads buyer's `society_id` from profiles. Orders store `society_id`, `buyer_society_id`, `seller_society_id` for cross-society logic.
 
-Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
+4. **Trust & identity** — Profiles display "Flat B-204, Green Valley Society". Society membership is the core identity anchor.
 
-**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
+### The Two-User Scenario
 
-**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
+- **User A** (picks existing society "Green Valley"): Gets linked to `societies.id = abc123`. All community features work. Seller store inherits coordinates from society.
 
-### Implementation
+- **User B** (pins location on map, no society name): Currently, a new society row IS created during signup via `validate-society` edge function with the Google Place data. So User B gets a society — but it may be a **duplicate** of User A's society with a different name/slug.
 
-**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
-- Renders the trigger button and the bottom sheet
-- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
-- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
-- Provides actionable buttons for failures (Open Settings, Retry Registration)
+**Key insight**: The system already handles "no society name" by creating a society from Google Places data. The problem is not that society names are required — it's that the **seller location setting flow** doesn't provide an inline way to set coordinates.
 
-**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
-- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
-- Consolidates the 7+ technical steps into 4 simple categories
-- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
+### Current Seller Location Issue
 
-**3. Update `src/pages/ProfilePage.tsx`**
-- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
-- Keep Push Debug link visible only for admins
+When a seller's society has no coordinates:
+- The checklist shows "Set Location" → opens `SetSocietyLocationSheet` → GPS only
+- If society_id is NULL → redirects to `/seller/settings` with no context
 
-**4. Optionally add to `src/pages/NotificationsPage.tsx`**
-- Add a small "Check notification status" link at the top
+Both flows are poor UX. The user needs an **inline autocomplete + map confirm** approach.
 
-### No backend changes needed
-The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
+## Proposed Solution
+
+Redesign `SetSocietyLocationSheet` to offer **Google Maps autocomplete search** as the primary input, with GPS as secondary. This keeps the drawer-based approach (which works well from the checklist) but makes it actually useful.
+
+### Changes
+
+**`src/components/seller/SetSocietyLocationSheet.tsx`** — Redesign:
+
+```text
+┌─────────────────────────────────────────┐
+│  Set Society Location                   │
+│  Search for your society or area        │
+│                                         │
+│  🔍 [Search your society/area...    ]   │  ← Google Places autocomplete
+│                                         │
+│  — or —                                 │
+│                                         │
+│  📍 Use Current Location                │  ← existing GPS button
+│                                         │
+│  (after selection → map confirm step)   │
+└─────────────────────────────────────────┘
+```
+
+- Step 1: Show search field (Google Places autocomplete) + "Use Current Location" button
+- On place select: extract lat/lng from place, move to step 2 (GoogleMapConfirm)
+- On GPS: same as current flow → step 2
+- Step 2: GoogleMapConfirm with draggable pin → confirm → RPC call
+
+**Reuse existing infrastructure**:
+- `useGoogleMaps()` hook already loaded
+- Google Places Autocomplete API already used in auth flow (`useAuthPage.ts` has `predictions`, `handleSelectPlace`)
+- `GoogleMapConfirm` component already exists
+
+**No schema changes needed** — the `set_my_society_coordinates` RPC already works correctly for the case where `society_id` exists and coordinates are NULL.
+
+### For the "no society_id" case
+
+This is a separate, deeper issue. Sellers inherit `society_id` from their profile at onboarding time (`society_id: profile?.society_id || null`). If a user signed up without a society (which shouldn't normally happen given the auth flow), the seller profile has no society link. The current "Update Settings" redirect is fine for this edge case — it's rare and needs manual resolution.
+
+### Files Changed
+
+1. **`src/components/seller/SetSocietyLocationSheet.tsx`** — Add Google Places autocomplete search field as primary input, keep GPS as secondary option. Both lead to GoogleMapConfirm step.
 
