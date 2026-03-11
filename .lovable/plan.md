@@ -1,105 +1,50 @@
 
 
-# Supplementary Fixes: Additional Risks from Architecture Review
+## Notification Health Check — User-Friendly UI
 
-Your review correctly identified gaps. Here is what the deeper investigation found.
+### What We'll Build
 
-## Verified Safe (No Action Needed)
+A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
 
-| Area | Finding |
-|------|---------|
-| **Seller Storefront Query** | `SellerDetailPage.tsx` uses Supabase SDK `.select('*, society:societies!...')` which is a LEFT JOIN by default. Commercial sellers with `society_id = null` will load fine — `society` field will simply be `null`. The COALESCE pattern on lines 115-116 already handles this. **No fix needed.** |
-| **Map Pins** | Product listing cards use `seller_latitude` / `seller_longitude` from the `search_sellers_by_location` RPC, which already returns `COALESCE(sp.latitude, s.latitude)`. **No fix needed.** |
-| **Push Notifications** | No notification logic uses `buyer.society_id = seller.society_id` for targeting. All notifications are triggered by order status changes, reviews, disputes — none by society matching. **No fix needed.** |
-| **Analytics GROUP BY** | No frontend code uses `GROUP BY society_id`. The `useSellerAnalytics` hook queries by `seller_id` directly. **No fix needed.** |
+### UI Design
 
-## One Real Issue Found: `get_seller_demand_stats` RPC
+**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
 
-**File**: Migration `20260225110843` — `get_seller_demand_stats` function
+**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
 
-**Current logic** (line 117-124):
-```sql
-SELECT society_id INTO _society_id FROM seller_profiles WHERE id = _seller_id;
+| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
+|---|---|---|
+| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
+| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
+| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
+| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
 
-SELECT COUNT(DISTINCT o.buyer_id) INTO _active_buyers
-FROM orders o
-JOIN profiles p ON p.id = o.buyer_id
-WHERE p.society_id = _society_id  -- NULL for commercial sellers
-  AND o.created_at > now() - interval '30 days'
-```
+Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
 
-**Problem**: For commercial sellers, `_society_id` is `NULL`. The condition `p.society_id = NULL` always evaluates to `FALSE` in SQL (not `NULL = NULL`). Result: `active_buyers_in_society` always returns **0** for commercial sellers.
+**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
 
-**Impact**: The "Demand Intelligence" card in `SellerAnalytics.tsx` shows 0 active buyers for commercial sellers — misleading but not breaking.
+**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
 
-**Risk**: Low-Medium
+### Implementation
 
-**Fix**: For commercial sellers, count active buyers who have ordered from THIS seller instead of from the same society:
+**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
+- Renders the trigger button and the bottom sheet
+- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
+- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
+- Provides actionable buttons for failures (Open Settings, Retry Registration)
 
-```sql
-IF _society_id IS NOT NULL THEN
-  -- Society seller: count buyers in same society
-  SELECT COUNT(DISTINCT o.buyer_id) INTO _active_buyers
-  FROM orders o
-  JOIN profiles p ON p.id = o.buyer_id
-  WHERE p.society_id = _society_id
-    AND o.created_at > now() - interval '30 days'
-    AND o.status != 'cancelled';
-ELSE
-  -- Commercial seller: count unique buyers who ordered from this seller
-  SELECT COUNT(DISTINCT o.buyer_id) INTO _active_buyers
-  FROM orders o
-  WHERE o.seller_id = _seller_id
-    AND o.created_at > now() - interval '30 days'
-    AND o.status != 'cancelled';
-END IF;
-```
+**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
+- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
+- Consolidates the 7+ technical steps into 4 simple categories
+- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
 
-Also rename the JSON key from `active_buyers_in_society` to `active_buyers` (or keep both for backward compat) and update the label in `SellerAnalytics.tsx` accordingly.
+**3. Update `src/pages/ProfilePage.tsx`**
+- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
+- Keep Push Debug link visible only for admins
 
-## Secondary Issue: `search_demand_log` RLS Policy
+**4. Optionally add to `src/pages/NotificationsPage.tsx`**
+- Add a small "Check notification status" link at the top
 
-**Current** (line 149-155):
-```sql
-CREATE POLICY "Sellers can read unmet demand via RPC" ON public.search_demand_log
-  FOR SELECT TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.seller_profiles sp
-      WHERE sp.user_id = auth.uid() AND sp.society_id = search_demand_log.society_id
-    )
-  );
-```
-
-**Problem**: Commercial sellers (`society_id = NULL`) will never match this policy, so they cannot read demand logs.
-
-**Fix**: Add a commercial seller bypass:
-```sql
-USING (
-  EXISTS (
-    SELECT 1 FROM public.seller_profiles sp
-    WHERE sp.user_id = auth.uid()
-      AND (sp.society_id = search_demand_log.society_id OR sp.seller_type = 'commercial')
-  )
-)
-```
-
-## Summary
-
-| Area | Status | Action |
-|------|--------|--------|
-| Storefront query | Safe | None |
-| Map pins | Safe | None |
-| Push notifications | Safe | None |
-| Analytics GROUP BY | Safe | None |
-| `get_seller_demand_stats` RPC | Needs fix | Update to handle NULL society_id |
-| `search_demand_log` RLS | Needs fix | Add commercial seller bypass |
-
-## Implementation
-
-One migration with two changes:
-1. Recreate `get_seller_demand_stats` with the IF/ELSE branching for commercial sellers
-2. Drop and recreate the `search_demand_log` RLS policy with commercial bypass
-
-No frontend changes needed — the JSON keys remain the same.
+### No backend changes needed
+The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
 
