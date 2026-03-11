@@ -5,7 +5,7 @@ import { Profile, SellerProfile, Review, PaymentRecord, VerificationStatus, Paym
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { useCurrency } from '@/hooks/useCurrency';
 import { logAudit } from '@/lib/audit';
-import { sendPushNotification } from '@/lib/notifications';
+import { notifySellerStatusChange } from '@/lib/admin-notifications';
 import { toast } from 'sonner';
 
 interface Report {
@@ -170,38 +170,18 @@ export function useAdminData() {
       if (status === 'approved') {
         await supabase.from('user_roles').insert({ user_id: seller.user_id, role: 'seller' });
         await supabase.from('products').update({ approval_status: 'approved' } as any).eq('seller_id', id).eq('approval_status', 'pending');
-
-        const { error: notifError } = await supabase.from('user_notifications').insert({
-          user_id: seller.user_id,
-          title: '🎉 Congratulations! Your store is approved!',
-          body: 'Your store has been approved and is now live.',
-          type: 'seller_approved',
-          is_read: false,
-        });
-        if (notifError) console.error('Failed to insert seller approval notification:', notifError);
       } else if (status === 'rejected' || status === 'suspended') {
         await supabase.from('user_roles').delete().eq('user_id', seller.user_id).eq('role', 'seller');
+      }
 
-        const title = status === 'rejected' ? '❌ Store application rejected' : '⚠️ Store suspended';
-        const body = status === 'rejected'
-          ? (rejNote
-            ? `Your store application for ${seller.business_name} was rejected. Reason: ${rejNote}`
-            : `Your store application for ${seller.business_name} was rejected. Please update your details and resubmit.`)
-          : `Your store ${seller.business_name} has been suspended. Please contact support or your admin for details.`;
-        const type = status === 'rejected' ? 'seller_rejected' : 'seller_suspended';
-
-        const { error: notifError } = await supabase.from('user_notifications').insert({
-          user_id: seller.user_id,
-          title,
-          body,
-          type,
-          is_read: false,
-        });
-        if (notifError) {
-          console.error('Failed to insert seller rejection/suspension notification:', notifError);
-        } else {
-          sendPushNotification({ userId: seller.user_id, title, body }).catch(() => {});
-        }
+      // Use shared notification helper
+      if (status === 'approved' || status === 'rejected' || status === 'suspended') {
+        await notifySellerStatusChange(
+          seller.user_id,
+          seller.business_name,
+          status as 'approved' | 'rejected' | 'suspended',
+          rejNote || undefined,
+        );
       }
 
       toast.success(`Seller ${status}`);

@@ -6,6 +6,7 @@ import { Profile, SellerProfile, VerificationStatus, SocietyAdmin } from '@/type
 import { useEffectiveFeatures } from '@/hooks/useEffectiveFeatures';
 import { toast } from 'sonner';
 import { logAudit } from '@/lib/audit';
+import { notifySellerStatusChange } from '@/lib/admin-notifications';
 
 export function useSocietyAdmin() {
   const { profile, effectiveSociety, effectiveSocietyId, isSocietyAdmin, isAdmin } = useAuth();
@@ -62,15 +63,42 @@ export function useSocietyAdmin() {
     } catch { toast.error('Failed to update'); }
   };
 
-  const updateSellerStatus = async (id: string, status: VerificationStatus) => {
+  const updateSellerStatus = async (id: string, status: VerificationStatus, rejectionNote?: string) => {
     if (!societyId) return;
     try {
-      const { data: seller } = await supabase.from('seller_profiles').select('user_id').eq('id', id).single();
+      // Fetch seller details for notification
+      const { data: seller } = await supabase
+        .from('seller_profiles')
+        .select('user_id, business_name')
+        .eq('id', id)
+        .single();
       if (!seller) throw new Error('Seller not found');
-      await supabase.from('seller_profiles').update({ verification_status: status }).eq('id', id);
-      if (status === 'approved') await supabase.from('user_roles').insert({ user_id: seller.user_id, role: 'seller' });
-      else if (status === 'rejected' || status === 'suspended') await supabase.from('user_roles').delete().eq('user_id', seller.user_id).eq('role', 'seller');
-      await logAudit(`seller_${status}`, 'seller_profile', id, societyId, { status });
+
+      // Update status and rejection_note
+      await supabase.from('seller_profiles').update({
+        verification_status: status,
+        rejection_note: status === 'rejected' ? (rejectionNote?.trim() || null) : null,
+      } as any).eq('id', id);
+
+      // Manage seller role
+      if (status === 'approved') {
+        await supabase.from('user_roles').insert({ user_id: seller.user_id, role: 'seller' });
+      } else if (status === 'rejected' || status === 'suspended') {
+        await supabase.from('user_roles').delete().eq('user_id', seller.user_id).eq('role', 'seller');
+      }
+
+      await logAudit(`seller_${status}`, 'seller_profile', id, societyId, { status, note: rejectionNote || undefined });
+
+      // Send notification via shared helper
+      if (status === 'approved' || status === 'rejected' || status === 'suspended') {
+        await notifySellerStatusChange(
+          seller.user_id,
+          seller.business_name,
+          status as 'approved' | 'rejected' | 'suspended',
+          rejectionNote?.trim() || undefined,
+        );
+      }
+
       toast.success(`Seller ${status}`);
       fetchData();
     } catch { toast.error('Failed to update'); }
@@ -108,7 +136,6 @@ export function useSocietyAdmin() {
 
   const removeAdmin = async (adminId: string) => {
     if (!societyId) return;
-    // C6: Prevent removing the last active admin — would orphan the society
     const activeAdmins = societyAdmins.filter(a => !a.deactivated_at);
     if (activeAdmins.length <= 1) {
       toast.error('Cannot remove the last admin. Appoint another admin first.');

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { SocietySwitcher } from '@/components/admin/SocietySwitcher';
 import { SecurityStaffManager } from '@/components/admin/SecurityStaffManager';
 import { SecurityModeSettings } from '@/components/admin/SecurityModeSettings';
@@ -41,6 +44,8 @@ function StatCard({ icon: Icon, value, label, color, delay = 0 }: { icon: any; v
 
 export default function SocietyAdminPage() {
   const sa = useSocietyAdmin();
+  const [rejectingSellerId, setRejectingSellerId] = useState<string | null>(null);
+  const [sellerRejectionNote, setSellerRejectionNote] = useState('');
 
   if (!sa.isSocietyAdmin && !sa.isAdmin) {
     return (
@@ -156,7 +161,7 @@ export default function SocietyAdminPage() {
                         <p className="text-xs text-muted-foreground">{(seller as any).profile?.name} • Block {(seller as any).profile?.block}</p>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="text-destructive h-9 w-9 p-0 rounded-xl" onClick={() => sa.updateSellerStatus(seller.id, 'rejected')}><X size={15} /></Button>
+                        <Button size="sm" variant="outline" className="text-destructive h-9 w-9 p-0 rounded-xl" onClick={() => { setRejectingSellerId(seller.id); setSellerRejectionNote(''); }}><X size={15} /></Button>
                         <Button size="sm" className="h-9 w-9 p-0 rounded-xl shadow-sm" onClick={() => sa.updateSellerStatus(seller.id, 'approved')}><Check size={15} /></Button>
                       </div>
                     </div>
@@ -322,6 +327,40 @@ export default function SocietyAdminPage() {
             </TabsContent>
           </Tabs>
         </div>
+
+        {/* Seller Rejection Dialog */}
+        <Dialog open={!!rejectingSellerId} onOpenChange={(open) => { if (!open) { setRejectingSellerId(null); setSellerRejectionNote(''); } }}>
+          <DialogContent className="rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="font-bold">Reject Seller Application</DialogTitle>
+              <DialogDescription>Please provide a reason for rejection. This will be shared with the seller.</DialogDescription>
+            </DialogHeader>
+            <Textarea
+              placeholder="Rejection reason (required)..."
+              value={sellerRejectionNote}
+              onChange={(e) => setSellerRejectionNote(e.target.value)}
+              rows={3}
+              className="rounded-xl"
+            />
+            <DialogFooter className="gap-2">
+              <Button variant="outline" className="rounded-xl" onClick={() => { setRejectingSellerId(null); setSellerRejectionNote(''); }}>Cancel</Button>
+              <Button
+                variant="destructive"
+                className="rounded-xl font-semibold"
+                disabled={!sellerRejectionNote.trim()}
+                onClick={() => {
+                  if (rejectingSellerId) {
+                    sa.updateSellerStatus(rejectingSellerId, 'rejected', sellerRejectionNote.trim());
+                    setRejectingSellerId(null);
+                    setSellerRejectionNote('');
+                  }
+                }}
+              >
+                Confirm Reject
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

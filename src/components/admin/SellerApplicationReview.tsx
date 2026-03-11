@@ -179,9 +179,9 @@ export function SellerApplicationReview() {
                               </div>
                               {lic.status === 'pending' && (
                                 <div className="space-y-2.5 pt-2.5 border-t border-border/30">
-                                  <Textarea placeholder="Admin notes (optional)" value={s.licenseAdminNotes} onChange={(e) => s.setLicenseAdminNotes(e.target.value)} rows={2} className="text-xs rounded-xl" onClick={(e) => e.stopPropagation()} />
-                                  <div className="flex gap-2">
-                                    <Button size="sm" variant="outline" className="text-destructive flex-1 h-8 text-xs rounded-xl font-semibold" onClick={(e) => { e.stopPropagation(); s.updateLicenseStatus(lic.id, 'rejected'); }}><X size={12} className="mr-1" /> Reject</Button>
+                                  <Textarea placeholder="Admin notes (required for rejection)" value={s.licenseAdminNotes} onChange={(e) => s.setLicenseAdminNotes(e.target.value)} rows={2} className="text-xs rounded-xl" onClick={(e) => e.stopPropagation()} />
+                                   <div className="flex gap-2">
+                                     <Button size="sm" variant="outline" className="text-destructive flex-1 h-8 text-xs rounded-xl font-semibold" disabled={!s.licenseAdminNotes.trim()} onClick={(e) => { e.stopPropagation(); s.updateLicenseStatus(lic.id, 'rejected'); }}><X size={12} className="mr-1" /> Reject</Button>
                                     <Button size="sm" className="flex-1 h-8 text-xs rounded-xl font-semibold" onClick={(e) => { e.stopPropagation(); s.updateLicenseStatus(lic.id, 'approved'); }}><Check size={12} className="mr-1" /> Approve</Button>
                                   </div>
                                 </div>
@@ -223,10 +223,10 @@ export function SellerApplicationReview() {
                                     <>
                                       {s.productRejectingId === prod.id ? (
                                         <div className="space-y-2 pt-1.5 border-t border-border/30">
-                                          <Textarea placeholder="Rejection reason (optional)..." value={s.productRejectionNote} onChange={(e) => s.setProductRejectionNote(e.target.value)} rows={2} className="text-xs rounded-xl" onClick={(e) => e.stopPropagation()} />
+                                         <Textarea placeholder="Rejection reason (required)..." value={s.productRejectionNote} onChange={(e) => s.setProductRejectionNote(e.target.value)} rows={2} className="text-xs rounded-xl" onClick={(e) => e.stopPropagation()} />
                                           <div className="flex gap-2">
-                                            <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] rounded-xl" onClick={(e) => { e.stopPropagation(); s.setProductRejectingId(null); s.setProductRejectionNote(''); }}>Cancel</Button>
-                                            <Button size="sm" variant="destructive" className="flex-1 h-7 text-[10px] rounded-xl font-semibold" disabled={s.productActionId === prod.id} onClick={(e) => { e.stopPropagation(); s.updateProductStatus(prod.id, 'rejected'); }}>
+                                             <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] rounded-xl" onClick={(e) => { e.stopPropagation(); s.setProductRejectingId(null); s.setProductRejectionNote(''); }}>Cancel</Button>
+                                             <Button size="sm" variant="destructive" className="flex-1 h-7 text-[10px] rounded-xl font-semibold" disabled={s.productActionId === prod.id || !s.productRejectionNote.trim()} onClick={(e) => { e.stopPropagation(); s.updateProductStatus(prod.id, 'rejected'); }}>
                                               {s.productActionId === prod.id && <Loader2 size={10} className="animate-spin mr-1" />}Confirm Reject
                                             </Button>
                                           </div>
@@ -259,10 +259,10 @@ export function SellerApplicationReview() {
                           </p>
                           {s.rejectingId === seller.id ? (
                             <div className="space-y-2.5">
-                              <Textarea placeholder="Rejection reason (will be shared with seller)..." value={s.rejectionNote} onChange={(e) => s.setRejectionNote(e.target.value)} rows={2} className="rounded-xl" />
+                              <Textarea placeholder="Rejection reason (required)..." value={s.rejectionNote} onChange={(e) => s.setRejectionNote(e.target.value)} rows={2} className="rounded-xl" />
                               <div className="flex gap-2">
                                 <Button size="sm" variant="outline" className="flex-1 rounded-xl" onClick={() => { s.setRejectingId(null); s.setRejectionNote(''); }}>Cancel</Button>
-                                <Button size="sm" variant="destructive" className="flex-1 rounded-xl font-semibold" disabled={s.actionId === seller.id} onClick={() => s.updateSellerStatus(seller, 'rejected')}>
+                                <Button size="sm" variant="destructive" className="flex-1 rounded-xl font-semibold" disabled={s.actionId === seller.id || !s.rejectionNote.trim()} onClick={() => s.updateSellerStatus(seller, 'rejected')}>
                                   {s.actionId === seller.id && <Loader2 size={14} className="animate-spin mr-1" />}Confirm Reject
                                 </Button>
                               </div>
