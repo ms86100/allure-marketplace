@@ -592,11 +592,11 @@ export function DraftProductManager({
           </Card>
 
           {/* Desktop sticky preview */}
-          <ProductFormPreviewPanel formData={previewFormData} sellerProfile={null} />
+          <ProductFormPreviewPanel formData={previewFormData} sellerProfile={null} attributeBlocks={attributeBlocks} />
         </div>
 
         {/* Mobile floating preview */}
-        <ProductFormPreviewMobile formData={previewFormData} sellerProfile={null} />
+        <ProductFormPreviewMobile formData={previewFormData} sellerProfile={null} attributeBlocks={attributeBlocks} />
         </>
       ) : (
         <Button variant="outline" className="w-full border-dashed" onClick={() => setIsAdding(true)}>
