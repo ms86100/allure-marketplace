@@ -176,6 +176,24 @@ export function BrowsingLocationProvider({ children }: { children: React.ReactNo
       pendingLocationChange, confirmLocationChange, cancelLocationChange,
     }}>
       {children}
+
+      {/* Cart clear confirmation dialog */}
+      <AlertDialog open={!!pendingLocationChange} onOpenChange={(open) => { if (!open) cancelLocationChange(); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Switch location?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your cart has items from your current location. Switching to "{pendingLocationChange?.label}" will clear your cart.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelLocationChange}>Stay here</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLocationChange} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Switch & clear cart
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </BrowsingLocationContext.Provider>
   );
 }
