@@ -14,6 +14,7 @@ import { OrderItemCard } from '@/components/order/OrderItemCard';
 import { AppointmentDetailsCard } from '@/components/order/AppointmentDetailsCard';
 import { useServiceBookingForOrder } from '@/hooks/useServiceBookings';
 import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
+import { SellerPaymentConfirmation } from '@/components/payment/SellerPaymentConfirmation';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
 import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck } from 'lucide-react';
