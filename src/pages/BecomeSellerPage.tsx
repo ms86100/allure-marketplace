@@ -78,6 +78,7 @@ export default function BecomeSellerPage() {
     selectedGroupInfo, selectedGroupRow, handleCategoryChange, toggleOperatingDay,
     handleProceedToSettings, handleProceedToProducts, handleSaveDraftAndExit, handleSubmit,
     setExistingSeller, setDraftSellerId, handleStepBack, handleGroupSelect, submissionComplete,
+    loadSellerDataIntoForm, reloadProducts,
   } = app;
 
   const fulfillmentLabel = FULFILLMENT_OPTIONS.find(o => o.value === formData.fulfillment_mode)?.label || formData.fulfillment_mode;
