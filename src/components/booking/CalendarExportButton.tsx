@@ -1,5 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { CalendarPlus } from 'lucide-react';
+import { addToCalendar } from '@/lib/calendar';
+import { toast } from 'sonner';
 
 interface CalendarExportButtonProps {
   title: string;
@@ -10,51 +12,22 @@ interface CalendarExportButtonProps {
   description?: string;
 }
 
-function pad(t: string) {
-  return t.length === 5 ? t + ':00' : t;
-}
-
-function toICSDate(date: string, time: string): string {
-  const d = date.replace(/-/g, '');
-  const t = pad(time).replace(/:/g, '').slice(0, 6);
-  return `${d}T${t}`;
-}
-
-function generateICS({ title, date, startTime, endTime, location, description }: CalendarExportButtonProps): string {
-  const dtStart = toICSDate(date, startTime);
-  const dtEnd = toICSDate(date, endTime);
-  const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
-
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Lovable//ServiceBooking//EN',
-    'BEGIN:VEVENT',
-    `DTSTART:${dtStart}`,
-    `DTEND:${dtEnd}`,
-    `DTSTAMP:${now}`,
-    `SUMMARY:${title}`,
-    location ? `LOCATION:${location}` : '',
-    description ? `DESCRIPTION:${description.replace(/\n/g, '\\n')}` : '',
-    'END:VEVENT',
-    'END:VCALENDAR',
-  ].filter(Boolean).join('\r\n');
-
-  return lines;
-}
-
 export function CalendarExportButton(props: CalendarExportButtonProps) {
-  const handleExport = () => {
-    const icsContent = generateICS(props);
-    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `appointment-${props.date}.ics`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleExport = async () => {
+    try {
+      const start = new Date(`${props.date}T${props.startTime}`);
+      const end = new Date(`${props.date}T${props.endTime}`);
+      await addToCalendar({
+        title: props.title,
+        startDate: start,
+        endDate: end,
+        location: props.location,
+        description: props.description,
+      });
+    } catch (e) {
+      console.warn('[Calendar] Export failed:', e);
+      toast.error('Could not add to calendar');
+    }
   };
 
   return (

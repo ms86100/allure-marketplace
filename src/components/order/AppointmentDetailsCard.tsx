@@ -25,28 +25,20 @@ export function AppointmentDetailsCard({ booking }: AppointmentDetailsCardProps)
   const bookingDate = new Date(booking.booking_date + 'T00:00:00');
   const statusConfig = SERVICE_STATUS_LABELS[booking.status];
 
-  const handleAddToCalendar = () => {
-    const start = new Date(`${booking.booking_date}T${booking.start_time}`);
-    const end = new Date(`${booking.booking_date}T${booking.end_time}`);
-    const formatICS = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-    const icsContent = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'BEGIN:VEVENT',
-      `DTSTART:${formatICS(start)}`,
-      `DTEND:${formatICS(end)}`,
-      `SUMMARY:Appointment`,
-      `LOCATION:${LOCATION_LABELS[booking.location_type] || booking.location_type}`,
-      'END:VEVENT',
-      'END:VCALENDAR',
-    ].join('\r\n');
-    const blob = new Blob([icsContent], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'appointment.ics';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleAddToCalendar = async () => {
+    try {
+      const start = new Date(`${booking.booking_date}T${booking.start_time}`);
+      const end = new Date(`${booking.booking_date}T${booking.end_time}`);
+      await addToCalendar({
+        title: 'Appointment',
+        startDate: start,
+        endDate: end,
+        location: LOCATION_LABELS[booking.location_type] || booking.location_type,
+      });
+    } catch (e) {
+      console.warn('[Calendar] Export failed:', e);
+      toast.error('Could not add to calendar');
+    }
   };
 
   return (
