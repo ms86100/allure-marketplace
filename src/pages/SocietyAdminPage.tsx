@@ -161,7 +161,7 @@ export default function SocietyAdminPage() {
                         <p className="text-xs text-muted-foreground">{(seller as any).profile?.name} • Block {(seller as any).profile?.block}</p>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="text-destructive h-9 w-9 p-0 rounded-xl" onClick={() => sa.updateSellerStatus(seller.id, 'rejected')}><X size={15} /></Button>
+                        <Button size="sm" variant="outline" className="text-destructive h-9 w-9 p-0 rounded-xl" onClick={() => { setRejectingSellerId(seller.id); setSellerRejectionNote(''); }}><X size={15} /></Button>
                         <Button size="sm" className="h-9 w-9 p-0 rounded-xl shadow-sm" onClick={() => sa.updateSellerStatus(seller.id, 'approved')}><Check size={15} /></Button>
                       </div>
                     </div>
