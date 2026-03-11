@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSellerHealth, SellerHealthCheck } from '@/hooks/queries/useSellerHealth';
 import { Card } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { CheckCircle2, AlertTriangle, XCircle, Info, ShieldCheck, ChevronRight, ShieldAlert, Package, Globe, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SetSocietyLocationSheet } from './SetSocietyLocationSheet';
 
 const STATUS_CONFIG = {
   pass: { icon: CheckCircle2, color: 'text-success', bg: 'bg-success/10' },
