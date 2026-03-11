@@ -65,7 +65,7 @@ function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number): num
 }
 
 export function BrowsingLocationProvider({ children }: { children: React.ReactNode }) {
-  const { society } = useAuth();
+  const { society, user } = useAuth();
   const { defaultAddress } = useDeliveryAddresses();
   const queryClient = useQueryClient();
 
