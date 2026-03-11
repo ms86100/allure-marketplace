@@ -538,10 +538,10 @@ export function DraftProductManager({
               )}
 
               <div className="flex gap-2 pt-1">
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => setIsAdding(false)}>Cancel</Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={resetForm}>Cancel</Button>
                 <Button size="sm" className="flex-1" onClick={handleAddProduct} disabled={isSaving}>
                   {isSaving && <Loader2 size={14} className="animate-spin mr-1" />}
-                  Save Product
+                  {editingIndex !== null ? 'Update Product' : 'Save Product'}
                 </Button>
               </div>
             </CardContent>
