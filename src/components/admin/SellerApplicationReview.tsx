@@ -179,9 +179,9 @@ export function SellerApplicationReview() {
                               </div>
                               {lic.status === 'pending' && (
                                 <div className="space-y-2.5 pt-2.5 border-t border-border/30">
-                                  <Textarea placeholder="Admin notes (optional)" value={s.licenseAdminNotes} onChange={(e) => s.setLicenseAdminNotes(e.target.value)} rows={2} className="text-xs rounded-xl" onClick={(e) => e.stopPropagation()} />
-                                  <div className="flex gap-2">
-                                    <Button size="sm" variant="outline" className="text-destructive flex-1 h-8 text-xs rounded-xl font-semibold" onClick={(e) => { e.stopPropagation(); s.updateLicenseStatus(lic.id, 'rejected'); }}><X size={12} className="mr-1" /> Reject</Button>
+                                  <Textarea placeholder="Admin notes (required for rejection)" value={s.licenseAdminNotes} onChange={(e) => s.setLicenseAdminNotes(e.target.value)} rows={2} className="text-xs rounded-xl" onClick={(e) => e.stopPropagation()} />
+                                   <div className="flex gap-2">
+                                     <Button size="sm" variant="outline" className="text-destructive flex-1 h-8 text-xs rounded-xl font-semibold" disabled={!s.licenseAdminNotes.trim()} onClick={(e) => { e.stopPropagation(); s.updateLicenseStatus(lic.id, 'rejected'); }}><X size={12} className="mr-1" /> Reject</Button>
                                     <Button size="sm" className="flex-1 h-8 text-xs rounded-xl font-semibold" onClick={(e) => { e.stopPropagation(); s.updateLicenseStatus(lic.id, 'approved'); }}><Check size={12} className="mr-1" /> Approve</Button>
                                   </div>
                                 </div>
