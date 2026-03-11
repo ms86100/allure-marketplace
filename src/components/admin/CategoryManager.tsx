@@ -273,7 +273,7 @@ export function CategoryManager() {
               />
             )}
             <div className="space-y-2">
-              <Label htmlFor="icon" className="text-xs font-semibold">Icon (Emoji)</Label>
+              <Label htmlFor="icon" className="text-xs font-semibold">Icon (Emoji or Lucide name)</Label>
               <Input id="icon" value={cm.editForm.icon} onChange={(e) => cm.setEditForm({ ...cm.editForm, icon: e.target.value })} className="text-2xl rounded-xl" />
               <div className="flex flex-wrap gap-1.5 mt-1">
                 {EMOJI_PRESETS.map((emoji) => (

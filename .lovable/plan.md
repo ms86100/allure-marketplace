@@ -1,57 +1,50 @@
 
 
-# Fix: Emojis Rendered as Raw Text Instead of Lucide Icons
+## Notification Health Check — User-Friendly UI
 
-## The Problem
+### What We'll Build
 
-The app has a dual icon system that's inconsistent. The database stores **two types of icon values**:
-- **Lucide icon names** (e.g. `ChefHat`, `Wrench`, `GraduationCap`) — used by most categories
-- **Raw emojis** (e.g. `📝`, `🧹`) — used by a few categories and parent groups
+A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
 
-The `DynamicIcon` component handles both correctly — it detects emojis and renders them as `<span>`, and renders Lucide names as proper icons. **But many places in the codebase don't use `DynamicIcon` at all** — they render `{config.icon}` directly as text, which means:
-- Lucide names like `ChefHat` display as the literal text "ChefHat" instead of the icon
-- Emojis display fine since browsers render them natively
+### UI Design
 
-### Places where icons are rendered as raw text (not through DynamicIcon)
+**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
 
-| File | What's broken |
-|------|--------------|
-| `SellerProductsPage.tsx` (line 60) | Category select dropdown shows `{config.icon}` as text |
-| `SellerProductsPage.tsx` (line 112) | Product placeholder shows `{icon \|\| '📦'}` as text |
-| `SellerDetailPage.tsx` (line 464) | Category badge shows `{categoryInfo?.icon}` as text |
-| `BulkProductUpload.tsx` (line 88) | Category select shows `{c.icon}` as text |
-| `WorkerCategoryManager.tsx` (line 136) | Worker category card shows `{cat.icon}` as text |
-| `SubcategoryManager.tsx` (line ~425) | Subcategory form shows emoji as text |
-| `CategoryManager.tsx` (lines 276-283) | Admin category editor labels icons as "Emoji" but DB stores Lucide names |
+**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
 
-### Database has 2 emoji icons that should be Lucide names
-- `resume_writing` category: icon = `📝` → should be `FileEdit` or `PenLine`
-- `domestic_help` parent group: icon = `🧹` → should be `Sparkles` or keep as emoji (DynamicIcon handles it)
+| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
+|---|---|---|
+| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
+| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
+| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
+| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
 
-## Fix Plan
+Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
 
-### 1. Replace all raw `{icon}` renders with `<DynamicIcon>`
+**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
 
-In every file listed above, replace inline `{config.icon}` / `{cat.icon}` text renders with `<DynamicIcon name={...} size={...} />`.
+**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
 
-### 2. Fix the Admin CategoryManager icon input
+### Implementation
 
-The admin UI currently shows emoji presets and labels the icon field as "Icon (Emoji)". But the DB actually stores Lucide icon names for most categories. Two options:
-- **Keep it as-is** — `DynamicIcon` handles both emojis and Lucide names, so the admin can enter either
-- **Update label** — Change "Icon (Emoji)" to "Icon (Emoji or Lucide name)" so admins know both are supported
+**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
+- Renders the trigger button and the bottom sheet
+- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
+- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
+- Provides actionable buttons for failures (Open Settings, Retry Registration)
 
-I'll update the label to be accurate.
+**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
+- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
+- Consolidates the 7+ technical steps into 4 simple categories
+- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
 
-### 3. Fix the 2 emoji values in DB
+**3. Update `src/pages/ProfilePage.tsx`**
+- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
+- Keep Push Debug link visible only for admins
 
-Run a migration to update `resume_writing.icon` from `📝` to `PenLine` and `domestic_help` parent group icon from `🧹` to a Lucide name, for consistency.
+**4. Optionally add to `src/pages/NotificationsPage.tsx`**
+- Add a small "Check notification status" link at the top
 
-### Files to modify
-- `src/pages/SellerProductsPage.tsx` — Use DynamicIcon in category select + product placeholder
-- `src/pages/SellerDetailPage.tsx` — Use DynamicIcon in category badge
-- `src/components/seller/BulkProductUpload.tsx` — Use DynamicIcon in category select
-- `src/components/workforce/WorkerCategoryManager.tsx` — Use DynamicIcon in card
-- `src/components/admin/CategoryManager.tsx` — Update label text
-- `src/components/admin/SubcategoryManager.tsx` — Update label text
-- DB migration: fix 2 emoji icon values
+### No backend changes needed
+The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
 

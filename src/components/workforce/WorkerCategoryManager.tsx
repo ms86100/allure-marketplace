@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Plus, Trash2 } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -133,7 +134,7 @@ export function WorkerCategoryManager() {
         <Card key={cat.id}>
           <CardContent className="p-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xl">{cat.icon}</span>
+              <DynamicIcon name={cat.icon} size={20} />
               <div>
                 <p className="font-medium text-sm">{cat.name}</p>
                 <p className="text-[10px] text-muted-foreground capitalize">{cat.entry_type.replace('_', ' ')} entry</p>

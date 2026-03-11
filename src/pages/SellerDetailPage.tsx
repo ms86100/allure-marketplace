@@ -7,6 +7,7 @@ import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { RatingStars } from '@/components/ui/rating-stars';
 import { ReviewList } from '@/components/review/ReviewList';
 import { FavoriteButton } from '@/components/favorite/FavoriteButton';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { SellerReputationTab } from '@/components/seller/SellerReputationTab';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -461,7 +462,7 @@ export default function SellerDetailPage() {
                     key={cat}
                     className="text-xs px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground font-medium"
                   >
-                    {categoryInfo?.icon} {categoryInfo?.displayName || cat}
+                    <span className="inline-flex items-center gap-1"><DynamicIcon name={categoryInfo?.icon || 'Package'} size={12} /> {categoryInfo?.displayName || cat}</span>
                   </span>
                 );
               })}

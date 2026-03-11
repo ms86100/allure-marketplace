@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Upload, Download, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { CategoryConfig } from '@/types/categories';
 import { useBulkUpload } from '@/hooks/useBulkUpload';
 
@@ -85,7 +86,7 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
                       <TableCell>
                         <Select value={row.category} onValueChange={(v) => b.updateRow(idx, 'category', v)}>
                           <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                          <SelectContent>{allowedCategories.map(c => <SelectItem key={c.category} value={c.category}>{c.icon} {c.displayName}</SelectItem>)}</SelectContent>
+                          <SelectContent>{allowedCategories.map(c => <SelectItem key={c.category} value={c.category}><span className="flex items-center gap-1.5"><DynamicIcon name={c.icon} size={14} /> {c.displayName}</span></SelectItem>)}</SelectContent>
                         </Select>
                       </TableCell>
                     )}

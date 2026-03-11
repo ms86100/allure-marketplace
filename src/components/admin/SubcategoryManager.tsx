@@ -419,9 +419,9 @@ export function SubcategoryManager() {
                   onImageGenerated={(url) => setFormData({ ...formData, image_url: url })}
                 />
 
-                {/* Icon (Emoji) */}
+                {/* Icon (Emoji or Lucide name) */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold">Icon (Emoji)</Label>
+                  <Label className="text-xs font-semibold">Icon (Emoji or Lucide name)</Label>
                   <Input value={formData.icon} onChange={e => setFormData({ ...formData, icon: e.target.value })} className="text-2xl rounded-xl" />
                   <div className="flex flex-wrap gap-1.5 mt-1">
                     {EMOJI_PRESETS.slice(0, 24).map((emoji) => (
