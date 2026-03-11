@@ -130,7 +130,7 @@ export function useSellerApplication() {
       if (!user || !selectedGroup) return;
       const { data } = await supabase
         .from('seller_profiles')
-        .select('id, business_name, verification_status')
+        .select('id, business_name, verification_status, rejection_note')
         .eq('user_id', user.id)
         .eq('primary_group', selectedGroup)
         .neq('verification_status', 'draft')
