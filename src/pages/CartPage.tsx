@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Minus, Plus, Clock, Store, MapPin, Bell, ChevronRight, Trash2, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Minus, Plus, Clock, Store, MapPin, Bell, ChevronRight, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { VegBadge } from '@/components/ui/veg-badge';
@@ -15,6 +15,7 @@ import { hapticImpact } from '@/lib/haptics';
 import { toast } from 'sonner';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { AlertCircle } from 'lucide-react';
+import { AddressPicker } from '@/components/profile/AddressPicker';
 
 export default function CartPage() {
   const c = useCartPage();
@@ -190,12 +191,28 @@ export default function CartPage() {
           <div className="flex-1 min-w-0">
             {c.fulfillmentType === 'self_pickup' ? (
               <><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pickup from</p><p className="text-sm font-medium mt-0.5">{c.sellerGroups[0]?.sellerName || 'Seller'}</p><p className="text-xs text-muted-foreground">{c.society?.name || 'Your Society'}</p></>
+            ) : c.selectedDeliveryAddress ? (
+              <>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deliver to</p>
+                <p className="text-sm font-medium mt-0.5">{c.selectedDeliveryAddress.label}</p>
+                <p className="text-xs text-muted-foreground">{[c.selectedDeliveryAddress.flat_number && `Flat ${c.selectedDeliveryAddress.flat_number}`, c.selectedDeliveryAddress.block && `Block ${c.selectedDeliveryAddress.block}`, c.selectedDeliveryAddress.building_name].filter(Boolean).join(', ')}</p>
+                {!c.selectedDeliveryAddress.latitude && (
+                  <p className="text-[10px] text-warning flex items-center gap-1 mt-1"><AlertTriangle size={10} /> No location pin — update address for delivery</p>
+                )}
+              </>
             ) : (
-              <><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deliver to</p><p className="text-sm font-medium mt-0.5">{c.profile?.name} — {[c.profile?.block, c.profile?.flat_number].filter(Boolean).join(', ')}</p><p className="text-xs text-muted-foreground">{c.society?.name || 'Your Society'}</p></>
+              <>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deliver to</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{c.addresses.length === 0 ? 'No saved addresses' : 'Select a delivery address'}</p>
+              </>
             )}
           </div>
           {c.fulfillmentType !== 'self_pickup' && (
-            <Link to="/profile/edit" className="text-xs text-primary font-semibold shrink-0">Change</Link>
+            c.addresses.length > 0 ? (
+              <AddressPicker selectedId={c.selectedDeliveryAddress?.id} onSelect={c.setSelectedDeliveryAddress} />
+            ) : (
+              <Link to="/profile/addresses" className="text-xs text-primary font-semibold shrink-0">Add</Link>
+            )
           )}
         </div>
 
@@ -251,7 +268,7 @@ export default function CartPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Items</span><span className="font-medium">{c.itemCount} item{c.itemCount !== 1 ? 's' : ''}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span className="font-medium">{c.paymentMethod === 'cod' ? 'Cash on Delivery' : 'UPI'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">{c.fulfillmentType === 'self_pickup' ? 'Pickup from' : 'Deliver to'}</span><span className="font-medium text-right">{c.fulfillmentType === 'self_pickup' ? c.sellerGroups[0]?.sellerName || 'Seller' : [c.profile?.block, c.profile?.flat_number].filter(Boolean).join(', ') || 'Not set'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{c.fulfillmentType === 'self_pickup' ? 'Pickup from' : 'Deliver to'}</span><span className="font-medium text-right">{c.fulfillmentType === 'self_pickup' ? c.sellerGroups[0]?.sellerName || 'Seller' : c.selectedDeliveryAddress?.label || 'Not set'}</span></div>
                 {c.sellerGroups.length > 1 && <p className="text-xs text-muted-foreground">{c.sellerGroups.length} separate orders will be created.</p>}
                 <div className="flex justify-between border-t border-border pt-2 font-bold"><span>Total</span><span>{c.formatPrice(c.finalAmount)}</span></div>
               </div>

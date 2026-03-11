@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { hapticImpact, hapticNotification, hapticSelection } from '@/lib/haptics';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
@@ -27,8 +28,10 @@ export function useCartPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [fulfillmentType, setFulfillmentType] = useState<'self_pickup' | 'delivery'>('self_pickup');
   const [orderStep, setOrderStep] = useState<'validating' | 'creating' | 'confirming'>('validating');
+  const [selectedDeliveryAddress, setSelectedDeliveryAddress] = useState<any>(null);
   const settings = useSystemSettings();
   const { formatPrice, currencySymbol } = useCurrency();
+  const { addresses, defaultAddress, isLoading: addressesLoading } = useDeliveryAddresses();
 
   const effectiveCouponDiscount = (() => {
     if (!appliedCoupon) return 0;
@@ -76,6 +79,13 @@ export function useCartPage() {
     if (sellerGroups.length > 1 && appliedCoupon) setAppliedCoupon(null);
   }, [sellerGroups.length]);
 
+  // Auto-select default delivery address
+  useEffect(() => {
+    if (!selectedDeliveryAddress && defaultAddress) {
+      setSelectedDeliveryAddress(defaultAddress);
+    }
+  }, [defaultAddress, selectedDeliveryAddress]);
+
   const hasUrgentItem = items.some((item) => (item.product as any)?.is_urgent);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const maxPrepTime = items.reduce((max, item) => {
@@ -98,19 +108,28 @@ export function useCartPage() {
     });
     if (priceMismatch) { toast.error('Some item prices have changed. Refreshing your cart...'); await refresh(); throw new Error('Price mismatch detected'); }
 
+    // Build delivery address text from selected address or profile fallback
+    const deliveryAddressText = fulfillmentType === 'delivery' && selectedDeliveryAddress
+      ? [selectedDeliveryAddress.flat_number && `Flat ${selectedDeliveryAddress.flat_number}`, selectedDeliveryAddress.block && `Block ${selectedDeliveryAddress.block}`, selectedDeliveryAddress.building_name, selectedDeliveryAddress.landmark].filter(Boolean).join(', ')
+      : [profile.block, profile.flat_number].filter(Boolean).join(', ');
+
     const { data, error } = await supabase.rpc('create_multi_vendor_orders', {
-      _buyer_id: user.id, _delivery_address: [profile.block, profile.flat_number].filter(Boolean).join(', '),
+      _buyer_id: user.id, _delivery_address: deliveryAddressText,
       _notes: notes || null, _payment_method: paymentMethod, _payment_status: paymentStatus,
       _coupon_id: appliedCoupon?.id || null, _coupon_code: appliedCoupon?.code || null,
       _coupon_discount: effectiveCouponDiscount, _cart_total: totalAmount, _has_urgent: hasUrgentItem,
       _seller_groups: sellerGroupsPayload, _fulfillment_type: fulfillmentType, _delivery_fee: effectiveDeliveryFee,
+      _delivery_address_id: selectedDeliveryAddress?.id || null,
+      _delivery_lat: selectedDeliveryAddress?.latitude || null,
+      _delivery_lng: selectedDeliveryAddress?.longitude || null,
     });
     if (error) throw error;
 
-    const result = data as { success: boolean; order_ids?: string[]; order_count?: number; error?: string; unavailable_items?: string[]; closed_sellers?: string[] };
+    const result = data as { success: boolean; order_ids?: string[]; order_count?: number; error?: string; unavailable_items?: string[]; closed_sellers?: string[]; out_of_range_sellers?: string[] };
     if (!result?.success) {
       if (result?.error === 'stock_validation_failed' && result?.unavailable_items) throw new Error(`Some items are unavailable:\n• ${result.unavailable_items.join('\n• ')}`);
       if (result?.error === 'store_closed') { const sellers = result.closed_sellers?.join(', '); throw new Error(sellers ? `Store closed: ${sellers}` : 'Store is currently closed. Please try again later.'); }
+      if (result?.error === 'delivery_out_of_range') { const sellers = result.out_of_range_sellers?.join('\n• '); throw new Error(sellers ? `Delivery not possible:\n• ${sellers}` : 'Delivery address is out of range for one or more sellers.'); }
       throw new Error('Failed to create orders');
     }
     return result.order_ids || [];
@@ -122,7 +141,8 @@ export function useCartPage() {
     const selfSellerGroup = sellerGroups.find(g => { const sellerUserId = (g.items[0]?.product?.seller as any)?.user_id; return sellerUserId && sellerUserId === user.id; });
     if (selfSellerGroup) { toast.error("You cannot place an order from your own store."); return; }
     if (!navigator.onLine) { toast.error("You're offline. Please check your connection and try again."); return; }
-    if (fulfillmentType === 'delivery' && (!profile.block || !profile.flat_number)) { toast.error('Please update your profile with block and flat number before placing a delivery order.'); return; }
+    if (fulfillmentType === 'delivery' && !selectedDeliveryAddress) { toast.error('Please select a delivery address before placing your order.'); return; }
+    if (fulfillmentType === 'delivery' && selectedDeliveryAddress && !selectedDeliveryAddress.latitude) { toast.error('Your selected address has no location coordinates. Please update it with a precise location.'); return; }
 
     for (const group of sellerGroups) {
       const minOrder = (group.items[0]?.product?.seller as any)?.minimum_order_amount;
@@ -218,6 +238,7 @@ export function useCartPage() {
     hasUrgentItem, itemCount, maxPrepTime,
     effectiveCouponDiscount, firstSellerFulfillmentMode,
     hasFulfillmentConflict, hasBelowMinimumOrder, noPaymentMethodAvailable,
+    selectedDeliveryAddress, setSelectedDeliveryAddress, addresses, addressesLoading,
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed,
     cancelPlacingOrder: () => setIsPlacingOrder(false),
   };
