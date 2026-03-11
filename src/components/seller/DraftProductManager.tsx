@@ -256,11 +256,54 @@ export function DraftProductManager({
     onProductsChange(updated);
   };
 
-  const handleEditProduct = (index: number) => {
+  const handleEditProduct = async (index: number) => {
     const product = products[index];
     setNewProduct({ ...product });
     setEditingIndex(index);
     setIsAdding(true);
+
+    // Load saved attribute blocks from DB
+    if (product.id) {
+      try {
+        const { data } = await supabase
+          .from('products')
+          .select('specifications')
+          .eq('id', product.id)
+          .single();
+        const specs = data?.specifications as any;
+        if (specs?.blocks && Array.isArray(specs.blocks)) {
+          setAttributeBlocks(specs.blocks);
+        } else {
+          setAttributeBlocks([]);
+        }
+      } catch {
+        setAttributeBlocks([]);
+      }
+
+      // Load service fields if service category
+      if (isServiceCategory(product.category, configs)) {
+        try {
+          const { data: sl } = await supabase
+            .from('service_listings')
+            .select('*')
+            .eq('product_id', product.id)
+            .maybeSingle();
+          if (sl) {
+            setServiceFields({
+              service_type: sl.service_type || 'one_time',
+              location_type: sl.location_type || 'onsite',
+              duration_minutes: String(sl.duration_minutes || 60),
+              buffer_minutes: String(sl.buffer_minutes || 0),
+              max_bookings_per_slot: String(sl.max_bookings_per_slot || 1),
+              cancellation_notice_hours: String(sl.cancellation_notice_hours || 24),
+              rescheduling_notice_hours: String(sl.rescheduling_notice_hours || 12),
+            });
+          }
+        } catch {
+          // keep defaults
+        }
+      }
+    }
   };
 
   const resetForm = () => {
