@@ -24,9 +24,15 @@ const GROUP_CONFIG = {
   quality: { label: 'Store Quality', icon: Sparkles, description: 'Improves buyer trust & conversion' },
 } as const;
 
-function CheckItem({ check }: { check: SellerHealthCheck }) {
+function CheckItem({ check, onSpecialAction }: { check: SellerHealthCheck; onSpecialAction?: (route: string) => void }) {
   const config = STATUS_CONFIG[check.status];
   const Icon = config.icon;
+
+  const handleAction = () => {
+    if (check.actionRoute?.startsWith('#') && onSpecialAction) {
+      onSpecialAction(check.actionRoute);
+    }
+  };
 
   return (
     <div className={cn('flex items-start gap-3 p-2.5 rounded-lg', config.bg)}>
@@ -35,15 +41,23 @@ function CheckItem({ check }: { check: SellerHealthCheck }) {
         <p className="text-xs font-medium">{check.label}</p>
         <p className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{check.message}</p>
         {check.actionLabel && check.actionRoute && (
-          <Link to={check.actionRoute}>
-            <Button variant="link" size="sm" className="h-auto p-0 mt-1 text-[10px] gap-1">
+          check.actionRoute.startsWith('#') ? (
+            <Button variant="link" size="sm" className="h-auto p-0 mt-1 text-[10px] gap-1" onClick={handleAction}>
               {check.actionLabel}
               <ChevronRight size={10} />
             </Button>
-          </Link>
+          ) : (
+            <Link to={check.actionRoute}>
+              <Button variant="link" size="sm" className="h-auto p-0 mt-1 text-[10px] gap-1">
+                {check.actionLabel}
+                <ChevronRight size={10} />
+              </Button>
+            </Link>
+          )
         )}
       </div>
     </div>
+  );
   );
 }
 
