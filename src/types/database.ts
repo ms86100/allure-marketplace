@@ -73,6 +73,7 @@ export interface Profile {
   id: string;
   phone: string;
   name: string;
+  email: string | null;
   flat_number: string;
   block: string;
   phase: string | null;

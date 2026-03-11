@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Loader2, MapPin, Phone, User } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, Mail, MapPin, Phone, User } from 'lucide-react';
 import { useRef } from 'react';
 
 export default function ProfileEditPage() {
