@@ -161,7 +161,7 @@ export function SellerVisibilityChecklist({ sellerId }: { sellerId: string }) {
           </div>
         </DrawerContent>
       </Drawer>
-      <SetSocietyLocationSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} sellerId={sellerId} />
+      <SetStoreLocationSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} sellerId={sellerId} />
     </>
   );
 }
