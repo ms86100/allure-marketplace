@@ -5107,6 +5107,7 @@ export type Database = {
           rating: number | null
           razorpay_account_id: string | null
           razorpay_onboarding_status: string | null
+          rejection_note: string | null
           sell_beyond_community: boolean
           society_id: string | null
           total_reviews: number | null
@@ -5156,6 +5157,7 @@ export type Database = {
           rating?: number | null
           razorpay_account_id?: string | null
           razorpay_onboarding_status?: string | null
+          rejection_note?: string | null
           sell_beyond_community?: boolean
           society_id?: string | null
           total_reviews?: number | null
@@ -5205,6 +5207,7 @@ export type Database = {
           rating?: number | null
           razorpay_account_id?: string | null
           razorpay_onboarding_status?: string | null
+          rejection_note?: string | null
           sell_beyond_community?: boolean
           society_id?: string | null
           total_reviews?: number | null

@@ -54,7 +54,7 @@ export function useSellerApplication() {
   const [isLoading, setIsLoading] = useState(false);
   const [submissionComplete, setSubmissionComplete] = useState(false);
   const [isCheckingExisting, setIsCheckingExisting] = useState(true);
-  const [existingSeller, setExistingSeller] = useState<{ id: string; business_name: string; verification_status?: string } | null>(null);
+  const [existingSeller, setExistingSeller] = useState<{ id: string; business_name: string; verification_status?: string; rejection_note?: string | null } | null>(null);
   const [draftSellerId, setDraftSellerId] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
@@ -80,30 +80,17 @@ export function useSellerApplication() {
       try {
         const { data } = await supabase.from('seller_profiles').select('*').eq('user_id', user.id);
         if (data && data.length > 0) {
-          const draft = data.find((s: any) => s.verification_status === 'draft');
-          if (draft) {
-            setDraftSellerId(draft.id);
-            setSelectedGroup((draft as any).primary_group);
-            setFormData(f => ({
-              ...f,
-              business_name: draft.business_name || '',
-              description: draft.description || '',
-              categories: draft.categories || [],
-              availability_start: (draft as any).availability_start || '09:00',
-              availability_end: (draft as any).availability_end || '21:00',
-              accepts_cod: draft.accepts_cod ?? true,
-              sell_beyond_community: (draft as any).sell_beyond_community ?? false,
-              delivery_radius_km: (draft as any).delivery_radius_km ?? 5,
-              fulfillment_mode: (draft as any).fulfillment_mode || 'self_pickup',
-              delivery_note: (draft as any).delivery_note || '',
-              accepts_upi: (draft as any).accepts_upi ?? false,
-              upi_id: (draft as any).upi_id || '',
-              operating_days: (draft as any).operating_days || [...DAYS_OF_WEEK],
-              profile_image_url: (draft as any).profile_image_url || null,
-              cover_image_url: (draft as any).cover_image_url || null,
-            }));
-            await reloadProducts(draft.id);
-            setStep(3);
+          // Look for draft or rejected profile to resume
+          const resumable = data.find((s: any) => s.verification_status === 'draft' || s.verification_status === 'rejected');
+          if (resumable) {
+            const isDraft = (resumable as any).verification_status === 'draft';
+            if (isDraft) {
+              setDraftSellerId(resumable.id);
+            }
+            setSelectedGroup((resumable as any).primary_group);
+            loadSellerDataIntoForm(resumable);
+            await reloadProducts(resumable.id);
+            if (isDraft) setStep(3);
           }
         }
       } catch (error) {
@@ -115,13 +102,35 @@ export function useSellerApplication() {
     checkExisting();
   }, [user, reloadProducts]);
 
+  // Helper to populate formData from an existing seller profile
+  const loadSellerDataIntoForm = useCallback((seller: any) => {
+    setFormData(f => ({
+      ...f,
+      business_name: seller.business_name || '',
+      description: seller.description || '',
+      categories: seller.categories || [],
+      availability_start: seller.availability_start || '09:00',
+      availability_end: seller.availability_end || '21:00',
+      accepts_cod: seller.accepts_cod ?? true,
+      sell_beyond_community: seller.sell_beyond_community ?? false,
+      delivery_radius_km: seller.delivery_radius_km ?? 5,
+      fulfillment_mode: seller.fulfillment_mode || 'self_pickup',
+      delivery_note: seller.delivery_note || '',
+      accepts_upi: seller.accepts_upi ?? false,
+      upi_id: seller.upi_id || '',
+      operating_days: seller.operating_days || [...DAYS_OF_WEEK],
+      profile_image_url: seller.profile_image_url || null,
+      cover_image_url: seller.cover_image_url || null,
+    }));
+  }, []);
+
   // Check group conflict
   useEffect(() => {
     const checkGroupConflict = async () => {
       if (!user || !selectedGroup) return;
       const { data } = await supabase
         .from('seller_profiles')
-        .select('id, business_name, verification_status')
+        .select('id, business_name, verification_status, rejection_note')
         .eq('user_id', user.id)
         .eq('primary_group', selectedGroup)
         .neq('verification_status', 'draft')
@@ -260,7 +269,7 @@ export function useSellerApplication() {
         delivery_note: formData.delivery_note.trim() || null, accepts_upi: formData.accepts_upi,
         upi_id: formData.accepts_upi ? formData.upi_id.trim() || null : null,
         operating_days: formData.operating_days, profile_image_url: formData.profile_image_url,
-        cover_image_url: formData.cover_image_url,
+        cover_image_url: formData.cover_image_url, rejection_note: null,
       } as any).eq('id', draftSellerId);
       if (error) throw error;
       const { error: prodError } = await supabase.from('products').update({ approval_status: 'pending' } as any).eq('seller_id', draftSellerId).eq('approval_status', 'draft');
@@ -295,6 +304,6 @@ export function useSellerApplication() {
     selectedGroupInfo, selectedGroupRow, handleCategoryChange, toggleOperatingDay,
     saveDraft, handleProceedToSettings, handleProceedToProducts, handleSaveDraftAndExit,
     handleSubmit, setExistingSeller, setDraftSellerId, handleStepBack, handleGroupSelect,
-    reloadProducts, submissionComplete,
+    reloadProducts, submissionComplete, loadSellerDataIntoForm,
   };
 }

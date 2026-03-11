@@ -150,7 +150,7 @@ export function useSellerApplicationReview() {
   const updateSellerStatus = async (seller: SellerApplication, status: 'approved' | 'rejected') => {
     setActionId(seller.id);
     try {
-      await supabase.from('seller_profiles').update({ verification_status: status }).eq('id', seller.id);
+      await supabase.from('seller_profiles').update({ verification_status: status, rejection_note: status === 'rejected' ? (rejectionNote.trim() || null) : null } as any).eq('id', seller.id);
       await logAudit(`seller_${status}`, 'seller_profile', seller.id, '', { status, note: rejectionNote || undefined });
 
       if (status === 'approved') {
