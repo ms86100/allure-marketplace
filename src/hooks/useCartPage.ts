@@ -24,6 +24,8 @@ export function useCartPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [showRazorpayCheckout, setShowRazorpayCheckout] = useState(false);
+  const [showUpiDeepLink, setShowUpiDeepLink] = useState(false);
+  const paymentMode = usePaymentMode();
   const [pendingOrderIds, setPendingOrderIds] = useState<string[]>([]);
   const [appliedCoupon, setAppliedCoupon] = useState<{ id: string; code: string; discountAmount: number; discount_type?: string; discount_value?: number; max_discount_amount?: number | null } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
