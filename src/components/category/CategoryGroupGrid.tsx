@@ -135,7 +135,7 @@ export function CategoryGroupGrid({
               )}
             >
               <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center text-lg', color)}>
-                {icon}
+                <DynamicIcon name={icon} size={20} />
               </div>
               <span className="font-medium text-sm">{label}</span>
             </button>
