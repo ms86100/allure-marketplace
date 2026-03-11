@@ -6,7 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Store, Users, Building2, AlertCircle, LayoutGrid, Flag,
   CreditCard, Star, Megaphone, Layers, Settings2, Bot,
-  Menu, ChevronRight, FileCode, Send, Package, Wrench, MessageSquare,
+  Menu, ChevronRight, FileCode, Send, Package, Wrench, MessageSquare, KeyRound,
 } from 'lucide-react';
 import { useState } from 'react';
 
