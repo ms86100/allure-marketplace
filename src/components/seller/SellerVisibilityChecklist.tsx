@@ -82,6 +82,7 @@ function CheckGroup({ groupKey, checks, onSpecialAction }: { groupKey: keyof typ
 
 export function SellerVisibilityChecklist({ sellerId }: { sellerId: string }) {
   const { data, isLoading } = useSellerHealth(sellerId);
+  const [locationSheetOpen, setLocationSheetOpen] = useState(false);
 
   if (isLoading) {
     return <Skeleton className="h-16 w-full rounded-xl" />;
@@ -110,49 +111,58 @@ export function SellerVisibilityChecklist({ sellerId }: { sellerId: string }) {
   discoveryChecks.sort(sortByStatus);
   qualityChecks.sort(sortByStatus);
 
+  const handleSpecialAction = (route: string) => {
+    if (route === '#set-society-location') {
+      setLocationSheetOpen(true);
+    }
+  };
+
   return (
-    <Drawer>
-      <DrawerTrigger asChild>
-        <Card className={cn(
-          'p-3 cursor-pointer border',
-          isFullyVisible ? 'border-success/30' : criticalBlockers > 0 ? 'border-destructive/30' : 'border-warning/30'
-        )}>
-          <div className="flex items-center gap-3 mb-2">
-            <ShieldCheck size={18} className={cn(
-              'shrink-0',
-              isFullyVisible ? 'text-success' : criticalBlockers > 0 ? 'text-destructive' : 'text-warning'
-            )} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold">Store Health</p>
-                <span className="text-[10px] text-muted-foreground">{passCount}/{totalChecks} passed</span>
+    <>
+      <Drawer>
+        <DrawerTrigger asChild>
+          <Card className={cn(
+            'p-3 cursor-pointer border',
+            isFullyVisible ? 'border-success/30' : criticalBlockers > 0 ? 'border-destructive/30' : 'border-warning/30'
+          )}>
+            <div className="flex items-center gap-3 mb-2">
+              <ShieldCheck size={18} className={cn(
+                'shrink-0',
+                isFullyVisible ? 'text-success' : criticalBlockers > 0 ? 'text-destructive' : 'text-warning'
+              )} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold">Store Health</p>
+                  <span className="text-[10px] text-muted-foreground">{passCount}/{totalChecks} passed</span>
+                </div>
               </div>
+              <ChevronRight size={14} className="text-muted-foreground shrink-0" />
             </div>
-            <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+            <Progress value={percentage} className="h-1.5" />
+            {issues.length > 0 && (
+              <p className="text-[10px] text-warning mt-1.5 truncate">
+                ⚠ {issues.length} issue{issues.length > 1 ? 's' : ''}: {issues.map(i => i.label).join(' · ')}
+              </p>
+            )}
+            {isFullyVisible && (
+              <p className="text-[10px] text-success mt-1.5">✓ All checks passed</p>
+            )}
+          </Card>
+        </DrawerTrigger>
+        <DrawerContent className="max-h-[85vh]">
+          <DrawerHeader className="pb-2">
+            <DrawerTitle className="text-base">Store Visibility Checklist</DrawerTitle>
+            <p className="text-xs text-muted-foreground">{passCount}/{totalChecks} checks passed · {percentage}% complete</p>
+          </DrawerHeader>
+          <div className="px-4 pb-6 space-y-4 overflow-y-auto">
+            <CheckGroup groupKey="critical" checks={criticalChecks} onSpecialAction={handleSpecialAction} />
+            <CheckGroup groupKey="products" checks={productChecks} onSpecialAction={handleSpecialAction} />
+            <CheckGroup groupKey="discovery" checks={discoveryChecks} onSpecialAction={handleSpecialAction} />
+            <CheckGroup groupKey="quality" checks={qualityChecks} onSpecialAction={handleSpecialAction} />
           </div>
-          <Progress value={percentage} className="h-1.5" />
-          {issues.length > 0 && (
-            <p className="text-[10px] text-warning mt-1.5 truncate">
-              ⚠ {issues.length} issue{issues.length > 1 ? 's' : ''}: {issues.map(i => i.label).join(' · ')}
-            </p>
-          )}
-          {isFullyVisible && (
-            <p className="text-[10px] text-success mt-1.5">✓ All checks passed</p>
-          )}
-        </Card>
-      </DrawerTrigger>
-      <DrawerContent className="max-h-[85vh]">
-        <DrawerHeader className="pb-2">
-          <DrawerTitle className="text-base">Store Visibility Checklist</DrawerTitle>
-          <p className="text-xs text-muted-foreground">{passCount}/{totalChecks} checks passed · {percentage}% complete</p>
-        </DrawerHeader>
-        <div className="px-4 pb-6 space-y-4 overflow-y-auto">
-          <CheckGroup groupKey="critical" checks={criticalChecks} />
-          <CheckGroup groupKey="products" checks={productChecks} />
-          <CheckGroup groupKey="discovery" checks={discoveryChecks} />
-          <CheckGroup groupKey="quality" checks={qualityChecks} />
-        </div>
-      </DrawerContent>
-    </Drawer>
+        </DrawerContent>
+      </Drawer>
+      <SetSocietyLocationSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} sellerId={sellerId} />
+    </>
   );
 }
