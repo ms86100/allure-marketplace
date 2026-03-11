@@ -19,7 +19,7 @@ export function LandingFooter() {
               <span className="font-bold text-foreground">{platformName}</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4 max-w-sm">
-              A private, GPS-verified marketplace for residential communities. Empowering neighbors to buy, sell, and access services — fostering trust, convenience, and local entrepreneurship.
+              The things your neighbors make, teach, cook, and fix — finally have a home. We're building the trust layer that connects families within residential communities.
             </p>
             <p className="text-xs text-muted-foreground">Operated by Sociva Technologies · Bangalore, India</p>
           </div>

@@ -37,10 +37,10 @@ export function LandingHowItWorks() {
           className="text-center mb-14"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Three Steps. That's It.
+            From Stranger-Free to Stress-Free
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            From signup to your first order — simpler than any delivery app.
+            Three steps between you and the best-kept secrets of your society.
           </p>
         </motion.div>
 

@@ -305,7 +305,7 @@ export default function WelcomeCarousel() {
         {/* Final CTA */}
         <Link to="/auth" className="block">
           <Button size="lg" className="w-full h-14 text-base font-bold shadow-cta rounded-2xl">
-            Get Started — It's Free <ArrowRight size={18} className="ml-2" />
+            Discover Your Society <ArrowRight size={18} className="ml-2" />
           </Button>
         </Link>
         <p className="text-center mt-4">

@@ -40,9 +40,9 @@ export function LandingTrustBar() {
   }, []);
 
   const items = [
-    { label: 'Societies Onboarded', value: societies },
-    { label: 'Verified Sellers', value: sellers },
-    { label: 'Service Categories', value: categories },
+    { label: 'Communities Trust Us', value: societies },
+    { label: 'Neighbor Sellers', value: sellers },
+    { label: 'Things You Can\'t Get Elsewhere', value: categories },
   ];
 
   return (
