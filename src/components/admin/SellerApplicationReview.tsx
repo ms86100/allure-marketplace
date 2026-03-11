@@ -9,6 +9,7 @@ import {
   Check, X, Loader2, Store, Package, FileText, Eye, Clock,
   ChevronDown, ChevronUp, MapPin, Phone, Calendar, CreditCard, Truck,
 } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { format } from 'date-fns';
 import { useSellerApplicationReview } from '@/hooks/useSellerApplicationReview';
 import { AdminProductApprovals } from './AdminProductApprovals';
