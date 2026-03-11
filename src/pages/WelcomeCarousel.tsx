@@ -117,7 +117,7 @@ export default function WelcomeCarousel() {
           transition={{ delay: 0.35, duration: 0.4 }}
           className="text-muted-foreground text-base leading-relaxed mb-8 px-2"
         >
-          The private marketplace for your residential society — homemade food, daily essentials, services & more.
+          Home-cooked meals, trusted tutors, skilled handymen — the best things in your society aren't on any delivery app. Until now.
         </motion.p>
 
         <motion.div
