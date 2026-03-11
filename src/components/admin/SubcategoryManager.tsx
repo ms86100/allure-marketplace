@@ -74,12 +74,16 @@ interface SubcategoryFormData {
   duration_label: string;
   show_veg_toggle: boolean | null;
   show_duration_field: boolean | null;
+  supports_addons: boolean | null;
+  supports_recurring: boolean | null;
+  supports_staff_assignment: boolean | null;
 }
 
 const INITIAL_FORM: SubcategoryFormData = {
   display_name: '', slug: '', icon: '', display_order: '0', is_active: true,
   image_url: '', color: '', name_placeholder: '', description_placeholder: '',
   price_label: '', duration_label: '', show_veg_toggle: null, show_duration_field: null,
+  supports_addons: null, supports_recurring: null, supports_staff_assignment: null,
 };
 
 function GenerateSubcategoryImageButton({ name, subcategoryId, parentCategoryName, imageUrl, onImageGenerated }: {
