@@ -366,8 +366,10 @@ export default function SellerDetailPage() {
             {(seller as any).fulfillment_mode && (
               <Badge variant="outline" className="text-[10px] font-medium">
                 {(seller as any).fulfillment_mode === 'self_pickup' && '🏪 Self Pickup'}
-                {(seller as any).fulfillment_mode === 'delivery' && '🚚 Delivery'}
-                {(seller as any).fulfillment_mode === 'both' && '🏪🚚 Pickup & Delivery'}
+                {(seller as any).fulfillment_mode === 'seller_delivery' && '🚚 I Deliver'}
+                {(seller as any).fulfillment_mode === 'platform_delivery' && '🚴 Delivery Partner'}
+                {(seller as any).fulfillment_mode === 'pickup_and_seller_delivery' && '🏪🚚 Pickup & Delivery'}
+                {(seller as any).fulfillment_mode === 'pickup_and_platform_delivery' && '🏪🚴 Pickup & Partner'}
               </Badge>
             )}
             {(seller as any).minimum_order_amount != null && (seller as any).minimum_order_amount > 0 && (
