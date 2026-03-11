@@ -111,17 +111,17 @@ export function BrowsingLocationProvider({ children }: { children: React.ReactNo
   const confirmLocationChange = useCallback(() => {
     if (!pendingLocationChange) return;
     // Clear cart via direct DB call + cache invalidation
-    import('@/integrations/supabase/client').then(({ supabase }) => {
-      const userId = queryClient.getQueryData<string>(['auth-user-id']);
-      if (userId) {
-        supabase.from('cart_items').delete().eq('user_id', userId).then(() => {
+    if (user?.id) {
+      import('@/integrations/supabase/client').then(({ supabase }) => {
+        supabase.from('cart_items').delete().eq('user_id', user.id).then(() => {
           queryClient.invalidateQueries({ queryKey: ['cart-items'] });
+          queryClient.invalidateQueries({ queryKey: ['cart-count'] });
         });
-      }
-    });
+      });
+    }
     applyLocation(pendingLocationChange);
     setPendingLocationChange(null);
-  }, [pendingLocationChange, applyLocation, queryClient]);
+  }, [pendingLocationChange, applyLocation, queryClient, user?.id]);
 
   const cancelLocationChange = useCallback(() => {
     setPendingLocationChange(null);
