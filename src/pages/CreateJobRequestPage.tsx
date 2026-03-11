@@ -326,7 +326,7 @@ export default function CreateJobRequestPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{society.name}</p>
                             <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                              <MapPin size={10} /> {society.distance_km} km away
+                              <MapPin size={10} /> {society.distance_km < 1 ? `${Math.round(society.distance_km * 1000)} m away` : `${Math.round(society.distance_km * 10) / 10} km away`}
                             </p>
                           </div>
                         </label>
