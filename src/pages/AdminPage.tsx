@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
-import { ApiKeySettings } from '@/components/admin/ApiKeySettings';
+import { CredentialsManager } from '@/components/admin/CredentialsManager';
 import { AppNavigator } from '@/components/admin/AppNavigator';
 import { AdminAIReviewLog } from '@/components/admin/AdminAIReviewLog';
 import { CampaignSender } from '@/components/admin/CampaignSender';
