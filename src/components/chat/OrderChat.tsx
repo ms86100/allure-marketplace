@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChatMessage } from '@/types/database';
@@ -30,14 +30,29 @@ export function OrderChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Track visual viewport for keyboard-aware layout
+  useEffect(() => {
+    if (!isOpen) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const handleResize = () => {
+      setViewportHeight(vv.height);
+    };
+    handleResize();
+    vv.addEventListener('resize', handleResize);
+    return () => vv.removeEventListener('resize', handleResize);
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && orderId) {
       fetchMessages();
       markMessagesAsRead();
       
-      // Subscribe to new messages
       const channel = supabase
         .channel(`chat-${orderId}`)
         .on(
@@ -65,7 +80,6 @@ export function OrderChat({
   }, [isOpen, orderId]);
 
   useEffect(() => {
-    // Scroll to bottom when messages change
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
@@ -124,26 +138,34 @@ export function OrderChat({
 
   if (!isOpen) return null;
 
+  // Use visualViewport height when available (keyboard-aware), fallback to 100dvh
+  const containerStyle: React.CSSProperties = viewportHeight
+    ? { height: `${viewportHeight}px`, top: window.visualViewport?.offsetTop ?? 0 }
+    : {};
+
   return (
-    <div className="fixed inset-0 z-[60] bg-background flex flex-col">
+    <div
+      className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col"
+      style={{ ...containerStyle, height: viewportHeight ? `${viewportHeight}px` : '100dvh' }}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
             <MessageCircle className="text-primary" size={20} />
           </div>
-          <div>
-            <p className="font-semibold">{otherUserName}</p>
+          <div className="min-w-0">
+            <p className="font-semibold truncate">{otherUserName}</p>
             <p className="text-xs text-muted-foreground">Order #{orderId.slice(0, 8)}</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
+        <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
           <X size={20} />
         </Button>
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 min-h-0 p-4" ref={scrollRef}>
         {messages.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <MessageCircle className="mx-auto mb-2" size={32} />
@@ -197,8 +219,8 @@ export function OrderChat({
         )}
       </ScrollArea>
 
-      {/* Input */}
-      <div className="p-4 border-t bg-card safe-bottom">
+      {/* Input — always visible above keyboard */}
+      <div className="p-3 border-t bg-card shrink-0 safe-bottom">
         {disabled ? (
           <p className="text-center text-sm text-muted-foreground">
             Chat is disabled for completed orders
@@ -206,10 +228,15 @@ export function OrderChat({
         ) : (
           <div className="flex gap-2">
             <Input
+              ref={inputRef}
               placeholder="Type a message..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={handleKeyPress}
+              onFocus={() => {
+                // Ensure input scrolls into view on focus
+                setTimeout(() => inputRef.current?.scrollIntoView({ block: 'nearest' }), 300);
+              }}
               className="flex-1"
             />
             <Button
