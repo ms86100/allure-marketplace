@@ -136,20 +136,34 @@ serve(async (req) => {
 
     if (locErr) console.error('Error inserting location:', locErr);
 
-    // Get destination (society coordinates)
-    const { data: society } = await supabase
-      .from('societies')
-      .select('latitude, longitude')
-      .eq('id', assignment.society_id)
+    // Get destination: prefer order delivery coords, fall back to society coords
+    const { data: orderForDest } = await supabase
+      .from('orders')
+      .select('delivery_lat, delivery_lng')
+      .eq('id', assignment.order_id)
       .single();
+
+    let destLat = orderForDest?.delivery_lat;
+    let destLng = orderForDest?.delivery_lng;
+
+    // Fallback to society coordinates if order doesn't have delivery coords
+    if (!destLat || !destLng) {
+      const { data: society } = await supabase
+        .from('societies')
+        .select('latitude, longitude')
+        .eq('id', assignment.society_id)
+        .single();
+      destLat = society?.latitude;
+      destLng = society?.longitude;
+    }
 
     let distanceMeters: number | null = null;
     let etaMinutes: number | null = null;
     let proximity: string = 'en_route';
     let skipEtaUpdate = false;
 
-    if (society?.latitude && society?.longitude) {
-      distanceMeters = Math.round(haversineDistance(latitude, longitude, society.latitude, society.longitude));
+    if (destLat && destLng) {
+      distanceMeters = Math.round(haversineDistance(latitude, longitude, destLat, destLng));
       proximity = getProximity(distanceMeters);
 
       const etaResult = calculateEta(distanceMeters, speed_kmh, accuracy_meters);
