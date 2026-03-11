@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2, Puzzle } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import {
   DndContext,
   closestCenter,
