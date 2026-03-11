@@ -144,7 +144,7 @@ export default function WelcomeCarousel() {
           transition={{ delay: 0.6, duration: 0.4 }}
           className="mt-5 text-xs text-muted-foreground"
         >
-          Free forever for buyers · No credit card needed
+          Free forever for buyers · No strangers allowed
         </motion.p>
       </div>
     </div>,
