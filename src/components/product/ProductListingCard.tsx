@@ -43,9 +43,10 @@ interface ProductListingCardProps {
   onNavigate?: (path: string) => void; className?: string; viewOnly?: boolean;
   categoryConfigs?: CategoryConfig[]; marketplaceConfig?: MarketplaceConfig;
   badgeConfigs?: BadgeConfigRow[]; socialProofCount?: number;
+  onViewClick?: () => void;
 }
 
-function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, className, viewOnly = false, categoryConfigs = [], marketplaceConfig, badgeConfigs = [], socialProofCount }: ProductListingCardProps) {
+function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, className, viewOnly = false, categoryConfigs = [], marketplaceConfig, badgeConfigs = [], socialProofCount, onViewClick }: ProductListingCardProps) {
   const { items, addItem, updateQuantity } = useCart();
   const { impact, selectionChanged } = useHaptics();
   const { formatPrice } = useCurrency();
@@ -170,7 +171,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
           </div>
         )}
       </div>
-      {viewOnly && (<div className="px-2.5 pb-2.5"><button onClick={(e) => { e.stopPropagation(); onNavigate?.(`/seller/${product.seller_id}`); }} className="w-full border border-primary text-primary font-bold text-[11px] py-1.5 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors">{mc.labels.viewButton}</button></div>)}
+      {viewOnly && (<div className="px-2.5 pb-2.5"><button onClick={(e) => { e.stopPropagation(); if (onViewClick) { onViewClick(); } else { onNavigate?.(`/seller/${product.seller_id}`); } }} className="w-full border border-primary text-primary font-bold text-[11px] py-1.5 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors">{onViewClick ? 'View Details' : mc.labels.viewButton}</button></div>)}
       {!viewOnly && isOutOfStock && (<NotifyMeButton productId={product.id} />)}
     </div>
   );
