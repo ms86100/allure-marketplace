@@ -140,7 +140,7 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
                   onClick={() => addBlock(block)}
                   className="w-full flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors text-left"
                 >
-                  <span className="text-lg shrink-0">{block.icon || '📋'}</span>
+                  <DynamicIcon name={block.icon || 'ClipboardList'} size={18} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">{block.display_name}</p>
                     <p className="text-xs text-muted-foreground line-clamp-1">{block.description}</p>
