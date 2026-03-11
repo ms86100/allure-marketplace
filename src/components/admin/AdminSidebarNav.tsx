@@ -33,6 +33,12 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: 'Intelligence',
+    items: [
+      { value: 'analytics', label: 'Analytics', icon: LayoutGrid },
+    ],
+  },
+  {
     label: 'System',
     items: [
       { value: 'features', label: 'Features', icon: Layers },

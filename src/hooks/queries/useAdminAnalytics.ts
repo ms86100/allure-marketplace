@@ -71,8 +71,8 @@ export function useOrdersMonitor(filters: {
         items:order_items(id, product_name, quantity, unit_price, product_id)
       `, { count: 'exact' }).order('created_at', { ascending: false }).range(from, to);
 
-      if (filters.status && filters.status !== 'all') q = q.eq('status', filters.status);
-      if (filters.paymentStatus && filters.paymentStatus !== 'all') q = q.eq('payment_status', filters.paymentStatus);
+      if (filters.status && filters.status !== 'all') q = q.eq('status', filters.status as any);
+      if (filters.paymentStatus && filters.paymentStatus !== 'all') q = q.eq('payment_status', filters.paymentStatus as any);
       if (filters.societyId) q = q.eq('society_id', filters.societyId);
       if (filters.sellerId) q = q.eq('seller_id', filters.sellerId);
       if (filters.dateFrom) q = q.gte('created_at', filters.dateFrom);

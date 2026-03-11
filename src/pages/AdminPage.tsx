@@ -368,6 +368,7 @@ export default function AdminPage() {
           {admin.activeTab === 'campaigns' && <CampaignSender />}
           {admin.activeTab === 'ai-review' && <AdminAIReviewLog />}
           {admin.activeTab === 'feedback' && <AdminFeedbackViewer />}
+          {admin.activeTab === 'analytics' && <AdminAnalyticsTab />}
           {admin.activeTab === 'navigator' && <AppNavigator />}
         </div>
 
