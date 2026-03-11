@@ -305,7 +305,7 @@ export function SubcategoryManager() {
             <SelectContent>
               <SelectItem value="all">All categories</SelectItem>
               {allConfigs.map(c => (
-                <SelectItem key={c.id} value={c.id}>{c.icon} {c.display_name}</SelectItem>
+                <SelectItem key={c.id} value={c.id}><span className="inline-flex items-center gap-1.5"><DynamicIcon name={c.icon} size={14} /> {c.display_name}</span></SelectItem>
               ))}
             </SelectContent>
           </Select>
