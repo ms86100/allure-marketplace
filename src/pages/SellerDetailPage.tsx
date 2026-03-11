@@ -338,10 +338,10 @@ export default function SellerDetailPage() {
                 {(seller as any).society.name}
               </span>
             )}
-            {distanceKm !== null && distanceKm > 0 && (
+            {distanceKm !== null && (
               <>
                 <span className="text-muted-foreground/40">·</span>
-                <span className="text-xs font-medium text-primary">📍 {distanceKm} km</span>
+                <span className="text-xs font-medium text-primary">📍 {distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm} km`}</span>
               </>
             )}
             {seller.availability_start && seller.availability_end && (
@@ -366,8 +366,10 @@ export default function SellerDetailPage() {
             {(seller as any).fulfillment_mode && (
               <Badge variant="outline" className="text-[10px] font-medium">
                 {(seller as any).fulfillment_mode === 'self_pickup' && '🏪 Self Pickup'}
-                {(seller as any).fulfillment_mode === 'delivery' && '🚚 Delivery'}
-                {(seller as any).fulfillment_mode === 'both' && '🏪🚚 Pickup & Delivery'}
+                {(seller as any).fulfillment_mode === 'seller_delivery' && '🚚 I Deliver'}
+                {(seller as any).fulfillment_mode === 'platform_delivery' && '🚴 Delivery Partner'}
+                {(seller as any).fulfillment_mode === 'pickup_and_seller_delivery' && '🏪🚚 Pickup & Delivery'}
+                {(seller as any).fulfillment_mode === 'pickup_and_platform_delivery' && '🏪🚴 Pickup & Partner'}
               </Badge>
             )}
             {(seller as any).minimum_order_amount != null && (seller as any).minimum_order_amount > 0 && (
