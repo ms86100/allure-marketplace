@@ -21,11 +21,12 @@ export function PaymentMethodSelector({
   onSelect,
 }: PaymentMethodSelectorProps) {
   const { upiProviderLabel } = useSystemSettings();
+  const { isUpiDeepLink } = usePaymentMode();
   const methods = [
     {
       id: 'upi' as PaymentMethod,
       label: 'UPI Payment',
-      description: `Pay via ${upiProviderLabel}`,
+      description: isUpiDeepLink ? 'Pay directly via UPI app' : `Pay via ${upiProviderLabel}`,
       icon: Smartphone,
       enabled: acceptsUpi,
       color: 'text-info',

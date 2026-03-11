@@ -235,10 +235,28 @@ export function useCartPage() {
     toast.error('Payment was not completed. Your order has been cancelled.');
   };
 
+  const handleUpiDeepLinkSuccess = async () => {
+    setShowUpiDeepLink(false);
+    toast.success('Payment submitted! Seller will verify shortly.');
+    await refresh();
+    navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
+    setPendingOrderIds([]);
+  };
+
+  const handleUpiDeepLinkFailed = async () => {
+    setShowUpiDeepLink(false);
+    if (!user?.id) { toast.error('Session expired.'); setPendingOrderIds([]); return; }
+    if (pendingOrderIds.length > 0) {
+      try { await supabase.from('orders').update({ status: 'cancelled' } as any).in('id', pendingOrderIds).eq('payment_status', 'pending').eq('buyer_id', user.id); } catch (err) { console.error('Failed to cancel unpaid orders:', err); }
+    }
+    setPendingOrderIds([]);
+    toast.error('Payment was not completed. Your order has been cancelled.');
+  };
+
   return {
     user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading,
     notes, setNotes, paymentMethod, setPaymentMethod,
-    isPlacingOrder, showRazorpayCheckout, pendingOrderIds,
+    isPlacingOrder, showRazorpayCheckout, showUpiDeepLink, pendingOrderIds, paymentMode,
     appliedCoupon, setAppliedCoupon, showConfirmDialog, setShowConfirmDialog,
     fulfillmentType, setFulfillmentType, orderStep,
     settings, formatPrice, currencySymbol,
@@ -248,6 +266,7 @@ export function useCartPage() {
     hasFulfillmentConflict, hasBelowMinimumOrder, noPaymentMethodAvailable,
     selectedDeliveryAddress, setSelectedDeliveryAddress, addresses, addressesLoading,
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed,
+    handleUpiDeepLinkSuccess, handleUpiDeepLinkFailed,
     cancelPlacingOrder: () => setIsPlacingOrder(false),
   };
 }
