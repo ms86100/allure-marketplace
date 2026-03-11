@@ -42,11 +42,12 @@ export function SocietySwitcher() {
   if (!isAdmin && !isBuilderMember) return null;
   if (societies.length === 0) return null;
 
+  const currentLabel = effectiveSocietyId && effectiveSocietyId !== profile?.society_id
+    ? societies.find(s => s.id === effectiveSocietyId)?.name || 'Society'
+    : 'My Society';
+
   return (
-    <div className="flex items-center gap-2.5 p-2.5 bg-muted/40 rounded-xl">
-      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-        <Building2 size={14} className="text-primary" />
-      </div>
+    <>
       <Select
         value={effectiveSocietyId || 'all'}
         onValueChange={(val) => {
@@ -57,8 +58,9 @@ export function SocietySwitcher() {
           }
         }}
       >
-        <SelectTrigger className="h-8 text-xs flex-1 border-0 bg-background shadow-sm rounded-lg">
-          <SelectValue placeholder="Select society" />
+        <SelectTrigger className="h-8 w-auto max-w-[160px] text-xs border-border/60 bg-background shadow-sm rounded-xl gap-1.5 px-2.5">
+          <Building2 size={12} className="text-muted-foreground shrink-0" />
+          <SelectValue placeholder="Society" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={profile?.society_id || 'my'} className="text-xs">
@@ -103,6 +105,6 @@ export function SocietySwitcher() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }

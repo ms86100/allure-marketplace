@@ -107,28 +107,15 @@ export default function AdminPage() {
       <div className="pb-8">
         {/* ═══ HEADER ═══ */}
         <div className="px-4 pt-5 pb-4">
-          <div className="flex items-center justify-between mb-4">
-            <motion.div initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }}>
+          <div className="flex items-center justify-between gap-2">
+            <motion.div initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }} className="min-w-0">
               <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Dashboard</h1>
               <p className="text-xs text-muted-foreground mt-0.5 font-medium">Platform overview & management</p>
             </motion.div>
-            <EmergencyBroadcastSheet />
-          </div>
-          <SocietySwitcher />
-        </div>
-
-        {/* ═══ STATS GRID ═══ */}
-        <div className="px-4 mb-6">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard icon={Users} value={admin.stats.users} label="Users" color="bg-blue-500" delay={0} />
-            <StatCard icon={Store} value={admin.stats.sellers} label="Sellers" color="bg-emerald-500" delay={0.05} />
-            <StatCard icon={Package} value={admin.stats.orders} label="Orders" color="bg-amber-500" delay={0.1} />
-            <StatCard icon={DollarSign} value={admin.formatPrice(admin.stats.revenue)} label="Revenue" color="bg-violet-500" delay={0.15} />
-          </div>
-          <div className="grid grid-cols-3 gap-3 mt-3">
-            <StatCard icon={Building2} value={admin.stats.societies} label="Societies" color="bg-cyan-500" delay={0.2} />
-            <StatCard icon={Star} value={admin.stats.reviews} label="Reviews" color="bg-indigo-500" delay={0.25} />
-            <StatCard icon={Flag} value={admin.stats.pendingReports} label="Reports" color="bg-rose-500" delay={0.3} />
+            <div className="flex items-center gap-2 shrink-0">
+              <SocietySwitcher />
+              <EmergencyBroadcastSheet />
+            </div>
           </div>
         </div>
 
