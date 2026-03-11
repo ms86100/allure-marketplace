@@ -5,6 +5,7 @@ import { Profile, SellerProfile, Review, PaymentRecord, VerificationStatus, Paym
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { useCurrency } from '@/hooks/useCurrency';
 import { logAudit } from '@/lib/audit';
+import { sendPushNotification } from '@/lib/notifications';
 import { toast } from 'sonner';
 
 interface Report {
@@ -157,17 +158,49 @@ export function useAdminData() {
 
   const updateSellerStatus = async (id: string, status: VerificationStatus) => {
     try {
-      const { data: seller } = await supabase.from('seller_profiles').select('user_id').eq('id', id).single();
+      const { data: seller } = await supabase.from('seller_profiles').select('user_id, business_name').eq('id', id).single();
       if (!seller) throw new Error('Seller not found');
-      await supabase.from('seller_profiles').update({ verification_status: status }).eq('id', id);
+
+      const { error: updateError } = await supabase.from('seller_profiles').update({ verification_status: status }).eq('id', id);
+      if (updateError) throw updateError;
+
       await logAudit(`seller_${status}`, 'seller_profile', id, '', { status });
+
       if (status === 'approved') {
         await supabase.from('user_roles').insert({ user_id: seller.user_id, role: 'seller' });
         await supabase.from('products').update({ approval_status: 'approved' } as any).eq('seller_id', id).eq('approval_status', 'pending');
-        await supabase.from('user_notifications').insert({ user_id: seller.user_id, title: '🎉 Congratulations! Your store is approved!', body: 'Your store has been approved and is now live.', type: 'seller_approved', is_read: false });
+
+        const { error: notifError } = await supabase.from('user_notifications').insert({
+          user_id: seller.user_id,
+          title: '🎉 Congratulations! Your store is approved!',
+          body: 'Your store has been approved and is now live.',
+          type: 'seller_approved',
+          is_read: false,
+        });
+        if (notifError) console.error('Failed to insert seller approval notification:', notifError);
       } else if (status === 'rejected' || status === 'suspended') {
         await supabase.from('user_roles').delete().eq('user_id', seller.user_id).eq('role', 'seller');
+
+        const title = status === 'rejected' ? '❌ Store application rejected' : '⚠️ Store suspended';
+        const body = status === 'rejected'
+          ? `Your store application for ${seller.business_name} was rejected. Please update your details and resubmit.`
+          : `Your store ${seller.business_name} has been suspended. Please contact support or your admin for details.`;
+        const type = status === 'rejected' ? 'seller_rejected' : 'seller_suspended';
+
+        const { error: notifError } = await supabase.from('user_notifications').insert({
+          user_id: seller.user_id,
+          title,
+          body,
+          type,
+          is_read: false,
+        });
+        if (notifError) {
+          console.error('Failed to insert seller rejection/suspension notification:', notifError);
+        } else {
+          sendPushNotification({ userId: seller.user_id, title, body }).catch(() => {});
+        }
       }
+
       toast.success(`Seller ${status}`);
       fetchData();
     } catch (error) { console.error('Error updating seller status:', error); toast.error('Failed to update'); }
