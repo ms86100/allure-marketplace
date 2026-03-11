@@ -332,174 +332,182 @@ export function DraftProductManager({
 
       {/* Add New Product Form */}
       {isAdding ? (
-        <Card className="border-primary/30">
-          <CardContent className="p-4 space-y-3">
-            <h4 className="font-medium text-sm">New Product / Service</h4>
-            <div className="space-y-2">
-              <Label htmlFor="prod-name" className="text-xs">Name *</Label>
-              <Input
-                id="prod-name"
-                placeholder={activeConfig?.formHints.namePlaceholder || "e.g., Product Name"}
-                value={newProduct.name}
-                onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-              />
-            </div>
-
-            {/* Price + MRP Row */}
-            <div className="grid grid-cols-2 gap-3">
+        <div className="flex gap-6 items-start">
+          <Card className="border-primary/30 flex-1 min-w-0">
+            <CardContent className="p-4 space-y-3">
+              <h4 className="font-medium text-sm">New Product / Service</h4>
               <div className="space-y-2">
-                <Label htmlFor="prod-price" className="text-xs">
-                  {activeConfig?.formHints.priceLabel || 'Selling Price'} ({currencySymbol}) {requiresPrice ? '*' : ''}
-                </Label>
+                <Label htmlFor="prod-name" className="text-xs">Name *</Label>
                 <Input
-                  id="prod-price"
-                  type="number"
-                  min={0}
-                  placeholder={requiresPrice ? '150' : '0 = On request'}
-                  value={newProduct.price || ''}
-                  onChange={(e) => setNewProduct({ ...newProduct, price: Number(e.target.value) })}
+                  id="prod-name"
+                  placeholder={activeConfig?.formHints.namePlaceholder || "e.g., Product Name"}
+                  value={newProduct.name}
+                  onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="prod-mrp" className="text-xs">MRP ({currencySymbol}) <span className="text-muted-foreground">(optional)</span></Label>
-                <Input
-                  id="prod-mrp"
-                  type="number"
-                  min={0}
-                  placeholder="e.g., 200"
-                  value={newProduct.mrp || ''}
-                  onChange={(e) => setNewProduct({ ...newProduct, mrp: e.target.value ? Number(e.target.value) : null })}
-                />
-              </div>
-            </div>
 
-            {/* Auto-computed discount display */}
-            {computedDiscount !== null && computedDiscount > 0 && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
-                <Percent size={14} className="text-success" />
-                <span className="text-sm font-semibold text-success">{computedDiscount}% OFF</span>
-                <span className="text-xs text-muted-foreground">({formatPrice(newProduct.mrp! - newProduct.price)} savings)</span>
-              </div>
-            )}
-
-            {categories.length > 1 && (
-              <div className="space-y-2">
-                <Label className="text-xs">Category</Label>
-                <select
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-                  value={newProduct.category}
-                  onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                >
-                  {categories.map((c) => {
-                    const catConfig = configs.find(cfg => cfg.category === c);
-                    return (
-                      <option key={c} value={c}>
-                        {catConfig ? catConfig.displayName : c.replace(/_/g, ' ')}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="prod-desc" className="text-xs">Description</Label>
-              <Textarea
-                id="prod-desc"
-                placeholder={activeConfig?.formHints.descriptionPlaceholder || "Short description..."}
-                rows={2}
-                value={newProduct.description}
-                onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-              />
-            </div>
-
-            {/* Product Image */}
-            <div className="space-y-2">
-              <Label className="text-xs">Product Image <span className="text-destructive">*</span></Label>
-              {user ? (
-                <ProductImageUpload
-                  value={newProduct.image_url || null}
-                  onChange={(url) => setNewProduct({ ...newProduct, image_url: url || '' })}
-                  userId={user.id}
-                  productName={newProduct.name}
-                  categoryName={newProduct.category}
-                  description={newProduct.description}
-                />
-              ) : (
-                <p className="text-xs text-muted-foreground">Sign in to upload images</p>
-              )}
-            </div>
-
-            {showVegToggle && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  checked={newProduct.is_veg}
-                  onCheckedChange={(checked) => setNewProduct({ ...newProduct, is_veg: checked as boolean })}
-                />
-                <span className="text-sm">Vegetarian</span>
-              </label>
-            )}
-
-            {/* Attribute Block Builder */}
-            <AttributeBlockBuilder
-              category={newProduct.category || null}
-              value={attributeBlocks}
-              onChange={setAttributeBlocks}
-            />
-
-            {/* Service Configuration Section */}
-            {isService && (
-              <>
-                <ServiceFieldsSection data={serviceFields} onChange={setServiceFields} />
-
-                {/* Feature Flags */}
-                <div className="space-y-1 px-3 py-2 bg-muted/50 rounded-lg">
-                  <p className="text-xs font-semibold text-primary">Enabled for this category</p>
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Info size={10} />
-                    <span>Service Add-ons {supportsAddons ? 'enabled' : 'not enabled'}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Info size={10} />
-                    <span>Recurring Bookings {supportsRecurring ? 'enabled' : 'not enabled'}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Info size={10} />
-                    <span>Staff Assignment {supportsStaffAssignment ? 'enabled' : 'not enabled'}</span>
-                  </div>
+              {/* Price + MRP Row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="prod-price" className="text-xs">
+                    {activeConfig?.formHints.priceLabel || 'Selling Price'} ({currencySymbol}) {requiresPrice ? '*' : ''}
+                  </Label>
+                  <Input
+                    id="prod-price"
+                    type="number"
+                    min={0}
+                    placeholder={requiresPrice ? '150' : '0 = On request'}
+                    value={newProduct.price || ''}
+                    onChange={(e) => setNewProduct({ ...newProduct, price: Number(e.target.value) })}
+                  />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="prod-mrp" className="text-xs">MRP ({currencySymbol}) <span className="text-muted-foreground">(optional)</span></Label>
+                  <Input
+                    id="prod-mrp"
+                    type="number"
+                    min={0}
+                    placeholder="e.g., 200"
+                    value={newProduct.mrp || ''}
+                    onChange={(e) => setNewProduct({ ...newProduct, mrp: e.target.value ? Number(e.target.value) : null })}
+                  />
+                </div>
+              </div>
 
-                {/* Availability Schedule */}
-                <InlineAvailabilitySchedule
-                  schedule={availabilitySchedule}
-                  onChange={setAvailabilitySchedule}
-                />
-              </>
-            )}
+              {/* Auto-computed discount display */}
+              {computedDiscount !== null && computedDiscount > 0 && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
+                  <Percent size={14} className="text-success" />
+                  <span className="text-sm font-semibold text-success">{computedDiscount}% OFF</span>
+                  <span className="text-xs text-muted-foreground">({formatPrice(newProduct.mrp! - newProduct.price)} savings)</span>
+                </div>
+              )}
 
-            {showDurationField && !isService && (
+              {categories.length > 1 && (
+                <div className="space-y-2">
+                  <Label className="text-xs">Category</Label>
+                  <select
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    value={newProduct.category}
+                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                  >
+                    {categories.map((c) => {
+                      const catConfig = configs.find(cfg => cfg.category === c);
+                      return (
+                        <option key={c} value={c}>
+                          {catConfig ? catConfig.displayName : c.replace(/_/g, ' ')}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label htmlFor="prod-prep" className="text-xs">{activeConfig?.formHints.durationLabel || 'Prep Time (min)'}</Label>
-                <Input
-                  id="prod-prep"
-                  type="number"
-                  min={1}
-                  placeholder="e.g., 30"
-                  value={newProduct.prep_time_minutes || ''}
-                  onChange={(e) => setNewProduct({ ...newProduct, prep_time_minutes: e.target.value ? Number(e.target.value) : null })}
+                <Label htmlFor="prod-desc" className="text-xs">Description</Label>
+                <Textarea
+                  id="prod-desc"
+                  placeholder={activeConfig?.formHints.descriptionPlaceholder || "Short description..."}
+                  rows={2}
+                  value={newProduct.description}
+                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
                 />
               </div>
-            )}
 
-            <div className="flex gap-2 pt-1">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setIsAdding(false)}>Cancel</Button>
-              <Button size="sm" className="flex-1" onClick={handleAddProduct} disabled={isSaving}>
-                {isSaving && <Loader2 size={14} className="animate-spin mr-1" />}
-                Save Product
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              {/* Product Image */}
+              <div className="space-y-2">
+                <Label className="text-xs">Product Image <span className="text-destructive">*</span></Label>
+                {user ? (
+                  <ProductImageUpload
+                    value={newProduct.image_url || null}
+                    onChange={(url) => setNewProduct({ ...newProduct, image_url: url || '' })}
+                    userId={user.id}
+                    productName={newProduct.name}
+                    categoryName={newProduct.category}
+                    description={newProduct.description}
+                  />
+                ) : (
+                  <p className="text-xs text-muted-foreground">Sign in to upload images</p>
+                )}
+              </div>
+
+              {showVegToggle && (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={newProduct.is_veg}
+                    onCheckedChange={(checked) => setNewProduct({ ...newProduct, is_veg: checked as boolean })}
+                  />
+                  <span className="text-sm">Vegetarian</span>
+                </label>
+              )}
+
+              {/* Attribute Block Builder */}
+              <AttributeBlockBuilder
+                category={newProduct.category || null}
+                value={attributeBlocks}
+                onChange={setAttributeBlocks}
+              />
+
+              {/* Service Configuration Section */}
+              {isService && (
+                <>
+                  <ServiceFieldsSection data={serviceFields} onChange={setServiceFields} />
+
+                  {/* Feature Flags */}
+                  <div className="space-y-1 px-3 py-2 bg-muted/50 rounded-lg">
+                    <p className="text-xs font-semibold text-primary">Enabled for this category</p>
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <Info size={10} />
+                      <span>Service Add-ons {supportsAddons ? 'enabled' : 'not enabled'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <Info size={10} />
+                      <span>Recurring Bookings {supportsRecurring ? 'enabled' : 'not enabled'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <Info size={10} />
+                      <span>Staff Assignment {supportsStaffAssignment ? 'enabled' : 'not enabled'}</span>
+                    </div>
+                  </div>
+
+                  {/* Availability Schedule */}
+                  <InlineAvailabilitySchedule
+                    schedule={availabilitySchedule}
+                    onChange={setAvailabilitySchedule}
+                  />
+                </>
+              )}
+
+              {showDurationField && !isService && (
+                <div className="space-y-2">
+                  <Label htmlFor="prod-prep" className="text-xs">{activeConfig?.formHints.durationLabel || 'Prep Time (min)'}</Label>
+                  <Input
+                    id="prod-prep"
+                    type="number"
+                    min={1}
+                    placeholder="e.g., 30"
+                    value={newProduct.prep_time_minutes || ''}
+                    onChange={(e) => setNewProduct({ ...newProduct, prep_time_minutes: e.target.value ? Number(e.target.value) : null })}
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setIsAdding(false)}>Cancel</Button>
+                <Button size="sm" className="flex-1" onClick={handleAddProduct} disabled={isSaving}>
+                  {isSaving && <Loader2 size={14} className="animate-spin mr-1" />}
+                  Save Product
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Desktop sticky preview */}
+          <ProductFormPreviewPanel formData={previewFormData} sellerProfile={null} />
+        </div>
+
+        {/* Mobile floating preview */}
+        <ProductFormPreviewMobile formData={previewFormData} sellerProfile={null} />
       ) : (
         <Button variant="outline" className="w-full border-dashed" onClick={() => setIsAdding(true)}>
           <Plus size={16} className="mr-2" />
