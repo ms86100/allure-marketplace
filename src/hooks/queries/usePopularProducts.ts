@@ -111,6 +111,7 @@ export function useCategoryProducts(parentGroup: string | null) {
 
       const categorySet = new Set(categoryList);
       const products: ProductWithSeller[] = [];
+      const seenIds = new Set<string>();
 
       for (const seller of data as any[]) {
         const items = seller.matching_products;
