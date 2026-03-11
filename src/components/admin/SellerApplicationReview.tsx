@@ -53,47 +53,7 @@ export function SellerApplicationReview() {
         </div>
       </div>
 
-      {/* License Requirements Config */}
-      <Collapsible>
-        <CollapsibleTrigger asChild>
-          <Button variant="outline" size="sm" className="w-full text-xs gap-2 rounded-xl h-9 font-semibold">
-            <Shield size={14} /> License Requirements Config <ChevronDown size={14} />
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-2.5">
-          <Card className="border-0 shadow-[var(--shadow-card)] rounded-2xl"><CardContent className="p-4 space-y-2.5">
-            <p className="text-[10px] text-muted-foreground font-medium">Configure which categories require sellers to upload a license.</p>
-            {s.groups.map((group) => (
-              <div key={group.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-xl">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="text-sm">{group.icon}</span>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-xs">{group.name}</p>
-                    {group.requires_license && group.license_type_name && (
-                      <p className="text-[10px] text-muted-foreground truncate">{group.license_type_name}</p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {group.requires_license && (
-                    <>
-                      <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2 rounded-lg"
-                        onClick={() => { s.setEditingGroup(group); s.setEditForm({ license_type_name: group.license_type_name || '', license_description: group.license_description || '' }); }}>
-                        Edit
-                      </Button>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-muted-foreground">Mandatory</span>
-                        <Switch checked={group.license_mandatory} onCheckedChange={(c) => s.toggleMandatory(group, c)} />
-                      </div>
-                    </>
-                  )}
-                  <Switch checked={group.requires_license} onCheckedChange={(c) => s.toggleRequiresLicense(group, c)} />
-                </div>
-              </div>
-            ))}
-          </CardContent></Card>
-        </CollapsibleContent>
-      </Collapsible>
+
 
       {/* Seller Applications */}
       {s.applications.length === 0 ? (
