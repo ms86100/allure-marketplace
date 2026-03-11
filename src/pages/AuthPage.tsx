@@ -25,7 +25,7 @@ export default function AuthPage() {
             </div>
             <h1 className="text-2xl font-extrabold text-white tracking-tight drop-shadow-lg">{auth.settings.platformName}</h1>
           </div>
-          <p className="text-sm text-white/80 drop-shadow font-medium">Your Community Marketplace</p>
+          <p className="text-sm text-white/80 drop-shadow font-medium">What your neighbors make, no app can deliver</p>
         </div>
       </div>
 
