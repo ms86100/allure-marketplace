@@ -327,6 +327,40 @@ export default function SocietyAdminPage() {
             </TabsContent>
           </Tabs>
         </div>
+
+        {/* Seller Rejection Dialog */}
+        <Dialog open={!!rejectingSellerId} onOpenChange={(open) => { if (!open) { setRejectingSellerId(null); setSellerRejectionNote(''); } }}>
+          <DialogContent className="rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="font-bold">Reject Seller Application</DialogTitle>
+              <DialogDescription>Please provide a reason for rejection. This will be shared with the seller.</DialogDescription>
+            </DialogHeader>
+            <Textarea
+              placeholder="Rejection reason (required)..."
+              value={sellerRejectionNote}
+              onChange={(e) => setSellerRejectionNote(e.target.value)}
+              rows={3}
+              className="rounded-xl"
+            />
+            <DialogFooter className="gap-2">
+              <Button variant="outline" className="rounded-xl" onClick={() => { setRejectingSellerId(null); setSellerRejectionNote(''); }}>Cancel</Button>
+              <Button
+                variant="destructive"
+                className="rounded-xl font-semibold"
+                disabled={!sellerRejectionNote.trim()}
+                onClick={() => {
+                  if (rejectingSellerId) {
+                    sa.updateSellerStatus(rejectingSellerId, 'rejected', sellerRejectionNote.trim());
+                    setRejectingSellerId(null);
+                    setSellerRejectionNote('');
+                  }
+                }}
+              >
+                Confirm Reject
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
