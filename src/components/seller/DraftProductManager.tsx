@@ -244,6 +244,32 @@ export function DraftProductManager({
     onProductsChange(updated);
   };
 
+  const handleEditProduct = (index: number) => {
+    const product = products[index];
+    setNewProduct({ ...product });
+    setEditingIndex(index);
+    setIsAdding(true);
+  };
+
+  const resetForm = () => {
+    setNewProduct({
+      name: '',
+      price: 0,
+      mrp: null,
+      discount_percentage: null,
+      description: '',
+      category: categories[0] || '',
+      is_veg: true,
+      image_url: '',
+      prep_time_minutes: null,
+    });
+    setIsAdding(false);
+    setEditingIndex(null);
+    setAttributeBlocks([]);
+    setServiceFields(INITIAL_SERVICE_FIELDS);
+    setAvailabilitySchedule(INITIAL_AVAILABILITY_SCHEDULE);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
