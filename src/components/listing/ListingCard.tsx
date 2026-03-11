@@ -35,6 +35,8 @@ export interface Listing {
     business_name: string;
     rating?: number;
     profile_image_url?: string;
+    latitude?: number;
+    longitude?: number;
   };
 }
 
