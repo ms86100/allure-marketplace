@@ -4,21 +4,21 @@ import { Quote } from 'lucide-react';
 
 const TESTIMONIALS = [
   {
-    quote: "I order home-cooked tiffin from my neighbor on the 3rd floor. My kids love it, and I know exactly who's making it.",
+    quote: "My son is allergic to nuts. Mrs. Patel on the 5th floor makes his tiffin every day — she knows exactly what to avoid. No Swiggy filter can replace that.",
     name: 'Priya M.',
     role: 'Working Parent',
     society: 'Prestige Lakeside',
   },
   {
-    quote: "I started selling my cakes and cookies here. Within a week, I had 15 orders — all from people in my own building!",
+    quote: "I tried Zomato for my baking business — 30% commission killed my margins. Here I keep everything. 22 repeat customers, all from my own society.",
     name: 'Anita K.',
     role: 'Home Baker & Seller',
     society: 'Brigade Gateway',
   },
   {
-    quote: "Managing community services used to be chaos. Now residents book electricians, plumbers — everything through one platform.",
+    quote: "The retired engineer in C-block fixed our AC in 20 minutes. We'd been waiting 3 days for the UrbanClap guy who never showed up.",
     name: 'Rajesh S.',
-    role: 'Society Committee Member',
+    role: 'Resident',
     society: 'Sobha Dream Acres',
   },
 ];

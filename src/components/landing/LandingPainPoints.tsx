@@ -37,10 +37,10 @@ export function LandingPainPoints() {
           className="text-center mb-14"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Sound Familiar?
+            You're Missing Out on What's Right Next Door
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Living in a large society shouldn't feel isolating. Here's what we're fixing.
+            The best food, services, and skills in your society have no app — until now.
           </p>
         </motion.div>
 

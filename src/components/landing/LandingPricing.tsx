@@ -20,7 +20,7 @@ const PLANS = [
     name: 'Sellers',
     price: 'Free',
     period: 'to start',
-    desc: 'List and sell to your community — zero upfront cost.',
+    desc: "Your kitchen, craft studio, or skill — finally has a storefront. Zero commission. Zero listing fees.",
     badge: 'Most Popular',
     features: [
       'List products, food, or services',

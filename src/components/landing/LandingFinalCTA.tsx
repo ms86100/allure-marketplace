@@ -19,10 +19,10 @@ export function LandingFinalCTA() {
         className="container relative mx-auto px-4 lg:px-8 text-center"
       >
         <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-foreground mb-6 leading-tight">
-          Your Community Is Waiting.
+          The Best Things in Your Society<br className="hidden sm:block" /> Aren't on Any App. Until Now.
         </h2>
         <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed">
-          Join the families who already shop local, support neighbors, and build trust — all from one app.
+          Home-cooked meals, trusted services, hidden talents — discover what your neighbors have been making all along.
         </p>
 
         <Link to="/welcome">

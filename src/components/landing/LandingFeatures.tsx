@@ -27,10 +27,10 @@ export function LandingFeatures() {
           className="text-center mb-14"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            What Changes When You Join
+            Things No Delivery App Can Offer
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            A marketplace built on trust, not algorithms. Here's what your community unlocks.
+            Speed is Blinkit's game. Exclusivity is ours. Here's what only your neighbors can give you.
           </p>
         </motion.div>
 
