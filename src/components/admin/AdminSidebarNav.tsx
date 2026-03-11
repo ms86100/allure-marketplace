@@ -36,7 +36,7 @@ const NAV_GROUPS = [
   {
     label: 'Intelligence',
     items: [
-      { value: 'analytics', label: 'Analytics', icon: LayoutGrid },
+      { value: 'analytics', label: 'Analytics', icon: BarChart3 },
     ],
   },
   {
