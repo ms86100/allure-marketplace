@@ -128,7 +128,9 @@ export function UpiDeepLinkCheckout({
   };
 
   const handleClose = () => {
-    if (step !== 'done') {
+    // Only auto-cancel order if still on the initial pay step
+    // After that, buyer may have already transferred money
+    if (step === 'pay') {
       onPaymentFailed();
     }
     onClose();
