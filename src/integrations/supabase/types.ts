@@ -8358,13 +8358,27 @@ export type Database = {
           tier_label: string
         }[]
       }
-      get_society_order_stats: {
-        Args: { _product_ids: string[]; _society_id: string }
-        Returns: {
-          families_this_week: number
-          product_id: string
-        }[]
-      }
+      get_society_order_stats:
+        | {
+            Args: {
+              _lat?: number
+              _lng?: number
+              _product_ids: string[]
+              _radius_km?: number
+              _society_id?: string
+            }
+            Returns: {
+              families_this_week: number
+              product_id: string
+            }[]
+          }
+        | {
+            Args: { _product_ids: string[]; _society_id: string }
+            Returns: {
+              families_this_week: number
+              product_id: string
+            }[]
+          }
       get_society_search_suggestions: {
         Args: { _limit?: number; _society_id: string }
         Returns: {
