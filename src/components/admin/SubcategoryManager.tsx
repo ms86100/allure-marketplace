@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Loader2, Plus, Edit2, Trash2, Tag, RefreshCw, Sparkles, ImageIcon } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { friendlyError, cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 
