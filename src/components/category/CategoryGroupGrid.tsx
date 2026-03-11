@@ -61,7 +61,7 @@ export function CategoryGroupGrid({
                 'bg-muted/60 border border-border/30'
               )}
             >
-              {icon}
+              <DynamicIcon name={icon} size={24} />
             </div>
             <span className="text-[10px] font-medium text-center leading-tight text-foreground line-clamp-2 max-w-[64px]">
               {label}
