@@ -371,7 +371,7 @@ export default function AdminPage() {
 
         {/* ═══ DIALOGS ═══ */}
         <Dialog open={!!admin.selectedReview} onOpenChange={() => admin.setSelectedReview(null)}>
-          <DialogContent className="rounded-2xl">
+          <DialogContent className="rounded-2xl max-h-[85dvh] overflow-y-auto">
             <DialogHeader><DialogTitle className="font-bold">Hide Review</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div><p className="text-sm text-muted-foreground mb-2 font-medium">Reason for hiding:</p><Input placeholder="e.g., Inappropriate content" value={admin.hideReason} onChange={(e) => admin.setHideReason(e.target.value)} className="rounded-xl" /></div>
@@ -381,7 +381,7 @@ export default function AdminPage() {
         </Dialog>
 
         <Dialog open={!!admin.selectedReport} onOpenChange={() => admin.setSelectedReport(null)}>
-          <DialogContent className="rounded-2xl">
+          <DialogContent className="rounded-2xl max-h-[85dvh] overflow-y-auto">
             <DialogHeader><DialogTitle className="font-bold">Review Report</DialogTitle></DialogHeader>
             {admin.selectedReport && (
               <div className="space-y-4">
@@ -394,7 +394,7 @@ export default function AdminPage() {
         </Dialog>
 
         <Dialog open={!!admin.selectedUserForWarning} onOpenChange={() => admin.setSelectedUserForWarning(null)}>
-          <DialogContent className="rounded-2xl">
+          <DialogContent className="rounded-2xl max-h-[85dvh] overflow-y-auto">
             <DialogHeader><DialogTitle className="font-bold">Issue Warning</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <Textarea placeholder="Warning reason..." value={admin.warningReason} onChange={(e) => admin.setWarningReason(e.target.value)} className="rounded-xl" />

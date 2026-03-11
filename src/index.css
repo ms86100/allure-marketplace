@@ -240,9 +240,16 @@
     }
   }
 
-  /* Keyboard-aware */
+  /* Keyboard-aware: ensure focused inputs scroll into view above keyboard */
   input:focus, textarea:focus, select:focus {
-    scroll-margin-bottom: 120px;
+    scroll-margin-bottom: 200px;
+    scroll-padding-bottom: 200px;
+  }
+
+  /* Dialog/sheet inputs should always be visible */
+  [role="dialog"] input:focus,
+  [role="dialog"] textarea:focus {
+    scroll-margin-bottom: 300px;
   }
 
   /* Touch targets */
