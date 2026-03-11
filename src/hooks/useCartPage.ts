@@ -79,6 +79,13 @@ export function useCartPage() {
     if (sellerGroups.length > 1 && appliedCoupon) setAppliedCoupon(null);
   }, [sellerGroups.length]);
 
+  // Auto-select default delivery address
+  useEffect(() => {
+    if (!selectedDeliveryAddress && defaultAddress) {
+      setSelectedDeliveryAddress(defaultAddress);
+    }
+  }, [defaultAddress, selectedDeliveryAddress]);
+
   const hasUrgentItem = items.some((item) => (item.product as any)?.is_urgent);
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const maxPrepTime = items.reduce((max, item) => {
