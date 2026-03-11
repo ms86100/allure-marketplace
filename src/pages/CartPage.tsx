@@ -15,6 +15,7 @@ import { hapticImpact } from '@/lib/haptics';
 import { toast } from 'sonner';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { AlertCircle } from 'lucide-react';
+import { AddressPicker } from '@/components/profile/AddressPicker';
 
 export default function CartPage() {
   const c = useCartPage();
