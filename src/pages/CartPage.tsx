@@ -211,7 +211,7 @@ export default function CartPage() {
             c.addresses.length > 0 ? (
               <AddressPicker selectedId={c.selectedDeliveryAddress?.id} onSelect={c.setSelectedDeliveryAddress} />
             ) : (
-              <Link to="/profile/addresses" className="text-xs text-primary font-semibold shrink-0">Add</Link>
+              <Link to="/profile/edit" className="text-xs text-primary font-semibold shrink-0">Add</Link>
             )
           )}
         </div>
