@@ -23,7 +23,7 @@ export function useNearbyProducts() {
       const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: searchRadius,
+        _radius_km: MARKETPLACE_RADIUS_KM,
       });
 
       if (error) throw error;
