@@ -260,7 +260,7 @@ export default function WelcomeCarousel() {
 
       <div className="relative z-10 max-w-sm mx-auto">
         <h2 className="text-3xl font-extrabold mb-6 text-foreground text-center leading-tight">
-          Families Love <span className="text-primary">{platformName}</span>
+          Your Neighbors Are<br />Already <span className="text-primary">Here</span>
         </h2>
 
         {/* Testimonial Card */}
@@ -271,7 +271,7 @@ export default function WelcomeCarousel() {
             ))}
           </div>
           <p className="text-sm text-foreground leading-relaxed italic mb-4">
-            "I order tiffin from my neighbor on the 3rd floor. My kids love the food, and I know exactly who's cooking it. This app changed how we eat."
+            "My son is allergic to nuts. Mrs. Patel makes his tiffin every day — she knows exactly what to avoid. No Swiggy filter can replace a neighbor who cares."
           </p>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
