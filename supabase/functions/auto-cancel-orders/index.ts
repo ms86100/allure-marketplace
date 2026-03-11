@@ -40,7 +40,7 @@ app.post("/", async (c) => {
       .select("id, buyer_id, seller_id, total_amount")
       .eq("status", "placed")
       .eq("payment_status", "pending")
-      .neq("payment_method", "cod")
+      .neq("payment_type", "cod")
       .lt("created_at", fifteenMinAgo);
 
     const fetchError = urgentErr || orphanErr;
