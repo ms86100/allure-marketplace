@@ -38,7 +38,7 @@ export type OrderStatus = 'placed' | 'accepted' | 'preparing' | 'ready' | 'picke
 // ProductCategory is now an alias to ServiceCategory for backward compatibility
 export type ProductCategory = ServiceCategory;
 export type PaymentMethod = 'cod' | 'upi';
-export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'buyer_confirmed' | 'disputed';
 export type OrderType = 'purchase' | 'booking' | 'rental' | 'enquiry';
 export type ListingType = 'product' | 'service' | 'rental' | 'resale';
 export type RentalPeriodType = 'hourly' | 'daily' | 'weekly' | 'monthly';
