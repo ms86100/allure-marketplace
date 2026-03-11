@@ -261,6 +261,12 @@ export default function BecomeSellerPage() {
         {step === 3 && (
           <div className="space-y-5">
             <button onClick={() => handleStepBack(2)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change categories</button>
+            {rejectionFeedback && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-left">
+                <p className="text-xs font-semibold text-destructive mb-1">⚠️ Admin Feedback — Please address before resubmitting:</p>
+                <p className="text-sm text-foreground">{rejectionFeedback}</p>
+              </div>
+            )}
             <div className="space-y-2"><Label htmlFor="business_name">Business Name *</Label><Input id="business_name" placeholder={groups.find(g => g.slug === selectedGroup)?.placeholder_hint || "e.g., Your Store Name"} value={formData.business_name} onChange={(e) => setFormData({ ...formData, business_name: e.target.value })} /></div>
             <div className="space-y-2"><Label htmlFor="description">Description</Label><Textarea id="description" placeholder="Tell customers about what you offer..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} /></div>
             <div className="space-y-2"><Label>Availability Hours</Label><div className="grid grid-cols-2 gap-3"><div><Label htmlFor="start" className="text-xs text-muted-foreground">Opens at</Label><Input id="start" type="time" value={formData.availability_start} onChange={(e) => setFormData({ ...formData, availability_start: e.target.value })} /></div><div><Label htmlFor="end" className="text-xs text-muted-foreground">Closes at</Label><Input id="end" type="time" value={formData.availability_end} onChange={(e) => setFormData({ ...formData, availability_end: e.target.value })} /></div></div></div>
