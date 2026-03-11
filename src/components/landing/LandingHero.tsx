@@ -29,17 +29,17 @@ export function LandingHero() {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8"
           >
             <Shield className="text-primary" size={14} />
-            <span className="text-xs font-semibold text-primary">Free for Buyers. Always.</span>
+            <span className="text-xs font-semibold text-primary">Only from verified neighbors</span>
           </motion.div>
 
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] mb-6 text-foreground tracking-tight">
-            Tired of Strangers?{' '}
+            What Your Neighbor Makes,{' '}
             <br className="hidden sm:block" />
-            <span className="text-primary">Shop From Neighbors You Trust.</span>
+            <span className="text-primary">No App Can Deliver.</span>
           </h1>
 
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-            Stop relying on unknown delivery apps. {platformName} is the private marketplace where you buy, sell, and book services — only from people who live in your society.
+            Home-cooked meals, trusted tutors, skilled handymen — the best things in your society aren't on any delivery app. {platformName} brings them to your doorstep.
           </p>
 
           <motion.div
