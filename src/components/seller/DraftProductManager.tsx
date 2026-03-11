@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { ProductImageUpload } from '@/components/ui/product-image-upload';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Trash2, Loader2, Package, Percent, CheckCircle2, Info } from 'lucide-react';
+import { Plus, Trash2, Loader2, Package, Percent, CheckCircle2, Info, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { friendlyError } from '@/lib/utils';
@@ -54,6 +54,7 @@ export function DraftProductManager({
 }: DraftProductManagerProps) {
   const { user } = useAuth();
   const [isAdding, setIsAdding] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [attributeBlocks, setAttributeBlocks] = useState<BlockData[]>([]);
   const [serviceFields, setServiceFields] = useState<ServiceFieldsData>(INITIAL_SERVICE_FIELDS);
@@ -140,28 +141,46 @@ export function DraftProductManager({
     }
 
     setIsSaving(true);
+    const isEditing = editingIndex !== null;
+    const existingId = isEditing ? products[editingIndex]?.id : undefined;
+
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .insert({
-          seller_id: sellerId,
-          name: newProduct.name.trim(),
-          price: newProduct.price || 0,
-          mrp: newProduct.mrp && newProduct.mrp > 0 ? newProduct.mrp : null,
-          description: newProduct.description.trim() || null,
-          category: newProduct.category,
-          is_veg: newProduct.is_veg,
-          image_url: newProduct.image_url.trim() || null,
-          is_available: true,
-          prep_time_minutes: newProduct.prep_time_minutes || null,
-          specifications: attributeBlocks.length > 0 ? { blocks: attributeBlocks } : null,
-        } as any)
-        .select()
-        .single();
+      const productPayload = {
+        seller_id: sellerId,
+        name: newProduct.name.trim(),
+        price: newProduct.price || 0,
+        mrp: newProduct.mrp && newProduct.mrp > 0 ? newProduct.mrp : null,
+        description: newProduct.description.trim() || null,
+        category: newProduct.category,
+        is_veg: newProduct.is_veg,
+        image_url: newProduct.image_url.trim() || null,
+        is_available: true,
+        prep_time_minutes: newProduct.prep_time_minutes || null,
+        specifications: attributeBlocks.length > 0 ? { blocks: attributeBlocks } : null,
+      };
 
-      if (error) throw error;
+      let savedProductId: string;
 
-      const savedProductId = data.id;
+      if (isEditing && existingId) {
+        // Update existing product
+        const { data, error } = await supabase
+          .from('products')
+          .update(productPayload as any)
+          .eq('id', existingId)
+          .select()
+          .single();
+        if (error) throw error;
+        savedProductId = data.id;
+      } else {
+        // Insert new product
+        const { data, error } = await supabase
+          .from('products')
+          .insert(productPayload as any)
+          .select()
+          .single();
+        if (error) throw error;
+        savedProductId = data.id;
+      }
 
       // Save service listing if service category
       if (isService && savedProductId) {
@@ -205,25 +224,19 @@ export function DraftProductManager({
         }
       }
 
-      onProductsChange([...products, { ...newProduct, id: data.id, discount_percentage: computedDiscount }]);
-      setNewProduct({
-        name: '',
-        price: 0,
-        mrp: null,
-        discount_percentage: null,
-        description: '',
-        category: categories[0] || '',
-        is_veg: true,
-        image_url: '',
-        prep_time_minutes: null,
-      });
-      setIsAdding(false);
-      setAttributeBlocks([]);
-      setServiceFields(INITIAL_SERVICE_FIELDS);
-      setAvailabilitySchedule(INITIAL_AVAILABILITY_SCHEDULE);
-      toast.success('Product added');
+      if (isEditing) {
+        const updated = [...products];
+        updated[editingIndex] = { ...newProduct, id: savedProductId, discount_percentage: computedDiscount };
+        onProductsChange(updated);
+        toast.success('Product updated');
+      } else {
+        onProductsChange([...products, { ...newProduct, id: savedProductId, discount_percentage: computedDiscount }]);
+        toast.success('Product added');
+      }
+
+      resetForm();
     } catch (error: any) {
-      console.error('Error adding product:', error);
+      console.error('Error saving product:', error);
       toast.error(friendlyError(error));
     } finally {
       setIsSaving(false);
@@ -241,6 +254,32 @@ export function DraftProductManager({
     }
     const updated = products.filter((_, i) => i !== index);
     onProductsChange(updated);
+  };
+
+  const handleEditProduct = (index: number) => {
+    const product = products[index];
+    setNewProduct({ ...product });
+    setEditingIndex(index);
+    setIsAdding(true);
+  };
+
+  const resetForm = () => {
+    setNewProduct({
+      name: '',
+      price: 0,
+      mrp: null,
+      discount_percentage: null,
+      description: '',
+      category: categories[0] || '',
+      is_veg: true,
+      image_url: '',
+      prep_time_minutes: null,
+    });
+    setIsAdding(false);
+    setEditingIndex(null);
+    setAttributeBlocks([]);
+    setServiceFields(INITIAL_SERVICE_FIELDS);
+    setAvailabilitySchedule(INITIAL_AVAILABILITY_SCHEDULE);
   };
 
   return (
@@ -321,9 +360,14 @@ export function DraftProductManager({
                     <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
                   )}
                 </div>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => handleRemoveProduct(index)}>
-                  <Trash2 size={14} />
-                </Button>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" onClick={() => handleEditProduct(index)}>
+                    <Pencil size={14} />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => handleRemoveProduct(index)}>
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -336,7 +380,7 @@ export function DraftProductManager({
         <div className="flex gap-6 items-start">
           <Card className="border-primary/30 flex-1 min-w-0">
             <CardContent className="p-4 space-y-3">
-              <h4 className="font-medium text-sm">New Product / Service</h4>
+              <h4 className="font-medium text-sm">{editingIndex !== null ? 'Edit Product / Service' : 'New Product / Service'}</h4>
               <div className="space-y-2">
                 <Label htmlFor="prod-name" className="text-xs">Name *</Label>
                 <Input
@@ -494,10 +538,10 @@ export function DraftProductManager({
               )}
 
               <div className="flex gap-2 pt-1">
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => setIsAdding(false)}>Cancel</Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={resetForm}>Cancel</Button>
                 <Button size="sm" className="flex-1" onClick={handleAddProduct} disabled={isSaving}>
                   {isSaving && <Loader2 size={14} className="animate-spin mr-1" />}
-                  Save Product
+                  {editingIndex !== null ? 'Update Product' : 'Save Product'}
                 </Button>
               </div>
             </CardContent>
