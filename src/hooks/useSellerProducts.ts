@@ -240,9 +240,9 @@ export function useSellerProducts() {
   };
 
   const isCurrentCategoryService = useMemo(() => isServiceCategory(formData.category, configs), [formData.category, configs]);
-  const currentCategorySupportsAddons = useMemo(() => { if (!formData.category) return false; return (configs.find((c: any) => c.category === formData.category) as any)?.supportsAddons === true; }, [formData.category, configs]);
-  const currentCategorySupportsRecurring = useMemo(() => { if (!formData.category) return false; return (configs.find((c: any) => c.category === formData.category) as any)?.supportsRecurring === true; }, [formData.category, configs]);
-  const currentCategorySupportsStaffAssignment = useMemo(() => { if (!formData.category) return false; return (configs.find((c: any) => c.category === formData.category) as any)?.supportsStaffAssignment === true; }, [formData.category, configs]);
+  const currentCategorySupportsAddons = activeSubcategory?.supports_addons ?? activeCategoryConfig?.supportsAddons ?? false;
+  const currentCategorySupportsRecurring = activeSubcategory?.supports_recurring ?? activeCategoryConfig?.supportsRecurring ?? false;
+  const currentCategorySupportsStaffAssignment = activeSubcategory?.supports_staff_assignment ?? activeCategoryConfig?.supportsStaffAssignment ?? false;
 
   return {
     user, sellerProfile, primaryGroup, products, isLoading, isDialogOpen, setIsDialogOpen,

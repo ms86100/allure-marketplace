@@ -38,7 +38,7 @@ const MAX_ADDRESS_LENGTH = 300;
 
 export function ServiceBookingFlow({
   open, onOpenChange, productId, productName, sellerId, sellerName,
-  price, category, imageUrl, durationMinutes, locationType,
+  price, category, imageUrl, durationMinutes, locationType, subcategoryId,
 }: ServiceBookingFlowProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
