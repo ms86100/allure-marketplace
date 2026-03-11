@@ -286,7 +286,7 @@ export default function CartPage() {
       )}
 
       {c.pendingOrderIds.length > 0 && c.paymentMode.isUpiDeepLink && (
-        <UpiDeepLinkCheckout isOpen={c.showUpiDeepLink} onClose={() => {}} orderId={c.pendingOrderIds[0]} amount={c.finalAmount} sellerUpiId={(c.sellerGroups[0]?.items[0]?.product?.seller as any)?.upi_id || ''} sellerName={c.sellerGroups[0]?.sellerName || 'Seller'} onPaymentConfirmed={c.handleUpiDeepLinkSuccess} onPaymentFailed={c.handleUpiDeepLinkFailed} />
+        <UpiDeepLinkCheckout isOpen={c.showUpiDeepLink} onClose={() => c.setShowUpiDeepLink(false)} orderId={c.pendingOrderIds[0]} amount={c.sellerGroups[0]?.subtotal || c.finalAmount} sellerUpiId={(c.sellerGroups[0]?.items[0]?.product?.seller as any)?.upi_id || ''} sellerName={c.sellerGroups[0]?.sellerName || 'Seller'} onPaymentConfirmed={c.handleUpiDeepLinkSuccess} onPaymentFailed={c.handleUpiDeepLinkFailed} />
       )}
     </AppLayout>
   );
