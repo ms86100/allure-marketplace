@@ -23,9 +23,9 @@ export function ShopByStore() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'seller_profiles', filter: `society_id=eq.${effectiveSocietyId}` },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['shop-by-store'] });
-          queryClient.invalidateQueries({ queryKey: ['local-sellers'] });
-          queryClient.invalidateQueries({ queryKey: ['nearby-sellers'] });
+          queryClient.invalidateQueries({ queryKey: ['store-discovery'] });
+          queryClient.invalidateQueries({ queryKey: ['trending-products'] });
+          queryClient.invalidateQueries({ queryKey: ['popular-products'] });
         }
       )
       .subscribe();
