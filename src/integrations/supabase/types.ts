@@ -3165,8 +3165,11 @@ export type Database = {
           coupon_id: string | null
           created_at: string | null
           delivery_address: string | null
+          delivery_address_id: string | null
           delivery_fee: number
           delivery_handled_by: string | null
+          delivery_lat: number | null
+          delivery_lng: number | null
           deposit_paid: boolean | null
           deposit_refunded: boolean | null
           discount_amount: number | null
@@ -3202,8 +3205,11 @@ export type Database = {
           coupon_id?: string | null
           created_at?: string | null
           delivery_address?: string | null
+          delivery_address_id?: string | null
           delivery_fee?: number
           delivery_handled_by?: string | null
+          delivery_lat?: number | null
+          delivery_lng?: number | null
           deposit_paid?: boolean | null
           deposit_refunded?: boolean | null
           discount_amount?: number | null
@@ -3239,8 +3245,11 @@ export type Database = {
           coupon_id?: string | null
           created_at?: string | null
           delivery_address?: string | null
+          delivery_address_id?: string | null
           delivery_fee?: number
           delivery_handled_by?: string | null
+          delivery_lat?: number | null
+          delivery_lng?: number | null
           deposit_paid?: boolean | null
           deposit_refunded?: boolean | null
           discount_amount?: number | null
@@ -3289,6 +3298,13 @@ export type Database = {
             columns: ["coupon_id"]
             isOneToOne: false
             referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_address_id_fkey"
+            columns: ["delivery_address_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_addresses"
             referencedColumns: ["id"]
           },
           {
@@ -8183,24 +8199,46 @@ export type Database = {
         }
         Returns: Json
       }
-      create_multi_vendor_orders: {
-        Args: {
-          _buyer_id: string
-          _cart_total: number
-          _coupon_code?: string
-          _coupon_discount?: number
-          _coupon_id?: string
-          _delivery_address: string
-          _delivery_fee?: number
-          _fulfillment_type?: string
-          _has_urgent?: boolean
-          _notes: string
-          _payment_method: string
-          _payment_status: string
-          _seller_groups: Json
-        }
-        Returns: Json
-      }
+      create_multi_vendor_orders:
+        | {
+            Args: {
+              _buyer_id: string
+              _cart_total: number
+              _coupon_code?: string
+              _coupon_discount?: number
+              _coupon_id?: string
+              _delivery_address: string
+              _delivery_fee?: number
+              _fulfillment_type?: string
+              _has_urgent?: boolean
+              _notes: string
+              _payment_method: string
+              _payment_status: string
+              _seller_groups: Json
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _buyer_id: string
+              _cart_total: number
+              _coupon_code?: string
+              _coupon_discount?: number
+              _coupon_id?: string
+              _delivery_address: string
+              _delivery_address_id?: string
+              _delivery_fee?: number
+              _delivery_lat?: number
+              _delivery_lng?: number
+              _fulfillment_type?: string
+              _has_urgent?: boolean
+              _notes: string
+              _payment_method: string
+              _payment_status: string
+              _seller_groups: Json
+            }
+            Returns: Json
+          }
       generate_recurring_visitor_entries: { Args: never; Returns: undefined }
       get_allowed_transitions: {
         Args: { _actor?: string; _order_id: string }
