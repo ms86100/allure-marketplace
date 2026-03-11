@@ -159,10 +159,10 @@ export default function WelcomeCarousel() {
         </div>
 
         <h2 className="text-3xl font-extrabold mb-3 text-foreground leading-tight">
-          A Marketplace<br />Built on <span className="text-primary">Trust</span>
+          No Strangers.<br />Only <span className="text-primary">Neighbors.</span>
         </h2>
         <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
-          Every seller is a verified resident. Every transaction happens between real neighbors — not anonymous strangers.
+          Every person on this platform lives in your society. GPS-verified. Code-protected. You'll never interact with someone you couldn't knock on the door of.
         </p>
 
         <div className="space-y-3">
