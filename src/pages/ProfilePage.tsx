@@ -162,6 +162,12 @@ export default function ProfilePage() {
                   <span>{profile.phone}</span>
                 </div>
               )}
+              {profile?.email && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Mail size={12} />
+                  <span className="truncate">{profile.email}</span>
+                </div>
+              )}
             </div>
             <Link to="/profile/edit" className="shrink-0">
               <Button variant="ghost" size="sm" className="h-8 text-xs text-primary">Edit</Button>
