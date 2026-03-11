@@ -5114,6 +5114,8 @@ export type Database = {
           is_available: boolean | null
           is_featured: boolean | null
           last_active_at: string | null
+          latitude: number | null
+          longitude: number | null
           low_stock_alert_threshold: number | null
           minimum_order_amount: number | null
           on_time_delivery_pct: number | null
@@ -5125,7 +5127,9 @@ export type Database = {
           razorpay_onboarding_status: string | null
           rejection_note: string | null
           sell_beyond_community: boolean
+          seller_type: Database["public"]["Enums"]["seller_type_enum"]
           society_id: string | null
+          store_location_source: string | null
           total_reviews: number | null
           updated_at: string | null
           upi_id: string | null
@@ -5164,6 +5168,8 @@ export type Database = {
           is_available?: boolean | null
           is_featured?: boolean | null
           last_active_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
           low_stock_alert_threshold?: number | null
           minimum_order_amount?: number | null
           on_time_delivery_pct?: number | null
@@ -5175,7 +5181,9 @@ export type Database = {
           razorpay_onboarding_status?: string | null
           rejection_note?: string | null
           sell_beyond_community?: boolean
+          seller_type?: Database["public"]["Enums"]["seller_type_enum"]
           society_id?: string | null
+          store_location_source?: string | null
           total_reviews?: number | null
           updated_at?: string | null
           upi_id?: string | null
@@ -5214,6 +5222,8 @@ export type Database = {
           is_available?: boolean | null
           is_featured?: boolean | null
           last_active_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
           low_stock_alert_threshold?: number | null
           minimum_order_amount?: number | null
           on_time_delivery_pct?: number | null
@@ -5225,7 +5235,9 @@ export type Database = {
           razorpay_onboarding_status?: string | null
           rejection_note?: string | null
           sell_beyond_community?: boolean
+          seller_type?: Database["public"]["Enums"]["seller_type_enum"]
           society_id?: string | null
+          store_location_source?: string | null
           total_reviews?: number | null
           updated_at?: string | null
           upi_id?: string | null
@@ -8594,6 +8606,10 @@ export type Database = {
         Args: { p_lat: number; p_lng: number }
         Returns: undefined
       }
+      set_my_store_coordinates: {
+        Args: { p_lat: number; p_lng: number; p_source?: string }
+        Returns: undefined
+      }
       validate_worker_entry: {
         Args: { _society_id: string; _worker_id: string }
         Returns: Json
@@ -8627,6 +8643,7 @@ export type Database = {
         | "snacks"
         | "groceries"
         | "other"
+      seller_type_enum: "society_resident" | "commercial"
       service_category:
         | "home_food"
         | "bakery"
@@ -8839,6 +8856,7 @@ export const Constants = {
         "no_show",
       ],
       product_category: ["home_food", "bakery", "snacks", "groceries", "other"],
+      seller_type_enum: ["society_resident", "commercial"],
       service_category: [
         "home_food",
         "bakery",
