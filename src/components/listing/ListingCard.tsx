@@ -8,7 +8,7 @@ import { VegBadge } from '@/components/ui/veg-badge';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Plus, Minus, Clock, Star, Zap } from 'lucide-react';
+import { Plus, Minus, Clock, Star, Zap, MapPin } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 
 export interface Listing {
