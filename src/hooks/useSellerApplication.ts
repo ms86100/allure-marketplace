@@ -54,7 +54,7 @@ export function useSellerApplication() {
   const [isLoading, setIsLoading] = useState(false);
   const [submissionComplete, setSubmissionComplete] = useState(false);
   const [isCheckingExisting, setIsCheckingExisting] = useState(true);
-  const [existingSeller, setExistingSeller] = useState<{ id: string; business_name: string; verification_status?: string } | null>(null);
+  const [existingSeller, setExistingSeller] = useState<{ id: string; business_name: string; verification_status?: string; rejection_note?: string | null } | null>(null);
   const [draftSellerId, setDraftSellerId] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
