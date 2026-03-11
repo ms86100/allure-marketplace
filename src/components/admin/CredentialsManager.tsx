@@ -152,10 +152,62 @@ export function CredentialsManager() {
     );
   }
 
-  const renderCredentialField = (config: CredentialConfig) => {
+  const renderCredentialField = (config: CredentialConfig & { isToggle?: boolean }) => {
     const setting = settings.find(s => s.key === config.key);
     const hasValue = !!setting?.value;
     const isActive = setting?.is_active ?? false;
+
+    // Special payment mode toggle
+    if (config.isToggle && config.key === 'payment_gateway_mode') {
+      const currentMode = setting?.value || 'upi_deep_link';
+      const isRazorpay = currentMode === 'razorpay';
+      const razorpayKeySet = !!settings.find(s => s.key === 'razorpay_key_id')?.value;
+
+      return (
+        <div key={config.key} className="space-y-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
+          <div className="flex items-center justify-between">
+            <Label className="font-semibold text-sm">{config.label}</Label>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-medium ${!isRazorpay ? 'text-primary' : 'text-muted-foreground'}`}>UPI Direct</span>
+              <Switch
+                checked={isRazorpay}
+                onCheckedChange={async (checked) => {
+                  if (checked && !razorpayKeySet) {
+                    toast.error('Configure Razorpay keys first before switching to gateway mode');
+                    return;
+                  }
+                  const newMode = checked ? 'razorpay' : 'upi_deep_link';
+                  setEditValues({ ...editValues, [config.key]: newMode });
+                  try {
+                    if (setting) {
+                      const { error } = await supabase.from('admin_settings').update({ value: newMode, is_active: true, updated_at: new Date().toISOString() }).eq('key', config.key);
+                      if (error) throw error;
+                    } else {
+                      const { error } = await supabase.from('admin_settings').insert({ key: config.key, value: newMode, is_active: true, description: config.description });
+                      if (error) throw error;
+                    }
+                    toast.success(`Payment mode switched to ${checked ? 'Razorpay Gateway' : 'UPI Deep Link'}`);
+                    await fetchSettings();
+                  } catch (err) {
+                    toast.error('Failed to update payment mode');
+                  }
+                }}
+              />
+              <span className={`text-xs font-medium ${isRazorpay ? 'text-primary' : 'text-muted-foreground'}`}>Razorpay</span>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">{config.description}</p>
+          <div className={`rounded-lg px-3 py-2 text-xs ${isRazorpay ? 'bg-accent/10 text-accent' : 'bg-primary/10 text-primary'}`}>
+            {isRazorpay
+              ? '🏦 Payments routed through Razorpay API. Automatic verification.'
+              : '📱 Buyers pay directly to seller UPI ID. Manual verification via UTR + seller confirmation.'}
+          </div>
+          {!razorpayKeySet && (
+            <p className="text-[10px] text-muted-foreground">⚠️ Razorpay keys not configured. Gateway mode requires valid API keys.</p>
+          )}
+        </div>
+      );
+    }
 
     return (
       <div key={config.key} className="space-y-2.5 p-3.5 rounded-xl bg-muted/30 border border-border/40">
@@ -164,7 +216,7 @@ export function CredentialsManager() {
           {hasValue && (
             <div className="flex items-center gap-2">
               {isActive ? (
-                <Badge variant="secondary" className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 gap-0.5">
+                <Badge variant="secondary" className="text-[10px] bg-accent/20 text-accent gap-0.5">
                   <Check size={10} /> Active
                 </Badge>
               ) : (
