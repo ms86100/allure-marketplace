@@ -22,36 +22,40 @@ export function BuyerActivityTable() {
       ) : (
         <Card className="border-0 shadow-[var(--shadow-card)] rounded-2xl overflow-hidden">
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-[11px] font-bold">Buyer</TableHead>
-                  <TableHead className="text-[11px] font-bold text-right">Orders</TableHead>
-                  <TableHead className="text-[11px] font-bold text-right">Sellers</TableHead>
-                  <TableHead className="text-[11px] font-bold text-right">Spent</TableHead>
-                  <TableHead className="text-[11px] font-bold text-right">Last Order</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(buyers || []).map((b: any) => (
-                  <TableRow key={b.id}>
-                    <TableCell className="py-2.5">
-                      <p className="text-xs font-bold truncate max-w-[120px]">{b.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{b.societyName} • {b.flat_number}</p>
-                    </TableCell>
-                    <TableCell className="text-xs font-bold text-right tabular-nums">{b.orderCount}</TableCell>
-                    <TableCell className="text-xs text-right tabular-nums">{b.sellerCount}</TableCell>
-                    <TableCell className="text-xs font-bold text-right tabular-nums">₹{b.totalSpent.toLocaleString()}</TableCell>
-                    <TableCell className="text-[11px] text-right text-muted-foreground">
-                      {b.lastOrderDate ? format(new Date(b.lastOrderDate), 'MMM d') : '—'}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-[11px] font-bold">Buyer</TableHead>
+                    <TableHead className="text-[11px] font-bold text-right">Total</TableHead>
+                    <TableHead className="text-[11px] font-bold text-right text-emerald-600">Delivered</TableHead>
+                    <TableHead className="text-[11px] font-bold text-right text-red-600">Cancelled</TableHead>
+                    <TableHead className="text-[11px] font-bold text-right">Spent</TableHead>
+                    <TableHead className="text-[11px] font-bold text-right">Last Order</TableHead>
                   </TableRow>
-                ))}
-                {!buyers?.length && (
-                  <TableRow><TableCell colSpan={5} className="text-center text-xs text-muted-foreground py-8">No buyer activity</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {(buyers || []).map((b: any) => (
+                    <TableRow key={b.id}>
+                      <TableCell className="py-2.5">
+                        <p className="text-xs font-bold truncate max-w-[120px]">{b.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{b.societyName} • {b.flat_number}</p>
+                      </TableCell>
+                      <TableCell className="text-xs font-bold text-right tabular-nums">{b.orderCount}</TableCell>
+                      <TableCell className="text-xs text-right tabular-nums text-emerald-600">{b.delivered}</TableCell>
+                      <TableCell className="text-xs text-right tabular-nums text-red-600">{b.cancelled}</TableCell>
+                      <TableCell className="text-xs font-bold text-right tabular-nums">₹{b.totalSpent.toLocaleString()}</TableCell>
+                      <TableCell className="text-[11px] text-right text-muted-foreground">
+                        {b.lastOrderDate ? format(new Date(b.lastOrderDate), 'MMM d') : '—'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!buyers?.length && (
+                    <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground py-8">No buyer activity</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}

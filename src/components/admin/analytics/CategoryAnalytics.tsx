@@ -25,29 +25,37 @@ export function CategoryAnalytics() {
               <div className="px-4 py-2.5 border-b border-border/30">
                 <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Orders by Category</p>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-[11px] font-bold">Category</TableHead>
-                    <TableHead className="text-[11px] font-bold text-right">Orders</TableHead>
-                    <TableHead className="text-[11px] font-bold text-right">Qty</TableHead>
-                    <TableHead className="text-[11px] font-bold text-right">Revenue</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(data?.categories || []).map((c: any) => (
-                    <TableRow key={c.category}>
-                      <TableCell className="text-xs font-semibold capitalize py-2.5">{c.category.replace(/_/g, ' ')}</TableCell>
-                      <TableCell className="text-xs font-bold text-right tabular-nums">{c.orders}</TableCell>
-                      <TableCell className="text-xs text-right tabular-nums">{c.quantity}</TableCell>
-                      <TableCell className="text-xs font-bold text-right tabular-nums">₹{c.revenue.toLocaleString()}</TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-[11px] font-bold">Category</TableHead>
+                      <TableHead className="text-[11px] font-bold text-right">Orders</TableHead>
+                      <TableHead className="text-[11px] font-bold text-right">Qty</TableHead>
+                      <TableHead className="text-[11px] font-bold text-right">Total ₹</TableHead>
+                      <TableHead className="text-[11px] font-bold text-right text-emerald-600">Delivered ₹</TableHead>
+                      <TableHead className="text-[11px] font-bold text-right text-red-600">Cancelled ₹</TableHead>
+                      <TableHead className="text-[11px] font-bold text-right text-blue-600">Active ₹</TableHead>
                     </TableRow>
-                  ))}
-                  {!data?.categories?.length && (
-                    <TableRow><TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-8">No category data</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {(data?.categories || []).map((c: any) => (
+                      <TableRow key={c.category}>
+                        <TableCell className="text-xs font-semibold capitalize py-2.5">{c.category.replace(/_/g, ' ')}</TableCell>
+                        <TableCell className="text-xs font-bold text-right tabular-nums">{c.orders}</TableCell>
+                        <TableCell className="text-xs text-right tabular-nums">{c.quantity}</TableCell>
+                        <TableCell className="text-xs font-bold text-right tabular-nums">₹{c.revenue.toLocaleString()}</TableCell>
+                        <TableCell className="text-xs text-right tabular-nums text-emerald-600">₹{c.deliveredRevenue.toLocaleString()}</TableCell>
+                        <TableCell className="text-xs text-right tabular-nums text-red-600">₹{c.cancelledRevenue.toLocaleString()}</TableCell>
+                        <TableCell className="text-xs text-right tabular-nums text-blue-600">₹{c.activeRevenue.toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                    {!data?.categories?.length && (
+                      <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-8">No category data</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
 
