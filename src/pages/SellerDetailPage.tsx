@@ -461,7 +461,7 @@ export default function SellerDetailPage() {
                     key={cat}
                     className="text-xs px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground font-medium"
                   >
-                    {categoryInfo?.icon} {categoryInfo?.displayName || cat}
+                    <span className="inline-flex items-center gap-1"><DynamicIcon name={categoryInfo?.icon || 'Package'} size={12} /> {categoryInfo?.displayName || cat}</span>
                   </span>
                 );
               })}

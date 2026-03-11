@@ -110,7 +110,7 @@ export default function SellerProductsPage() {
                 <div key={product.id} className={`bg-card rounded-xl p-4 shadow-sm transition-opacity ${!product.is_available ? 'opacity-60' : ''}`}>
                   <div className="flex items-start gap-3">
                     <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 relative">
-                      {product.image_url ? <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-muted flex items-center justify-center"><span className="text-xl">{sp.configs.find(c => c.category === product.category)?.icon || '📦'}</span></div>}
+                      {product.image_url ? <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-muted flex items-center justify-center"><DynamicIcon name={sp.configs.find(c => c.category === product.category)?.icon || 'Package'} size={24} /></div>}
                       {!product.is_available && <div className="absolute inset-0 bg-background/70 flex items-center justify-center"><span className="text-[10px] font-medium text-destructive">Out of Stock</span></div>}
                     </div>
                     <div className="flex-1 min-w-0">

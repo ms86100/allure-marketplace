@@ -134,7 +134,7 @@ export function WorkerCategoryManager() {
         <Card key={cat.id}>
           <CardContent className="p-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xl">{cat.icon}</span>
+              <DynamicIcon name={cat.icon} size={20} />
               <div>
                 <p className="font-medium text-sm">{cat.name}</p>
                 <p className="text-[10px] text-muted-foreground capitalize">{cat.entry_type.replace('_', ' ')} entry</p>
