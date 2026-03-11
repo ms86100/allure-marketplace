@@ -338,10 +338,10 @@ export default function SellerDetailPage() {
                 {(seller as any).society.name}
               </span>
             )}
-            {distanceKm !== null && distanceKm > 0 && (
+            {distanceKm !== null && (
               <>
                 <span className="text-muted-foreground/40">·</span>
-                <span className="text-xs font-medium text-primary">📍 {distanceKm} km</span>
+                <span className="text-xs font-medium text-primary">📍 {distanceKm < 1 ? `${Math.round(distanceKm * 1000)} m` : `${distanceKm} km`}</span>
               </>
             )}
             {seller.availability_start && seller.availability_end && (
