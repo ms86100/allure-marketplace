@@ -297,6 +297,7 @@ export function DraftProductManager({
               max_bookings_per_slot: String(sl.max_bookings_per_slot || 1),
               cancellation_notice_hours: String(sl.cancellation_notice_hours || 24),
               rescheduling_notice_hours: String(sl.rescheduling_notice_hours || 12),
+              preparation_instructions: (sl as any).preparation_instructions || '',
             });
           }
         } catch {
