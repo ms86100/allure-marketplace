@@ -51,6 +51,8 @@ export function useTrendingProducts(limit = 10) {
             seller_is_available: seller.is_available ?? true,
             distance_km: seller.distance_km ?? null,
             society_name: seller.society_name || null,
+            seller_latitude: seller.seller_latitude ?? null,
+            seller_longitude: seller.seller_longitude ?? null,
           } as ProductWithSeller);
         });
       });
