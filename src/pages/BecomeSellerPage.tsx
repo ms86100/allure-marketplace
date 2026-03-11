@@ -295,8 +295,8 @@ export default function BecomeSellerPage() {
               <div className="flex items-center gap-2"><Truck size={16} className="text-primary" /><h3 className="font-semibold text-sm">Fulfillment Mode</h3></div>
               <RadioGroup value={formData.fulfillment_mode} onValueChange={(value) => setFormData({ ...formData, fulfillment_mode: value })} className="space-y-2">
                 {FULFILLMENT_OPTIONS.map((option) => { const Icon = option.icon; return (
-                  <label key={option.value} className={cn('flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all', formData.fulfillment_mode === option.value ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30')}>
-                    <RadioGroupItem value={option.value} /><div className="flex-1"><span className="text-sm font-medium">{option.label}</span><p className="text-xs text-muted-foreground">{option.description}</p></div>
+                  <label key={option.value} className={cn('flex items-center gap-3 p-3 rounded-lg border transition-all', option.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer', !option.disabled && formData.fulfillment_mode === option.value ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30')}>
+                    <RadioGroupItem value={option.value} disabled={option.disabled} /><div className="flex-1"><span className="text-sm font-medium">{option.label}</span><p className="text-xs text-muted-foreground">{option.description}</p></div>
                   </label>
                 ); })}
               </RadioGroup>
