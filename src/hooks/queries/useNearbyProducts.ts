@@ -16,7 +16,7 @@ export function useNearbyProducts() {
   const lng = browsingLocation?.lng;
 
   return useQuery({
-    queryKey: ['store-discovery', 'nearby-products', lat, lng, searchRadius],
+    queryKey: ['store-discovery', 'nearby-products', lat, lng, MARKETPLACE_RADIUS_KM],
     queryFn: async (): Promise<ProductWithSeller[]> => {
       if (!lat || !lng) return [];
 
