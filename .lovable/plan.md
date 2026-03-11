@@ -1,50 +1,143 @@
 
 
-## Notification Health Check — User-Friendly UI
+# Refined Plan: Coordinate-First Discovery Architecture
 
-### What We'll Build
+All feedback points are agreed and incorporated. Here is the final implementation plan.
 
-A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
+## Migration (single SQL file)
 
-### UI Design
+### 1. Schema changes on `seller_profiles`
 
-**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
+```sql
+-- Enum for seller type (not text)
+CREATE TYPE public.seller_type_enum AS ENUM ('society_resident', 'commercial');
 
-**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
+ALTER TABLE public.seller_profiles
+  ADD COLUMN IF NOT EXISTS latitude double precision,
+  ADD COLUMN IF NOT EXISTS longitude double precision,
+  ADD COLUMN IF NOT EXISTS seller_type public.seller_type_enum NOT NULL DEFAULT 'society_resident',
+  ADD COLUMN IF NOT EXISTS store_location_source text;
 
-| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
-|---|---|---|
-| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
-| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
-| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
-| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
+-- Composite index for bounding-box pre-filter
+CREATE INDEX IF NOT EXISTS idx_seller_coords ON public.seller_profiles(latitude, longitude);
+```
 
-Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
+### 2. Backfill existing sellers (copy society coords)
 
-**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
+```sql
+UPDATE public.seller_profiles sp
+SET latitude = s.latitude::double precision,
+    longitude = s.longitude::double precision,
+    store_location_source = 'society'
+FROM public.societies s
+WHERE s.id = sp.society_id
+  AND s.latitude IS NOT NULL
+  AND sp.latitude IS NULL;
+```
 
-**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
+### 3. New RPC: `set_my_store_coordinates`
 
-### Implementation
+Writes directly to `seller_profiles.latitude/longitude`. Source is set automatically (not user-controlled).
 
-**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
-- Renders the trigger button and the bottom sheet
-- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
-- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
-- Provides actionable buttons for failures (Open Settings, Retry Registration)
+```sql
+CREATE OR REPLACE FUNCTION public.set_my_store_coordinates(
+  p_lat double precision, p_lng double precision, p_source text DEFAULT 'manual'
+) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+BEGIN
+  UPDATE public.seller_profiles
+  SET latitude = p_lat, longitude = p_lng,
+      store_location_source = p_source
+  WHERE user_id = auth.uid();
+END; $$;
+```
 
-**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
-- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
-- Consolidates the 7+ technical steps into 4 simple categories
-- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
+### 4. Update `set_my_society_coordinates` for backward compat
 
-**3. Update `src/pages/ProfilePage.tsx`**
-- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
-- Keep Push Debug link visible only for admins
+Extend existing function to ALSO update seller_profiles coordinates:
 
-**4. Optionally add to `src/pages/NotificationsPage.tsx`**
-- Add a small "Check notification status" link at the top
+```sql
+-- After updating societies, also sync to seller_profiles
+UPDATE public.seller_profiles
+SET latitude = p_lat, longitude = p_lng,
+    store_location_source = 'society'
+WHERE user_id = auth.uid() AND latitude IS NULL;
+```
 
-### No backend changes needed
-The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
+### 5. Recreate `search_sellers_by_location`
+
+Key changes from current:
+- `LEFT JOIN societies` (was INNER JOIN)
+- Society filters (`s.latitude IS NOT NULL`) move INTO the JOIN condition
+- `COALESCE(sp.latitude, s.latitude::double precision)` for all coordinate references
+- Bounding box pre-filter before haversine (~0.045 degrees per km × radius)
+- `sell_beyond_community` bypassed when `seller_type = 'commercial'`
+- `LEAST(_radius_km, COALESCE(sp.delivery_radius_km, _radius_km))` for radius safety
+
+```text
+FROM seller_profiles sp
+LEFT JOIN societies s 
+  ON s.id = sp.society_id 
+  AND s.latitude IS NOT NULL 
+  AND s.longitude IS NOT NULL
+WHERE sp.verification_status = 'approved'
+  AND sp.is_available = true
+  AND COALESCE(sp.latitude, s.latitude) IS NOT NULL
+  AND COALESCE(sp.longitude, s.longitude) IS NOT NULL
+  -- Bounding box pre-filter (fast index scan)
+  AND COALESCE(sp.latitude, s.latitude::dp) BETWEEN (_lat - _radius_km * 0.009) AND (_lat + _radius_km * 0.009)
+  AND COALESCE(sp.longitude, s.longitude::dp) BETWEEN (_lng - _radius_km * 0.009) AND (_lng + _radius_km * 0.009)
+  -- Precise haversine
+  AND haversine_km(...) <= LEAST(_radius_km, COALESCE(sp.delivery_radius_km, _radius_km))
+  -- Community gating: commercial sellers bypass this entirely
+  AND (sp.seller_type = 'commercial' OR sp.sell_beyond_community = true 
+       OR sp.society_id = (SELECT p2.society_id FROM profiles p2 WHERE p2.id = auth.uid()))
+```
+
+### 6. Update `get_location_stats`
+
+Same LEFT JOIN + COALESCE + bounding box pattern.
+
+### 7. Update `create_multi_vendor_orders`
+
+Delivery radius check uses `COALESCE(sp.latitude, s.latitude)` instead of only `s.latitude`.
+
+## Frontend Changes
+
+### 1. Rename `SetSocietyLocationSheet` to `SetStoreLocationSheet`
+
+- File: `src/components/seller/SetSocietyLocationSheet.tsx` → `src/components/seller/SetStoreLocationSheet.tsx`
+- Title: "Set Store Location"
+- Call `set_my_store_coordinates` RPC (with `p_source = 'manual'` for search, `p_source = 'gps'` for GPS)
+- Remove society-specific error messaging
+
+### 2. Update `SellerVisibilityChecklist.tsx`
+
+- Import `SetStoreLocationSheet` instead of `SetSocietyLocationSheet`
+
+### 3. Update `useSellerHealth.ts`
+
+- Fetch `latitude, longitude, seller_type` from `seller_profiles` in the query
+- Location check logic:
+  - If `sp.latitude` exists OR `society.latitude` exists → PASS
+  - If neither → FAIL with "Store location not configured" + action "Set Store Location"
+  - Remove "No society linked" message entirely
+- For `seller_type = 'commercial'`: skip society-related checks
+
+### 4. Update `useSellerApplication.ts`
+
+- No structural changes needed. `society_id` already allows null (line 226: `profile?.society_id || null`)
+
+## Technical Details
+
+- **Bounding box**: `0.009` degrees per km is conservative (~111 km per degree latitude). This pre-filters candidates before expensive haversine math.
+- **ENUM vs text**: `seller_type_enum` prevents typos, enables faster filtering.
+- **`store_location_source`**: Set automatically by the system (`'society'` during backfill, `'manual'` from map pin, `'gps'` from device). Never user-controlled.
+- **`sell_beyond_community` for commercial**: Commercial sellers (`seller_type = 'commercial'`) always bypass the community restriction regardless of the flag value.
+
+## Files Changed
+
+1. **Migration SQL** — schema + backfill + 4 RPCs (new `set_my_store_coordinates`, updated `set_my_society_coordinates`, `search_sellers_by_location`, `get_location_stats`, delivery radius in `create_multi_vendor_orders`)
+2. **`src/components/seller/SetStoreLocationSheet.tsx`** — renamed from SetSocietyLocationSheet, calls new RPC
+3. **`src/components/seller/SellerVisibilityChecklist.tsx`** — import update
+4. **`src/hooks/queries/useSellerHealth.ts`** — coordinate-aware location check, commercial seller handling
 
