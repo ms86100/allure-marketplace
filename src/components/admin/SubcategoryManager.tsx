@@ -547,49 +547,28 @@ export function SubcategoryManager() {
                 {/* ── Service Feature Toggles ── */}
                 <div className="border-t pt-4 mt-2">
                   <Label className="text-xs text-muted-foreground mb-3 block font-bold uppercase tracking-wider">Service Features</Label>
-                  <p className="text-[10px] text-muted-foreground mb-3">Override parent category service settings. "Inherit" uses the parent's value.</p>
+                  <p className="text-[10px] text-muted-foreground mb-3">Toggle service features for this subcategory. When off, the parent category's setting is used.</p>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
-                      <span className="text-xs font-medium">Service Add-ons</span>
-                      <Select
-                        value={formData.supports_addons === null ? 'inherit' : formData.supports_addons ? 'yes' : 'no'}
-                        onValueChange={(v) => setFormData({ ...formData, supports_addons: v === 'inherit' ? null : v === 'yes' })}
-                      >
-                        <SelectTrigger className="w-28 h-8 rounded-lg text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="inherit">Inherit</SelectItem>
-                          <SelectItem value="yes">Yes</SelectItem>
-                          <SelectItem value="no">No</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div>
+                        <span className="text-xs font-medium">Service Add-ons</span>
+                        <p className="text-[10px] text-muted-foreground">Allow sellers to offer optional extras</p>
+                      </div>
+                      <Switch checked={formData.supports_addons ?? false} onCheckedChange={(v) => setFormData({ ...formData, supports_addons: v })} />
                     </div>
                     <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
-                      <span className="text-xs font-medium">Recurring Booking</span>
-                      <Select
-                        value={formData.supports_recurring === null ? 'inherit' : formData.supports_recurring ? 'yes' : 'no'}
-                        onValueChange={(v) => setFormData({ ...formData, supports_recurring: v === 'inherit' ? null : v === 'yes' })}
-                      >
-                        <SelectTrigger className="w-28 h-8 rounded-lg text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="inherit">Inherit</SelectItem>
-                          <SelectItem value="yes">Yes</SelectItem>
-                          <SelectItem value="no">No</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div>
+                        <span className="text-xs font-medium">Recurring Booking</span>
+                        <p className="text-[10px] text-muted-foreground">Enable buyers to set up recurring bookings</p>
+                      </div>
+                      <Switch checked={formData.supports_recurring ?? false} onCheckedChange={(v) => setFormData({ ...formData, supports_recurring: v })} />
                     </div>
                     <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
-                      <span className="text-xs font-medium">Staff Assignment</span>
-                      <Select
-                        value={formData.supports_staff_assignment === null ? 'inherit' : formData.supports_staff_assignment ? 'yes' : 'no'}
-                        onValueChange={(v) => setFormData({ ...formData, supports_staff_assignment: v === 'inherit' ? null : v === 'yes' })}
-                      >
-                        <SelectTrigger className="w-28 h-8 rounded-lg text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="inherit">Inherit</SelectItem>
-                          <SelectItem value="yes">Yes</SelectItem>
-                          <SelectItem value="no">No</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div>
+                        <span className="text-xs font-medium">Staff Assignment</span>
+                        <p className="text-[10px] text-muted-foreground">Allow sellers to assign staff to bookings</p>
+                      </div>
+                      <Switch checked={formData.supports_staff_assignment ?? false} onCheckedChange={(v) => setFormData({ ...formData, supports_staff_assignment: v })} />
                     </div>
                   </div>
                 </div>
