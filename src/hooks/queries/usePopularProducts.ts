@@ -103,7 +103,7 @@ export function useCategoryProducts(parentGroup: string | null) {
       const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: 10,
+        _radius_km: MARKETPLACE_RADIUS_KM,
       });
 
       if (error) throw error;

@@ -1,4 +1,7 @@
 import { Plus, ShoppingBag, Calendar, Send, MessageCircle, Phone, Home, Handshake } from 'lucide-react';
+
+/** Single source of truth for marketplace discovery radius (km). */
+export const MARKETPLACE_RADIUS_KM = 5;
 import { ProductActionType } from '@/types/database';
 
 /**

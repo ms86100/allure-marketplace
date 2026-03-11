@@ -43,7 +43,7 @@ export function useProductsByCategory(limit = 50) {
       const rpcPromise = supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: 10,
+        _radius_km: MARKETPLACE_RADIUS_KM,
       });
 
       const [resolvedConfigs, rpcResult] = await Promise.all([configPromise, rpcPromise]);

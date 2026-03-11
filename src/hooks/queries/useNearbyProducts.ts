@@ -69,7 +69,7 @@ export function useNearbyProducts() {
       }
       return products;
     },
-    enabled: browseBeyond && !!(lat && lng),
+    enabled: !!(lat && lng),
     staleTime: jitteredStaleTime(10 * 60 * 1000),
   });
 }

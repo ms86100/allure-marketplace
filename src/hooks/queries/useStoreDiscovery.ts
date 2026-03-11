@@ -95,7 +95,7 @@ export function useLocalSellers() {
  * Coordinate-based nearby sellers grouped by distance band.
  * Always uses search_sellers_by_location with browsingLocation.
  */
-export function useNearbySocietySellers(radiusKm: number = 5, enabled: boolean = true) {
+export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM, enabled: boolean = true) {
   const { isApproved } = useAuth();
   const { browsingLocation } = useBrowsingLocation();
   const lat = browsingLocation?.lat;
