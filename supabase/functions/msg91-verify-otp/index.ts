@@ -8,7 +8,6 @@ const corsHeaders = {
 
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
-// Map MSG91 error codes to user-friendly messages
 function getFriendlyError(code?: number, message?: string): string {
   if (code === 703 || message?.includes("already verif")) return "This OTP has already been used. Please request a new one.";
   if (code === 705 || message?.includes("invalid otp")) return "Incorrect OTP. Please check the code and try again.";
@@ -16,6 +15,25 @@ function getFriendlyError(code?: number, message?: string): string {
   if (code === 707 || message?.includes("max attempt")) return "Too many attempts. Please request a new OTP.";
   if (message?.includes("mobile not found")) return "Phone number not found. Please go back and re-enter your number.";
   return "Verification failed. Please request a new OTP and try again.";
+}
+
+/** Read credential from admin_settings, fall back to env secret */
+async function getCredential(
+  supabase: any,
+  dbKey: string,
+  envKey: string
+): Promise<string | undefined> {
+  try {
+    const { data } = await supabase
+      .from("admin_settings")
+      .select("value, is_active")
+      .eq("key", dbKey)
+      .maybeSingle();
+    if (data?.value && data.is_active !== false) return data.value;
+  } catch (e) {
+    console.warn(`DB credential lookup failed for ${dbKey}:`, e);
+  }
+  return Deno.env.get(envKey);
 }
 
 Deno.serve(async (req) => {
@@ -38,9 +56,17 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Invalid phone number." }), { status: 400, headers: jsonHeaders });
     }
 
-    const authKey = Deno.env.get("MSG91_AUTH_KEY");
-    const widgetId = Deno.env.get("MSG91_WIDGET_ID");
-    const tokenAuth = Deno.env.get("MSG91_TOKEN_AUTH");
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const [authKey, widgetId, tokenAuth] = await Promise.all([
+      getCredential(adminClient, "msg91_auth_key", "MSG91_AUTH_KEY"),
+      getCredential(adminClient, "msg91_widget_id", "MSG91_WIDGET_ID"),
+      getCredential(adminClient, "msg91_token_auth", "MSG91_TOKEN_AUTH"),
+    ]);
+
     if (!authKey || !widgetId || !tokenAuth) {
       return new Response(JSON.stringify({ error: "OTP service is temporarily unavailable. Please try again later." }), { status: 500, headers: jsonHeaders });
     }
@@ -61,18 +87,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // OTP verified successfully — use the phone number from the request
-    // (MSG91 already validated it matches the reqId)
     const mobile = `${country_code}${phone}`;
     const fullPhone = `+${mobile}`;
     const syntheticEmail = `${mobile}@phone.sociva.app`;
 
     // ─── 2. Find or create Supabase user ───
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
     let isNewUser = false;
     let userEmail = syntheticEmail;
 

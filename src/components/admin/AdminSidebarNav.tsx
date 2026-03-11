@@ -39,6 +39,7 @@ const NAV_GROUPS = [
       { value: 'campaigns', label: 'Campaigns', icon: Send },
       { value: 'ai-review', label: 'AI Review', icon: Bot },
       { value: 'feedback', label: 'Feedback', icon: MessageSquare },
+      { value: 'credentials', label: 'Credentials', icon: KeyRound },
       { value: 'settings', label: 'Settings', icon: Settings2 },
       { value: 'api-docs', label: 'API Docs', icon: FileCode },
     ],

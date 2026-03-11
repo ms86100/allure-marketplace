@@ -363,6 +363,7 @@ export default function AdminPage() {
             </Tabs>
           )}
 
+          {admin.activeTab === 'credentials' && <CredentialsManager />}
           {admin.activeTab === 'campaigns' && <CampaignSender />}
           {admin.activeTab === 'ai-review' && <AdminAIReviewLog />}
           {admin.activeTab === 'feedback' && <AdminFeedbackViewer />}

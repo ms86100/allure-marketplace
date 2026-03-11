@@ -1,31 +1,59 @@
 /// <reference types="@types/google.maps" />
 import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyC96Rzpof_eGJc-QycAw1aHXZ6rMx4bRvU';
+const HARDCODED_FALLBACK_KEY = 'AIzaSyC96Rzpof_eGJc-QycAw1aHXZ6rMx4bRvU';
 const SCRIPT_ID = 'google-maps-script';
 
 let loadPromise: Promise<void> | null = null;
+let resolvedApiKey: string | null = null;
 
-export function loadGoogleMapsScript(): Promise<void> {
+async function fetchGoogleMapsApiKey(): Promise<string> {
+  if (resolvedApiKey) return resolvedApiKey;
+  try {
+    const { data } = await supabase
+      .from('admin_settings')
+      .select('value, is_active')
+      .eq('key', 'google_maps_api_key')
+      .maybeSingle();
+    if (data?.value && data.is_active !== false) {
+      resolvedApiKey = data.value;
+      return data.value;
+    }
+  } catch (e) {
+    console.warn('Failed to fetch Google Maps key from DB, using fallback:', e);
+  }
+  resolvedApiKey = HARDCODED_FALLBACK_KEY;
+  return HARDCODED_FALLBACK_KEY;
+}
+
+export async function loadGoogleMapsScript(): Promise<void> {
   if (loadPromise) return loadPromise;
   if ((window as any).google?.maps) return Promise.resolve();
 
-  loadPromise = new Promise((resolve, reject) => {
+  loadPromise = (async () => {
+    const apiKey = await fetchGoogleMapsApiKey();
+
     if (document.getElementById(SCRIPT_ID)) {
-      const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement;
-      existing.addEventListener('load', () => resolve());
-      existing.addEventListener('error', () => reject(new Error('Failed to load Google Maps')));
+      await new Promise<void>((resolve, reject) => {
+        const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement;
+        existing.addEventListener('load', () => resolve());
+        existing.addEventListener('error', () => reject(new Error('Failed to load Google Maps')));
+      });
       return;
     }
-    const script = document.createElement('script');
-    script.id = SCRIPT_ID;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Google Maps'));
-    document.head.appendChild(script);
-  });
+
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.id = SCRIPT_ID;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load Google Maps'));
+      document.head.appendChild(script);
+    });
+  })();
 
   return loadPromise;
 }
@@ -73,7 +101,6 @@ export function useAutocomplete() {
     }
     setIsSearching(true);
     try {
-      // Use the new AutocompleteSuggestion API (replaces deprecated AutocompleteService)
       const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
         input,
         includedRegionCodes: ['in'],
@@ -100,7 +127,6 @@ export function useAutocomplete() {
   const getPlaceDetails = useCallback(async (placeId: string): Promise<PlaceDetails | null> => {
     if (!isLoaded) return null;
     try {
-      // Use the new Place class (replaces deprecated PlacesService)
       const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
       const place = new Place({ id: placeId });
       await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'addressComponents', 'location'] });
