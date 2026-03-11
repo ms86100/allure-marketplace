@@ -60,9 +60,9 @@ export function useSellerCategoryFlags(categories: string[]): CategoryFeatureFla
 function configToFlags(config: CategoryConfig): CategoryFeatureFlags {
   return {
     hasServiceLayout: config.layoutType === 'service',
-    supportsAddons: (config as any).supportsAddons ?? false,
-    supportsRecurring: (config as any).supportsRecurring ?? false,
-    supportsStaffAssignment: (config as any).supportsStaffAssignment ?? false,
+    supportsAddons: config.supportsAddons ?? false,
+    supportsRecurring: config.supportsRecurring ?? false,
+    supportsStaffAssignment: config.supportsStaffAssignment ?? false,
     showVegToggle: config.formHints.showVegToggle,
     showDurationField: config.formHints.showDurationField,
   };
