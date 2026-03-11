@@ -256,7 +256,7 @@ export function useCartPage() {
   return {
     user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading,
     notes, setNotes, paymentMethod, setPaymentMethod,
-    isPlacingOrder, showRazorpayCheckout, showUpiDeepLink, pendingOrderIds, paymentMode,
+    isPlacingOrder, showRazorpayCheckout, showUpiDeepLink, setShowUpiDeepLink, pendingOrderIds, paymentMode,
     appliedCoupon, setAppliedCoupon, showConfirmDialog, setShowConfirmDialog,
     fulfillmentType, setFulfillmentType, orderStep,
     settings, formatPrice, currencySymbol,
