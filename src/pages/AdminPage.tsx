@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
-import { ApiKeySettings } from '@/components/admin/ApiKeySettings';
+import { CredentialsManager } from '@/components/admin/CredentialsManager';
 import { AppNavigator } from '@/components/admin/AppNavigator';
 import { AdminAIReviewLog } from '@/components/admin/AdminAIReviewLog';
 import { CampaignSender } from '@/components/admin/CampaignSender';
@@ -359,10 +359,11 @@ export default function AdminPage() {
               </TabsList>
               <TabsContent value="platform" className="space-y-5"><PlatformSettingsManager /></TabsContent>
               <TabsContent value="notifications" className="space-y-5"><NotificationDiagnostics /><OtpSettings /></TabsContent>
-              <TabsContent value="system" className="space-y-5"><ApiKeySettings /><PurgeDataButton /><ResetAndSeedButton /></TabsContent>
+              <TabsContent value="system" className="space-y-5"><PurgeDataButton /><ResetAndSeedButton /></TabsContent>
             </Tabs>
           )}
 
+          {admin.activeTab === 'credentials' && <CredentialsManager />}
           {admin.activeTab === 'campaigns' && <CampaignSender />}
           {admin.activeTab === 'ai-review' && <AdminAIReviewLog />}
           {admin.activeTab === 'feedback' && <AdminFeedbackViewer />}

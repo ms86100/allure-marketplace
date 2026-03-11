@@ -27,6 +27,25 @@ interface FirebaseServiceAccount {
   client_x509_cert_url: string;
 }
 
+/** Read credential from admin_settings, fall back to env secret */
+async function getCredential(
+  supabase: any,
+  dbKey: string,
+  envKey: string
+): Promise<string | undefined> {
+  try {
+    const { data } = await supabase
+      .from("admin_settings")
+      .select("value, is_active")
+      .eq("key", dbKey)
+      .maybeSingle();
+    if (data?.value && data.is_active !== false) return data.value;
+  } catch (e) {
+    console.warn(`DB credential lookup failed for ${dbKey}:`, e);
+  }
+  return Deno.env.get(envKey);
+}
+
 // ─── APNs Direct Delivery (iOS) ───
 
 function b64url(data: Uint8Array): string {
@@ -75,53 +94,16 @@ async function createApnsJwt(
   return `${signingInput}.${b64url(new Uint8Array(signature))}`;
 }
 
-/** Resolve FCM token → APNs device token via Firebase Instance ID API */
-async function resolveApnsToken(
-  fcmToken: string,
-  serviceAccount: FirebaseServiceAccount,
-  accessToken: string
-): Promise<string | null> {
-  try {
-    // Use the IID API to get APNs token from FCM token
-    const url = `https://iid.googleapis.com/iid/info/${fcmToken}?details=true`;
-    const resp = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.warn(`[APNs] IID lookup failed (${resp.status}): ${errText}`);
-      return null;
-    }
-    const info = await resp.json();
-    const apnsToken = info?.applicationVersion // not the right field
-      ? null
-      : null;
-    // The IID API doesn't directly expose the APNs token in a reliable way.
-    // Instead, we'll store APNs tokens alongside FCM tokens in device_tokens.
-    console.warn("[APNs] IID API doesn't reliably expose APNs tokens; falling back to stored apns_token");
-    return null;
-  } catch (e) {
-    console.warn(`[APNs] IID lookup exception: ${e}`);
-    return null;
-  }
-}
-
 async function sendApnsDirectNotification(
   apnsToken: string,
   title: string,
   body: string,
-  data?: Record<string, string>
+  data: Record<string, string> | undefined,
+  p8Key: string,
+  keyId: string,
+  teamId: string,
+  bundleId: string
 ): Promise<{ success: boolean; error?: string }> {
-  const p8Key = Deno.env.get("APNS_KEY_P8");
-  const keyId = Deno.env.get("APNS_KEY_ID");
-  const teamId = Deno.env.get("APNS_TEAM_ID");
-  const bundleId = Deno.env.get("APNS_BUNDLE_ID");
-
-  if (!p8Key || !keyId || !teamId || !bundleId) {
-    console.error("[APNs] Missing APNs secrets, falling back to FCM");
-    return { success: false, error: "APNS_NOT_CONFIGURED" };
-  }
-
   try {
     const cryptoKey = await importP8Key(p8Key);
     const jwt = await createApnsJwt(cryptoKey, keyId, teamId);
@@ -327,9 +309,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    const serviceAccountJson = Deno.env.get("FIREBASE_SERVICE_ACCOUNT");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Load Firebase credential from DB first, env fallback
+    const serviceAccountJson = await getCredential(supabase, "firebase_service_account", "FIREBASE_SERVICE_ACCOUNT");
     if (!serviceAccountJson) {
-      throw new Error("FIREBASE_SERVICE_ACCOUNT not configured");
+      throw new Error("FIREBASE_SERVICE_ACCOUNT not configured (checked DB + env)");
     }
 
     let serviceAccount: FirebaseServiceAccount;
@@ -339,9 +326,14 @@ Deno.serve(async (req) => {
       throw new Error(`FIREBASE_SERVICE_ACCOUNT is not valid JSON`);
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Load APNs credentials from DB first, env fallback
+    const [apnsP8Key, apnsKeyId, apnsTeamId, apnsBundleId] = await Promise.all([
+      getCredential(supabase, "apns_key_p8", "APNS_KEY_P8"),
+      getCredential(supabase, "apns_key_id", "APNS_KEY_ID"),
+      getCredential(supabase, "apns_team_id", "APNS_TEAM_ID"),
+      getCredential(supabase, "apns_bundle_id", "APNS_BUNDLE_ID"),
+    ]);
+    const apnsConfigured = !!(apnsP8Key && apnsKeyId && apnsTeamId && apnsBundleId);
 
     const { userId, title, body, data }: PushPayload = await req.json();
 
@@ -352,7 +344,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch device tokens for user (now includes apns_token column for iOS)
+    // Fetch device tokens for user
     const { data: tokens, error: tokensError } = await supabase
       .from("device_tokens")
       .select("id, token, platform, apns_token")
@@ -369,8 +361,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Deduplicate iOS tokens: same apns_token means same physical device,
-    // keep only the most recently updated row per apns_token.
+    // Deduplicate iOS tokens
     const seenApns = new Set<string>();
     const deduped = tokens.filter((t: any) => {
       if (t.platform === "ios" && t.apns_token) {
@@ -381,30 +372,34 @@ Deno.serve(async (req) => {
     });
 
     if (deduped.length < tokens.length) {
-      console.log(`[Push] Deduplicated ${tokens.length} tokens → ${deduped.length} (removed ${tokens.length - deduped.length} duplicate iOS devices)`);
+      console.log(`[Push] Deduplicated ${tokens.length} tokens → ${deduped.length}`);
     }
 
-    // Generate FCM access token (needed for Android and iOS fallback)
+    // Generate FCM access token
     const accessToken = await generateAccessToken(serviceAccount);
 
-    // Send to deduplicated device tokens — iOS uses direct APNs when apns_token available
+    // Send to deduplicated device tokens
     const results = await Promise.all(
       deduped.map(async (tokenRecord: any) => {
         let result: { success: boolean; error?: string };
 
-        // iOS with stored APNs token → direct APNs delivery (bypasses FCM)
-        if (tokenRecord.platform === "ios" && tokenRecord.apns_token) {
+        // iOS with stored APNs token → direct APNs delivery
+        if (tokenRecord.platform === "ios" && tokenRecord.apns_token && apnsConfigured) {
           console.log(`[Push] iOS device — using direct APNs for token prefix: ${tokenRecord.apns_token.substring(0, 16)}…`);
           result = await sendApnsDirectNotification(
             tokenRecord.apns_token,
             title,
             body,
-            data
+            data,
+            apnsP8Key!,
+            apnsKeyId!,
+            apnsTeamId!,
+            apnsBundleId!
           );
 
-          // If APNs fails due to config, fall back to FCM
-          if (!result.success && result.error === "APNS_NOT_CONFIGURED") {
-            console.log(`[Push] APNs not configured, falling back to FCM`);
+          // If APNs fails, fall back to FCM
+          if (!result.success && result.error !== "INVALID_TOKEN") {
+            console.log(`[Push] APNs failed, falling back to FCM`);
             result = await sendFCMNotification(
               accessToken,
               serviceAccount.project_id,
