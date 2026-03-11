@@ -2,6 +2,10 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { useAuth } from '@/contexts/AuthContext';
 import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export interface BrowsingLocation {
   id: string; // 'gps' | 'society' | delivery_address.id
