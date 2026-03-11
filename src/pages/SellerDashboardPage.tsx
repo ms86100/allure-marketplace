@@ -6,13 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile } from '@/types/database';
-import { Package, Loader2, Eye, Star, Clock, CheckCircle, XCircle, ShieldCheck } from 'lucide-react';
+import { Package, Loader2, Eye, Star, Clock, CheckCircle, XCircle, ShieldCheck, CalendarDays, Wrench, BarChart3, ShoppingBag } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { logAudit } from '@/lib/audit';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 // Import refactored components
 import { StoreStatusCard } from '@/components/seller/StoreStatusCard';
@@ -43,12 +44,10 @@ export default function SellerDashboardPage() {
   const activeSellerId = currentSellerId || (Array.isArray(sellerProfiles) && sellerProfiles.length > 0 ? sellerProfiles[0].id : null);
   const { pendingAlerts, dismiss: dismissAlert, snooze: snoozeAlert } = useNewOrderAlert(activeSellerId);
 
-  // Debug: log auth state for seller dashboard
   useEffect(() => {
     console.log('[SellerDashboard] Auth state:', { userId: user?.id, sellerProfilesCount: sellerProfiles?.length, activeSellerId, currentSellerId });
   }, [user, sellerProfiles, activeSellerId, currentSellerId]);
 
-  // Fetch seller profile
   useEffect(() => {
     if (user && activeSellerId) {
       fetchSellerProfile(activeSellerId);
@@ -80,7 +79,6 @@ export default function SellerDashboardPage() {
     }
   };
 
-  // Use React Query for stats and orders
   const { data: stats } = useSellerOrderStats(activeSellerId);
   const { data: filterCounts } = useSellerOrderFilterCounts(activeSellerId);
   const {
@@ -171,148 +169,168 @@ export default function SellerDashboardPage() {
   return (
     <AppLayout headerTitle="Seller Dashboard" showLocation={false}>
       <NewOrderAlertOverlay orders={pendingAlerts} onDismiss={dismissAlert} onSnooze={snoozeAlert} />
-      <div className="p-4 space-y-5">
+      <div className="p-4 space-y-4">
+        {/* Always visible */}
         <StoreStatusCard
           sellerProfile={sellerProfile}
           sellerProfiles={sellerProfiles}
           onToggleAvailability={toggleAvailability}
         />
-
         <SellerVisibilityChecklist sellerId={sellerProfile.id} />
-        <AvailabilityPromptBanner sellerId={sellerProfile.id} />
 
-        {/* ── Service Bookings ── */}
-        <ServiceBookingStats sellerId={sellerProfile.id} />
-        <SellerDayAgenda sellerId={sellerProfile.id} />
-        <div className="space-y-3">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">Performance</p>
-          
-          {/* Store Performance Card */}
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-sm">How buyers see your store</h3>
-                <Link to={`/seller/${sellerProfile.id}`}>
-                  <Button variant="ghost" size="sm" className="gap-1 text-xs h-7">
-                    <Eye size={14} />
-                    Preview
-                  </Button>
-                </Link>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-                  <Star size={16} className="text-warning" />
-                  <div>
-                    <p className="text-sm font-semibold tabular-nums">{Number(sellerProfile.rating || 0).toFixed(1)} ★</p>
-                    <p className="text-[10px] text-muted-foreground">{sellerProfile.total_reviews || 0} reviews</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-                  <Clock size={16} className="text-primary" />
-                  <div>
-                    <p className="text-sm font-semibold tabular-nums">{sellerProfile.avg_response_minutes != null ? `~${sellerProfile.avg_response_minutes} min` : 'N/A'}</p>
-                    <p className="text-[10px] text-muted-foreground">Avg response</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-                  <CheckCircle size={16} className="text-success" />
-                  <div>
-                    <p className="text-sm font-semibold tabular-nums">{sellerProfile.completed_order_count || 0}</p>
-                    <p className="text-[10px] text-muted-foreground">Orders fulfilled</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-                  <XCircle size={16} className="text-destructive" />
-                  <div>
-                    <p className="text-sm font-semibold tabular-nums">{sellerProfile.cancellation_rate != null ? `${sellerProfile.cancellation_rate}%` : '0%'}</p>
-                    <p className="text-[10px] text-muted-foreground">Cancellation</p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {(sellerProfile.completed_order_count || 0) === 0 && (
-                  <Badge variant="secondary" className="text-[10px] bg-secondary text-secondary-foreground">New Seller</Badge>
-                )}
-                {(sellerProfile.cancellation_rate === 0 || sellerProfile.cancellation_rate === null) && (sellerProfile.completed_order_count || 0) > 2 && (
-                  <Badge variant="secondary" className="text-[10px] bg-success/10 text-success">
-                    <ShieldCheck size={10} className="mr-0.5" />0% Cancellation
-                  </Badge>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        {/* Tab navigation */}
+        <Tabs defaultValue="orders" className="w-full">
+          <TabsList className="sticky top-0 z-10 w-full grid grid-cols-4 h-11 bg-muted/80 backdrop-blur-sm">
+            <TabsTrigger value="orders" className="gap-1.5 text-xs px-1">
+              <ShoppingBag size={14} />
+              <span className="hidden min-[360px]:inline">Orders</span>
+            </TabsTrigger>
+            <TabsTrigger value="schedule" className="gap-1.5 text-xs px-1">
+              <CalendarDays size={14} />
+              <span className="hidden min-[360px]:inline">Schedule</span>
+            </TabsTrigger>
+            <TabsTrigger value="tools" className="gap-1.5 text-xs px-1">
+              <Wrench size={14} />
+              <span className="hidden min-[360px]:inline">Tools</span>
+            </TabsTrigger>
+            <TabsTrigger value="stats" className="gap-1.5 text-xs px-1">
+              <BarChart3 size={14} />
+              <span className="hidden min-[360px]:inline">Stats</span>
+            </TabsTrigger>
+          </TabsList>
 
-          <EarningsSummary
-            todayEarnings={stats?.todayEarnings || 0}
-            weekEarnings={stats?.weekEarnings || 0}
-            totalEarnings={stats?.totalEarnings || 0}
-          />
+          {/* ── Orders Tab ── */}
+          <TabsContent value="orders" className="space-y-4 mt-4">
+            <AvailabilityPromptBanner sellerId={sellerProfile.id} />
 
-          <DashboardStats
-            totalOrders={stats?.totalOrders || 0}
-            pendingOrders={stats?.pendingOrders || 0}
-            todayOrders={stats?.todayOrders || 0}
-            completedOrders={stats?.completedOrders || 0}
-          />
-        </div>
-
-        {/* ── Tools & Promotions ── */}
-        <div className="space-y-3">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">Tools & Promotions</p>
-          <QuickActions />
-          <CouponManager />
-        </div>
-        
-        {/* ── Analytics ── */}
-        <div className="space-y-3">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">Analytics</p>
-          <SellerAnalytics sellerId={sellerProfile.id} />
-          {sellerProfile.society_id && (
-            <DemandInsights societyId={sellerProfile.society_id} />
-          )}
-        </div>
-
-        {/* Orders Section */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold">Orders</h3>
-          </div>
-
-          <div className="mb-4">
-            <OrderFilters
-              currentFilter={orderFilter}
-              onFilterChange={setOrderFilter}
-              counts={filterCounts || { all: 0, today: 0, enquiries: 0, pending: 0, preparing: 0, ready: 0, completed: 0 }}
+            <DashboardStats
+              totalOrders={stats?.totalOrders || 0}
+              pendingOrders={stats?.pendingOrders || 0}
+              todayOrders={stats?.todayOrders || 0}
+              completedOrders={stats?.completedOrders || 0}
             />
-          </div>
 
-          {allOrders.length > 0 ? (
-            <div className="space-y-3">
-              {allOrders.map((order: any) => (
-                <SellerOrderCard key={order.id} order={order} />
-              ))}
-              {hasNextPage && (
-                <div className="flex justify-center py-2">
-                    <Button variant="secondary" size="default" className="w-full" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
-                     {isFetchingNextPage ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading...</> : 'Load More'}
-                  </Button>
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold">Orders</h3>
+              </div>
+              <div className="mb-4">
+                <OrderFilters
+                  currentFilter={orderFilter}
+                  onFilterChange={setOrderFilter}
+                  counts={filterCounts || { all: 0, today: 0, enquiries: 0, pending: 0, preparing: 0, ready: 0, completed: 0 }}
+                />
+              </div>
+              {allOrders.length > 0 ? (
+                <div className="space-y-3">
+                  {allOrders.map((order: any) => (
+                    <SellerOrderCard key={order.id} order={order} />
+                  ))}
+                  {hasNextPage && (
+                    <div className="flex justify-center py-2">
+                      <Button variant="secondary" size="default" className="w-full" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+                        {isFetchingNextPage ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading...</> : 'Load More'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 bg-muted rounded-xl">
+                  <Package className="mx-auto text-muted-foreground mb-2" size={32} />
+                  <p className="text-sm text-muted-foreground">
+                    No {orderFilter !== 'all' ? orderFilter : ''} orders
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {orderFilter === 'all'
+                      ? 'Share your store link with neighbors to get your first order'
+                      : 'Orders in this status will appear here as buyers place them'}
+                  </p>
                 </div>
               )}
             </div>
-          ) : (
-            <div className="text-center py-8 bg-muted rounded-xl">
-              <Package className="mx-auto text-muted-foreground mb-2" size={32} />
-              <p className="text-sm text-muted-foreground">
-                No {orderFilter !== 'all' ? orderFilter : ''} orders
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {orderFilter === 'all'
-                  ? 'Share your store link with neighbors to get your first order'
-                  : 'Orders in this status will appear here as buyers place them'}
-              </p>
-            </div>
-          )}
-        </div>
+          </TabsContent>
+
+          {/* ── Schedule Tab ── */}
+          <TabsContent value="schedule" className="space-y-4 mt-4">
+            <ServiceBookingStats sellerId={sellerProfile.id} />
+            <SellerDayAgenda sellerId={sellerProfile.id} />
+          </TabsContent>
+
+          {/* ── Tools Tab ── */}
+          <TabsContent value="tools" className="space-y-4 mt-4">
+            <QuickActions />
+            <CouponManager />
+          </TabsContent>
+
+          {/* ── Stats Tab ── */}
+          <TabsContent value="stats" className="space-y-4 mt-4">
+            {/* Store Performance Card */}
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm">How buyers see your store</h3>
+                  <Link to={`/seller/${sellerProfile.id}`}>
+                    <Button variant="ghost" size="sm" className="gap-1 text-xs h-7">
+                      <Eye size={14} />
+                      Preview
+                    </Button>
+                  </Link>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                    <Star size={16} className="text-warning" />
+                    <div>
+                      <p className="text-sm font-semibold tabular-nums">{Number(sellerProfile.rating || 0).toFixed(1)} ★</p>
+                      <p className="text-[10px] text-muted-foreground">{sellerProfile.total_reviews || 0} reviews</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                    <Clock size={16} className="text-primary" />
+                    <div>
+                      <p className="text-sm font-semibold tabular-nums">{sellerProfile.avg_response_minutes != null ? `~${sellerProfile.avg_response_minutes} min` : 'N/A'}</p>
+                      <p className="text-[10px] text-muted-foreground">Avg response</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                    <CheckCircle size={16} className="text-success" />
+                    <div>
+                      <p className="text-sm font-semibold tabular-nums">{sellerProfile.completed_order_count || 0}</p>
+                      <p className="text-[10px] text-muted-foreground">Orders fulfilled</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                    <XCircle size={16} className="text-destructive" />
+                    <div>
+                      <p className="text-sm font-semibold tabular-nums">{sellerProfile.cancellation_rate != null ? `${sellerProfile.cancellation_rate}%` : '0%'}</p>
+                      <p className="text-[10px] text-muted-foreground">Cancellation</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(sellerProfile.completed_order_count || 0) === 0 && (
+                    <Badge variant="secondary" className="text-[10px] bg-secondary text-secondary-foreground">New Seller</Badge>
+                  )}
+                  {(sellerProfile.cancellation_rate === 0 || sellerProfile.cancellation_rate === null) && (sellerProfile.completed_order_count || 0) > 2 && (
+                    <Badge variant="secondary" className="text-[10px] bg-success/10 text-success">
+                      <ShieldCheck size={10} className="mr-0.5" />0% Cancellation
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <EarningsSummary
+              todayEarnings={stats?.todayEarnings || 0}
+              weekEarnings={stats?.weekEarnings || 0}
+              totalEarnings={stats?.totalEarnings || 0}
+            />
+
+            <SellerAnalytics sellerId={sellerProfile.id} />
+            {sellerProfile.society_id && (
+              <DemandInsights societyId={sellerProfile.society_id} />
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
