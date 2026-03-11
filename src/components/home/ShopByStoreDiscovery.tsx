@@ -115,6 +115,13 @@ function DistanceBandSection({ band }: { band: DistanceBand }) {
   );
 }
 
+// ── Format distance nicely ──
+function formatDistance(km: number): string {
+  if (km < 0.1) return `${Math.round(km * 1000)} m`;
+  if (km < 1) return `${Math.round(km * 1000)} m`;
+  return `${Math.round(km * 10) / 10} km`;
+}
+
 // ── Society Card inside a distance band ──
 function SocietyCard({ society }: { society: SocietyGroup }) {
   const navigate = useNavigate();
@@ -133,7 +140,7 @@ function SocietyCard({ society }: { society: SocietyGroup }) {
     <div className="mx-4 rounded-2xl border border-border bg-card overflow-hidden">
       <div className="px-3 py-2.5 bg-secondary flex items-center justify-between">
         <span className="text-xs font-bold text-foreground">{society.societyName}</span>
-        <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{society.distanceKm} km</span>
+        <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{formatDistance(society.distanceKm)}</span>
       </div>
       <div className="relative p-2">
         <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
