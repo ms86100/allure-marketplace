@@ -10,11 +10,8 @@ import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
  * with browsingLocation lat/lng. Returns a flat, deduplicated product list.
  */
 export function useNearbyProducts() {
-  const { profile } = useAuth();
   const { browsingLocation } = useBrowsingLocation();
 
-  const browseBeyond = profile?.browse_beyond_community !== false;
-  const searchRadius = profile?.search_radius_km ?? 10;
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
 
