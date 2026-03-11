@@ -111,7 +111,7 @@ export default function AuthPage() {
                   </Button>
 
                   <div className="bg-muted/50 rounded-xl p-3 text-xs text-muted-foreground text-center">
-                    <p>📱 We'll send a 6-digit OTP to verify your number</p>
+                    <p>📱 We'll send a 4-digit OTP to verify your number</p>
                     <p className="mt-1 text-muted-foreground/70">Same process for new & existing users</p>
                   </div>
                 </motion.div>
