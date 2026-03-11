@@ -269,7 +269,7 @@ export function useSellerApplication() {
         delivery_note: formData.delivery_note.trim() || null, accepts_upi: formData.accepts_upi,
         upi_id: formData.accepts_upi ? formData.upi_id.trim() || null : null,
         operating_days: formData.operating_days, profile_image_url: formData.profile_image_url,
-        cover_image_url: formData.cover_image_url,
+        cover_image_url: formData.cover_image_url, rejection_note: null,
       } as any).eq('id', draftSellerId);
       if (error) throw error;
       const { error: prodError } = await supabase.from('products').update({ approval_status: 'pending' } as any).eq('seller_id', draftSellerId).eq('approval_status', 'draft');
