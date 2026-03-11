@@ -298,7 +298,7 @@ export default function CategoriesPage() {
                 {/* Section Header */}
                 <div className="flex items-center gap-2 mb-2 px-1">
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-bold">
-                    {group.icon || '📦'} {group.name}
+                    <DynamicIcon name={group.icon || 'Package'} size={12} /> {group.name}
                   </span>
                   <span className="text-[10px] text-muted-foreground">({group.categories.length})</span>
                   <div className="flex-1 h-px bg-border" />

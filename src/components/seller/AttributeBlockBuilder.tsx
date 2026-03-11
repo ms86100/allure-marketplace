@@ -187,7 +187,7 @@ function SortableBlock({ block, libBlock, isExpanded, onToggle, onRemove, onData
         <button {...attributes} {...listeners} className="cursor-grab text-muted-foreground hover:text-foreground">
           <GripVertical size={14} />
         </button>
-        <span className="text-sm">{libBlock.icon || '📋'}</span>
+        <DynamicIcon name={libBlock.icon || 'ClipboardList'} size={14} />
         <button onClick={onToggle} className="flex-1 text-left">
           <span className="text-xs font-medium text-foreground">{libBlock.display_name}</span>
           {hasData && <span className="ml-1.5 text-[9px] text-primary">●</span>}

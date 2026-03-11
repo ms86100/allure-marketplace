@@ -159,7 +159,7 @@ export function CategoryGroupGrid({
                         : 'border-border hover:border-muted-foreground/30'
                     )}
                   >
-                    <span className="text-lg">{config.icon}</span>
+                    <DynamicIcon name={config.icon} size={18} />
                     <span className="text-sm font-medium">{config.displayName}</span>
                   </button>
                 );

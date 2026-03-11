@@ -247,7 +247,7 @@ export function LicenseManager() {
                 <p className="font-medium text-sm">{(sub as any).seller?.business_name}</p>
                 <p className="text-xs text-muted-foreground">{(sub as any).seller?.profile?.name}</p>
                 <div className="flex items-center gap-1 mt-0.5">
-                  <span className="text-xs">{(sub as any).group?.icon}</span>
+                  <DynamicIcon name={(sub as any).group?.icon || 'FileText'} size={14} />
                   <span className="text-[10px] text-muted-foreground">{sub.license_type}</span>
                 </div>
                 {sub.license_number && (

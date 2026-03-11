@@ -335,7 +335,7 @@ export function SubcategoryManager() {
                   {sub.image_url ? (
                     <img src={sub.image_url} alt={sub.display_name} className="w-8 h-8 rounded-lg object-cover" />
                   ) : (
-                    <span className="text-lg">{sub.icon || '📂'}</span>
+                    <DynamicIcon name={sub.icon || 'FolderOpen'} size={18} />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{sub.display_name}</p>
