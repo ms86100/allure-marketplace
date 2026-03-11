@@ -106,7 +106,7 @@ export function useSearchPage() {
   const [hasSearched, setHasSearched] = useState(false);
 
   const [browseBeyond, setBrowseBeyondLocal] = useState(profile?.browse_beyond_community ?? true);
-  const [searchRadius, setSearchRadiusLocal] = useState(profile?.search_radius_km ?? 10);
+  const [searchRadius, setSearchRadiusLocal] = useState(profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM);
 
   useEffect(() => { if (profile) { setBrowseBeyondLocal(profile.browse_beyond_community ?? true); setSearchRadiusLocal(profile.search_radius_km ?? 10); } }, [profile]);
 
