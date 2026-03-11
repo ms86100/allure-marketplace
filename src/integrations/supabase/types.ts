@@ -3180,6 +3180,8 @@ export type Database = {
           is_cross_society: boolean
           notes: string | null
           order_type: string | null
+          payment_confirmed_at: string | null
+          payment_confirmed_by_seller: boolean | null
           payment_status: string | null
           payment_type: string | null
           razorpay_order_id: string | null
@@ -3197,6 +3199,7 @@ export type Database = {
           status: Database["public"]["Enums"]["order_status"] | null
           total_amount: number
           updated_at: string | null
+          upi_transaction_ref: string | null
         }
         Insert: {
           auto_cancel_at?: string | null
@@ -3220,6 +3223,8 @@ export type Database = {
           is_cross_society?: boolean
           notes?: string | null
           order_type?: string | null
+          payment_confirmed_at?: string | null
+          payment_confirmed_by_seller?: boolean | null
           payment_status?: string | null
           payment_type?: string | null
           razorpay_order_id?: string | null
@@ -3237,6 +3242,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["order_status"] | null
           total_amount: number
           updated_at?: string | null
+          upi_transaction_ref?: string | null
         }
         Update: {
           auto_cancel_at?: string | null
@@ -3260,6 +3266,8 @@ export type Database = {
           is_cross_society?: boolean
           notes?: string | null
           order_type?: string | null
+          payment_confirmed_at?: string | null
+          payment_confirmed_by_seller?: boolean | null
           payment_status?: string | null
           payment_type?: string | null
           razorpay_order_id?: string | null
@@ -3277,6 +3285,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["order_status"] | null
           total_amount?: number
           updated_at?: string | null
+          upi_transaction_ref?: string | null
         }
         Relationships: [
           {

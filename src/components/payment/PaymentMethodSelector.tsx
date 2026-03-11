@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Banknote, Smartphone, Check } from 'lucide-react';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
+import { usePaymentMode } from '@/hooks/usePaymentMode';
 
 interface PaymentMethodSelectorProps {
   acceptsCod: boolean;
@@ -20,11 +21,12 @@ export function PaymentMethodSelector({
   onSelect,
 }: PaymentMethodSelectorProps) {
   const { upiProviderLabel } = useSystemSettings();
+  const { isUpiDeepLink } = usePaymentMode();
   const methods = [
     {
       id: 'upi' as PaymentMethod,
       label: 'UPI Payment',
-      description: `Pay via ${upiProviderLabel}`,
+      description: isUpiDeepLink ? 'Pay directly via UPI app' : `Pay via ${upiProviderLabel}`,
       icon: Smartphone,
       enabled: acceptsUpi,
       color: 'text-info',

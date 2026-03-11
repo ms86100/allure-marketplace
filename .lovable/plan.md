@@ -1,121 +1,50 @@
 
 
-# UPI Deep Link Payment System with Seller Confirmation
+## Notification Health Check — User-Friendly UI
 
-## What We're Building
+### What We'll Build
 
-An interim payment system using UPI deep links (direct to seller's UPI ID) with dual-confirmation verification (buyer declares + seller confirms), controlled by an admin toggle that can switch to Razorpay when ready.
+A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
 
-## Architecture
+### UI Design
 
-```text
-Admin Toggle: payment_gateway_mode = "upi_deep_link" | "razorpay"
+**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
 
-When upi_deep_link:
-  Buyer → UPI deep link (upi://pay?pa=seller@upi&am=250&tn=ORD_abc123)
-       → Returns to app → Declares "I paid" + enters UTR
-       → Seller gets notification → Confirms "Payment received"
-       → Order proceeds
+**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
 
-When razorpay:
-  Existing Razorpay flow (unchanged)
-```
+| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
+|---|---|---|
+| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
+| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
+| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
+| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
 
-## Database Changes (1 migration)
+Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
 
-1. **Add `payment_gateway_mode` to `admin_settings`** — insert row with key `payment_gateway_mode`, value `upi_deep_link`, `is_active = true`
-2. **Add columns to `orders` table**:
-   - `upi_transaction_ref text` — UTR/transaction ID from buyer
-   - `payment_confirmed_by_seller boolean default null` — seller's confirmation
-   - `payment_confirmed_at timestamptz` — when seller confirmed
-3. **Update `payment_status` handling** — add `buyer_confirmed` as a recognized status in the frontend `PaymentStatus` type and labels
+**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
 
-No new tables needed. No storage bucket needed (no screenshot upload — UTR + dual confirmation is sufficient per your approved approach).
+**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
 
-## Implementation Plan
+### Implementation
 
-### 1. New Hook: `usePaymentMode`
-- Reads `payment_gateway_mode` from `admin_settings` table
-- Returns `{ mode: 'upi_deep_link' | 'razorpay', isLoading }`
-- Cached with React Query
+**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
+- Renders the trigger button and the bottom sheet
+- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
+- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
+- Provides actionable buttons for failures (Open Settings, Retry Registration)
 
-### 2. New Component: `UpiDeepLinkCheckout.tsx`
-Bottom sheet (same pattern as `RazorpayCheckout.tsx`) with 3 states:
+**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
+- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
+- Consolidates the 7+ technical steps into 4 simple categories
+- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
 
-**State 1 — Pay**: Shows order amount, seller name, QR code (using existing `qrcode.react`), and "Pay with UPI" button that opens `upi://pay?pa={seller_upi}&pn={seller_name}&am={amount}&cu=INR&tn=ORD_{order_id_short}`
+**3. Update `src/pages/ProfilePage.tsx`**
+- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
+- Keep Push Debug link visible only for admins
 
-**State 2 — Confirm**: After returning from UPI app: "Did you complete the payment?" with three buttons (Yes / Pay Again / Cancel). On "Yes" → show UTR input field (required, 12-char alphanumeric validation).
+**4. Optionally add to `src/pages/NotificationsPage.tsx`**
+- Add a small "Check notification status" link at the top
 
-**State 3 — Done**: Success state. Updates order `payment_status` to `buyer_confirmed` and stores `upi_transaction_ref`.
-
-### 3. Modify `useCartPage.ts`
-- Import `usePaymentMode`
-- When `paymentMethod === 'upi'`:
-  - If mode is `upi_deep_link` → open `UpiDeepLinkCheckout` sheet (new state: `showUpiDeepLink`)
-  - If mode is `razorpay` → existing Razorpay flow (unchanged)
-- Add `handleUpiDeepLinkSuccess` handler that navigates to order page
-- Add `showUpiDeepLink` / `setShowUpiDeepLink` to returned state
-
-### 4. Modify `CartPage.tsx`
-- Import `UpiDeepLinkCheckout`
-- Conditionally render `UpiDeepLinkCheckout` OR `RazorpayCheckout` based on payment mode
-- Pass seller's `upi_id` from `sellerGroups[0]` to the UPI sheet
-
-### 5. New Component: `SellerPaymentConfirmation.tsx`
-Banner shown on `OrderDetailPage.tsx` when:
-- `isSellerView === true`
-- `payment_status === 'buyer_confirmed'`
-- `payment_confirmed_by_seller` is null
-
-Shows: "Buyer claims UPI payment of ₹{amount}. UTR: {ref}. Verify in your bank app and confirm."
-
-Two buttons: "Payment Received ✓" / "Not Received ✗"
-- Received → updates `payment_status = 'paid'`, `payment_confirmed_by_seller = true`, `payment_confirmed_at = now()`
-- Not Received → updates `payment_status = 'disputed'`, `payment_confirmed_by_seller = false`
-
-### 6. Modify `OrderDetailPage.tsx`
-- Import and render `SellerPaymentConfirmation` in the payment card section
-- Show UTR reference in the payment card for both buyer and seller views when available
-
-### 7. Admin Toggle in `CredentialsManager.tsx`
-Add a new tab or card at the top of the Payment tab:
-- "Payment Mode" toggle: UPI Deep Link ↔ Payment Gateway
-- Reads/writes `payment_gateway_mode` in `admin_settings`
-- When Razorpay keys are not configured, show note that gateway mode requires keys first
-
-### 8. Update `PaymentMethodSelector.tsx`
-- When mode is `upi_deep_link`, change UPI description to "Pay directly via UPI app" instead of "Pay via Razorpay"
-- Dynamic label based on payment mode
-
-### 9. Update Types
-- `PaymentStatus` in `types/database.ts`: add `'buyer_confirmed' | 'disputed'`
-- `PAYMENT_STATUS_LABELS`: add labels for new statuses
-
-### 10. Notification Trigger
-Add a database trigger or handle in the `UpiDeepLinkCheckout` success handler:
-- When buyer confirms → insert into `notification_queue` for seller: "Payment confirmation needed for Order #{short_id}"
-- When seller confirms/disputes → insert notification for buyer
-
-## What Stays Unchanged
-- `RazorpayCheckout.tsx` — untouched, conditionally rendered
-- `useRazorpay.ts` — untouched
-- `create-razorpay-order` edge function — untouched
-- COD flow — completely unaffected
-- `create_multi_vendor_orders` RPC — no changes needed
-- Multi-seller cart logic — UPI deep link only works for single-seller carts (same constraint as current Razorpay UPI)
-
-## File Summary
-
-| File | Action |
-|------|--------|
-| DB migration | Add columns + admin setting |
-| `src/hooks/usePaymentMode.ts` | Create |
-| `src/components/payment/UpiDeepLinkCheckout.tsx` | Create |
-| `src/components/payment/SellerPaymentConfirmation.tsx` | Create |
-| `src/hooks/useCartPage.ts` | Modify — branch on payment mode |
-| `src/pages/CartPage.tsx` | Modify — render UPI sheet conditionally |
-| `src/pages/OrderDetailPage.tsx` | Modify — show UTR + seller confirmation |
-| `src/components/admin/CredentialsManager.tsx` | Modify — add payment mode toggle |
-| `src/components/payment/PaymentMethodSelector.tsx` | Modify — dynamic UPI label |
-| `src/types/database.ts` | Modify — add payment status types |
+### No backend changes needed
+The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
 

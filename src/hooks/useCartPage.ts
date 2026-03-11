@@ -6,6 +6,7 @@ import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
+import { usePaymentMode } from '@/hooks/usePaymentMode';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { hapticImpact, hapticNotification, hapticSelection } from '@/lib/haptics';
@@ -23,6 +24,8 @@ export function useCartPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [showRazorpayCheckout, setShowRazorpayCheckout] = useState(false);
+  const [showUpiDeepLink, setShowUpiDeepLink] = useState(false);
+  const paymentMode = usePaymentMode();
   const [pendingOrderIds, setPendingOrderIds] = useState<string[]>([]);
   const [appliedCoupon, setAppliedCoupon] = useState<{ id: string; code: string; discountAmount: number; discount_type?: string; discount_value?: number; max_discount_amount?: number | null } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -179,7 +182,12 @@ export function useCartPage() {
       try {
         const orderIds = await createOrdersForAllSellers('pending');
         if (orderIds.length === 0) throw new Error('Failed to create orders');
-        setPendingOrderIds(orderIds); setShowRazorpayCheckout(true);
+        setPendingOrderIds(orderIds);
+        if (paymentMode.isUpiDeepLink) {
+          setShowUpiDeepLink(true);
+        } else {
+          setShowRazorpayCheckout(true);
+        }
       } catch (error: any) { console.error('Error creating orders:', error); toast.error(friendlyError(error)); }
       finally { setIsPlacingOrder(false); }
       return;
@@ -227,10 +235,28 @@ export function useCartPage() {
     toast.error('Payment was not completed. Your order has been cancelled.');
   };
 
+  const handleUpiDeepLinkSuccess = async () => {
+    setShowUpiDeepLink(false);
+    toast.success('Payment submitted! Seller will verify shortly.');
+    await refresh();
+    navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
+    setPendingOrderIds([]);
+  };
+
+  const handleUpiDeepLinkFailed = async () => {
+    setShowUpiDeepLink(false);
+    if (!user?.id) { toast.error('Session expired.'); setPendingOrderIds([]); return; }
+    if (pendingOrderIds.length > 0) {
+      try { await supabase.from('orders').update({ status: 'cancelled' } as any).in('id', pendingOrderIds).eq('payment_status', 'pending').eq('buyer_id', user.id); } catch (err) { console.error('Failed to cancel unpaid orders:', err); }
+    }
+    setPendingOrderIds([]);
+    toast.error('Payment was not completed. Your order has been cancelled.');
+  };
+
   return {
     user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading,
     notes, setNotes, paymentMethod, setPaymentMethod,
-    isPlacingOrder, showRazorpayCheckout, pendingOrderIds,
+    isPlacingOrder, showRazorpayCheckout, showUpiDeepLink, pendingOrderIds, paymentMode,
     appliedCoupon, setAppliedCoupon, showConfirmDialog, setShowConfirmDialog,
     fulfillmentType, setFulfillmentType, orderStep,
     settings, formatPrice, currencySymbol,
@@ -240,6 +266,7 @@ export function useCartPage() {
     hasFulfillmentConflict, hasBelowMinimumOrder, noPaymentMethodAvailable,
     selectedDeliveryAddress, setSelectedDeliveryAddress, addresses, addressesLoading,
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed,
+    handleUpiDeepLinkSuccess, handleUpiDeepLinkFailed,
     cancelPlacingOrder: () => setIsPlacingOrder(false),
   };
 }
