@@ -167,9 +167,9 @@ export default function WelcomeCarousel() {
 
         <div className="space-y-3">
           {[
-            { icon: MapPin, title: 'GPS-Verified Residents', desc: 'Location proof at signup ensures real neighbors only' },
-            { icon: Lock, title: 'Invite-Only Communities', desc: 'Society code required — no outsiders can access' },
-            { icon: BadgeCheck, title: 'Verified Seller Badges', desc: 'Trust scores & review history visible on every profile' },
+            { icon: MapPin, title: 'GPS-Verified Residents', desc: 'Proof of residence at signup — no faking it' },
+            { icon: Lock, title: 'Gated Community, Gated App', desc: 'Society code required — your world stays private' },
+            { icon: BadgeCheck, title: 'Reputation You Can See', desc: 'Trust scores built from real neighbor interactions' },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex items-start gap-3.5 bg-card/80 backdrop-blur-sm p-4 rounded-2xl border border-border">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
