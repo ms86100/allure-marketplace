@@ -163,7 +163,19 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
         </div>
         {product.price_per_unit && (<span className="text-[9px] text-muted-foreground leading-none mt-0.5">{product.price_per_unit}</span>)}
         {(locationLabel || (product as any).is_same_society !== false) && (
-          <div className="flex items-center gap-1 mt-1">
+          <div
+            className={cn("flex items-center gap-1 mt-1", (product as any).seller_latitude && (product as any).seller_longitude && "cursor-pointer hover:text-primary transition-colors")}
+            onClick={(e) => {
+              const lat = (product as any).seller_latitude;
+              const lng = (product as any).seller_longitude;
+              if (lat && lng) {
+                e.stopPropagation();
+                e.preventDefault();
+                window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
+              }
+            }}
+            title={(product as any).seller_latitude ? "Open in Google Maps" : undefined}
+          >
             <MapPin size={9} className="shrink-0 text-primary" />
             <span className="text-[9px] font-medium text-muted-foreground leading-tight truncate">
               {locationLabel || ml.label('label_in_your_society')}
