@@ -257,15 +257,32 @@ export function ListingCard({
       </div>
 
       {/* Image */}
-      {listing.image_url && (
-        <div className="relative w-24 h-24 rounded-lg overflow-hidden shrink-0">
+      {/* Image + Location */}
+      <div className="relative w-24 h-24 rounded-lg overflow-hidden shrink-0">
+        {listing.image_url && (
           <img
             src={listing.image_url}
             alt={listing.name}
             className="w-full h-full object-cover"
           />
-        </div>
-      )}
+        )}
+        {listing.seller?.latitude && listing.seller?.longitude && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              window.open(
+                `https://www.google.com/maps/search/?api=1&query=${listing.seller!.latitude},${listing.seller!.longitude}`,
+                '_blank'
+              );
+            }}
+            className="absolute bottom-1 right-1 p-1 rounded-full bg-background/80 backdrop-blur-sm shadow-sm hover:bg-background transition-colors"
+            title="View seller location"
+          >
+            <MapPin size={14} className="text-primary" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
