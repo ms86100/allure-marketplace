@@ -8583,6 +8583,8 @@ export type Database = {
           profile_image_url: string
           rating: number
           seller_id: string
+          seller_latitude: number
+          seller_longitude: number
           society_name: string
           total_reviews: number
           user_id: string
