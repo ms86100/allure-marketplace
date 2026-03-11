@@ -191,12 +191,28 @@ export default function CartPage() {
           <div className="flex-1 min-w-0">
             {c.fulfillmentType === 'self_pickup' ? (
               <><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pickup from</p><p className="text-sm font-medium mt-0.5">{c.sellerGroups[0]?.sellerName || 'Seller'}</p><p className="text-xs text-muted-foreground">{c.society?.name || 'Your Society'}</p></>
+            ) : c.selectedDeliveryAddress ? (
+              <>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deliver to</p>
+                <p className="text-sm font-medium mt-0.5">{c.selectedDeliveryAddress.label}</p>
+                <p className="text-xs text-muted-foreground">{[c.selectedDeliveryAddress.flat_number && `Flat ${c.selectedDeliveryAddress.flat_number}`, c.selectedDeliveryAddress.block && `Block ${c.selectedDeliveryAddress.block}`, c.selectedDeliveryAddress.building_name].filter(Boolean).join(', ')}</p>
+                {!c.selectedDeliveryAddress.latitude && (
+                  <p className="text-[10px] text-warning flex items-center gap-1 mt-1"><AlertTriangle size={10} /> No location pin — update address for delivery</p>
+                )}
+              </>
             ) : (
-              <><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deliver to</p><p className="text-sm font-medium mt-0.5">{c.profile?.name} — {[c.profile?.block, c.profile?.flat_number].filter(Boolean).join(', ')}</p><p className="text-xs text-muted-foreground">{c.society?.name || 'Your Society'}</p></>
+              <>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deliver to</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{c.addresses.length === 0 ? 'No saved addresses' : 'Select a delivery address'}</p>
+              </>
             )}
           </div>
           {c.fulfillmentType !== 'self_pickup' && (
-            <Link to="/profile/edit" className="text-xs text-primary font-semibold shrink-0">Change</Link>
+            c.addresses.length > 0 ? (
+              <AddressPicker selectedId={c.selectedDeliveryAddress?.id} onSelect={c.setSelectedDeliveryAddress} />
+            ) : (
+              <Link to="/profile/addresses" className="text-xs text-primary font-semibold shrink-0">Add</Link>
+            )
           )}
         </div>
 
