@@ -5,6 +5,7 @@ import { Profile, SellerProfile, Review, PaymentRecord, VerificationStatus, Paym
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { useCurrency } from '@/hooks/useCurrency';
 import { logAudit } from '@/lib/audit';
+import { sendPushNotification } from '@/lib/notifications';
 import { toast } from 'sonner';
 
 interface Report {
