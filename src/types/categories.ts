@@ -71,6 +71,9 @@ export interface CategoryConfig {
   displayOrder: number;
   isActive: boolean;
   transactionType?: string;
+  supportsAddons: boolean;
+  supportsRecurring: boolean;
+  supportsStaffAssignment: boolean;
 }
 
 export const DEFAULT_FALLBACK_BEHAVIOR: CategoryBehavior = {
