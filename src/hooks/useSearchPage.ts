@@ -12,6 +12,7 @@ import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { useQuery } from '@tanstack/react-query';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { useCurrency } from '@/hooks/useCurrency';
+import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 
 export interface ProductSearchResult {
   product_id: string;
