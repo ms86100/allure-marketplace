@@ -254,6 +254,9 @@ export function SubcategoryManager() {
         duration_label: formData.duration_label.trim() || null,
         show_veg_toggle: formData.show_veg_toggle,
         show_duration_field: formData.show_duration_field,
+        supports_addons: formData.supports_addons,
+        supports_recurring: formData.supports_recurring,
+        supports_staff_assignment: formData.supports_staff_assignment,
       };
       if (editingSub) {
         const { error } = await supabase.from('subcategories').update(payload).eq('id', editingSub.id);
