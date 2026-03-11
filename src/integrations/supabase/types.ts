@@ -8590,6 +8590,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      set_my_society_coordinates: {
+        Args: { p_lat: number; p_lng: number }
+        Returns: undefined
+      }
       validate_worker_entry: {
         Args: { _society_id: string; _worker_id: string }
         Returns: Json
