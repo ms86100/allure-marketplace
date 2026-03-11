@@ -6,6 +6,7 @@ import { ServiceCategory } from '@/types/categories';
 import { cn } from '@/lib/utils';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 
 interface CategoryGroupGridProps {
   variant?: 'compact' | 'expanded' | 'selection';
