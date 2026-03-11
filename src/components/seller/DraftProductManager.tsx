@@ -54,6 +54,7 @@ export function DraftProductManager({
 }: DraftProductManagerProps) {
   const { user } = useAuth();
   const [isAdding, setIsAdding] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [attributeBlocks, setAttributeBlocks] = useState<BlockData[]>([]);
   const [serviceFields, setServiceFields] = useState<ServiceFieldsData>(INITIAL_SERVICE_FIELDS);
