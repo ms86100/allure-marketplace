@@ -13,6 +13,7 @@ import {
   User,
   MapPin,
   Phone,
+  Mail,
   Store,
   Package,
   Heart,
@@ -159,6 +160,12 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Phone size={12} />
                   <span>{profile.phone}</span>
+                </div>
+              )}
+              {profile?.email && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Mail size={12} />
+                  <span className="truncate">{profile.email}</span>
                 </div>
               )}
             </div>

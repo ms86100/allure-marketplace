@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Loader2, MapPin, Phone, User } from 'lucide-react';
+import { ArrowLeft, Plus, Loader2, Mail, MapPin, Phone, User } from 'lucide-react';
 import { useRef } from 'react';
 
 export default function ProfileEditPage() {
@@ -21,6 +21,7 @@ export default function ProfileEditPage() {
   const [name, setName] = useState(
     profile?.name && profile.name !== 'User' ? profile.name : ''
   );
+  const [email, setEmail] = useState(profile?.email || '');
   const [savingProfile, setSavingProfile] = useState(false);
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<any>(null);
@@ -38,6 +39,7 @@ export default function ProfileEditPage() {
     try {
       const { error } = await supabase.from('profiles').update({
         name: name.trim(),
+        email: email.trim() || null,
       }).eq('id', user.id);
       if (error) throw error;
       await refreshProfile();
@@ -178,6 +180,21 @@ export default function ProfileEditPage() {
                 <Phone size={12} /> Phone
               </Label>
               <Input value={profile?.phone || user?.phone || ''} disabled className="mt-1.5 bg-muted/50" />
+            </div>
+
+            {/* Email */}
+            <div>
+              <Label htmlFor="email" className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Mail size={12} /> Email (optional)
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="mt-1.5"
+              />
             </div>
 
             <Button onClick={handleSaveProfile} disabled={savingProfile || !name.trim()} className="w-full h-11 rounded-xl font-semibold">
