@@ -161,7 +161,8 @@ export function useAdminData() {
       const { data: seller } = await supabase.from('seller_profiles').select('user_id, business_name').eq('id', id).single();
       if (!seller) throw new Error('Seller not found');
 
-      const { error: updateError } = await supabase.from('seller_profiles').update({ verification_status: status }).eq('id', id);
+      const rejNote = (status === 'rejected' || status === 'suspended') ? (adminNotes.trim() || null) : null;
+      const { error: updateError } = await supabase.from('seller_profiles').update({ verification_status: status, rejection_note: rejNote } as any).eq('id', id);
       if (updateError) throw updateError;
 
       await logAudit(`seller_${status}`, 'seller_profile', id, '', { status });
@@ -183,7 +184,9 @@ export function useAdminData() {
 
         const title = status === 'rejected' ? '❌ Store application rejected' : '⚠️ Store suspended';
         const body = status === 'rejected'
-          ? `Your store application for ${seller.business_name} was rejected. Please update your details and resubmit.`
+          ? (rejNote
+            ? `Your store application for ${seller.business_name} was rejected. Reason: ${rejNote}`
+            : `Your store application for ${seller.business_name} was rejected. Please update your details and resubmit.`)
           : `Your store ${seller.business_name} has been suspended. Please contact support or your admin for details.`;
         const type = status === 'rejected' ? 'seller_rejected' : 'seller_suspended';
 

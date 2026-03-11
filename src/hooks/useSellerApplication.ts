@@ -55,6 +55,7 @@ export function useSellerApplication() {
   const [submissionComplete, setSubmissionComplete] = useState(false);
   const [isCheckingExisting, setIsCheckingExisting] = useState(true);
   const [existingSeller, setExistingSeller] = useState<{ id: string; business_name: string; verification_status?: string; rejection_note?: string | null } | null>(null);
+  const [rejectionFeedback, setRejectionFeedback] = useState<string | null>(null);
   const [draftSellerId, setDraftSellerId] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
@@ -80,17 +81,26 @@ export function useSellerApplication() {
       try {
         const { data } = await supabase.from('seller_profiles').select('*').eq('user_id', user.id);
         if (data && data.length > 0) {
-          // Look for draft or rejected profile to resume
-          const resumable = data.find((s: any) => s.verification_status === 'draft' || s.verification_status === 'rejected');
-          if (resumable) {
-            const isDraft = (resumable as any).verification_status === 'draft';
-            if (isDraft) {
-              setDraftSellerId(resumable.id);
+          // Look for draft to resume directly
+          const draft = data.find((s: any) => s.verification_status === 'draft');
+          if (draft) {
+            setDraftSellerId(draft.id);
+            setSelectedGroup((draft as any).primary_group);
+            loadSellerDataIntoForm(draft);
+            await reloadProducts(draft.id);
+            setStep(3);
+          } else {
+            // For rejected profiles, set existingSeller so the rejection screen shows first
+            const rejected = data.find((s: any) => s.verification_status === 'rejected');
+            if (rejected) {
+              setSelectedGroup((rejected as any).primary_group);
+              setExistingSeller({
+                id: rejected.id,
+                business_name: (rejected as any).business_name,
+                verification_status: (rejected as any).verification_status,
+                rejection_note: (rejected as any).rejection_note,
+              });
             }
-            setSelectedGroup((resumable as any).primary_group);
-            loadSellerDataIntoForm(resumable);
-            await reloadProducts(resumable.id);
-            if (isDraft) setStep(3);
           }
         }
       } catch (error) {
@@ -304,6 +314,6 @@ export function useSellerApplication() {
     selectedGroupInfo, selectedGroupRow, handleCategoryChange, toggleOperatingDay,
     saveDraft, handleProceedToSettings, handleProceedToProducts, handleSaveDraftAndExit,
     handleSubmit, setExistingSeller, setDraftSellerId, handleStepBack, handleGroupSelect,
-    reloadProducts, submissionComplete, loadSellerDataIntoForm,
+    reloadProducts, submissionComplete, loadSellerDataIntoForm, rejectionFeedback, setRejectionFeedback,
   };
 }
