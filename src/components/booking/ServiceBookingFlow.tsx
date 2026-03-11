@@ -76,8 +76,15 @@ export function ServiceBookingFlow({
     }
   }, [open]);
 
-  const supportsAddons = (config as any)?.supports_addons ?? false;
-  const supportsRecurring = (config as any)?.supports_recurring ?? false;
+  // Resolve subcategory overrides for service feature flags
+  const { data: subcategories = [] } = useSubcategories(config?.id || null);
+  const activeSubcategory = useMemo(() => {
+    if (!subcategoryId) return null;
+    return subcategories.find(s => s.id === subcategoryId) || null;
+  }, [subcategoryId, subcategories]);
+
+  const supportsAddons = activeSubcategory?.supports_addons ?? config?.supportsAddons ?? false;
+  const supportsRecurring = activeSubcategory?.supports_recurring ?? config?.supportsRecurring ?? false;
   const needsAddress = locationType === 'home_visit' || locationType === 'at_buyer';
 
   const addonTotal = selectedAddons.reduce((s, a) => s + a.price, 0);
