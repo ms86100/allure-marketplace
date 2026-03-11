@@ -7,6 +7,7 @@ import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { RatingStars } from '@/components/ui/rating-stars';
 import { ReviewList } from '@/components/review/ReviewList';
 import { FavoriteButton } from '@/components/favorite/FavoriteButton';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { SellerReputationTab } from '@/components/seller/SellerReputationTab';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
