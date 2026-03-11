@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { useNearbyProducts, mergeProducts } from './useNearbyProducts';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
+import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 
 /**
  * Popular products discovered via coordinate-based search.
