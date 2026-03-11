@@ -1,9 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
-import { sendPushNotification } from '@/lib/notifications';
 
 /**
  * Shared notification layer for all admin review actions.
  * Every seller/license/product status change MUST go through these functions.
+ * All notifications are routed through notification_queue for reliable delivery.
  */
 
 export async function notifySellerStatusChange(
@@ -32,20 +32,15 @@ export async function notifySellerStatusChange(
     suspended: 'seller_suspended',
   };
 
-  const title = titleMap[status];
-  const body = bodyMap[status];
-  const type = typeMap[status];
-
-  const { error } = await supabase.from('user_notifications').insert({
+  const { error } = await supabase.from('notification_queue').insert({
     user_id: userId,
-    title,
-    body,
-    type,
-    is_read: false,
+    title: titleMap[status],
+    body: bodyMap[status],
+    type: typeMap[status],
+    reference_path: '/seller/dashboard',
+    payload: { type: typeMap[status] },
   });
-  if (error) console.error('Failed to insert seller notification:', error);
-
-  sendPushNotification({ userId, title, body }).catch(() => {});
+  if (error) console.error('Failed to enqueue seller notification:', error);
 }
 
 export async function notifyLicenseStatusChange(
@@ -64,16 +59,15 @@ export async function notifyLicenseStatusChange(
 
   const type = status === 'approved' ? 'license_approved' : 'license_rejected';
 
-  const { error } = await supabase.from('user_notifications').insert({
+  const { error } = await supabase.from('notification_queue').insert({
     user_id: userId,
     title,
     body,
     type,
-    is_read: false,
+    reference_path: '/seller/licenses',
+    payload: { type },
   });
-  if (error) console.error('Failed to insert license notification:', error);
-
-  sendPushNotification({ userId, title, body }).catch(() => {});
+  if (error) console.error('Failed to enqueue license notification:', error);
 }
 
 export async function notifyProductStatusChange(
@@ -93,14 +87,13 @@ export async function notifyProductStatusChange(
 
   const type = status === 'approved' ? 'product_approved' : 'product_rejected';
 
-  const { error } = await supabase.from('user_notifications').insert({
+  const { error } = await supabase.from('notification_queue').insert({
     user_id: userId,
     title,
     body,
     type,
-    is_read: false,
+    reference_path: '/seller/products',
+    payload: { type },
   });
-  if (error) console.error('Failed to insert product notification:', error);
-
-  sendPushNotification({ userId, title, body }).catch(() => {});
+  if (error) console.error('Failed to enqueue product notification:', error);
 }
