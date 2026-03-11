@@ -70,9 +70,9 @@ export default function SellerProductsPage() {
                     <div className="flex items-center justify-between p-3 bg-muted rounded-lg"><span className="text-sm font-medium">Available for order</span><Switch checked={sp.formData.is_available} onCheckedChange={(checked) => sp.setFormData({ ...sp.formData, is_available: checked })} /></div>
                     <Button className="w-full" onClick={sp.handleSave} disabled={sp.isSaving}>{sp.isSaving && <Loader2 className="animate-spin mr-2" size={18} />}{sp.editingProduct ? 'Save Changes' : 'Add Product'}</Button>
                   </div>
-                  <ProductFormPreviewPanel formData={sp.formData} sellerProfile={sp.sellerProfile} />
+                  <ProductFormPreviewPanel formData={sp.formData} sellerProfile={sp.sellerProfile} attributeBlocks={sp.attributeBlocks} />
                 </div>
-                <ProductFormPreviewMobile formData={sp.formData} sellerProfile={sp.sellerProfile} />
+                <ProductFormPreviewMobile formData={sp.formData} sellerProfile={sp.sellerProfile} attributeBlocks={sp.attributeBlocks} />
               </DialogContent>
             </Dialog>
           </div>
