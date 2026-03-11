@@ -28,8 +28,10 @@ export function useCartPage() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [fulfillmentType, setFulfillmentType] = useState<'self_pickup' | 'delivery'>('self_pickup');
   const [orderStep, setOrderStep] = useState<'validating' | 'creating' | 'confirming'>('validating');
+  const [selectedDeliveryAddress, setSelectedDeliveryAddress] = useState<any>(null);
   const settings = useSystemSettings();
   const { formatPrice, currencySymbol } = useCurrency();
+  const { addresses, defaultAddress, isLoading: addressesLoading } = useDeliveryAddresses();
 
   const effectiveCouponDiscount = (() => {
     if (!appliedCoupon) return 0;
