@@ -30,6 +30,7 @@ interface ServiceBookingFlowProps {
   imageUrl?: string | null;
   durationMinutes?: number;
   locationType?: string;
+  subcategoryId?: string | null;
 }
 
 const MAX_NOTES_LENGTH = 500;
