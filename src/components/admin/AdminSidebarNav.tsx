@@ -15,8 +15,7 @@ const NAV_GROUPS = [
   {
     label: 'Commerce',
     items: [
-      { value: 'sellers', label: 'Sellers', icon: Store },
-      { value: 'products', label: 'Products', icon: Package },
+      { value: 'sellers', label: 'Moderation', icon: Store },
       { value: 'payments', label: 'Payments', icon: CreditCard },
       { value: 'services', label: 'Services', icon: Wrench },
       { value: 'catalog', label: 'Catalog', icon: LayoutGrid },

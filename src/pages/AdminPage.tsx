@@ -113,7 +113,6 @@ export default function AdminPage() {
         {/* ═══ CONTENT ═══ */}
         <div className="px-4">
           {admin.activeTab === 'sellers' && <SellerApplicationReview />}
-          {admin.activeTab === 'products' && <AdminProductApprovals />}
 
           {admin.activeTab === 'users' && (
             <div className="space-y-3">
