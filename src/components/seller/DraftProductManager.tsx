@@ -98,6 +98,29 @@ export function DraftProductManager({
     return null;
   }, [newProduct.mrp, newProduct.price]);
 
+  // Adapter: map DraftProduct → ProductFormData for preview components
+  const previewFormData = useMemo(() => ({
+    name: newProduct.name,
+    description: newProduct.description,
+    price: newProduct.price ? String(newProduct.price) : '',
+    mrp: newProduct.mrp ? String(newProduct.mrp) : '',
+    prep_time_minutes: newProduct.prep_time_minutes ? String(newProduct.prep_time_minutes) : '',
+    category: (newProduct.category || '') as any,
+    is_veg: newProduct.is_veg,
+    is_available: true,
+    is_bestseller: false,
+    is_recommended: false,
+    is_urgent: false,
+    image_url: newProduct.image_url || null,
+    action_type: 'add_to_cart' as const,
+    contact_phone: '',
+    stock_quantity: '',
+    low_stock_threshold: '5',
+    subcategory_id: '',
+    lead_time_hours: '',
+    accepts_preorders: false,
+  }), [newProduct]);
+
   const handleAddProduct = async () => {
     if (!newProduct.name.trim()) {
       toast.error('Product name is required');
