@@ -223,10 +223,10 @@ export function SellerApplicationReview() {
                                     <>
                                       {s.productRejectingId === prod.id ? (
                                         <div className="space-y-2 pt-1.5 border-t border-border/30">
-                                          <Textarea placeholder="Rejection reason (optional)..." value={s.productRejectionNote} onChange={(e) => s.setProductRejectionNote(e.target.value)} rows={2} className="text-xs rounded-xl" onClick={(e) => e.stopPropagation()} />
+                                         <Textarea placeholder="Rejection reason (required)..." value={s.productRejectionNote} onChange={(e) => s.setProductRejectionNote(e.target.value)} rows={2} className="text-xs rounded-xl" onClick={(e) => e.stopPropagation()} />
                                           <div className="flex gap-2">
-                                            <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] rounded-xl" onClick={(e) => { e.stopPropagation(); s.setProductRejectingId(null); s.setProductRejectionNote(''); }}>Cancel</Button>
-                                            <Button size="sm" variant="destructive" className="flex-1 h-7 text-[10px] rounded-xl font-semibold" disabled={s.productActionId === prod.id} onClick={(e) => { e.stopPropagation(); s.updateProductStatus(prod.id, 'rejected'); }}>
+                                             <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] rounded-xl" onClick={(e) => { e.stopPropagation(); s.setProductRejectingId(null); s.setProductRejectionNote(''); }}>Cancel</Button>
+                                             <Button size="sm" variant="destructive" className="flex-1 h-7 text-[10px] rounded-xl font-semibold" disabled={s.productActionId === prod.id || !s.productRejectionNote.trim()} onClick={(e) => { e.stopPropagation(); s.updateProductStatus(prod.id, 'rejected'); }}>
                                               {s.productActionId === prod.id && <Loader2 size={10} className="animate-spin mr-1" />}Confirm Reject
                                             </Button>
                                           </div>
