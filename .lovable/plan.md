@@ -1,50 +1,90 @@
 
 
-## Notification Health Check — User-Friendly UI
+# Separate Browsing Location from Delivery Address
 
-### What We'll Build
+## Current State — What's Wrong
 
-A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
+The system conflates browsing location with delivery address:
 
-### UI Design
+1. **No delivery address selection at checkout.** The cart page hardcodes `delivery_address` as `profile.block + profile.flat_number` (line 102 of `useCartPage.ts`). There's no `AddressPicker` on the checkout page.
 
-**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
+2. **Orders table has no coordinate columns.** `delivery_address` is a plain text column. No `delivery_address_id`, `delivery_lat`, or `delivery_lng` exist. Sellers cannot navigate to the buyer.
 
-**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
+3. **No delivery radius validation.** Before placing an order, the system never checks whether the delivery address is within the seller's `delivery_radius_km`.
 
-| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
-|---|---|---|
-| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
-| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
-| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
-| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
+4. **`AddressPicker` component exists but is unused at checkout.** It's only referenced in profile editing.
 
-Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
+5. **Cart location guard clears cart on location switch** — but this is about browsing location. It should NOT affect the delivery address, which is chosen at checkout.
 
-**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
+## Architecture
 
-**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
+```text
+CURRENT:
+  BrowsingLocation → discovery + checkout delivery_address (WRONG)
+  profile.block/flat → delivery_address text
 
-### Implementation
+PROPOSED:
+  BrowsingLocation → discovery ONLY
+  delivery_addresses table → checkout address selection
+  orders.delivery_address_id + delivery_lat + delivery_lng → fulfillment
+```
 
-**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
-- Renders the trigger button and the bottom sheet
-- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
-- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
-- Provides actionable buttons for failures (Open Settings, Retry Registration)
+## Plan — 7 Changes
 
-**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
-- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
-- Consolidates the 7+ technical steps into 4 simple categories
-- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
+### 1. Database Migration: Add delivery coordinate columns to orders
+Add three columns to the `orders` table:
+- `delivery_address_id uuid` (nullable FK to `delivery_addresses`)
+- `delivery_lat double precision`
+- `delivery_lng double precision`
 
-**3. Update `src/pages/ProfilePage.tsx`**
-- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
-- Keep Push Debug link visible only for admins
+No data migration needed — existing orders keep their text `delivery_address`.
 
-**4. Optionally add to `src/pages/NotificationsPage.tsx`**
-- Add a small "Check notification status" link at the top
+### 2. Update `create_multi_vendor_orders` RPC
+Add three new parameters: `_delivery_address_id uuid`, `_delivery_lat double precision`, `_delivery_lng double precision`. Store them in the orders INSERT. Also add a **delivery radius check**: before inserting each order, compare `haversine_km(delivery_lat, delivery_lng, seller_society_lat, seller_society_lng)` against `seller.delivery_radius_km`. If outside radius and fulfillment is delivery, return error.
 
-### No backend changes needed
-The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
+### 3. Add delivery address state to `useCartPage`
+- Add `selectedDeliveryAddress` state (from `useDeliveryAddresses`)
+- Auto-select default address on mount
+- When fulfillment = delivery, require `selectedDeliveryAddress` with valid lat/lng
+- Pass `delivery_address_id`, `delivery_lat`, `delivery_lng` to the RPC
+- Keep building `delivery_address` text from the selected address fields (backward compatible)
+
+### 4. Add AddressPicker to CartPage checkout UI
+Replace the static "Deliver to" section (lines 187-200 of `CartPage.tsx`) with:
+- When `fulfillment = delivery`: show `AddressPicker` sheet allowing user to select from saved addresses
+- Show selected address details (label, flat, block, building)
+- "Change" button opens the picker
+- If no addresses exist, show "Add delivery address" button linking to profile
+- If selected address has no coordinates, show warning
+
+### 5. Pre-checkout delivery radius validation
+In `handlePlaceOrderInner`, when fulfillment = delivery:
+- Get seller's society coordinates and `delivery_radius_km`
+- Calculate distance from `selectedDeliveryAddress.lat/lng` to seller coordinates
+- If outside radius, show toast: "{SellerName} does not deliver to this address ({distance} km away, max {radius} km)"
+- Block order placement
+
+### 6. Remove browsing-location dependency from checkout
+- Remove the line that builds `delivery_address` from `profile.block + profile.flat_number`
+- Remove the profile-field validation (`!profile.block || !profile.flat_number`) that currently gates delivery orders
+- The "Deliver to" section should show the selected delivery address, not profile fields
+
+### 7. Update cart location guard behavior
+The existing 2km cart-clear warning in `BrowsingLocationContext` remains valid for **discovery** (sellers change when you move). But the delivery address is now independently chosen at checkout, making the system correct:
+- Browsing = what you see
+- Delivery address = where you receive
+
+No change needed to the guard itself — it correctly protects discovery context.
+
+## Files Changed
+- **1 migration**: Add columns + update RPC
+- `src/hooks/useCartPage.ts`: Add delivery address state, pass to RPC, radius validation
+- `src/pages/CartPage.tsx`: Integrate `AddressPicker` at checkout
+- `src/components/profile/AddressPicker.tsx`: Minor enhancement (show coordinates warning)
+
+## What This Does NOT Change
+- Browsing location logic (stays as-is)
+- Discovery hooks (stays as-is)
+- Cart location guard (stays as-is, still useful for discovery)
+- Self-pickup flow (no delivery address needed)
 
