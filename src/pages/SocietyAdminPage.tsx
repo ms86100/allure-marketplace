@@ -44,6 +44,8 @@ function StatCard({ icon: Icon, value, label, color, delay = 0 }: { icon: any; v
 
 export default function SocietyAdminPage() {
   const sa = useSocietyAdmin();
+  const [rejectingSellerId, setRejectingSellerId] = useState<string | null>(null);
+  const [sellerRejectionNote, setSellerRejectionNote] = useState('');
 
   if (!sa.isSocietyAdmin && !sa.isAdmin) {
     return (
