@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logAudit } from '@/lib/audit';
 import { useCurrency } from '@/hooks/useCurrency';
-import { sendPushNotification } from '@/lib/notifications';
+import { notifySellerStatusChange, notifyLicenseStatusChange, notifyProductStatusChange } from '@/lib/admin-notifications';
 
 export interface SellerApplication {
   id: string;
@@ -150,37 +150,20 @@ export function useSellerApplicationReview() {
   const updateSellerStatus = async (seller: SellerApplication, status: 'approved' | 'rejected') => {
     setActionId(seller.id);
     try {
-      await supabase.from('seller_profiles').update({ verification_status: status, rejection_note: status === 'rejected' ? (rejectionNote.trim() || null) : null } as any).eq('id', seller.id);
+      await supabase.from('seller_profiles').update({
+        verification_status: status,
+        rejection_note: status === 'rejected' ? (rejectionNote.trim() || null) : null,
+      } as any).eq('id', seller.id);
       await logAudit(`seller_${status}`, 'seller_profile', seller.id, '', { status, note: rejectionNote || undefined });
 
       if (status === 'approved') {
         await supabase.from('user_roles').insert({ user_id: seller.user_id, role: 'seller' });
         await supabase.from('products').update({ approval_status: 'approved' } as any).eq('seller_id', seller.id).in('approval_status', ['pending', 'draft']);
-        await supabase.from('user_notifications').insert({
-          user_id: seller.user_id,
-          title: '🎉 Congratulations! Your store is approved!',
-          body: 'Your store has been approved and is now live. Start selling to your neighbors!',
-          type: 'seller_approved',
-          is_read: false,
-        });
       } else if (status === 'rejected') {
         await supabase.from('user_roles').delete().eq('user_id', seller.user_id).eq('role', 'seller');
-        const rejBody = rejectionNote.trim()
-          ? `Your store application was rejected. Reason: ${rejectionNote.trim()}`
-          : 'Your store application was rejected. Please review the requirements and try again.';
-        await supabase.from('user_notifications').insert({
-          user_id: seller.user_id,
-          title: '❌ Store application rejected',
-          body: rejBody,
-          type: 'seller_rejected',
-          is_read: false,
-        });
-        sendPushNotification({
-          userId: seller.user_id,
-          title: '❌ Store application rejected',
-          body: rejBody,
-        }).catch(() => {});
       }
+
+      await notifySellerStatusChange(seller.user_id, seller.business_name, status, rejectionNote.trim() || undefined);
 
       toast.success(`Seller ${status}`);
       setRejectingId(null);
@@ -201,39 +184,12 @@ export function useSellerApplicationReview() {
         admin_notes: licenseAdminNotes.trim() || null,
       } as any).eq('id', licenseId);
 
-      // Find the seller's user_id and license type for notification
-      const license = applications
-        .flatMap(a => a.licenses)
-        .find(l => l.id === licenseId);
+      const license = applications.flatMap(a => a.licenses).find(l => l.id === licenseId);
       const seller = applications.find(a => a.licenses.some(l => l.id === licenseId));
 
       if (seller) {
         const licenseType = license?.license_type || 'license';
-        const notifTitle = status === 'approved'
-          ? `✅ Your ${licenseType} has been verified!`
-          : `❌ Your ${licenseType} was rejected`;
-        const notifBody = status === 'approved'
-          ? `Your ${licenseType} has been verified. You're all set!`
-          : `Your ${licenseType} was rejected.${licenseAdminNotes.trim() ? ` Reason: ${licenseAdminNotes.trim()}` : ' Please re-upload a valid document.'}`;
-
-        const { error: notifError } = await supabase.from('user_notifications').insert({
-          user_id: seller.user_id,
-          title: notifTitle,
-          body: notifBody,
-          type: status === 'approved' ? 'license_approved' : 'license_rejected',
-          is_read: false,
-        });
-        if (notifError) {
-          console.error('Failed to insert license notification:', notifError);
-        }
-
-        sendPushNotification({
-          userId: seller.user_id,
-          title: notifTitle,
-          body: notifBody,
-        }).catch(() => {});
-      } else {
-        console.warn('Could not find seller for license notification, licenseId:', licenseId);
+        await notifyLicenseStatusChange(seller.user_id, licenseType, status, licenseAdminNotes.trim() || undefined);
       }
 
       toast.success(`License ${status}`);
@@ -277,9 +233,30 @@ export function useSellerApplicationReview() {
   const updateProductStatus = async (productId: string, status: 'approved' | 'rejected') => {
     setProductActionId(productId);
     try {
-      const { error } = await supabase.from('products').update({ approval_status: status } as any).eq('id', productId);
+      const updatePayload: any = { approval_status: status };
+      if (status === 'rejected') {
+        updatePayload.rejection_note = productRejectionNote.trim() || null;
+      } else {
+        updatePayload.rejection_note = null;
+      }
+
+      const { error } = await supabase.from('products').update(updatePayload).eq('id', productId);
       if (error) { toast.error(`Failed to ${status} product`); return; }
       await logAudit(`product_${status}`, 'product', productId, '', { reason: productRejectionNote || undefined });
+
+      // Find seller info for notification
+      const seller = applications.find(a => a.products.some(p => p.id === productId));
+      const product = seller?.products.find(p => p.id === productId);
+      if (seller && product) {
+        await notifyProductStatusChange(
+          seller.user_id,
+          product.name,
+          seller.business_name,
+          status,
+          status === 'rejected' ? (productRejectionNote.trim() || undefined) : undefined,
+        );
+      }
+
       toast.success(`Product ${status}`);
       setProductRejectingId(null);
       setProductRejectionNote('');

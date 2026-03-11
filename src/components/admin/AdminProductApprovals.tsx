@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { logAudit } from '@/lib/audit';
 import { ProductAttributeBlocks } from '@/components/product/ProductAttributeBlocks';
 import { useCurrency } from '@/hooks/useCurrency';
+import { notifyProductStatusChange } from '@/lib/admin-notifications';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -23,8 +24,10 @@ interface PendingProduct {
   specifications: Record<string, any> | null;
   approval_status: string;
   seller: {
+    id: string;
     business_name: string;
     society_id: string;
+    user_id: string;
   } | null;
 }
 
@@ -44,28 +47,52 @@ export function AdminProductApprovals() {
     setIsLoading(true);
     const { data } = await supabase
       .from('products')
-      .select('id, name, price, category, description, image_url, is_veg, approval_status, created_at, specifications, seller:seller_profiles!products_seller_id_fkey(business_name, society_id)')
+      .select('id, name, price, category, description, image_url, is_veg, approval_status, created_at, specifications, seller:seller_profiles!products_seller_id_fkey(id, business_name, society_id, user_id)')
       .eq('approval_status', 'pending')
       .order('created_at', { ascending: true });
     setProducts((data as any) || []);
     setIsLoading(false);
   };
 
-  const handleApprove = async (id: string) => {
-    setActionId(id);
-    const { error } = await supabase.from('products').update({ approval_status: 'approved' } as any).eq('id', id);
+  const handleApprove = async (product: PendingProduct) => {
+    setActionId(product.id);
+    const { error } = await supabase.from('products').update({ approval_status: 'approved', rejection_note: null } as any).eq('id', product.id);
     if (error) { toast.error('Failed to approve'); setActionId(null); return; }
-    await logAudit('product_approved', 'product', id, '', {});
+    await logAudit('product_approved', 'product', product.id, '', {});
+
+    if (product.seller) {
+      await notifyProductStatusChange(
+        product.seller.user_id,
+        product.name,
+        product.seller.business_name,
+        'approved',
+      );
+    }
+
     toast.success('Product approved');
     setActionId(null);
     fetchPending();
   };
 
-  const handleReject = async (id: string) => {
-    setActionId(id);
-    const { error } = await supabase.from('products').update({ approval_status: 'rejected' } as any).eq('id', id);
+  const handleReject = async (product: PendingProduct) => {
+    setActionId(product.id);
+    const { error } = await supabase.from('products').update({
+      approval_status: 'rejected',
+      rejection_note: rejectionNote.trim() || null,
+    } as any).eq('id', product.id);
     if (error) { toast.error('Failed to reject'); setActionId(null); return; }
-    await logAudit('product_rejected', 'product', id, '', { reason: rejectionNote });
+    await logAudit('product_rejected', 'product', product.id, '', { reason: rejectionNote });
+
+    if (product.seller) {
+      await notifyProductStatusChange(
+        product.seller.user_id,
+        product.name,
+        product.seller.business_name,
+        'rejected',
+        rejectionNote.trim() || undefined,
+      );
+    }
+
     toast.success('Product rejected');
     setActionId(null);
     setRejectingId(null);
@@ -132,7 +159,7 @@ export function AdminProductApprovals() {
                 {rejectingId === product.id ? (
                   <div className="space-y-2.5">
                     <Textarea
-                      placeholder="Rejection reason (optional)..."
+                      placeholder="Rejection reason (required)..."
                       value={rejectionNote}
                       onChange={(e) => setRejectionNote(e.target.value)}
                       rows={2}
@@ -142,7 +169,13 @@ export function AdminProductApprovals() {
                       <Button size="sm" variant="outline" className="rounded-xl" onClick={() => { setRejectingId(null); setRejectionNote(''); }}>
                         Cancel
                       </Button>
-                      <Button size="sm" variant="destructive" className="rounded-xl font-semibold" disabled={actionId === product.id} onClick={() => handleReject(product.id)}>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="rounded-xl font-semibold"
+                        disabled={actionId === product.id || !rejectionNote.trim()}
+                        onClick={() => handleReject(product)}
+                      >
                         {actionId === product.id && <Loader2 size={14} className="animate-spin mr-1" />}
                         Confirm Reject
                       </Button>
@@ -153,7 +186,7 @@ export function AdminProductApprovals() {
                     <Button size="sm" variant="outline" className="text-destructive rounded-xl font-semibold" onClick={() => setRejectingId(product.id)} disabled={!!actionId}>
                       <X size={14} className="mr-1" /> Reject
                     </Button>
-                    <Button size="sm" className="rounded-xl font-semibold shadow-sm" onClick={() => handleApprove(product.id)} disabled={!!actionId}>
+                    <Button size="sm" className="rounded-xl font-semibold shadow-sm" onClick={() => handleApprove(product)} disabled={!!actionId}>
                       {actionId === product.id && <Loader2 size={14} className="animate-spin mr-1" />}
                       <Check size={14} className="mr-1" /> Approve
                     </Button>
