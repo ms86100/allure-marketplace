@@ -232,10 +232,10 @@ export default function WelcomeCarousel() {
 
         <div className="space-y-3 mb-7">
           {[
-            { icon: Sparkles, text: 'Zero listing fees to get started' },
-            { icon: Clock, text: 'Set up your store in under 2 minutes' },
-            { icon: Heart, text: 'Coupons, promotions & loyalty tools built-in' },
-            { icon: CheckCircle2, text: 'Real-time order dashboard with instant alerts' },
+            { icon: Sparkles, text: 'Zero commission — you keep every rupee' },
+            { icon: Clock, text: 'Set up in 2 minutes, start earning today' },
+            { icon: Heart, text: 'Repeat customers who live in your building' },
+            { icon: CheckCircle2, text: 'Orders, payments, reviews — all handled' },
           ].map(({ icon: Icon, text }) => (
             <div key={text} className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
