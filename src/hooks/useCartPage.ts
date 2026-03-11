@@ -108,19 +108,28 @@ export function useCartPage() {
     });
     if (priceMismatch) { toast.error('Some item prices have changed. Refreshing your cart...'); await refresh(); throw new Error('Price mismatch detected'); }
 
+    // Build delivery address text from selected address or profile fallback
+    const deliveryAddressText = fulfillmentType === 'delivery' && selectedDeliveryAddress
+      ? [selectedDeliveryAddress.flat_number && `Flat ${selectedDeliveryAddress.flat_number}`, selectedDeliveryAddress.block && `Block ${selectedDeliveryAddress.block}`, selectedDeliveryAddress.building_name, selectedDeliveryAddress.landmark].filter(Boolean).join(', ')
+      : [profile.block, profile.flat_number].filter(Boolean).join(', ');
+
     const { data, error } = await supabase.rpc('create_multi_vendor_orders', {
-      _buyer_id: user.id, _delivery_address: [profile.block, profile.flat_number].filter(Boolean).join(', '),
+      _buyer_id: user.id, _delivery_address: deliveryAddressText,
       _notes: notes || null, _payment_method: paymentMethod, _payment_status: paymentStatus,
       _coupon_id: appliedCoupon?.id || null, _coupon_code: appliedCoupon?.code || null,
       _coupon_discount: effectiveCouponDiscount, _cart_total: totalAmount, _has_urgent: hasUrgentItem,
       _seller_groups: sellerGroupsPayload, _fulfillment_type: fulfillmentType, _delivery_fee: effectiveDeliveryFee,
+      _delivery_address_id: selectedDeliveryAddress?.id || null,
+      _delivery_lat: selectedDeliveryAddress?.latitude || null,
+      _delivery_lng: selectedDeliveryAddress?.longitude || null,
     });
     if (error) throw error;
 
-    const result = data as { success: boolean; order_ids?: string[]; order_count?: number; error?: string; unavailable_items?: string[]; closed_sellers?: string[] };
+    const result = data as { success: boolean; order_ids?: string[]; order_count?: number; error?: string; unavailable_items?: string[]; closed_sellers?: string[]; out_of_range_sellers?: string[] };
     if (!result?.success) {
       if (result?.error === 'stock_validation_failed' && result?.unavailable_items) throw new Error(`Some items are unavailable:\n• ${result.unavailable_items.join('\n• ')}`);
       if (result?.error === 'store_closed') { const sellers = result.closed_sellers?.join(', '); throw new Error(sellers ? `Store closed: ${sellers}` : 'Store is currently closed. Please try again later.'); }
+      if (result?.error === 'delivery_out_of_range') { const sellers = result.out_of_range_sellers?.join('\n• '); throw new Error(sellers ? `Delivery not possible:\n• ${sellers}` : 'Delivery address is out of range for one or more sellers.'); }
       throw new Error('Failed to create orders');
     }
     return result.order_ids || [];
