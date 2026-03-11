@@ -107,9 +107,8 @@ export default function WelcomeCarousel() {
           transition={{ delay: 0.25, duration: 0.5 }}
           className="text-[2.5rem] leading-[1.1] font-extrabold mb-5 text-foreground tracking-tight"
         >
-          Shop From{' '}
-          <span className="text-primary">Neighbors</span>
-          <br />You Already Trust
+          What Your Neighbor Makes,{' '}
+          <span className="text-primary">No App Can Deliver</span>
         </motion.h1>
 
         <motion.p
