@@ -165,6 +165,21 @@ export function useSellerApplicationReview() {
         });
       } else if (status === 'rejected') {
         await supabase.from('user_roles').delete().eq('user_id', seller.user_id).eq('role', 'seller');
+        const rejBody = rejectionNote.trim()
+          ? `Your store application was rejected. Reason: ${rejectionNote.trim()}`
+          : 'Your store application was rejected. Please review the requirements and try again.';
+        await supabase.from('user_notifications').insert({
+          user_id: seller.user_id,
+          title: '❌ Store application rejected',
+          body: rejBody,
+          type: 'seller_rejected',
+          is_read: false,
+        });
+        sendPushNotification({
+          userId: seller.user_id,
+          title: '❌ Store application rejected',
+          body: rejBody,
+        }).catch(() => {});
       }
 
       toast.success(`Seller ${status}`);
