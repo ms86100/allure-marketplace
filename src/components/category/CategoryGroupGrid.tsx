@@ -106,7 +106,7 @@ export function CategoryGroupGrid({
                     to={`/category/${value}?sub=${config.category}`}
                     className="flex flex-col items-center gap-1 p-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
                   >
-                    <span className="text-xl">{config.icon}</span>
+                    <DynamicIcon name={config.icon} size={20} />
                     <span className="text-xs font-medium text-center">{config.displayName}</span>
                   </Link>
                 ))}
