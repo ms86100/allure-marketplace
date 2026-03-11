@@ -259,10 +259,10 @@ export function SellerApplicationReview() {
                           </p>
                           {s.rejectingId === seller.id ? (
                             <div className="space-y-2.5">
-                              <Textarea placeholder="Rejection reason (will be shared with seller)..." value={s.rejectionNote} onChange={(e) => s.setRejectionNote(e.target.value)} rows={2} className="rounded-xl" />
+                              <Textarea placeholder="Rejection reason (required)..." value={s.rejectionNote} onChange={(e) => s.setRejectionNote(e.target.value)} rows={2} className="rounded-xl" />
                               <div className="flex gap-2">
                                 <Button size="sm" variant="outline" className="flex-1 rounded-xl" onClick={() => { s.setRejectingId(null); s.setRejectionNote(''); }}>Cancel</Button>
-                                <Button size="sm" variant="destructive" className="flex-1 rounded-xl font-semibold" disabled={s.actionId === seller.id} onClick={() => s.updateSellerStatus(seller, 'rejected')}>
+                                <Button size="sm" variant="destructive" className="flex-1 rounded-xl font-semibold" disabled={s.actionId === seller.id || !s.rejectionNote.trim()} onClick={() => s.updateSellerStatus(seller, 'rejected')}>
                                   {s.actionId === seller.id && <Loader2 size={14} className="animate-spin mr-1" />}Confirm Reject
                                 </Button>
                               </div>
