@@ -12,6 +12,7 @@ import { RecurringBookingSelector, RecurringConfig } from './RecurringBookingSel
 import { useAuth } from '@/contexts/AuthContext';
 import { useCategoryBehavior } from '@/hooks/useCategoryBehavior';
 import { useServiceSlots, slotsToPickerFormat, findSlot } from '@/hooks/useServiceSlots';
+import { useSubcategories } from '@/hooks/useSubcategories';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrency } from '@/hooks/useCurrency';
 import { toast } from 'sonner';
