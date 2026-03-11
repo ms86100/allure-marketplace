@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Upload, Download, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { CategoryConfig } from '@/types/categories';
 import { useBulkUpload } from '@/hooks/useBulkUpload';
 
