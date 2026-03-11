@@ -1,51 +1,50 @@
 
 
-# Fix Missing Notifications & Restore Header Buttons
+## Notification Health Check — User-Friendly UI
 
-## Issues Found
+### What We'll Build
 
-### 1. No notification sent on license approve/reject
-Both `updateLicenseStatus` functions (in `useSellerApplicationReview.ts` and `LicenseManager.tsx`) only update the `seller_licenses` table — they never insert into `user_notifications` or `notification_queue`, and never send a push notification. Compare this with `updateSellerStatus` which inserts into `user_notifications` on approval/rejection.
+A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
 
-### 2. Missing seller dashboard shortcut in Header
-The Header (`Header.tsx`) has shortcuts for builder (`/builder`), admin (`/admin`), and society admin (`Building2` icon), but there is no seller dashboard link (`/seller/dashboard`). This was likely never added or was lost during a refactor.
+### UI Design
 
-### 3. Bell icon & profile avatar gated behind `isApproved`
-The bell icon and profile avatar are wrapped in `{isApproved && (...)}` (line 119). If the user's profile `verification_status` is not `'approved'`, these disappear. This is likely intentional — but worth noting. The buttons the user sees missing may be because they're testing with a non-approved profile, or it could be a viewport/layout issue on the current route.
+**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
 
----
+**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
 
-## Plan
+| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
+|---|---|---|
+| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
+| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
+| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
+| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
 
-### A. Add license status notification to seller (both files)
+Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
 
-**Files**: `src/hooks/useSellerApplicationReview.ts`, `src/components/admin/LicenseManager.tsx`
+**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
 
-After updating `seller_licenses` status, insert a row into `user_notifications` for the seller's `user_id` and send a push notification:
+**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
 
-- Look up the seller's `user_id` from the license's `seller_id` → `seller_profiles.user_id`
-- Insert into `user_notifications` with appropriate title/body:
-  - Approved: "Your [license_type] has been verified!"
-  - Rejected: "Your [license_type] was rejected. [admin_notes]"
-- Call `sendPushNotification` for real-time delivery
+### Implementation
 
-### B. Add seller dashboard shortcut to Header
+**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
+- Renders the trigger button and the bottom sheet
+- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
+- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
+- Provides actionable buttons for failures (Open Settings, Retry Registration)
 
-**File**: `src/components/layout/Header.tsx`
+**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
+- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
+- Consolidates the 7+ technical steps into 4 simple categories
+- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
 
-- Import `isSeller` from `useAuth()`
-- Add a `Store` icon button linking to `/seller/dashboard`, shown when `isSeller` is true, placed alongside the existing builder/admin shortcuts
+**3. Update `src/pages/ProfilePage.tsx`**
+- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
+- Keep Push Debug link visible only for admins
 
-### C. Ensure bell icon is visible for all logged-in users
+**4. Optionally add to `src/pages/NotificationsPage.tsx`**
+- Add a small "Check notification status" link at the top
 
-**File**: `src/components/layout/Header.tsx`
-
-- Move the bell icon + profile avatar outside the `isApproved` gate — show them for any authenticated `user` (not just approved profiles). A seller going through onboarding still needs to see notifications.
-
----
-
-## Files Changed
-- **Edit**: `src/hooks/useSellerApplicationReview.ts` — add notification insert + push after license status update
-- **Edit**: `src/components/admin/LicenseManager.tsx` — same notification logic
-- **Edit**: `src/components/layout/Header.tsx` — add seller dashboard shortcut, show bell/avatar for all logged-in users
+### No backend changes needed
+The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
 
