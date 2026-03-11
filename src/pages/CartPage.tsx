@@ -268,7 +268,7 @@ export default function CartPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Items</span><span className="font-medium">{c.itemCount} item{c.itemCount !== 1 ? 's' : ''}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span className="font-medium">{c.paymentMethod === 'cod' ? 'Cash on Delivery' : 'UPI'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">{c.fulfillmentType === 'self_pickup' ? 'Pickup from' : 'Deliver to'}</span><span className="font-medium text-right">{c.fulfillmentType === 'self_pickup' ? c.sellerGroups[0]?.sellerName || 'Seller' : [c.profile?.block, c.profile?.flat_number].filter(Boolean).join(', ') || 'Not set'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">{c.fulfillmentType === 'self_pickup' ? 'Pickup from' : 'Deliver to'}</span><span className="font-medium text-right">{c.fulfillmentType === 'self_pickup' ? c.sellerGroups[0]?.sellerName || 'Seller' : c.selectedDeliveryAddress?.label || 'Not set'}</span></div>
                 {c.sellerGroups.length > 1 && <p className="text-xs text-muted-foreground">{c.sellerGroups.length} separate orders will be created.</p>}
                 <div className="flex justify-between border-t border-border pt-2 font-bold"><span>Total</span><span>{c.formatPrice(c.finalAmount)}</span></div>
               </div>
