@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useSellerHealth, SellerHealthCheck } from '@/hooks/queries/useSellerHealth';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { CheckCircle2, AlertTriangle, XCircle, Info, ShieldCheck, ChevronRight, ShieldAlert, Package, Globe, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
 
 const STATUS_CONFIG = {
   pass: { icon: CheckCircle2, color: 'text-success', bg: 'bg-success/10' },
@@ -66,23 +66,25 @@ function CheckGroup({ groupKey, checks }: { groupKey: keyof typeof GROUP_CONFIG;
 
 export function SellerVisibilityChecklist({ sellerId }: { sellerId: string }) {
   const { data, isLoading } = useSellerHealth(sellerId);
-  const [expanded, setExpanded] = useState(true);
 
   if (isLoading) {
-    return <Skeleton className="h-24 w-full rounded-xl" />;
+    return <Skeleton className="h-16 w-full rounded-xl" />;
   }
 
   if (!data || data.checks.length === 0) return null;
 
   const { checks, passCount, totalChecks, isFullyVisible, criticalBlockers } = data;
 
-  // Group checks
+  const percentage = totalChecks > 0 ? Math.round((passCount / totalChecks) * 100) : 0;
+
+  const issues = checks.filter(c => c.status === 'fail' || c.status === 'warn');
+
+  // Group checks for drawer
   const criticalChecks = checks.filter(c => c.group === 'critical');
   const productChecks = checks.filter(c => c.group === 'products');
   const discoveryChecks = checks.filter(c => c.group === 'discovery');
   const qualityChecks = checks.filter(c => c.group === 'quality');
 
-  // Sort within groups: issues first
   const sortByStatus = (a: SellerHealthCheck, b: SellerHealthCheck) => {
     const order = { fail: 0, warn: 1, info: 2, pass: 3 };
     return order[a.status] - order[b.status];
@@ -93,60 +95,48 @@ export function SellerVisibilityChecklist({ sellerId }: { sellerId: string }) {
   qualityChecks.sort(sortByStatus);
 
   return (
-    <Card className={cn(
-      'overflow-hidden border',
-      isFullyVisible ? 'border-success/30' : criticalBlockers > 0 ? 'border-destructive/30' : 'border-warning/30'
-    )}>
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full p-4 flex items-center justify-between"
-      >
-        <div className="flex items-center gap-3">
-          <div className={cn(
-            'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-            isFullyVisible ? 'bg-success/10' : criticalBlockers > 0 ? 'bg-destructive/10' : 'bg-warning/10'
-          )}>
-            <ShieldCheck size={20} className={isFullyVisible ? 'text-success' : criticalBlockers > 0 ? 'text-destructive' : 'text-warning'} />
+    <Drawer>
+      <DrawerTrigger asChild>
+        <Card className={cn(
+          'p-3 cursor-pointer border',
+          isFullyVisible ? 'border-success/30' : criticalBlockers > 0 ? 'border-destructive/30' : 'border-warning/30'
+        )}>
+          <div className="flex items-center gap-3 mb-2">
+            <ShieldCheck size={18} className={cn(
+              'shrink-0',
+              isFullyVisible ? 'text-success' : criticalBlockers > 0 ? 'text-destructive' : 'text-warning'
+            )} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold">Store Health</p>
+                <span className="text-[10px] text-muted-foreground">{passCount}/{totalChecks} passed</span>
+              </div>
+            </div>
+            <ChevronRight size={14} className="text-muted-foreground shrink-0" />
           </div>
-          <div className="text-left">
-            <p className="text-sm font-semibold">
-              {isFullyVisible
-                ? 'Store is fully visible'
-                : criticalBlockers > 0
-                  ? `${criticalBlockers} visibility blocker(s)`
-                  : 'Store visibility issues'}
+          <Progress value={percentage} className="h-1.5" />
+          {issues.length > 0 && (
+            <p className="text-[10px] text-warning mt-1.5 truncate">
+              ⚠ {issues.length} issue{issues.length > 1 ? 's' : ''}: {issues.map(i => i.label).join(' · ')}
             </p>
-            <p className="text-xs text-muted-foreground">
-              {passCount}/{totalChecks} critical checks passed
-            </p>
-          </div>
-        </div>
-        <ChevronRight
-          size={16}
-          className={cn(
-            'text-muted-foreground transition-transform',
-            expanded && 'rotate-90'
           )}
-        />
-      </button>
-
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <CardContent className="pt-0 pb-4 px-4 space-y-4">
-              <CheckGroup groupKey="critical" checks={criticalChecks} />
-              <CheckGroup groupKey="products" checks={productChecks} />
-              <CheckGroup groupKey="discovery" checks={discoveryChecks} />
-              <CheckGroup groupKey="quality" checks={qualityChecks} />
-            </CardContent>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </Card>
+          {isFullyVisible && (
+            <p className="text-[10px] text-success mt-1.5">✓ All checks passed</p>
+          )}
+        </Card>
+      </DrawerTrigger>
+      <DrawerContent className="max-h-[85vh]">
+        <DrawerHeader className="pb-2">
+          <DrawerTitle className="text-base">Store Visibility Checklist</DrawerTitle>
+          <p className="text-xs text-muted-foreground">{passCount}/{totalChecks} checks passed · {percentage}% complete</p>
+        </DrawerHeader>
+        <div className="px-4 pb-6 space-y-4 overflow-y-auto">
+          <CheckGroup groupKey="critical" checks={criticalChecks} />
+          <CheckGroup groupKey="products" checks={productChecks} />
+          <CheckGroup groupKey="discovery" checks={discoveryChecks} />
+          <CheckGroup groupKey="quality" checks={qualityChecks} />
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }
