@@ -138,6 +138,9 @@ export default function BecomeSellerPage() {
                 <p className="text-sm text-muted-foreground mb-6">You can update your details and resubmit your application.</p>
                 <div className="space-y-3">
                   <Button className="w-full" size="lg" onClick={async () => {
+                    // Save the rejection note so it persists in the edit form
+                    const note = (existingSeller as any).rejection_note || null;
+                    setRejectionFeedback(note);
                     // Load existing data into form before navigating to edit
                     const { data: fullSeller } = await supabase.from('seller_profiles').select('*').eq('id', (existingSeller as any).id).single();
                     if (fullSeller) {
