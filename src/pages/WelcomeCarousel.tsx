@@ -190,11 +190,11 @@ export default function WelcomeCarousel() {
       <div className="absolute inset-0 bg-gradient-to-br from-accent/8 via-background to-primary/4" />
 
       <div className="relative z-10 max-w-sm mx-auto">
-        <span className="text-xs font-bold text-primary uppercase tracking-widest mb-3 block">One App, Everything</span>
+        <span className="text-xs font-bold text-primary uppercase tracking-widest mb-3 block">Hidden in Plain Sight</span>
         <h2 className="text-3xl font-extrabold mb-2 text-foreground leading-tight">
-          From Breakfast to<br />Home Repairs
+          The Best Things Were<br />Always Next Door
         </h2>
-        <p className="text-muted-foreground text-sm mb-6">Browse what your neighbors offer — all within your society gates.</p>
+        <p className="text-muted-foreground text-sm mb-6">Homemade pickles, birthday cakes, AC repairs, yoga classes — all from people who live where you live.</p>
 
         <div className="grid grid-cols-2 gap-3">
           {displayGroups.map(({ icon: Icon, title, desc, color }) => (
