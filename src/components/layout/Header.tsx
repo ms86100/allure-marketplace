@@ -42,7 +42,7 @@ function HeaderInner({
       navigate('/society');
     }
   }, [navigate]);
-  const { profile, isApproved, society, user, viewAsSocietyId, effectiveSociety, effectiveSocietyId, setViewAsSociety, isAdmin, isBuilderMember } = useAuth();
+  const { profile, isApproved, society, user, viewAsSocietyId, effectiveSociety, effectiveSocietyId, setViewAsSociety, isAdmin, isBuilderMember, isSeller } = useAuth();
   const { itemCount } = useCart();
   const { selectionChanged } = useHaptics();
   const unreadCount = useUnreadNotificationCount();
