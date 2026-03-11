@@ -111,38 +111,34 @@ function SortableCategoryItem({ cat, groupIsActive, onToggle, onEdit, onDelete, 
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 50 : 'auto' as any };
   return (
     <div ref={setNodeRef} style={style} className={cn(
-      'flex items-center justify-between p-2.5 rounded-xl transition-all duration-200 group',
+      'p-2.5 rounded-xl transition-all duration-200 group',
       cat.is_active ? 'bg-card border border-border/40 shadow-sm hover:shadow-md' : 'bg-muted/30 opacity-60'
     )}>
       <div className="flex items-center gap-2">
-        <button className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground transition-colors" {...attributes} {...listeners}>
+        <button className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground transition-colors shrink-0" {...attributes} {...listeners}>
           <GripVertical size={14} />
         </button>
         {cat.image_url ? (
-          <img src={cat.image_url} alt={cat.display_name} className="w-7 h-7 rounded-lg object-cover" />
+          <img src={cat.image_url} alt={cat.display_name} className="w-7 h-7 rounded-lg object-cover shrink-0" />
         ) : (
-          <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', cat.color)}>
+          <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', cat.color)}>
             <DynamicIcon name={cat.icon} size={16} />
           </div>
         )}
-        <div className="flex flex-col">
-          <span className={cn('text-sm font-medium', !cat.is_active && 'text-muted-foreground')}>{cat.display_name}</span>
-          <span className="text-[10px] text-muted-foreground">
-            {LISTING_TYPE_PRESETS.find(p => p.value === cat.transaction_type)?.label || cat.transaction_type || 'Product'}
-          </span>
+        <div className="flex-1 min-w-0">
+          <span className={cn('text-sm font-medium block truncate', !cat.is_active && 'text-muted-foreground')}>{cat.display_name}</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-muted-foreground">
+              {LISTING_TYPE_PRESETS.find(p => p.value === cat.transaction_type)?.label || cat.transaction_type || 'Product'}
+            </span>
+            <span className="text-[10px] text-muted-foreground font-mono">({cat.category})</span>
+            {!cat.image_url && <span className="text-[10px] text-amber-500 font-semibold">No image</span>}
+          </div>
         </div>
-        <span className="text-[10px] text-muted-foreground font-mono">({cat.category})</span>
-        {!cat.image_url && <span className="text-[10px] text-amber-500 font-semibold">No image</span>}
+        <Switch checked={cat.is_active} onCheckedChange={(checked) => onToggle(cat.id, checked)} disabled={!groupIsActive} className="shrink-0" />
       </div>
-      <div className="flex items-center gap-1.5">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 rounded-lg"
-          onClick={() => onAddSubcategory(cat)}
-          title="Add subcategory"
-          aria-label={`Add subcategory to ${cat.display_name}`}
-        >
+      <div className="flex items-center gap-1 mt-1.5 ml-[38px]">
+        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => onAddSubcategory(cat)} title="Add subcategory" aria-label={`Add subcategory to ${cat.display_name}`}>
           <Plus size={13} />
         </Button>
         <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => onEdit(cat)}>
@@ -151,7 +147,6 @@ function SortableCategoryItem({ cat, groupIsActive, onToggle, onEdit, onDelete, 
         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive rounded-lg" onClick={() => onDelete(cat)}>
           <Trash2 size={13} />
         </Button>
-        <Switch checked={cat.is_active} onCheckedChange={(checked) => onToggle(cat.id, checked)} disabled={!groupIsActive} />
       </div>
     </div>
   );
