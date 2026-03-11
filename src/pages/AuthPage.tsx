@@ -25,7 +25,7 @@ export default function AuthPage() {
             </div>
             <h1 className="text-2xl font-extrabold text-white tracking-tight drop-shadow-lg">{auth.settings.platformName}</h1>
           </div>
-          <p className="text-sm text-white/80 drop-shadow font-medium">Your Community Marketplace</p>
+          <p className="text-sm text-white/80 drop-shadow font-medium">What your neighbors make, no app can deliver</p>
         </div>
       </div>
 
@@ -33,7 +33,7 @@ export default function AuthPage() {
       <div className="mx-5 -mt-3 relative z-10 mb-4">
         <div className="bg-primary/5 border border-primary/15 rounded-xl px-4 py-2.5 flex items-center gap-2.5">
           <ShieldCheck className="text-primary shrink-0" size={18} />
-          <p className="text-xs text-foreground/80 font-medium">Exclusively for verified residential society members</p>
+          <p className="text-xs text-foreground/80 font-medium">Only verified residents can join. No strangers. No exceptions.</p>
         </div>
       </div>
 

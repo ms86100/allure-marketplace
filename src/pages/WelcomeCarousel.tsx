@@ -98,7 +98,7 @@ export default function WelcomeCarousel() {
           className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/12 border border-primary/20 mb-6"
         >
           <Shield className="text-primary" size={14} />
-          <span className="text-xs font-semibold text-primary tracking-wide">Trusted by Families Across India</span>
+          <span className="text-xs font-semibold text-primary tracking-wide">Only From Verified Neighbors</span>
         </motion.div>
 
         <motion.h1
@@ -107,9 +107,8 @@ export default function WelcomeCarousel() {
           transition={{ delay: 0.25, duration: 0.5 }}
           className="text-[2.5rem] leading-[1.1] font-extrabold mb-5 text-foreground tracking-tight"
         >
-          Shop From{' '}
-          <span className="text-primary">Neighbors</span>
-          <br />You Already Trust
+          What Your Neighbor Makes,{' '}
+          <span className="text-primary">No App Can Deliver</span>
         </motion.h1>
 
         <motion.p
@@ -118,7 +117,7 @@ export default function WelcomeCarousel() {
           transition={{ delay: 0.35, duration: 0.4 }}
           className="text-muted-foreground text-base leading-relaxed mb-8 px-2"
         >
-          The private marketplace for your residential society — homemade food, daily essentials, services & more.
+          Home-cooked meals, trusted tutors, skilled handymen — the best things in your society aren't on any delivery app. Until now.
         </motion.p>
 
         <motion.div
@@ -145,7 +144,7 @@ export default function WelcomeCarousel() {
           transition={{ delay: 0.6, duration: 0.4 }}
           className="mt-5 text-xs text-muted-foreground"
         >
-          Free forever for buyers · No credit card needed
+          Free forever for buyers · No strangers allowed
         </motion.p>
       </div>
     </div>,
@@ -160,17 +159,17 @@ export default function WelcomeCarousel() {
         </div>
 
         <h2 className="text-3xl font-extrabold mb-3 text-foreground leading-tight">
-          A Marketplace<br />Built on <span className="text-primary">Trust</span>
+          No Strangers.<br />Only <span className="text-primary">Neighbors.</span>
         </h2>
         <p className="text-muted-foreground text-sm mb-8 leading-relaxed">
-          Every seller is a verified resident. Every transaction happens between real neighbors — not anonymous strangers.
+          Every person on this platform lives in your society. GPS-verified. Code-protected. You'll never interact with someone you couldn't knock on the door of.
         </p>
 
         <div className="space-y-3">
           {[
-            { icon: MapPin, title: 'GPS-Verified Residents', desc: 'Location proof at signup ensures real neighbors only' },
-            { icon: Lock, title: 'Invite-Only Communities', desc: 'Society code required — no outsiders can access' },
-            { icon: BadgeCheck, title: 'Verified Seller Badges', desc: 'Trust scores & review history visible on every profile' },
+            { icon: MapPin, title: 'GPS-Verified Residents', desc: 'Proof of residence at signup — no faking it' },
+            { icon: Lock, title: 'Gated Community, Gated App', desc: 'Society code required — your world stays private' },
+            { icon: BadgeCheck, title: 'Reputation You Can See', desc: 'Trust scores built from real neighbor interactions' },
           ].map(({ icon: Icon, title, desc }) => (
             <div key={title} className="flex items-start gap-3.5 bg-card/80 backdrop-blur-sm p-4 rounded-2xl border border-border">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
@@ -191,11 +190,11 @@ export default function WelcomeCarousel() {
       <div className="absolute inset-0 bg-gradient-to-br from-accent/8 via-background to-primary/4" />
 
       <div className="relative z-10 max-w-sm mx-auto">
-        <span className="text-xs font-bold text-primary uppercase tracking-widest mb-3 block">One App, Everything</span>
+        <span className="text-xs font-bold text-primary uppercase tracking-widest mb-3 block">Hidden in Plain Sight</span>
         <h2 className="text-3xl font-extrabold mb-2 text-foreground leading-tight">
-          From Breakfast to<br />Home Repairs
+          The Best Things Were<br />Always Next Door
         </h2>
-        <p className="text-muted-foreground text-sm mb-6">Browse what your neighbors offer — all within your society gates.</p>
+        <p className="text-muted-foreground text-sm mb-6">Homemade pickles, birthday cakes, AC repairs, yoga classes — all from people who live where you live.</p>
 
         <div className="grid grid-cols-2 gap-3">
           {displayGroups.map(({ icon: Icon, title, desc, color }) => (
@@ -225,18 +224,18 @@ export default function WelcomeCarousel() {
         </div>
 
         <h2 className="text-3xl font-extrabold mb-3 text-foreground leading-tight">
-          Your Passion.<br /><span className="text-primary">Your Income.</span>
+          Your Skill Deserves<br /><span className="text-primary">An Audience.</span>
         </h2>
         <p className="text-muted-foreground text-sm mb-7 leading-relaxed">
-          Start selling to hundreds of neighbors in minutes — no shop, no marketing budget, no logistics headaches.
+          You cook, bake, teach, repair, or create something wonderful. Your neighbors just don't know yet. Give your talent a storefront — zero commission, zero risk.
         </p>
 
         <div className="space-y-3 mb-7">
           {[
-            { icon: Sparkles, text: 'Zero listing fees to get started' },
-            { icon: Clock, text: 'Set up your store in under 2 minutes' },
-            { icon: Heart, text: 'Coupons, promotions & loyalty tools built-in' },
-            { icon: CheckCircle2, text: 'Real-time order dashboard with instant alerts' },
+            { icon: Sparkles, text: 'Zero commission — you keep every rupee' },
+            { icon: Clock, text: 'Set up in 2 minutes, start earning today' },
+            { icon: Heart, text: 'Repeat customers who live in your building' },
+            { icon: CheckCircle2, text: 'Orders, payments, reviews — all handled' },
           ].map(({ icon: Icon, text }) => (
             <div key={text} className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -261,7 +260,7 @@ export default function WelcomeCarousel() {
 
       <div className="relative z-10 max-w-sm mx-auto">
         <h2 className="text-3xl font-extrabold mb-6 text-foreground text-center leading-tight">
-          Families Love <span className="text-primary">{platformName}</span>
+          Your Neighbors Are<br />Already <span className="text-primary">Here</span>
         </h2>
 
         {/* Testimonial Card */}
@@ -272,7 +271,7 @@ export default function WelcomeCarousel() {
             ))}
           </div>
           <p className="text-sm text-foreground leading-relaxed italic mb-4">
-            "I order tiffin from my neighbor on the 3rd floor. My kids love the food, and I know exactly who's cooking it. This app changed how we eat."
+            "My son is allergic to nuts. Mrs. Patel makes his tiffin every day — she knows exactly what to avoid. No Swiggy filter can replace a neighbor who cares."
           </p>
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
@@ -306,7 +305,7 @@ export default function WelcomeCarousel() {
         {/* Final CTA */}
         <Link to="/auth" className="block">
           <Button size="lg" className="w-full h-14 text-base font-bold shadow-cta rounded-2xl">
-            Get Started — It's Free <ArrowRight size={18} className="ml-2" />
+            Discover Your Society <ArrowRight size={18} className="ml-2" />
           </Button>
         </Link>
         <p className="text-center mt-4">
