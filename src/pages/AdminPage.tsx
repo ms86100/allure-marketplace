@@ -359,7 +359,7 @@ export default function AdminPage() {
               </TabsList>
               <TabsContent value="platform" className="space-y-5"><PlatformSettingsManager /></TabsContent>
               <TabsContent value="notifications" className="space-y-5"><NotificationDiagnostics /><OtpSettings /></TabsContent>
-              <TabsContent value="system" className="space-y-5"><ApiKeySettings /><PurgeDataButton /><ResetAndSeedButton /></TabsContent>
+              <TabsContent value="system" className="space-y-5"><PurgeDataButton /><ResetAndSeedButton /></TabsContent>
             </Tabs>
           )}
 
