@@ -43,9 +43,10 @@ interface ProductListingCardProps {
   onNavigate?: (path: string) => void; className?: string; viewOnly?: boolean;
   categoryConfigs?: CategoryConfig[]; marketplaceConfig?: MarketplaceConfig;
   badgeConfigs?: BadgeConfigRow[]; socialProofCount?: number;
+  onViewClick?: () => void;
 }
 
-function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, className, viewOnly = false, categoryConfigs = [], marketplaceConfig, badgeConfigs = [], socialProofCount }: ProductListingCardProps) {
+function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, className, viewOnly = false, categoryConfigs = [], marketplaceConfig, badgeConfigs = [], socialProofCount, onViewClick }: ProductListingCardProps) {
   const { items, addItem, updateQuantity } = useCart();
   const { impact, selectionChanged } = useHaptics();
   const { formatPrice } = useCurrency();
