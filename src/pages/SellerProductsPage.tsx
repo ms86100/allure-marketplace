@@ -121,6 +121,11 @@ export default function SellerProductsPage() {
                             {approvalStatus === 'draft' && <Badge variant="outline" className="text-[10px] px-1 gap-0.5 border-muted-foreground/30"><Clock size={10} /> Draft</Badge>}
                             {approvalStatus === 'pending' && <Badge className="bg-warning/20 text-warning-foreground text-[10px] px-1 gap-0.5"><Clock size={10} /> Pending</Badge>}
                             {approvalStatus === 'rejected' && <Badge variant="destructive" className="text-[10px] px-1 gap-0.5"><XCircle size={10} /> Rejected</Badge>}
+                            {approvalStatus === 'rejected' && (product as any).rejection_note && (
+                              <p className="w-full text-xs text-destructive mt-1 bg-destructive/10 rounded-lg px-2.5 py-1.5">
+                                <span className="font-semibold">Reason:</span> {(product as any).rejection_note}
+                              </p>
+                            )}
                             {approvalStatus === 'approved' && <Badge className="bg-success/20 text-success text-[10px] px-1 gap-0.5"><CheckCircle2 size={10} /> Live</Badge>}
                             {product.is_bestseller && <Badge className="bg-warning/20 text-warning-foreground text-[10px] px-1"><Star size={10} className="mr-0.5 fill-warning text-warning" />Bestseller</Badge>}
                           </div>
