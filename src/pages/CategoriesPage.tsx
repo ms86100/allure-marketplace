@@ -10,6 +10,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { Skeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 import { Store, Sparkles, Clock, Star, Users, Tag } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { cn } from '@/lib/utils';
 import { useSearchPlaceholder } from '@/hooks/useSearchPlaceholder';
 
