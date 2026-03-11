@@ -13,6 +13,7 @@ import {
   User,
   MapPin,
   Phone,
+  Mail,
   Store,
   Package,
   Heart,
