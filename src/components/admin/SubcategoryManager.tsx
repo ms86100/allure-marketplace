@@ -172,7 +172,7 @@ export function SubcategoryManager() {
 
   const getCategoryName = (configId: string) => {
     const c = allConfigs.find(cfg => cfg.id === configId);
-    return c ? `${c.icon} ${c.display_name}` : configId;
+    return c ? c.display_name : configId;
   };
 
   const getParentCategoryName = (configId: string) => {
