@@ -170,7 +170,9 @@ export function useSellerHealth(sellerId: string | null) {
       // ═══════════════════════════════════════
 
       const society = profile.societies;
-      if (society?.latitude != null && society?.longitude != null) {
+      if (!profile.society_id) {
+        checks.push({ key: 'society_coords', label: 'No society linked', status: 'fail', message: 'Your store is not linked to a society. Update your store settings to select one.', actionLabel: 'Update Settings', actionRoute: '/seller/settings', group: 'discovery' });
+      } else if (society?.latitude != null && society?.longitude != null) {
         checks.push({ key: 'society_coords', label: 'Society location set', status: 'pass', message: 'Your society has valid coordinates for distance-based discovery.', group: 'discovery' });
       } else {
         checks.push({ key: 'society_coords', label: 'Society location missing', status: 'fail', message: 'Your society has no coordinates. Cross-society buyers cannot find you.', actionLabel: 'Set Location', actionRoute: '#set-society-location', group: 'discovery' });

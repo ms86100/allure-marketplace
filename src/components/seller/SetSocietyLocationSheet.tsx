@@ -50,7 +50,12 @@ export function SetSocietyLocationSheet({ open, onOpenChange, sellerId }: SetSoc
       setStep('pick');
       setCoords(null);
     } catch (err: any) {
-      toast.error(err.message || 'Failed to save location');
+      const msg = err.message || 'Failed to save location';
+      if (msg.includes('No society assigned')) {
+        toast.error('Your store doesn\'t have a society linked yet. Please update your store settings first.', { duration: 5000 });
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setSaving(false);
     }
