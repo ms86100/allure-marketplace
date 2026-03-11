@@ -380,7 +380,7 @@ export function DraftProductManager({
         <div className="flex gap-6 items-start">
           <Card className="border-primary/30 flex-1 min-w-0">
             <CardContent className="p-4 space-y-3">
-              <h4 className="font-medium text-sm">New Product / Service</h4>
+              <h4 className="font-medium text-sm">{editingIndex !== null ? 'Edit Product / Service' : 'New Product / Service'}</h4>
               <div className="space-y-2">
                 <Label htmlFor="prod-name" className="text-xs">Name *</Label>
                 <Input
