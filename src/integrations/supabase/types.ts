@@ -6962,6 +6962,9 @@ export type Database = {
           show_duration_field: boolean | null
           show_veg_toggle: boolean | null
           slug: string
+          supports_addons: boolean | null
+          supports_recurring: boolean | null
+          supports_staff_assignment: boolean | null
           updated_at: string
         }
         Insert: {
@@ -6981,6 +6984,9 @@ export type Database = {
           show_duration_field?: boolean | null
           show_veg_toggle?: boolean | null
           slug: string
+          supports_addons?: boolean | null
+          supports_recurring?: boolean | null
+          supports_staff_assignment?: boolean | null
           updated_at?: string
         }
         Update: {
@@ -7000,6 +7006,9 @@ export type Database = {
           show_duration_field?: boolean | null
           show_veg_toggle?: boolean | null
           slug?: string
+          supports_addons?: boolean | null
+          supports_recurring?: boolean | null
+          supports_staff_assignment?: boolean | null
           updated_at?: string
         }
         Relationships: [

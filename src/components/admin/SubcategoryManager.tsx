@@ -544,6 +544,56 @@ export function SubcategoryManager() {
                   </div>
                 </div>
 
+                {/* ── Service Feature Toggles ── */}
+                <div className="border-t pt-4 mt-2">
+                  <Label className="text-xs text-muted-foreground mb-3 block font-bold uppercase tracking-wider">Service Features</Label>
+                  <p className="text-[10px] text-muted-foreground mb-3">Override parent category service settings. "Inherit" uses the parent's value.</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
+                      <span className="text-xs font-medium">Service Add-ons</span>
+                      <Select
+                        value={formData.supports_addons === null ? 'inherit' : formData.supports_addons ? 'yes' : 'no'}
+                        onValueChange={(v) => setFormData({ ...formData, supports_addons: v === 'inherit' ? null : v === 'yes' })}
+                      >
+                        <SelectTrigger className="w-28 h-8 rounded-lg text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="inherit">Inherit</SelectItem>
+                          <SelectItem value="yes">Yes</SelectItem>
+                          <SelectItem value="no">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
+                      <span className="text-xs font-medium">Recurring Booking</span>
+                      <Select
+                        value={formData.supports_recurring === null ? 'inherit' : formData.supports_recurring ? 'yes' : 'no'}
+                        onValueChange={(v) => setFormData({ ...formData, supports_recurring: v === 'inherit' ? null : v === 'yes' })}
+                      >
+                        <SelectTrigger className="w-28 h-8 rounded-lg text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="inherit">Inherit</SelectItem>
+                          <SelectItem value="yes">Yes</SelectItem>
+                          <SelectItem value="no">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
+                      <span className="text-xs font-medium">Staff Assignment</span>
+                      <Select
+                        value={formData.supports_staff_assignment === null ? 'inherit' : formData.supports_staff_assignment ? 'yes' : 'no'}
+                        onValueChange={(v) => setFormData({ ...formData, supports_staff_assignment: v === 'inherit' ? null : v === 'yes' })}
+                      >
+                        <SelectTrigger className="w-28 h-8 rounded-lg text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="inherit">Inherit</SelectItem>
+                          <SelectItem value="yes">Yes</SelectItem>
+                          <SelectItem value="no">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Save */}
                 <Button onClick={handleSave} disabled={isSaving} className="w-full rounded-xl h-11 font-semibold">
                   {isSaving && <Loader2 className="animate-spin mr-2" size={16} />}
