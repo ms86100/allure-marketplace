@@ -61,7 +61,7 @@ function CheckItem({ check, onSpecialAction }: { check: SellerHealthCheck; onSpe
   );
 }
 
-function CheckGroup({ groupKey, checks }: { groupKey: keyof typeof GROUP_CONFIG; checks: SellerHealthCheck[] }) {
+function CheckGroup({ groupKey, checks, onSpecialAction }: { groupKey: keyof typeof GROUP_CONFIG; checks: SellerHealthCheck[]; onSpecialAction?: (route: string) => void }) {
   if (checks.length === 0) return null;
   const config = GROUP_CONFIG[groupKey];
   const GroupIcon = config.icon;
@@ -74,7 +74,7 @@ function CheckGroup({ groupKey, checks }: { groupKey: keyof typeof GROUP_CONFIG;
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{config.label}</span>
       </div>
       {checks.map(check => (
-        <CheckItem key={check.key} check={check} />
+        <CheckItem key={check.key} check={check} onSpecialAction={onSpecialAction} />
       ))}
     </div>
   );
