@@ -1,32 +1,29 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
+import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 
 /**
  * Coordinate-based discovery hook. Always uses search_sellers_by_location
  * with browsingLocation lat/lng. Returns a flat, deduplicated product list.
  */
 export function useNearbyProducts() {
-  const { profile } = useAuth();
   const { browsingLocation } = useBrowsingLocation();
 
-  const browseBeyond = profile?.browse_beyond_community !== false;
-  const searchRadius = profile?.search_radius_km ?? 10;
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
 
   return useQuery({
-    queryKey: ['store-discovery', 'nearby-products', lat, lng, searchRadius],
+    queryKey: ['store-discovery', 'nearby-products', lat, lng, MARKETPLACE_RADIUS_KM],
     queryFn: async (): Promise<ProductWithSeller[]> => {
       if (!lat || !lng) return [];
 
       const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: searchRadius,
+        _radius_km: MARKETPLACE_RADIUS_KM,
       });
 
       if (error) throw error;
@@ -72,7 +69,7 @@ export function useNearbyProducts() {
       }
       return products;
     },
-    enabled: browseBeyond && !!(lat && lng),
+    enabled: !!(lat && lng),
     staleTime: jitteredStaleTime(10 * 60 * 1000),
   });
 }

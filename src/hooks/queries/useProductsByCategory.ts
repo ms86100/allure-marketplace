@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
+import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 
 interface CategoryGroup {
   category: string;
@@ -42,7 +43,7 @@ export function useProductsByCategory(limit = 50) {
       const rpcPromise = supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: 10,
+        _radius_km: MARKETPLACE_RADIUS_KM,
       });
 
       const [resolvedConfigs, rpcResult] = await Promise.all([configPromise, rpcPromise]);

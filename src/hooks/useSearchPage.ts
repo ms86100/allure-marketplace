@@ -12,6 +12,7 @@ import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { useQuery } from '@tanstack/react-query';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { useCurrency } from '@/hooks/useCurrency';
+import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 
 export interface ProductSearchResult {
   product_id: string;
@@ -105,9 +106,9 @@ export function useSearchPage() {
   const [hasSearched, setHasSearched] = useState(false);
 
   const [browseBeyond, setBrowseBeyondLocal] = useState(profile?.browse_beyond_community ?? true);
-  const [searchRadius, setSearchRadiusLocal] = useState(profile?.search_radius_km ?? 10);
+  const [searchRadius, setSearchRadiusLocal] = useState(profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM);
 
-  useEffect(() => { if (profile) { setBrowseBeyondLocal(profile.browse_beyond_community ?? true); setSearchRadiusLocal(profile.search_radius_km ?? 10); } }, [profile]);
+  useEffect(() => { if (profile) { setBrowseBeyondLocal(profile.browse_beyond_community ?? true); setSearchRadiusLocal(profile.search_radius_km ?? MARKETPLACE_RADIUS_KM); } }, [profile]);
 
   const persistPreference = useCallback(async (field: string, value: any) => { if (!user) return; await supabase.from('profiles').update({ [field]: value } as any).eq('id', user.id); }, [user]);
   const setBrowseBeyond = useCallback((val: boolean) => { setBrowseBeyondLocal(val); persistPreference('browse_beyond_community', val); }, [persistPreference]);

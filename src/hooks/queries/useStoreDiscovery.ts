@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
+import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 
 export interface LocalSeller {
   id: string;
@@ -59,7 +60,7 @@ export function useLocalSellers() {
       const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: 2, // hyper-local
+        _radius_km: MARKETPLACE_RADIUS_KM,
       });
 
       if (error) {
@@ -94,7 +95,7 @@ export function useLocalSellers() {
  * Coordinate-based nearby sellers grouped by distance band.
  * Always uses search_sellers_by_location with browsingLocation.
  */
-export function useNearbySocietySellers(radiusKm: number = 5, enabled: boolean = true) {
+export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM, enabled: boolean = true) {
   const { isApproved } = useAuth();
   const { browsingLocation } = useBrowsingLocation();
   const lat = browsingLocation?.lat;

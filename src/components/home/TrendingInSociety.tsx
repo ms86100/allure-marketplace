@@ -28,7 +28,7 @@ export function TrendingInSociety({
           <TrendingUp size={13} className="text-primary" />
         </div>
         <h3 className="font-bold text-[14px] text-foreground tracking-tight">
-          Trending in your society
+          Trending near you
         </h3>
       </div>
       <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory">

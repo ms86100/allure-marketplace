@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { useNearbyProducts, mergeProducts } from './useNearbyProducts';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
+import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 
 /**
  * Popular products discovered via coordinate-based search.
@@ -23,7 +24,7 @@ export function usePopularProducts(limit = 12) {
       const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: 5, // popular = within 5km
+        _radius_km: MARKETPLACE_RADIUS_KM,
       });
 
       if (error) throw error;
@@ -102,7 +103,7 @@ export function useCategoryProducts(parentGroup: string | null) {
       const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: 10,
+        _radius_km: MARKETPLACE_RADIUS_KM,
       });
 
       if (error) throw error;
@@ -110,12 +111,15 @@ export function useCategoryProducts(parentGroup: string | null) {
 
       const categorySet = new Set(categoryList);
       const products: ProductWithSeller[] = [];
+      const seenIds = new Set<string>();
 
       for (const seller of data as any[]) {
         const items = seller.matching_products;
         if (!Array.isArray(items)) continue;
         for (const p of items) {
           if (!categorySet.has(p.category)) continue;
+          if (seenIds.has(p.id)) continue;
+          seenIds.add(p.id);
           products.push({
             ...p,
             seller_id: seller.seller_id,
