@@ -43,24 +43,7 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
-/* ── Stat Card ── */
-function StatCard({ icon: Icon, value, label, color, delay = 0 }: { icon: any; value: string | number; label: string; color: string; delay?: number }) {
-  return (
-    <motion.div initial={{ opacity: 0, y: 16, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.4, delay }}>
-      <Card className="border-0 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-md)] transition-all duration-300 rounded-2xl group">
-        <CardContent className="p-3.5 flex items-center gap-3">
-          <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110', color)}>
-            <Icon size={17} className="text-white" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xl font-extrabold tabular-nums leading-tight tracking-tight">{value}</p>
-            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-widest">{label}</p>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
+
 
 /* ── Section Header ── */
 function SectionHeader({ icon: Icon, title, count, action, color = 'bg-primary/10 text-primary' }: { icon: any; title: string; count?: number; action?: React.ReactNode; color?: string }) {
