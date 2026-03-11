@@ -182,6 +182,21 @@ export default function ProfileEditPage() {
               <Input value={profile?.phone || user?.phone || ''} disabled className="mt-1.5 bg-muted/50" />
             </div>
 
+            {/* Email */}
+            <div>
+              <Label htmlFor="email" className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Mail size={12} /> Email (optional)
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="mt-1.5"
+              />
+            </div>
+
             <Button onClick={handleSaveProfile} disabled={savingProfile || !name.trim()} className="w-full h-11 rounded-xl font-semibold">
               {savingProfile ? <Loader2 size={16} className="mr-1 animate-spin" /> : null}
               Save & Go to Home
