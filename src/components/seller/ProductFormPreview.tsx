@@ -78,7 +78,6 @@ function ProductDetailPreview({
             <DrawerTitle>{name}</DrawerTitle>
           </DrawerHeader>
 
-          {/* Image */}
           <div className="relative w-full aspect-[4/3] max-h-[45vh] bg-muted">
             {formData.image_url ? (
               <img src={formData.image_url} alt={name} className="w-full h-full object-contain" />
@@ -94,7 +93,6 @@ function ProductDetailPreview({
             </button>
           </div>
 
-          {/* Content */}
           <div className="p-4 space-y-3">
             {formData.prep_time_minutes && parseInt(formData.prep_time_minutes) > 0 && (
               <div className="flex items-center gap-1.5">
@@ -131,10 +129,8 @@ function ProductDetailPreview({
               </div>
             )}
 
-            {/* Attribute blocks */}
             <ProductAttributeBlocks specifications={specs} />
 
-            {/* Seller card */}
             <div className="flex items-center gap-3 bg-muted rounded-xl p-3">
               <div className="w-10 h-10 rounded-xl bg-card flex items-center justify-center border border-border/30 text-muted-foreground text-lg">
                 🏪
@@ -151,7 +147,6 @@ function ProductDetailPreview({
           <div className="h-20" />
         </div>
 
-        {/* Bottom action bar */}
         <div className="absolute bottom-0 left-0 right-0 bg-background border-t border-border p-4">
           <Button className="w-full h-12 text-base font-bold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl" disabled>
             Add to cart · {formatPrice(price)}
@@ -179,30 +174,19 @@ export function ProductFormPreviewPanel({ formData, sellerProfile, attributeBloc
         <span>Live Preview</span>
       </div>
 
-      {/* Phone frame */}
       <div className="w-[180px] rounded-2xl border-2 border-border bg-muted/30 p-2 shadow-sm">
         <div className="rounded-xl overflow-hidden">
           <ProductListingCard
             product={mockProduct}
             viewOnly
             categoryConfigs={configs}
+            onViewClick={() => setDetailOpen(true)}
           />
         </div>
       </div>
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="mt-3 text-xs gap-1.5"
-        onClick={() => setDetailOpen(true)}
-      >
-        <Eye size={12} />
-        View Detail Page
-      </Button>
-
       <p className="text-[10px] text-muted-foreground mt-2 text-center max-w-[180px] leading-tight">
-        This is how buyers will see your listing
+        Tap "View Details" to preview the full product page
       </p>
 
       <ProductDetailPreview
@@ -254,18 +238,9 @@ export function ProductFormPreviewMobile({ formData, sellerProfile, attributeBlo
                 product={mockProduct}
                 viewOnly
                 categoryConfigs={configs}
+                onViewClick={() => { setOpen(false); setTimeout(() => setDetailOpen(true), 300); }}
               />
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-xs gap-1.5"
-              onClick={() => { setOpen(false); setTimeout(() => setDetailOpen(true), 300); }}
-            >
-              <Eye size={12} />
-              View Detail Page
-            </Button>
           </div>
         </DrawerContent>
       </Drawer>
