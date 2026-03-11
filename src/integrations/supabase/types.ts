@@ -8220,6 +8220,10 @@ export type Database = {
         }
         Returns: Json
       }
+      confirm_upi_payment: {
+        Args: { _order_id: string; _upi_transaction_ref: string }
+        Returns: undefined
+      }
       create_multi_vendor_orders:
         | {
             Args: {
@@ -8636,6 +8640,10 @@ export type Database = {
       validate_worker_entry: {
         Args: { _society_id: string; _worker_id: string }
         Returns: Json
+      }
+      verify_seller_payment: {
+        Args: { _order_id: string; _received: boolean }
+        Returns: undefined
       }
     }
     Enums: {

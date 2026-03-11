@@ -25,13 +25,14 @@ app.post("/", async (c) => {
     const now = new Date().toISOString();
     const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
-    // Query 1: Urgent orders past auto_cancel_at
+    // Query 1: Urgent orders past auto_cancel_at (skip if buyer already confirmed/paid)
     const { data: urgentExpired, error: urgentErr } = await supabase
       .from("orders")
       .select("id, buyer_id, seller_id, total_amount")
       .eq("status", "placed")
       .not("auto_cancel_at", "is", null)
-      .lt("auto_cancel_at", now);
+      .lt("auto_cancel_at", now)
+      .not("payment_status", "in", "(buyer_confirmed,paid)");
 
     // Query 2: Orphaned UPI/online orders — payment_status=pending, non-COD, older than 15 min
     const { data: orphanedUpi, error: orphanErr } = await supabase
