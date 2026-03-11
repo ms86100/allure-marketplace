@@ -73,32 +73,32 @@ function SortableSectionItem({ group, groupCats, onToggle, onEdit, onDelete, onA
   const activeCount = groupCats.filter((c) => c.is_active).length;
   return (
     <div ref={setNodeRef} style={style} className="space-y-2">
-      <div className="flex items-center justify-between p-3.5 bg-card border-0 shadow-[var(--shadow-card)] rounded-2xl hover:shadow-[var(--shadow-md)] transition-all duration-300">
+      <div className="p-3.5 bg-card border-0 shadow-[var(--shadow-card)] rounded-2xl hover:shadow-[var(--shadow-md)] transition-all duration-300">
         <div className="flex items-center gap-3">
-          <button className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground transition-colors" {...attributes} {...listeners}>
+          <button className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground transition-colors shrink-0" {...attributes} {...listeners}>
             <GripVertical size={16} />
           </button>
           <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', group.color)}>
             <DynamicIcon name={group.icon} size={20} />
           </div>
-          <div>
-            <h4 className="font-bold text-sm">{group.name}</h4>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-bold text-sm truncate">{group.name}</h4>
             <p className="text-[10px] text-muted-foreground font-medium">
               {activeCount}/{groupCats.length} categories · Section
             </p>
           </div>
+          <Switch checked={group.is_active} onCheckedChange={(checked) => onToggle(group, checked)} className="shrink-0" />
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 mt-2.5 ml-[60px]">
           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-muted" onClick={() => onEdit(group)}>
             <Edit2 size={13} />
           </Button>
           <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(group)}>
             <Trash2 size={13} />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => onAddCategory(group.slug)} className="rounded-xl text-xs h-8 font-semibold">
-            <Plus size={12} className="mr-1" />Add Category
+          <Button variant="outline" size="sm" onClick={() => onAddCategory(group.slug)} className="rounded-xl text-xs h-8 font-semibold ml-auto">
+            <Plus size={12} className="mr-1" />Add
           </Button>
-          <Switch checked={group.is_active} onCheckedChange={(checked) => onToggle(group, checked)} />
         </div>
       </div>
       {children}
