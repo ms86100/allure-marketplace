@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { hapticImpact, hapticNotification, hapticSelection } from '@/lib/haptics';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
