@@ -33,9 +33,10 @@ const CREDENTIAL_TABS = [
     label: 'Payment',
     icon: CreditCard,
     credentials: [
+      { key: 'payment_gateway_mode', label: 'Payment Mode', description: 'Toggle between UPI Deep Link (direct to seller) and Payment Gateway (Razorpay). UPI Deep Link is recommended until company registration is complete.', placeholder: 'upi_deep_link', isToggle: true },
       { key: 'razorpay_key_id', label: 'Razorpay Key ID', description: 'Public key for UPI/card payments via Razorpay', placeholder: 'rzp_live_...' },
       { key: 'razorpay_key_secret', label: 'Razorpay Key Secret', description: 'Secret key for payment verification (keep private)', placeholder: 'Your secret key' },
-    ] as CredentialConfig[],
+    ] as (CredentialConfig & { isToggle?: boolean })[],
   },
   {
     id: 'sms',

@@ -138,10 +138,29 @@ export default function OrderDetailPage() {
           {serviceBooking && <AppointmentDetailsCard booking={serviceBooking} />}
 
           {/* Payment */}
-          <div className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2.5"><CreditCard size={16} className="text-muted-foreground" /><p className="text-sm font-medium">{((order as any).payment_method || (order as any).payment_type) === 'cod' ? 'Cash on Delivery' : 'UPI Payment'}</p></div>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full ${paymentStatusInfo.color}`}>{paymentStatusInfo.label}</span>
+          <div className="bg-card border border-border rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5"><CreditCard size={16} className="text-muted-foreground" /><p className="text-sm font-medium">{((order as any).payment_method || (order as any).payment_type) === 'cod' ? 'Cash on Delivery' : 'UPI Payment'}</p></div>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full ${paymentStatusInfo.color}`}>{paymentStatusInfo.label}</span>
+            </div>
+            {(order as any).upi_transaction_ref && (
+              <div className="mt-2 pt-2 border-t border-border">
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Transaction ID (UTR)</p>
+                <p className="text-sm font-mono font-medium mt-0.5">{(order as any).upi_transaction_ref}</p>
+              </div>
+            )}
           </div>
+
+          {/* Seller Payment Confirmation Banner */}
+          {o.isSellerView && (order as any).payment_status === 'buyer_confirmed' && (order as any).payment_confirmed_by_seller === null && (
+            <SellerPaymentConfirmation
+              orderId={order.id}
+              amount={order.total_amount}
+              utrRef={(order as any).upi_transaction_ref}
+              buyerName={buyer?.name}
+              onConfirmed={() => window.location.reload()}
+            />
+          )}
 
           {/* Live Delivery Tracking or Static Card */}
           {o.orderFulfillmentType === 'delivery' && isInTransit && deliveryAssignmentId && (
