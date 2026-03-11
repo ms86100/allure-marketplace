@@ -224,10 +224,10 @@ export default function WelcomeCarousel() {
         </div>
 
         <h2 className="text-3xl font-extrabold mb-3 text-foreground leading-tight">
-          Your Passion.<br /><span className="text-primary">Your Income.</span>
+          Your Skill Deserves<br /><span className="text-primary">An Audience.</span>
         </h2>
         <p className="text-muted-foreground text-sm mb-7 leading-relaxed">
-          Start selling to hundreds of neighbors in minutes — no shop, no marketing budget, no logistics headaches.
+          You cook, bake, teach, repair, or create something wonderful. Your neighbors just don't know yet. Give your talent a storefront — zero commission, zero risk.
         </p>
 
         <div className="space-y-3 mb-7">
