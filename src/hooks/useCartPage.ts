@@ -238,6 +238,7 @@ export function useCartPage() {
     hasUrgentItem, itemCount, maxPrepTime,
     effectiveCouponDiscount, firstSellerFulfillmentMode,
     hasFulfillmentConflict, hasBelowMinimumOrder, noPaymentMethodAvailable,
+    selectedDeliveryAddress, setSelectedDeliveryAddress, addresses, addressesLoading,
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed,
     cancelPlacingOrder: () => setIsPlacingOrder(false),
   };
