@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { PaymentMethodSelector } from '@/components/payment/PaymentMethodSelector';
 import { RazorpayCheckout } from '@/components/payment/RazorpayCheckout';
+import { UpiDeepLinkCheckout } from '@/components/payment/UpiDeepLinkCheckout';
 import { CouponInput } from '@/components/cart/CouponInput';
 import { FulfillmentSelector } from '@/components/delivery/FulfillmentSelector';
 import { OrderProgressOverlay } from '@/components/checkout/OrderProgressOverlay';
