@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
+import { useQueryClient } from '@tanstack/react-query';
 
 export interface BrowsingLocation {
   id: string; // 'gps' | 'society' | delivery_address.id
@@ -19,11 +20,16 @@ interface BrowsingLocationContextType {
   clearOverride: () => void;
   /** Whether a user override is active */
   hasOverride: boolean;
+  /** Whether a pending cart-clear confirmation is needed */
+  pendingLocationChange: BrowsingLocation | null;
+  confirmLocationChange: () => void;
+  cancelLocationChange: () => void;
 }
 
 const BrowsingLocationContext = createContext<BrowsingLocationContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'sociva_browsing_location';
+const CART_CLEAR_THRESHOLD_KM = 2;
 
 function loadFromStorage(): BrowsingLocation | null {
   try {
@@ -45,29 +51,88 @@ function saveToStorage(loc: BrowsingLocation | null) {
   } catch { /* ignore */ }
 }
 
+/** Simple haversine distance in km */
+function distanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.sqrt(a));
+}
+
 export function BrowsingLocationProvider({ children }: { children: React.ReactNode }) {
   const { society } = useAuth();
   const { defaultAddress } = useDeliveryAddresses();
+  const queryClient = useQueryClient();
 
   // Session override (highest priority)
   const [override, setOverride] = useState<BrowsingLocation | null>(() => loadFromStorage());
+  const [pendingLocationChange, setPendingLocationChange] = useState<BrowsingLocation | null>(null);
+  const previousLocationRef = useRef<BrowsingLocation | null>(null);
 
-  const setBrowsingLocation = useCallback((loc: BrowsingLocation | null) => {
+  const invalidateDiscovery = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['store-discovery'] });
+    queryClient.invalidateQueries({ queryKey: ['trending-products'] });
+    queryClient.invalidateQueries({ queryKey: ['popular-products'] });
+    queryClient.invalidateQueries({ queryKey: ['products-by-category'] });
+    queryClient.invalidateQueries({ queryKey: ['category-products'] });
+    queryClient.invalidateQueries({ queryKey: ['search-popular-products'] });
+  }, [queryClient]);
+
+  const applyLocation = useCallback((loc: BrowsingLocation | null) => {
     setOverride(loc);
     saveToStorage(loc);
+    invalidateDiscovery();
+  }, [invalidateDiscovery]);
+
+  const setBrowsingLocation = useCallback((loc: BrowsingLocation | null) => {
+    const current = previousLocationRef.current;
+
+    // Check if location change is significant enough to warrant cart clear warning
+    if (loc && current && loc.lat && loc.lng && current.lat && current.lng) {
+      const dist = distanceKm(current.lat, current.lng, loc.lat, loc.lng);
+      if (dist > CART_CLEAR_THRESHOLD_KM) {
+        // Check if cart has items
+        const cartData = queryClient.getQueryData<any[]>(['cart-items']);
+        if (cartData && cartData.length > 0) {
+          setPendingLocationChange(loc);
+          return;
+        }
+      }
+    }
+
+    applyLocation(loc);
+  }, [applyLocation, queryClient]);
+
+  const confirmLocationChange = useCallback(() => {
+    if (!pendingLocationChange) return;
+    // Clear cart via direct DB call + cache invalidation
+    import('@/integrations/supabase/client').then(({ supabase }) => {
+      const userId = queryClient.getQueryData<string>(['auth-user-id']);
+      if (userId) {
+        supabase.from('cart_items').delete().eq('user_id', userId).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['cart-items'] });
+        });
+      }
+    });
+    applyLocation(pendingLocationChange);
+    setPendingLocationChange(null);
+  }, [pendingLocationChange, applyLocation, queryClient]);
+
+  const cancelLocationChange = useCallback(() => {
+    setPendingLocationChange(null);
   }, []);
 
   const clearOverride = useCallback(() => {
-    setOverride(null);
-    saveToStorage(null);
-  }, []);
+    applyLocation(null);
+  }, [applyLocation]);
 
   // Fallback chain: override → default delivery address → society coordinates
   const browsingLocation = useMemo<BrowsingLocation | null>(() => {
     // 1. Session/localStorage override
     if (override) return override;
 
-    // 2. Default delivery address
+    // 2. Default delivery address (only if it has coordinates)
     if (defaultAddress?.latitude && defaultAddress?.longitude) {
       return {
         id: defaultAddress.id,
@@ -92,10 +157,20 @@ export function BrowsingLocationProvider({ children }: { children: React.ReactNo
     return null;
   }, [override, defaultAddress, society]);
 
+  // Track previous location for distance comparison
+  useEffect(() => {
+    if (browsingLocation) {
+      previousLocationRef.current = browsingLocation;
+    }
+  }, [browsingLocation]);
+
   const hasOverride = !!override;
 
   return (
-    <BrowsingLocationContext.Provider value={{ browsingLocation, setBrowsingLocation, clearOverride, hasOverride }}>
+    <BrowsingLocationContext.Provider value={{
+      browsingLocation, setBrowsingLocation, clearOverride, hasOverride,
+      pendingLocationChange, confirmLocationChange, cancelLocationChange,
+    }}>
       {children}
     </BrowsingLocationContext.Provider>
   );
