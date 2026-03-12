@@ -430,6 +430,7 @@ export default function BecomeSellerPage() {
                 <div className="flex justify-between"><span className="text-muted-foreground">Category</span><span className="font-medium">{selectedGroupInfo?.label}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Products</span><span className="font-medium">{draftProducts.length} item(s)</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Hours</span><span className="font-medium">{formData.availability_start} – {formData.availability_end}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Location</span><span className="font-medium">{formData.latitude ? '📍 Set' : profile?.society_id ? 'Society default' : '⚠️ Not set'}</span></div>
                 <div className="border-t pt-2 mt-2 space-y-2">
                   <div className="flex justify-between"><span className="text-muted-foreground">Fulfillment</span><span className="font-medium">{fulfillmentLabel}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Payments</span><span className="font-medium">{paymentMethods}</span></div>
