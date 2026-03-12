@@ -8,6 +8,7 @@ import { ServiceCategory } from '@/types/categories';
 import { DAYS_OF_WEEK } from '@/types/database';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
+import { notifyAdminsNewStoreApplication } from '@/lib/admin-notifications';
 
 export interface SellerFormData {
   business_name: string;
@@ -287,6 +288,8 @@ export function useSellerApplication() {
       await refreshProfile();
       localStorage.setItem('seller_onboarding_completed', 'true');
       toast.success('Application submitted! Awaiting admin approval.');
+      // Notify admins about the new store application
+      notifyAdminsNewStoreApplication(formData.business_name.trim(), user.id).catch(console.error);
       setSubmissionComplete(true);
     } catch (error: any) {
       console.error('Error submitting application:', error);

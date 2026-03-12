@@ -1,114 +1,71 @@
 
 
-# Notification System: Investigation & Comprehensive Audit
+# Notification System — Comprehensive Audit & Plan
 
-## Root Cause: Admin Not Notified on New Store Submission
+## Root Cause Fix (Implemented)
 
-In `src/hooks/useSellerApplication.ts` (line 264-294), when a seller clicks "Submit for Review", the code updates `verification_status` to `'pending'` but **never enqueues any notification for admins**. There is also no database trigger on `seller_profiles` that fires a notification when `verification_status` changes to `'pending'`.
+Admin users were not notified when a new store or product was submitted for review. Fixed by:
 
-**Fix:** After the seller profile update succeeds, call a new notification function (or use the existing `notifySocietyAdmins`) to notify all admin-role users that a new store application is awaiting review. Similarly, when a product is submitted for review (status changes to `'pending'`), admins should be notified.
+1. **`notifyAdminsNewStoreApplication()`** in `src/lib/admin-notifications.ts` — queries `user_roles` for admins, enqueues push+in-app notification via `notification_queue`
+2. **`handleSubmit` in `useSellerApplication.ts`** — calls the above after successful submission
+3. **DB trigger `trg_enqueue_product_review_notification`** on `products` table — fires when `approval_status` changes to `'pending'`, notifies all admins
 
 ---
 
 ## Current State (As-Is): All Notification Flows
 
-### A. Database Triggers (automatic, server-side)
+### A. Database Triggers
 
 | Trigger | Event | Recipient | Push | In-App |
 |---|---|---|---|---|
-| `enqueue_order_status_notification` | Order status changes (placed, accepted, preparing, ready, picked_up, delivered, completed, cancelled, confirmed, no_show, etc.) | Buyer + Seller (varies by status) | Yes | Yes |
-| `enqueue_review_notification` | New review created | Seller | Yes | Yes |
-| `enqueue_dispute_status_notification` | Dispute status changes (under_review, resolved, rejected) | Dispute submitter | Yes | Yes |
-| `enqueue_settlement_notification` | Settlement created | Seller | Yes | Yes |
+| `enqueue_order_status_notification` | Order status changes | Buyer + Seller | ✅ | ✅ |
+| `enqueue_review_notification` | New review created | Seller | ✅ | ✅ |
+| `enqueue_dispute_status_notification` | Dispute status changes | Submitter | ✅ | ✅ |
+| `enqueue_settlement_notification` | Settlement created | Seller | ✅ | ✅ |
+| `trg_enqueue_product_review_notification` | Product submitted for review | Admins | ✅ | ✅ |
 
-### B. Edge Functions (scheduled/invoked)
+### B. Edge Functions
 
 | Function | Event | Recipient | Push | In-App |
 |---|---|---|---|---|
-| `send-booking-reminders` | 1 hour before appointment | Buyer + Seller | Yes | Yes |
-| `process-notification-queue` | Processes queued notifications | N/A (processor) | Yes | Yes |
-| `send-campaign` | Admin broadcast campaign | Targeted users | Yes | Yes |
-| `generate-weekly-digest` | Weekly digest | Society members | Yes | Yes |
-| `generate-society-report` | Monthly report | Society members | Yes | Yes |
-| `detect-collective-issues` | Pattern detection in complaints | Society admins | Yes | Yes |
+| `send-booking-reminders` | 1h before appointment | Buyer + Seller | ✅ | ✅ |
+| `process-notification-queue` | Queue processor | N/A | ✅ | ✅ |
+| `send-campaign` | Admin broadcast | Targeted users | ✅ | ✅ |
+| `generate-weekly-digest` | Weekly digest | Society members | ✅ | ✅ |
+| `generate-society-report` | Monthly report | Society members | ✅ | ✅ |
+| `detect-collective-issues` | Pattern detection | Society admins | ✅ | ✅ |
 
-### C. Client-Side Notifications (in-code inserts to `notification_queue`)
+### C. Client-Side (inserts to `notification_queue`)
 
 | Location | Event | Recipient | Push | In-App |
 |---|---|---|---|---|
-| `admin-notifications.ts` → `notifySellerStatusChange` | Admin approves/rejects/suspends seller | Seller | Yes | Yes |
-| `admin-notifications.ts` → `notifyLicenseStatusChange` | Admin approves/rejects license | Seller | Yes | Yes |
-| `admin-notifications.ts` → `notifyProductStatusChange` | Admin approves/rejects product | Seller | Yes | Yes |
-| `society-notifications.ts` → `notifySocietyAdmins` | Dispute filed, snag reported | Society admins | Yes | Yes |
-| `society-notifications.ts` → `notifySocietyMembers` | Bulletin posts, community events | Society members | Yes | Yes |
-| `ServiceBookingFlow.tsx` | New service booking | Seller | Yes | No |
-| `BuyerCancelBooking.tsx` | Buyer cancels booking | Seller | Yes | No |
-| `SellerPaymentConfirmation.tsx` | Payment confirmed | Buyer | Yes | No |
-| `UpiDeepLinkCheckout.tsx` | UPI payment initiated | Seller | Yes | No |
-| `useSellerChat.ts` | New chat message (throttled 60s) | Recipient | Yes | No |
-| `GuardManualEntryTab.tsx` | Gate entry request | Resident | Yes | No |
-| `manage-delivery` edge fn | Delivery OTP, rider at gate | Buyer | Yes | Yes |
-| `update-delivery-location` edge fn | Delivery delay / arrival | Buyer | Yes | Yes |
-| `pushDiagnostics.ts` | Test notification | Self | Yes | Yes |
-
-### D. Missing Notifications (Gaps Found)
-
-| Event | Who Should Be Notified | Currently Notified? |
-|---|---|---|
-| **New store submitted for review** | **Admins** | **NO** |
-| **Product submitted for review** | **Admins** | **NO** |
-| **Product resubmitted after edit** | **Admins** | **NO** |
-| New user registration (pending approval) | Society admins | NO |
-| Seller resubmits rejected application | Admins | NO |
-| New society request | Platform admins | NO |
-| Delivery partner assigned to order | Seller | NO |
-| Coupon/promotion activated by seller | Buyers who favorited | NO |
-| Seller goes online/offline | Subscribed buyers | NO |
-| New product added by favorite seller | Buyer | NO |
-| Report filed against seller/product | Admins | NO |
+| `admin-notifications.ts` → `notifySellerStatusChange` | Admin approves/rejects seller | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyLicenseStatusChange` | Admin approves/rejects license | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyProductStatusChange` | Admin approves/rejects product | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyAdminsNewStoreApplication` | Seller submits store | Admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyAdmins` | Dispute/snag | Society admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyMembers` | Bulletin posts | Society members | ✅ | ✅ |
+| `ServiceBookingFlow.tsx` | New booking | Seller | ✅ | ❌ |
+| `BuyerCancelBooking.tsx` | Buyer cancels | Seller | ✅ | ❌ |
+| `SellerPaymentConfirmation.tsx` | Payment confirmed | Buyer | ✅ | ❌ |
+| `UpiDeepLinkCheckout.tsx` | UPI payment | Seller | ✅ | ❌ |
+| `useSellerChat.ts` | New chat (60s throttle) | Recipient | ✅ | ❌ |
+| `GuardManualEntryTab.tsx` | Gate entry | Resident | ✅ | ❌ |
+| `manage-delivery` edge fn | Delivery OTP/arrival | Buyer | ✅ | ✅ |
+| `update-delivery-location` edge fn | Delivery delay | Buyer | ✅ | ✅ |
 
 ---
 
-## Future State (To-Be): Comprehensive Notification Framework
+## Future Gaps (To-Be)
 
-### Priority 1 — Fix Critical Gaps (this implementation)
+### Priority 2 — Operational
+- New user pending approval → Society admins
+- New society request → Platform admins
+- Report filed → Admins
+- Delivery partner assigned → Seller
 
-1. **New store submission → Notify admins** (push + in-app)
-   - In `useSellerApplication.ts` `handleSubmit`, after successful update, call a new `notifyAdminsNewApplication()` function
-   - Fetches all users with `admin` role from `user_roles` table
-   - Enqueues: "🏪 New Store Application — {businessName} submitted for review"
-   - Reference path: `/admin` (moderation tab)
-
-2. **Product submitted for review → Notify admins** (push + in-app)
-   - Create a DB trigger `enqueue_product_review_notification` on `products` table
-   - Fires when `approval_status` changes TO `'pending'`
-   - Notifies all admin-role users
-   - Enqueues: "📦 New Product for Review — {productName} from {businessName}"
-
-3. **Seller resubmission after rejection → Notify admins** (push + in-app)
-   - Same trigger as #1, fires when `verification_status` changes from `rejected` to `pending`
-
-### Priority 2 — Operational Completeness
-
-4. **New user pending approval → Notify society admins**
-5. **New society request → Notify platform admins**
-6. **Report filed → Notify admins**
-7. **Delivery partner assigned → Notify seller**
-
-### Priority 3 — Engagement & Retention
-
-8. **New product from favorite seller → Notify buyer**
-9. **Seller back online → Notify recent buyers**
-10. **Price drop on wishlisted item → Notify buyer**
-11. **Order review reminder (24h after delivery) → Notify buyer**
-
-### Implementation Approach for Priority 1
-
-**File changes:**
-- `src/lib/admin-notifications.ts` — Add `notifyAdminsNewStoreApplication()` and `notifyAdminsNewProductSubmission()` functions that query `user_roles` for admins, then insert into `notification_queue`
-- `src/hooks/useSellerApplication.ts` — Call `notifyAdminsNewStoreApplication()` after successful submission (line ~289)
-- **New DB migration** — Create trigger `enqueue_product_pending_review_notification` on `products` table for `approval_status` changing to `'pending'`
-- `src/hooks/useSellerProducts.ts` — If products are submitted for review from the product management page, also notify admins
-
-**No frozen files are touched.** All changes go through the existing `notification_queue` → `process-notification-queue` pipeline.
-
+### Priority 3 — Engagement
+- New product from favorite seller → Buyer
+- Seller back online → Recent buyers
+- Price drop on wishlisted item → Buyer
+- Order review reminder (24h after delivery) → Buyer
