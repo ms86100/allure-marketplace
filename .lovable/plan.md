@@ -1,40 +1,71 @@
 
 
-# Final Integrity Enforcement — Remaining Items
+# Notification System — Comprehensive Audit & Plan
 
-Most safeguards are already implemented from the previous round. Here's what exists and what's still needed.
+## Root Cause Fix (Implemented)
 
-## Already Implemented ✓
-- **DB trigger** `validate_seller_location_on_approval` — blocks approval without coords
-- **Admin approval checks** in both `useSellerApplicationReview` and `useAdminData` — pre-validate before DB call
-- **Onboarding validation** — checks society coords exist, not just society_id
-- **Falsy check fix** — `??` instead of `||` for lat/lng
+Admin users were not notified when a new store or product was submitted for review. Fixed by:
 
-## Remaining Work
+1. **`notifyAdminsNewStoreApplication()`** in `src/lib/admin-notifications.ts` — queries `user_roles` for admins, enqueues push+in-app notification via `notification_queue`
+2. **`handleSubmit` in `useSellerApplication.ts`** — calls the above after successful submission
+3. **DB trigger `trg_enqueue_product_review_notification`** on `products` table — fires when `approval_status` changes to `'pending'`, notifies all admins
 
-### 1. Discovery RPC Logging
-Update `search_sellers_by_location` to log sellers excluded due to missing coordinates using `RAISE WARNING`. This adds observability without breaking the safe-exclusion behavior.
+---
 
-**File:** New migration  
-**Change:** Add a logging CTE that identifies approved+available sellers with NULL coordinates and raises a warning for each.
+## Current State (As-Is): All Notification Flows
 
-### 2. Scheduled Integrity Monitor
-Create a lightweight edge function `check-location-integrity` that queries for approved sellers with no discoverable coordinates and logs warnings. Schedule it via pg_cron (daily).
+### A. Database Triggers
 
-**Files:**
-- `supabase/functions/check-location-integrity/index.ts` — queries for invalid records, logs them
-- pg_cron job (via insert tool, not migration) — runs daily at 3 AM
+| Trigger | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `enqueue_order_status_notification` | Order status changes | Buyer + Seller | ✅ | ✅ |
+| `enqueue_review_notification` | New review created | Seller | ✅ | ✅ |
+| `enqueue_dispute_status_notification` | Dispute status changes | Submitter | ✅ | ✅ |
+| `enqueue_settlement_notification` | Settlement created | Seller | ✅ | ✅ |
+| `trg_enqueue_product_review_notification` | Product submitted for review | Admins | ✅ | ✅ |
 
-### 3. Data Fix for "Electric shock"
-Use the insert tool to revert "Electric shock" to `pending` status since it has no coordinates. Also remove the seller role so the store is no longer treated as live.
+### B. Edge Functions
 
-**Action:** `UPDATE seller_profiles SET verification_status = 'pending' WHERE business_name = 'Electric shock' AND latitude IS NULL AND longitude IS NULL;`
+| Function | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `send-booking-reminders` | 1h before appointment | Buyer + Seller | ✅ | ✅ |
+| `process-notification-queue` | Queue processor | N/A | ✅ | ✅ |
+| `send-campaign` | Admin broadcast | Targeted users | ✅ | ✅ |
+| `generate-weekly-digest` | Weekly digest | Society members | ✅ | ✅ |
+| `generate-society-report` | Monthly report | Society members | ✅ | ✅ |
+| `detect-collective-issues` | Pattern detection | Society admins | ✅ | ✅ |
 
-### Summary of Changes
-| Item | Type | Description |
-|---|---|---|
-| New migration | SQL | Add logging to `search_sellers_by_location` for excluded sellers |
-| `check-location-integrity` | Edge function | Daily scan for invalid approved sellers |
-| pg_cron job | Data insert | Schedule daily integrity check |
-| "Electric shock" fix | Data update | Revert to pending |
+### C. Client-Side (inserts to `notification_queue`)
 
+| Location | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `admin-notifications.ts` → `notifySellerStatusChange` | Admin approves/rejects seller | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyLicenseStatusChange` | Admin approves/rejects license | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyProductStatusChange` | Admin approves/rejects product | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyAdminsNewStoreApplication` | Seller submits store | Admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyAdmins` | Dispute/snag | Society admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyMembers` | Bulletin posts | Society members | ✅ | ✅ |
+| `ServiceBookingFlow.tsx` | New booking | Seller | ✅ | ❌ |
+| `BuyerCancelBooking.tsx` | Buyer cancels | Seller | ✅ | ❌ |
+| `SellerPaymentConfirmation.tsx` | Payment confirmed | Buyer | ✅ | ❌ |
+| `UpiDeepLinkCheckout.tsx` | UPI payment | Seller | ✅ | ❌ |
+| `useSellerChat.ts` | New chat (60s throttle) | Recipient | ✅ | ❌ |
+| `GuardManualEntryTab.tsx` | Gate entry | Resident | ✅ | ❌ |
+| `manage-delivery` edge fn | Delivery OTP/arrival | Buyer | ✅ | ✅ |
+| `update-delivery-location` edge fn | Delivery delay | Buyer | ✅ | ✅ |
+
+---
+
+## Future Gaps (To-Be)
+
+### Priority 2 — Operational
+- New user pending approval → Society admins
+- New society request → Platform admins
+- Report filed → Admins
+- Delivery partner assigned → Seller
+
+### Priority 3 — Engagement
+- New product from favorite seller → Buyer
+- Seller back online → Recent buyers
+- Price drop on wishlisted item → Buyer
+- Order review reminder (24h after delivery) → Buyer
