@@ -605,7 +605,7 @@ export function usePushNotificationsInternal() {
       // Step 1: Check permissions — NEVER request here (would consume the one-time iOS prompt).
       // Permission requests must ONLY happen via requestFullPermission (user taps "Turn On").
       pushLog('info', 'AR_CHECK_PERMISSIONS_CALLING', { ts: Date.now() });
-      const permStatus = await withTimeout(
+      const permStatus: any = await withTimeout(
         PN.checkPermissions(),
         CHECK_PERMISSIONS_TIMEOUT_MS,
         'AR checkPermissions timed out'
