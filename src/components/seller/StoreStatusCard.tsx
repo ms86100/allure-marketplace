@@ -40,7 +40,7 @@ export function StoreStatusCard({ sellerProfile, sellerProfiles, onToggleAvailab
           </div>
           <div className="min-w-0">
             <h3 className="font-semibold truncate">{sellerProfile.business_name}</h3>
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <span className="inline-flex items-center gap-1 text-xs font-medium text-accent">
                 <CheckCircle2 size={12} />
                 Store is live
@@ -48,6 +48,11 @@ export function StoreStatusCard({ sellerProfile, sellerProfiles, onToggleAvailab
               <span className="text-xs text-muted-foreground">
                 •{' '}{sellerProfile.is_available ? '🟢 Open' : '🔴 Closed'}
               </span>
+              {sellerProfiles.length > 1 && (
+                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                  {sellerProfiles.length} businesses
+                </span>
+              )}
             </div>
           </div>
         </div>
