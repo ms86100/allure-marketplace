@@ -2030,4 +2030,4 @@ CREATE TABLE public.worker_salary_records (
   society_id uuid NOT NULL,
   status text NOT NULL DEFAULT 'pending'::text,
   worker_id uuid NOT NULL
-);]]
+);
