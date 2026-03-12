@@ -32,7 +32,9 @@ export function computeStoreStatus(
   const [endH, endM] = availabilityEnd.split(':').map(Number);
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const startMinutes = startH * 60 + startM;
-  const endMinutes = endH * 60 + endM;
+  const rawEndMinutes = endH * 60 + endM;
+  // Treat 00:00 as end-of-day (1440) so "09:00–00:00" means open until midnight
+  const endMinutes = rawEndMinutes === 0 ? 1440 : rawEndMinutes;
 
   if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
     return { status: 'open', nextOpenAt: null, minutesUntilOpen: 0 };

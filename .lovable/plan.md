@@ -1,26 +1,50 @@
 
 
-# Fix Store Location Icon and Midnight Availability Bug
+## Notification Health Check — User-Friendly UI
 
-## Issue 1: Missing clickable location icon on Seller Detail Page
+### What We'll Build
 
-The seller detail page (line 362-366) shows `MapPin` + society name as static text. It does NOT have a clickable button to open Google Maps, unlike `ListingCard.tsx` which opens `https://www.google.com/maps/search/?api=1&query={lat},{lng}`.
+A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
 
-**Fix in `src/pages/SellerDetailPage.tsx`**: Make the existing MapPin + society name row clickable. When the seller has coordinates (direct or via society fallback), wrap the location span in a button that opens Google Maps.
+### UI Design
 
-## Issue 2: Midnight `availability_end` bug
+**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
 
-**Root cause**: `computeStoreStatus` in `src/lib/store-availability.ts` parses `00:00:00` as 0 minutes. The open check `currentMinutes >= startMinutes && currentMinutes < endMinutes` becomes `currentMinutes >= 540 && currentMinutes < 0` — always false.
+**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
 
-The same bug exists in the DB function `compute_store_status` which also compares `v_current_time >= p_start AND v_current_time < p_end` — `00:00:00` is midnight start-of-day, so this also always fails.
+| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
+|---|---|---|
+| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
+| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
+| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
+| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
 
-**Fix**:
-- **Client-side** (`src/lib/store-availability.ts`): If `endMinutes === 0`, treat it as `1440` (end of day).
-- **DB function** (`compute_store_status`): If `p_end = '00:00:00'`, treat it as `'23:59:59'` for comparison purposes. This requires a migration.
+Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
 
-## Files to modify
+**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
 
-1. `src/pages/SellerDetailPage.tsx` — Add clickable location button with Google Maps link
-2. `src/lib/store-availability.ts` — Fix midnight end-time handling
-3. DB migration — Fix `compute_store_status` function for midnight end-time
+**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
+
+### Implementation
+
+**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
+- Renders the trigger button and the bottom sheet
+- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
+- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
+- Provides actionable buttons for failures (Open Settings, Retry Registration)
+
+**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
+- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
+- Consolidates the 7+ technical steps into 4 simple categories
+- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
+
+**3. Update `src/pages/ProfilePage.tsx`**
+- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
+- Keep Push Debug link visible only for admins
+
+**4. Optionally add to `src/pages/NotificationsPage.tsx`**
+- Add a small "Check notification status" link at the top
+
+### No backend changes needed
+The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
 
