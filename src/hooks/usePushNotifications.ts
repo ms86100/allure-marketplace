@@ -653,7 +653,7 @@ export function usePushNotificationsInternal() {
         for (let i = 1; i <= 3; i++) {
           try {
             pushLog('info', `AR_IOS_FCM_GETTOKEN_ATTEMPT_${i}`, { ts: Date.now() });
-            const result = await withTimeout(fcm.getToken(), FCM_GETTOKEN_TIMEOUT_MS, `AR iOS fcm.getToken attempt ${i} timed out`);
+            const result: any = await withTimeout(fcm.getToken(), FCM_GETTOKEN_TIMEOUT_MS, `AR iOS fcm.getToken attempt ${i} timed out`);
             const candidate = result.token;
             pushLog('info', `AR_IOS_FCM_GETTOKEN_RESULT_${i}`, {
               tokenPrefix: candidate?.substring(0, 20) ?? null,
