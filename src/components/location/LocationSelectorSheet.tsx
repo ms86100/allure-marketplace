@@ -25,6 +25,30 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
   const { browsingLocation, setBrowsingLocation, clearOverride } = useBrowsingLocation();
   const navigate = useNavigate();
   const [detectingGps, setDetectingGps] = useState(false);
+  const [step, setStep] = useState<'pick' | 'confirm'>('pick');
+  const [detectedLocation, setDetectedLocation] = useState<{ lat: number; lng: number; label: string } | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+
+  // Render mini-map when confirming detected location
+  useEffect(() => {
+    if (step !== 'confirm' || !detectedLocation || !mapContainerRef.current) return;
+    if (!(window as any).google?.maps) return;
+
+    const map = new google.maps.Map(mapContainerRef.current, {
+      center: { lat: detectedLocation.lat, lng: detectedLocation.lng },
+      zoom: 15,
+      disableDefaultUI: true,
+      zoomControl: false,
+      gestureHandling: 'none',
+      styles: [{ featureType: 'poi', stylers: [{ visibility: 'simplified' }] }],
+    });
+
+    new google.maps.Marker({
+      position: { lat: detectedLocation.lat, lng: detectedLocation.lng },
+      map,
+      animation: google.maps.Animation.DROP,
+    });
+  }, [step, detectedLocation]);
 
   const handleSelectAddress = (addr: any) => {
     if (!addr.latitude || !addr.longitude) {
@@ -51,7 +75,6 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
     try {
       const pos = await getCurrentPosition();
 
-      // Use Places API nearbySearch (which IS enabled) instead of Geocoder (which is NOT)
       let label = '';
       try {
         await loadGoogleMapsScript();
@@ -59,7 +82,6 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
 
       if ((window as any).google?.maps?.places) {
         try {
-          // Create a temporary hidden div for PlacesService
           const div = document.createElement('div');
           const service = new google.maps.places.PlacesService(div);
           const result = await new Promise<string>((resolve) => {
@@ -82,7 +104,6 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
         } catch { /* fallback below */ }
       }
 
-      // If Places API also failed, try to match against user's saved addresses
       if (!label) {
         const nearbyAddr = addresses.find(a =>
           a.latitude && a.longitude &&
@@ -92,15 +113,8 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
         label = nearbyAddr?.building_name || nearbyAddr?.label || `${pos.latitude.toFixed(4)}, ${pos.longitude.toFixed(4)}`;
       }
 
-      setBrowsingLocation({
-        id: 'gps',
-        label,
-        lat: pos.latitude,
-        lng: pos.longitude,
-        source: 'gps',
-      });
-      onOpenChange(false);
-      toast.success(`Browsing near ${label}`);
+      setDetectedLocation({ lat: pos.latitude, lng: pos.longitude, label });
+      setStep('confirm');
     } catch {
       toast.error('Could not detect location. Please enable location access.');
     } finally {
@@ -108,97 +122,159 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
     }
   };
 
+  const handleConfirmGps = () => {
+    if (!detectedLocation) return;
+    setBrowsingLocation({
+      id: 'gps',
+      label: detectedLocation.label,
+      lat: detectedLocation.lat,
+      lng: detectedLocation.lng,
+      source: 'gps',
+    });
+    onOpenChange(false);
+    toast.success(`Browsing near ${detectedLocation.label}`);
+  };
+
   const handleAddAddress = () => {
     onOpenChange(false);
     navigate('/profile/edit');
   };
 
+  const handleOpenChange = (val: boolean) => {
+    if (!val) {
+      setStep('pick');
+      setDetectedLocation(null);
+    }
+    onOpenChange(val);
+  };
+
   const isSelected = (id: string) => browsingLocation?.id === id;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="bottom" className="rounded-t-2xl max-h-[70dvh] overflow-y-auto">
         <SheetHeader className="pb-2">
-          <SheetTitle className="text-base font-bold">Browse Near</SheetTitle>
+          <SheetTitle className="text-base font-bold">
+            {step === 'confirm' ? 'Confirm Detected Location' : 'Browse Near'}
+          </SheetTitle>
         </SheetHeader>
 
-        <div className="space-y-1.5">
-          {/* GPS Option */}
-          <button
-            type="button"
-            onClick={handleUseGps}
-            disabled={detectingGps}
-            className="w-full flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors text-left"
-          >
-            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              {detectingGps ? <Loader2 size={16} className="animate-spin text-primary" /> : <Navigation size={16} className="text-primary" />}
+        {step === 'confirm' && detectedLocation ? (
+          <div className="space-y-3">
+            {/* Location label */}
+            <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-xl border border-primary/20">
+              <MapPin size={14} className="text-primary shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{detectedLocation.label}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {detectedLocation.lat.toFixed(5)}, {detectedLocation.lng.toFixed(5)}
+                </p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground">Use Current Location</p>
-              <p className="text-[11px] text-muted-foreground">Detect via GPS</p>
-            </div>
-            {isSelected('gps') && <Check size={16} className="text-primary shrink-0" />}
-          </button>
 
-          {/* Saved Addresses */}
-          {addresses.length > 0 && (
-            <div className="pt-2">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1 mb-1.5">Saved Addresses</p>
-              {addresses.map(addr => {
-                const Icon = LABEL_ICONS[addr.label] || MapPin;
-                return (
-                  <button
-                    key={addr.id}
-                    type="button"
-                    onClick={() => handleSelectAddress(addr)}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors text-left mb-1.5"
-                  >
-                    <div className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                      <Icon size={16} className="text-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-foreground">{addr.label}</p>
-                      <p className="text-[11px] text-muted-foreground truncate">
-                        {addr.building_name || addr.full_address || `${addr.flat_number}, ${addr.block}`}
-                      </p>
-                    </div>
-                    {isSelected(addr.id) && <Check size={16} className="text-primary shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+            {/* Mini map */}
+            <div ref={mapContainerRef} className="w-full h-40 rounded-xl border border-border overflow-hidden bg-muted" />
 
-          {/* Add Address */}
-          <button
-            type="button"
-            onClick={handleAddAddress}
-            className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-primary/30 hover:bg-primary/5 transition-colors text-left"
-          >
-            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <Plus size={16} className="text-primary" />
-            </div>
-            <p className="text-sm font-semibold text-primary">Add New Address</p>
-          </button>
+            <p className="text-[10px] text-muted-foreground text-center">
+              Is this the correct location? Confirm to browse stores nearby.
+            </p>
 
-          {/* Society Default */}
-          {society?.latitude && society?.longitude && (
+            {/* Action buttons */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => { setStep('pick'); setDetectedLocation(null); }}
+                className="flex-1 h-11 rounded-xl"
+              >
+                <ArrowLeft size={14} className="mr-1" /> Back
+              </Button>
+              <Button
+                onClick={handleConfirmGps}
+                className="flex-1 h-11 rounded-xl font-semibold"
+              >
+                <Check size={14} className="mr-1" /> Confirm
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {/* GPS Option */}
             <button
               type="button"
-              onClick={handleUseSociety}
+              onClick={handleUseGps}
+              disabled={detectingGps}
               className="w-full flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors text-left"
             >
-              <div className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                <Building size={16} className="text-foreground" />
+              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                {detectingGps ? <Loader2 size={16} className="animate-spin text-primary" /> : <Navigation size={16} className="text-primary" />}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground">Society Default</p>
-                <p className="text-[11px] text-muted-foreground truncate">{society.name}</p>
+                <p className="text-sm font-semibold text-foreground">Use Current Location</p>
+                <p className="text-[11px] text-muted-foreground">Detect via GPS</p>
               </div>
-              {browsingLocation?.source === 'society' && <Check size={16} className="text-primary shrink-0" />}
+              {isSelected('gps') && <Check size={16} className="text-primary shrink-0" />}
             </button>
-          )}
-        </div>
+
+            {/* Saved Addresses */}
+            {addresses.length > 0 && (
+              <div className="pt-2">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1 mb-1.5">Saved Addresses</p>
+                {addresses.map(addr => {
+                  const Icon = LABEL_ICONS[addr.label] || MapPin;
+                  return (
+                    <button
+                      key={addr.id}
+                      type="button"
+                      onClick={() => handleSelectAddress(addr)}
+                      className="w-full flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors text-left mb-1.5"
+                    >
+                      <div className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                        <Icon size={16} className="text-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground">{addr.label}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {addr.building_name || addr.full_address || `${addr.flat_number}, ${addr.block}`}
+                        </p>
+                      </div>
+                      {isSelected(addr.id) && <Check size={16} className="text-primary shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Add Address */}
+            <button
+              type="button"
+              onClick={handleAddAddress}
+              className="w-full flex items-center gap-3 p-3 rounded-xl border border-dashed border-primary/30 hover:bg-primary/5 transition-colors text-left"
+            >
+              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Plus size={16} className="text-primary" />
+              </div>
+              <p className="text-sm font-semibold text-primary">Add New Address</p>
+            </button>
+
+            {/* Society Default */}
+            {society?.latitude && society?.longitude && (
+              <button
+                type="button"
+                onClick={handleUseSociety}
+                className="w-full flex items-center gap-3 p-3 rounded-xl border border-border hover:bg-muted/50 transition-colors text-left"
+              >
+                <div className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                  <Building size={16} className="text-foreground" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">Society Default</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{society.name}</p>
+                </div>
+                {browsingLocation?.source === 'society' && <Check size={16} className="text-primary shrink-0" />}
+              </button>
+            )}
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );
