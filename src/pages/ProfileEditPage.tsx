@@ -21,7 +21,9 @@ export default function ProfileEditPage() {
   const [name, setName] = useState(
     profile?.name && profile.name !== 'User' ? profile.name : ''
   );
-  const [email, setEmail] = useState(profile?.email || '');
+  const [email, setEmail] = useState(
+    profile?.email && !profile.email.endsWith('@phone.sociva.app') ? profile.email : ''
+  );
   const [savingProfile, setSavingProfile] = useState(false);
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<any>(null);
