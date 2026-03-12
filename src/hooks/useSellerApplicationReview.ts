@@ -166,11 +166,14 @@ export function useSellerApplicationReview() {
         }
       }
 
-      const { error } = await supabase.from('seller_profiles').update({
+      const { data: updated, error } = await supabase.from('seller_profiles').update({
         verification_status: status,
         rejection_note: status === 'rejected' ? (rejectionNote.trim() || null) : null,
-      } as any).eq('id', seller.id);
+      } as any).eq('id', seller.id).select('verification_status').single();
       if (error) throw error;
+      if (!updated || (updated as any).verification_status !== status) {
+        throw new Error(`Update did not persist — status is still "${(updated as any)?.verification_status ?? 'unknown'}"`);
+      }
       await logAudit(`seller_${status}`, 'seller_profile', seller.id, '', { status, note: rejectionNote || undefined });
 
       if (status === 'approved') {
