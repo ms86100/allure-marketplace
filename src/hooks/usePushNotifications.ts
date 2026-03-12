@@ -483,7 +483,7 @@ export function usePushNotificationsInternal() {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         pushLog('info', 'RECONCILE_GETTOKEN_CALLING', { reason, platform, attempt, ts: Date.now() });
-        const result = await withTimeout(
+        const result: any = await withTimeout(
           fcm.getToken(),
           RECONCILE_GETTOKEN_TIMEOUT_MS,
           'reconcileRuntimeToken getToken timed out'
