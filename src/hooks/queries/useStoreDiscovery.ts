@@ -86,7 +86,7 @@ export function useLocalSellers() {
       }
       return grouped;
     },
-    enabled: !!isApproved && !!(lat && lng),
+    enabled: !!(lat && lng),
     staleTime: jitteredStaleTime(10 * 60_000),
   });
 }
@@ -96,7 +96,6 @@ export function useLocalSellers() {
  * Always uses search_sellers_by_location with browsingLocation.
  */
 export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM, enabled: boolean = true) {
-  const { isApproved } = useAuth();
   const { browsingLocation } = useBrowsingLocation();
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
