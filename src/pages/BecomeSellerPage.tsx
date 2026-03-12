@@ -127,6 +127,7 @@ const FULFILLMENT_OPTIONS = [
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
 export default function BecomeSellerPage() {
+  const { profile } = useAuth();
   const app = useSellerApplication();
   const {
     user, isLoading, isCheckingExisting, groupsLoading, existingSeller, draftSellerId,
