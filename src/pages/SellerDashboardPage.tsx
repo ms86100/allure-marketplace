@@ -178,6 +178,11 @@ export default function SellerDashboardPage() {
           onToggleAvailability={toggleAvailability}
         />
         <SellerVisibilityChecklist sellerId={sellerProfile.id} />
+        <MissingLocationBanner
+          sellerId={sellerProfile.id}
+          hasCoordinates={!!(sellerProfile as any).latitude && !!(sellerProfile as any).longitude}
+          hasSocietyId={!!sellerProfile.society_id}
+        />
 
         {/* Tab navigation */}
         <Tabs defaultValue="orders" className="w-full">
