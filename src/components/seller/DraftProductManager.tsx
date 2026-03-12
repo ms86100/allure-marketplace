@@ -99,17 +99,22 @@ export function DraftProductManager({
     prep_time_minutes: null,
   });
 
-  // Auto-persist product form draft to sessionStorage on every change
+  // Auto-persist product form draft to localStorage with debounce
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
     if (!isAdding) {
-      sessionStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(DRAFT_KEY);
       return;
     }
-    try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
-        isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule,
-      }));
-    } catch { /* quota exceeded — non-critical */ }
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule,
+        }));
+      } catch { /* quota exceeded — non-critical */ }
+    }, 500);
+    return () => clearTimeout(debounceRef.current);
   }, [isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule, DRAFT_KEY]);
 
   // Get form hints for the selected category
