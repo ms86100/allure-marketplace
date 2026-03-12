@@ -7,7 +7,7 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 interface DemandInsightsProps {
-  societyId: string;
+  societyId?: string | null;
 }
 
 export function DemandInsights({ societyId }: DemandInsightsProps) {
@@ -15,15 +15,14 @@ export function DemandInsights({ societyId }: DemandInsightsProps) {
   const maxItems = ml.threshold('demand_insights_max_items');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['unmet-demand', societyId],
+    queryKey: ['unmet-demand', societyId ?? 'all'],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_unmet_demand', {
-        _society_id: societyId,
+        _society_id: societyId || null,
       });
       if (error) throw error;
       return (data || []) as { search_term: string; search_count: number; last_searched: string }[];
     },
-    enabled: !!societyId,
     staleTime: 10 * 60 * 1000,
   });
 

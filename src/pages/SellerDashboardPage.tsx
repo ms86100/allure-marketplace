@@ -326,7 +326,7 @@ export default function SellerDashboardPage() {
             />
 
             <SellerAnalytics sellerId={sellerProfile.id} />
-            <DemandInsights societyId={sellerProfile.society_id || ''} />
+            <DemandInsights societyId={sellerProfile.society_id} />
           </TabsContent>
         </Tabs>
       </div>

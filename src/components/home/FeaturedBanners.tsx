@@ -24,6 +24,8 @@ export function FeaturedBanners() {
 
       if (effectiveSocietyId) {
         query = query.or(`society_id.eq.${effectiveSocietyId},society_id.is.null`);
+      } else {
+        query = query.is('society_id', null);
       }
 
       const { data, error } = await query;

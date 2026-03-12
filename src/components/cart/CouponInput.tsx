@@ -75,7 +75,7 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
     }
     fetchCoupons();
     return () => { cancelled = true; };
-  }, [effectiveSocietyId, sellerId, user]);
+  }, [sellerId, user]);
 
   const calculateDiscount = (coupon: CouponData) => {
     let discount = 0;
