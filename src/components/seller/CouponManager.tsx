@@ -67,8 +67,8 @@ export function CouponManager() {
   };
 
   const handleCreate = async () => {
-    if (!currentSellerId || !profile?.society_id) {
-      toast.error('Missing seller or society information');
+    if (!currentSellerId) {
+      toast.error('Missing seller information');
       return;
     }
     if (!formData.code || !formData.discount_value) {
@@ -78,7 +78,7 @@ export function CouponManager() {
 
     const { error } = await supabase.from('coupons').insert({
       seller_id: currentSellerId,
-      society_id: profile.society_id,
+      society_id: profile?.society_id || null,
       code: formData.code.toUpperCase().trim(),
       description: formData.description.trim() || null,
       discount_type: formData.discount_type,
@@ -92,7 +92,7 @@ export function CouponManager() {
     });
 
     if (error) {
-      if (error.message.includes('unique')) toast.error('This coupon code already exists in your society');
+      if (error.message.includes('unique')) toast.error('This coupon code already exists for your store');
       else toast.error('Failed to create coupon');
       return;
     }

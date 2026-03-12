@@ -51,10 +51,10 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
   const [userRedemptions, setUserRedemptions] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    if (!effectiveSocietyId || !user) return;
+    if (!user) return;
     let cancelled = false;
     async function fetchCoupons() {
-      const { data } = await supabase.from('coupons').select('id, code, description, discount_type, discount_value, max_discount_amount, min_order_amount, expires_at, starts_at, usage_limit, times_used, per_user_limit, show_to_buyers').eq('society_id', effectiveSocietyId!).eq('seller_id', sellerId).eq('is_active', true).eq('show_to_buyers', true);
+      const { data } = await supabase.from('coupons').select('id, code, description, discount_type, discount_value, max_discount_amount, min_order_amount, expires_at, starts_at, usage_limit, times_used, per_user_limit, show_to_buyers').eq('seller_id', sellerId).eq('is_active', true).eq('show_to_buyers', true);
       if (cancelled || !data) return;
       const now = new Date();
       const valid = (data as CouponData[]).filter(c => {
@@ -105,10 +105,10 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
   };
 
   const handleApply = async () => {
-    if (!code.trim() || !user || !effectiveSocietyId) return;
+    if (!code.trim() || !user) return;
     setIsValidating(true);
     try {
-      const { data: coupon, error } = await supabase.from('coupons').select('*').eq('code', code.toUpperCase().trim()).eq('society_id', effectiveSocietyId).eq('seller_id', sellerId).eq('is_active', true).single();
+      const { data: coupon, error } = await supabase.from('coupons').select('*').eq('code', code.toUpperCase().trim()).eq('seller_id', sellerId).eq('is_active', true).single();
       if (error || !coupon) { toast.error('Invalid or expired coupon code'); return; }
       if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) { toast.error('This coupon has expired'); return; }
       if (new Date(coupon.starts_at) > new Date()) { toast.error('This coupon is not yet active'); return; }
