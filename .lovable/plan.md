@@ -1,50 +1,72 @@
 
+Round 3 replan approved scope: keep MyGate-style society gating, remove marketplace over-restriction.
 
-## Notification Health Check — User-Friendly UI
+1) Deep issues found (current blockers)
+- Product RLS is still society-coupled:
+  - `products` SELECT policy allows approved products only when seller is commercial OR seller.society_id = user society.
+  - This breaks cross-society marketplace visibility in direct table reads.
+- Discovery RPC still society-coupled:
+  - `search_sellers_by_location` includes `sp.society_id = user society` gate for society-resident sellers.
+  - This conflicts with your rule: radius-based discovery must override society boundary.
+- Seller detail is inconsistent:
+  - `SellerDetailPage` can allow seller card via coordinate fallback, but product list is fetched from `products` table (RLS can still hide products).
+- Cart/reorder flows can silently degrade:
+  - `useCart` joins `cart_items -> products`; if product row is hidden by RLS, item disappears.
+  - `ReorderLastOrder`, `ReorderButton`, `useProductDetail` similar-products all depend on direct `products` reads.
+- “Phase 4 E2E” test is not real E2E:
+  - `src/test/marketplace-society-separation-e2e.test.ts` simulates logic with local helper functions; it does not verify real DB policies/RPC behavior.
 
-### What We'll Build
+2) Implementation replan (Round 3)
+Phase A — Backend policy/RPC correction (P0)
+- Update `products` SELECT RLS to marketplace-open for approved products from approved sellers (no society equality gate).
+- Update `search_sellers_by_location` to remove same-society requirement; rely on:
+  - approved seller
+  - distance/radius
+  - seller availability
+  - product availability.
+- Keep society-feature tables/policies unchanged.
 
-A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
+Phase B — Frontend consistency (P0/P1)
+- `SellerDetailPage`: use one consistent access rule source (RPC-backed seller visibility + product fetch aligned with new policy).
+- `useCart`: prevent silent cart row loss; add explicit handling when product relation is missing.
+- Verify marketplace read paths using `products`:
+  - `useProductDetail` similar products
+  - `ReorderLastOrder`
+  - `ReorderButton`
+  - buy-again fallback queries.
 
-### UI Design
+Phase C — FeatureGate hardening (P1)
+- Keep society features strictly gated by `effectiveSocietyId`.
+- Keep marketplace features always passable.
+- Centralize domain map (`society` vs `marketplace`) and add a guard to prevent future misclassification.
 
-**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
+Phase D — Real verification matrix (P0)
+- Replace simulated “E2E” with integration validation that exercises actual app queries/RPC + RLS behavior.
+- Validate these must-pass journeys:
+  1. No-society buyer: discovery → seller detail/menu → cart → coupon → checkout → order visible.
+  2. Society buyer cross-society seller: same complete flow.
+  3. Commercial seller (no society): coupon create, order receive, status progression, demand insights relevance.
+  4. No-society user blocked from society features (gate entry, bulletin, workforce, authorized persons).
 
-**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
+3) Technical details (explicit change targets)
+- DB migration:
+  - `products` SELECT policy rewrite.
+  - `search_sellers_by_location` function rewrite.
+  - (Optional cleanup) remove deprecated overloaded `get_unmet_demand` signatures to avoid ambiguity.
+- Code files likely impacted:
+  - `src/pages/SellerDetailPage.tsx`
+  - `src/hooks/useCart.tsx`
+  - `src/hooks/useProductDetail.ts`
+  - `src/components/home/ReorderLastOrder.tsx`
+  - `src/components/order/ReorderButton.tsx`
+  - `src/hooks/useEffectiveFeatures.ts`
+  - `src/test/marketplace-society-separation-e2e.test.ts` (replace with real integration checks).
 
-| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
-|---|---|---|
-| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
-| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
-| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
-| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
-
-Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
-
-**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
-
-**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
-
-### Implementation
-
-**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
-- Renders the trigger button and the bottom sheet
-- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
-- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
-- Provides actionable buttons for failures (Open Settings, Retry Registration)
-
-**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
-- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
-- Consolidates the 7+ technical steps into 4 simple categories
-- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
-
-**3. Update `src/pages/ProfilePage.tsx`**
-- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
-- Keep Push Debug link visible only for admins
-
-**4. Optionally add to `src/pages/NotificationsPage.tsx`**
-- Add a small "Check notification status" link at the top
-
-### No backend changes needed
-The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
-
+4) Expected post-fix behavior
+- Society layer remains private and fully gated.
+- Marketplace is fully operational for:
+  - users with society
+  - users without society
+  - commercial sellers
+  - cross-society interactions.
+- No buyer/seller marketplace journey fails due to null `effectiveSocietyId`.
