@@ -1060,7 +1060,7 @@ export function usePushNotificationsInternal() {
             const PN = await getPushNotificationsPlugin();
             let resumePermission = 'prompt';
             if (PN) {
-              const p = await withTimeout(
+              const p: any = await withTimeout(
                 PN.checkPermissions(),
                 CHECK_PERMISSIONS_TIMEOUT_MS,
                 'resume checkPermissions timed out'
