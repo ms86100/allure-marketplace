@@ -1,106 +1,50 @@
 
 
-## Round 4 Verification Report — Marketplace vs Society Architecture
+## Notification Health Check — User-Friendly UI
 
-### 1. Full Codebase Society-Gate Audit Report
+### What We'll Build
 
-Every file using `effectiveSocietyId` has been classified. **No marketplace bugs found.**
+A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
 
-#### Society Features (VALID gates — 20 files)
-| File | Feature Domain |
-|---|---|
-| `WorkerSalaryPage` | Workforce |
-| `useWorkerRole` | Workforce |
-| `useSecurityOfficer` | Security |
-| `useSocietyAdmin` | Society Admin |
-| `useVisitorManagement` | Visitor Mgmt |
-| `useInspectionChecklist` | Inspection |
-| `WorkerCategoryManager` | Workforce |
-| `WorkerGateValidation` | Workforce |
-| `CollectiveBuyPage` | Collective Buy |
-| `MaintenancePage` | Maintenance |
-| `SecurityAuditPage` | Security |
-| `SocietyFinancesPage` | Finances |
-| `SocietyDashboardPage` | Society Admin |
-| `SocietyReportPage` | Society Reports |
-| `CommunityTeaser` | Bulletin |
-| `SocietyLeaderboard` | Society Stats |
-| `SocietyTrustStrip` | Society Stats |
-| `useCommunitySearchSuggestions` | Society Search |
-| `useSocietyHealthMetrics` | Society Health |
-| `CreateGroupBuySheet` | Collective Buy |
+### UI Design
 
-#### Marketplace Files — Optional Usage Only (NOT gates)
-| File | Usage | Blocks on null? |
+**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
+
+**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
+
+| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
 |---|---|---|
-| `SellerDetailPage` | Coordinate fallback for distance calc + `is_same_society` metadata | No |
-| `useSearchPage` | Optional `society_id` in demand log insert | No |
-| `FeaturedBanners` | Filter banners by society OR null (shows global when no society) | No |
-| `SellerRecommendButton` | Optional metadata `society_id: effectiveSocietyId \|\| null` | No |
+| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
+| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
+| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
+| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
 
-#### Marketplace Files — Zero Society Dependency
-| File | Status |
-|---|---|
-| `useCart` | No `effectiveSocietyId` |
-| `ReorderLastOrder` | No `effectiveSocietyId` |
-| `useStoreDiscovery` | No society gates |
-| `useProductDetail` | No society gates |
-| `CategoryGroupPage` | Uses coordinate RPC |
+Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
 
-### 2. RPC Verification — `search_sellers_by_location`
+**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
 
-**Confirmed clean via direct database query.** The live function body contains:
-- Bounding box filter
-- Haversine radius check
-- `verification_status = 'approved'`
-- `is_available = true`
-- Product existence check
-- `_exclude_society_id` (optional exclusion, not a gate)
-- `society_name` as metadata return only
+**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
 
-**No society equality filtering exists.** No `get_user_society_id()` calls. No `sp.society_id = ...` gates.
+### Implementation
 
-### 3. RLS Policy Verification (Live Database)
+**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
+- Renders the trigger button and the bottom sheet
+- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
+- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
+- Provides actionable buttons for failures (Open Settings, Retry Registration)
 
-| Table | Policy | Society Gate? | Status |
-|---|---|---|---|
-| `products` SELECT | Approved products from approved sellers | None | CLEAN |
-| `coupons` SELECT | Active, valid date range | None | CLEAN |
-| `cart_items` ALL | `user_id = auth.uid()` | None | CLEAN |
-| `orders` SELECT/UPDATE | `buyer_id` or seller's `user_id` | None | CLEAN |
-| `orders` INSERT | `buyer_id = auth.uid()` | None | CLEAN |
-| `seller_recommendations` SELECT | `true` | None | CLEAN |
-| `search_demand_log` INSERT | `auth.uid() IS NOT NULL` | None | CLEAN |
-| `search_demand_log` SELECT (sellers) | Seller-scoped OR null society | None | CLEAN |
+**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
+- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
+- Consolidates the 7+ technical steps into 4 simple categories
+- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
 
-### 4. Feature Classification Confirmation
+**3. Update `src/pages/ProfilePage.tsx`**
+- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
+- Keep Push Debug link visible only for admins
 
-**MARKETPLACE_FEATURES** (always enabled, no society required):
-`marketplace`, `seller_tools`, `trust_directory`, `trust_score`, `subscriptions`, `notifications`
+**4. Optionally add to `src/pages/NotificationsPage.tsx`**
+- Add a small "Check notification status" link at the top
 
-**SOCIETY_FEATURES** (require `effectiveSocietyId`):
-`delivery_management`, `collective_buy`, `gate_entry`, `authorized_persons`, `bulletin`, `visitor_management`, `domestic_help`, `workforce_management`, `worker_marketplace`, `worker_attendance`, `worker_salary`, `worker_leave`, `society_notices`, `security_audit`, `guard_kiosk`, `vehicle_parking`, `resident_identity_verification`, `community_rules`, `society_reports`, `inspection`, `maintenance`, `parcel_management`
-
-**`delivery_management`** is correctly NOT in MARKETPLACE_FEATURES.
-
-### 5. Query Performance
-
-The `EXPLAIN` output for `search_sellers_by_location` shows a clean function scan with no nested subqueries for society matching. The redundant community gating block (which included a per-row `SELECT p2.society_id FROM profiles WHERE p2.id = auth.uid()`) was removed in Round 3. Performance improvement: eliminated one correlated subquery per seller row.
-
-### 6. What Needs to Change — E2E Test Update
-
-The only remaining deliverable is replacing the simulated E2E tests with real integration tests that exercise actual DB queries/RPCs.
-
-**Implementation:**
-- Rewrite `src/test/marketplace-society-separation-e2e.test.ts` to use `src/test/helpers/integration.ts` infrastructure
-- Tests will authenticate as real users (buyer, seller) and hit actual Supabase tables/RPCs
-- Four test suites:
-  1. **No-society buyer**: discovery RPC, product read, cart CRUD, coupon read, order create
-  2. **Cross-society buyer**: same flow with society-resident seller
-  3. **Commercial seller**: coupon create, order visibility, demand insights RPC
-  4. **Society feature denial**: verify gate_entry/bulletin tables reject non-society users
-
-### 7. Architecture Verdict
-
-**No code or schema changes needed.** The marketplace layer is fully independent of `effectiveSocietyId`. All Rounds 1-3 fixes are correctly deployed and verified against the live database. The only remaining work is upgrading the test file from simulated to real integration tests.
+### No backend changes needed
+The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
 
