@@ -157,7 +157,7 @@ export function useSearchPage() {
 
     // Log search demand (best-effort, society_id nullable for non-society users)
     if (term.length >= 3) {
-      supabase.from('search_demand_log').insert({ society_id: effectiveSocietyId || null, search_term: term.trim().toLowerCase(), category: selectedCategory || null }).then(() => {});
+      supabase.from('search_demand_log').insert({ society_id: effectiveSocietyId || null, search_term: term.trim().toLowerCase(), category: selectedCategory || null }).then(({ error: logErr }) => { if (logErr) console.warn('Search demand log failed:', logErr.message); });
     }
 
     try {

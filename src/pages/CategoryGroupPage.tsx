@@ -15,11 +15,12 @@ import { ServiceCategory } from '@/types/categories';
 import { SORT_OPTIONS, SortKey } from '@/lib/marketplace-constants';
 import { ArrowLeft, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useNearbyProducts } from '@/hooks/queries/useNearbyProducts';
+import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
+import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 
 export default function CategoryGroupPage() {
   const { category } = useParams<{ category: string }>();
@@ -81,9 +82,15 @@ export default function CategoryGroupPage() {
   );
   const showAllTab = subCategories.length > 1;
 
+  const { browsingLocation } = useBrowsingLocation();
+  const lat = browsingLocation?.lat;
+  const lng = browsingLocation?.lng;
+
   const { data: topSellers = [] } = useQuery({
-    queryKey: ['category-sellers', category],
+    queryKey: ['category-sellers', category, lat, lng],
     queryFn: async () => {
+      if (!lat || !lng) return [];
+
       const { data: cats } = await supabase
         .from('category_config')
         .select('category')
@@ -92,26 +99,37 @@ export default function CategoryGroupPage() {
       const categoryList = (cats || []).map((c: any) => c.category);
       if (categoryList.length === 0) return [];
 
-      const { data: sellers, error } = await supabase
-        .from('seller_profiles')
-        .select(`
-          *,
-          profile:profiles!seller_profiles_user_id_fkey(name, block),
-          products!products_seller_id_fkey(category)
-        `)
-        .eq('verification_status', 'approved')
-        .order('rating', { ascending: false })
-        .limit(20);
+      // Use coordinate-based RPC for each category, then deduplicate
+      const allSellers = new Map<string, any>();
+      for (const cat of categoryList.slice(0, 5)) {
+        const { data: rpcData } = await supabase.rpc('search_sellers_by_location' as any, {
+          _lat: lat, _lng: lng, _radius_km: MARKETPLACE_RADIUS_KM, _category: cat,
+        });
+        if (rpcData) {
+          (rpcData as any[]).forEach((s: any) => {
+            if (!allSellers.has(s.seller_id)) {
+              allSellers.set(s.seller_id, {
+                id: s.seller_id,
+                business_name: s.business_name,
+                profile_image_url: s.profile_image_url,
+                rating: s.rating,
+                total_reviews: s.total_reviews,
+                is_featured: s.is_featured,
+                categories: s.categories,
+                primary_group: s.primary_group,
+                distance_km: s.distance_km,
+                society_name: s.society_name,
+              });
+            }
+          });
+        }
+      }
 
-      if (error) throw error;
-
-      const filtered = (sellers || []).filter((s: any) =>
-        s.products?.some((p: any) => categoryList.includes(p.category))
-      );
-
-      return filtered.slice(0, 10);
+      return Array.from(allSellers.values())
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        .slice(0, 10);
     },
-    enabled: !!category,
+    enabled: !!category && !!(lat && lng),
   });
 
   const displayProducts = useMemo(() => {

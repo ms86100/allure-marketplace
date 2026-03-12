@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
@@ -47,7 +47,6 @@ export interface SocietyGroup {
  * Replaces the old society_id–based query.
  */
 export function useLocalSellers() {
-  const { isApproved } = useAuth();
   const { browsingLocation } = useBrowsingLocation();
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
@@ -86,7 +85,7 @@ export function useLocalSellers() {
       }
       return grouped;
     },
-    enabled: !!isApproved && !!(lat && lng),
+    enabled: !!(lat && lng),
     staleTime: jitteredStaleTime(10 * 60_000),
   });
 }
@@ -96,7 +95,6 @@ export function useLocalSellers() {
  * Always uses search_sellers_by_location with browsingLocation.
  */
 export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM, enabled: boolean = true) {
-  const { isApproved } = useAuth();
   const { browsingLocation } = useBrowsingLocation();
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
@@ -155,7 +153,7 @@ export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM
 
       return bands;
     },
-    enabled: !!isApproved && !!(lat && lng) && enabled,
+    enabled: !!(lat && lng) && enabled,
     staleTime: jitteredStaleTime(10 * 60_000),
   });
 }

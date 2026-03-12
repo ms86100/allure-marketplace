@@ -79,13 +79,21 @@ export function useEffectiveFeatures() {
 
   const { isAdmin } = useAuth();
 
+  // Marketplace features that must work without a society
+  const MARKETPLACE_FEATURES: Set<string> = useMemo(() => new Set([
+    'marketplace', 'seller_tools', 'trust_directory', 'trust_score',
+    'subscriptions', 'notifications',
+  ]), []);
+
   const isFeatureEnabled = useCallback((key: FeatureKey): boolean => {
     if (isAdmin) return true; // Platform admins bypass all feature gates
+    // Marketplace-domain features are always enabled even without a society
+    if (MARKETPLACE_FEATURES.has(key)) return true;
     if (!effectiveSocietyId) return false;
     const feature = featureMap.get(key);
     if (!feature) return false;
     return feature.is_enabled;
-  }, [isAdmin, effectiveSocietyId, featureMap]);
+  }, [isAdmin, effectiveSocietyId, featureMap, MARKETPLACE_FEATURES]);
 
   const getFeatureState = useCallback((key: FeatureKey): FeatureState => {
     const feature = featureMap.get(key);
