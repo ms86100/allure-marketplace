@@ -82,10 +82,10 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
         <button className="w-full flex items-center justify-between p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
           <div className="flex items-center gap-2">
             <Puzzle size={16} className="text-primary" />
-            <span className="text-sm font-medium">Customize Listing</span>
+            <span className="text-sm font-medium">Extra Details</span>
             {activeBlocks.length > 0 && (
               <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
-                {activeBlocks.length} block{activeBlocks.length > 1 ? 's' : ''}
+                {activeBlocks.length} added
               </Badge>
             )}
           </div>
