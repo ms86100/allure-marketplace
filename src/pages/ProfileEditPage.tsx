@@ -41,7 +41,7 @@ export default function ProfileEditPage() {
     try {
       const { error } = await supabase.from('profiles').update({
         name: name.trim(),
-        email: email.trim() || null,
+        email: email.trim() && !email.trim().endsWith('@phone.sociva.app') ? email.trim() : null,
       }).eq('id', user.id);
       if (error) throw error;
       await refreshProfile();

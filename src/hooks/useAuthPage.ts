@@ -190,7 +190,7 @@ export function useAuthPage() {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (authUser) {
           const { data: prof } = await supabase.from('profiles').select('name, flat_number, block').eq('id', authUser.id).maybeSingle();
-          const isIncomplete = !prof?.name || prof.name === 'User' || !prof.flat_number || !prof.block;
+          const isIncomplete = !prof?.name || prof.name === 'User';
           navigate(isIncomplete ? '/profile/edit' : '/');
         } else {
           navigate('/');
