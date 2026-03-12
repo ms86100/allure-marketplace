@@ -1,47 +1,50 @@
 
 
-# Fix Onboarding Flow: Email, Redirect, and Navigation Loop
+## Notification Health Check — User-Friendly UI
 
-## Issue 1: Email field pre-filled with synthetic address
+### What We'll Build
 
-**Root cause**: `ProfileEditPage` line 24 initializes email state with `profile?.email || ''`. The profile email is set to the synthetic `917838459432@phone.sociva.app` during OTP registration.
+A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
 
-**Fix in `src/pages/ProfileEditPage.tsx`**: Filter out synthetic emails — if the email ends with `@phone.sociva.app`, treat it as empty.
+### UI Design
 
-```ts
-const [email, setEmail] = useState(
-  profile?.email && !profile.email.endsWith('@phone.sociva.app') ? profile.email : ''
-);
-```
+**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
 
-Also apply the same filter when saving — strip the synthetic email so it doesn't persist:
-```ts
-email: email.trim() && !email.trim().endsWith('@phone.sociva.app') ? email.trim() : null,
-```
+**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
 
-## Issue 2: Redirect loop after "Save & Go to Home"
+| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
+|---|---|---|
+| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
+| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
+| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
+| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
 
-**Root cause**: `HomePage.tsx` lines 24-31 has a `useEffect` that checks `!profile.flat_number || !profile.block` and redirects back to `/profile/edit`. Even after saving the profile, the `refreshProfile()` updates the context, but by the time the user reaches HomePage, the profile state in context may still be stale from the previous render cycle (React batching). More critically, if the user didn't save an address first, flat_number/block might genuinely be empty.
+Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
 
-The real problem is that `handleSaveProfile` only saves `name` and `email` — it does NOT save `flat_number` and `block`. Those are only synced when an address is saved (line 64-74). So if the user fills out an address, then edits their name and clicks "Save & Go to Home," the profile IS complete. But if flat_number/block are empty (e.g., user without a society), the redirect guard on HomePage sends them right back.
+**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
 
-**Fix**: The HomePage redirect guard is too aggressive. A user should be able to reach home if they have a name and at least one delivery address OR flat_number+block. The simplest fix is to relax the HomePage guard to only require `name`:
+**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
 
-**In `src/pages/HomePage.tsx`** (line 26): Change the completeness check to only require name:
-```ts
-const isIncomplete = !profile.name || profile.name === 'User';
-```
+### Implementation
 
-The profile completion banner (lines 61-85) already handles showing missing flat_number/block as a non-blocking prompt, which is the correct UX.
+**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
+- Renders the trigger button and the bottom sheet
+- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
+- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
+- Provides actionable buttons for failures (Open Settings, Retry Registration)
 
-Also update the same check in `src/hooks/useAuthPage.ts` (line 193) to match:
-```ts
-const isIncomplete = !prof?.name || prof.name === 'User';
-```
+**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
+- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
+- Consolidates the 7+ technical steps into 4 simple categories
+- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
 
-## Files to modify
+**3. Update `src/pages/ProfilePage.tsx`**
+- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
+- Keep Push Debug link visible only for admins
 
-1. **`src/pages/ProfileEditPage.tsx`** — Filter out synthetic `@phone.sociva.app` emails from initial state and save payload
-2. **`src/pages/HomePage.tsx`** — Relax redirect guard to only require name (not flat_number/block)
-3. **`src/hooks/useAuthPage.ts`** — Match the relaxed completeness check for post-login redirect
+**4. Optionally add to `src/pages/NotificationsPage.tsx`**
+- Add a small "Check notification status" link at the top
+
+### No backend changes needed
+The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
 

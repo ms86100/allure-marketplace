@@ -23,7 +23,7 @@ export default function HomePage() {
   // Auto-redirect to profile edit if profile is incomplete
   useEffect(() => {
     if (profile) {
-      const isIncomplete = !profile.name || profile.name === 'User' || !profile.flat_number || !profile.block;
+      const isIncomplete = !profile.name || profile.name === 'User';
       if (isIncomplete) {
         navigate('/profile/edit', { replace: true });
       }
