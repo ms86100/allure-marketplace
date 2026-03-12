@@ -67,8 +67,8 @@ export function CouponManager() {
   };
 
   const handleCreate = async () => {
-    if (!currentSellerId || !profile?.society_id) {
-      toast.error('Missing seller or society information');
+    if (!currentSellerId) {
+      toast.error('Missing seller information');
       return;
     }
     if (!formData.code || !formData.discount_value) {
