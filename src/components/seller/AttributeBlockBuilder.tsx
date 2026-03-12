@@ -82,10 +82,10 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
         <button className="w-full flex items-center justify-between p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
           <div className="flex items-center gap-2">
             <Puzzle size={16} className="text-primary" />
-            <span className="text-sm font-medium">Customize Listing</span>
+            <span className="text-sm font-medium">Extra Details</span>
             {activeBlocks.length > 0 && (
               <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
-                {activeBlocks.length} block{activeBlocks.length > 1 ? 's' : ''}
+                {activeBlocks.length} added
               </Badge>
             )}
           </div>
@@ -125,13 +125,13 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
           disabled={availableBlocks.length === 0}
         >
           <Plus size={14} className="mr-1" />
-          Add Attribute Block
+          Add More Details
         </Button>
 
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetContent side="bottom" className="rounded-t-2xl max-h-[60vh] overflow-y-auto">
             <SheetHeader>
-              <SheetTitle>Add Attribute Block</SheetTitle>
+              <SheetTitle>Add Details to Your Listing</SheetTitle>
             </SheetHeader>
             <div className="mt-4 space-y-2">
               {availableBlocks.map((block) => (
@@ -150,7 +150,7 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
               ))}
               {availableBlocks.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  {category ? 'All available blocks have been added' : 'Select a category first to see available attribute blocks'}
+                  {category ? 'All details have been added' : 'Select a category first to see available details'}
                 </p>
               )}
             </div>
