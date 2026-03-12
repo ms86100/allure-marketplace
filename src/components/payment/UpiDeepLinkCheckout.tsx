@@ -223,7 +223,7 @@ export function UpiDeepLinkCheckout({
           {step === 'confirm' && (
             <div className="text-center space-y-5">
               <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                <Smartphone className="text-primary" size={40} />
+                <CheckCircle className="text-primary" size={40} />
               </div>
               <div>
                 <p className="font-semibold text-lg">Did you complete the payment?</p>
