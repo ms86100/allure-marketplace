@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,11 +55,25 @@ export function DraftProductManager({
   const { user } = useAuth();
   const DRAFT_KEY = `draft-product-form-${sellerId}`;
 
-  // Restore persisted draft from sessionStorage on mount
+  // Restore persisted draft from localStorage on mount
   const restoredDraft = useMemo(() => {
     try {
-      const raw = sessionStorage.getItem(DRAFT_KEY);
-      if (raw) return JSON.parse(raw);
+      // Try localStorage first, fall back to sessionStorage for migration
+      const raw = localStorage.getItem(DRAFT_KEY) || sessionStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        // Clean up legacy sessionStorage
+        sessionStorage.removeItem(DRAFT_KEY);
+        const parsed = JSON.parse(raw);
+        // Validate editingIndex bounds
+        if (parsed?.editingIndex != null && parsed.editingIndex >= products.length) {
+          parsed.editingIndex = null; // out of bounds → treat as new
+        }
+        // Validate category
+        if (parsed?.newProduct?.category && categories.length > 0 && !categories.includes(parsed.newProduct.category)) {
+          parsed.newProduct.category = categories[0] || '';
+        }
+        return parsed;
+      }
     } catch { /* ignore */ }
     return null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,17 +99,22 @@ export function DraftProductManager({
     prep_time_minutes: null,
   });
 
-  // Auto-persist product form draft to sessionStorage on every change
+  // Auto-persist product form draft to localStorage with debounce
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
     if (!isAdding) {
-      sessionStorage.removeItem(DRAFT_KEY);
+      localStorage.removeItem(DRAFT_KEY);
       return;
     }
-    try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
-        isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule,
-      }));
-    } catch { /* quota exceeded — non-critical */ }
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule,
+        }));
+      } catch { /* quota exceeded — non-critical */ }
+    }, 500);
+    return () => clearTimeout(debounceRef.current);
   }, [isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule, DRAFT_KEY]);
 
   // Get form hints for the selected category
@@ -349,6 +368,7 @@ export function DraftProductManager({
     setAttributeBlocks([]);
     setServiceFields(INITIAL_SERVICE_FIELDS);
     setAvailabilitySchedule(INITIAL_AVAILABILITY_SCHEDULE);
+    localStorage.removeItem(DRAFT_KEY);
     sessionStorage.removeItem(DRAFT_KEY);
   };
 

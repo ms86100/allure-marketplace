@@ -1,66 +1,71 @@
 
 
-# Audit: Auto-Persist Product Form Data
+# Notification System — Comprehensive Audit & Plan
 
-## 6. UX & Behavioral Gaps
+## Root Cause Fix (Implemented)
 
-### What feels incomplete
-- **SellerProductsPage (post-approval) has ZERO auto-persist.** The fix only covers `DraftProductManager` (onboarding). When an approved seller opens the "Add Product" dialog, fills in details, closes the dialog (or navigates away), everything is lost. This is the more frequently used flow.
-- **sessionStorage dies with the tab.** If a seller closes the browser tab and comes back later, their draft is gone. The user request says "comes back later" which implies cross-session persistence — `localStorage` would be more appropriate.
+Admin users were not notified when a new store or product was submitted for review. Fixed by:
 
-### What would confuse users
-- Inconsistent behavior: onboarding auto-saves, but the post-approval product page does not.
-- If a seller is editing an existing product (`editingIndex` restored), but the product list changed between sessions, the restored `editingIndex` could point to the wrong product or be out of bounds.
+1. **`notifyAdminsNewStoreApplication()`** in `src/lib/admin-notifications.ts` — queries `user_roles` for admins, enqueues push+in-app notification via `notification_queue`
+2. **`handleSubmit` in `useSellerApplication.ts`** — calls the above after successful submission
+3. **DB trigger `trg_enqueue_product_review_notification`** on `products` table — fires when `approval_status` changes to `'pending'`, notifies all admins
 
-### Edge cases not handled
-1. **Stale editingIndex**: restored `editingIndex` is `2` but products list now has only 2 items → index out of bounds, silent corruption
-2. **Category mismatch**: seller's allowed categories change (admin removes a category) → restored form has an invalid category
-3. **Image URL expiry**: persisted `image_url` is a signed URL that may expire (not an issue if using public bucket paths, but worth noting)
-4. **Multiple tabs**: two tabs open same seller → both write to same sessionStorage key → race condition, last-write-wins
+---
 
-### What happens if user abandons mid-flow
-- **Onboarding**: Draft persists in sessionStorage until tab closes or explicit cancel. Acceptable.
-- **Post-approval**: All data lost immediately on dialog close. **Not acceptable.**
+## Current State (As-Is): All Notification Flows
 
-## 7. Remaining Implementation Checklist
+### A. Database Triggers
 
-### Critical (must fix before production)
-- [ ] **Add auto-persist to `useSellerProducts` hook** — the post-approval "Add/Edit Product" dialog in `SellerProductsPage` has no draft persistence at all. This is the primary flow sellers use daily.
+| Trigger | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `enqueue_order_status_notification` | Order status changes | Buyer + Seller | ✅ | ✅ |
+| `enqueue_review_notification` | New review created | Seller | ✅ | ✅ |
+| `enqueue_dispute_status_notification` | Dispute status changes | Submitter | ✅ | ✅ |
+| `enqueue_settlement_notification` | Settlement created | Seller | ✅ | ✅ |
+| `trg_enqueue_product_review_notification` | Product submitted for review | Admins | ✅ | ✅ |
 
-### High Priority
-- [ ] **Switch from `sessionStorage` to `localStorage`** in `DraftProductManager` — user expects "comes back later" to work across sessions, not just within the same tab.
-- [ ] **Guard restored `editingIndex`** — validate that the index is within bounds of the current products array; if not, reset to "new product" mode instead of editing a phantom index.
+### B. Edge Functions
 
-### Medium Priority
-- [ ] **Validate restored category** — on restore, check that `newProduct.category` is still in the allowed `categories` list; if not, reset to `categories[0]`.
-- [ ] **Add "Unsaved draft" indicator** — when a draft is restored, show a subtle banner: "You have an unsaved draft" with a "Discard" option so the user knows data was recovered.
+| Function | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `send-booking-reminders` | 1h before appointment | Buyer + Seller | ✅ | ✅ |
+| `process-notification-queue` | Queue processor | N/A | ✅ | ✅ |
+| `send-campaign` | Admin broadcast | Targeted users | ✅ | ✅ |
+| `generate-weekly-digest` | Weekly digest | Society members | ✅ | ✅ |
+| `generate-society-report` | Monthly report | Society members | ✅ | ✅ |
+| `detect-collective-issues` | Pattern detection | Society admins | ✅ | ✅ |
 
-### Nice to Have
-- [ ] **Debounce persistence writes** — currently writes to storage on every keystroke via useEffect. A 500ms debounce would reduce writes.
-- [ ] **Conflict detection for edit mode** — if restoring an edit draft, verify the product still exists in DB before allowing continued editing.
+### C. Client-Side (inserts to `notification_queue`)
 
-## 8. Regression Risk
+| Location | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `admin-notifications.ts` → `notifySellerStatusChange` | Admin approves/rejects seller | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyLicenseStatusChange` | Admin approves/rejects license | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyProductStatusChange` | Admin approves/rejects product | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyAdminsNewStoreApplication` | Seller submits store | Admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyAdmins` | Dispute/snag | Society admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyMembers` | Bulletin posts | Society members | ✅ | ✅ |
+| `ServiceBookingFlow.tsx` | New booking | Seller | ✅ | ❌ |
+| `BuyerCancelBooking.tsx` | Buyer cancels | Seller | ✅ | ❌ |
+| `SellerPaymentConfirmation.tsx` | Payment confirmed | Buyer | ✅ | ❌ |
+| `UpiDeepLinkCheckout.tsx` | UPI payment | Seller | ✅ | ❌ |
+| `useSellerChat.ts` | New chat (60s throttle) | Recipient | ✅ | ❌ |
+| `GuardManualEntryTab.tsx` | Gate entry | Resident | ✅ | ❌ |
+| `manage-delivery` edge fn | Delivery OTP/arrival | Buyer | ✅ | ✅ |
+| `update-delivery-location` edge fn | Delivery delay | Buyer | ✅ | ✅ |
 
-| Risk | Assessment |
-|---|---|
-| Breaks existing functionality? | **No** — sessionStorage persistence is additive, read-only on mount |
-| Requires migration for old data? | **No** — no DB changes |
-| Requires cache invalidation? | **No** |
-| Affects audit logging? | **No** |
-| Affects governance health checks? | **No** |
-| Side effects | If switching to localStorage, old sessionStorage drafts will be orphaned (harmless). Multiple seller profiles could accumulate stale drafts in localStorage — needs cleanup on successful save. |
+---
 
-## 9. Final Confidence Rating
+## Future Gaps (To-Be)
 
-| Dimension | Score | Reasoning |
-|---|---|---|
-| Architectural correctness | **5/10** | Only one of two product form flows has persistence. The more-used flow (SellerProductsPage) is completely unprotected. |
-| Multi-tenant integrity | **8/10** | Draft key includes `sellerId`, so no cross-seller leakage. |
-| Scalability readiness | **7/10** | sessionStorage/localStorage is client-only, no server load. But no debounce means excessive writes. |
-| Security isolation | **9/10** | No sensitive data exposed. Form data in client storage is standard practice. |
-| UX completeness | **4/10** | Core user request ("comes back later") partially met — only works in onboarding, only within same tab, no visual indicator of restored draft. |
+### Priority 2 — Operational
+- New user pending approval → Society admins
+- New society request → Platform admins
+- Report filed → Admins
+- Delivery partner assigned → Seller
 
-## Implementation Truth Summary
-
-The auto-persist feature is **partially implemented**. The `DraftProductManager` (onboarding flow) correctly saves and restores in-progress product form data to `sessionStorage`, including all fields, attribute blocks, and service configuration. However, the **primary daily-use flow** — the `SellerProductsPage` product dialog powered by `useSellerProducts` — has **zero persistence** and will lose all data on dialog close or navigation. Additionally, `sessionStorage` does not survive tab/browser closure, so the "comes back later" scenario from the user's request is **not fully addressed**. The restored `editingIndex` is not bounds-checked, creating a silent corruption risk. To be production-ready, the same persistence pattern must be applied to `useSellerProducts`, storage should move to `localStorage`, and a draft-recovery indicator should be added.
-
+### Priority 3 — Engagement
+- New product from favorite seller → Buyer
+- Seller back online → Recent buyers
+- Price drop on wishlisted item → Buyer
+- Order review reminder (24h after delivery) → Buyer

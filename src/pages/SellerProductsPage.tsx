@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { ProductImageUpload } from '@/components/ui/product-image-upload';
 import { ProductCategory } from '@/types/database';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
-import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle, Store, ShieldAlert, Upload, Send, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle, Store, ShieldAlert, Upload, Send, CheckCircle2, Clock, XCircle, FileText, X } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { toast } from 'sonner';
 import { BulkProductUpload } from '@/components/seller/BulkProductUpload';
@@ -89,6 +89,22 @@ export default function SellerProductsPage() {
           <div className={`mb-4 p-3 rounded-xl border flex items-start gap-3 ${sp.licenseBlocked.status === 'rejected' ? 'bg-destructive/10 border-destructive/30' : 'bg-warning/10 border-warning/30'}`}>
             <ShieldAlert size={20} className={sp.licenseBlocked.status === 'rejected' ? 'text-destructive mt-0.5' : 'text-warning mt-0.5'} />
             <div><p className={`text-sm font-semibold ${sp.licenseBlocked.status === 'rejected' ? 'text-destructive' : 'text-warning'}`}>{sp.licenseBlocked.status === 'rejected' ? `${sp.licenseBlocked.licenseName} Rejected` : sp.licenseBlocked.status === 'pending' ? `${sp.licenseBlocked.licenseName} Pending Verification` : `${sp.licenseBlocked.licenseName} Required`}</p><p className="text-xs text-muted-foreground mt-0.5">{sp.licenseBlocked.status === 'rejected' ? 'Your license was rejected. Please re-upload from Seller Settings.' : sp.licenseBlocked.status === 'pending' ? 'Your license is being reviewed.' : 'You need to upload your license from Seller Settings.'}</p></div>
+          </div>
+        )}
+
+        {/* Draft recovery banner */}
+        {sp.draftRestored && sp.isDialogOpen && sp.formData.name.trim() !== '' && (
+          <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-xl flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText size={16} className="text-primary" />
+              <div>
+                <p className="text-sm font-medium">Unsaved draft recovered</p>
+                <p className="text-xs text-muted-foreground">Your previous work has been restored</p>
+              </div>
+            </div>
+            <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => { sp.resetForm(); sp.setIsDialogOpen(false); }}>
+              <X size={14} className="mr-1" /> Discard
+            </Button>
           </div>
         )}
 

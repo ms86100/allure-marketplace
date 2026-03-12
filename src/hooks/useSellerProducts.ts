@@ -9,6 +9,7 @@ import { type BlockData } from '@/hooks/useAttributeBlocks';
 import { INITIAL_SERVICE_FIELDS, type ServiceFieldsData } from '@/components/seller/ServiceFieldsSection';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
+import { buildDraftKey, readDraft, useAutoSaveDraft } from '@/hooks/useProductFormDraft';
 
 export interface ProductFormData {
   name: string;
@@ -41,6 +42,13 @@ const INITIAL_FORM: ProductFormData = {
   accepts_preorders: false,
 };
 
+interface SellerProductDraft {
+  formData: ProductFormData;
+  attributeBlocks: BlockData[];
+  serviceFields: ServiceFieldsData;
+  editingProductId: string | null;
+}
+
 export function useSellerProducts() {
   const { user, sellerProfiles, currentSellerId } = useAuth();
   const { groupedConfigs, configs } = useCategoryConfigs();
@@ -58,6 +66,7 @@ export function useSellerProducts() {
   const [formData, setFormData] = useState<ProductFormData>(INITIAL_FORM);
   const [serviceFields, setServiceFields] = useState<ServiceFieldsData>(INITIAL_SERVICE_FIELDS);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const activeCategoryConfig = useMemo(() => {
     if (!formData.category) return null;
@@ -79,6 +88,41 @@ export function useSellerProducts() {
     if (!primaryGroup || !groupedConfigs[primaryGroup]) return [];
     return groupedConfigs[primaryGroup];
   }, [primaryGroup, groupedConfigs]);
+
+  // ── Draft persistence ──
+  const draftKey = buildDraftKey('seller-product-draft', sellerProfile?.id || 'unknown');
+  const draftData = useMemo<SellerProductDraft>(() => ({
+    formData, attributeBlocks, serviceFields, editingProductId: editingProduct?.id || null,
+  }), [formData, attributeBlocks, serviceFields, editingProduct]);
+
+  const isFormDirty = formData.name.trim() !== '' || formData.description.trim() !== '' || formData.price !== '' || (formData.image_url ?? '') !== '';
+  const clearDraftFn = useAutoSaveDraft(draftKey, draftData, isDialogOpen && isFormDirty);
+
+  // Restore draft on mount (once seller profile is known)
+  useEffect(() => {
+    if (!sellerProfile || draftRestored) return;
+    const key = buildDraftKey('seller-product-draft', sellerProfile.id);
+    const saved = readDraft<SellerProductDraft>(key);
+    if (saved && saved.formData && saved.formData.name?.trim()) {
+      // Validate category is still allowed
+      const validCategory = !saved.formData.category ||
+        configs.some(c => c.category === saved.formData.category);
+      if (validCategory) {
+        setFormData(saved.formData);
+        setAttributeBlocks(saved.attributeBlocks || []);
+        setServiceFields(saved.serviceFields || INITIAL_SERVICE_FIELDS);
+        if (saved.editingProductId) {
+          // Verify the product still exists in the loaded list
+          const existing = products.find(p => p.id === saved.editingProductId);
+          if (existing) setEditingProduct(existing);
+          // If product no longer exists, treat as new product (don't set editingProduct)
+        }
+        setIsDialogOpen(true);
+        setDraftRestored(true);
+      }
+    }
+    setDraftRestored(true);
+  }, [sellerProfile, products, configs, draftRestored]);
 
   useEffect(() => {
     if (user && currentSellerId) fetchData(currentSellerId);
@@ -112,6 +156,7 @@ export function useSellerProducts() {
     const defaultCategory = allowedCategories.length === 1 ? allowedCategories[0].category as ProductCategory : '';
     setFormData({ ...INITIAL_FORM, category: defaultCategory });
     setEditingProduct(null); setAttributeBlocks([]); setServiceFields(INITIAL_SERVICE_FIELDS);
+    clearDraftFn();
   };
 
   const openEditDialog = async (product: Product) => {
@@ -252,6 +297,7 @@ export function useSellerProducts() {
     configs, sellerProfiles, resetForm, openEditDialog, handleSave, confirmDelete,
     toggleAvailability, fetchData, serviceFields, setServiceFields, isCurrentCategoryService,
     currentCategorySupportsAddons, currentCategorySupportsRecurring, currentCategorySupportsStaffAssignment,
+    draftRestored, clearDraftFn,
   };
 }
 
