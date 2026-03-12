@@ -8273,6 +8273,8 @@ export type Database = {
             }
             Returns: Json
           }
+      disable_cron_job: { Args: { p_jobid: number }; Returns: undefined }
+      enable_cron_job: { Args: { p_jobid: number }; Returns: undefined }
       generate_recurring_visitor_entries: { Args: never; Returns: undefined }
       get_allowed_transitions: {
         Args: { _actor?: string; _order_id: string }
@@ -8284,6 +8286,27 @@ export type Database = {
       }
       get_builder_dashboard: { Args: { _builder_id: string }; Returns: Json }
       get_category_parent_group: { Args: { cat: string }; Returns: string }
+      get_cron_job_runs: {
+        Args: { p_jobid: number; p_limit?: number }
+        Returns: {
+          end_time: string
+          job_id: number
+          return_message: string
+          runid: number
+          start_time: string
+          status: string
+        }[]
+      }
+      get_cron_jobs: {
+        Args: never
+        Returns: {
+          active: boolean
+          command: string
+          jobid: number
+          jobname: string
+          schedule: string
+        }[]
+      }
       get_delivery_scores_batch: {
         Args: { _seller_ids: string[] }
         Returns: {
@@ -8661,6 +8684,10 @@ export type Database = {
       }
       set_my_store_coordinates: {
         Args: { p_lat: number; p_lng: number; p_source?: string }
+        Returns: undefined
+      }
+      update_cron_schedule: {
+        Args: { p_jobid: number; p_schedule: string }
         Returns: undefined
       }
       validate_worker_entry: {
