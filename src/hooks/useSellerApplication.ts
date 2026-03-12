@@ -46,6 +46,8 @@ const INITIAL_FORM: SellerFormData = {
   operating_days: [...DAYS_OF_WEEK],
   profile_image_url: null,
   cover_image_url: null,
+  latitude: null,
+  longitude: null,
 };
 
 export function useSellerApplication() {
