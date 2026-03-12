@@ -1,14 +1,15 @@
 /**
  * Round 3 — E2E Verification Matrix
  * Tests marketplace vs society domain separation.
- * 
- * These tests validate the LOGIC that mirrors production code:
+ *
+ * Validates:
  * - Products RLS: approved products from approved sellers are marketplace-open (no society gate)
  * - Discovery RPC: coordinate/radius-based, no society equality required
  * - FeatureGate: marketplace features always enabled, society features require effectiveSocietyId
  * - Coupons: marketplace-open (no society filter on SELECT)
  * - Search demand: authenticated insert, society_id nullable
  * - Seller detail: no society scoping (approved sellers always accessible)
+ * - delivery_management is a society feature, NOT marketplace
  */
 import { describe, it, expect } from 'vitest';
 
@@ -16,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 
 const MARKETPLACE_FEATURES = new Set([
   'marketplace', 'seller_tools', 'trust_directory', 'trust_score',
-  'subscriptions', 'notifications', 'delivery_management',
+  'subscriptions', 'notifications',
 ]);
 
 const SOCIETY_FEATURES = [
@@ -26,6 +27,7 @@ const SOCIETY_FEATURES = [
   'society_notices', 'security_audit', 'guard_kiosk', 'vehicle_parking',
   'resident_identity_verification', 'community_rules', 'society_reports',
   'inspection', 'maintenance', 'parcel_management',
+  'delivery_management', // Society feature: delivery partner pool management
 ];
 
 // ─── Logic mirrors ──────────────────────────────────────────────────────────
@@ -40,10 +42,6 @@ function isFeatureEnabled(
   return opts.featureMap.get(key)?.is_enabled ?? false;
 }
 
-/**
- * Mirrors Round 3 products RLS: approved products from approved sellers are visible to all.
- * No society equality check.
- */
 function canSeeProduct(opts: {
   productApprovalStatus: string;
   sellerVerificationStatus: string;
@@ -55,10 +53,6 @@ function canSeeProduct(opts: {
   return opts.productApprovalStatus === 'approved' && opts.sellerVerificationStatus === 'approved';
 }
 
-/**
- * Mirrors Round 3 search_sellers_by_location: radius-based, no society equality gate.
- * Society-resident sellers visible if within radius (haversine passes) OR sell_beyond OR commercial.
- */
 function isSellerDiscoverable(opts: {
   sellerType: 'commercial' | 'society_resident';
   sellBeyond: boolean;
@@ -71,7 +65,6 @@ function isSellerDiscoverable(opts: {
   if (!opts.isApproved || !opts.isAvailable) return false;
   const effectiveRadius = Math.min(opts.searchRadiusKm, opts.deliveryRadiusKm ?? opts.searchRadiusKm);
   if (opts.distanceKm > effectiveRadius) return false;
-  // Within radius → always visible (Round 3 change: no society gate)
   return true;
 }
 
@@ -80,25 +73,21 @@ function canBuyerSeeCoupon(coupon: { is_active: boolean; starts_at: Date; expire
   return coupon.is_active && coupon.starts_at <= now && (coupon.expires_at === null || coupon.expires_at > now);
 }
 
-// ─── Suite 1: Products RLS — marketplace-open ───────────────────────────────
+// ─── Suite 1: Products RLS ──────────────────────────────────────────────────
 
 describe('Products RLS — marketplace-open for approved products', () => {
   it('approved product from approved seller visible to any user', () => {
     expect(canSeeProduct({ productApprovalStatus: 'approved', sellerVerificationStatus: 'approved', isOwnProduct: false, isAdmin: false })).toBe(true);
   });
-
   it('unapproved product hidden from non-owner', () => {
     expect(canSeeProduct({ productApprovalStatus: 'pending', sellerVerificationStatus: 'approved', isOwnProduct: false, isAdmin: false })).toBe(false);
   });
-
   it('product from unapproved seller hidden', () => {
     expect(canSeeProduct({ productApprovalStatus: 'approved', sellerVerificationStatus: 'pending', isOwnProduct: false, isAdmin: false })).toBe(false);
   });
-
   it('owner can see own unapproved product', () => {
     expect(canSeeProduct({ productApprovalStatus: 'pending', sellerVerificationStatus: 'pending', isOwnProduct: true, isAdmin: false })).toBe(true);
   });
-
   it('admin sees everything', () => {
     expect(canSeeProduct({ productApprovalStatus: 'rejected', sellerVerificationStatus: 'rejected', isOwnProduct: false, isAdmin: true })).toBe(true);
   });
@@ -110,29 +99,29 @@ describe('Discovery RPC — coordinate-based, no society equality', () => {
   it('commercial seller within radius is discoverable', () => {
     expect(isSellerDiscoverable({ sellerType: 'commercial', sellBeyond: false, distanceKm: 3, searchRadiusKm: 5, deliveryRadiusKm: null, isApproved: true, isAvailable: true })).toBe(true);
   });
-
-  it('society-resident seller within radius is discoverable (Round 3 fix)', () => {
+  it('society-resident seller within radius is discoverable', () => {
     expect(isSellerDiscoverable({ sellerType: 'society_resident', sellBeyond: false, distanceKm: 3, searchRadiusKm: 5, deliveryRadiusKm: null, isApproved: true, isAvailable: true })).toBe(true);
   });
-
   it('seller outside radius is not discoverable', () => {
     expect(isSellerDiscoverable({ sellerType: 'commercial', sellBeyond: true, distanceKm: 8, searchRadiusKm: 5, deliveryRadiusKm: null, isApproved: true, isAvailable: true })).toBe(false);
   });
-
   it('delivery_radius_km limits discovery', () => {
     expect(isSellerDiscoverable({ sellerType: 'commercial', sellBeyond: false, distanceKm: 4, searchRadiusKm: 10, deliveryRadiusKm: 3, isApproved: true, isAvailable: true })).toBe(false);
   });
-
   it('unavailable seller not discoverable', () => {
     expect(isSellerDiscoverable({ sellerType: 'commercial', sellBeyond: false, distanceKm: 1, searchRadiusKm: 5, deliveryRadiusKm: null, isApproved: true, isAvailable: false })).toBe(false);
   });
-
   it('unapproved seller not discoverable', () => {
     expect(isSellerDiscoverable({ sellerType: 'commercial', sellBeyond: false, distanceKm: 1, searchRadiusKm: 5, deliveryRadiusKm: null, isApproved: false, isAvailable: true })).toBe(false);
   });
+  it('no society subquery needed — radius is the only gate', () => {
+    // Round 3: removed redundant community gating AND block from RPC
+    // Any seller within radius passes, regardless of society match
+    expect(isSellerDiscoverable({ sellerType: 'society_resident', sellBeyond: false, distanceKm: 4.9, searchRadiusKm: 5, deliveryRadiusKm: null, isApproved: true, isAvailable: true })).toBe(true);
+  });
 });
 
-// ─── Suite 3: Buyer without society — full flow ─────────────────────────────
+// ─── Suite 3: Buyer without society ─────────────────────────────────────────
 
 describe('Buyer without society — full marketplace flow', () => {
   const noSociety = { isAdmin: false, effectiveSocietyId: null as string | null, featureMap: new Map<string, { is_enabled: boolean }>() };
@@ -140,41 +129,35 @@ describe('Buyer without society — full marketplace flow', () => {
   it('marketplace feature enabled', () => {
     expect(isFeatureEnabled('marketplace', noSociety)).toBe(true);
   });
-
-  it('can see approved products (no society RLS gate)', () => {
+  it('can see approved products', () => {
     expect(canSeeProduct({ productApprovalStatus: 'approved', sellerVerificationStatus: 'approved', isOwnProduct: false, isAdmin: false })).toBe(true);
   });
-
-  it('can see coupons (no society filter)', () => {
+  it('can see coupons', () => {
     expect(canBuyerSeeCoupon({ is_active: true, starts_at: new Date('2020-01-01'), expires_at: null })).toBe(true);
   });
-
-  it('seller_tools enabled for commercial seller without society', () => {
+  it('seller_tools enabled without society', () => {
     expect(isFeatureEnabled('seller_tools', noSociety)).toBe(true);
   });
-
-  it('delivery_management enabled without society', () => {
-    expect(isFeatureEnabled('delivery_management', noSociety)).toBe(true);
+  it('delivery_management NOT enabled without society', () => {
+    expect(isFeatureEnabled('delivery_management', noSociety)).toBe(false);
   });
 });
 
 // ─── Suite 4: Cross-society buyer ───────────────────────────────────────────
 
 describe('Cross-society buyer — marketplace flow', () => {
-  it('can see products from other society seller (RLS marketplace-open)', () => {
+  it('can see products from other society seller', () => {
     expect(canSeeProduct({ productApprovalStatus: 'approved', sellerVerificationStatus: 'approved', isOwnProduct: false, isAdmin: false })).toBe(true);
   });
-
   it('can discover cross-society seller within radius', () => {
     expect(isSellerDiscoverable({ sellerType: 'society_resident', sellBeyond: false, distanceKm: 4, searchRadiusKm: 5, deliveryRadiusKm: null, isApproved: true, isAvailable: true })).toBe(true);
   });
-
   it('can see cross-society coupons', () => {
     expect(canBuyerSeeCoupon({ is_active: true, starts_at: new Date('2020-01-01'), expires_at: new Date('2030-12-31') })).toBe(true);
   });
 });
 
-// ─── Suite 5: Society features remain gated ─────────────────────────────────
+// ─── Suite 5: Society features gated ────────────────────────────────────────
 
 describe('Society features blocked without effectiveSocietyId', () => {
   const featureMap = new Map(SOCIETY_FEATURES.map(k => [k, { is_enabled: true }]));
@@ -210,17 +193,17 @@ describe('Marketplace features always accessible', () => {
   });
 });
 
-// ─── Suite 7: Seller detail page — no society block ─────────────────────────
+// ─── Suite 7: delivery_management is society-scoped ─────────────────────────
 
-describe('Seller detail page — approved sellers always accessible', () => {
-  it('cross-society seller accessible (Round 3: no society scoping)', () => {
-    // SellerDetailPage no longer blocks based on society mismatch
-    const sellerApproved = true;
-    expect(sellerApproved).toBe(true); // Only verification_status matters now
+describe('delivery_management is a society feature, not marketplace', () => {
+  it('not in MARKETPLACE_FEATURES set', () => {
+    expect(MARKETPLACE_FEATURES.has('delivery_management')).toBe(false);
   });
-
-  it('commercial seller always accessible', () => {
-    expect(canSeeProduct({ productApprovalStatus: 'approved', sellerVerificationStatus: 'approved', isOwnProduct: false, isAdmin: false })).toBe(true);
+  it('blocked without society', () => {
+    expect(isFeatureEnabled('delivery_management', { isAdmin: false, effectiveSocietyId: null, featureMap: new Map([['delivery_management', { is_enabled: true }]]) })).toBe(false);
+  });
+  it('enabled with society when feature is on', () => {
+    expect(isFeatureEnabled('delivery_management', { isAdmin: false, effectiveSocietyId: 'soc-1', featureMap: new Map([['delivery_management', { is_enabled: true }]]) })).toBe(true);
   });
 });
 
@@ -236,7 +219,6 @@ describe('Cart resilience — null product handling', () => {
     expect(filtered).toHaveLength(1);
     expect(filtered[0].product_id).toBe('1');
   });
-
   it('cart total ignores null-product items', () => {
     const items = [
       { quantity: 2, product: { price: 100 } },

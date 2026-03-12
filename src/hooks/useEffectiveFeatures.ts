@@ -83,7 +83,7 @@ export function useEffectiveFeatures() {
   // Society-domain features (everything else) require effectiveSocietyId.
   const MARKETPLACE_FEATURES: Set<string> = useMemo(() => new Set([
     'marketplace', 'seller_tools', 'trust_directory', 'trust_score',
-    'subscriptions', 'notifications', 'delivery_management',
+    'subscriptions', 'notifications',
   ]), []);
 
   const isFeatureEnabled = useCallback((key: FeatureKey): boolean => {
