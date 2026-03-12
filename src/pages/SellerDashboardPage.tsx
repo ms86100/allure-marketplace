@@ -30,6 +30,7 @@ import { NewOrderAlertOverlay } from '@/components/seller/NewOrderAlertOverlay';
 import { ServiceBookingStats } from '@/components/seller/ServiceBookingStats';
 import { SellerDayAgenda } from '@/components/seller/SellerDayAgenda';
 import { AvailabilityPromptBanner } from '@/components/seller/AvailabilityPromptBanner';
+import { MissingLocationBanner } from '@/components/seller/MissingLocationBanner';
 import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCounts } from '@/hooks/queries/useSellerOrders';
 import { useNewOrderAlert } from '@/hooks/useNewOrderAlert';
 
