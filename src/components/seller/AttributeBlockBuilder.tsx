@@ -150,7 +150,7 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
               ))}
               {availableBlocks.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  {category ? 'All available blocks have been added' : 'Select a category first to see available attribute blocks'}
+                  {category ? 'All details have been added' : 'Select a category first to see available details'}
                 </p>
               )}
             </div>
