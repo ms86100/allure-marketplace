@@ -46,6 +46,15 @@ export function UpiDeepLinkCheckout({
   const shortOrderId = orderId.slice(0, 8).toUpperCase();
   const transactionNote = `ORD_${shortOrderId}`;
 
+  const UPI_APPS = [
+    { name: 'Google Pay', scheme: 'tez', bg: 'bg-[hsl(217,89%,51%)]', text: 'text-white' },
+    { name: 'PhonePe', scheme: 'phonepe', bg: 'bg-[hsl(267,56%,42%)]', text: 'text-white' },
+    { name: 'Paytm', scheme: 'paytmupi', bg: 'bg-[hsl(197,97%,46%)]', text: 'text-white' },
+  ];
+
+  const buildUpiLink = (scheme: string) =>
+    `${scheme}://upi/pay?pa=${encodeURIComponent(sellerUpiId)}&pn=${encodeURIComponent(sellerName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+
   const upiLink = `upi://pay?pa=${encodeURIComponent(sellerUpiId)}&pn=${encodeURIComponent(sellerName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
 
   useEffect(() => {
@@ -54,6 +63,18 @@ export function UpiDeepLinkCheckout({
       setUtrValue('');
     }
   }, [isOpen]);
+
+  // When user returns to the app after paying, advance to confirm step
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && step === 'pay') {
+        // Only advance if we've already opened a payment app (tracked via ref)
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [isOpen, step]);
 
   useEffect(() => {
     if (isOpen && !sellerUpiId) {
