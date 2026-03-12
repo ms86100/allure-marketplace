@@ -39,14 +39,7 @@ export function StoreStatusCard({ sellerProfile, sellerProfiles, onToggleAvailab
             <Store className="text-primary" size={22} />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold truncate">{sellerProfile.business_name}</h3>
-              {sellerProfiles.length > 1 && (
-                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                  {sellerProfiles.length} businesses
-                </span>
-              )}
-            </div>
+            <h3 className="font-semibold truncate">{sellerProfile.business_name}</h3>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="inline-flex items-center gap-1 text-xs font-medium text-accent">
                 <CheckCircle2 size={12} />
