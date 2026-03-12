@@ -276,6 +276,7 @@ export function useSellerApplication() {
     if (!acceptedDeclaration) { toast.error('Please accept the seller declaration'); return; }
     if (formData.operating_days.length === 0) { toast.error('Please select at least one operating day'); return; }
     if (formData.accepts_upi && !formData.upi_id.trim()) { toast.error('Please enter your UPI ID or disable UPI payments'); return; }
+    if (!formData.latitude && !profile?.society_id) { toast.error('Please set your store location before submitting'); return; }
 
     setIsLoading(true);
     try {
