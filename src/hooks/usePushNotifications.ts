@@ -59,31 +59,72 @@ function isValidFcmToken(token: string, platform: string): boolean {
   return token.length > 20;
 }
 
+// ── Module-level cached plugin singletons ──
+// Dynamic imports are executed ONCE and cached. This prevents repeated
+// import() calls from hanging the iOS native bridge during early login.
+let _cachedPN: any = null;
+let _cachedPNPromise: Promise<any> | null = null;
+let _cachedFCM: any = null;
+let _cachedFCMPromise: Promise<any> | null = null;
+
 async function getPushNotificationsPlugin() {
-  try {
-    const { PushNotifications } = await withTimeout(
-      import('@capacitor/push-notifications'),
-      PLUGIN_IMPORT_TIMEOUT_MS,
-      'getPushNotificationsPlugin import timed out'
-    );
-    return PushNotifications;
-  } catch (e) {
-    console.warn('[Push] @capacitor/push-notifications not available:', e);
-    return null;
-  }
+  if (_cachedPN) return _cachedPN;
+  if (_cachedPNPromise) return _cachedPNPromise;
+
+  _cachedPNPromise = (async () => {
+    try {
+      console.log('[Push] getPushNotificationsPlugin: importing (first time)…');
+      const { PushNotifications } = await withTimeout(
+        import('@capacitor/push-notifications'),
+        PLUGIN_IMPORT_TIMEOUT_MS,
+        'getPushNotificationsPlugin import timed out'
+      );
+      _cachedPN = PushNotifications;
+      console.log('[Push] getPushNotificationsPlugin: cached ✓');
+      return PushNotifications;
+    } catch (e) {
+      console.warn('[Push] @capacitor/push-notifications not available:', e);
+      _cachedPNPromise = null; // allow retry on next call
+      return null;
+    }
+  })();
+
+  return _cachedPNPromise;
 }
 
 async function getFcmPlugin() {
-  try {
-    const { FCM } = await withTimeout(
-      import('@capacitor-community/fcm'),
-      PLUGIN_IMPORT_TIMEOUT_MS,
-      'getFcmPlugin import timed out'
-    );
-    return FCM;
-  } catch (e) {
-    console.warn('[Push] @capacitor-community/fcm not available:', e);
-    return null;
+  if (_cachedFCM) return _cachedFCM;
+  if (_cachedFCMPromise) return _cachedFCMPromise;
+
+  _cachedFCMPromise = (async () => {
+    try {
+      console.log('[Push] getFcmPlugin: importing (first time)…');
+      const { FCM } = await withTimeout(
+        import('@capacitor-community/fcm'),
+        PLUGIN_IMPORT_TIMEOUT_MS,
+        'getFcmPlugin import timed out'
+      );
+      _cachedFCM = FCM;
+      console.log('[Push] getFcmPlugin: cached ✓');
+      return FCM;
+    } catch (e) {
+      console.warn('[Push] @capacitor-community/fcm not available:', e);
+      _cachedFCMPromise = null; // allow retry on next call
+      return null;
+    }
+  })();
+
+  return _cachedFCMPromise;
+}
+
+// ── Pre-warm plugin imports on native platforms ──
+// Fire-and-forget: starts the import() immediately at module load time
+// so plugins are cached before login triggers registration.
+if (Capacitor.isNativePlatform()) {
+  console.log('[Push] Pre-warming plugin imports…');
+  getPushNotificationsPlugin();
+  if (Capacitor.getPlatform() === 'ios') {
+    getFcmPlugin();
   }
 }
 
