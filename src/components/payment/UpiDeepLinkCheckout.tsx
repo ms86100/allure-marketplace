@@ -50,7 +50,7 @@ export function UpiDeepLinkCheckout({
   const UPI_APPS = [
     { name: 'Google Pay', scheme: 'tez', bg: 'bg-[hsl(217,89%,51%)]', text: 'text-white' },
     { name: 'PhonePe', scheme: 'phonepe', bg: 'bg-[hsl(267,56%,42%)]', text: 'text-white' },
-    { name: 'Paytm', scheme: 'paytmupi', bg: 'bg-[hsl(197,97%,46%)]', text: 'text-white' },
+    { name: 'Paytm', scheme: 'paytmmp', bg: 'bg-[hsl(197,97%,46%)]', text: 'text-white' },
   ];
 
   const buildUpiLink = (scheme: string) =>
