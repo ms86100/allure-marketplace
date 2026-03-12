@@ -166,6 +166,7 @@ export function usePushNotificationsInternal() {
   userRef.current = user;
 
   const registrationStateRef = useRef<RegistrationState>('idle');
+  const registeringStartedAtRef = useRef<number | null>(null);
   const retryCountRef = useRef(0);
   const watchdogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastErrorRef = useRef<unknown>(null);
