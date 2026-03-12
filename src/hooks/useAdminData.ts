@@ -158,8 +158,22 @@ export function useAdminData() {
 
   const updateSellerStatus = async (id: string, status: VerificationStatus) => {
     try {
-      const { data: seller } = await supabase.from('seller_profiles').select('user_id, business_name').eq('id', id).single();
+      const { data: seller } = await supabase.from('seller_profiles').select('user_id, business_name, latitude, longitude, society_id').eq('id', id).single();
       if (!seller) throw new Error('Seller not found');
+
+      // Block approval if no location coordinates
+      if (status === 'approved') {
+        const hasDirectCoords = seller.latitude != null && seller.longitude != null;
+        let hasSocietyCoords = false;
+        if (!hasDirectCoords && seller.society_id) {
+          const { data: soc } = await supabase.from('societies').select('latitude, longitude').eq('id', seller.society_id).single();
+          hasSocietyCoords = soc?.latitude != null && soc?.longitude != null;
+        }
+        if (!hasDirectCoords && !hasSocietyCoords) {
+          toast.error('Cannot approve: Store has no location set.');
+          return;
+        }
+      }
 
       const rejNote = (status === 'rejected' || status === 'suspended') ? (adminNotes.trim() || null) : null;
       const { error: updateError } = await supabase.from('seller_profiles').update({ verification_status: status, rejection_note: rejNote } as any).eq('id', id);
@@ -186,7 +200,15 @@ export function useAdminData() {
 
       toast.success(`Seller ${status}`);
       fetchData();
-    } catch (error) { console.error('Error updating seller status:', error); toast.error('Failed to update'); }
+    } catch (error: any) {
+      const msg = error?.message || '';
+      if (msg.includes('Cannot approve seller without location')) {
+        toast.error('Cannot approve: Store has no location coordinates.');
+      } else {
+        console.error('Error updating seller status:', error);
+        toast.error('Failed to update');
+      }
+    }
   };
 
   const toggleSellerFeatured = async (seller: SellerProfile) => {

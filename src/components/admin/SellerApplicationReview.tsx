@@ -131,6 +131,11 @@ function SellerCard({ seller, s, idx }: { seller: any; s: ReturnType<typeof useS
   const pendingProducts = seller.products.filter((p: any) => p.approval_status === 'pending').length;
   const isPending = seller.verification_status === 'pending';
 
+  // Location status
+  const hasDirectCoords = seller.latitude != null && seller.longitude != null;
+  const hasSocietyFallback = !hasDirectCoords && seller.society_id != null;
+  const noLocation = !hasDirectCoords && !seller.society_id;
+
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.02 }}>
       <Card className={cn('border-0 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-md)] transition-all duration-300 rounded-2xl', isPending && 'ring-1 ring-warning/30')}>
@@ -146,6 +151,16 @@ function SellerCard({ seller, s, idx }: { seller: any; s: ReturnType<typeof useS
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-bold text-sm truncate">{seller.business_name}</p>
                 {statusBadge(seller.verification_status)}
+                {noLocation && (
+                  <Badge variant="outline" className="text-[9px] text-destructive border-destructive rounded-md h-5">
+                    <MapPin size={8} className="mr-0.5" /> No Location
+                  </Badge>
+                )}
+                {hasSocietyFallback && !hasDirectCoords && (
+                  <Badge variant="outline" className="text-[9px] text-warning border-warning rounded-md h-5">
+                    <MapPin size={8} className="mr-0.5" /> Society
+                  </Badge>
+                )}
               </div>
               <p className="text-[11px] text-muted-foreground truncate">
                 {seller.profile?.name}

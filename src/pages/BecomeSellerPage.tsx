@@ -84,7 +84,7 @@ function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }:
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
             {hasSociety
-              ? 'Optionally set a precise location for your store'
+              ? 'Set a precise location for your store (recommended for better discovery)'
               : 'Set your store location so buyers can find you'}
           </p>
           <Button variant="outline" className="w-full h-10" onClick={() => setSheetOpen(true)}>

@@ -136,8 +136,8 @@ export function useSellerApplication() {
       operating_days: seller.operating_days || [...DAYS_OF_WEEK],
       profile_image_url: seller.profile_image_url || null,
       cover_image_url: seller.cover_image_url || null,
-      latitude: seller.latitude || null,
-      longitude: seller.longitude || null,
+      latitude: seller.latitude ?? null,
+      longitude: seller.longitude ?? null,
     }));
   }, []);
 
@@ -276,7 +276,21 @@ export function useSellerApplication() {
     if (!acceptedDeclaration) { toast.error('Please accept the seller declaration'); return; }
     if (formData.operating_days.length === 0) { toast.error('Please select at least one operating day'); return; }
     if (formData.accepts_upi && !formData.upi_id.trim()) { toast.error('Please enter your UPI ID or disable UPI payments'); return; }
-    if (!formData.latitude && !profile?.society_id) { toast.error('Please set your store location before submitting'); return; }
+    // Check location: must have direct coords OR society with coords
+    if (!formData.latitude) {
+      if (!profile?.society_id) {
+        toast.error('Please set your store location before submitting');
+        setIsLoading(false);
+        return;
+      }
+      // Verify society actually has coordinates
+      const { data: society } = await supabase.from('societies').select('latitude, longitude').eq('id', profile.society_id).single();
+      if (!society?.latitude || !society?.longitude) {
+        toast.error('Your society has no location set. Please set your store location manually.');
+        setIsLoading(false);
+        return;
+      }
+    }
 
     setIsLoading(true);
     try {
