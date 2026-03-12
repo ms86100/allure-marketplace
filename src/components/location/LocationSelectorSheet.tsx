@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { MapPin, Home, Briefcase, Tag, Building, Navigation, Loader2, Plus, Check } from 'lucide-react';
+import { MapPin, Home, Briefcase, Tag, Building, Navigation, Loader2, Plus, Check, ArrowLeft } from 'lucide-react';
 import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrowsingLocation, BrowsingLocation } from '@/contexts/BrowsingLocationContext';
