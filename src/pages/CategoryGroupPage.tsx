@@ -27,7 +27,7 @@ export default function CategoryGroupPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const subCategory = searchParams.get('sub') as ServiceCategory | null;
 
-  const { effectiveSocietyId } = useAuth();
+  const { } = useAuth();
   const { groupedConfigs, configs, isLoading: configsLoading } = useCategoryConfigs();
   const { getGroupBySlug, isLoading: groupsLoading } = useParentGroups();
   const [activeSubCategory, setActiveSubCategory] = useState<ServiceCategory | null>(subCategory);
