@@ -1,71 +1,64 @@
 
 
-# Notification System — Comprehensive Audit & Plan
+# Push Notification Regression — Root Cause Analysis
 
-## Root Cause Fix (Implemented)
+## What Changed (Backup vs Current)
 
-Admin users were not notified when a new store or product was submitted for review. Fixed by:
+I compared all 5 files from your backup drive against the current codebase. Here are the **exact differences**:
 
-1. **`notifyAdminsNewStoreApplication()`** in `src/lib/admin-notifications.ts` — queries `user_roles` for admins, enqueues push+in-app notification via `notification_queue`
-2. **`handleSubmit` in `useSellerApplication.ts`** — calls the above after successful submission
-3. **DB trigger `trg_enqueue_product_review_notification`** on `products` table — fires when `approval_status` changes to `'pending'`, notifies all admins
+### Files that are IDENTICAL (no changes)
+- `capacitor.ts` — identical
+- `PushNotificationContext.tsx` — identical  
+- `EnableNotificationsBanner.tsx` — identical
 
----
+### Files that were modified (2 files, 3 changes total)
 
-## Current State (As-Is): All Notification Flows
+**1. `src/hooks/usePushNotifications.ts`** — Two changes:
 
-### A. Database Triggers
+| Change | Backup (working) | Current (broken) |
+|--------|------------------|-------------------|
+| **Plugin loaders** (lines 62-129) | Simple functions: call `import()` every time with timeout | Module-level cached singletons with pre-warming at module load time. Adds `_cachedPN`, `_cachedPNPromise`, `_cachedFCM`, `_cachedFCMPromise` variables and runs `getPushNotificationsPlugin()` + `getFcmPlugin()` eagerly when module loads |
+| **Staleness guard** (lines 169, 570-589) | Simple: if state is `'registering'`, skip immediately | Added `registeringStartedAtRef`. If stuck in `'registering'` for >30s, force-resets to `'idle'` and retries |
 
-| Trigger | Event | Recipient | Push | In-App |
-|---|---|---|---|---|
-| `enqueue_order_status_notification` | Order status changes | Buyer + Seller | ✅ | ✅ |
-| `enqueue_review_notification` | New review created | Seller | ✅ | ✅ |
-| `enqueue_dispute_status_notification` | Dispute status changes | Submitter | ✅ | ✅ |
-| `enqueue_settlement_notification` | Settlement created | Seller | ✅ | ✅ |
-| `trg_enqueue_product_review_notification` | Product submitted for review | Admins | ✅ | ✅ |
+**2. `src/components/notifications/PushNotificationProvider.tsx`** — One change:
 
-### B. Edge Functions
+| Backup (working) | Current (broken) |
+|------------------|-------------------|
+| Watches `user` via `IdentityContext`. When user transitions non-null → null, calls `removeTokenFromDatabase()` | Removed `IdentityContext` dependency entirely. Instead listens for `window` custom event `app:explicit-signout` |
 
-| Function | Event | Recipient | Push | In-App |
-|---|---|---|---|---|
-| `send-booking-reminders` | 1h before appointment | Buyer + Seller | ✅ | ✅ |
-| `process-notification-queue` | Queue processor | N/A | ✅ | ✅ |
-| `send-campaign` | Admin broadcast | Targeted users | ✅ | ✅ |
-| `generate-weekly-digest` | Weekly digest | Society members | ✅ | ✅ |
-| `generate-society-report` | Monthly report | Society members | ✅ | ✅ |
-| `detect-collective-issues` | Pattern detection | Society admins | ✅ | ✅ |
-
-### C. Client-Side (inserts to `notification_queue`)
-
-| Location | Event | Recipient | Push | In-App |
-|---|---|---|---|---|
-| `admin-notifications.ts` → `notifySellerStatusChange` | Admin approves/rejects seller | Seller | ✅ | ✅ |
-| `admin-notifications.ts` → `notifyLicenseStatusChange` | Admin approves/rejects license | Seller | ✅ | ✅ |
-| `admin-notifications.ts` → `notifyProductStatusChange` | Admin approves/rejects product | Seller | ✅ | ✅ |
-| `admin-notifications.ts` → `notifyAdminsNewStoreApplication` | Seller submits store | Admins | ✅ | ✅ |
-| `society-notifications.ts` → `notifySocietyAdmins` | Dispute/snag | Society admins | ✅ | ✅ |
-| `society-notifications.ts` → `notifySocietyMembers` | Bulletin posts | Society members | ✅ | ✅ |
-| `ServiceBookingFlow.tsx` | New booking | Seller | ✅ | ❌ |
-| `BuyerCancelBooking.tsx` | Buyer cancels | Seller | ✅ | ❌ |
-| `SellerPaymentConfirmation.tsx` | Payment confirmed | Buyer | ✅ | ❌ |
-| `UpiDeepLinkCheckout.tsx` | UPI payment | Seller | ✅ | ❌ |
-| `useSellerChat.ts` | New chat (60s throttle) | Recipient | ✅ | ❌ |
-| `GuardManualEntryTab.tsx` | Gate entry | Resident | ✅ | ❌ |
-| `manage-delivery` edge fn | Delivery OTP/arrival | Buyer | ✅ | ✅ |
-| `update-delivery-location` edge fn | Delivery delay | Buyer | ✅ | ✅ |
+A corresponding change was made in `src/contexts/auth/useAuthState.ts` to dispatch `app:explicit-signout` before `signOut()`.
 
 ---
 
-## Future Gaps (To-Be)
+## Root Cause
 
-### Priority 2 — Operational
-- New user pending approval → Society admins
-- New society request → Platform admins
-- Report filed → Admins
-- Delivery partner assigned → Seller
+The **module-level pre-warming** is the likely culprit:
 
-### Priority 3 — Engagement
-- New product from favorite seller → Buyer
-- Seller back online → Recent buyers
-- Price drop on wishlisted item → Buyer
-- Order review reminder (24h after delivery) → Buyer
+```typescript
+// This runs at JS module load time — BEFORE React mounts
+if (Capacitor.isNativePlatform()) {
+  getPushNotificationsPlugin();  // fires import() immediately
+  if (Capacitor.getPlatform() === 'ios') {
+    getFcmPlugin();              // fires import() immediately
+  }
+}
+```
+
+On iOS, this triggers native bridge calls to Firebase **before the app is fully initialized** (before `SplashScreen.hide()`, before auth state resolves). The cached promise then resolves with a plugin handle that may be in a broken state, and since it's cached as a singleton, **every subsequent call reuses the broken handle** — the original backup retries a fresh `import()` each time, which works because by the time registration actually runs, the native bridge is ready.
+
+The staleness guard and Provider changes are secondary — they don't cause the failure but change recovery behavior.
+
+---
+
+## Fix Plan
+
+**Revert the 3 changes to restore the exact backup code:**
+
+1. **`src/hooks/usePushNotifications.ts`**: Remove module-level caching (lines 62-129). Restore the simple `getPushNotificationsPlugin()` and `getFcmPlugin()` functions that do a fresh `import()` with timeout each call. Remove `registeringStartedAtRef` and the staleness guard block — restore simple "skip if registering" logic.
+
+2. **`src/components/notifications/PushNotificationProvider.tsx`**: Restore `IdentityContext` user-watching pattern with `prevUserRef` for token cleanup on user→null transition. Remove the `app:explicit-signout` event listener.
+
+3. **`src/contexts/auth/useAuthState.ts`**: Remove the `app:explicit-signout` dispatch line (line 139) and `isExplicitSignOut` ref if it was added by the same change. (Need to verify if `isExplicitSignOut` existed in the original — it handles session-expired toast logic, so it may have been pre-existing.)
+
+No database or backend changes needed.
+
