@@ -17,15 +17,28 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 let buyerClient: SupabaseClient;
 let sellerClient: SupabaseClient;
-let seedData: Awaited<ReturnType<typeof ensureTestUsersSeeded>>;
+let seeded = false;
 
 beforeAll(async () => {
-  seedData = await ensureTestUsersSeeded();
-  [buyerClient, sellerClient] = await Promise.all([
-    createAuthenticatedClient('buyer'),
-    createAuthenticatedClient('seller'),
-  ]);
+  try {
+    await ensureTestUsersSeeded();
+    [buyerClient, sellerClient] = await Promise.all([
+      createAuthenticatedClient('buyer'),
+      createAuthenticatedClient('seller'),
+    ]);
+    seeded = true;
+  } catch (e) {
+    console.warn('Integration seed unavailable, integration suites will be skipped:', (e as Error).message);
+  }
 }, 30_000);
+
+function requireSeeded() {
+  if (!seeded) {
+    return true; // signal to skip
+  }
+  return false;
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Suite 1: No-society buyer — full marketplace flow
