@@ -42,6 +42,13 @@ const INITIAL_FORM: ProductFormData = {
   accepts_preorders: false,
 };
 
+interface SellerProductDraft {
+  formData: ProductFormData;
+  attributeBlocks: BlockData[];
+  serviceFields: ServiceFieldsData;
+  editingProductId: string | null;
+}
+
 export function useSellerProducts() {
   const { user, sellerProfiles, currentSellerId } = useAuth();
   const { groupedConfigs, configs } = useCategoryConfigs();
@@ -59,6 +66,7 @@ export function useSellerProducts() {
   const [formData, setFormData] = useState<ProductFormData>(INITIAL_FORM);
   const [serviceFields, setServiceFields] = useState<ServiceFieldsData>(INITIAL_SERVICE_FIELDS);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const activeCategoryConfig = useMemo(() => {
     if (!formData.category) return null;
