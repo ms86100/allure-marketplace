@@ -1355,7 +1355,7 @@ export function usePushNotificationsInternal() {
 
       // Check current permission — if already granted (banner called requestPermissions
       // directly), skip the prompt and go straight to registration + reconciliation.
-      let permStatus = await withTimeout(
+      let permStatus: any = await withTimeout(
         PN.checkPermissions(),
         CHECK_PERMISSIONS_TIMEOUT_MS,
         'requestFullPermission checkPermissions timed out'
