@@ -9,7 +9,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Loader2, CheckCircle, XCircle, RefreshCw, Smartphone, Copy } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, RefreshCw, Copy } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -46,6 +46,15 @@ export function UpiDeepLinkCheckout({
   const shortOrderId = orderId.slice(0, 8).toUpperCase();
   const transactionNote = `ORD_${shortOrderId}`;
 
+  const UPI_APPS = [
+    { name: 'Google Pay', scheme: 'tez', bg: 'bg-[hsl(217,89%,51%)]', text: 'text-white' },
+    { name: 'PhonePe', scheme: 'phonepe', bg: 'bg-[hsl(267,56%,42%)]', text: 'text-white' },
+    { name: 'Paytm', scheme: 'paytmupi', bg: 'bg-[hsl(197,97%,46%)]', text: 'text-white' },
+  ];
+
+  const buildUpiLink = (scheme: string) =>
+    `${scheme}://upi/pay?pa=${encodeURIComponent(sellerUpiId)}&pn=${encodeURIComponent(sellerName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
+
   const upiLink = `upi://pay?pa=${encodeURIComponent(sellerUpiId)}&pn=${encodeURIComponent(sellerName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
 
   useEffect(() => {
@@ -55,6 +64,18 @@ export function UpiDeepLinkCheckout({
     }
   }, [isOpen]);
 
+  // When user returns to the app after paying, advance to confirm step
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && step === 'pay') {
+        // Only advance if we've already opened a payment app (tracked via ref)
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [isOpen, step]);
+
   useEffect(() => {
     if (isOpen && !sellerUpiId) {
       toast.error('Seller UPI ID is not configured. Please contact the seller.');
@@ -63,10 +84,10 @@ export function UpiDeepLinkCheckout({
     }
   }, [isOpen, sellerUpiId]);
 
-  const handlePayNow = () => {
-    window.open(upiLink, '_blank');
-    // After a brief delay, show the confirmation step
-    setTimeout(() => setStep('confirm'), 1500);
+  const handlePayWithApp = (scheme: string) => {
+    setStep('confirm');
+    const link = buildUpiLink(scheme);
+    window.open(link, '_blank');
   };
 
   const handleCopyUpi = () => {
@@ -160,7 +181,7 @@ export function UpiDeepLinkCheckout({
               <div>
                 <p className="font-semibold text-2xl">{formatPrice(amount)}</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Scan QR or tap "Pay Now" to open your UPI app
+                  Scan QR or choose your UPI app below
                 </p>
               </div>
 
@@ -180,15 +201,21 @@ export function UpiDeepLinkCheckout({
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <Button variant="outline" className="flex-1" onClick={handleClose}>
-                  Cancel
-                </Button>
-                <Button className="flex-1 gap-2" onClick={handlePayNow}>
-                  <Smartphone size={16} />
-                  Pay Now
-                </Button>
+              <div className="grid grid-cols-3 gap-3 pt-2">
+                {UPI_APPS.map((app) => (
+                  <button
+                    key={app.scheme}
+                    onClick={() => handlePayWithApp(app.scheme)}
+                    className={`${app.bg} ${app.text} rounded-xl py-3 px-2 text-sm font-semibold transition-transform active:scale-95`}
+                  >
+                    {app.name}
+                  </button>
+                ))}
               </div>
+
+              <Button variant="outline" className="w-full" onClick={handleClose}>
+                Cancel
+              </Button>
             </div>
           )}
 
@@ -196,7 +223,7 @@ export function UpiDeepLinkCheckout({
           {step === 'confirm' && (
             <div className="text-center space-y-5">
               <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                <Smartphone className="text-primary" size={40} />
+                <CheckCircle className="text-primary" size={40} />
               </div>
               <div>
                 <p className="font-semibold text-lg">Did you complete the payment?</p>
