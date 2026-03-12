@@ -1,28 +1,50 @@
 
 
-# Fix Missing Location Link in Product Detail Sheet and Seller Switcher Text Overflow
+## Notification Health Check — User-Friendly UI
 
-## Issue 1: Product Detail Sheet — Location icon not clickable
+### What We'll Build
 
-The first screenshot shows the product detail sheet for "Ac Service." The location icon (MapPin) and text on line 159 of `ProductDetailSheet.tsx` are static — they don't link to Google Maps. The seller detail page was fixed earlier, but the product detail sheet was missed.
+A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
 
-The product object has `seller_id` but no direct lat/lng. We need to use the seller's coordinates (already fetched or fetchable) to build the Google Maps link.
+### UI Design
 
-**Fix in `src/components/product/ProductDetailSheet.tsx`** (line 159):
-- Wrap the MapPin + locationText in a clickable button that opens Google Maps
-- The seller coordinates aren't on the product object directly, so fetch them alongside the existing `fetchedSellerAvailability` query (add `latitude, longitude` to the select on line 71) or use a separate lightweight query
-- When coordinates are available, make the location span clickable; otherwise keep it static
+**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
 
-## Issue 2: Seller Switcher — Business name truncated on mobile
+**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
 
-The second screenshot shows the StoreStatusCard where "2 businesses" badge overlaps with the business name text. In `StoreStatusCard.tsx` line 42-48, the business name and badge are on the same flex row with `gap-2`, causing truncation on small screens.
+| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
+|---|---|---|
+| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
+| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
+| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
+| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
 
-**Fix in `src/components/seller/StoreStatusCard.tsx`** (lines 41-48):
-- Stack the business name and "N businesses" badge vertically instead of horizontally
-- Move the badge below the business name or make it part of the subtitle line (next to "Store is live · Open")
+Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
 
-## Files to modify
+**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
 
-1. **`src/components/product/ProductDetailSheet.tsx`** — Add lat/lng to seller availability query, make location label clickable to open Google Maps
-2. **`src/components/seller/StoreStatusCard.tsx`** — Stack business name and badge count vertically to prevent text cutoff on mobile
+**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
+
+### Implementation
+
+**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
+- Renders the trigger button and the bottom sheet
+- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
+- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
+- Provides actionable buttons for failures (Open Settings, Retry Registration)
+
+**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
+- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
+- Consolidates the 7+ technical steps into 4 simple categories
+- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
+
+**3. Update `src/pages/ProfilePage.tsx`**
+- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
+- Keep Push Debug link visible only for admins
+
+**4. Optionally add to `src/pages/NotificationsPage.tsx`**
+- Add a small "Check notification status" link at the top
+
+### No backend changes needed
+The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
 

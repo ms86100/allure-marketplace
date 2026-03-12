@@ -68,7 +68,7 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
     queryKey: ['product-detail-seller-availability', product?.seller_id],
     queryFn: async () => {
       if (!product?.seller_id) return null;
-      const { data } = await supabase.from('seller_profiles').select('availability_start, availability_end, operating_days, is_available').eq('id', product.seller_id).maybeSingle();
+      const { data } = await supabase.from('seller_profiles').select('availability_start, availability_end, operating_days, is_available, latitude, longitude').eq('id', product.seller_id).maybeSingle();
       return data;
     },
     enabled: open && !!product?.seller_id && !inlineAvailability.hasInlineAvailability,
@@ -156,7 +156,18 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
                   <p className="font-semibold text-sm text-foreground truncate">{product.seller_name}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     {d.isNewSeller ? <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">New Seller</Badge> : null}
-                    {locationText ? (<span className="flex items-center gap-0.5 text-[10px] text-muted-foreground"><MapPin size={10} />{locationText}</span>) : product.is_same_society ? (<span className="flex items-center gap-0.5 text-[10px] text-accent font-medium"><Home size={10} /> {ml.label('label_your_neighbor')}</span>) : null}
+                    {locationText ? (
+                      (() => {
+                        const lat = (product as any).seller_latitude ?? (product as any).seller?.latitude ?? fetchedSellerAvailability?.latitude;
+                        const lng = (product as any).seller_longitude ?? (product as any).seller?.longitude ?? fetchedSellerAvailability?.longitude;
+                        if (lat && lng) {
+                          return (
+                            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank'); }} className="flex items-center gap-0.5 text-[10px] text-primary font-medium"><MapPin size={10} />{locationText}</button>
+                          );
+                        }
+                        return <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground"><MapPin size={10} />{locationText}</span>;
+                      })()
+                    ) : product.is_same_society ? (<span className="flex items-center gap-0.5 text-[10px] text-accent font-medium"><Home size={10} /> {ml.label('label_your_neighbor')}</span>) : null}
                     {(product as any).last_active_at && (<span className="flex items-center gap-0.5 text-[10px] text-muted-foreground"><Clock size={9} />{formatSellerLastActive((product as any).last_active_at, ml)}</span>)}
                   </div>
                 </div>
