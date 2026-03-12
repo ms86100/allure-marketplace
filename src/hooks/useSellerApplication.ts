@@ -26,6 +26,8 @@ export interface SellerFormData {
   operating_days: string[];
   profile_image_url: string | null;
   cover_image_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 const INITIAL_FORM: SellerFormData = {
