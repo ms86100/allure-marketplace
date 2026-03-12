@@ -77,6 +77,7 @@ export function UpiDeepLinkCheckout({
   }, [isOpen, sellerUpiId]);
 
   const handlePayWithApp = (scheme: string) => {
+    hasOpenedApp.current = true;
     setStep('confirm');
     const link = buildUpiLink(scheme);
     window.open(link, '_blank');
