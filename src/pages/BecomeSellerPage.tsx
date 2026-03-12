@@ -23,11 +23,6 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSellerApplication } from '@/hooks/useSellerApplication';
-import { useGoogleMaps, useAutocomplete } from '@/hooks/useGoogleMaps';
-import { getCurrentPosition } from '@/lib/native-location';
-import { GoogleMapConfirm } from '@/components/auth/GoogleMapConfirm';
-import { toast } from 'sonner';
-import { Search } from 'lucide-react';
 
 // ─── Sub-category Selector ─────────────────────────────────────────────────
 function SubCategorySelector({ selectedGroup, selectedCategories, onCategorySelect }: {
