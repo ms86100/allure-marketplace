@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -16,9 +17,11 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DAYS_OF_WEEK } from '@/types/database';
-import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe, LayoutGrid, Tags, FileText, Package, CheckCircle2, ArrowRight, Truck, Smartphone, Banknote, Clock, ImageIcon } from 'lucide-react';
+import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe, LayoutGrid, Tags, FileText, Package, CheckCircle2, ArrowRight, Truck, Smartphone, Banknote, Clock, ImageIcon, MapPin, Navigation, CheckCircle } from 'lucide-react';
+import { OnboardingLocationSheet } from '@/components/seller/OnboardingLocationSheet';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
 import { useSellerApplication } from '@/hooks/useSellerApplication';
 
 // ─── Sub-category Selector ─────────────────────────────────────────────────
@@ -50,6 +53,61 @@ function SubCategorySelector({ selectedGroup, selectedCategories, onCategorySele
   );
 }
 
+// ─── Store Location Picker ──────────────────────────────────────────────────
+function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }: {
+  latitude: number | null;
+  longitude: number | null;
+  onLocationSet: (lat: number, lng: number) => void;
+  hasSociety: boolean;
+}) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const hasCoords = !!(latitude && longitude);
+
+  // We need a dummy sellerId for the sheet since it saves via RPC;
+  // we'll intercept the confirm differently. Let's use a wrapper approach.
+  return (
+    <div className="border rounded-lg p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <MapPin size={16} className="text-primary" />
+        <h3 className="font-semibold text-sm">Store Location {!hasSociety && <span className="text-destructive">*</span>}</h3>
+      </div>
+      {hasCoords ? (
+        <div className="flex items-center gap-2 p-3 bg-success/10 rounded-lg">
+          <CheckCircle size={16} className="text-success" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-success">Location set</p>
+            <p className="text-[10px] text-muted-foreground">{latitude?.toFixed(5)}, {longitude?.toFixed(5)}</p>
+          </div>
+          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => setSheetOpen(true)}>Change</Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            {hasSociety
+              ? 'Optionally set a precise location for your store'
+              : 'Set your store location so buyers can find you'}
+          </p>
+          <Button variant="outline" className="w-full h-10" onClick={() => setSheetOpen(true)}>
+            <Navigation size={14} className="mr-2" />
+            Set Store Location
+          </Button>
+          {!hasSociety && (
+            <p className="text-[10px] text-destructive">Required — your store won't be visible without a location</p>
+          )}
+        </div>
+      )}
+      <OnboardingLocationSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        onConfirm={(lat, lng) => {
+          onLocationSet(lat, lng);
+          setSheetOpen(false);
+        }}
+      />
+    </div>
+  );
+}
+
 // ─── Constants ──────────────────────────────────────────────────────────────
 const TOTAL_STEPS = 6;
 const STEP_META = [
@@ -70,6 +128,7 @@ const FULFILLMENT_OPTIONS = [
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
 export default function BecomeSellerPage() {
+  const { profile } = useAuth();
   const app = useSellerApplication();
   const {
     user, isLoading, isCheckingExisting, groupsLoading, existingSeller, draftSellerId,
@@ -282,6 +341,13 @@ export default function BecomeSellerPage() {
                 {(selectedGroupRow as any).license_mandatory && (!licenseStatus || licenseStatus === 'rejected') && <div className="bg-destructive/10 rounded-lg p-3 text-sm text-destructive flex items-center gap-2"><Shield size={16} />You must upload your {(selectedGroupRow as any).license_type_name || 'Business License'} before continuing.</div>}
               </div>
             )}
+            {/* Store Location */}
+            <StoreLocationPicker
+              latitude={formData.latitude}
+              longitude={formData.longitude}
+              onLocationSet={(lat, lng) => setFormData({ ...formData, latitude: lat, longitude: lng })}
+              hasSociety={!!profile?.society_id}
+            />
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Configure delivery, payments, and schedule</p>
             <Button className="w-full" onClick={handleProceedToSettings} disabled={isLoading || !formData.business_name.trim() || ((selectedGroupRow as any)?.license_mandatory && (!licenseStatus || licenseStatus === 'rejected'))}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Store Settings<ChevronRight size={16} className="ml-1" /></Button>
           </div>
@@ -359,6 +425,7 @@ export default function BecomeSellerPage() {
                 <div className="flex justify-between"><span className="text-muted-foreground">Category</span><span className="font-medium">{selectedGroupInfo?.label}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Products</span><span className="font-medium">{draftProducts.length} item(s)</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Hours</span><span className="font-medium">{formData.availability_start} – {formData.availability_end}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Location</span><span className="font-medium">{formData.latitude ? '📍 Set' : profile?.society_id ? 'Society default' : '⚠️ Not set'}</span></div>
                 <div className="border-t pt-2 mt-2 space-y-2">
                   <div className="flex justify-between"><span className="text-muted-foreground">Fulfillment</span><span className="font-medium">{fulfillmentLabel}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Payments</span><span className="font-medium">{paymentMethods}</span></div>

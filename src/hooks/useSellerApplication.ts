@@ -26,6 +26,8 @@ export interface SellerFormData {
   operating_days: string[];
   profile_image_url: string | null;
   cover_image_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 const INITIAL_FORM: SellerFormData = {
@@ -44,6 +46,8 @@ const INITIAL_FORM: SellerFormData = {
   operating_days: [...DAYS_OF_WEEK],
   profile_image_url: null,
   cover_image_url: null,
+  latitude: null,
+  longitude: null,
 };
 
 export function useSellerApplication() {
@@ -132,6 +136,8 @@ export function useSellerApplication() {
       operating_days: seller.operating_days || [...DAYS_OF_WEEK],
       profile_image_url: seller.profile_image_url || null,
       cover_image_url: seller.cover_image_url || null,
+      latitude: seller.latitude || null,
+      longitude: seller.longitude || null,
     }));
   }, []);
 
@@ -217,6 +223,8 @@ export function useSellerApplication() {
         upi_id: formData.accepts_upi ? formData.upi_id.trim() || null : null,
         operating_days: formData.operating_days, profile_image_url: formData.profile_image_url,
         cover_image_url: formData.cover_image_url,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
       };
       if (draftSellerId) {
         const { error } = await supabase.from('seller_profiles').update(draftPayload as any).eq('id', draftSellerId);
@@ -268,6 +276,7 @@ export function useSellerApplication() {
     if (!acceptedDeclaration) { toast.error('Please accept the seller declaration'); return; }
     if (formData.operating_days.length === 0) { toast.error('Please select at least one operating day'); return; }
     if (formData.accepts_upi && !formData.upi_id.trim()) { toast.error('Please enter your UPI ID or disable UPI payments'); return; }
+    if (!formData.latitude && !profile?.society_id) { toast.error('Please set your store location before submitting'); return; }
 
     setIsLoading(true);
     try {
@@ -281,6 +290,7 @@ export function useSellerApplication() {
         upi_id: formData.accepts_upi ? formData.upi_id.trim() || null : null,
         operating_days: formData.operating_days, profile_image_url: formData.profile_image_url,
         cover_image_url: formData.cover_image_url, rejection_note: null,
+        latitude: formData.latitude, longitude: formData.longitude,
       } as any).eq('id', draftSellerId);
       if (error) throw error;
       const { error: prodError } = await supabase.from('products').update({ approval_status: 'pending' } as any).eq('seller_id', draftSellerId).eq('approval_status', 'draft');
