@@ -330,7 +330,7 @@ export default function AdminPage() {
               </TabsList>
               <TabsContent value="platform" className="space-y-5"><PlatformSettingsManager /></TabsContent>
               <TabsContent value="notifications" className="space-y-5"><NotificationDiagnostics /><OtpSettings /></TabsContent>
-              <TabsContent value="system" className="space-y-5"><PurgeDataButton /><ResetAndSeedButton /></TabsContent>
+              <TabsContent value="system" className="space-y-5"><AdminCronManager /><div className="border-t border-border/30 pt-5"><PurgeDataButton /></div><ResetAndSeedButton /></TabsContent>
             </Tabs>
           )}
 
