@@ -67,11 +67,11 @@ let _cachedPNPromise: Promise<any> | null = null;
 let _cachedFCM: any = null;
 let _cachedFCMPromise: Promise<any> | null = null;
 
-async function getPushNotificationsPlugin() {
+async function getPushNotificationsPlugin(): Promise<any | null> {
   if (_cachedPN) return _cachedPN;
   if (_cachedPNPromise) return _cachedPNPromise;
 
-  _cachedPNPromise = (async () => {
+  _cachedPNPromise = (async (): Promise<any | null> => {
     try {
       console.log('[Push] getPushNotificationsPlugin: importing (first time)…');
       const { PushNotifications } = await withTimeout(
@@ -84,7 +84,7 @@ async function getPushNotificationsPlugin() {
       return PushNotifications;
     } catch (e) {
       console.warn('[Push] @capacitor/push-notifications not available:', e);
-      _cachedPNPromise = null; // allow retry on next call
+      _cachedPNPromise = null;
       return null;
     }
   })();
