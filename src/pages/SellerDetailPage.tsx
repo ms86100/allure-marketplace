@@ -359,12 +359,31 @@ export default function SellerDetailPage() {
 
           {/* Row 2: Location · Distance · Hours — compact info line */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
-            {(seller as any).society && (
-              <span className="flex items-center gap-1">
-                <MapPin size={13} className="text-primary shrink-0" />
-                {(seller as any).society.name}
-              </span>
-            )}
+            {(seller as any).society && (() => {
+              const lat = seller.latitude ?? (seller as any).society?.latitude;
+              const lng = seller.longitude ?? (seller as any).society?.longitude;
+              const content = (
+                <>
+                  <MapPin size={13} className="text-primary shrink-0" />
+                  {(seller as any).society.name}
+                </>
+              );
+              return lat && lng ? (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
+                  }}
+                  className="flex items-center gap-1 hover:text-primary transition-colors"
+                  title="View on Google Maps"
+                >
+                  {content}
+                </button>
+              ) : (
+                <span className="flex items-center gap-1">{content}</span>
+              );
+            })()}
             {distanceKm !== null && (
               <>
                 <span className="text-muted-foreground/40">·</span>
