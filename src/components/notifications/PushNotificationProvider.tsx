@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useContext, useRef } from 'react';
 import { usePushNotificationsInternal } from '@/hooks/usePushNotifications';
 import { PushNotificationContext } from '@/contexts/PushNotificationContext';
+import { IdentityContext } from '@/contexts/auth/contexts';
 
 interface PushNotificationProviderProps {
   children: React.ReactNode;
@@ -9,25 +10,23 @@ interface PushNotificationProviderProps {
 /**
  * Single provider that owns ALL push notification side effects.
  * Must be mounted exactly once in the component tree (App.tsx).
- *
- * Token cleanup now happens ONLY on explicit sign-out (via custom event),
- * NOT on any user→null transition (which can happen during transient auth drops).
  */
 export function PushNotificationProvider({ children }: PushNotificationProviderProps) {
+  const identity = useContext(IdentityContext);
+  const user = identity?.user ?? null;
+
   // This is the ONLY place the full hook (with listeners + effects) runs
   const pushState = usePushNotificationsInternal();
-  const removeRef = useRef(pushState.removeTokenFromDatabase);
-  removeRef.current = pushState.removeTokenFromDatabase;
+  const { removeTokenFromDatabase } = pushState;
+  const prevUserRef = useRef(user);
 
-  // Listen for explicit sign-out event only
+  // Remove token on explicit logout (user transitions non-null → null)
   useEffect(() => {
-    const handler = () => {
-      console.log('[PushProvider] Explicit sign-out detected — removing device token');
-      removeRef.current();
-    };
-    window.addEventListener('app:explicit-signout', handler);
-    return () => window.removeEventListener('app:explicit-signout', handler);
-  }, []);
+    if (prevUserRef.current && !user) {
+      removeTokenFromDatabase();
+    }
+    prevUserRef.current = user;
+  }, [user, removeTokenFromDatabase]);
 
   return (
     <PushNotificationContext.Provider value={pushState}>
