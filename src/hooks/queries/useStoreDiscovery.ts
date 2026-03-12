@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
