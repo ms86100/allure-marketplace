@@ -368,6 +368,7 @@ export function DraftProductManager({
     setAttributeBlocks([]);
     setServiceFields(INITIAL_SERVICE_FIELDS);
     setAvailabilitySchedule(INITIAL_AVAILABILITY_SCHEDULE);
+    localStorage.removeItem(DRAFT_KEY);
     sessionStorage.removeItem(DRAFT_KEY);
   };
 

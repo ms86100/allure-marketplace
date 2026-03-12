@@ -297,6 +297,7 @@ export function useSellerProducts() {
     configs, sellerProfiles, resetForm, openEditDialog, handleSave, confirmDelete,
     toggleAvailability, fetchData, serviceFields, setServiceFields, isCurrentCategoryService,
     currentCategorySupportsAddons, currentCategorySupportsRecurring, currentCategorySupportsStaffAssignment,
+    draftRestored, clearDraftFn,
   };
 }
 

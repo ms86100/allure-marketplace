@@ -92,6 +92,22 @@ export default function SellerProductsPage() {
           </div>
         )}
 
+        {/* Draft recovery banner */}
+        {sp.draftRestored && sp.isDialogOpen && sp.formData.name.trim() !== '' && (
+          <div className="mb-4 p-3 bg-primary/5 border border-primary/20 rounded-xl flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText size={16} className="text-primary" />
+              <div>
+                <p className="text-sm font-medium">Unsaved draft recovered</p>
+                <p className="text-xs text-muted-foreground">Your previous work has been restored</p>
+              </div>
+            </div>
+            <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => { sp.resetForm(); sp.setIsDialogOpen(false); }}>
+              <X size={14} className="mr-1" /> Discard
+            </Button>
+          </div>
+        )}
+
         <h1 className="text-xl font-bold mb-4">Your Products ({sp.products.length})</h1>
 
         {sp.products.some(p => (p as any).approval_status === 'draft') && (sp.sellerProfile as any)?.verification_status !== 'approved' && (
