@@ -125,7 +125,7 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
           disabled={availableBlocks.length === 0}
         >
           <Plus size={14} className="mr-1" />
-          Add Attribute Block
+          Add More Details
         </Button>
 
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
