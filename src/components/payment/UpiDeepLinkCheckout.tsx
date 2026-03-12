@@ -67,16 +67,6 @@ export function UpiDeepLinkCheckout({
   }, [isOpen]);
 
   // When user returns to the app after paying, advance to confirm step
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && step === 'pay') {
-        // Only advance if we've already opened a payment app (tracked via ref)
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [isOpen, step]);
 
   useEffect(() => {
     if (isOpen && !sellerUpiId) {
