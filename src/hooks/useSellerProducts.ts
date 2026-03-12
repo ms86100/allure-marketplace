@@ -89,6 +89,41 @@ export function useSellerProducts() {
     return groupedConfigs[primaryGroup];
   }, [primaryGroup, groupedConfigs]);
 
+  // ── Draft persistence ──
+  const draftKey = buildDraftKey('seller-product-draft', sellerProfile?.id || 'unknown');
+  const draftData = useMemo<SellerProductDraft>(() => ({
+    formData, attributeBlocks, serviceFields, editingProductId: editingProduct?.id || null,
+  }), [formData, attributeBlocks, serviceFields, editingProduct]);
+
+  const isFormDirty = formData.name.trim() !== '' || formData.description.trim() !== '' || formData.price !== '' || (formData.image_url ?? '') !== '';
+  const clearDraftFn = useAutoSaveDraft(draftKey, draftData, isDialogOpen && isFormDirty);
+
+  // Restore draft on mount (once seller profile is known)
+  useEffect(() => {
+    if (!sellerProfile || draftRestored) return;
+    const key = buildDraftKey('seller-product-draft', sellerProfile.id);
+    const saved = readDraft<SellerProductDraft>(key);
+    if (saved && saved.formData && saved.formData.name?.trim()) {
+      // Validate category is still allowed
+      const validCategory = !saved.formData.category ||
+        configs.some(c => c.category === saved.formData.category);
+      if (validCategory) {
+        setFormData(saved.formData);
+        setAttributeBlocks(saved.attributeBlocks || []);
+        setServiceFields(saved.serviceFields || INITIAL_SERVICE_FIELDS);
+        if (saved.editingProductId) {
+          // Verify the product still exists in the loaded list
+          const existing = products.find(p => p.id === saved.editingProductId);
+          if (existing) setEditingProduct(existing);
+          // If product no longer exists, treat as new product (don't set editingProduct)
+        }
+        setIsDialogOpen(true);
+        setDraftRestored(true);
+      }
+    }
+    setDraftRestored(true);
+  }, [sellerProfile, products, configs, draftRestored]);
+
   useEffect(() => {
     if (user && currentSellerId) fetchData(currentSellerId);
     else if (user && sellerProfiles.length > 0) fetchData(sellerProfiles[0].id);
