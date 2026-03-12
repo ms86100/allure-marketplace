@@ -8482,6 +8482,14 @@ export type Database = {
               search_term: string
             }[]
           }
+        | {
+            Args: { _seller_id?: string; _society_id: string }
+            Returns: {
+              last_searched: string
+              search_count: number
+              search_term: string
+            }[]
+          }
       get_user_auth_context: { Args: { _user_id: string }; Returns: Json }
       get_user_frequent_products: {
         Args: { _limit?: number; _user_id: string }
