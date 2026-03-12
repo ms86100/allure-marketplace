@@ -71,7 +71,7 @@ async function getPushNotificationsPlugin(): Promise<any> {
   if (_cachedPN) return _cachedPN;
   if (_cachedPNPromise) return _cachedPNPromise;
 
-  _cachedPNPromise = (async (): Promise<any | null> => {
+  _cachedPNPromise = (async (): Promise<any> => {
     try {
       console.log('[Push] getPushNotificationsPlugin: importing (first time)…');
       const { PushNotifications } = await withTimeout(
