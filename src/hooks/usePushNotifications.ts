@@ -96,7 +96,7 @@ async function getFcmPlugin(): Promise<any> {
   if (_cachedFCM) return _cachedFCM;
   if (_cachedFCMPromise) return _cachedFCMPromise;
 
-  _cachedFCMPromise = (async (): Promise<any | null> => {
+  _cachedFCMPromise = (async (): Promise<any> => {
     try {
       console.log('[Push] getFcmPlugin: importing (first time)…');
       const { FCM } = await withTimeout(
