@@ -154,7 +154,7 @@ export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM
 
       return bands;
     },
-    enabled: !!isApproved && !!(lat && lng) && enabled,
+    enabled: !!(lat && lng) && enabled,
     staleTime: jitteredStaleTime(10 * 60_000),
   });
 }
