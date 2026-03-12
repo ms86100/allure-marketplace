@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,6 +42,7 @@ export function UpiDeepLinkCheckout({
   const [step, setStep] = useState<CheckoutStep>('pay');
   const [utrValue, setUtrValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasOpenedApp = useRef(false);
 
   const shortOrderId = orderId.slice(0, 8).toUpperCase();
   const transactionNote = `ORD_${shortOrderId}`;
@@ -49,7 +50,7 @@ export function UpiDeepLinkCheckout({
   const UPI_APPS = [
     { name: 'Google Pay', scheme: 'tez', bg: 'bg-[hsl(217,89%,51%)]', text: 'text-white' },
     { name: 'PhonePe', scheme: 'phonepe', bg: 'bg-[hsl(267,56%,42%)]', text: 'text-white' },
-    { name: 'Paytm', scheme: 'paytmupi', bg: 'bg-[hsl(197,97%,46%)]', text: 'text-white' },
+    { name: 'Paytm', scheme: 'paytmmp', bg: 'bg-[hsl(197,97%,46%)]', text: 'text-white' },
   ];
 
   const buildUpiLink = (scheme: string) =>
@@ -61,20 +62,11 @@ export function UpiDeepLinkCheckout({
     if (isOpen) {
       setStep('pay');
       setUtrValue('');
+      hasOpenedApp.current = false;
     }
   }, [isOpen]);
 
   // When user returns to the app after paying, advance to confirm step
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && step === 'pay') {
-        // Only advance if we've already opened a payment app (tracked via ref)
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [isOpen, step]);
 
   useEffect(() => {
     if (isOpen && !sellerUpiId) {
@@ -85,6 +77,7 @@ export function UpiDeepLinkCheckout({
   }, [isOpen, sellerUpiId]);
 
   const handlePayWithApp = (scheme: string) => {
+    hasOpenedApp.current = true;
     setStep('confirm');
     const link = buildUpiLink(scheme);
     window.open(link, '_blank');
@@ -154,9 +147,8 @@ export function UpiDeepLinkCheckout({
   };
 
   const handleClose = () => {
-    // Only auto-cancel order if still on the initial pay step
-    // After that, buyer may have already transferred money
-    if (step === 'pay') {
+    // Only auto-cancel order if user never opened a payment app
+    if (step === 'pay' && !hasOpenedApp.current) {
       onPaymentFailed();
     }
     onClose();

@@ -1,44 +1,50 @@
 
 
-# Fix Paytm Deep Link and Payment Sheet Auto-Close
+## Notification Health Check — User-Friendly UI
 
-## Issue 1: Paytm not working
+### What We'll Build
 
-The scheme `paytmupi://upi/pay?...` is not the correct deep link format for Paytm. Paytm uses `paytmmp://pay?...` (Paytm Merchant Pay) or the standard `upi://pay` routed via intent. The correct working scheme is `paytmmp://upi/pay?...`.
+A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
 
-**Fix**: Change Paytm scheme from `paytmupi` to `paytmmp` in the `UPI_APPS` array.
+### UI Design
 
-## Issue 2: Payment sheet auto-closes when returning to app
+**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
 
-Two related problems:
+**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
 
-1. **Sheet `onClose` triggers `onPaymentFailed`**: In `CartPage.tsx` line 289, `onClose={() => c.setShowUpiDeepLink(false)}` is passed separately from `onPaymentFailed`. But inside the component, `handleClose` (line 156-163) calls `onPaymentFailed()` when `step === 'pay'`. Since we set `step='confirm'` synchronously before opening the app, the sheet should be on `confirm` when user returns — but the Sheet's `onOpenChange` fires `handleClose` on any dismiss (backdrop tap, swipe down), so if the OS briefly refocuses the app before the UPI app opens, the sheet can close.
+| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
+|---|---|---|
+| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
+| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
+| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
+| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
 
-2. **Second attempt auto-places order**: After `handleUpiDeepLinkFailed` cancels orders and clears `pendingOrderIds`, the next "Place Order" creates new orders. But the cart was already cleared by `create_multi_vendor_orders`, so the cart page shows empty. The real issue is that `handleClose` in the component shouldn't call `onPaymentFailed` once the user has initiated payment (step !== 'pay').
+Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
 
-**Fixes in `UpiDeepLinkCheckout.tsx`**:
-- Track whether a payment app was opened via a ref (`hasOpenedApp`)
-- Set the ref to `true` in `handlePayWithApp`
-- In `handleClose`: only call `onPaymentFailed()` if `!hasOpenedApp.current` (user never tapped any app)
-- If user has opened an app but closes the sheet (swipe/backdrop), don't cancel the order — just close
-- The `visibilitychange` listener (lines 68-77) currently does nothing — remove the empty handler since step is already set to `confirm` synchronously
+**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
 
-**Fix in `handleClose`**:
-```
-const handleClose = () => {
-  if (step === 'pay' && !hasOpenedApp.current) {
-    onPaymentFailed();
-  }
-  onClose();
-};
-```
+**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
 
-## Files to modify
+### Implementation
 
-1. **`src/components/payment/UpiDeepLinkCheckout.tsx`**
-   - Change Paytm scheme from `paytmupi` to `paytmmp`
-   - Add `useRef` for `hasOpenedApp`
-   - Set ref in `handlePayWithApp`
-   - Update `handleClose` to check ref before calling `onPaymentFailed`
-   - Remove the no-op `visibilitychange` listener
+**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
+- Renders the trigger button and the bottom sheet
+- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
+- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
+- Provides actionable buttons for failures (Open Settings, Retry Registration)
+
+**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
+- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
+- Consolidates the 7+ technical steps into 4 simple categories
+- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
+
+**3. Update `src/pages/ProfilePage.tsx`**
+- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
+- Keep Push Debug link visible only for admins
+
+**4. Optionally add to `src/pages/NotificationsPage.tsx`**
+- Add a small "Check notification status" link at the top
+
+### No backend changes needed
+The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
 
