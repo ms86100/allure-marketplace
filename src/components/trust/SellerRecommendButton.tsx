@@ -40,7 +40,7 @@ export function SellerRecommendButton({ sellerId, sellerUserId }: Props) {
   };
 
   const handleToggle = async () => {
-    if (!user || !effectiveSocietyId) {
+    if (!user) {
       toast.error('Please sign in to recommend');
       return;
     }
