@@ -56,12 +56,8 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
           .neq('id', product.product_id).limit(6),
       ]);
       setLoadedSpecs(specsRes.data?.specifications as Record<string, any> | null);
-      // Filter similar products to same society when applicable
-      const rawSimilar = similarRes.data || [];
-      const filtered = product.is_same_society
-        ? rawSimilar.filter((p: any) => !p.seller?.society_id || p.seller.society_id === (product as any).seller?.society_id)
-        : rawSimilar;
-      setSimilarProducts(filtered);
+      // Marketplace-open: show all similar products from approved sellers (RLS handles visibility)
+      setSimilarProducts(similarRes.data || []);
     };
     fetchData();
   }, [product?.product_id, open]);
