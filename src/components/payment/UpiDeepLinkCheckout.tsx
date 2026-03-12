@@ -84,10 +84,10 @@ export function UpiDeepLinkCheckout({
     }
   }, [isOpen, sellerUpiId]);
 
-  const handlePayNow = () => {
-    window.open(upiLink, '_blank');
-    // After a brief delay, show the confirmation step
-    setTimeout(() => setStep('confirm'), 1500);
+  const handlePayWithApp = (scheme: string) => {
+    setStep('confirm');
+    const link = buildUpiLink(scheme);
+    window.open(link, '_blank');
   };
 
   const handleCopyUpi = () => {
