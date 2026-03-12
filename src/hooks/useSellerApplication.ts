@@ -8,6 +8,7 @@ import { ServiceCategory } from '@/types/categories';
 import { DAYS_OF_WEEK } from '@/types/database';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
+import { notifyAdminsNewStoreApplication } from '@/lib/admin-notifications';
 
 export interface SellerFormData {
   business_name: string;

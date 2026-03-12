@@ -70,6 +70,40 @@ export async function notifyLicenseStatusChange(
   if (error) console.error('Failed to enqueue license notification:', error);
 }
 
+/**
+ * Notify all platform admins when a new store application is submitted for review.
+ */
+export async function notifyAdminsNewStoreApplication(
+  businessName: string,
+  sellerUserId: string,
+) {
+  try {
+    const { data: adminRoles } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('role', 'admin');
+
+    if (!adminRoles || adminRoles.length === 0) return;
+
+    const rows = adminRoles
+      .filter((r) => r.user_id !== sellerUserId) // don't notify the seller if they're also an admin
+      .map((r) => ({
+        user_id: r.user_id,
+        title: '🏪 New Store Application',
+        body: `"${businessName}" has been submitted for review. Tap to moderate.`,
+        type: 'moderation',
+        reference_path: '/admin',
+        payload: { type: 'new_store_application' },
+      }));
+
+    if (rows.length === 0) return;
+    const { error } = await supabase.from('notification_queue').insert(rows);
+    if (error) console.error('Failed to enqueue admin store notification:', error);
+  } catch (err) {
+    console.error('notifyAdminsNewStoreApplication error:', err);
+  }
+}
+
 export async function notifyProductStatusChange(
   userId: string,
   productName: string,
