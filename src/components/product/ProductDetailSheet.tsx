@@ -68,7 +68,7 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
     queryKey: ['product-detail-seller-availability', product?.seller_id],
     queryFn: async () => {
       if (!product?.seller_id) return null;
-      const { data } = await supabase.from('seller_profiles').select('availability_start, availability_end, operating_days, is_available').eq('id', product.seller_id).maybeSingle();
+      const { data } = await supabase.from('seller_profiles').select('availability_start, availability_end, operating_days, is_available, latitude, longitude').eq('id', product.seller_id).maybeSingle();
       return data;
     },
     enabled: open && !!product?.seller_id && !inlineAvailability.hasInlineAvailability,
