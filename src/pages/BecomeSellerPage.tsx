@@ -283,6 +283,13 @@ export default function BecomeSellerPage() {
                 {(selectedGroupRow as any).license_mandatory && (!licenseStatus || licenseStatus === 'rejected') && <div className="bg-destructive/10 rounded-lg p-3 text-sm text-destructive flex items-center gap-2"><Shield size={16} />You must upload your {(selectedGroupRow as any).license_type_name || 'Business License'} before continuing.</div>}
               </div>
             )}
+            {/* Store Location */}
+            <StoreLocationPicker
+              latitude={formData.latitude}
+              longitude={formData.longitude}
+              onLocationSet={(lat, lng) => setFormData({ ...formData, latitude: lat, longitude: lng })}
+              hasSociety={!!profile?.society_id}
+            />
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Configure delivery, payments, and schedule</p>
             <Button className="w-full" onClick={handleProceedToSettings} disabled={isLoading || !formData.business_name.trim() || ((selectedGroupRow as any)?.license_mandatory && (!licenseStatus || licenseStatus === 'rejected'))}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Store Settings<ChevronRight size={16} className="ml-1" /></Button>
           </div>
