@@ -92,11 +92,11 @@ async function getPushNotificationsPlugin(): Promise<any | null> {
   return _cachedPNPromise;
 }
 
-async function getFcmPlugin() {
+async function getFcmPlugin(): Promise<any | null> {
   if (_cachedFCM) return _cachedFCM;
   if (_cachedFCMPromise) return _cachedFCMPromise;
 
-  _cachedFCMPromise = (async () => {
+  _cachedFCMPromise = (async (): Promise<any | null> => {
     try {
       console.log('[Push] getFcmPlugin: importing (first time)…');
       const { FCM } = await withTimeout(
@@ -109,7 +109,7 @@ async function getFcmPlugin() {
       return FCM;
     } catch (e) {
       console.warn('[Push] @capacitor-community/fcm not available:', e);
-      _cachedFCMPromise = null; // allow retry on next call
+      _cachedFCMPromise = null;
       return null;
     }
   })();
