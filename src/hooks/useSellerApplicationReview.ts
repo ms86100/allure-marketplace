@@ -150,10 +150,27 @@ export function useSellerApplicationReview() {
   const updateSellerStatus = async (seller: SellerApplication, status: 'approved' | 'rejected') => {
     setActionId(seller.id);
     try {
-      await supabase.from('seller_profiles').update({
+      // Block approval if no location coordinates
+      if (status === 'approved') {
+        const { data: sp } = await supabase.from('seller_profiles').select('latitude, longitude, society_id').eq('id', seller.id).single();
+        const hasDirectCoords = sp?.latitude != null && sp?.longitude != null;
+        let hasSocietyCoords = false;
+        if (!hasDirectCoords && sp?.society_id) {
+          const { data: soc } = await supabase.from('societies').select('latitude, longitude').eq('id', sp.society_id).single();
+          hasSocietyCoords = soc?.latitude != null && soc?.longitude != null;
+        }
+        if (!hasDirectCoords && !hasSocietyCoords) {
+          toast.error('Cannot approve: Store has no location set. Ask seller to set their store location first.');
+          setActionId(null);
+          return;
+        }
+      }
+
+      const { error } = await supabase.from('seller_profiles').update({
         verification_status: status,
         rejection_note: status === 'rejected' ? (rejectionNote.trim() || null) : null,
       } as any).eq('id', seller.id);
+      if (error) throw error;
       await logAudit(`seller_${status}`, 'seller_profile', seller.id, '', { status, note: rejectionNote || undefined });
 
       if (status === 'approved') {
@@ -169,8 +186,13 @@ export function useSellerApplicationReview() {
       setRejectingId(null);
       setRejectionNote('');
       fetchData();
-    } catch (error) {
-      toast.error('Failed to update seller status');
+    } catch (error: any) {
+      const msg = error?.message || '';
+      if (msg.includes('Cannot approve seller without location')) {
+        toast.error('Cannot approve: Store has no location coordinates.');
+      } else {
+        toast.error('Failed to update seller status');
+      }
     } finally {
       setActionId(null);
     }
