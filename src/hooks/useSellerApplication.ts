@@ -136,8 +136,8 @@ export function useSellerApplication() {
       operating_days: seller.operating_days || [...DAYS_OF_WEEK],
       profile_image_url: seller.profile_image_url || null,
       cover_image_url: seller.cover_image_url || null,
-      latitude: seller.latitude || null,
-      longitude: seller.longitude || null,
+      latitude: seller.latitude ?? null,
+      longitude: seller.longitude ?? null,
     }));
   }, []);
 
