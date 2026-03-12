@@ -73,7 +73,11 @@ export function CroppableImageUpload({
     } catch (err: any) {
       if (err?.message?.includes('cancelled') || err?.message?.includes('canceled')) return;
       console.error('Native pick error:', err);
-      toast.error('Failed to select image');
+      if (err?.message?.includes('permission denied') || err?.message?.includes('Permission denied')) {
+        toast.error(err.message);
+      } else {
+        toast.error('Failed to select image');
+      }
     }
   }, []);
 
