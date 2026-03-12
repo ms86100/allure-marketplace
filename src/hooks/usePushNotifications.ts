@@ -67,7 +67,7 @@ let _cachedPNPromise: Promise<any> | null = null;
 let _cachedFCM: any = null;
 let _cachedFCMPromise: Promise<any> | null = null;
 
-async function getPushNotificationsPlugin(): Promise<any | null> {
+async function getPushNotificationsPlugin(): Promise<any> {
   if (_cachedPN) return _cachedPN;
   if (_cachedPNPromise) return _cachedPNPromise;
 
