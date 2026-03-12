@@ -1,5 +1,5 @@
 /**
- * Round 4 — Real Integration Tests: Marketplace vs Society Separation
+ * Round 5 — Real Integration Tests: Marketplace vs Society Separation
  * ====================================================================
  * Authenticates as real test users and hits actual Supabase tables/RPCs.
  * Integration suites skip gracefully when seed function is unavailable.
@@ -7,7 +7,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   createAuthenticatedClient,
-  ensureTestUsersSeeded,
   testSlug,
 } from './helpers/integration';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -19,7 +18,6 @@ let sellerClient: SupabaseClient;
 let seeded = false;
 
 try {
-  // Attempt seed synchronously at module level so describe.skipIf works
   const res = await fetch(
     'https://rvvctaikytfeyzkwoqxg.supabase.co/functions/v1/seed-integration-test-users',
     {
@@ -45,11 +43,11 @@ try {
 const skipIntegration = !seeded;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Suite 1: No-society buyer — full marketplace flow
+// Suite 1: Non-society buyer — full marketplace flow
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe.skipIf(skipIntegration)('No-society buyer — marketplace access', () => {
-  it('can call search_sellers_by_location RPC', async () => {
+describe.skipIf(skipIntegration)('Non-society buyer — marketplace journey', () => {
+  it('discovers sellers via search_sellers_by_location RPC', async () => {
     const { data, error } = await buyerClient.rpc('search_sellers_by_location', {
       _lat: 18.55, _lng: 73.85, _radius_km: 50,
     });
@@ -57,44 +55,52 @@ describe.skipIf(skipIntegration)('No-society buyer — marketplace access', () =
     expect(Array.isArray(data)).toBe(true);
   });
 
-  it('can read approved products', async () => {
+  it('reads approved products without society gate', async () => {
     const { data, error } = await buyerClient
       .from('products').select('id, name').eq('approval_status', 'approved').limit(5);
     expect(error).toBeNull();
     expect(Array.isArray(data)).toBe(true);
   });
 
-  it('can read active coupons', async () => {
+  it('reads active coupons without society gate', async () => {
     const { data, error } = await buyerClient
       .from('coupons').select('id, code').eq('is_active', true).limit(5);
     expect(error).toBeNull();
     expect(Array.isArray(data)).toBe(true);
   });
 
-  it('can read seller recommendations', async () => {
+  it('reads seller recommendations', async () => {
     const { data, error } = await buyerClient
       .from('seller_recommendations').select('id').limit(5);
     expect(error).toBeNull();
     expect(Array.isArray(data)).toBe(true);
   });
 
-  it('can insert search demand log without society', async () => {
+  it('inserts search demand log without society', async () => {
     const { error } = await buyerClient
       .from('search_demand_log')
       .insert({ search_term: testSlug('demand'), society_id: null });
     expect(error).toBeNull();
   });
 
-  it('can read own cart items', async () => {
+  it('reads own cart items', async () => {
     const { data, error } = await buyerClient.from('cart_items').select('id');
     expect(error).toBeNull();
     expect(Array.isArray(data)).toBe(true);
   });
 
-  it('can read own orders', async () => {
+  it('reads own orders', async () => {
     const { data, error } = await buyerClient.from('orders').select('id').limit(5);
     expect(error).toBeNull();
     expect(Array.isArray(data)).toBe(true);
+  });
+
+  it('handles null coordinates gracefully in RPC', async () => {
+    const { data, error } = await buyerClient.rpc('search_sellers_by_location', {
+      _lat: null as any, _lng: null as any,
+    });
+    expect(error).toBeNull();
+    expect(data).toEqual([]);
   });
 });
 
@@ -103,36 +109,49 @@ describe.skipIf(skipIntegration)('No-society buyer — marketplace access', () =
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe.skipIf(skipIntegration)('Commercial seller — marketplace tools', () => {
-  it('can read own seller profile', async () => {
+  it('reads own seller profile', async () => {
     const { data, error } = await sellerClient
       .from('seller_profiles').select('id, business_name').limit(1);
     expect(error).toBeNull();
     expect(Array.isArray(data)).toBe(true);
   });
 
-  it('can read own products', async () => {
+  it('reads own products', async () => {
     const { data, error } = await sellerClient.from('products').select('id').limit(5);
     expect(error).toBeNull();
     expect(Array.isArray(data)).toBe(true);
   });
 
-  it('can call get_unmet_demand with null society', async () => {
+  it('calls get_unmet_demand with null society', async () => {
     const { data, error } = await sellerClient.rpc('get_unmet_demand', { _society_id: null });
     expect(error).toBeNull();
     expect(Array.isArray(data)).toBe(true);
   });
 
-  it('can call get_location_stats', async () => {
+  it('calls get_location_stats RPC', async () => {
     const { data, error } = await sellerClient.rpc('get_location_stats', {
       _lat: 18.55, _lng: 73.85, _radius_km: 10,
     });
     expect(error).toBeNull();
     expect(data).toBeDefined();
   });
+
+  it('calls get_seller_recommendations RPC', async () => {
+    // Get seller's profile ID first
+    const { data: profile } = await sellerClient
+      .from('seller_profiles').select('id').limit(1).single();
+    if (profile) {
+      const { data, error } = await sellerClient.rpc('get_seller_recommendations', {
+        _seller_id: profile.id,
+      });
+      expect(error).toBeNull();
+      expect(data).toBeDefined();
+    }
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Suite 3: Society feature denial
+// Suite 3: Society feature denial for non-society buyer
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe.skipIf(skipIntegration)('Society features blocked for non-society buyer', () => {
@@ -147,35 +166,19 @@ describe.skipIf(skipIntegration)('Society features blocked for non-society buyer
     if (error) expect(error.code).toBeDefined();
     else expect(data).toHaveLength(0);
   });
-});
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Suite 4: RPC no society gate
-// ═══════════════════════════════════════════════════════════════════════════
-
-describe.skipIf(skipIntegration)('search_sellers_by_location — no society gate', () => {
-  it('returns results without society context', async () => {
-    const { data, error } = await buyerClient.rpc('search_sellers_by_location', {
-      _lat: 18.55, _lng: 73.85, _radius_km: 100,
-    });
-    expect(error).toBeNull();
-    expect(Array.isArray(data)).toBe(true);
-  });
-
-  it('returns empty for null coordinates', async () => {
-    const { data, error } = await buyerClient.rpc('search_sellers_by_location', {
-      _lat: null as any, _lng: null as any,
-    });
-    expect(error).toBeNull();
-    expect(data).toEqual([]);
+  it('cannot read security_staff', async () => {
+    const { data, error } = await buyerClient.from('security_staff').select('id').limit(1);
+    if (error) expect(error.code).toBeDefined();
+    else expect(data).toHaveLength(0);
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Suite 5: Feature classification (unit — always runs)
+// Suite 4: Feature classification (unit — always runs)
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('Feature classification — delivery_management is society-scoped', () => {
+describe('Feature classification — marketplace vs society', () => {
   const MARKETPLACE_FEATURES = new Set([
     'marketplace', 'seller_tools', 'trust_directory', 'trust_score',
     'subscriptions', 'notifications',
