@@ -42,6 +42,7 @@ export function UpiDeepLinkCheckout({
   const [step, setStep] = useState<CheckoutStep>('pay');
   const [utrValue, setUtrValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasOpenedApp = useRef(false);
 
   const shortOrderId = orderId.slice(0, 8).toUpperCase();
   const transactionNote = `ORD_${shortOrderId}`;
