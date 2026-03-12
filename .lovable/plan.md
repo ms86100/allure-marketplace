@@ -1,71 +1,53 @@
 
 
-# Notification System — Comprehensive Audit & Plan
+# Export Complete Database Schema Reference
 
-## Root Cause Fix (Implemented)
+## Summary
 
-Admin users were not notified when a new store or product was submitted for review. Fixed by:
+The database contains **143 tables**, **200+ RLS policies**, **80+ database functions**, **60+ triggers**, **300+ indexes**, and **5 custom enum types**. The total DDL output exceeds **250,000 characters** — far too large for chat.
 
-1. **`notifyAdminsNewStoreApplication()`** in `src/lib/admin-notifications.ts` — queries `user_roles` for admins, enqueues push+in-app notification via `notification_queue`
-2. **`handleSubmit` in `useSellerApplication.ts`** — calls the above after successful submission
-3. **DB trigger `trg_enqueue_product_review_notification`** on `products` table — fires when `approval_status` changes to `'pending'`, notifies all admins
+## What I'll Create
 
----
+A single consolidated file: **`.lovable/schema-export.sql`** containing everything in one runnable reference:
 
-## Current State (As-Is): All Notification Flows
+### Section 1: Custom Enum Types (5 types)
+- `order_status` (20 values: placed → no_show)
+- `product_category` (5 values)
+- `seller_type_enum` (2 values)
+- `service_category` (52 values)
+- `user_role` (4 values: buyer, seller, admin, security_officer)
+- `verification_status` (5 values)
 
-### A. Database Triggers
+### Section 2: CREATE TABLE Statements (143 tables)
+All tables with columns, types, defaults, NOT NULL constraints, and inline foreign keys. Organized alphabetically from `admin_settings` through `worker_salary_records`.
 
-| Trigger | Event | Recipient | Push | In-App |
-|---|---|---|---|---|
-| `enqueue_order_status_notification` | Order status changes | Buyer + Seller | ✅ | ✅ |
-| `enqueue_review_notification` | New review created | Seller | ✅ | ✅ |
-| `enqueue_dispute_status_notification` | Dispute status changes | Submitter | ✅ | ✅ |
-| `enqueue_settlement_notification` | Settlement created | Seller | ✅ | ✅ |
-| `trg_enqueue_product_review_notification` | Product submitted for review | Admins | ✅ | ✅ |
+### Section 3: Foreign Key Relationships (~200 constraints)
+All FK references extracted from `pg_constraint` — e.g., `cart_items.product_id → products.id`, `orders.buyer_id → profiles.id`.
 
-### B. Edge Functions
+### Section 4: Indexes (~300 indexes)
+All custom and primary key indexes.
 
-| Function | Event | Recipient | Push | In-App |
-|---|---|---|---|---|
-| `send-booking-reminders` | 1h before appointment | Buyer + Seller | ✅ | ✅ |
-| `process-notification-queue` | Queue processor | N/A | ✅ | ✅ |
-| `send-campaign` | Admin broadcast | Targeted users | ✅ | ✅ |
-| `generate-weekly-digest` | Weekly digest | Society members | ✅ | ✅ |
-| `generate-society-report` | Monthly report | Society members | ✅ | ✅ |
-| `detect-collective-issues` | Pattern detection | Society admins | ✅ | ✅ |
+### Section 5: RLS Policies (~200 policies)
+Every policy with table, operation (SELECT/INSERT/UPDATE/DELETE), USING clause, and WITH CHECK clause. Extracted from `pg_policies`.
 
-### C. Client-Side (inserts to `notification_queue`)
+### Section 6: Database Functions (~80 functions)
+Full `CREATE OR REPLACE FUNCTION` definitions for all functions — access control helpers (`has_role`, `is_admin`, `is_society_admin`), business logic (`create_multi_vendor_orders`, `book_service_slot`), triggers, RPCs, etc.
 
-| Location | Event | Recipient | Push | In-App |
-|---|---|---|---|---|
-| `admin-notifications.ts` → `notifySellerStatusChange` | Admin approves/rejects seller | Seller | ✅ | ✅ |
-| `admin-notifications.ts` → `notifyLicenseStatusChange` | Admin approves/rejects license | Seller | ✅ | ✅ |
-| `admin-notifications.ts` → `notifyProductStatusChange` | Admin approves/rejects product | Seller | ✅ | ✅ |
-| `admin-notifications.ts` → `notifyAdminsNewStoreApplication` | Seller submits store | Admins | ✅ | ✅ |
-| `society-notifications.ts` → `notifySocietyAdmins` | Dispute/snag | Society admins | ✅ | ✅ |
-| `society-notifications.ts` → `notifySocietyMembers` | Bulletin posts | Society members | ✅ | ✅ |
-| `ServiceBookingFlow.tsx` | New booking | Seller | ✅ | ❌ |
-| `BuyerCancelBooking.tsx` | Buyer cancels | Seller | ✅ | ❌ |
-| `SellerPaymentConfirmation.tsx` | Payment confirmed | Buyer | ✅ | ❌ |
-| `UpiDeepLinkCheckout.tsx` | UPI payment | Seller | ✅ | ❌ |
-| `useSellerChat.ts` | New chat (60s throttle) | Recipient | ✅ | ❌ |
-| `GuardManualEntryTab.tsx` | Gate entry | Resident | ✅ | ❌ |
-| `manage-delivery` edge fn | Delivery OTP/arrival | Buyer | ✅ | ✅ |
-| `update-delivery-location` edge fn | Delivery delay | Buyer | ✅ | ✅ |
+### Section 7: Triggers (~60 triggers)
+All trigger registrations with timing, events, and attached function.
 
----
+### Section 8: Realtime Configuration
+Tables enabled for realtime subscriptions.
 
-## Future Gaps (To-Be)
+### Section 9: Seed Data Function
+The `seed-test-data` edge function reference showing the test data creation pattern (3 societies, 4 users, 2 sellers, 5 products).
 
-### Priority 2 — Operational
-- New user pending approval → Society admins
-- New society request → Platform admins
-- Report filed → Admins
-- Delivery partner assigned → Seller
+## Implementation
+- Single file creation at `.lovable/schema-export.sql`
+- Data is already queried from live database — just needs formatting
+- No database changes required
+- File will be ~200KB+ given the volume of functions
 
-### Priority 3 — Engagement
-- New product from favorite seller → Buyer
-- Seller back online → Recent buyers
-- Price drop on wishlisted item → Buyer
-- Order review reminder (24h after delivery) → Buyer
+## Note on Size
+Due to the massive schema (143 tables, 80+ functions with full bodies), this file will be very large. I'll structure it with clear section headers and table-of-contents comments so you can navigate it easily.
+
