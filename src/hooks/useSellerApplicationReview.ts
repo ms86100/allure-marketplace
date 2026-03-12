@@ -177,8 +177,17 @@ export function useSellerApplicationReview() {
       await logAudit(`seller_${status}`, 'seller_profile', seller.id, '', { status, note: rejectionNote || undefined });
 
       if (status === 'approved') {
-        await supabase.from('user_roles').insert({ user_id: seller.user_id, role: 'seller' });
-        await supabase.from('products').update({ approval_status: 'approved' } as any).eq('seller_id', seller.id).in('approval_status', ['pending', 'draft']);
+        // Add seller role (ignore duplicate error)
+        const { error: roleErr } = await supabase.from('user_roles').insert({ user_id: seller.user_id, role: 'seller' });
+        if (roleErr && !roleErr.message?.includes('duplicate')) {
+          console.error('[Admin] Failed to add seller role:', roleErr);
+        }
+        // Approve all pending/draft products
+        const { error: prodErr } = await supabase.from('products').update({ approval_status: 'approved' } as any).eq('seller_id', seller.id).in('approval_status', ['pending', 'draft']);
+        if (prodErr) console.error('[Admin] Failed to approve products:', prodErr);
+        // Approve all pending licenses
+        const { error: licErr } = await supabase.from('seller_licenses').update({ status: 'approved', reviewed_at: new Date().toISOString() } as any).eq('seller_id', seller.id).eq('status', 'pending');
+        if (licErr) console.error('[Admin] Failed to approve licenses:', licErr);
       } else if (status === 'rejected') {
         await supabase.from('user_roles').delete().eq('user_id', seller.user_id).eq('role', 'seller');
       }
