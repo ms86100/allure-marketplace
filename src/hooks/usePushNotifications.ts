@@ -92,7 +92,7 @@ async function getPushNotificationsPlugin(): Promise<any> {
   return _cachedPNPromise;
 }
 
-async function getFcmPlugin(): Promise<any | null> {
+async function getFcmPlugin(): Promise<any> {
   if (_cachedFCM) return _cachedFCM;
   if (_cachedFCMPromise) return _cachedFCMPromise;
 
