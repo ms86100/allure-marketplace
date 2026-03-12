@@ -881,7 +881,7 @@ export function usePushNotificationsInternal() {
             for (let fcmAttempt = 1; fcmAttempt <= 3; fcmAttempt++) {
               try {
                 console.log(`[Push][iOS] FCM.getToken() attempt ${fcmAttempt}/3…`);
-                const fcmResult = await withTimeout(fcm.getToken(), FCM_GETTOKEN_TIMEOUT_MS, `listener iOS fcm.getToken attempt ${fcmAttempt} timed out`);
+                const fcmResult: any = await withTimeout(fcm.getToken(), FCM_GETTOKEN_TIMEOUT_MS, `listener iOS fcm.getToken attempt ${fcmAttempt} timed out`);
                 const candidate = fcmResult.token;
                 if (candidate && isValidFcmToken(candidate, 'ios')) {
                   fcmToken = candidate;
