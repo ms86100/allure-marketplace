@@ -568,11 +568,25 @@ export function usePushNotificationsInternal() {
       return;
     }
     if (state === 'registering') {
-      console.log('[Push] attemptRegistration skipped — already in progress');
-      return;
+      // ── Staleness guard: if stuck in 'registering' for >30s, force-reset ──
+      const STALE_THRESHOLD_MS = 30000;
+      const startedAt = registeringStartedAtRef.current;
+      if (startedAt && Date.now() - startedAt > STALE_THRESHOLD_MS) {
+        pushLog('warn', 'REGISTERING_STALE_RESET', {
+          stuckForMs: Date.now() - startedAt,
+          ts: Date.now(),
+        });
+        registrationStateRef.current = 'idle';
+        registeringStartedAtRef.current = null;
+        // Fall through to retry
+      } else {
+        console.log('[Push] attemptRegistration skipped — already in progress');
+        return;
+      }
     }
 
     registrationStateRef.current = 'registering';
+    registeringStartedAtRef.current = Date.now();
     const attempt = retryCountRef.current + 1;
     const platform = Capacitor.getPlatform();
     pushLog('info', `attemptRegistration — attempt ${attempt}/${MAX_RETRIES}`, { platform });
