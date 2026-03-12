@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Camera, X, Loader2, ImageIcon } from 'lucide-react';
+import { Camera, X, Loader2, ImageIcon, Upload } from 'lucide-react';
 import { cn, friendlyError } from '@/lib/utils';
 import { ImageCropDialog } from './image-crop-dialog';
 import { Capacitor } from '@capacitor/core';
@@ -31,6 +31,7 @@ export function CroppableImageUpload({
   const [isUploading, setIsUploading] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const effectiveCropAspect = cropAspect ?? (aspectRatio === 'video' ? 16 / 9 : aspectRatio === 'portrait' ? 3 / 4 : 1);
 
@@ -39,6 +40,8 @@ export function CroppableImageUpload({
     video: 'aspect-video',
     portrait: 'aspect-[3/4]',
   };
+
+  const isMobileWeb = !Capacitor.isNativePlatform() && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
   const handleUploadBlob = useCallback(async (blob: Blob) => {
     setIsUploading(true);
@@ -64,7 +67,6 @@ export function CroppableImageUpload({
       const { pickOrCaptureImage } = await import('@/lib/native-media');
       const blob = await pickOrCaptureImage();
       if (blob) {
-        // Show crop dialog with the native image
         const objectUrl = URL.createObjectURL(blob);
         setCropSrc(objectUrl);
       }
@@ -94,6 +96,7 @@ export function CroppableImageUpload({
     const objectUrl = URL.createObjectURL(file);
     setCropSrc(objectUrl);
     if (inputRef.current) inputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
   const handleCropComplete = async (blob: Blob) => {
@@ -123,12 +126,31 @@ export function CroppableImageUpload({
     }
   };
 
+  const handleCameraCapture = () => {
+    if (Capacitor.isNativePlatform()) {
+      handleNativePick();
+    } else {
+      cameraInputRef.current?.click();
+    }
+  };
+
   return (
     <div className={cn('relative', className)}>
+      {/* Gallery / file picker input */}
       <input
         ref={inputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
+        onChange={handleFileSelect}
+        className="hidden"
+        disabled={isUploading}
+      />
+      {/* Camera capture input (mobile web) */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
         onChange={handleFileSelect}
         className="hidden"
         disabled={isUploading}
@@ -138,9 +160,20 @@ export function CroppableImageUpload({
         <div className={cn('relative rounded-lg overflow-hidden border border-border max-h-48', aspectClasses[aspectRatio])}>
           <img src={value} alt="Uploaded" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-            <Button type="button" size="sm" variant="secondary" onClick={handlePickImage} disabled={isUploading}>
-              <Camera size={16} className="mr-1" /> Change
-            </Button>
+            {isMobileWeb ? (
+              <>
+                <Button type="button" size="sm" variant="secondary" onClick={handleCameraCapture} disabled={isUploading}>
+                  <Camera size={16} className="mr-1" /> Retake
+                </Button>
+                <Button type="button" size="sm" variant="secondary" onClick={handlePickImage} disabled={isUploading}>
+                  <Upload size={16} className="mr-1" /> Gallery
+                </Button>
+              </>
+            ) : (
+              <Button type="button" size="sm" variant="secondary" onClick={handlePickImage} disabled={isUploading}>
+                <Camera size={16} className="mr-1" /> Change
+              </Button>
+            )}
             <Button type="button" size="sm" variant="destructive" onClick={handleRemove} disabled={isUploading}>
               <X size={16} />
             </Button>
@@ -152,29 +185,70 @@ export function CroppableImageUpload({
           )}
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={handlePickImage}
-          disabled={isUploading}
-          className={cn(
-            'w-full rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 transition-colors',
-            'flex items-center justify-center gap-3 text-muted-foreground h-24 px-4'
-          )}
-        >
-          {isUploading ? (
-            <Loader2 className="animate-spin" size={24} />
+        <div className="space-y-2">
+          {isMobileWeb ? (
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleCameraCapture}
+                disabled={isUploading}
+                className={cn(
+                  'rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 transition-colors',
+                  'flex flex-col items-center justify-center gap-1.5 text-muted-foreground h-24 px-3'
+                )}
+              >
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Camera size={17} className="text-primary" />
+                </div>
+                <span className="text-xs font-medium">Take Photo</span>
+              </button>
+              <button
+                type="button"
+                onClick={handlePickImage}
+                disabled={isUploading}
+                className={cn(
+                  'rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 transition-colors',
+                  'flex flex-col items-center justify-center gap-1.5 text-muted-foreground h-24 px-3'
+                )}
+              >
+                <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                  <ImageIcon size={17} />
+                </div>
+                <span className="text-xs font-medium">Gallery</span>
+              </button>
+            </div>
           ) : (
-            <>
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                <ImageIcon size={18} />
-              </div>
-              <div className="text-left">
-                <span className="text-sm font-medium block">{placeholder}</span>
-                <span className="text-[10px]">JPG, PNG, WebP (max 5MB)</span>
-              </div>
-            </>
+            <button
+              type="button"
+              onClick={handlePickImage}
+              disabled={isUploading}
+              className={cn(
+                'w-full rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 transition-colors',
+                'flex items-center justify-center gap-3 text-muted-foreground h-24 px-4'
+              )}
+            >
+              {isUploading ? (
+                <Loader2 className="animate-spin" size={24} />
+              ) : (
+                <>
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                    <ImageIcon size={18} />
+                  </div>
+                  <div className="text-left">
+                    <span className="text-sm font-medium block">{placeholder}</span>
+                    <span className="text-[10px]">JPG, PNG, WebP (max 5MB)</span>
+                  </div>
+                </>
+              )}
+            </button>
           )}
-        </button>
+          {isUploading && (
+            <div className="flex items-center justify-center gap-2 py-2">
+              <Loader2 className="animate-spin text-primary" size={18} />
+              <span className="text-xs text-muted-foreground">Uploading…</span>
+            </div>
+          )}
+        </div>
       )}
 
       {cropSrc && (
