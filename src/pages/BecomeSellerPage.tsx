@@ -52,6 +52,61 @@ function SubCategorySelector({ selectedGroup, selectedCategories, onCategorySele
   );
 }
 
+// ─── Store Location Picker ──────────────────────────────────────────────────
+function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }: {
+  latitude: number | null;
+  longitude: number | null;
+  onLocationSet: (lat: number, lng: number) => void;
+  hasSociety: boolean;
+}) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const hasCoords = !!(latitude && longitude);
+
+  // We need a dummy sellerId for the sheet since it saves via RPC;
+  // we'll intercept the confirm differently. Let's use a wrapper approach.
+  return (
+    <div className="border rounded-lg p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <MapPin size={16} className="text-primary" />
+        <h3 className="font-semibold text-sm">Store Location {!hasSociety && <span className="text-destructive">*</span>}</h3>
+      </div>
+      {hasCoords ? (
+        <div className="flex items-center gap-2 p-3 bg-success/10 rounded-lg">
+          <CheckCircle size={16} className="text-success" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-success">Location set</p>
+            <p className="text-[10px] text-muted-foreground">{latitude?.toFixed(5)}, {longitude?.toFixed(5)}</p>
+          </div>
+          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => setSheetOpen(true)}>Change</Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            {hasSociety
+              ? 'Optionally set a precise location for your store'
+              : 'Set your store location so buyers can find you'}
+          </p>
+          <Button variant="outline" className="w-full h-10" onClick={() => setSheetOpen(true)}>
+            <Navigation size={14} className="mr-2" />
+            Set Store Location
+          </Button>
+          {!hasSociety && (
+            <p className="text-[10px] text-destructive">Required — your store won't be visible without a location</p>
+          )}
+        </div>
+      )}
+      <OnboardingLocationSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        onConfirm={(lat, lng) => {
+          onLocationSet(lat, lng);
+          setSheetOpen(false);
+        }}
+      />
+    </div>
+  );
+}
+
 // ─── Constants ──────────────────────────────────────────────────────────────
 const TOTAL_STEPS = 6;
 const STEP_META = [
