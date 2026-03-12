@@ -1401,7 +1401,7 @@ export type Database = {
           per_user_limit: number
           seller_id: string
           show_to_buyers: boolean
-          society_id: string
+          society_id: string | null
           starts_at: string
           times_used: number
           updated_at: string
@@ -1421,7 +1421,7 @@ export type Database = {
           per_user_limit?: number
           seller_id: string
           show_to_buyers?: boolean
-          society_id: string
+          society_id?: string | null
           starts_at?: string
           times_used?: number
           updated_at?: string
@@ -1441,7 +1441,7 @@ export type Database = {
           per_user_limit?: number
           seller_id?: string
           show_to_buyers?: boolean
-          society_id?: string
+          society_id?: string | null
           starts_at?: string
           times_used?: number
           updated_at?: string
@@ -4792,21 +4792,21 @@ export type Database = {
           id: string
           search_term: string
           searched_at: string
-          society_id: string
+          society_id: string | null
         }
         Insert: {
           category?: string | null
           id?: string
           search_term: string
           searched_at?: string
-          society_id: string
+          society_id?: string | null
         }
         Update: {
           category?: string | null
           id?: string
           search_term?: string
           searched_at?: string
-          society_id?: string
+          society_id?: string | null
         }
         Relationships: [
           {
@@ -5279,7 +5279,7 @@ export type Database = {
           id: string
           recommender_id: string
           seller_id: string
-          society_id: string
+          society_id: string | null
         }
         Insert: {
           comment?: string | null
@@ -5287,7 +5287,7 @@ export type Database = {
           id?: string
           recommender_id: string
           seller_id: string
-          society_id: string
+          society_id?: string | null
         }
         Update: {
           comment?: string | null
@@ -5295,7 +5295,7 @@ export type Database = {
           id?: string
           recommender_id?: string
           seller_id?: string
-          society_id?: string
+          society_id?: string | null
         }
         Relationships: [
           {
@@ -8465,14 +8465,23 @@ export type Database = {
           status: string
         }[]
       }
-      get_unmet_demand: {
-        Args: { _seller_categories?: string[]; _society_id: string }
-        Returns: {
-          last_searched: string
-          search_count: number
-          search_term: string
-        }[]
-      }
+      get_unmet_demand:
+        | {
+            Args: { _society_id: string }
+            Returns: {
+              last_searched: string
+              search_count: number
+              search_term: string
+            }[]
+          }
+        | {
+            Args: { _seller_categories?: string[]; _society_id: string }
+            Returns: {
+              last_searched: string
+              search_count: number
+              search_term: string
+            }[]
+          }
       get_user_auth_context: { Args: { _user_id: string }; Returns: Json }
       get_user_frequent_products: {
         Args: { _limit?: number; _user_id: string }
