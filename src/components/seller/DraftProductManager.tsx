@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,15 +53,27 @@ export function DraftProductManager({
   onProductsChange,
 }: DraftProductManagerProps) {
   const { user } = useAuth();
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const DRAFT_KEY = `draft-product-form-${sellerId}`;
+
+  // Restore persisted draft from sessionStorage on mount
+  const restoredDraft = useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [isAdding, setIsAdding] = useState(restoredDraft?.isAdding ?? false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(restoredDraft?.editingIndex ?? null);
   const [isSaving, setIsSaving] = useState(false);
-  const [attributeBlocks, setAttributeBlocks] = useState<BlockData[]>([]);
-  const [serviceFields, setServiceFields] = useState<ServiceFieldsData>(INITIAL_SERVICE_FIELDS);
-  const [availabilitySchedule, setAvailabilitySchedule] = useState<DayScheduleData[]>(INITIAL_AVAILABILITY_SCHEDULE);
+  const [attributeBlocks, setAttributeBlocks] = useState<BlockData[]>(restoredDraft?.attributeBlocks ?? []);
+  const [serviceFields, setServiceFields] = useState<ServiceFieldsData>(restoredDraft?.serviceFields ?? INITIAL_SERVICE_FIELDS);
+  const [availabilitySchedule, setAvailabilitySchedule] = useState<DayScheduleData[]>(restoredDraft?.availabilitySchedule ?? INITIAL_AVAILABILITY_SCHEDULE);
   const { configs } = useCategoryConfigs();
   const { formatPrice, currencySymbol } = useCurrency();
-  const [newProduct, setNewProduct] = useState<DraftProduct>({
+  const [newProduct, setNewProduct] = useState<DraftProduct>(restoredDraft?.newProduct ?? {
     name: '',
     price: 0,
     mrp: null,
@@ -72,6 +84,19 @@ export function DraftProductManager({
     image_url: '',
     prep_time_minutes: null,
   });
+
+  // Auto-persist product form draft to sessionStorage on every change
+  useEffect(() => {
+    if (!isAdding) {
+      sessionStorage.removeItem(DRAFT_KEY);
+      return;
+    }
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule,
+      }));
+    } catch { /* quota exceeded — non-critical */ }
+  }, [isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule, DRAFT_KEY]);
 
   // Get form hints for the selected category
   const activeConfig = useMemo(() => {
@@ -324,6 +349,7 @@ export function DraftProductManager({
     setAttributeBlocks([]);
     setServiceFields(INITIAL_SERVICE_FIELDS);
     setAvailabilitySchedule(INITIAL_AVAILABILITY_SCHEDULE);
+    sessionStorage.removeItem(DRAFT_KEY);
   };
 
   return (
