@@ -126,16 +126,20 @@ export default function CartPage() {
                       {item.product?.image_url ? <img src={item.product.image_url} alt={item.product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg">🛍️</div>}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5"><VegBadge isVeg={item.product?.is_veg ?? true} size="sm" /><h4 className="text-sm font-medium truncate">{item.product?.name}</h4></div>
-                      <p className="text-sm font-bold mt-0.5">{c.formatPrice((item.product?.price || 0) * item.quantity)}</p>
-                      <p className="text-[11px] text-muted-foreground">{c.formatPrice(item.product?.price || 0)} × {item.quantity}</p>
+                      {item.product ? (<>
+                        <div className="flex items-center gap-1.5"><VegBadge isVeg={item.product.is_veg ?? true} size="sm" /><h4 className="text-sm font-medium truncate">{item.product.name}</h4></div>
+                        <p className="text-sm font-bold mt-0.5">{c.formatPrice(item.product.price * item.quantity)}</p>
+                        <p className="text-[11px] text-muted-foreground">{c.formatPrice(item.product.price)} × {item.quantity}</p>
+                      </>) : (<p className="text-sm text-muted-foreground italic">Item unavailable</p>)}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <div className="inline-flex items-center bg-accent rounded-lg overflow-hidden">
-                        <button className="h-8 w-8 flex items-center justify-center active:scale-95 transition-transform" onClick={() => { hapticImpact('medium'); c.updateQuantity(item.product_id, item.quantity - 1); }}><Minus size={14} className="text-accent-foreground" /></button>
-                        <span className="w-6 text-center text-sm font-bold text-accent-foreground tabular-nums">{item.quantity}</span>
-                        <button className="h-8 w-8 flex items-center justify-center active:scale-95 transition-transform" onClick={() => { hapticImpact('medium'); c.updateQuantity(item.product_id, item.quantity + 1); }}><Plus size={14} className="text-accent-foreground" /></button>
-                      </div>
+                      {item.product && (
+                        <div className="inline-flex items-center bg-accent rounded-lg overflow-hidden">
+                          <button className="h-8 w-8 flex items-center justify-center active:scale-95 transition-transform" onClick={() => { hapticImpact('medium'); c.updateQuantity(item.product_id, item.quantity - 1); }}><Minus size={14} className="text-accent-foreground" /></button>
+                          <span className="w-6 text-center text-sm font-bold text-accent-foreground tabular-nums">{item.quantity}</span>
+                          <button className="h-8 w-8 flex items-center justify-center active:scale-95 transition-transform" onClick={() => { hapticImpact('medium'); c.updateQuantity(item.product_id, item.quantity + 1); }}><Plus size={14} className="text-accent-foreground" /></button>
+                        </div>
+                      )}
                       <button className="h-8 w-8 flex items-center justify-center text-muted-foreground" onClick={() => { hapticImpact('medium'); const name = item.product?.name || 'Item'; c.removeItem(item.product_id); toast(`${name} removed`, { action: { label: 'Undo', onClick: () => c.addItem(item.product as any, item.quantity, true) }, duration: 4000 }); }}><Trash2 size={15} /></button>
                     </div>
                   </div>

@@ -133,7 +133,7 @@ export default function CategoriesPage() {
     return s;
   })();
 
-  const isLoading = authLoading || !effectiveSocietyId || configsLoading || groupsLoading || productsLoading || (browseBeyond && nearbyLoading);
+  const isLoading = authLoading || configsLoading || groupsLoading || productsLoading || (browseBeyond && nearbyLoading);
 
   const grouped = (() => {
     const q = searchQuery.toLowerCase().trim();

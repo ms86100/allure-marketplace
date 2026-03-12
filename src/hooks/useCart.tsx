@@ -85,7 +85,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         .eq('user_id', user.id);
       if (error) throw error;
       const items = (data as any as (CartItem & { product: Product })[]) || [];
-      return items.filter(item => item.product?.is_available !== false);
+      return items.filter(item => item.product != null && item.product.is_available !== false);
     },
     enabled: !!user,
     staleTime: 30 * 1000,
