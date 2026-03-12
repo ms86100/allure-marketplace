@@ -18,7 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DAYS_OF_WEEK } from '@/types/database';
 import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe, LayoutGrid, Tags, FileText, Package, CheckCircle2, ArrowRight, Truck, Smartphone, Banknote, Clock, ImageIcon, MapPin, Navigation, CheckCircle } from 'lucide-react';
-import { SetStoreLocationSheet } from '@/components/seller/SetStoreLocationSheet';
+import { OnboardingLocationSheet } from '@/components/seller/OnboardingLocationSheet';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
