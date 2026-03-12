@@ -79,10 +79,11 @@ export function useEffectiveFeatures() {
 
   const { isAdmin } = useAuth();
 
-  // Marketplace features that must work without a society
+  // Marketplace-domain features: always enabled regardless of society context.
+  // Society-domain features (everything else) require effectiveSocietyId.
   const MARKETPLACE_FEATURES: Set<string> = useMemo(() => new Set([
     'marketplace', 'seller_tools', 'trust_directory', 'trust_score',
-    'subscriptions', 'notifications',
+    'subscriptions', 'notifications', 'delivery_management',
   ]), []);
 
   const isFeatureEnabled = useCallback((key: FeatureKey): boolean => {

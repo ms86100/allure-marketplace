@@ -97,35 +97,8 @@ export default function SellerDetailPage() {
         return;
       }
 
-      // Society scoping: commercial sellers always visible; society_resident follows sell_beyond rule
-      // Also allow if seller is within browsing radius (coordinate-based discovery)
-      const isWithinBrowsingRadius = (() => {
-        try {
-          const browsing = JSON.parse(localStorage.getItem('sociva_browsing_location') || 'null');
-          if (!browsing?.lat || !browsing?.lng) return false;
-          const sLat = sellerData.latitude ?? sellerData.society?.latitude;
-          const sLng = sellerData.longitude ?? sellerData.society?.longitude;
-          if (!sLat || !sLng) return false;
-          const R = 6371;
-          const dLat = (sLat - browsing.lat) * Math.PI / 180;
-          const dLng = (sLng - browsing.lng) * Math.PI / 180;
-          const a = Math.sin(dLat/2)**2 + Math.cos(browsing.lat * Math.PI/180) * Math.cos(sLat * Math.PI/180) * Math.sin(dLng/2)**2;
-          const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-          return dist <= (browsing.radius || 5);
-        } catch { return false; }
-      })();
-
-      if (
-        effectiveSocietyId &&
-        sellerData.society_id &&
-        sellerData.society_id !== effectiveSocietyId &&
-        !sellerData.sell_beyond_community &&
-        sellerData.seller_type !== 'commercial' &&
-        !isWithinBrowsingRadius
-      ) {
-        setSeller(null);
-        return;
-      }
+      // Marketplace-open: any approved seller is accessible.
+      // Products RLS now handles visibility; no society scoping needed here.
 
       setSeller(sellerData);
       setProducts((productsRes.data || []) as Product[]);
