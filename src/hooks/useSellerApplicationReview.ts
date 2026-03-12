@@ -200,10 +200,13 @@ export function useSellerApplicationReview() {
       fetchData();
     } catch (error: any) {
       const msg = error?.message || '';
-      if (msg.includes('Cannot approve seller without location')) {
-        toast.error('Cannot approve: Store has no location coordinates.');
+      console.error('[Admin] updateSellerStatus error:', { msg, code: error?.code, details: error?.details, hint: error?.hint });
+      if (msg.includes('Cannot approve seller without location') || msg.includes('location')) {
+        toast.error('Cannot approve: Store has no location coordinates. Ask seller to set their store location first.');
+      } else if (msg.includes('Update did not persist')) {
+        toast.error('Approval failed — the update did not save. Please try again or check permissions.');
       } else {
-        toast.error('Failed to update seller status');
+        toast.error(`Failed to update seller status: ${msg || 'Unknown error'}`);
       }
     } finally {
       setActionId(null);
