@@ -1374,7 +1374,7 @@ export function usePushNotificationsInternal() {
         console.log(`[Push] requestFullPermission (${platform}) AFTER requestPermissions:`, permStatus.receive);
       }
 
-      const recheck = await withTimeout(
+      const recheck: any = await withTimeout(
         PN.checkPermissions(),
         CHECK_PERMISSIONS_TIMEOUT_MS,
         'requestFullPermission recheck timed out'
