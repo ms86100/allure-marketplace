@@ -78,7 +78,7 @@ export function CouponManager() {
 
     const { error } = await supabase.from('coupons').insert({
       seller_id: currentSellerId,
-      society_id: profile.society_id,
+      society_id: profile?.society_id || null,
       code: formData.code.toUpperCase().trim(),
       description: formData.description.trim() || null,
       discount_type: formData.discount_type,
