@@ -223,6 +223,8 @@ export function useSellerApplication() {
         upi_id: formData.accepts_upi ? formData.upi_id.trim() || null : null,
         operating_days: formData.operating_days, profile_image_url: formData.profile_image_url,
         cover_image_url: formData.cover_image_url,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
       };
       if (draftSellerId) {
         const { error } = await supabase.from('seller_profiles').update(draftPayload as any).eq('id', draftSellerId);
