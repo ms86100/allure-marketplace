@@ -1,50 +1,32 @@
 
 
-## Notification Health Check — User-Friendly UI
+# Fix UPI Payment App Selection and Post-Payment Flow
 
-### What We'll Build
+## Problem 1: WhatsApp UPI Default
+The generic `upi://pay?` scheme opens whatever the OS default is (often WhatsApp). Users expect GPay, PhonePe, or Paytm.
 
-A simple "Check Notifications" button accessible from the **Profile page** (replacing the current "Push Debug" developer link) and from the **Notifications page**. When tapped, it runs the existing diagnostic engine in the background and presents results as plain, friendly status messages — no technical jargon.
+**Fix**: Replace the single "Pay Now" button with a 3-app picker grid:
+- **GPay** → `tez://upi/pay?...`
+- **PhonePe** → `phonepe://pay?...`
+- **Paytm** → `paytmupi://pay?...`
 
-### UI Design
+No generic "Other UPI" fallback — these three cover the vast majority of Indian UPI users.
 
-**Trigger:** A card/button labeled "Check Notifications" with a bell icon, placed in Profile menu items (replacing "Push Debug" for non-admin users; admins keep the debug link).
+## Problem 2: Flash of "Yes, I paid" then Empty Cart
+The `setTimeout(() => setStep('confirm'), 1500)` races with app backgrounding. When the user returns, the step may still be `pay`, and if the sheet closes, `onPaymentFailed` fires.
 
-**Result view:** A bottom sheet (using `vaul` Drawer) with 4 user-facing status rows:
+**Fix**:
+- Set `step='confirm'` synchronously on tap (before `window.open`)
+- Add a `visibilitychange` listener: when user returns to the app and step is still `pay`, advance to `confirm`
 
-| Internal Check | User Sees (if OK) | User Sees (if NOT OK) |
-|---|---|---|
-| Permission check | "Notification permission is enabled" | "Notifications are turned off" + "Open Settings" button |
-| Plugin + registration | "Your device is set up for notifications" | "Setup incomplete — tap to retry" + retry button |
-| Token in DB | "Your device is registered" | "Registration pending — tap to retry" |
-| Test notification queue | "Everything is working correctly" | "Could not send test — please try again later" |
+## File to Modify
 
-Each row shows a green checkmark or red X icon with the message. No step numbers, no token strings, no technical terms.
+### `src/components/payment/UpiDeepLinkCheckout.tsx`
+- Define a `UPI_APPS` array: `[{ name: 'Google Pay', scheme: 'tez', icon, color }, { name: 'PhonePe', scheme: 'phonepe', icon, color }, { name: 'Paytm', scheme: 'paytmupi', icon, color }]`
+- Replace single "Pay Now" button with a 3-button grid, each building its own deep link
+- `handlePayWithApp(scheme)`: set `step='confirm'` first, then `window.open(appLink)`
+- Add `useEffect` with `visibilitychange` listener to catch returning users
+- Remove the `setTimeout` entirely
 
-**Loading state:** A simple spinner with "Checking..." while the diagnostic runs (typically 2-3 seconds).
-
-**All-pass state:** A green banner at the top: "Notifications are working correctly" with a checkmark.
-
-### Implementation
-
-**1. New component: `src/components/notifications/NotificationHealthCheck.tsx`**
-- Renders the trigger button and the bottom sheet
-- Calls `runPushDiagnostics(userId)` from `src/lib/pushDiagnostics.ts` (reuses existing engine)
-- Maps technical `DiagnosticResult[]` into 4 user-friendly status items
-- Provides actionable buttons for failures (Open Settings, Retry Registration)
-
-**2. New helper: `src/lib/pushDiagnosticsSummary.ts`**
-- Pure function: takes `DiagnosticResult[]` → returns `UserFriendlyStatus[]`
-- Consolidates the 7+ technical steps into 4 simple categories
-- Each category has: `label`, `ok`, `actionType` (none | openSettings | retry)
-
-**3. Update `src/pages/ProfilePage.tsx`**
-- Replace `{ icon: Bug, label: 'Push Debug', to: '/push-debug' }` with an inline button that opens the health check sheet (for all users)
-- Keep Push Debug link visible only for admins
-
-**4. Optionally add to `src/pages/NotificationsPage.tsx`**
-- Add a small "Check notification status" link at the top
-
-### No backend changes needed
-The existing `runPushDiagnostics` function and `device_tokens` table are sufficient. No new tables, migrations, or edge functions required.
+No other files need changes.
 
