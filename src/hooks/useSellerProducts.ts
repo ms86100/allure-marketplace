@@ -9,6 +9,7 @@ import { type BlockData } from '@/hooks/useAttributeBlocks';
 import { INITIAL_SERVICE_FIELDS, type ServiceFieldsData } from '@/components/seller/ServiceFieldsSection';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
+import { buildDraftKey, readDraft, useAutoSaveDraft } from '@/hooks/useProductFormDraft';
 
 export interface ProductFormData {
   name: string;
