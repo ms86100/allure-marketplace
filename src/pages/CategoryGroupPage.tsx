@@ -166,7 +166,7 @@ export default function CategoryGroupPage() {
     );
   }
 
-  if (!parentGroup && !groupsLoading && effectiveSocietyId !== undefined) {
+  if (!parentGroup && !groupsLoading) {
     return (
       <AppLayout showHeader={false}>
         <div className="p-4 text-center">

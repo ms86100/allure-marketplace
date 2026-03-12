@@ -22,7 +22,7 @@ import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 export function MarketplaceSection() {
   const navigate = useNavigate();
-  const { user, profile, effectiveSocietyId } = useAuth();
+  const { user, profile } = useAuth();
   const ml = useMarketplaceLabels();
   const { browsingLocation } = useBrowsingLocation();
 
