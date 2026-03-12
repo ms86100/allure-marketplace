@@ -360,8 +360,8 @@ export default function SellerDetailPage() {
           {/* Row 2: Location · Distance · Hours — compact info line */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
             {(seller as any).society && (() => {
-              const lat = seller.latitude ?? (seller as any).society?.latitude;
-              const lng = seller.longitude ?? (seller as any).society?.longitude;
+              const lat = (seller as any).latitude ?? (seller as any).society?.latitude;
+              const lng = (seller as any).longitude ?? (seller as any).society?.longitude;
               const content = (
                 <>
                   <MapPin size={13} className="text-primary shrink-0" />
