@@ -1,4 +1,9 @@
-[map[ddl:CREATE TABLE public.admin_settings (
+-- ============================================================
+-- Section 2: CREATE TABLE Statements (143 tables)
+-- Generated: 2026-03-12
+-- ============================================================
+
+CREATE TABLE public.admin_settings (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   key text NOT NULL,
   value text,
