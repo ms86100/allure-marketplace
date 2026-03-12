@@ -166,16 +166,28 @@ export function useSellerApplicationReview() {
         }
       }
 
-      const { error } = await supabase.from('seller_profiles').update({
+      const { data: updated, error } = await supabase.from('seller_profiles').update({
         verification_status: status,
         rejection_note: status === 'rejected' ? (rejectionNote.trim() || null) : null,
-      } as any).eq('id', seller.id);
+      } as any).eq('id', seller.id).select('verification_status').single();
       if (error) throw error;
+      if (!updated || (updated as any).verification_status !== status) {
+        throw new Error(`Update did not persist — status is still "${(updated as any)?.verification_status ?? 'unknown'}"`);
+      }
       await logAudit(`seller_${status}`, 'seller_profile', seller.id, '', { status, note: rejectionNote || undefined });
 
       if (status === 'approved') {
-        await supabase.from('user_roles').insert({ user_id: seller.user_id, role: 'seller' });
-        await supabase.from('products').update({ approval_status: 'approved' } as any).eq('seller_id', seller.id).in('approval_status', ['pending', 'draft']);
+        // Add seller role (ignore duplicate error)
+        const { error: roleErr } = await supabase.from('user_roles').insert({ user_id: seller.user_id, role: 'seller' });
+        if (roleErr && !roleErr.message?.includes('duplicate')) {
+          console.error('[Admin] Failed to add seller role:', roleErr);
+        }
+        // Approve all pending/draft products
+        const { error: prodErr } = await supabase.from('products').update({ approval_status: 'approved' } as any).eq('seller_id', seller.id).in('approval_status', ['pending', 'draft']);
+        if (prodErr) console.error('[Admin] Failed to approve products:', prodErr);
+        // Approve all pending licenses
+        const { error: licErr } = await supabase.from('seller_licenses').update({ status: 'approved', reviewed_at: new Date().toISOString() } as any).eq('seller_id', seller.id).eq('status', 'pending');
+        if (licErr) console.error('[Admin] Failed to approve licenses:', licErr);
       } else if (status === 'rejected') {
         await supabase.from('user_roles').delete().eq('user_id', seller.user_id).eq('role', 'seller');
       }
@@ -188,10 +200,13 @@ export function useSellerApplicationReview() {
       fetchData();
     } catch (error: any) {
       const msg = error?.message || '';
-      if (msg.includes('Cannot approve seller without location')) {
-        toast.error('Cannot approve: Store has no location coordinates.');
+      console.error('[Admin] updateSellerStatus error:', { msg, code: error?.code, details: error?.details, hint: error?.hint });
+      if (msg.includes('Cannot approve seller without location') || msg.includes('location')) {
+        toast.error('Cannot approve: Store has no location coordinates. Ask seller to set their store location first.');
+      } else if (msg.includes('Update did not persist')) {
+        toast.error('Approval failed — the update did not save. Please try again or check permissions.');
       } else {
-        toast.error('Failed to update seller status');
+        toast.error(`Failed to update seller status: ${msg || 'Unknown error'}`);
       }
     } finally {
       setActionId(null);
