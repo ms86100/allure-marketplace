@@ -97,7 +97,7 @@ function ImageCollage({ images, fallbackIcon, fallbackUrl, alt }: {
 /* ── Page ─────────────────────────────────────────────────── */
 
 export default function CategoriesPage() {
-  const { profile, isLoading: authLoading, effectiveSocietyId } = useAuth();
+  const { profile, isLoading: authLoading } = useAuth();
   const { configs, isLoading: configsLoading } = useCategoryConfigs();
   const { groups, isLoading: groupsLoading } = useParentGroups();
   const { data: productCategories = [], isLoading: productsLoading } = useProductsByCategory();

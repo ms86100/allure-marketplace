@@ -27,7 +27,7 @@ export default function CategoryGroupPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const subCategory = searchParams.get('sub') as ServiceCategory | null;
 
-  const { effectiveSocietyId } = useAuth();
+  
   const { groupedConfigs, configs, isLoading: configsLoading } = useCategoryConfigs();
   const { getGroupBySlug, isLoading: groupsLoading } = useParentGroups();
   const [activeSubCategory, setActiveSubCategory] = useState<ServiceCategory | null>(subCategory);
@@ -82,7 +82,7 @@ export default function CategoryGroupPage() {
   const showAllTab = subCategories.length > 1;
 
   const { data: topSellers = [] } = useQuery({
-    queryKey: ['category-sellers', category, effectiveSocietyId],
+    queryKey: ['category-sellers', category],
     queryFn: async () => {
       const { data: cats } = await supabase
         .from('category_config')
@@ -109,11 +109,9 @@ export default function CategoryGroupPage() {
         s.products?.some((p: any) => categoryList.includes(p.category))
       );
 
-      return effectiveSocietyId
-        ? filtered.filter((s: any) => s.society_id === effectiveSocietyId).slice(0, 10)
-        : filtered.slice(0, 10);
+      return filtered.slice(0, 10);
     },
-    enabled: !!category && !!effectiveSocietyId,
+    enabled: !!category,
   });
 
   const displayProducts = useMemo(() => {
@@ -168,7 +166,7 @@ export default function CategoryGroupPage() {
     );
   }
 
-  if (!parentGroup && !groupsLoading && effectiveSocietyId !== undefined) {
+  if (!parentGroup && !groupsLoading) {
     return (
       <AppLayout showHeader={false}>
         <div className="p-4 text-center">

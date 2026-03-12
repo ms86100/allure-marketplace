@@ -43,7 +43,7 @@ interface CouponInputProps {
 
 export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedCoupon }: CouponInputProps) {
   const { formatPrice } = useCurrency();
-  const { user, effectiveSocietyId } = useAuth();
+  const { user } = useAuth();
   const [code, setCode] = useState('');
   const [isValidating, setIsValidating] = useState(false);
   const [availableCoupons, setAvailableCoupons] = useState<CouponData[]>([]);
@@ -75,7 +75,7 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
     }
     fetchCoupons();
     return () => { cancelled = true; };
-  }, [effectiveSocietyId, sellerId, user]);
+  }, [sellerId, user]);
 
   const calculateDiscount = (coupon: CouponData) => {
     let discount = 0;
