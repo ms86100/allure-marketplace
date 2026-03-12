@@ -71,3 +71,6 @@ verify_jwt = false
 
 [functions.test-apns-direct]
 verify_jwt = false
+
+[functions.manage-cron-jobs]
+verify_jwt = false
