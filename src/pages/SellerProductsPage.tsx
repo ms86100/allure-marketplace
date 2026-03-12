@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { ProductImageUpload } from '@/components/ui/product-image-upload';
 import { ProductCategory } from '@/types/database';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
-import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle, Store, ShieldAlert, Upload, Send, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle, Store, ShieldAlert, Upload, Send, CheckCircle2, Clock, XCircle, FileText, X } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { toast } from 'sonner';
 import { BulkProductUpload } from '@/components/seller/BulkProductUpload';
