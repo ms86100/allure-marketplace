@@ -62,6 +62,7 @@ export function UpiDeepLinkCheckout({
     if (isOpen) {
       setStep('pay');
       setUtrValue('');
+      hasOpenedApp.current = false;
     }
   }, [isOpen]);
 
