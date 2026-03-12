@@ -8,17 +8,19 @@ import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 interface DemandInsightsProps {
   societyId?: string | null;
+  sellerId?: string | null;
 }
 
-export function DemandInsights({ societyId }: DemandInsightsProps) {
+export function DemandInsights({ societyId, sellerId }: DemandInsightsProps) {
   const ml = useMarketplaceLabels();
   const maxItems = ml.threshold('demand_insights_max_items');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['unmet-demand', societyId ?? 'all'],
+    queryKey: ['unmet-demand', societyId ?? 'none', sellerId ?? 'none'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_unmet_demand', {
+      const { data, error } = await supabase.rpc('get_unmet_demand' as any, {
         _society_id: societyId || null,
+        _seller_id: sellerId || null,
       });
       if (error) throw error;
       return (data || []) as { search_term: string; search_count: number; last_searched: string }[];

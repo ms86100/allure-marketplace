@@ -47,7 +47,6 @@ export interface SocietyGroup {
  * Replaces the old society_id–based query.
  */
 export function useLocalSellers() {
-  const { isApproved } = useAuth();
   const { browsingLocation } = useBrowsingLocation();
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
