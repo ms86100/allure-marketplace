@@ -43,7 +43,7 @@ interface CouponInputProps {
 
 export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedCoupon }: CouponInputProps) {
   const { formatPrice } = useCurrency();
-  const { user, effectiveSocietyId } = useAuth();
+  const { user } = useAuth();
   const [code, setCode] = useState('');
   const [isValidating, setIsValidating] = useState(false);
   const [availableCoupons, setAvailableCoupons] = useState<CouponData[]>([]);
