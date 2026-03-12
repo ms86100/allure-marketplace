@@ -59,31 +59,72 @@ function isValidFcmToken(token: string, platform: string): boolean {
   return token.length > 20;
 }
 
-async function getPushNotificationsPlugin() {
-  try {
-    const { PushNotifications } = await withTimeout(
-      import('@capacitor/push-notifications'),
-      PLUGIN_IMPORT_TIMEOUT_MS,
-      'getPushNotificationsPlugin import timed out'
-    );
-    return PushNotifications;
-  } catch (e) {
-    console.warn('[Push] @capacitor/push-notifications not available:', e);
-    return null;
-  }
+// ── Module-level cached plugin singletons ──
+// Dynamic imports are executed ONCE and cached. This prevents repeated
+// import() calls from hanging the iOS native bridge during early login.
+let _cachedPN: any = null;
+let _cachedPNPromise: Promise<any> | null = null;
+let _cachedFCM: any = null;
+let _cachedFCMPromise: Promise<any> | null = null;
+
+async function getPushNotificationsPlugin(): Promise<any> {
+  if (_cachedPN) return _cachedPN;
+  if (_cachedPNPromise) return _cachedPNPromise;
+
+  _cachedPNPromise = (async (): Promise<any> => {
+    try {
+      console.log('[Push] getPushNotificationsPlugin: importing (first time)…');
+      const { PushNotifications } = await withTimeout(
+        import('@capacitor/push-notifications'),
+        PLUGIN_IMPORT_TIMEOUT_MS,
+        'getPushNotificationsPlugin import timed out'
+      );
+      _cachedPN = PushNotifications;
+      console.log('[Push] getPushNotificationsPlugin: cached ✓');
+      return PushNotifications;
+    } catch (e) {
+      console.warn('[Push] @capacitor/push-notifications not available:', e);
+      _cachedPNPromise = null;
+      return null;
+    }
+  })();
+
+  return _cachedPNPromise;
 }
 
-async function getFcmPlugin() {
-  try {
-    const { FCM } = await withTimeout(
-      import('@capacitor-community/fcm'),
-      PLUGIN_IMPORT_TIMEOUT_MS,
-      'getFcmPlugin import timed out'
-    );
-    return FCM;
-  } catch (e) {
-    console.warn('[Push] @capacitor-community/fcm not available:', e);
-    return null;
+async function getFcmPlugin(): Promise<any> {
+  if (_cachedFCM) return _cachedFCM;
+  if (_cachedFCMPromise) return _cachedFCMPromise;
+
+  _cachedFCMPromise = (async (): Promise<any> => {
+    try {
+      console.log('[Push] getFcmPlugin: importing (first time)…');
+      const { FCM } = await withTimeout(
+        import('@capacitor-community/fcm'),
+        PLUGIN_IMPORT_TIMEOUT_MS,
+        'getFcmPlugin import timed out'
+      );
+      _cachedFCM = FCM;
+      console.log('[Push] getFcmPlugin: cached ✓');
+      return FCM;
+    } catch (e) {
+      console.warn('[Push] @capacitor-community/fcm not available:', e);
+      _cachedFCMPromise = null;
+      return null;
+    }
+  })();
+
+  return _cachedFCMPromise;
+}
+
+// ── Pre-warm plugin imports on native platforms ──
+// Fire-and-forget: starts the import() immediately at module load time
+// so plugins are cached before login triggers registration.
+if (Capacitor.isNativePlatform()) {
+  console.log('[Push] Pre-warming plugin imports…');
+  getPushNotificationsPlugin();
+  if (Capacitor.getPlatform() === 'ios') {
+    getFcmPlugin();
   }
 }
 
@@ -125,6 +166,7 @@ export function usePushNotificationsInternal() {
   userRef.current = user;
 
   const registrationStateRef = useRef<RegistrationState>('idle');
+  const registeringStartedAtRef = useRef<number | null>(null);
   const retryCountRef = useRef(0);
   const watchdogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastErrorRef = useRef<unknown>(null);
@@ -441,7 +483,7 @@ export function usePushNotificationsInternal() {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         pushLog('info', 'RECONCILE_GETTOKEN_CALLING', { reason, platform, attempt, ts: Date.now() });
-        const result = await withTimeout(
+        const result: any = await withTimeout(
           fcm.getToken(),
           RECONCILE_GETTOKEN_TIMEOUT_MS,
           'reconcileRuntimeToken getToken timed out'
@@ -526,11 +568,25 @@ export function usePushNotificationsInternal() {
       return;
     }
     if (state === 'registering') {
-      console.log('[Push] attemptRegistration skipped — already in progress');
-      return;
+      // ── Staleness guard: if stuck in 'registering' for >30s, force-reset ──
+      const STALE_THRESHOLD_MS = 30000;
+      const startedAt = registeringStartedAtRef.current;
+      if (startedAt && Date.now() - startedAt > STALE_THRESHOLD_MS) {
+        pushLog('warn', 'REGISTERING_STALE_RESET', {
+          stuckForMs: Date.now() - startedAt,
+          ts: Date.now(),
+        });
+        registrationStateRef.current = 'idle';
+        registeringStartedAtRef.current = null;
+        // Fall through to retry
+      } else {
+        console.log('[Push] attemptRegistration skipped — already in progress');
+        return;
+      }
     }
 
     registrationStateRef.current = 'registering';
+    registeringStartedAtRef.current = Date.now();
     const attempt = retryCountRef.current + 1;
     const platform = Capacitor.getPlatform();
     pushLog('info', `attemptRegistration — attempt ${attempt}/${MAX_RETRIES}`, { platform });
@@ -549,7 +605,7 @@ export function usePushNotificationsInternal() {
       // Step 1: Check permissions — NEVER request here (would consume the one-time iOS prompt).
       // Permission requests must ONLY happen via requestFullPermission (user taps "Turn On").
       pushLog('info', 'AR_CHECK_PERMISSIONS_CALLING', { ts: Date.now() });
-      const permStatus = await withTimeout(
+      const permStatus: any = await withTimeout(
         PN.checkPermissions(),
         CHECK_PERMISSIONS_TIMEOUT_MS,
         'AR checkPermissions timed out'
@@ -597,7 +653,7 @@ export function usePushNotificationsInternal() {
         for (let i = 1; i <= 3; i++) {
           try {
             pushLog('info', `AR_IOS_FCM_GETTOKEN_ATTEMPT_${i}`, { ts: Date.now() });
-            const result = await withTimeout(fcm.getToken(), FCM_GETTOKEN_TIMEOUT_MS, `AR iOS fcm.getToken attempt ${i} timed out`);
+            const result: any = await withTimeout(fcm.getToken(), FCM_GETTOKEN_TIMEOUT_MS, `AR iOS fcm.getToken attempt ${i} timed out`);
             const candidate = result.token;
             pushLog('info', `AR_IOS_FCM_GETTOKEN_RESULT_${i}`, {
               tokenPrefix: candidate?.substring(0, 20) ?? null,
@@ -825,7 +881,7 @@ export function usePushNotificationsInternal() {
             for (let fcmAttempt = 1; fcmAttempt <= 3; fcmAttempt++) {
               try {
                 console.log(`[Push][iOS] FCM.getToken() attempt ${fcmAttempt}/3…`);
-                const fcmResult = await withTimeout(fcm.getToken(), FCM_GETTOKEN_TIMEOUT_MS, `listener iOS fcm.getToken attempt ${fcmAttempt} timed out`);
+                const fcmResult: any = await withTimeout(fcm.getToken(), FCM_GETTOKEN_TIMEOUT_MS, `listener iOS fcm.getToken attempt ${fcmAttempt} timed out`);
                 const candidate = fcmResult.token;
                 if (candidate && isValidFcmToken(candidate, 'ios')) {
                   fcmToken = candidate;
@@ -1004,7 +1060,7 @@ export function usePushNotificationsInternal() {
             const PN = await getPushNotificationsPlugin();
             let resumePermission = 'prompt';
             if (PN) {
-              const p = await withTimeout(
+              const p: any = await withTimeout(
                 PN.checkPermissions(),
                 CHECK_PERMISSIONS_TIMEOUT_MS,
                 'resume checkPermissions timed out'
@@ -1299,7 +1355,7 @@ export function usePushNotificationsInternal() {
 
       // Check current permission — if already granted (banner called requestPermissions
       // directly), skip the prompt and go straight to registration + reconciliation.
-      let permStatus = await withTimeout(
+      let permStatus: any = await withTimeout(
         PN.checkPermissions(),
         CHECK_PERMISSIONS_TIMEOUT_MS,
         'requestFullPermission checkPermissions timed out'
@@ -1318,7 +1374,7 @@ export function usePushNotificationsInternal() {
         console.log(`[Push] requestFullPermission (${platform}) AFTER requestPermissions:`, permStatus.receive);
       }
 
-      const recheck = await withTimeout(
+      const recheck: any = await withTimeout(
         PN.checkPermissions(),
         CHECK_PERMISSIONS_TIMEOUT_MS,
         'requestFullPermission recheck timed out'

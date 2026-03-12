@@ -134,6 +134,9 @@ export function useAuthState() {
 
   const signOut = useCallback(async () => {
     isExplicitSignOut.current = true;
+    // Dispatch explicit sign-out event BEFORE clearing auth state
+    // so PushNotificationProvider can remove the device token while userId is still available
+    window.dispatchEvent(new CustomEvent('app:explicit-signout'));
     await supabase.auth.signOut();
     clearAuthState();
     // P0-3: Clear React Query cache directly to prevent cross-user data leakage
