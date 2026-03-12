@@ -55,11 +55,25 @@ export function DraftProductManager({
   const { user } = useAuth();
   const DRAFT_KEY = `draft-product-form-${sellerId}`;
 
-  // Restore persisted draft from sessionStorage on mount
+  // Restore persisted draft from localStorage on mount
   const restoredDraft = useMemo(() => {
     try {
-      const raw = sessionStorage.getItem(DRAFT_KEY);
-      if (raw) return JSON.parse(raw);
+      // Try localStorage first, fall back to sessionStorage for migration
+      const raw = localStorage.getItem(DRAFT_KEY) || sessionStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        // Clean up legacy sessionStorage
+        sessionStorage.removeItem(DRAFT_KEY);
+        const parsed = JSON.parse(raw);
+        // Validate editingIndex bounds
+        if (parsed?.editingIndex != null && parsed.editingIndex >= products.length) {
+          parsed.editingIndex = null; // out of bounds → treat as new
+        }
+        // Validate category
+        if (parsed?.newProduct?.category && categories.length > 0 && !categories.includes(parsed.newProduct.category)) {
+          parsed.newProduct.category = categories[0] || '';
+        }
+        return parsed;
+      }
     } catch { /* ignore */ }
     return null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
