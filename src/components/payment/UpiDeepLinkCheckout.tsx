@@ -181,7 +181,7 @@ export function UpiDeepLinkCheckout({
               <div>
                 <p className="font-semibold text-2xl">{formatPrice(amount)}</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Scan QR or tap "Pay Now" to open your UPI app
+                  Scan QR or choose your UPI app below
                 </p>
               </div>
 
@@ -201,15 +201,21 @@ export function UpiDeepLinkCheckout({
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <Button variant="outline" className="flex-1" onClick={handleClose}>
-                  Cancel
-                </Button>
-                <Button className="flex-1 gap-2" onClick={handlePayNow}>
-                  <Smartphone size={16} />
-                  Pay Now
-                </Button>
+              <div className="grid grid-cols-3 gap-3 pt-2">
+                {UPI_APPS.map((app) => (
+                  <button
+                    key={app.scheme}
+                    onClick={() => handlePayWithApp(app.scheme)}
+                    className={`${app.bg} ${app.text} rounded-xl py-3 px-2 text-sm font-semibold transition-transform active:scale-95`}
+                  >
+                    {app.name}
+                  </button>
+                ))}
               </div>
+
+              <Button variant="outline" className="w-full" onClick={handleClose}>
+                Cancel
+              </Button>
             </div>
           )}
 
