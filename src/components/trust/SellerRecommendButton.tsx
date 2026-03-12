@@ -63,7 +63,7 @@ export function SellerRecommendButton({ sellerId, sellerUserId }: Props) {
         const { error } = await supabase.from('seller_recommendations').insert({
           seller_id: sellerId,
           recommender_id: user.id,
-          society_id: effectiveSocietyId,
+          society_id: effectiveSocietyId || null,
         });
         if (error) throw error;
         setRecommended(true);

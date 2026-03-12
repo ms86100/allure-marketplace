@@ -92,7 +92,7 @@ export function CouponManager() {
     });
 
     if (error) {
-      if (error.message.includes('unique')) toast.error('This coupon code already exists in your society');
+      if (error.message.includes('unique')) toast.error('This coupon code already exists for your store');
       else toast.error('Failed to create coupon');
       return;
     }

@@ -155,9 +155,9 @@ export function useSearchPage() {
     abortRef.current = controller;
     setIsLoading(true); setHasSearched(true);
 
-    // Log search demand (best-effort, still society-scoped)
-    if (term.length >= 3 && effectiveSocietyId) {
-      supabase.from('search_demand_log').insert({ society_id: effectiveSocietyId, search_term: term.trim().toLowerCase(), category: selectedCategory || null }).then(() => {});
+    // Log search demand (best-effort, society_id nullable for non-society users)
+    if (term.length >= 3) {
+      supabase.from('search_demand_log').insert({ society_id: effectiveSocietyId || null, search_term: term.trim().toLowerCase(), category: selectedCategory || null }).then(() => {});
     }
 
     try {
