@@ -111,6 +111,8 @@ export function UpiDeepLinkCheckout({
     if (completionTriggeredRef.current) return;
     completionTriggeredRef.current = true;
     setStep('done');
+    // Clean up persisted session on success
+    try { sessionStorage.removeItem(UPI_STEP_KEY); sessionStorage.removeItem(UPI_OPENED_APP_KEY); } catch {}
     setTimeout(() => onPaymentConfirmed(), 1500);
   }, [onPaymentConfirmed]);
 
