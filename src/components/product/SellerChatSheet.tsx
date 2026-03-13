@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useSellerChat } from '@/hooks/useSellerChat';
@@ -88,7 +89,7 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
     ? { height: `${viewportHeight}px`, top: window.visualViewport?.offsetTop ?? 0 }
     : { height: '100dvh' };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col animate-in slide-in-from-bottom duration-200"
       style={containerStyle}
@@ -164,6 +165,7 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
           <Send size={16} />
         </Button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

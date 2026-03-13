@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChatMessage } from '@/types/database';
@@ -152,7 +153,7 @@ export function OrderChat({
     ? { height: `${viewportHeight}px`, top: window.visualViewport?.offsetTop ?? 0 }
     : { height: '100dvh' };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col"
       style={containerStyle}
@@ -264,6 +265,7 @@ export function OrderChat({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
