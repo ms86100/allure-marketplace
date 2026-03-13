@@ -93,7 +93,7 @@ export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: Onboa
                   value={searchInput}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   className="pl-9 h-12 rounded-xl"
-                  autoFocus
+                  inputMode="search"
                 />
                 {isSearching && (
                   <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />

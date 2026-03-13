@@ -25,6 +25,7 @@ async function ensureCameraPermissions(source: 'camera' | 'photos' | 'prompt'): 
     if (needsCamera && requested.camera === 'denied') {
       throw new Error('Camera permission denied. Please enable it in your device Settings.');
     }
+    // On iOS 14+, 'limited' is a valid granted state for photos
     if (needsPhotos && requested.photos === 'denied') {
       throw new Error('Photo library permission denied. Please enable it in your device Settings.');
     }
@@ -84,13 +85,25 @@ export async function pickOrCaptureImage(): Promise<Blob | null> {
 
   await ensureCameraPermissions('prompt');
   const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+
+  // Use DataUrl as fallback — Uri can fail on some iOS versions when
+  // the user selects from the gallery via the prompt action sheet.
   const photo = await Camera.getPhoto({
     source: CameraSource.Prompt,
-    resultType: CameraResultType.Uri,
+    resultType: CameraResultType.DataUrl,
     quality: 85,
   });
 
-  if (!photo.webPath) throw new Error('No image selected');
-  const response = await fetch(photo.webPath);
-  return response.blob();
+  if (photo.dataUrl) {
+    const response = await fetch(photo.dataUrl);
+    return response.blob();
+  }
+
+  // Fallback for webPath (shouldn't happen with DataUrl but just in case)
+  if (photo.webPath) {
+    const response = await fetch(photo.webPath);
+    return response.blob();
+  }
+
+  throw new Error('No image selected');
 }
