@@ -92,7 +92,7 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
   return createPortal(
     <div
       className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col animate-in slide-in-from-bottom duration-200"
-      style={containerStyle}
+      style={{ ...containerStyle, pointerEvents: 'auto' }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
