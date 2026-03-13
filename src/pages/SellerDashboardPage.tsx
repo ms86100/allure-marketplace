@@ -26,7 +26,7 @@ import { SellerOrderCard } from '@/components/seller/SellerOrderCard';
 import { CouponManager } from '@/components/seller/CouponManager';
 import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
 import { DemandInsights } from '@/components/seller/DemandInsights';
-import { NewOrderAlertOverlay } from '@/components/seller/NewOrderAlertOverlay';
+
 import { ServiceBookingStats } from '@/components/seller/ServiceBookingStats';
 import { SellerDayAgenda } from '@/components/seller/SellerDayAgenda';
 import { AvailabilityPromptBanner } from '@/components/seller/AvailabilityPromptBanner';
