@@ -186,8 +186,16 @@ export function useNewOrderAlert(sellerId: string | null) {
 
         if (data && data.length > 0) {
           data.forEach(order => handleNewOrder(order as NewOrder));
+          emptyAtMaxRef.current = 0;
         } else {
           pollDelayRef.current = Math.min(pollDelayRef.current * BACKOFF_FACTOR, MAX_POLL_MS);
+          if (pollDelayRef.current >= MAX_POLL_MS) {
+            emptyAtMaxRef.current += 1;
+            if (emptyAtMaxRef.current >= MAX_EMPTY_AT_MAX_DELAY) {
+              pollingStoppedRef.current = true;
+              return; // Stop polling, rely on realtime
+            }
+          }
         }
       } catch {
         // Silently ignore poll errors

@@ -169,7 +169,7 @@ export default function SellerDashboardPage() {
 
   return (
     <AppLayout headerTitle="Seller Dashboard" showLocation={false}>
-      <NewOrderAlertOverlay orders={pendingAlerts} onDismiss={dismissAlert} onSnooze={snoozeAlert} />
+      {/* NewOrderAlertOverlay is rendered globally in App.tsx — removed here to prevent duplicates */}
       <div className="p-4 space-y-4">
         {/* Rejection / Pending banner */}
         {sellerProfile.verification_status !== 'approved' && (
