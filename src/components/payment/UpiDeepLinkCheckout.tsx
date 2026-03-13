@@ -238,12 +238,14 @@ export function UpiDeepLinkCheckout({
     if (dismissLocked) return;
     // Only auto-cancel order if user never opened a payment app
     if (step === 'pay' && !hasOpenedApp.current) {
+      try { sessionStorage.removeItem(UPI_STEP_KEY); sessionStorage.removeItem(UPI_OPENED_APP_KEY); } catch {}
       onPaymentFailed();
     }
     onClose();
   };
 
   const handleCancelOrder = () => {
+    try { sessionStorage.removeItem(UPI_STEP_KEY); sessionStorage.removeItem(UPI_OPENED_APP_KEY); } catch {}
     onPaymentFailed();
     onClose();
   };
