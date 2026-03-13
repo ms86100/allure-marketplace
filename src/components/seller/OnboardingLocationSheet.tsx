@@ -17,6 +17,7 @@ interface OnboardingLocationSheetProps {
 export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: OnboardingLocationSheetProps) {
   const [step, setStep] = useState<'pick' | 'confirm'>('pick');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedPlaceName, setSelectedPlaceName] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const { isLoaded: mapsLoaded } = useGoogleMaps();
