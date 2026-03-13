@@ -141,6 +141,13 @@ export default function BecomeSellerPage() {
     loadSellerDataIntoForm, reloadProducts, rejectionFeedback, setRejectionFeedback,
   } = app;
 
+  // Auto-save draft before opening native image picker (survives WebView reload)
+  const beforeImagePick = useCallback(async () => {
+    if (draftSellerId) {
+      await app.saveDraft();
+    }
+  }, [draftSellerId, app]);
+
   const fulfillmentLabel = FULFILLMENT_OPTIONS.find(o => o.value === formData.fulfillment_mode)?.label || formData.fulfillment_mode;
   const paymentMethods = [formData.accepts_cod && 'COD', formData.accepts_upi && 'UPI'].filter(Boolean).join(', ') || 'None';
 
