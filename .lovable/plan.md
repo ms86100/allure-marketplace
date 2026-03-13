@@ -1,71 +1,33 @@
 
 
-# Notification System — Comprehensive Audit & Plan
+## Investigation Findings
 
-## Root Cause Fix (Implemented)
+### Issue 1: Wrong API Key Still Being Used (Script Caching)
+The console logs prove the Maps script is **still loaded with the old hardcoded key** (`AIzaSyC96Rz...`). This is visible in the deprecation warning URL. The module-level variables `loadPromise` and `resolvedApiKey` are cached — once the script loads with the old key, it never reloads with the new DB key, even after the database was updated.
 
-Admin users were not notified when a new store or product was submitted for review. Fixed by:
+### Issue 2: Plus Code Displayed Instead of Address Name
+"3QC3+85" is a **Google Plus Code** (Open Location Code). The Geocoder returns results successfully (status `OK`), but the first result often has no `premise`, `neighborhood`, `sublocality`, or `route` address components — so line 84 falls through to `result.formatted_address.split(',')[0]`, which is the Plus Code prefix. The code only inspects `results[0]` and never checks subsequent results which typically contain the actual street address.
 
-1. **`notifyAdminsNewStoreApplication()`** in `src/lib/admin-notifications.ts` — queries `user_roles` for admins, enqueues push+in-app notification via `notification_queue`
-2. **`handleSubmit` in `useSellerApplication.ts`** — calls the above after successful submission
-3. **DB trigger `trg_enqueue_product_review_notification`** on `products` table — fires when `approval_status` changes to `'pending'`, notifies all admins
+### Issue 3: Map Zoom Limited
+The map is set to `zoom: 16` with `disableDefaultUI: true` and only `zoomControl: true`. Zoom 16 is not the max — the issue is likely that without the correct API key, the map tiles aren't fully loading at higher zoom levels.
 
----
+## Fix Plan
 
-## Current State (As-Is): All Notification Flows
+### 1. Fix Script Caching (`useGoogleMaps.ts`)
+- Reset `loadPromise` and `resolvedApiKey` when key source changes, or simply remove the stale cache by not caching at module level when the script hasn't loaded yet
+- Ensure `fetchGoogleMapsApiKey` always queries DB fresh on first load (don't cache `resolvedApiKey` until confirmed working)
 
-### A. Database Triggers
+### 2. Fix Plus Code Display (`GoogleMapConfirm.tsx`)
+- When geocoder returns results, iterate through **all results** (not just `results[0]`) to find one with meaningful address components
+- Skip results where `formatted_address` starts with a Plus Code pattern (matches regex like `/^[23456789CFGHJMPQRVWX]+\+/`)
+- Extract the best human-readable name from the first non-Plus-Code result
+- Add `plus_code` type check on address components to explicitly skip them
 
-| Trigger | Event | Recipient | Push | In-App |
-|---|---|---|---|---|
-| `enqueue_order_status_notification` | Order status changes | Buyer + Seller | ✅ | ✅ |
-| `enqueue_review_notification` | New review created | Seller | ✅ | ✅ |
-| `enqueue_dispute_status_notification` | Dispute status changes | Submitter | ✅ | ✅ |
-| `enqueue_settlement_notification` | Settlement created | Seller | ✅ | ✅ |
-| `trg_enqueue_product_review_notification` | Product submitted for review | Admins | ✅ | ✅ |
+### 3. Increase Max Zoom (`GoogleMapConfirm.tsx`)
+- Set `maxZoom: 20` on the map options to allow deeper zoom levels
+- Keep initial zoom at 16 but allow users to zoom in further
 
-### B. Edge Functions
+### Files Changed
+- **`src/hooks/useGoogleMaps.ts`** — Clear cached `resolvedApiKey` so DB key is used on next load
+- **`src/components/auth/GoogleMapConfirm.tsx`** — Fix result parsing to skip Plus Codes, increase max zoom
 
-| Function | Event | Recipient | Push | In-App |
-|---|---|---|---|---|
-| `send-booking-reminders` | 1h before appointment | Buyer + Seller | ✅ | ✅ |
-| `process-notification-queue` | Queue processor | N/A | ✅ | ✅ |
-| `send-campaign` | Admin broadcast | Targeted users | ✅ | ✅ |
-| `generate-weekly-digest` | Weekly digest | Society members | ✅ | ✅ |
-| `generate-society-report` | Monthly report | Society members | ✅ | ✅ |
-| `detect-collective-issues` | Pattern detection | Society admins | ✅ | ✅ |
-
-### C. Client-Side (inserts to `notification_queue`)
-
-| Location | Event | Recipient | Push | In-App |
-|---|---|---|---|---|
-| `admin-notifications.ts` → `notifySellerStatusChange` | Admin approves/rejects seller | Seller | ✅ | ✅ |
-| `admin-notifications.ts` → `notifyLicenseStatusChange` | Admin approves/rejects license | Seller | ✅ | ✅ |
-| `admin-notifications.ts` → `notifyProductStatusChange` | Admin approves/rejects product | Seller | ✅ | ✅ |
-| `admin-notifications.ts` → `notifyAdminsNewStoreApplication` | Seller submits store | Admins | ✅ | ✅ |
-| `society-notifications.ts` → `notifySocietyAdmins` | Dispute/snag | Society admins | ✅ | ✅ |
-| `society-notifications.ts` → `notifySocietyMembers` | Bulletin posts | Society members | ✅ | ✅ |
-| `ServiceBookingFlow.tsx` | New booking | Seller | ✅ | ❌ |
-| `BuyerCancelBooking.tsx` | Buyer cancels | Seller | ✅ | ❌ |
-| `SellerPaymentConfirmation.tsx` | Payment confirmed | Buyer | ✅ | ❌ |
-| `UpiDeepLinkCheckout.tsx` | UPI payment | Seller | ✅ | ❌ |
-| `useSellerChat.ts` | New chat (60s throttle) | Recipient | ✅ | ❌ |
-| `GuardManualEntryTab.tsx` | Gate entry | Resident | ✅ | ❌ |
-| `manage-delivery` edge fn | Delivery OTP/arrival | Buyer | ✅ | ✅ |
-| `update-delivery-location` edge fn | Delivery delay | Buyer | ✅ | ✅ |
-
----
-
-## Future Gaps (To-Be)
-
-### Priority 2 — Operational
-- New user pending approval → Society admins
-- New society request → Platform admins
-- Report filed → Admins
-- Delivery partner assigned → Seller
-
-### Priority 3 — Engagement
-- New product from favorite seller → Buyer
-- Seller back online → Recent buyers
-- Price drop on wishlisted item → Buyer
-- Order review reminder (24h after delivery) → Buyer
