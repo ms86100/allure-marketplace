@@ -1,35 +1,71 @@
 
 
-## Root Cause: API Key Not in Database
+# Notification System — Comprehensive Audit & Plan
 
-The `admin_settings` table has **no row** for `google_maps_api_key`. The app's key-fetching logic (`useGoogleMaps.ts` line 11-27) queries the database first, finds nothing, and falls back to a **hardcoded key** (`AIzaSyC96Rz...`). That hardcoded key belongs to a different Google Cloud project where the Geocoding API is **not** enabled — hence "Geocode failed" every time.
+## Root Cause Fix (Implemented)
 
-Your Sociva project key with Geocoding enabled is never actually used by the app.
+Admin users were not notified when a new store or product was submitted for review. Fixed by:
 
-## Fix
+1. **`notifyAdminsNewStoreApplication()`** in `src/lib/admin-notifications.ts` — queries `user_roles` for admins, enqueues push+in-app notification via `notification_queue`
+2. **`handleSubmit` in `useSellerApplication.ts`** — calls the above after successful submission
+3. **DB trigger `trg_enqueue_product_review_notification`** on `products` table — fires when `approval_status` changes to `'pending'`, notifies all admins
 
-### 1. Insert API key into database (migration)
+---
 
-Add the correct Google Maps API key to `admin_settings` so the app uses it instead of the fallback. You will be prompted to provide the key value.
+## Current State (As-Is): All Notification Flows
 
-```sql
-INSERT INTO admin_settings (key, value, is_active)
-VALUES ('google_maps_api_key', '<YOUR_KEY>', true);
-```
+### A. Database Triggers
 
-### 2. Add enhanced error logging (`GoogleMapConfirm.tsx`)
+| Trigger | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `enqueue_order_status_notification` | Order status changes | Buyer + Seller | ✅ | ✅ |
+| `enqueue_review_notification` | New review created | Seller | ✅ | ✅ |
+| `enqueue_dispute_status_notification` | Dispute status changes | Submitter | ✅ | ✅ |
+| `enqueue_settlement_notification` | Settlement created | Seller | ✅ | ✅ |
+| `trg_enqueue_product_review_notification` | Product submitted for review | Admins | ✅ | ✅ |
 
-Log the actual geocoder error status (`REQUEST_DENIED`, `OVER_QUERY_LIMIT`, etc.) so future failures are immediately diagnosable instead of a generic "Geocode failed" message.
+### B. Edge Functions
 
-### 3. Add Places API fallback (`GoogleMapConfirm.tsx`)
+| Function | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `send-booking-reminders` | 1h before appointment | Buyer + Seller | ✅ | ✅ |
+| `process-notification-queue` | Queue processor | N/A | ✅ | ✅ |
+| `send-campaign` | Admin broadcast | Targeted users | ✅ | ✅ |
+| `generate-weekly-digest` | Weekly digest | Society members | ✅ | ✅ |
+| `generate-society-report` | Monthly report | Society members | ✅ | ✅ |
+| `detect-collective-issues` | Pattern detection | Society admins | ✅ | ✅ |
 
-If the Geocoder fails for any reason, fall back to `google.maps.places.PlacesService.nearbySearch()` to get a place name from the already-working Places API. This makes reverse geocoding resilient even if the Geocoding API is temporarily unavailable.
+### C. Client-Side (inserts to `notification_queue`)
 
-### 4. Log key source (`useGoogleMaps.ts`)
+| Location | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `admin-notifications.ts` → `notifySellerStatusChange` | Admin approves/rejects seller | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyLicenseStatusChange` | Admin approves/rejects license | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyProductStatusChange` | Admin approves/rejects product | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyAdminsNewStoreApplication` | Seller submits store | Admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyAdmins` | Dispute/snag | Society admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyMembers` | Bulletin posts | Society members | ✅ | ✅ |
+| `ServiceBookingFlow.tsx` | New booking | Seller | ✅ | ❌ |
+| `BuyerCancelBooking.tsx` | Buyer cancels | Seller | ✅ | ❌ |
+| `SellerPaymentConfirmation.tsx` | Payment confirmed | Buyer | ✅ | ❌ |
+| `UpiDeepLinkCheckout.tsx` | UPI payment | Seller | ✅ | ❌ |
+| `useSellerChat.ts` | New chat (60s throttle) | Recipient | ✅ | ❌ |
+| `GuardManualEntryTab.tsx` | Gate entry | Resident | ✅ | ❌ |
+| `manage-delivery` edge fn | Delivery OTP/arrival | Buyer | ✅ | ✅ |
+| `update-delivery-location` edge fn | Delivery delay | Buyer | ✅ | ✅ |
 
-Add a `console.info` indicating whether the key came from the database or the hardcoded fallback, so you can instantly verify the correct key is being used in future builds.
+---
 
-### Summary
+## Future Gaps (To-Be)
 
-The code is actually correct — it just never had the right API key. Fix 1 (inserting the key) solves the problem immediately. Fixes 2-4 add resilience and diagnostics to prevent this from being hard to debug again.
+### Priority 2 — Operational
+- New user pending approval → Society admins
+- New society request → Platform admins
+- Report filed → Admins
+- Delivery partner assigned → Seller
 
+### Priority 3 — Engagement
+- New product from favorite seller → Buyer
+- Seller back online → Recent buyers
+- Price drop on wishlisted item → Buyer
+- Order review reminder (24h after delivery) → Buyer

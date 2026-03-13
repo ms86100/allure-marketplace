@@ -48,11 +48,33 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
 
     const geocoder = new google.maps.Geocoder();
 
+    // Places API fallback for reverse geocoding
+    const reverseGeocodeViaPlaces = (lat: number, lng: number): Promise<string | null> => {
+      return new Promise((resolve) => {
+        try {
+          const service = new google.maps.places.PlacesService(map);
+          service.nearbySearch(
+            { location: { lat, lng }, radius: 50, rankBy: google.maps.places.RankBy.PROMINENCE },
+            (results, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]) {
+                resolve(results[0].name || results[0].vicinity || null);
+              } else {
+                console.warn('GoogleMapConfirm: Places nearbySearch fallback status:', status);
+                resolve(null);
+              }
+            }
+          );
+        } catch (err) {
+          console.warn('GoogleMapConfirm: Places fallback error:', err);
+          resolve(null);
+        }
+      });
+    };
+
     // Also reverse-geocode the initial position so the displayed address is always accurate
     const reverseGeocode = (lat: number, lng: number) => {
       setIsGeocoding(true);
-      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-        setIsGeocoding(false);
+      geocoder.geocode({ location: { lat, lng } }, async (results, status) => {
         if (status === 'OK' && results && results[0]) {
           const result = results[0];
           const premise = result.address_components?.find(c => c.types.includes('premise'))?.long_name;
@@ -61,10 +83,18 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
           const route = result.address_components?.find(c => c.types.includes('route'))?.long_name;
           const updatedName = premise || neighborhood || sublocality || route || result.formatted_address.split(',')[0];
           setDisplayName(updatedName);
+          setIsGeocoding(false);
         } else {
-          console.warn('GoogleMapConfirm: Geocode failed', status);
-          // Fallback: show coordinates so user knows pin moved
-          setDisplayName(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+          console.warn('GoogleMapConfirm: Geocoder failed with status:', status, '— trying Places API fallback');
+          // Fallback to Places API nearbySearch
+          const placeName = await reverseGeocodeViaPlaces(lat, lng);
+          if (placeName) {
+            setDisplayName(placeName);
+          } else {
+            console.warn('GoogleMapConfirm: Both Geocoder and Places fallback failed. Showing coordinates.');
+            setDisplayName(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+          }
+          setIsGeocoding(false);
         }
       });
     };
