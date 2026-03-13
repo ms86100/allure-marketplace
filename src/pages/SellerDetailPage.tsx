@@ -350,29 +350,28 @@ export default function SellerDetailPage() {
 
           {/* Row 2: Location · Distance · Hours — compact info line */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
-            {(seller as any).society && (() => {
+            {(() => {
               const lat = (seller as any).latitude ?? (seller as any).society?.latitude;
               const lng = (seller as any).longitude ?? (seller as any).society?.longitude;
-              const content = (
-                <>
-                  <MapPin size={13} className="text-primary shrink-0" />
-                  {(seller as any).society.name}
-                </>
-              );
-              return lat && lng ? (
+              const locationName = (seller as any).society?.name || null;
+
+              if (!lat || !lng) return null;
+
+              const openMaps = (e: React.MouseEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
+              };
+
+              return (
                 <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
-                  }}
+                  onClick={openMaps}
                   className="flex items-center gap-1 hover:text-primary transition-colors"
                   title="View on Google Maps"
                 >
-                  {content}
+                  <MapPin size={13} className="text-primary shrink-0" />
+                  {locationName || 'View on Map'}
                 </button>
-              ) : (
-                <span className="flex items-center gap-1">{content}</span>
               );
             })()}
             {distanceKm !== null && (
