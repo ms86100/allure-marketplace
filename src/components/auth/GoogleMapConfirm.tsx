@@ -1,5 +1,5 @@
 /// <reference types="@types/google.maps" />
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { MapPin, Check, Loader2 } from 'lucide-react';
 import {
@@ -7,7 +7,6 @@ import {
   extractBestFormattedAddress,
   findNearbyPlaceName,
   pickBetterLabel,
-  isLowQualityLabel,
   formatCoords,
   LabelQuality,
   type ResolvedLabel,
@@ -34,6 +33,14 @@ function callerNameToLabel(name: string): ResolvedLabel | null {
 
 export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack }: GoogleMapConfirmProps) {
   const mapRef = useRef<HTMLDivElement>(null);
+
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markerInstanceRef = useRef<google.maps.Marker | null>(null);
+  const geocoderRef = useRef<google.maps.Geocoder | null>(null);
+  const mapInitializedRef = useRef(false);
+  const hasUserInteractedRef = useRef(false);
+  const resolveRequestIdRef = useRef(0);
+
   const [marker, setMarker] = useState<{ lat: number; lng: number }>({ lat: latitude, lng: longitude });
   const [displayName, setDisplayName] = useState(name);
   const [formattedAddress, setFormattedAddress] = useState('');
@@ -41,110 +48,156 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
 
   const displayNameRef = useRef(name);
   const formattedAddressRef = useRef('');
-  useEffect(() => { displayNameRef.current = displayName; }, [displayName]);
-  useEffect(() => { formattedAddressRef.current = formattedAddress; }, [formattedAddress]);
-
   const initialLabelRef = useRef<ResolvedLabel | null>(callerNameToLabel(name));
 
+  useEffect(() => { displayNameRef.current = displayName; }, [displayName]);
+  useEffect(() => { formattedAddressRef.current = formattedAddress; }, [formattedAddress]);
+  useEffect(() => {
+    initialLabelRef.current = callerNameToLabel(name);
+    if (name.trim()) setDisplayName(name);
+  }, [name]);
+
+  const resolveLabel = useCallback(async (lat: number, lng: number, preserveInitial: boolean) => {
+    const requestId = ++resolveRequestIdRef.current;
+    setIsGeocoding(true);
+
+    let currentBest: ResolvedLabel | null = preserveInitial ? initialLabelRef.current : null;
+    let bestAddress: string | null = null;
+
+    try {
+      const geocoder = geocoderRef.current;
+      const map = mapInstanceRef.current;
+      if (!geocoder) return;
+
+      const geocodeResult = await new Promise<google.maps.GeocoderResult[] | null>((resolve) => {
+        geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+          resolve(status === 'OK' && results ? results : null);
+        });
+      });
+
+      if (geocodeResult) {
+        bestAddress = extractBestFormattedAddress(geocodeResult);
+        const geocodeLabel = extractBestLabel(geocodeResult);
+        currentBest = pickBetterLabel(currentBest, geocodeLabel);
+      }
+
+      // Try Places fallback for non-POI outcomes so pinned businesses are captured reliably.
+      const shouldTryPlaces =
+        !currentBest ||
+        currentBest.quality <= LabelQuality.Neighborhood ||
+        (!preserveInitial && currentBest.quality === LabelQuality.Premise);
+
+      if (shouldTryPlaces && map) {
+        const placesLabel = await findNearbyPlaceName(map, lat, lng, { maxDistanceMeters: 45 });
+        currentBest = pickBetterLabel(currentBest, placesLabel);
+      }
+    } catch (err) {
+      console.warn('[GoogleMapConfirm] Label resolution error:', err);
+    }
+
+    if (requestId !== resolveRequestIdRef.current) return;
+
+    if (!currentBest) currentBest = formatCoords(lat, lng);
+
+    setDisplayName(currentBest.name);
+    const finalAddress = bestAddress || currentBest.formattedAddress || '';
+    setFormattedAddress(finalAddress);
+    setIsGeocoding(false);
+  }, []);
+
+  // Initialize map once per mount; do not recreate on each render.
   useEffect(() => {
     if (!mapRef.current || !(window as any).google?.maps) {
       console.warn('GoogleMapConfirm: Google Maps not loaded');
       return;
     }
+    if (mapInitializedRef.current) return;
+
+    const initialPos = { lat: latitude, lng: longitude };
 
     const map = new google.maps.Map(mapRef.current, {
-      center: { lat: latitude, lng: longitude },
-      zoom: 16,
+      center: initialPos,
+      zoom: 17,
       maxZoom: 21,
       disableDefaultUI: true,
       zoomControl: true,
       gestureHandling: 'greedy',
-      styles: [
-        { featureType: 'poi', stylers: [{ visibility: 'simplified' }] },
-      ],
+      styles: [{ featureType: 'poi', stylers: [{ visibility: 'simplified' }] }],
     });
 
     const pin = new google.maps.Marker({
-      position: { lat: latitude, lng: longitude },
+      position: initialPos,
       map,
       draggable: true,
       title: 'Adjust your location',
       animation: google.maps.Animation.DROP,
     });
 
-    const geocoder = new google.maps.Geocoder();
+    mapInstanceRef.current = map;
+    markerInstanceRef.current = pin;
+    geocoderRef.current = new google.maps.Geocoder();
+    mapInitializedRef.current = true;
 
-    const resolveLabel = async (lat: number, lng: number, preserveInitial: boolean) => {
-      setIsGeocoding(true);
-
-      let currentBest: ResolvedLabel | null = preserveInitial ? initialLabelRef.current : null;
-      let bestAddress: string | null = null;
-
-      try {
-        // Step 1: Geocode
-        const geocodeResult = await new Promise<google.maps.GeocoderResult[] | null>((resolve) => {
-          geocoder.geocode({ location: { lat, lng } }, (results, status) => {
-            console.info('[LocationResolver] Geocode status:', status, 'results:', results?.length ?? 0);
-            if (status !== 'OK') {
-              console.warn('[LocationResolver] Geocode failed with status:', status);
-            }
-            resolve(status === 'OK' && results ? results : null);
-          });
-        });
-
-        if (geocodeResult) {
-          // Extract the best formatted address (always, regardless of label quality)
-          bestAddress = extractBestFormattedAddress(geocodeResult);
-          console.info('[LocationResolver] Best formatted address:', bestAddress);
-
-          const geocodeLabel = extractBestLabel(geocodeResult);
-          console.info('[LocationResolver] Geocode label:', geocodeLabel?.name, 'quality:', geocodeLabel?.quality);
-          currentBest = pickBetterLabel(currentBest, geocodeLabel);
-        }
-
-        // Step 2: If geocode result is low quality, try Places fallback
-        if (isLowQualityLabel(currentBest)) {
-          console.info('[LocationResolver] Label is low quality, trying Places fallback');
-          const placesLabel = await findNearbyPlaceName(map, lat, lng);
-          currentBest = pickBetterLabel(currentBest, placesLabel);
-        }
-      } catch (err) {
-        console.warn('[LocationResolver] Label resolution error:', err);
-      }
-
-      // Final fallback to coordinates
-      if (!currentBest) {
-        currentBest = formatCoords(lat, lng);
-      }
-
-      // Set the display label (short name)
-      setDisplayName(currentBest.name);
-
-      // Set the formatted address (full postal address) - separate from label
-      const finalAddress = bestAddress || currentBest.formattedAddress || '';
-      setFormattedAddress(finalAddress);
-
-      console.info('[LocationResolver] Final → label:', currentBest.name, '| address:', finalAddress);
-      setIsGeocoding(false);
-    };
-
-    // Initial resolve — preserve the caller-provided name if it's high quality
-    resolveLabel(latitude, longitude, true);
-
-    pin.addListener('dragend', () => {
+    const dragEndListener = pin.addListener('dragend', () => {
       const pos = pin.getPosition();
-      if (pos) {
-        const newLat = pos.lat();
-        const newLng = pos.lng();
-        setMarker({ lat: newLat, lng: newLng });
-        resolveLabel(newLat, newLng, false);
-      }
+      if (!pos) return;
+      hasUserInteractedRef.current = true;
+      const newLat = pos.lat();
+      const newLng = pos.lng();
+      setMarker({ lat: newLat, lng: newLng });
+      resolveLabel(newLat, newLng, false);
     });
 
+    // Allow tap-to-place for easier mobile pinning.
+    const clickListener = map.addListener('click', (event: google.maps.MapMouseEvent) => {
+      if (!event.latLng) return;
+      hasUserInteractedRef.current = true;
+      const newLat = event.latLng.lat();
+      const newLng = event.latLng.lng();
+      pin.setPosition({ lat: newLat, lng: newLng });
+      setMarker({ lat: newLat, lng: newLng });
+      resolveLabel(newLat, newLng, false);
+    });
+
+    const mapDragListener = map.addListener('dragstart', () => {
+      hasUserInteractedRef.current = true;
+    });
+
+    const mapZoomListener = map.addListener('zoom_changed', () => {
+      hasUserInteractedRef.current = true;
+    });
+
+    // Initial resolve — preserve caller name if already meaningful.
+    resolveLabel(latitude, longitude, true);
+
     return () => {
+      dragEndListener.remove();
+      clickListener.remove();
+      mapDragListener.remove();
+      mapZoomListener.remove();
       pin.setMap(null);
+      mapInstanceRef.current = null;
+      markerInstanceRef.current = null;
+      geocoderRef.current = null;
+      mapInitializedRef.current = false;
     };
-  }, [latitude, longitude]);
+  }, [resolveLabel]);
+
+  // If parent updates coordinates, move marker without forcing zoom reset.
+  useEffect(() => {
+    if (!mapInstanceRef.current || !markerInstanceRef.current || !mapInitializedRef.current) return;
+
+    const nextPos = { lat: latitude, lng: longitude };
+    markerInstanceRef.current.setPosition(nextPos);
+    setMarker(nextPos);
+
+    // Keep user zoom level; only pan programmatically before user starts interacting.
+    if (!hasUserInteractedRef.current) {
+      mapInstanceRef.current.panTo(nextPos);
+    }
+
+    resolveLabel(latitude, longitude, true);
+  }, [latitude, longitude, resolveLabel]);
 
   return (
     <div className="space-y-3">
@@ -162,7 +215,7 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       <div ref={mapRef} className="w-full h-72 sm:h-80 rounded-xl border border-border overflow-hidden bg-muted" />
 
       <p className="text-xs text-muted-foreground text-center">
-        Drag the pin to adjust your exact location
+        Drag or tap the pin to adjust your exact location
       </p>
 
       <div className="flex gap-2">

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { MapPin, Home, Briefcase, Tag, Building, Navigation, Loader2, Plus, Check, ArrowLeft } from 'lucide-react';
@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBrowsingLocation, BrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { getCurrentPosition } from '@/lib/native-location';
 import { loadGoogleMapsScript } from '@/hooks/useGoogleMaps';
-import { extractBestLabel, extractBestFormattedAddress, findNearbyPlaceName, isLowQualityLabel, pickBetterLabel } from '@/lib/location-label-resolver';
+import { extractBestLabel, extractBestFormattedAddress, findNearbyPlaceName, pickBetterLabel, LabelQuality } from '@/lib/location-label-resolver';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
@@ -35,10 +35,15 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
   const markerInstanceRef = useRef<google.maps.Marker | null>(null);
   const mapInitializedRef = useRef(false);
   const [relocating, setRelocating] = useState(false);
+  const geocodeRequestIdRef = useRef(0);
+  const ignoreIdleUntilRef = useRef(0);
+  const idleDebounceRef = useRef<number | null>(null);
 
-  // Helper: reverse-geocode a position and return a label (uses Places API fallback for POI names)
-  const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
-    let label = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  // Helper: reverse-geocode a position and return a label (uses Places fallback when geocoder is not POI-precise)
+  const reverseGeocode = useCallback(async (lat: number, lng: number, preserveInitial = false): Promise<string> => {
+    const requestId = ++geocodeRequestIdRef.current;
+    let bestLabel = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
     try {
       const geocoder = new google.maps.Geocoder();
       const results = await new Promise<google.maps.GeocoderResult[] | null>((resolve) => {
@@ -50,16 +55,29 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
       let geocoderLabel = results ? extractBestLabel(results) : null;
       const bestAddress = results ? extractBestFormattedAddress(results) : null;
 
-      // If geocoder only gave us a road/generic name, try Places API for a real POI name
-      if (isLowQualityLabel(geocoderLabel) && mapInstanceRef.current) {
-        const placesLabel = await findNearbyPlaceName(mapInstanceRef.current, lat, lng);
+      // Try Places fallback for neighborhood/route-level labels and for manual pin moves.
+      const shouldTryPlaces =
+        !geocoderLabel ||
+        geocoderLabel.quality <= LabelQuality.Neighborhood ||
+        (!preserveInitial && geocoderLabel.quality === LabelQuality.Premise);
+
+      if (shouldTryPlaces && mapInstanceRef.current) {
+        const placesLabel = await findNearbyPlaceName(mapInstanceRef.current, lat, lng, { maxDistanceMeters: 45 });
         geocoderLabel = pickBetterLabel(geocoderLabel, placesLabel);
       }
 
-      label = geocoderLabel?.name || bestAddress || label;
-    } catch { /* use coord fallback */ }
-    return label;
-  };
+      bestLabel = geocoderLabel?.name || bestAddress || bestLabel;
+    } catch {
+      // keep coordinate fallback
+    }
+
+    // Ignore stale geocode responses from older drag/idle events.
+    if (requestId !== geocodeRequestIdRef.current) {
+      return detectedLocationRef.current?.label || bestLabel;
+    }
+
+    return bestLabel;
+  }, []);
 
   // Initialize map ONCE when entering confirm step
   useEffect(() => {
@@ -70,6 +88,7 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
     const map = new google.maps.Map(mapContainerRef.current, {
       center: { lat: detectedLocation.lat, lng: detectedLocation.lng },
       zoom: 17,
+      maxZoom: 21,
       disableDefaultUI: true,
       zoomControl: true,
       gestureHandling: 'greedy',
@@ -84,25 +103,76 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
       draggable: true,
       animation: google.maps.Animation.DROP,
     });
+
     markerInstanceRef.current = marker;
     mapInitializedRef.current = true;
 
+    const updateFromPosition = async (lat: number, lng: number, preserveInitial = false) => {
+      const label = await reverseGeocode(lat, lng, preserveInitial);
+      setDetectedLocation({ lat, lng, label });
+    };
+
     // Reverse-geocode on pin drag
-    marker.addListener('dragend', async () => {
+    const dragStartListener = marker.addListener('dragstart', () => {
+      ignoreIdleUntilRef.current = Date.now() + 500;
+    });
+
+    const dragEndListener = marker.addListener('dragend', async () => {
       const pos = marker.getPosition();
       if (!pos) return;
+      ignoreIdleUntilRef.current = Date.now() + 500;
       const lat = pos.lat();
       const lng = pos.lng();
-      const label = await reverseGeocode(lat, lng);
-      setDetectedLocation({ lat, lng, label });
+      await updateFromPosition(lat, lng, false);
     });
 
-    // Also reverse-geocode when user pans the map (update pin to map center)
-    map.addListener('idle', async () => {
-      // Only update if user dragged/zoomed the map (not programmatic moves)
+    // Tap to place pin (mobile-friendly)
+    const clickListener = map.addListener('click', async (event: google.maps.MapMouseEvent) => {
+      if (!event.latLng) return;
+      const lat = event.latLng.lat();
+      const lng = event.latLng.lng();
+      ignoreIdleUntilRef.current = Date.now() + 500;
+      marker.setPosition({ lat, lng });
+      await updateFromPosition(lat, lng, false);
     });
-  }, [step]); // only depend on step, not on coordinates
 
+    // Move pin to map center after pan/zoom idle for easier Zomato/Blinkit-style adjustment
+    const idleListener = map.addListener('idle', () => {
+      if (Date.now() < ignoreIdleUntilRef.current) return;
+      if (idleDebounceRef.current) window.clearTimeout(idleDebounceRef.current);
+
+      idleDebounceRef.current = window.setTimeout(async () => {
+        const center = map.getCenter();
+        if (!center) return;
+
+        const centerLat = center.lat();
+        const centerLng = center.lng();
+
+        const currentPos = marker.getPosition();
+        const currentLat = currentPos?.lat() ?? centerLat;
+        const currentLng = currentPos?.lng() ?? centerLng;
+
+        // Skip tiny map movement noise
+        const moved = Math.abs(centerLat - currentLat) > 0.00001 || Math.abs(centerLng - currentLng) > 0.00001;
+        if (!moved) return;
+
+        marker.setPosition({ lat: centerLat, lng: centerLng });
+        await updateFromPosition(centerLat, centerLng, false);
+      }, 220);
+    });
+
+    return () => {
+      dragStartListener.remove();
+      dragEndListener.remove();
+      clickListener.remove();
+      idleListener.remove();
+      if (idleDebounceRef.current) {
+        window.clearTimeout(idleDebounceRef.current);
+        idleDebounceRef.current = null;
+      }
+      marker.setMap(null);
+    };
+  }, [step, reverseGeocode]);
   const handleSelectAddress = (addr: any) => {
     if (!addr.latitude || !addr.longitude) {
       toast.error('This address has no location coordinates');
@@ -246,7 +316,7 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
             </div>
 
             <p className="text-[10px] text-muted-foreground text-center">
-              Is this the correct location? Confirm to browse stores nearby.
+              Drag/tap pin or move map to center it, then confirm this location.
             </p>
 
             {/* Action buttons */}

@@ -32,6 +32,18 @@ function isPlusCode(text: string): boolean {
   return PLUS_CODE_REGEX.test(text);
 }
 
+function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
 /**
  * Score a single geocoder result and return the best candidate from it.
  * NOTE: We no longer reject results whose formatted_address starts with a plus code,
@@ -137,13 +149,16 @@ export function extractBestFormattedAddress(results: google.maps.GeocoderResult[
 
 /**
  * Use Places API to find a nearby POI name.
- * Filters out overly generic results like city names.
+ * Filters out overly generic results and ignores POIs that are too far from the pin.
  */
 export async function findNearbyPlaceName(
   map: google.maps.Map,
   lat: number,
-  lng: number
+  lng: number,
+  options?: { maxDistanceMeters?: number }
 ): Promise<ResolvedLabel | null> {
+  const maxDistanceMeters = options?.maxDistanceMeters ?? 40;
+
   try {
     const service = new google.maps.places.PlacesService(map);
     return new Promise((resolve) => {
@@ -151,19 +166,29 @@ export async function findNearbyPlaceName(
         { location: { lat, lng }, rankBy: google.maps.places.RankBy.DISTANCE, type: 'establishment' },
         (results, status) => {
           if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-            // Iterate through results to find an actual POI, not a city/locality
+            // Iterate through results to find a true POI near this exact pin.
             for (const place of results) {
               const types = place.types || [];
+
               // Skip generic locality/political results
               if (types.includes('locality') || types.includes('administrative_area_level_1') || types.includes('country')) {
                 continue;
               }
+
               const name = place.name;
-              if (name && !isGeneric(name) && !isPlusCode(name)) {
-                console.info('[LocationResolver] Places fallback found:', name, 'types:', types);
-                resolve({ name, quality: LabelQuality.POI });
-                return;
-              }
+              const location = place.geometry?.location;
+              if (!name || !location || isGeneric(name) || isPlusCode(name)) continue;
+
+              const placeLat = Number(typeof (location as any).lat === 'function' ? (location as any).lat() : (location as any).lat);
+              const placeLng = Number(typeof (location as any).lng === 'function' ? (location as any).lng() : (location as any).lng);
+              const dist = distanceMeters(lat, lng, placeLat, placeLng);
+
+              // If the nearest establishment is still too far, don't override address labels.
+              if (dist > maxDistanceMeters) continue;
+
+              console.info('[LocationResolver] Places fallback found:', name, 'distance(m):', Math.round(dist), 'types:', types);
+              resolve({ name, quality: LabelQuality.POI });
+              return;
             }
           }
           resolve(null);
