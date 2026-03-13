@@ -27,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isApproved = profile?.verification_status === 'approved';
   const isSeller = roles.includes('seller') && sellerProfiles.some(s => (s as any).verification_status === 'approved');
+  const hasSellerProfile = roles.includes('seller') && sellerProfiles.length > 0;
   const isAdmin = roles.includes('admin');
   const isSocietyAdmin = !!societyAdminRole || isAdmin;
   const isBuilderMember = managedBuilderIds.length > 0;
@@ -114,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const legacyValue = useMemo<AuthContextType>(() => ({
     user, session, profile, society, roles, sellerProfiles,
-    currentSellerId, isLoading, isApproved, isSeller, isAdmin,
+    currentSellerId, isLoading, isApproved, isSeller, hasSellerProfile, isAdmin,
     isSocietyAdmin, isBuilderMember, isSecurityOfficer, isWorker,
     societyAdminRole, managedBuilderIds,
     signOut, refreshProfile,
@@ -123,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     effectiveSocietyId, effectiveSociety,
   }), [
     user, session, profile, society, roles, sellerProfiles,
-    currentSellerId, isLoading, isApproved, isSeller, isAdmin,
+    currentSellerId, isLoading, isApproved, isSeller, hasSellerProfile, isAdmin,
     isSocietyAdmin, isBuilderMember, isSecurityOfficer, isWorker,
     societyAdminRole, managedBuilderIds,
     signOut, refreshProfile, setCurrentSellerId,

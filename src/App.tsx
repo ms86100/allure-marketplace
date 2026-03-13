@@ -263,9 +263,9 @@ function ManagementRoute({ children }: { children: React.ReactNode }) {
 }
 
 function SellerRoute({ children }: { children: React.ReactNode }) {
-  const { isSeller, isAdmin, isLoading } = useAuth();
+  const { hasSellerProfile, isAdmin, isLoading } = useAuth();
   if (isLoading) return <div className="min-h-[100dvh] flex items-center justify-center bg-background"><Skeleton className="h-6 w-32 rounded-lg" /></div>;
-  if (!isSeller && !isAdmin) return <Navigate to="/" replace />;
+  if (!hasSellerProfile && !isAdmin) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 

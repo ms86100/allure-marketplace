@@ -10,7 +10,7 @@ import { Package, Loader2, Eye, Star, Clock, CheckCircle, XCircle, ShieldCheck, 
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { friendlyError } from '@/lib/utils';
+import { friendlyError, cn } from '@/lib/utils';
 import { logAudit } from '@/lib/audit';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -171,6 +171,40 @@ export default function SellerDashboardPage() {
     <AppLayout headerTitle="Seller Dashboard" showLocation={false}>
       <NewOrderAlertOverlay orders={pendingAlerts} onDismiss={dismissAlert} onSnooze={snoozeAlert} />
       <div className="p-4 space-y-4">
+        {/* Rejection / Pending banner */}
+        {sellerProfile.verification_status !== 'approved' && (
+          <div className={cn(
+            'rounded-xl border p-4 space-y-2',
+            sellerProfile.verification_status === 'rejected'
+              ? 'bg-destructive/10 border-destructive/20'
+              : 'bg-warning/10 border-warning/20',
+          )}>
+            <div className="flex items-start gap-2">
+              {sellerProfile.verification_status === 'rejected' ? (
+                <XCircle size={18} className="text-destructive shrink-0 mt-0.5" />
+              ) : (
+                <Clock size={18} className="text-warning shrink-0 mt-0.5" />
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">
+                  {sellerProfile.verification_status === 'rejected'
+                    ? 'Your store application was rejected'
+                    : 'Your store is pending review'}
+                </p>
+                {(sellerProfile as any).rejection_note && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Reason: {(sellerProfile as any).rejection_note}
+                  </p>
+                )}
+                <Link to="/become-seller">
+                  <Button size="sm" variant={sellerProfile.verification_status === 'rejected' ? 'destructive' : 'outline'} className="mt-2 h-8 text-xs">
+                    {sellerProfile.verification_status === 'rejected' ? 'Update & Resubmit' : 'View Application'}
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Always visible */}
         <StoreStatusCard
           sellerProfile={sellerProfile}
