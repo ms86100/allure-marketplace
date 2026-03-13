@@ -77,6 +77,7 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
       queryClient.invalidateQueries({ queryKey: ['seller-health', sellerId] });
       queryClient.invalidateQueries({ queryKey: ['seller-profile'] });
       queryClient.invalidateQueries({ queryKey: ['seller-settings'] });
+      onSuccess?.();
       onOpenChange(false);
       setStep('pick');
       setCoords(null);
