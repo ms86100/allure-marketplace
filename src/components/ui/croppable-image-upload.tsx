@@ -125,7 +125,8 @@ export function CroppableImageUpload({
     onChange(null);
   };
 
-  const handlePickImage = () => {
+  const handlePickImage = async () => {
+    await beforePick?.();
     if (Capacitor.isNativePlatform()) {
       handleNativePick();
     } else {
@@ -133,7 +134,8 @@ export function CroppableImageUpload({
     }
   };
 
-  const handleCameraCapture = () => {
+  const handleCameraCapture = async () => {
+    await beforePick?.();
     if (Capacitor.isNativePlatform()) {
       handleNativePick();
     } else {
