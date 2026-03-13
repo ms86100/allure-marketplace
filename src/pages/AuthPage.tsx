@@ -119,25 +119,20 @@ export default function AuthPage() {
 
               {/* Step 2: OTP Verification */}
               {auth.step === 'otp' && (
-                <motion.div key="otp" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5">
-                  <button
-                    type="button"
-                    onClick={() => { auth.setStep('phone'); auth.setOtp(''); }}
-                    className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-1"
-                  >
-                    <ArrowLeft size={16} /> Change number
-                  </button>
-
+                <motion.div key="otp" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5"
+                  ref={(el) => { if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300); }}
+                >
                   <div className="text-center space-y-1">
                     <p className="text-sm text-muted-foreground">OTP sent to</p>
                     <p className="text-base font-semibold text-foreground">{auth.settings.defaultCountryCode} {auth.phone}</p>
                   </div>
 
-                  <div className="flex justify-center">
+                  <div className="flex justify-center" style={{ scrollMarginBottom: '200px' }}>
                     <InputOTP
                       maxLength={4}
                       value={auth.otp}
                       onChange={(value) => auth.setOtp(value)}
+                      autoFocus
                     >
                       <InputOTPGroup className="gap-3">
                         <InputOTPSlot index={0} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
