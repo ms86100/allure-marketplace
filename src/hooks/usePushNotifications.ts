@@ -64,8 +64,8 @@ function isValidFcmToken(token: string, platform: string): boolean {
  * If the import fails/times out the cache resets so retries work.
  * NO pre-warming at module load (that caused the previous regression).
  */
-let _pnPromise: Promise<any> | null = null;
-async function getPushNotificationsPlugin() {
+let _pnPromise: ReturnType<typeof import('@capacitor/push-notifications')['then']> | null = null;
+async function getPushNotificationsPlugin(): Promise<typeof import('@capacitor/push-notifications').PushNotifications | null> {
   if (!_pnPromise) {
     _pnPromise = withTimeout(
       import('@capacitor/push-notifications').then(m => m.PushNotifications),
@@ -75,13 +75,13 @@ async function getPushNotificationsPlugin() {
       console.warn('[Push] @capacitor/push-notifications not available:', e);
       _pnPromise = null;
       return null;
-    });
+    }) as any;
   }
-  return _pnPromise;
+  return _pnPromise as any;
 }
 
 let _fcmPromise: Promise<any> | null = null;
-async function getFcmPlugin() {
+async function getFcmPlugin(): Promise<typeof import('@capacitor-community/fcm').FCM | null> {
   if (!_fcmPromise) {
     _fcmPromise = withTimeout(
       import('@capacitor-community/fcm').then(m => m.FCM),
