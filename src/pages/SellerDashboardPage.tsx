@@ -43,7 +43,7 @@ export default function SellerDashboardPage() {
   const [renderError, setRenderError] = useState<string | null>(null);
 
   const activeSellerId = currentSellerId || (Array.isArray(sellerProfiles) && sellerProfiles.length > 0 ? sellerProfiles[0].id : null);
-  const { pendingAlerts, dismiss: dismissAlert, snooze: snoozeAlert } = useNewOrderAlert(activeSellerId);
+  // NewOrderAlert hook + overlay handled globally in App.tsx
 
   useEffect(() => {
     console.log('[SellerDashboard] Auth state:', { userId: user?.id, sellerProfilesCount: sellerProfiles?.length, activeSellerId, currentSellerId });
