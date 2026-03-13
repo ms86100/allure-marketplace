@@ -53,7 +53,7 @@ export function UpiDeepLinkCheckout({
   });
   const [utrValue, setUtrValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const hasOpenedApp = useRef(() => {
+  const hasOpenedApp = useRef<boolean>(() => {
     try { return sessionStorage.getItem(UPI_OPENED_APP_KEY) === 'true'; } catch { return false; }
   });
   const completionTriggeredRef = useRef(false);
