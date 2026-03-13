@@ -43,12 +43,6 @@ function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; s
   const [locationSaved, setLocationSaved] = useState(false);
   const hasCoords = locationSaved || (!!(sellerProfile as any).latitude && !!(sellerProfile as any).longitude);
 
-  const handleSheetChange = (open: boolean) => {
-    setSheetOpen(open);
-    // If sheet is closing and was open, check if location was saved
-    // SetStoreLocationSheet calls onOpenChange(false) after successful save
-  };
-
   return (
     <div className="bg-card rounded-xl p-4 shadow-sm">
       <h3 className="font-semibold mb-3 flex items-center gap-2">
@@ -77,15 +71,9 @@ function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; s
       )}
       <SetStoreLocationSheet
         open={sheetOpen}
-        onOpenChange={(open) => {
-          if (!open && sheetOpen) {
-            // Sheet closing — optimistically mark as saved if it was open
-            // The toast inside SetStoreLocationSheet confirms success
-            setLocationSaved(true);
-          }
-          setSheetOpen(open);
-        }}
+        onOpenChange={setSheetOpen}
         sellerId={sellerId}
+        onSuccess={() => setLocationSaved(true)}
       />
     </div>
   );
