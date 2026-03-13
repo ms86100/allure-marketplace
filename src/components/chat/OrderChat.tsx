@@ -265,6 +265,7 @@ export function OrderChat({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
