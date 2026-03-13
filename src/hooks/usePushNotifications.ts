@@ -1168,6 +1168,13 @@ export function usePushNotificationsInternal() {
           registrationStateRef.current = 'idle';
           retryCountRef.current = 0;
 
+          // ── GATE: Wait for listener gate before reconciling ──
+          // This ensures the main IIFE's PN plugin import is complete
+          // before login tries a second concurrent plugin import.
+          pushLog('info', 'LOGIN_WAITING_FOR_LISTENER_GATE', { ts: Date.now() });
+          const listenersOk = await waitForListenersReady('login_block');
+          pushLog('info', 'LOGIN_LISTENER_GATE_RESULT', { listenersOk, ts: Date.now() });
+
           // First try reconcileRuntimeToken (fast path for iOS)
           pushLog('info', 'RECONCILE_STARTING', { ts: Date.now() });
           try {
