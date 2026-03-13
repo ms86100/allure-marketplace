@@ -118,6 +118,7 @@ export function ProductImageUpload({
           aspectRatio="square"
           placeholder="Upload product photo"
           cropAspect={1}
+          beforePick={beforePick}
         />
       </TabsContent>
 
