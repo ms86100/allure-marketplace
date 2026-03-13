@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBrowsingLocation, BrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { getCurrentPosition } from '@/lib/native-location';
 import { loadGoogleMapsScript } from '@/hooks/useGoogleMaps';
+import { extractBestLabel, extractBestFormattedAddress } from '@/lib/location-label-resolver';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
