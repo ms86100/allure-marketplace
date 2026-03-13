@@ -935,6 +935,10 @@ export function usePushNotificationsInternal() {
         listenersReadyResolveRef.current();
         listenersReadyResolveRef.current = null;
       }
+
+      // ── Mark boot complete so appStateChange handler can proceed ──
+      bootComplete = true;
+      pushLog('info', 'BOOT_COMPLETE', { platform, ts: Date.now() });
     })();
 
     // ── iOS: also listen for FCM token refresh ──
