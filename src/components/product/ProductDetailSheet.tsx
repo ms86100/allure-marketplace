@@ -220,7 +220,7 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
           </div>
         </DrawerContent>
       </Drawer>
-      {d.actionType === 'contact_seller' && <ContactSellerModal open={d.contactOpen} onOpenChange={d.setContactOpen} sellerName={product.seller_name} phone={product.contact_phone || ''} sellerId={product.seller_id} buyerId="" productId={product.product_id} productName={product.product_name} />}
+      {d.actionType === 'contact_seller' && <ContactSellerModal open={d.contactOpen} onOpenChange={d.setContactOpen} sellerName={product.seller_name} phone={product.contact_phone || ''} sellerId={product.seller_id} buyerId={user?.id ?? ''} productId={product.product_id} productName={product.product_name} />}
       {!d.isCartAction && d.actionType !== 'contact_seller' && !isServiceBookingAction && <ProductEnquirySheet open={d.enquiryOpen} onOpenChange={d.setEnquiryOpen} productId={product.product_id} productName={product.product_name} sellerId={product.seller_id} sellerName={product.seller_name} actionType={d.actionType} price={product.price} />}
       {isServiceBookingAction && product && (
         <ServiceBookingFlow open={bookingOpen} onOpenChange={setBookingOpen} productId={product.product_id} productName={product.product_name} sellerId={product.seller_id} sellerName={product.seller_name} price={product.price} category={product.category || ''} imageUrl={product.image_url} durationMinutes={product.prep_time_minutes || undefined} locationType={(product as any).location_type || undefined} subcategoryId={(product as any).subcategory_id || undefined} />
