@@ -16,6 +16,8 @@ interface CroppableImageUploadProps {
   aspectRatio?: 'square' | 'video' | 'portrait';
   placeholder?: string;
   cropAspect?: number;
+  /** Called before opening the native image picker — use to persist state before WebView may reload */
+  beforePick?: () => void | Promise<void>;
 }
 
 export function CroppableImageUpload({
