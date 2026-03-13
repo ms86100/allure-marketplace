@@ -26,10 +26,11 @@ interface UpiDeepLinkCheckoutProps {
   onPaymentFailed: () => void;
 }
 
+type CheckoutStep = 'pay' | 'confirm' | 'utr' | 'done' | 'failed';
+
 // Key for persisting UPI checkout step across app-switch
 const UPI_STEP_KEY = 'sociva_upi_checkout_step';
 const UPI_OPENED_APP_KEY = 'sociva_upi_opened_app';
-
 
 export function UpiDeepLinkCheckout({
   isOpen,
