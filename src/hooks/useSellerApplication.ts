@@ -325,8 +325,9 @@ export function useSellerApplication() {
       if (prodError) console.error('Failed to transition products:', prodError);
       await refreshProfile();
       localStorage.setItem('seller_onboarding_completed', 'true');
-      toast.success('Application submitted! Awaiting admin approval.');
-      // Notify admins about the new store application
+    localStorage.removeItem('seller_onboarding_step');
+    toast.success('Application submitted! Awaiting admin approval.');
+    // Notify admins about the new store application
       notifyAdminsNewStoreApplication(formData.business_name.trim(), user.id).catch(console.error);
       setSubmissionComplete(true);
     } catch (error: any) {
