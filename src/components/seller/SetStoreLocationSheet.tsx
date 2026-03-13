@@ -137,7 +137,7 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
 
   return (
     <Drawer open={open} onOpenChange={handleOpenChange} repositionInputs={false}>
-      <DrawerContent className="overflow-hidden flex flex-col" style={drawerStyle}>
+      <DrawerContent className="mt-0 overflow-hidden flex flex-col" style={drawerStyle}>
         <DrawerHeader className="pb-2 shrink-0">
           <DrawerTitle className="text-base">Set Store Location</DrawerTitle>
           <p className="text-xs text-muted-foreground">
