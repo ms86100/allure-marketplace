@@ -106,9 +106,51 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
       className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col overflow-hidden"
       style={containerStyle}
     >
-...
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <MessageCircle className="text-primary" size={20} />
+          </div>
+          <div className="min-w-0">
+            <p className="font-semibold truncate text-sm">{sellerName}</p>
+            <p className="text-xs text-muted-foreground truncate">Re: {productName}</p>
+          </div>
+        </div>
+        <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="shrink-0">
+          <X size={20} />
+        </Button>
+      </div>
+
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-2">
+        {isLoading && <p className="text-xs text-muted-foreground text-center py-8">Loading messages…</p>}
+        {!isLoading && messages.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            <MessageCircle className="mx-auto mb-2" size={32} />
+            <p className="text-sm">No messages yet</p>
+            <p className="text-xs">Say hello to {sellerName}!</p>
+          </div>
+        )}
+        {messages.map((m) => {
+          const isMine = m.sender_id === buyerId;
+          return (
+            <div key={m.id} className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
+              <div
+                className={cn(
+                  'max-w-[75%] px-3 py-2 rounded-2xl text-sm',
+                  isMine ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-muted text-foreground rounded-bl-md',
+                )}
+              >
+                {m.message_text}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Input bar — pinned above keyboard */}
-      <div className="shrink-0 border-t border-border px-3 pt-3 flex items-end gap-2 bg-card pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] relative z-10">>
+      <div className="shrink-0 border-t border-border px-3 pt-3 flex items-end gap-2 bg-card pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] relative z-10">
         <Textarea
           ref={textareaRef}
           value={text}
@@ -117,7 +159,7 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
           rows={1}
           className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl text-base md:text-sm py-2.5"
           onFocus={() => {
-            setTimeout(scrollToBottom, 300);
+            setTimeout(scrollToBottom, 200);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -136,6 +178,6 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
         </Button>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }
