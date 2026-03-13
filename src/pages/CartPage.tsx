@@ -37,7 +37,7 @@ export default function CartPage() {
     );
   }
 
-  if (c.items.length === 0) {
+  if (c.items.length === 0 && !c.hasActivePaymentSession) {
     return (
       <AppLayout showHeader={false} showCart={false}>
         <div className="p-4 safe-top">
@@ -289,7 +289,9 @@ export default function CartPage() {
         <RazorpayCheckout isOpen={c.showRazorpayCheckout} onClose={() => { /* neutral close — do nothing, let success/fail handlers drive */ }} orderId={c.pendingOrderIds[0]} amount={c.finalAmount} sellerId={c.sellerGroups[0]?.sellerId || ''} sellerName={c.sellerGroups[0]?.sellerName || 'Seller'} customerName={c.profile?.name || ''} customerEmail={c.user?.email || ''} customerPhone={c.profile?.phone || ''} onPaymentSuccess={c.handleRazorpaySuccess} onPaymentFailed={c.handleRazorpayFailed} />
       )}
 
-      {c.pendingOrderIds.length > 0 && c.paymentMode.isUpiDeepLink && (
+      {/* CRITICAL: Render UPI sheet whenever pendingOrderIds exist — independent of cart state.
+          This prevents the sheet from unmounting when cart items refetch as empty during app-switch. */}
+      {c.pendingOrderIds.length > 0 && (
         <UpiDeepLinkCheckout isOpen={c.showUpiDeepLink} onClose={() => c.setShowUpiDeepLink(false)} orderId={c.pendingOrderIds[0]} amount={c.finalAmount} sellerUpiId={(c.sellerGroups[0]?.items[0]?.product?.seller as any)?.upi_id || ''} sellerName={c.sellerGroups[0]?.sellerName || 'Seller'} onPaymentConfirmed={c.handleUpiDeepLinkSuccess} onPaymentFailed={c.handleUpiDeepLinkFailed} />
       )}
     </AppLayout>

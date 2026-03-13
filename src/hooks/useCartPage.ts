@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentMethod } from '@/types/database';
@@ -15,6 +15,39 @@ import { friendlyError } from '@/lib/utils';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
 import { computeStoreStatus, formatStoreClosedMessage } from '@/lib/store-availability';
 
+// ── Session persistence for UPI payment state ──
+// Survives app-switch, re-renders, and component remounts
+const PAYMENT_SESSION_KEY = 'sociva_pending_payment_session';
+
+interface PaymentSession {
+  orderIds: string[];
+  paymentMethod: string;
+  amount: number;
+  createdAt: number;
+}
+
+function savePaymentSession(session: PaymentSession) {
+  try { sessionStorage.setItem(PAYMENT_SESSION_KEY, JSON.stringify(session)); } catch {}
+}
+
+function loadPaymentSession(): PaymentSession | null {
+  try {
+    const raw = sessionStorage.getItem(PAYMENT_SESSION_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw) as PaymentSession;
+    // Expire sessions older than 30 minutes
+    if (Date.now() - session.createdAt > 30 * 60 * 1000) {
+      clearPaymentSession();
+      return null;
+    }
+    return session;
+  } catch { return null; }
+}
+
+function clearPaymentSession() {
+  try { sessionStorage.removeItem(PAYMENT_SESSION_KEY); } catch {}
+}
+
 export function useCartPage() {
   const navigate = useNavigate();
   const { user, profile, society } = useAuth();
@@ -27,7 +60,6 @@ export function useCartPage() {
   const [showUpiDeepLink, setShowUpiDeepLink] = useState(false);
   const paymentMode = usePaymentMode();
   const [pendingOrderIds, setPendingOrderIds] = useState<string[]>([]);
-  // Ref to persist pendingOrderIds across re-renders caused by cart changes
   const pendingOrderIdsRef = useRef<string[]>([]);
   const [appliedCoupon, setAppliedCoupon] = useState<{ id: string; code: string; discountAmount: number; discount_type?: string; discount_value?: number; max_discount_amount?: number | null } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -40,6 +72,22 @@ export function useCartPage() {
 
   // Keep ref in sync
   useEffect(() => { pendingOrderIdsRef.current = pendingOrderIds; }, [pendingOrderIds]);
+
+  // ── Restore payment session on mount (app resume / remount) ──
+  useEffect(() => {
+    const session = loadPaymentSession();
+    if (!session || session.orderIds.length === 0) return;
+
+    // Restore pending order IDs from session
+    setPendingOrderIds(session.orderIds);
+
+    // Re-open the correct payment UI
+    if (session.paymentMethod === 'upi') {
+      setPaymentMethod('upi');
+      // Small delay to allow component to mount with pendingOrderIds
+      setTimeout(() => setShowUpiDeepLink(true), 100);
+    }
+  }, []); // Only on mount
 
   const effectiveCouponDiscount = (() => {
     if (!appliedCoupon) return 0;
@@ -116,7 +164,6 @@ export function useCartPage() {
     });
     if (priceMismatch) { toast.error('Some item prices have changed. Refreshing your cart...'); await refresh(); throw new Error('Price mismatch detected'); }
 
-    // Build delivery address text from selected address or profile fallback
     const deliveryAddressText = fulfillmentType === 'delivery' && selectedDeliveryAddress
       ? [selectedDeliveryAddress.flat_number && `Flat ${selectedDeliveryAddress.flat_number}`, selectedDeliveryAddress.block && `Block ${selectedDeliveryAddress.block}`, selectedDeliveryAddress.building_name, selectedDeliveryAddress.landmark].filter(Boolean).join(', ')
       : [profile.block, profile.flat_number].filter(Boolean).join(', ');
@@ -147,24 +194,29 @@ export function useCartPage() {
     if (!user || !profile || sellerGroups.length === 0) return;
 
     // GUARD: Check for existing pending unpaid orders to prevent duplicates
-    if (pendingOrderIdsRef.current.length > 0) {
+    const existingSession = loadPaymentSession();
+    const pendingIds = pendingOrderIdsRef.current.length > 0 ? pendingOrderIdsRef.current : (existingSession?.orderIds || []);
+
+    if (pendingIds.length > 0) {
       const { data: existingOrders } = await supabase
         .from('orders')
         .select('id, status, payment_status')
-        .in('id', pendingOrderIdsRef.current)
+        .in('id', pendingIds)
         .eq('buyer_id', user.id);
 
-      const stillPending = existingOrders?.filter(o => o.status !== 'cancelled' && o.payment_status !== 'paid');
+      const stillPending = existingOrders?.filter(o => o.status !== 'cancelled' && o.payment_status !== 'paid' && o.payment_status !== 'buyer_confirmed');
       if (stillPending && stillPending.length > 0) {
         toast.error('You have a pending payment. Please complete or cancel it first.');
-        // Re-open the UPI payment sheet if applicable
+        // Re-open the UPI payment sheet
+        setPendingOrderIds(stillPending.map(o => o.id));
         if (paymentMethod === 'upi' && paymentMode.isUpiDeepLink) {
           setShowUpiDeepLink(true);
         }
         return;
       }
-      // All pending orders were cancelled or paid — clear refs
+      // All pending orders were cancelled or paid — clear session
       setPendingOrderIds([]);
+      clearPaymentSession();
     }
 
     const selfSellerGroup = sellerGroups.find(g => { const sellerUserId = (g.items[0]?.product?.seller as any)?.user_id; return sellerUserId && sellerUserId === user.id; });
@@ -209,7 +261,14 @@ export function useCartPage() {
         const orderIds = await createOrdersForAllSellers('pending');
         if (orderIds.length === 0) throw new Error('Failed to create orders');
         setPendingOrderIds(orderIds);
-        // Do NOT clear cart here — cart stays until payment is confirmed
+        // CRITICAL: Persist payment session so it survives app-switch
+        savePaymentSession({
+          orderIds,
+          paymentMethod: 'upi',
+          amount: finalAmount,
+          createdAt: Date.now(),
+        });
+        // Do NOT clear cart — cart stays until payment is confirmed
         if (paymentMode.isUpiDeepLink) {
           setShowUpiDeepLink(true);
         } else {
@@ -247,21 +306,23 @@ export function useCartPage() {
       else toast.success('Payment successful! Order placed.');
     }
     supabase.functions.invoke('process-notification-queue').catch(() => {});
-    // Clear cart ONLY after payment success
+    // Clear cart and payment session ONLY after payment success
     clearCart(); await refresh();
+    clearPaymentSession();
     navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
     setPendingOrderIds([]);
   };
 
   const handleRazorpayFailed = async () => {
     setShowRazorpayCheckout(false);
-    if (!user?.id) { toast.error('Session expired. Please sign in again.'); setPendingOrderIds([]); return; }
+    if (!user?.id) { toast.error('Session expired. Please sign in again.'); setPendingOrderIds([]); clearPaymentSession(); return; }
     if (pendingOrderIds.length > 0) {
       const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
-      if (recheckOrder?.payment_status === 'paid') { toast.success('Payment verified! Your order is confirmed.'); clearCart(); await refresh(); navigate(`/orders/${pendingOrderIds[0]}`); setPendingOrderIds([]); return; }
+      if (recheckOrder?.payment_status === 'paid') { toast.success('Payment verified! Your order is confirmed.'); clearCart(); await refresh(); clearPaymentSession(); navigate(`/orders/${pendingOrderIds[0]}`); setPendingOrderIds([]); return; }
       try { await supabase.from('orders').update({ status: 'cancelled' } as any).in('id', pendingOrderIds).eq('payment_status', 'pending').eq('buyer_id', user.id); } catch (err) { console.error('Failed to cancel unpaid orders:', err); }
     }
     setPendingOrderIds([]);
+    clearPaymentSession();
     // Do NOT clear cart on payment failure — user can retry
     toast.error('Payment was not completed. Your order has been cancelled. You can try again.');
   };
@@ -269,21 +330,23 @@ export function useCartPage() {
   const handleUpiDeepLinkSuccess = async () => {
     setShowUpiDeepLink(false);
     toast.success('Payment submitted! Seller will verify shortly.');
-    // Clear cart ONLY after payment confirmation submitted
+    // Clear cart and payment session ONLY after payment confirmation submitted
     clearCart(); await refresh();
+    clearPaymentSession();
     navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
     setPendingOrderIds([]);
   };
 
   const handleUpiDeepLinkFailed = async () => {
     setShowUpiDeepLink(false);
-    if (!user?.id) { toast.error('Session expired.'); setPendingOrderIds([]); return; }
+    if (!user?.id) { toast.error('Session expired.'); setPendingOrderIds([]); clearPaymentSession(); return; }
     if (pendingOrderIds.length > 0) {
       // Check if payment was actually completed before cancelling
       const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
       if (recheckOrder?.payment_status === 'paid' || recheckOrder?.payment_status === 'buyer_confirmed') {
         toast.success('Payment was already confirmed! Your order is active.');
         clearCart(); await refresh();
+        clearPaymentSession();
         navigate(`/orders/${pendingOrderIds[0]}`);
         setPendingOrderIds([]);
         return;
@@ -291,9 +354,13 @@ export function useCartPage() {
       try { await supabase.from('orders').update({ status: 'cancelled' } as any).in('id', pendingOrderIds).eq('payment_status', 'pending').eq('buyer_id', user.id); } catch (err) { console.error('Failed to cancel unpaid orders:', err); }
     }
     setPendingOrderIds([]);
+    clearPaymentSession();
     // Do NOT clear cart on payment failure — user can retry with the same items
     toast.error('Payment was not completed. Your order has been cancelled. You can try again.');
   };
+
+  // Compute whether we have an active payment session (for rendering payment UI even if cart is empty)
+  const hasActivePaymentSession = pendingOrderIds.length > 0 || !!loadPaymentSession();
 
   return {
     user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading,
@@ -309,6 +376,7 @@ export function useCartPage() {
     selectedDeliveryAddress, setSelectedDeliveryAddress, addresses, addressesLoading,
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed,
     handleUpiDeepLinkSuccess, handleUpiDeepLinkFailed,
+    hasActivePaymentSession,
     cancelPlacingOrder: () => setIsPlacingOrder(false),
   };
 }

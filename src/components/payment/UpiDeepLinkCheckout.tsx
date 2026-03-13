@@ -28,6 +28,10 @@ interface UpiDeepLinkCheckoutProps {
 
 type CheckoutStep = 'pay' | 'confirm' | 'utr' | 'done' | 'failed';
 
+// Key for persisting UPI checkout step across app-switch
+const UPI_STEP_KEY = 'sociva_upi_checkout_step';
+const UPI_OPENED_APP_KEY = 'sociva_upi_opened_app';
+
 export function UpiDeepLinkCheckout({
   isOpen,
   onClose,
@@ -39,11 +43,29 @@ export function UpiDeepLinkCheckout({
   onPaymentFailed,
 }: UpiDeepLinkCheckoutProps) {
   const { formatPrice } = useCurrency();
-  const [step, setStep] = useState<CheckoutStep>('pay');
+  // Restore persisted step on mount (survives app-switch remounts)
+  const [step, setStepRaw] = useState<CheckoutStep>(() => {
+    try {
+      const saved = sessionStorage.getItem(UPI_STEP_KEY);
+      if (saved && ['pay', 'confirm', 'utr'].includes(saved)) return saved as CheckoutStep;
+    } catch {}
+    return 'pay';
+  });
   const [utrValue, setUtrValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const hasOpenedApp = useRef(false);
+  const hasOpenedApp = useRef<boolean>(
+    (() => { try { return sessionStorage.getItem(UPI_OPENED_APP_KEY) === 'true'; } catch { return false; } })()
+  );
   const completionTriggeredRef = useRef(false);
+
+  // Wrapper to persist step changes
+  const setStep = useCallback((nextStep: CheckoutStep | ((prev: CheckoutStep) => CheckoutStep)) => {
+    setStepRaw(prev => {
+      const resolved = typeof nextStep === 'function' ? nextStep(prev) : nextStep;
+      try { sessionStorage.setItem(UPI_STEP_KEY, resolved); } catch {}
+      return resolved;
+    });
+  }, []);
 
   const shortOrderId = orderId.slice(0, 8).toUpperCase();
   const transactionNote = `ORD_${shortOrderId}`;
@@ -59,12 +81,29 @@ export function UpiDeepLinkCheckout({
 
   const upiLink = `upi://pay?pa=${encodeURIComponent(sellerUpiId)}&pn=${encodeURIComponent(sellerName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
 
+  // Track whether this is the first open vs a restored open
+  const isRestoredRef = useRef(false);
   useEffect(() => {
     if (isOpen) {
-      setStep('pay');
-      setUtrValue('');
-      hasOpenedApp.current = false;
-      completionTriggeredRef.current = false;
+      // If we have a persisted step from a prior app-switch, DON'T reset
+      const savedStep = (() => { try { return sessionStorage.getItem(UPI_STEP_KEY); } catch { return null; } })();
+      const savedOpened = (() => { try { return sessionStorage.getItem(UPI_OPENED_APP_KEY) === 'true'; } catch { return false; } })();
+      
+      if (savedOpened && savedStep && ['confirm', 'utr'].includes(savedStep)) {
+        // Restoring from app-switch — keep persisted state
+        isRestoredRef.current = true;
+        hasOpenedApp.current = true;
+        setStep(savedStep as CheckoutStep);
+      } else if (!isRestoredRef.current) {
+        // Fresh open — reset everything
+        setStep('pay');
+        setUtrValue('');
+        hasOpenedApp.current = false;
+        try { sessionStorage.removeItem(UPI_OPENED_APP_KEY); } catch {}
+        completionTriggeredRef.current = false;
+      }
+    } else {
+      isRestoredRef.current = false;
     }
   }, [isOpen]);
 
@@ -72,6 +111,8 @@ export function UpiDeepLinkCheckout({
     if (completionTriggeredRef.current) return;
     completionTriggeredRef.current = true;
     setStep('done');
+    // Clean up persisted session on success
+    try { sessionStorage.removeItem(UPI_STEP_KEY); sessionStorage.removeItem(UPI_OPENED_APP_KEY); } catch {}
     setTimeout(() => onPaymentConfirmed(), 1500);
   }, [onPaymentConfirmed]);
 
@@ -123,6 +164,7 @@ export function UpiDeepLinkCheckout({
 
   const handlePayWithApp = (scheme: string) => {
     hasOpenedApp.current = true;
+    try { sessionStorage.setItem(UPI_OPENED_APP_KEY, 'true'); } catch {}
     setStep('confirm');
     const link = buildUpiLink(scheme);
     window.open(link, '_blank');
@@ -196,12 +238,14 @@ export function UpiDeepLinkCheckout({
     if (dismissLocked) return;
     // Only auto-cancel order if user never opened a payment app
     if (step === 'pay' && !hasOpenedApp.current) {
+      try { sessionStorage.removeItem(UPI_STEP_KEY); sessionStorage.removeItem(UPI_OPENED_APP_KEY); } catch {}
       onPaymentFailed();
     }
     onClose();
   };
 
   const handleCancelOrder = () => {
+    try { sessionStorage.removeItem(UPI_STEP_KEY); sessionStorage.removeItem(UPI_OPENED_APP_KEY); } catch {}
     onPaymentFailed();
     onClose();
   };
