@@ -21,7 +21,7 @@ const getViewportSnapshot = (): ViewportSnapshot => {
   return { height, top, visualKeyboardHeight };
 };
 
-export function useChatViewport(enabled: boolean) {
+export function useKeyboardViewport(enabled: boolean) {
   const [snapshot, setSnapshot] = useState<ViewportSnapshot>(() => getViewportSnapshot());
   const [nativeKeyboardHeight, setNativeKeyboardHeight] = useState(0);
 
@@ -90,5 +90,10 @@ export function useChatViewport(enabled: boolean) {
     viewportHeight: snapshot.height,
     viewportTop: snapshot.top,
     keyboardInset,
+    isKeyboardOpen: snapshot.visualKeyboardHeight > 0 || nativeKeyboardHeight > 0,
   };
+}
+
+export function useChatViewport(enabled: boolean) {
+  return useKeyboardViewport(enabled);
 }

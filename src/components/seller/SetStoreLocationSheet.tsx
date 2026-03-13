@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, type CSSProperties } from 'react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { getCurrentPosition } from '@/lib/native-location';
 import { useGoogleMaps, useAutocomplete } from '@/hooks/useGoogleMaps';
+import { useKeyboardViewport } from '@/hooks/useChatViewport';
 import { MapPin, Navigation, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -27,6 +28,34 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
   const queryClient = useQueryClient();
   const { isLoaded: mapsLoaded } = useGoogleMaps();
   const { predictions, isSearching, searchPlaces, getPlaceDetails, clearPredictions } = useAutocomplete();
+  const { viewportHeight, viewportTop, keyboardInset } = useKeyboardViewport(open);
+
+  const effectiveViewportHeight = useMemo(
+    () => Math.max(320, viewportHeight - keyboardInset),
+    [viewportHeight, keyboardInset],
+  );
+
+  const sheetHeight = useMemo(
+    () => Math.max(360, Math.min(Math.round(effectiveViewportHeight * 0.86), 760)),
+    [effectiveViewportHeight],
+  );
+
+  const sheetTop = useMemo(
+    () => viewportTop + Math.max(0, effectiveViewportHeight - sheetHeight),
+    [viewportTop, effectiveViewportHeight, sheetHeight],
+  );
+
+  const dropdownMaxHeight = useMemo(
+    () => Math.max(140, Math.min(280, Math.round(effectiveViewportHeight * 0.34))),
+    [effectiveViewportHeight],
+  );
+
+  const drawerStyle: CSSProperties = {
+    top: sheetTop,
+    bottom: 'auto',
+    height: sheetHeight,
+    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+  };
 
   const handleSearchChange = useCallback((value: string) => {
     setSearchInput(value);
@@ -107,52 +136,59 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
   };
 
   return (
-    <Drawer open={open} onOpenChange={handleOpenChange}>
-      <DrawerContent className="max-h-[85vh] overflow-y-auto">
-        <DrawerHeader className="pb-2">
+    <Drawer open={open} onOpenChange={handleOpenChange} repositionInputs={false}>
+      <DrawerContent className="overflow-hidden flex flex-col" style={drawerStyle}>
+        <DrawerHeader className="pb-2 shrink-0">
           <DrawerTitle className="text-base">Set Store Location</DrawerTitle>
           <p className="text-xs text-muted-foreground">
             {step === 'pick' ? 'Search for your store location or use GPS' : 'Drag the pin to adjust the exact location'}
           </p>
         </DrawerHeader>
-        <div className="px-4 pb-6">
+
+        <div className="px-4 pb-4 flex-1 min-h-0 overflow-y-auto overscroll-contain">
           {step === 'pick' && (
-            <div className="space-y-3">
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search your store location or area..."
-                  value={searchInput}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
-                  className="pl-9 h-12 rounded-xl"
-                  inputMode="search"
-                />
-                {isSearching && (
-                  <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
-                )}
+            <div className="space-y-3 pb-2">
+              <div className="sticky top-0 z-20 bg-background pb-2">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search your store location or area..."
+                    value={searchInput}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    className="pl-9 h-12 rounded-xl"
+                    inputMode="search"
+                    autoComplete="off"
+                    enterKeyHint="search"
+                  />
+                  {isSearching && (
+                    <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
+                  )}
+
+                  {predictions.length > 0 && (
+                    <div
+                      className="absolute left-0 right-0 top-full mt-2 z-30 border border-border rounded-xl overflow-hidden divide-y divide-border bg-card shadow-lg overflow-y-auto overscroll-contain"
+                      style={{ maxHeight: `${dropdownMaxHeight}px` }}
+                    >
+                      {predictions.map((p) => (
+                        <button
+                          key={p.placeId}
+                          onClick={() => handleSelectPlace(p.placeId)}
+                          disabled={loading}
+                          className="w-full text-left px-3 py-2.5 hover:bg-accent/50 transition-colors flex items-start gap-2.5"
+                        >
+                          <MapPin size={14} className="text-primary shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{p.mainText}</p>
+                            <p className="text-[10px] text-muted-foreground truncate">{p.secondaryText}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {predictions.length > 0 && (
-                <div className="border border-border rounded-xl overflow-hidden divide-y divide-border max-h-48 overflow-y-auto">
-                  {predictions.map((p) => (
-                    <button
-                      key={p.placeId}
-                      onClick={() => handleSelectPlace(p.placeId)}
-                      disabled={loading}
-                      className="w-full text-left px-3 py-2.5 hover:bg-accent/50 transition-colors flex items-start gap-2.5"
-                    >
-                      <MapPin size={14} className="text-primary shrink-0 mt-0.5" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{p.mainText}</p>
-                        <p className="text-[10px] text-muted-foreground truncate">{p.secondaryText}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 pt-1">
                 <div className="flex-1 h-px bg-border" />
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider">or</span>
                 <div className="flex-1 h-px bg-border" />
@@ -171,6 +207,7 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
                 )}
                 Use Current Location
               </Button>
+
               <p className="text-[10px] text-muted-foreground text-center">
                 <MapPin size={10} className="inline mr-1" />
                 Make sure you are at or near your store when using this option
@@ -186,6 +223,14 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
               onConfirm={(lat, lng) => handleConfirm(lat, lng)}
               onBack={handleBack}
             />
+          )}
+
+          {step === 'confirm' && coords && !mapsLoaded && (
+            <div className="py-10 text-center text-muted-foreground text-sm">Loading map…</div>
+          )}
+
+          {saving && (
+            <div className="pt-3 text-center text-xs text-muted-foreground">Saving location…</div>
           )}
         </div>
       </DrawerContent>
