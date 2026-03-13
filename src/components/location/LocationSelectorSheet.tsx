@@ -47,6 +47,8 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
       styles: [{ featureType: 'poi', stylers: [{ visibility: 'simplified' }] }],
     });
 
+    mapInstanceRef.current = map;
+
     const marker = new google.maps.Marker({
       position: { lat: detectedLocation.lat, lng: detectedLocation.lng },
       map,
