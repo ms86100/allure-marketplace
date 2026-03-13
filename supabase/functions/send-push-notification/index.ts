@@ -382,8 +382,9 @@ Deno.serve(async (req) => {
     const results = await Promise.all(
       deduped.map(async (tokenRecord: any) => {
         let result: { success: boolean; error?: string };
+        const isApnsOnlyToken = tokenRecord.token.startsWith("apns:");
 
-        // iOS with stored APNs token → direct APNs delivery
+        // iOS with stored APNs token → direct APNs delivery (primary path)
         if (tokenRecord.platform === "ios" && tokenRecord.apns_token && apnsConfigured) {
           console.log(`[Push] iOS device — using direct APNs for token prefix: ${tokenRecord.apns_token.substring(0, 16)}…`);
           result = await sendApnsDirectNotification(
@@ -397,8 +398,8 @@ Deno.serve(async (req) => {
             apnsBundleId!
           );
 
-          // If APNs fails, fall back to FCM
-          if (!result.success && result.error !== "INVALID_TOKEN") {
+          // If APNs fails and we have a real FCM token, fall back to FCM
+          if (!result.success && result.error !== "INVALID_TOKEN" && !isApnsOnlyToken) {
             console.log(`[Push] APNs failed, falling back to FCM`);
             result = await sendFCMNotification(
               accessToken,
@@ -409,6 +410,10 @@ Deno.serve(async (req) => {
               data
             );
           }
+        } else if (isApnsOnlyToken) {
+          // APNs-only token but APNs not configured — skip
+          console.log(`[Push] iOS APNs-only token but APNs not configured — skipping`);
+          result = { success: false, error: "APNS_NOT_CONFIGURED" };
         } else {
           // Android or iOS without APNs token → FCM
           console.log(`[Push] ${tokenRecord.platform} device — using FCM`);
