@@ -17,6 +17,7 @@ async function fetchGoogleMapsApiKey(): Promise<string> {
       .eq('key', 'google_maps_api_key')
       .maybeSingle();
     if (data?.value && data.is_active !== false) {
+      console.info('useGoogleMaps: API key loaded from database (admin_settings)');
       resolvedApiKey = data.value;
       return data.value;
     }
