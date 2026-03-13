@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Camera, RotateCcw, Check } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
+import { toast } from 'sonner';
 
 interface LiveCameraCaptureProps {
   onCapture: (imageBlob: Blob) => void;
