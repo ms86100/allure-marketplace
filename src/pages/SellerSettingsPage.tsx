@@ -164,7 +164,7 @@ export default function SellerSettingsPage() {
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground mb-2 block">Profile Photo</Label>
-                {user && <div className="max-w-[160px]"><CroppableImageUpload value={formData.profile_image_url} onChange={(url) => setFormData({ ...formData, profile_image_url: url })} folder="sellers" userId={user.id} aspectRatio="square" placeholder="Upload profile photo" cropAspect={1} /></div>}
+                {user && <div className="w-[140px]"><CroppableImageUpload value={formData.profile_image_url} onChange={(url) => setFormData({ ...formData, profile_image_url: url })} folder="sellers" userId={user.id} aspectRatio="square" placeholder="Upload profile photo" cropAspect={1} /></div>}
               </div>
             </div>
           </div>

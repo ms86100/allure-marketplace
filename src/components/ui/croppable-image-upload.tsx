@@ -228,7 +228,7 @@ export function CroppableImageUpload({
               disabled={isUploading}
               className={cn(
                 'w-full rounded-lg border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 transition-colors',
-                'flex items-center justify-center gap-3 text-muted-foreground h-24 px-4'
+                'flex flex-col items-center justify-center gap-1.5 text-muted-foreground py-4 px-3'
               )}
             >
               {isUploading ? (
@@ -238,9 +238,9 @@ export function CroppableImageUpload({
                   <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
                     <ImageIcon size={18} />
                   </div>
-                  <div className="text-left">
-                    <span className="text-sm font-medium block">{placeholder}</span>
-                    <span className="text-[10px]">JPG, PNG, WebP (max 5MB)</span>
+                  <div className="text-center min-w-0">
+                    <span className="text-xs font-medium block truncate">{placeholder}</span>
+                    <span className="text-[10px]">JPG, PNG, WebP</span>
                   </div>
                 </>
               )}
