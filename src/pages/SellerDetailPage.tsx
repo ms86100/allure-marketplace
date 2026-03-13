@@ -113,13 +113,11 @@ export default function SellerDetailPage() {
           let buyerLat: number | null = null;
           let buyerLng: number | null = null;
 
-          try {
-            const browsing = JSON.parse(localStorage.getItem('sociva_browsing_location') || 'null');
-            if (browsing?.lat && browsing?.lng) {
-              buyerLat = browsing.lat;
-              buyerLng = browsing.lng;
-            }
-          } catch { /* ignore */ }
+          // Use browsing location from context (passed via browsingLoc prop)
+          if (browsingLoc?.lat && browsingLoc?.lng) {
+            buyerLat = browsingLoc.lat;
+            buyerLng = browsingLoc.lng;
+          }
 
           // Fallback to buyer's society coordinates
           if (!buyerLat && !buyerLng && effectiveSocietyId) {

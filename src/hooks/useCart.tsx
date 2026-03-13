@@ -174,7 +174,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase.from('cart_items').delete().eq('user_id', user.id).eq('product_id', productId);
       if (error) throw error;
-      toast.success('Removed from cart');
+      // Toast removed — callers provide their own contextual feedback
       invalidate();
     } catch (error) {
       queryClient.setQueryData([...CART_QUERY_KEY, user?.id], prev);
