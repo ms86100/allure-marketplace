@@ -15,6 +15,7 @@ interface ProductImageUploadProps {
   categoryName?: string;
   description?: string;
   className?: string;
+  beforePick?: () => void | Promise<void>;
 }
 
 export function ProductImageUpload({
