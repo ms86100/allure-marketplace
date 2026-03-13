@@ -89,7 +89,7 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
     ? { height: `${viewportHeight}px`, top: window.visualViewport?.offsetTop ?? 0 }
     : { height: '100dvh' };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col animate-in slide-in-from-bottom duration-200"
       style={containerStyle}
