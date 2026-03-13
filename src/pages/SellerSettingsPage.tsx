@@ -40,7 +40,8 @@ function LicenseUploadSection({ sellerId, primaryGroup }: { sellerId: string; pr
 
 function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; sellerProfile: any }) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const hasCoords = !!(sellerProfile as any).latitude && !!(sellerProfile as any).longitude;
+  const [locationSaved, setLocationSaved] = useState(false);
+  const hasCoords = locationSaved || (!!(sellerProfile as any).latitude && !!(sellerProfile as any).longitude);
 
   return (
     <div className="bg-card rounded-xl p-4 shadow-sm">
@@ -68,7 +69,12 @@ function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; s
           </Button>
         </div>
       )}
-      <SetStoreLocationSheet open={sheetOpen} onOpenChange={setSheetOpen} sellerId={sellerId} />
+      <SetStoreLocationSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        sellerId={sellerId}
+        onSuccess={() => setLocationSaved(true)}
+      />
     </div>
   );
 }
