@@ -179,8 +179,8 @@ export async function findNearbyPlaceName(
               const location = place.geometry?.location;
               if (!name || !location || isGeneric(name) || isPlusCode(name)) continue;
 
-              const placeLat = typeof location.lat === 'function' ? location.lat() : location.lat;
-              const placeLng = typeof location.lng === 'function' ? location.lng() : location.lng;
+              const placeLat = Number(typeof (location as any).lat === 'function' ? (location as any).lat() : (location as any).lat);
+              const placeLng = Number(typeof (location as any).lng === 'function' ? (location as any).lng() : (location as any).lng);
               const dist = distanceMeters(lat, lng, placeLat, placeLng);
 
               // If the nearest establishment is still too far, don't override address labels.
