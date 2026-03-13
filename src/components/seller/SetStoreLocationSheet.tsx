@@ -14,9 +14,10 @@ interface SetStoreLocationSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sellerId: string;
+  onSuccess?: () => void;
 }
 
-export function SetStoreLocationSheet({ open, onOpenChange, sellerId }: SetStoreLocationSheetProps) {
+export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess }: SetStoreLocationSheetProps) {
   const [step, setStep] = useState<'pick' | 'confirm'>('pick');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
