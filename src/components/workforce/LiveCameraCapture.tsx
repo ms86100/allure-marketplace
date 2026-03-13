@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Camera, RotateCcw, Check } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
+import { toast } from 'sonner';
 
 interface LiveCameraCaptureProps {
   onCapture: (imageBlob: Blob) => void;
@@ -22,8 +23,12 @@ export function LiveCameraCapture({ onCapture, capturedPreview, onClear }: LiveC
       const { capturePhotoFromCamera } = await import('@/lib/native-media');
       const blob = await capturePhotoFromCamera();
       if (blob) onCapture(blob);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Native camera error:', err);
+      const msg = err?.message || '';
+      if (!msg.includes('cancel') && !msg.includes('Cancel')) {
+        toast.error(msg.includes('permission') || msg.includes('Permission') ? msg : 'Failed to capture photo. Please try again.');
+      }
     } finally {
       setIsCapturing(false);
     }

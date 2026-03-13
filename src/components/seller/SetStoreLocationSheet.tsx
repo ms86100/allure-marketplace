@@ -117,6 +117,7 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId }: SetStore
                   placeholder="Search your store location or area..."
                   value={searchInput}
                   onChange={(e) => handleSearchChange(e.target.value)}
+                  onFocus={(e) => setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)}
                   className="pl-9 h-12 rounded-xl"
                   inputMode="search"
                 />

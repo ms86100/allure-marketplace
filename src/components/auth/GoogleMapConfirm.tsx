@@ -101,8 +101,17 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
         <Button variant="outline" onClick={onBack} className="flex-1 h-12 rounded-xl">
           Back
         </Button>
-        <Button onClick={() => onConfirm(marker.lat, marker.lng, displayNameRef.current)} className="flex-1 h-12 rounded-xl font-semibold">
-          <Check size={16} className="mr-1" /> Confirm Location
+        <Button
+          onClick={() => onConfirm(marker.lat, marker.lng, displayNameRef.current)}
+          disabled={isGeocoding}
+          className="flex-1 h-12 rounded-xl font-semibold"
+        >
+          {isGeocoding ? (
+            <Loader2 size={16} className="mr-1 animate-spin" />
+          ) : (
+            <Check size={16} className="mr-1" />
+          )}
+          {isGeocoding ? 'Locating…' : 'Confirm Location'}
         </Button>
       </div>
     </div>
