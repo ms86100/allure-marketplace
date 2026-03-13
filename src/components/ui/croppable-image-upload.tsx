@@ -29,6 +29,7 @@ export function CroppableImageUpload({
   aspectRatio = 'square',
   placeholder = 'Upload Image',
   cropAspect,
+  beforePick,
 }: CroppableImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
