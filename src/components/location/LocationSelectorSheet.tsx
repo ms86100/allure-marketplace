@@ -35,6 +35,9 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
   const markerInstanceRef = useRef<google.maps.Marker | null>(null);
   const mapInitializedRef = useRef(false);
   const [relocating, setRelocating] = useState(false);
+  const geocodeRequestIdRef = useRef(0);
+  const ignoreIdleUntilRef = useRef(0);
+  const idleDebounceRef = useRef<number | null>(null);
 
   // Helper: reverse-geocode a position and return a label (uses Places API fallback for POI names)
   const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
