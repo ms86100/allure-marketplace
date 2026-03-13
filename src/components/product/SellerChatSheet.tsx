@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useSellerChat } from '@/hooks/useSellerChat';
 import { Send, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -20,40 +20,57 @@ interface SellerChatSheetProps {
 export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, productId, productName, sellerName }: SellerChatSheetProps) {
   const { messages, isLoading, getOrCreate, sendMessage, isSending } = useSellerChat(buyerId, sellerId, productId);
   const [text, setText] = useState('');
-  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [containerHeight, setContainerHeight] = useState('85dvh');
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (open) getOrCreate();
   }, [open, getOrCreate]);
 
+  // Dynamically adapt to keyboard open/close using visualViewport
   useEffect(() => {
-    if (!open) {
-      setViewportHeight(null);
-      return;
-    }
+    if (!open) return;
 
     const vv = window.visualViewport;
     if (!vv) return;
 
-    const handleViewport = () => {
-      setViewportHeight(Math.max(320, vv.height));
+    const update = () => {
+      // visualViewport.height = screen minus keyboard
+      // offsetTop handles any browser chrome offset
+      const h = vv.height;
+      setContainerHeight(`${Math.max(280, h)}px`);
     };
 
-    handleViewport();
-    vv.addEventListener('resize', handleViewport);
-    vv.addEventListener('scroll', handleViewport);
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
 
     return () => {
-      vv.removeEventListener('resize', handleViewport);
-      vv.removeEventListener('scroll', handleViewport);
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
     };
   }, [open]);
 
+  // Auto-scroll to bottom on new messages
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    });
+  }, []);
+
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages]);
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  // Auto-resize textarea
+  const handleTextChange = (value: string) => {
+    setText(value);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  };
 
   const handleSend = async () => {
     const trimmed = text.trim();
@@ -62,6 +79,10 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
     try {
       await sendMessage({ text: trimmed, senderId: buyerId });
       setText('');
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
     } catch (error) {
       console.error('Failed to send seller chat message:', error);
       toast.error('Could not send message. Please try again.');
@@ -71,10 +92,11 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent
-        className="h-[85vh]"
-        style={viewportHeight ? { height: `${viewportHeight}px`, maxHeight: `${viewportHeight}px` } : undefined}
+        style={{ height: containerHeight, maxHeight: containerHeight }}
+        className="flex flex-col overflow-hidden"
       >
-        <DrawerHeader className="pb-2">
+        {/* Header - fixed */}
+        <DrawerHeader className="pb-2 shrink-0">
           <DrawerTitle className="flex items-center gap-2 text-sm">
             <MessageCircle size={16} className="text-primary" />
             Chat with {sellerName}
@@ -82,6 +104,7 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
           <p className="text-xs text-muted-foreground">Re: {productName}</p>
         </DrawerHeader>
 
+        {/* Messages - scrollable */}
         <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-2">
           {isLoading && <p className="text-xs text-muted-foreground text-center py-8">Loading messages…</p>}
           {!isLoading && messages.length === 0 && (
@@ -104,22 +127,32 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
           })}
         </div>
 
-        <div className="p-4 border-t border-border flex gap-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
-          <Input
-            ref={inputRef}
+        {/* Input bar - pinned to bottom, above keyboard */}
+        <div className="shrink-0 border-t border-border p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] flex items-end gap-2 bg-background">
+          <Textarea
+            ref={textareaRef}
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => handleTextChange(e.target.value)}
             placeholder="Type a message…"
-            onFocus={() => setTimeout(() => inputRef.current?.scrollIntoView({ block: 'nearest' }), 120)}
+            rows={1}
+            className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl text-sm py-2.5"
+            onFocus={() => {
+              // Give keyboard time to appear, then scroll messages to bottom
+              setTimeout(scrollToBottom, 300);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 void handleSend();
               }
             }}
-            className="flex-1"
           />
-          <Button size="icon" onClick={() => void handleSend()} disabled={!text.trim() || isSending}>
+          <Button
+            size="icon"
+            className="shrink-0 h-10 w-10 rounded-xl"
+            onClick={() => void handleSend()}
+            disabled={!text.trim() || isSending}
+          >
             <Send size={16} />
           </Button>
         </div>
@@ -127,4 +160,3 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
     </Drawer>
   );
 }
-
