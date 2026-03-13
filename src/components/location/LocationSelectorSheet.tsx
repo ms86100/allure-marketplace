@@ -36,7 +36,7 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
   const mapInitializedRef = useRef(false);
   const [relocating, setRelocating] = useState(false);
 
-  // Helper: reverse-geocode a position and return a label
+  // Helper: reverse-geocode a position and return a label (uses Places API fallback for POI names)
   const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
     let label = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
     try {
@@ -46,11 +46,17 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
           resolve(status === 'OK' && res ? res : null);
         });
       });
-      if (results) {
-        const bestLabel = extractBestLabel(results);
-        const bestAddress = extractBestFormattedAddress(results);
-        label = bestLabel?.name || bestAddress || label;
+
+      let geocoderLabel = results ? extractBestLabel(results) : null;
+      const bestAddress = results ? extractBestFormattedAddress(results) : null;
+
+      // If geocoder only gave us a road/generic name, try Places API for a real POI name
+      if (isLowQualityLabel(geocoderLabel) && mapInstanceRef.current) {
+        const placesLabel = await findNearbyPlaceName(mapInstanceRef.current, lat, lng);
+        geocoderLabel = pickBetterLabel(geocoderLabel, placesLabel);
       }
+
+      label = geocoderLabel?.name || bestAddress || label;
     } catch { /* use coord fallback */ }
     return label;
   };
