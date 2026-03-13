@@ -193,8 +193,9 @@ export function AddressForm({ initial, onSave, onCancel, saving }: AddressFormPr
       {/* Label Chips */}
       <div>
         <Label className="text-xs text-muted-foreground uppercase tracking-wide">Address Label</Label>
-        <div className="flex gap-2 mt-1.5">
-          {LABEL_OPTIONS.map(({ value, icon: Icon }) => (
+        <div className="flex flex-wrap gap-2 mt-1.5">
+          {/* Fixed labels */}
+          {FIXED_LABELS.map(({ value, icon: Icon }) => (
             <button
               key={value}
               type="button"
@@ -209,6 +210,130 @@ export function AddressForm({ initial, onSave, onCancel, saving }: AddressFormPr
               {value}
             </button>
           ))}
+
+          {/* Custom labels */}
+          {customLabels.map((cl, idx) => (
+            <div key={`custom-${idx}`} className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => update('label', cl)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-l-xl text-xs font-medium border transition-all ${
+                  form.label === cl
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card border-border text-muted-foreground hover:border-primary/30'
+                }`}
+              >
+                <Tag size={14} />
+                {cl}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingCustomIndex(idx);
+                  setCustomInput(cl);
+                  setIsAddingCustom(true);
+                }}
+                className={`px-1.5 py-2 border-y text-xs transition-all ${
+                  form.label === cl
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card border-border text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Pencil size={10} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = customLabels.filter((_, i) => i !== idx);
+                  setCustomLabels(updated);
+                  if (form.label === cl) update('label', 'Home');
+                }}
+                className={`px-1.5 py-2 border-y border-r rounded-r-xl text-xs transition-all ${
+                  form.label === cl
+                    ? 'bg-primary text-primary-foreground border-primary hover:bg-destructive'
+                    : 'bg-card border-border text-muted-foreground hover:text-destructive'
+                }`}
+              >
+                <Trash2 size={10} />
+              </button>
+            </div>
+          ))}
+
+          {/* Add custom label button / input */}
+          {isAddingCustom ? (
+            <div className="flex items-center gap-1">
+              <Input
+                autoFocus
+                value={customInput}
+                onChange={e => setCustomInput(e.target.value)}
+                placeholder="e.g. Mom's House"
+                className="h-8 w-32 text-xs"
+                maxLength={20}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const trimmed = customInput.trim();
+                    if (!trimmed) return;
+                    if (editingCustomIndex !== null) {
+                      const updated = [...customLabels];
+                      updated[editingCustomIndex] = trimmed;
+                      setCustomLabels(updated);
+                      if (form.label === customLabels[editingCustomIndex]) update('label', trimmed);
+                    } else {
+                      setCustomLabels(prev => [...prev, trimmed]);
+                      update('label', trimmed);
+                    }
+                    setCustomInput('');
+                    setIsAddingCustom(false);
+                    setEditingCustomIndex(null);
+                  }
+                  if (e.key === 'Escape') {
+                    setCustomInput('');
+                    setIsAddingCustom(false);
+                    setEditingCustomIndex(null);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const trimmed = customInput.trim();
+                  if (!trimmed) { setIsAddingCustom(false); setEditingCustomIndex(null); return; }
+                  if (editingCustomIndex !== null) {
+                    const updated = [...customLabels];
+                    updated[editingCustomIndex] = trimmed;
+                    setCustomLabels(updated);
+                    if (form.label === customLabels[editingCustomIndex]) update('label', trimmed);
+                  } else {
+                    setCustomLabels(prev => [...prev, trimmed]);
+                    update('label', trimmed);
+                  }
+                  setCustomInput('');
+                  setIsAddingCustom(false);
+                  setEditingCustomIndex(null);
+                }}
+                className="h-8 w-8 flex items-center justify-center rounded-lg bg-primary text-primary-foreground text-xs"
+              >
+                ✓
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsAddingCustom(false); setCustomInput(''); setEditingCustomIndex(null); }}
+                className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground text-xs hover:text-foreground"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setIsAddingCustom(true); setEditingCustomIndex(null); setCustomInput(''); }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border border-dashed border-primary/30 text-primary hover:bg-primary/5 transition-all"
+            >
+              <Plus size={14} />
+              Other
+            </button>
+          )}
         </div>
       </div>
 
