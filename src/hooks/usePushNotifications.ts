@@ -816,6 +816,8 @@ export function usePushNotificationsInternal() {
   markFailedRef.current = markFailed;
   const reconcileRuntimeTokenRef = useRef(reconcileRuntimeToken);
   reconcileRuntimeTokenRef.current = reconcileRuntimeToken;
+  const saveApnsTokenImmediatelyRef = useRef(saveApnsTokenImmediately);
+  saveApnsTokenImmediatelyRef.current = saveApnsTokenImmediately;
 
   // ── Listeners + lifecycle ──
   // LIFECYCLE FIX: Depend ONLY on user?.id to prevent effect remounts
