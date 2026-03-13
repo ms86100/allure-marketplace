@@ -36,7 +36,14 @@ export function computeStoreStatus(
   // Treat 00:00 as end-of-day (1440) so "09:00–00:00" means open until midnight
   const endMinutes = rawEndMinutes === 0 ? 1440 : rawEndMinutes;
 
-  if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+  // Handle overnight hours (e.g. 20:00–02:00)
+  const isOvernight = endMinutes <= startMinutes;
+
+  const isOpen = isOvernight
+    ? (currentMinutes >= startMinutes || currentMinutes < endMinutes)
+    : (currentMinutes >= startMinutes && currentMinutes < endMinutes);
+
+  if (isOpen) {
     return { status: 'open', nextOpenAt: null, minutesUntilOpen: 0 };
   }
 

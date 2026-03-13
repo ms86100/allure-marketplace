@@ -39,7 +39,7 @@ export function FavoriteButton({
         .select('id')
         .eq('user_id', user.id)
         .eq('seller_id', sellerId)
-        .single();
+        .maybeSingle();
       setIsFavorite(!!data);
     } catch (error) {
       // Not found is expected

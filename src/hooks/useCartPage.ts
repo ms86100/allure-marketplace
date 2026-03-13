@@ -197,7 +197,7 @@ export function useCartPage() {
     try {
       const orderIds = await createOrdersForAllSellers('pending');
       if (orderIds.length === 0) throw new Error('Failed to create orders');
-      await refresh(); hapticNotification('success');
+      clearCart(); await refresh(); hapticNotification('success');
       requestFullPermission().catch(() => {});
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (orderIds.length === 1) { toast.success('Order placed successfully!'); navigate(`/orders/${orderIds[0]}`); }
