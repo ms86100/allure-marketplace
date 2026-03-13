@@ -26,11 +26,25 @@ export function useDeliveryAddresses() {
 
   const saveMutation = useMutation({
     mutationFn: async (addr: any) => {
-      const payload = { ...addr, user_id: user!.id };
-      delete payload.id;
+      const payload: Record<string, any> = {
+        user_id: user!.id,
+        label: addr.label,
+        flat_number: addr.flat_number,
+        block: addr.block ?? null,
+        floor: addr.floor ?? null,
+        building_name: addr.building_name ?? null,
+        landmark: addr.landmark ?? null,
+        phase: addr.phase ?? null,
+        pincode: addr.pincode ?? null,
+        full_address: addr.full_address ?? null,
+        latitude: addr.latitude ?? null,
+        longitude: addr.longitude ?? null,
+        is_default: addr.is_default ?? false,
+        society_id: addr.society_id ?? null,
+      };
 
-      // If setting as default, unset others
-      if (addr.is_default) {
+      // If setting as default, unset others first
+      if (payload.is_default) {
         await supabase.from('delivery_addresses').update({ is_default: false }).eq('user_id', user!.id);
       }
 
