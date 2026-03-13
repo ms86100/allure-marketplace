@@ -290,7 +290,7 @@ export function UpiDeepLinkCheckout({
                   <RefreshCw size={16} />
                   Pay again
                 </Button>
-                <Button variant="ghost" className="w-full text-muted-foreground" onClick={handleClose}>
+                <Button variant="ghost" className="w-full text-muted-foreground" onClick={handleCancelOrder}>
                   Cancel order
                 </Button>
               </div>
