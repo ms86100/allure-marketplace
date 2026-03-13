@@ -957,8 +957,7 @@ export function usePushNotificationsInternal() {
       })();
     }
 
-    // ── Boot-complete gate: prevents app_resume from racing the main IIFE ──
-    let bootComplete = false;
+    // (bootComplete declared above, before the main IIFE)
 
     // ── App resume: re-check permission and retry if now granted ──
     let appListenerCleanup: (() => void) | undefined;
