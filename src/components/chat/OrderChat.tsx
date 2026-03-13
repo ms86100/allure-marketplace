@@ -18,41 +18,56 @@ interface OrderChatProps {
   disabled?: boolean;
 }
 
-export function OrderChat({ 
-  orderId, 
-  otherUserId, 
-  otherUserName, 
-  isOpen, 
+export function OrderChat({
+  orderId,
+  otherUserId,
+  otherUserName,
+  isOpen,
   onClose,
-  disabled = false 
+  disabled = false,
 }: OrderChatProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [viewportTop, setViewportTop] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Track visual viewport for keyboard-aware layout
+  // Track visual viewport for keyboard-aware layout (mobile web + native webview)
   useEffect(() => {
     if (!isOpen) return;
-    const vv = window.visualViewport;
-    if (!vv) return;
 
-    const handleResize = () => {
-      setViewportHeight(vv.height);
+    const updateViewport = () => {
+      const vv = window.visualViewport;
+      if (vv) {
+        setViewportHeight(vv.height);
+        setViewportTop(vv.offsetTop);
+        return;
+      }
+      setViewportHeight(window.innerHeight);
+      setViewportTop(0);
     };
-    handleResize();
-    vv.addEventListener('resize', handleResize);
-    return () => vv.removeEventListener('resize', handleResize);
+
+    updateViewport();
+    const vv = window.visualViewport;
+    window.addEventListener('resize', updateViewport);
+    vv?.addEventListener('resize', updateViewport);
+    vv?.addEventListener('scroll', updateViewport);
+
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('scroll', updateViewport);
+    };
   }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && orderId) {
       fetchMessages();
       markMessagesAsRead();
-      
+
       const channel = supabase
         .channel(`chat-${orderId}`)
         .on(
@@ -69,7 +84,7 @@ export function OrderChat({
             if (newMsg.receiver_id === user?.id) {
               markMessagesAsRead();
             }
-          }
+          },
         )
         .subscribe();
 
@@ -105,7 +120,7 @@ export function OrderChat({
 
   const markMessagesAsRead = async () => {
     if (!user) return;
-    
+
     await supabase
       .from('chat_messages')
       .update({ read_status: true })
@@ -150,16 +165,13 @@ export function OrderChat({
   if (!isOpen) return null;
 
   const containerStyle: React.CSSProperties = {
-    height: viewportHeight ? `${viewportHeight}px` : '100dvh',
-    top: viewportHeight ? (window.visualViewport?.offsetTop ?? 0) : 0,
+    height: `${viewportHeight ?? window.innerHeight}px`,
+    top: viewportTop,
     pointerEvents: 'auto' as const,
   };
 
   return createPortal(
-    <div
-      className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col overflow-hidden"
-      style={containerStyle}
-    >
+    <div className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col overflow-hidden" style={containerStyle}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
         <div className="flex items-center gap-3 min-w-0">
@@ -189,39 +201,24 @@ export function OrderChat({
             {messages.map((msg) => {
               const isMine = msg.sender_id === user?.id;
               return (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    'flex',
-                    isMine ? 'justify-end' : 'justify-start'
-                  )}
-                >
+                <div key={msg.id} className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
                   <div
                     className={cn(
                       'max-w-[80%] rounded-2xl px-4 py-2',
-                      isMine
-                        ? 'bg-primary text-primary-foreground rounded-br-sm'
-                        : 'bg-muted rounded-bl-sm'
+                      isMine ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted rounded-bl-sm',
                     )}
                   >
                     <p className="text-sm">{msg.message_text}</p>
-                    <div className={cn(
-                      'flex items-center gap-1 mt-1',
-                      isMine ? 'justify-end' : 'justify-start'
-                    )}>
-                      <span className={cn(
-                        'text-[10px]',
-                        isMine ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                      )}>
+                    <div className={cn('flex items-center gap-1 mt-1', isMine ? 'justify-end' : 'justify-start')}>
+                      <span className={cn('text-[10px]', isMine ? 'text-primary-foreground/70' : 'text-muted-foreground')}>
                         {format(new Date(msg.created_at), 'h:mm a')}
                       </span>
-                      {isMine && (
-                        msg.read_status ? (
+                      {isMine &&
+                        (msg.read_status ? (
                           <CheckCheck size={12} className="text-primary-foreground/70" />
                         ) : (
                           <Check size={12} className="text-primary-foreground/70" />
-                        )
-                      )}
+                        ))}
                     </div>
                   </div>
                 </div>
@@ -232,11 +229,9 @@ export function OrderChat({
       </div>
 
       {/* Input — pinned above keyboard */}
-      <div className="p-3 border-t bg-card shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="px-3 pt-3 border-t bg-card shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] relative z-10">
         {disabled ? (
-          <p className="text-center text-sm text-muted-foreground">
-            Chat is disabled for completed orders
-          </p>
+          <p className="text-center text-sm text-muted-foreground">Chat is disabled for completed orders</p>
         ) : (
           <div className="flex items-end gap-2">
             <Textarea
@@ -251,23 +246,18 @@ export function OrderChat({
                 }
               }}
               onFocus={() => {
-                setTimeout(scrollToBottom, 300);
+                setTimeout(scrollToBottom, 200);
               }}
               rows={1}
-              className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl text-sm py-2.5"
+              className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl text-base md:text-sm py-2.5"
             />
-            <Button
-              size="icon"
-              className="shrink-0 h-10 w-10 rounded-xl"
-              onClick={sendMessage}
-              disabled={!newMessage.trim() || isSending}
-            >
+            <Button size="icon" className="shrink-0 h-10 w-10 rounded-xl" onClick={sendMessage} disabled={!newMessage.trim() || isSending}>
               <Send size={16} />
             </Button>
           </div>
         )}
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

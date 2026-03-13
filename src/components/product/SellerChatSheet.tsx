@@ -21,6 +21,7 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
   const { messages, isLoading, getOrCreate, sendMessage, isSending } = useSellerChat(buyerId, sellerId, productId);
   const [text, setText] = useState('');
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [viewportTop, setViewportTop] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -28,22 +29,31 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
     if (open) getOrCreate();
   }, [open, getOrCreate]);
 
-  // Track visual viewport for keyboard-aware layout
+  // Track visual viewport for keyboard-aware layout (mobile web + native webview)
   useEffect(() => {
     if (!open) return;
-    const vv = window.visualViewport;
-    if (!vv) return;
 
-    const update = () => {
-      setViewportHeight(vv.height);
+    const updateViewport = () => {
+      const vv = window.visualViewport;
+      if (vv) {
+        setViewportHeight(vv.height);
+        setViewportTop(vv.offsetTop);
+        return;
+      }
+      setViewportHeight(window.innerHeight);
+      setViewportTop(0);
     };
-    update();
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
+
+    updateViewport();
+    const vv = window.visualViewport;
+    window.addEventListener('resize', updateViewport);
+    vv?.addEventListener('resize', updateViewport);
+    vv?.addEventListener('scroll', updateViewport);
 
     return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
+      window.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('scroll', updateViewport);
     };
   }, [open]);
 
@@ -86,14 +96,14 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
   if (!open) return null;
 
   const containerStyle: React.CSSProperties = {
-    height: viewportHeight ? `${viewportHeight}px` : '100dvh',
-    top: viewportHeight ? (window.visualViewport?.offsetTop ?? 0) : 0,
+    height: `${viewportHeight ?? window.innerHeight}px`,
+    top: viewportTop,
     pointerEvents: 'auto' as const,
   };
 
   return createPortal(
     <div
-      className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col animate-in slide-in-from-bottom duration-200 overflow-hidden"
+      className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col overflow-hidden"
       style={containerStyle}
     >
       {/* Header */}
@@ -126,12 +136,12 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
           const isMine = m.sender_id === buyerId;
           return (
             <div key={m.id} className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
-              <div className={cn(
-                'max-w-[75%] px-3 py-2 rounded-2xl text-sm',
-                isMine
-                  ? 'bg-primary text-primary-foreground rounded-br-md'
-                  : 'bg-muted text-foreground rounded-bl-md'
-              )}>
+              <div
+                className={cn(
+                  'max-w-[75%] px-3 py-2 rounded-2xl text-sm',
+                  isMine ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-muted text-foreground rounded-bl-md',
+                )}
+              >
                 {m.message_text}
               </div>
             </div>
@@ -140,16 +150,16 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
       </div>
 
       {/* Input bar — pinned above keyboard */}
-      <div className="shrink-0 border-t border-border p-3 flex items-end gap-2 bg-card pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="shrink-0 border-t border-border px-3 pt-3 flex items-end gap-2 bg-card pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] relative z-10">
         <Textarea
           ref={textareaRef}
           value={text}
           onChange={(e) => handleTextChange(e.target.value)}
           placeholder="Type a message…"
           rows={1}
-          className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl text-sm py-2.5"
+          className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl text-base md:text-sm py-2.5"
           onFocus={() => {
-            setTimeout(scrollToBottom, 300);
+            setTimeout(scrollToBottom, 200);
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -168,6 +178,6 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
         </Button>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }
