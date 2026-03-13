@@ -73,6 +73,29 @@ export default function SellerSettingsPage() {
         </div>
 
         <div className="space-y-5">
+          {/* Rejection / Pending status banner */}
+          {sellerProfile.verification_status !== 'approved' && (
+            <Card className={sellerProfile.verification_status === 'rejected' ? 'border-destructive/30 bg-destructive/5' : 'border-warning/30 bg-warning/5'}>
+              <CardContent className="p-4">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle size={18} className={sellerProfile.verification_status === 'rejected' ? 'text-destructive' : 'text-warning'} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">
+                      {sellerProfile.verification_status === 'rejected' ? 'Store Rejected' : 'Store Pending Review'}
+                    </p>
+                    {(sellerProfile as any).rejection_note && (
+                      <p className="text-xs text-muted-foreground mt-1">Reason: {(sellerProfile as any).rejection_note}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {sellerProfile.verification_status === 'rejected'
+                        ? 'You can update your details below and resubmit from the onboarding page.'
+                        : 'Your store is being reviewed. You can still update settings below.'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           {/* Pause/Resume */}
           <Card className={formData.is_available ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'}>
             <CardContent className="p-4">

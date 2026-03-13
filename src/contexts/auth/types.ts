@@ -12,6 +12,7 @@ export interface AuthContextType {
   isLoading: boolean;
   isApproved: boolean;
   isSeller: boolean;
+  hasSellerProfile: boolean;
   isAdmin: boolean;
   isSocietyAdmin: boolean;
   isBuilderMember: boolean;

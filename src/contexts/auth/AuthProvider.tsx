@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     effectiveSocietyId, effectiveSociety,
   }), [
     user, session, profile, society, roles, sellerProfiles,
-    currentSellerId, isLoading, isApproved, isSeller, isAdmin,
+    currentSellerId, isLoading, isApproved, isSeller, hasSellerProfile, isAdmin,
     isSocietyAdmin, isBuilderMember, isSecurityOfficer, isWorker,
     societyAdminRole, managedBuilderIds,
     signOut, refreshProfile, setCurrentSellerId,
