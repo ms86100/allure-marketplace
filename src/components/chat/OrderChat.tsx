@@ -232,7 +232,7 @@ export function OrderChat({
       </div>
 
       {/* Input — pinned above keyboard */}
-      <div className="p-3 border-t bg-card shrink-0 safe-bottom">
+      <div className="p-3 border-t bg-card shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {disabled ? (
           <p className="text-center text-sm text-muted-foreground">
             Chat is disabled for completed orders
