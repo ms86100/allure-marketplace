@@ -59,7 +59,7 @@ export function useOrderDetail(id: string | undefined) {
   const currentStatusIndex = order ? statusOrder.indexOf(order.status) : -1;
 
   const getNextStatus = (): OrderStatus | null => {
-    if (!order || order.status === 'cancelled' || order.status === 'completed') return null;
+    if (!order || order.status === 'cancelled' || order.status === 'completed' || order.status === 'delivered') return null;
     if (flow.length > 0) { const next = getNextStatusForActor(flow, order.status, 'seller'); return next as OrderStatus | null; }
     const legacyOrder: OrderStatus[] = isEnquiryOrder ? ['enquired', 'accepted', 'preparing', 'ready', 'completed'] : ['placed', 'accepted', 'preparing', 'ready', 'picked_up', 'delivered', 'completed'];
     if (!isEnquiryOrder && orderFulfillmentType === 'delivery' && order.status === 'ready') return null;
