@@ -81,12 +81,29 @@ export function UpiDeepLinkCheckout({
 
   const upiLink = `upi://pay?pa=${encodeURIComponent(sellerUpiId)}&pn=${encodeURIComponent(sellerName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(transactionNote)}`;
 
+  // Track whether this is the first open vs a restored open
+  const isRestoredRef = useRef(false);
   useEffect(() => {
     if (isOpen) {
-      setStep('pay');
-      setUtrValue('');
-      hasOpenedApp.current = false;
-      completionTriggeredRef.current = false;
+      // If we have a persisted step from a prior app-switch, DON'T reset
+      const savedStep = (() => { try { return sessionStorage.getItem(UPI_STEP_KEY); } catch { return null; } })();
+      const savedOpened = (() => { try { return sessionStorage.getItem(UPI_OPENED_APP_KEY) === 'true'; } catch { return false; } })();
+      
+      if (savedOpened && savedStep && ['confirm', 'utr'].includes(savedStep)) {
+        // Restoring from app-switch — keep persisted state
+        isRestoredRef.current = true;
+        hasOpenedApp.current = true;
+        setStep(savedStep as CheckoutStep);
+      } else if (!isRestoredRef.current) {
+        // Fresh open — reset everything
+        setStep('pay');
+        setUtrValue('');
+        hasOpenedApp.current = false;
+        try { sessionStorage.removeItem(UPI_OPENED_APP_KEY); } catch {}
+        completionTriggeredRef.current = false;
+      }
+    } else {
+      isRestoredRef.current = false;
     }
   }, [isOpen]);
 
