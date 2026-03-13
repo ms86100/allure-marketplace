@@ -62,7 +62,18 @@ export function useSellerApplication() {
   const [existingSeller, setExistingSeller] = useState<{ id: string; business_name: string; verification_status?: string; rejection_note?: string | null } | null>(null);
   const [rejectionFeedback, setRejectionFeedback] = useState<string | null>(null);
   const [draftSellerId, setDraftSellerId] = useState<string | null>(null);
-  const [step, setStep] = useState(1);
+  const [step, _setStep] = useState(1);
+
+  // Wrap setStep to persist to localStorage
+  const setStep = useCallback((s: number | ((prev: number) => number)) => {
+    _setStep(prev => {
+      const next = typeof s === 'function' ? s(prev) : s;
+      if (next >= 3) {
+        localStorage.setItem('seller_onboarding_step', String(next));
+      }
+      return next;
+    });
+  }, []);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [formData, setFormData] = useState<SellerFormData>(INITIAL_FORM);
   const [draftProducts, setDraftProducts] = useState<any[]>([]);
