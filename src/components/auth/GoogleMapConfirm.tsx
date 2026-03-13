@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MapPin, Check, Loader2 } from 'lucide-react';
 
+const PLUS_CODE_REGEX = /^[23456789CFGHJMPQRVWX]+\+/;
+
 interface GoogleMapConfirmProps {
   latitude: number;
   longitude: number;
@@ -11,13 +13,37 @@ interface GoogleMapConfirmProps {
   onBack: () => void;
 }
 
+/**
+ * Given an array of geocoder results, find the best human-readable name,
+ * skipping any result whose formatted_address starts with a Plus Code.
+ */
+function extractBestName(results: google.maps.GeocoderResult[]): string | null {
+  for (const result of results) {
+    // Skip plus-code results
+    if (PLUS_CODE_REGEX.test(result.formatted_address)) continue;
+    // Skip results that only have plus_code type
+    if (result.types.includes('plus_code' as any)) continue;
+
+    const components = result.address_components || [];
+    const get = (type: string) => components.find(c => c.types.includes(type))?.long_name;
+
+    const name = get('premise') || get('point_of_interest') || get('establishment')
+      || get('neighborhood') || get('sublocality_level_1') || get('route');
+    if (name) return name;
+
+    // If we have a non-plus-code formatted_address, use its first segment
+    const firstSegment = result.formatted_address.split(',')[0]?.trim();
+    if (firstSegment && !PLUS_CODE_REGEX.test(firstSegment)) return firstSegment;
+  }
+  return null;
+}
+
 export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack }: GoogleMapConfirmProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [marker, setMarker] = useState<{ lat: number; lng: number }>({ lat: latitude, lng: longitude });
   const [displayName, setDisplayName] = useState(name);
   const [isGeocoding, setIsGeocoding] = useState(false);
 
-  // Keep a ref for the latest geocoded name so the confirm button always uses it
   const displayNameRef = useRef(name);
   useEffect(() => { displayNameRef.current = displayName; }, [displayName]);
 
@@ -30,6 +56,7 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
     const map = new google.maps.Map(mapRef.current, {
       center: { lat: latitude, lng: longitude },
       zoom: 16,
+      maxZoom: 21,
       disableDefaultUI: true,
       zoomControl: true,
       gestureHandling: 'greedy',
@@ -48,7 +75,6 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
 
     const geocoder = new google.maps.Geocoder();
 
-    // Places API fallback for reverse geocoding
     const reverseGeocodeViaPlaces = (lat: number, lng: number): Promise<string | null> => {
       return new Promise((resolve) => {
         try {
@@ -59,47 +85,42 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
               if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]) {
                 resolve(results[0].name || results[0].vicinity || null);
               } else {
-                console.warn('GoogleMapConfirm: Places nearbySearch fallback status:', status);
                 resolve(null);
               }
             }
           );
-        } catch (err) {
-          console.warn('GoogleMapConfirm: Places fallback error:', err);
+        } catch {
           resolve(null);
         }
       });
     };
 
-    // Also reverse-geocode the initial position so the displayed address is always accurate
     const reverseGeocode = (lat: number, lng: number) => {
       setIsGeocoding(true);
       geocoder.geocode({ location: { lat, lng } }, async (results, status) => {
-        if (status === 'OK' && results && results[0]) {
-          const result = results[0];
-          const premise = result.address_components?.find(c => c.types.includes('premise'))?.long_name;
-          const sublocality = result.address_components?.find(c => c.types.includes('sublocality_level_1'))?.long_name;
-          const neighborhood = result.address_components?.find(c => c.types.includes('neighborhood'))?.long_name;
-          const route = result.address_components?.find(c => c.types.includes('route'))?.long_name;
-          const updatedName = premise || neighborhood || sublocality || route || result.formatted_address.split(',')[0];
-          setDisplayName(updatedName);
-          setIsGeocoding(false);
-        } else {
-          console.warn('GoogleMapConfirm: Geocoder failed with status:', status, '— trying Places API fallback');
-          // Fallback to Places API nearbySearch
-          const placeName = await reverseGeocodeViaPlaces(lat, lng);
-          if (placeName) {
-            setDisplayName(placeName);
-          } else {
-            console.warn('GoogleMapConfirm: Both Geocoder and Places fallback failed. Showing coordinates.');
-            setDisplayName(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+        if (status === 'OK' && results && results.length > 0) {
+          const bestName = extractBestName(results);
+          if (bestName) {
+            setDisplayName(bestName);
+            setIsGeocoding(false);
+            return;
           }
-          setIsGeocoding(false);
+          // All results were plus codes — try Places fallback
+          console.warn('GoogleMapConfirm: All geocoder results are Plus Codes, trying Places fallback');
+        } else {
+          console.warn('GoogleMapConfirm: Geocoder failed with status:', status);
         }
+
+        const placeName = await reverseGeocodeViaPlaces(lat, lng);
+        if (placeName) {
+          setDisplayName(placeName);
+        } else {
+          setDisplayName(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+        }
+        setIsGeocoding(false);
       });
     };
 
-    // Reverse geocode initial position for accuracy
     reverseGeocode(latitude, longitude);
 
     pin.addListener('dragend', () => {
