@@ -1,32 +1,71 @@
 
 
-## Brutal Honest Assessment
+# Notification System — Comprehensive Audit & Plan
 
-The code has a **fatal caching bug** on line 29 of `useGoogleMaps.ts`:
+## Root Cause Fix (Implemented)
 
-```
-if (loadPromise) return loadPromise;
-```
+Admin users were not notified when a new store or product was submitted for review. Fixed by:
 
-Once the script loads with ANY key (including the old broken one), `loadPromise` is set and **never cleared**. Every subsequent call returns the cached promise — the DB is never queried again, the script is never reloaded. The "fix" on line 45 that sets `loadPromise = null` is **inside** the promise that line 29 already short-circuits past. It's dead code.
+1. **`notifyAdminsNewStoreApplication()`** in `src/lib/admin-notifications.ts` — queries `user_roles` for admins, enqueues push+in-app notification via `notification_queue`
+2. **`handleSubmit` in `useSellerApplication.ts`** — calls the above after successful submission
+3. **DB trigger `trg_enqueue_product_review_notification`** on `products` table — fires when `approval_status` changes to `'pending'`, notifies all admins
 
-The previous "fixes" added Plus Code filtering and Places fallback, which are fine defensive measures, but they were treating symptoms. The root cause was always: **wrong API key loaded, and caching prevents the correct one from ever being used.**
+---
 
-## Plan
+## Current State (As-Is): All Notification Flows
 
-### 1. Update API key in database
-Update the `admin_settings` row with your new key: `AIzaSyAGqPf40RaQ16EW8HQKASZLtrfGUH8rmSg`
+### A. Database Triggers
 
-### 2. Update hardcoded fallback (`useGoogleMaps.ts`)
-Change the `HARDCODED_FALLBACK_KEY` on line 5 to use this same key, so even if the DB query fails, the correct key is used.
+| Trigger | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `enqueue_order_status_notification` | Order status changes | Buyer + Seller | ✅ | ✅ |
+| `enqueue_review_notification` | New review created | Seller | ✅ | ✅ |
+| `enqueue_dispute_status_notification` | Dispute status changes | Submitter | ✅ | ✅ |
+| `enqueue_settlement_notification` | Settlement created | Seller | ✅ | ✅ |
+| `trg_enqueue_product_review_notification` | Product submitted for review | Admins | ✅ | ✅ |
 
-### 3. Fix the caching bug (`useGoogleMaps.ts`)
-Restructure `loadGoogleMapsScript()` to:
-- Always fetch the API key from DB first (not cached)
-- Only skip reloading if the **currently loaded script** already uses the correct key
-- Remove the broken `loadPromise` guard that prevents key updates from taking effect
+### B. Edge Functions
 
-### Files Changed
-- `src/hooks/useGoogleMaps.ts` — Fix caching, update fallback key
-- Database `admin_settings` — Update key value
+| Function | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `send-booking-reminders` | 1h before appointment | Buyer + Seller | ✅ | ✅ |
+| `process-notification-queue` | Queue processor | N/A | ✅ | ✅ |
+| `send-campaign` | Admin broadcast | Targeted users | ✅ | ✅ |
+| `generate-weekly-digest` | Weekly digest | Society members | ✅ | ✅ |
+| `generate-society-report` | Monthly report | Society members | ✅ | ✅ |
+| `detect-collective-issues` | Pattern detection | Society admins | ✅ | ✅ |
 
+### C. Client-Side (inserts to `notification_queue`)
+
+| Location | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `admin-notifications.ts` → `notifySellerStatusChange` | Admin approves/rejects seller | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyLicenseStatusChange` | Admin approves/rejects license | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyProductStatusChange` | Admin approves/rejects product | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyAdminsNewStoreApplication` | Seller submits store | Admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyAdmins` | Dispute/snag | Society admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyMembers` | Bulletin posts | Society members | ✅ | ✅ |
+| `ServiceBookingFlow.tsx` | New booking | Seller | ✅ | ❌ |
+| `BuyerCancelBooking.tsx` | Buyer cancels | Seller | ✅ | ❌ |
+| `SellerPaymentConfirmation.tsx` | Payment confirmed | Buyer | ✅ | ❌ |
+| `UpiDeepLinkCheckout.tsx` | UPI payment | Seller | ✅ | ❌ |
+| `useSellerChat.ts` | New chat (60s throttle) | Recipient | ✅ | ❌ |
+| `GuardManualEntryTab.tsx` | Gate entry | Resident | ✅ | ❌ |
+| `manage-delivery` edge fn | Delivery OTP/arrival | Buyer | ✅ | ✅ |
+| `update-delivery-location` edge fn | Delivery delay | Buyer | ✅ | ✅ |
+
+---
+
+## Future Gaps (To-Be)
+
+### Priority 2 — Operational
+- New user pending approval → Society admins
+- New society request → Platform admins
+- Report filed → Admins
+- Delivery partner assigned → Seller
+
+### Priority 3 — Engagement
+- New product from favorite seller → Buyer
+- Seller back online → Recent buyers
+- Price drop on wishlisted item → Buyer
+- Order review reminder (24h after delivery) → Buyer
