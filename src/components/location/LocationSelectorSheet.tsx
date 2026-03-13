@@ -233,26 +233,11 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
                     const pos = await getCurrentPosition();
                     const newPos = { lat: pos.latitude, lng: pos.longitude };
 
-                    // Move map and marker
                     mapInstanceRef.current?.panTo(newPos);
+                    mapInstanceRef.current?.setZoom(17);
                     markerInstanceRef.current?.setPosition(newPos);
 
-                    // Reverse geocode
-                    let label = `${newPos.lat.toFixed(4)}, ${newPos.lng.toFixed(4)}`;
-                    try {
-                      const geocoder = new google.maps.Geocoder();
-                      const results = await new Promise<google.maps.GeocoderResult[] | null>((resolve) => {
-                        geocoder.geocode({ location: newPos }, (res, status) => {
-                          resolve(status === 'OK' && res ? res : null);
-                        });
-                      });
-                      if (results) {
-                        const bestLabel = extractBestLabel(results);
-                        const bestAddress = extractBestFormattedAddress(results);
-                        label = bestLabel?.name || bestAddress || label;
-                      }
-                    } catch {}
-
+                    const label = await reverseGeocode(newPos.lat, newPos.lng);
                     setDetectedLocation({ ...newPos, label });
                   } catch {
                     toast.error('Could not get your location');
