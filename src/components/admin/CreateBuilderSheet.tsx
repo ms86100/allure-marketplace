@@ -59,7 +59,7 @@ export function CreateBuilderSheet({ onCreated }: CreateBuilderSheetProps) {
     }
   };
 
-  const handleMapConfirm = (lat: number, lng: number, updatedName?: string) => {
+  const handleMapConfirm = (lat: number, lng: number, updatedName?: string, _formattedAddress?: string) => {
     setForm(prev => ({ ...prev, latitude: lat, longitude: lng }));
     if (updatedName) setLocationName(updatedName);
     setStep('form');

@@ -127,10 +127,11 @@ export function AddressForm({ initial, onSave, onCancel, saving }: AddressFormPr
         geocoder.geocode({ location: { lat: pos.latitude, lng: pos.longitude } }, (results, status) => {
           if (status === 'OK' && results && results.length > 0) {
             const bestLabel = extractBestLabel(results);
+            const bestAddress = extractBestFormattedAddress(results);
             const pincode = results[0].address_components?.find(c => c.types.includes('postal_code'))?.long_name || '';
             setForm(f => ({
               ...f,
-              full_address: bestLabel?.formattedAddress || results[0].formatted_address,
+              full_address: bestAddress || bestLabel?.formattedAddress || results[0].formatted_address,
               pincode: pincode || f.pincode,
             }));
           }
