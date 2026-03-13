@@ -120,65 +120,7 @@ export default function AuthPage() {
 
               {/* Step 2: OTP Verification */}
               {auth.step === 'otp' && (
-                <motion.div key="otp" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5"
-                  ref={(el) => { if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300); }}
-                >
-                  <div className="text-center space-y-1">
-                    <p className="text-sm text-muted-foreground">OTP sent to</p>
-                    <p className="text-base font-semibold text-foreground">{auth.settings.defaultCountryCode} {auth.phone}</p>
-                  </div>
-
-                  <div className="flex justify-center" style={{ scrollMarginBottom: '200px' }}>
-                    <InputOTP
-                      maxLength={4}
-                      value={auth.otp}
-                      onChange={(value) => auth.setOtp(value)}
-                      autoFocus
-                    >
-                      <InputOTPGroup className="gap-3">
-                        <InputOTPSlot index={0} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
-                        <InputOTPSlot index={1} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
-                        <InputOTPSlot index={2} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
-                        <InputOTPSlot index={3} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
-
-                  <Button
-                    onClick={auth.handleVerifyOtp}
-                    disabled={auth.otp.length < 4 || auth.isLoading}
-                    className="w-full h-12 rounded-xl text-base font-semibold"
-                  >
-                    {auth.isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <CheckCircle2 className="mr-2" size={18} />}
-                    Verify & Continue
-                  </Button>
-
-                  <div className="flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => { auth.setStep('phone'); auth.setOtp(''); }}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
-                    >
-                      <ArrowLeft size={12} /> Change number
-                    </button>
-                    <div>
-                      {auth.resendCooldown > 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                          Resend in <span className="font-semibold text-primary">{auth.resendCooldown}s</span>
-                        </p>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => auth.handleSendOtp(true)}
-                          disabled={auth.isLoading}
-                          className="text-xs text-primary font-medium hover:underline inline-flex items-center gap-1"
-                        >
-                          <RefreshCw size={12} /> Resend OTP
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
+                <OtpStep auth={auth} />
               )}
 
               {/* Step 3: Society Selection (new users) */}
