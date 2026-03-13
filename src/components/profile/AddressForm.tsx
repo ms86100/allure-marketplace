@@ -6,7 +6,7 @@ import { MapPin, Navigation, Loader2, Home, Briefcase, Tag, Search, X } from 'lu
 import { getCurrentPosition } from '@/lib/native-location';
 import { GoogleMapConfirm } from '@/components/auth/GoogleMapConfirm';
 import { useAutocomplete } from '@/hooks/useGoogleMaps';
-import { extractBestLabel } from '@/lib/location-label-resolver';
+import { extractBestLabel, extractBestFormattedAddress } from '@/lib/location-label-resolver';
 import { toast } from 'sonner';
 
 interface AddressData {
