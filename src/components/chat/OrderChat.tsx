@@ -149,14 +149,16 @@ export function OrderChat({
 
   if (!isOpen) return null;
 
-  const containerStyle: React.CSSProperties = viewportHeight
-    ? { height: `${viewportHeight}px`, top: window.visualViewport?.offsetTop ?? 0 }
-    : { height: '100dvh' };
+  const containerStyle: React.CSSProperties = {
+    height: viewportHeight ? `${viewportHeight}px` : '100dvh',
+    top: viewportHeight ? (window.visualViewport?.offsetTop ?? 0) : 0,
+    pointerEvents: 'auto' as const,
+  };
 
   return createPortal(
     <div
-      className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col"
-      style={{ ...containerStyle, pointerEvents: 'auto' }}
+      className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col overflow-hidden"
+      style={containerStyle}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
