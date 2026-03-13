@@ -39,9 +39,11 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
   const ignoreIdleUntilRef = useRef(0);
   const idleDebounceRef = useRef<number | null>(null);
 
-  // Helper: reverse-geocode a position and return a label (uses Places API fallback for POI names)
-  const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
-    let label = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  // Helper: reverse-geocode a position and return a label (uses Places fallback when geocoder is not POI-precise)
+  const reverseGeocode = useCallback(async (lat: number, lng: number, preserveInitial = false): Promise<string> => {
+    const requestId = ++geocodeRequestIdRef.current;
+    let bestLabel = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
     try {
       const geocoder = new google.maps.Geocoder();
       const results = await new Promise<google.maps.GeocoderResult[] | null>((resolve) => {
@@ -53,16 +55,29 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
       let geocoderLabel = results ? extractBestLabel(results) : null;
       const bestAddress = results ? extractBestFormattedAddress(results) : null;
 
-      // If geocoder only gave us a road/generic name, try Places API for a real POI name
-      if (isLowQualityLabel(geocoderLabel) && mapInstanceRef.current) {
-        const placesLabel = await findNearbyPlaceName(mapInstanceRef.current, lat, lng);
+      // Try Places fallback for neighborhood/route-level labels and for manual pin moves.
+      const shouldTryPlaces =
+        !geocoderLabel ||
+        geocoderLabel.quality <= 3 ||
+        (!preserveInitial && geocoderLabel.quality === 4);
+
+      if (shouldTryPlaces && mapInstanceRef.current) {
+        const placesLabel = await findNearbyPlaceName(mapInstanceRef.current, lat, lng, { maxDistanceMeters: 45 });
         geocoderLabel = pickBetterLabel(geocoderLabel, placesLabel);
       }
 
-      label = geocoderLabel?.name || bestAddress || label;
-    } catch { /* use coord fallback */ }
-    return label;
-  };
+      bestLabel = geocoderLabel?.name || bestAddress || bestLabel;
+    } catch {
+      // keep coordinate fallback
+    }
+
+    // Ignore stale geocode responses from older drag/idle events.
+    if (requestId !== geocodeRequestIdRef.current) {
+      return detectedLocationRef.current?.label || bestLabel;
+    }
+
+    return bestLabel;
+  }, []);
 
   // Initialize map ONCE when entering confirm step
   useEffect(() => {
