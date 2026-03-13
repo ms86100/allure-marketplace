@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useSellerChat } from '@/hooks/useSellerChat';
-import { Send, MessageCircle } from 'lucide-react';
+import { Send, MessageCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -20,7 +19,7 @@ interface SellerChatSheetProps {
 export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, productId, productName, sellerName }: SellerChatSheetProps) {
   const { messages, isLoading, getOrCreate, sendMessage, isSending } = useSellerChat(buyerId, sellerId, productId);
   const [text, setText] = useState('');
-  const [containerHeight, setContainerHeight] = useState('85vh');
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -28,20 +27,15 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
     if (open) getOrCreate();
   }, [open, getOrCreate]);
 
-  // Dynamically adapt to keyboard open/close using visualViewport
+  // Track visual viewport for keyboard-aware layout
   useEffect(() => {
     if (!open) return;
-
     const vv = window.visualViewport;
     if (!vv) return;
 
     const update = () => {
-      // visualViewport.height = screen minus keyboard
-      // offsetTop handles any browser chrome offset
-      const h = vv.height;
-      setContainerHeight(`${Math.max(280, h)}px`);
+      setViewportHeight(vv.height);
     };
-
     update();
     vv.addEventListener('resize', update);
     vv.addEventListener('scroll', update);
@@ -79,7 +73,6 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
     try {
       await sendMessage({ text: trimmed, senderId: buyerId });
       setText('');
-      // Reset textarea height
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
@@ -89,74 +82,88 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
     }
   };
 
+  if (!open) return null;
+
+  const containerStyle: React.CSSProperties = viewportHeight
+    ? { height: `${viewportHeight}px`, top: window.visualViewport?.offsetTop ?? 0 }
+    : { height: '100dvh' };
+
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent
-        style={{ height: containerHeight, maxHeight: containerHeight }}
-        className="flex flex-col overflow-hidden"
-      >
-        {/* Header - fixed */}
-        <DrawerHeader className="pb-2 shrink-0">
-          <DrawerTitle className="flex items-center gap-2 text-sm">
-            <MessageCircle size={16} className="text-primary" />
-            Chat with {sellerName}
-          </DrawerTitle>
-          <p className="text-xs text-muted-foreground">Re: {productName}</p>
-        </DrawerHeader>
+    <div
+      className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col animate-in slide-in-from-bottom duration-200"
+      style={containerStyle}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <MessageCircle className="text-primary" size={20} />
+          </div>
+          <div className="min-w-0">
+            <p className="font-semibold truncate text-sm">{sellerName}</p>
+            <p className="text-xs text-muted-foreground truncate">Re: {productName}</p>
+          </div>
+        </div>
+        <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="shrink-0">
+          <X size={20} />
+        </Button>
+      </div>
 
-        {/* Messages - scrollable */}
-        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-2">
-          {isLoading && <p className="text-xs text-muted-foreground text-center py-8">Loading messages…</p>}
-          {!isLoading && messages.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-8">No messages yet. Say hello!</p>
-          )}
-          {messages.map((m) => {
-            const isMine = m.sender_id === buyerId;
-            return (
-              <div key={m.id} className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
-                <div className={cn(
-                  'max-w-[75%] px-3 py-2 rounded-2xl text-sm',
-                  isMine
-                    ? 'bg-primary text-primary-foreground rounded-br-md'
-                    : 'bg-muted text-foreground rounded-bl-md'
-                )}>
-                  {m.message_text}
-                </div>
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-2">
+        {isLoading && <p className="text-xs text-muted-foreground text-center py-8">Loading messages…</p>}
+        {!isLoading && messages.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">
+            <MessageCircle className="mx-auto mb-2" size={32} />
+            <p className="text-sm">No messages yet</p>
+            <p className="text-xs">Say hello to {sellerName}!</p>
+          </div>
+        )}
+        {messages.map((m) => {
+          const isMine = m.sender_id === buyerId;
+          return (
+            <div key={m.id} className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
+              <div className={cn(
+                'max-w-[75%] px-3 py-2 rounded-2xl text-sm',
+                isMine
+                  ? 'bg-primary text-primary-foreground rounded-br-md'
+                  : 'bg-muted text-foreground rounded-bl-md'
+              )}>
+                {m.message_text}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
+      </div>
 
-        {/* Input bar - pinned to bottom, above keyboard */}
-        <div className="shrink-0 border-t border-border p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] flex items-end gap-2 bg-background">
-          <Textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(e) => handleTextChange(e.target.value)}
-            placeholder="Type a message…"
-            rows={1}
-            className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl text-sm py-2.5"
-            onFocus={() => {
-              // Give keyboard time to appear, then scroll messages to bottom
-              setTimeout(scrollToBottom, 300);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                void handleSend();
-              }
-            }}
-          />
-          <Button
-            size="icon"
-            className="shrink-0 h-10 w-10 rounded-xl"
-            onClick={() => void handleSend()}
-            disabled={!text.trim() || isSending}
-          >
-            <Send size={16} />
-          </Button>
-        </div>
-      </DrawerContent>
-    </Drawer>
+      {/* Input bar — pinned above keyboard */}
+      <div className="shrink-0 border-t border-border p-3 flex items-end gap-2 bg-card safe-bottom">
+        <Textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => handleTextChange(e.target.value)}
+          placeholder="Type a message…"
+          rows={1}
+          className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl text-sm py-2.5"
+          onFocus={() => {
+            setTimeout(scrollToBottom, 300);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              void handleSend();
+            }
+          }}
+        />
+        <Button
+          size="icon"
+          className="shrink-0 h-10 w-10 rounded-xl"
+          onClick={() => void handleSend()}
+          disabled={!text.trim() || isSending}
+        >
+          <Send size={16} />
+        </Button>
+      </div>
+    </div>
   );
 }

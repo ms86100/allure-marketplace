@@ -1,55 +1,71 @@
 
 
-## Fix: Chat Keyboard Visibility on Mobile (Both Chats)
+# Notification System — Comprehensive Audit & Plan
 
-### Root Cause
+## Root Cause Fix (Implemented)
 
-The seller chat uses a **Vaul Drawer** (bottom sheet), which has its own internal keyboard repositioning logic. On Capacitor iOS with `Keyboard: { resize: 'body' }`, the body itself resizes when the keyboard opens, which tricks Vaul into thinking no keyboard is present. The drawer does not move upward, and the input field ends up hidden behind the keyboard.
+Admin users were not notified when a new store or product was submitted for review. Fixed by:
 
-The custom `visualViewport` listener added to `SellerChatSheet` conflicts with Vaul's internal handler, causing unpredictable behavior.
+1. **`notifyAdminsNewStoreApplication()`** in `src/lib/admin-notifications.ts` — queries `user_roles` for admins, enqueues push+in-app notification via `notification_queue`
+2. **`handleSubmit` in `useSellerApplication.ts`** — calls the above after successful submission
+3. **DB trigger `trg_enqueue_product_review_notification`** on `products` table — fires when `approval_status` changes to `'pending'`, notifies all admins
 
-### Solution
+---
 
-**Replace the Vaul Drawer in `SellerChatSheet` with a full-screen fixed overlay** — the same proven pattern already used by `OrderChat`. This completely avoids the Vaul/keyboard conflict.
+## Current State (As-Is): All Notification Flows
 
-Then **apply the same robust keyboard-aware pattern to both chat components** so they behave identically:
+### A. Database Triggers
 
-### Changes
+| Trigger | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `enqueue_order_status_notification` | Order status changes | Buyer + Seller | ✅ | ✅ |
+| `enqueue_review_notification` | New review created | Seller | ✅ | ✅ |
+| `enqueue_dispute_status_notification` | Dispute status changes | Submitter | ✅ | ✅ |
+| `enqueue_settlement_notification` | Settlement created | Seller | ✅ | ✅ |
+| `trg_enqueue_product_review_notification` | Product submitted for review | Admins | ✅ | ✅ |
 
-**1. `src/components/product/SellerChatSheet.tsx`** — Rewrite to use a full-screen fixed overlay instead of Vaul Drawer:
-- Remove `Drawer`, `DrawerContent`, `DrawerHeader`, `DrawerTitle` imports
-- Use a `fixed inset-x-0 top-0 z-[60]` container (same as `OrderChat`)
-- Track `visualViewport.height` to set container height dynamically
-- Keep auto-expanding `Textarea` and flex layout (header / messages / input)
-- Add close button in the header
-- Transition: slide-up animation for opening
+### B. Edge Functions
 
-**2. `src/components/chat/OrderChat.tsx`** — Apply same improvements:
-- Replace single-line `Input` with auto-expanding `Textarea` (WhatsApp-like)
-- Ensure `scrollToBottom` fires on focus with delay
-- Keep existing `visualViewport` resize handling (already working pattern)
+| Function | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `send-booking-reminders` | 1h before appointment | Buyer + Seller | ✅ | ✅ |
+| `process-notification-queue` | Queue processor | N/A | ✅ | ✅ |
+| `send-campaign` | Admin broadcast | Targeted users | ✅ | ✅ |
+| `generate-weekly-digest` | Weekly digest | Society members | ✅ | ✅ |
+| `generate-society-report` | Monthly report | Society members | ✅ | ✅ |
+| `detect-collective-issues` | Pattern detection | Society admins | ✅ | ✅ |
 
-### Layout Structure (Both Chats)
+### C. Client-Side (inserts to `notification_queue`)
 
-```text
-┌──────────────────────────┐
-│  Header (shrink-0)       │  ← Fixed, shows name + close button
-├──────────────────────────┤
-│                          │
-│  Messages (flex-1)       │  ← Scrollable, min-h-0, overflow-y-auto
-│                          │
-├──────────────────────────┤
-│  Input bar (shrink-0)    │  ← Pinned above keyboard, auto-expanding textarea
-└──────────────────────────┘
-     ↑ keyboard starts here
-```
+| Location | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `admin-notifications.ts` → `notifySellerStatusChange` | Admin approves/rejects seller | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyLicenseStatusChange` | Admin approves/rejects license | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyProductStatusChange` | Admin approves/rejects product | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyAdminsNewStoreApplication` | Seller submits store | Admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyAdmins` | Dispute/snag | Society admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyMembers` | Bulletin posts | Society members | ✅ | ✅ |
+| `ServiceBookingFlow.tsx` | New booking | Seller | ✅ | ❌ |
+| `BuyerCancelBooking.tsx` | Buyer cancels | Seller | ✅ | ❌ |
+| `SellerPaymentConfirmation.tsx` | Payment confirmed | Buyer | ✅ | ❌ |
+| `UpiDeepLinkCheckout.tsx` | UPI payment | Seller | ✅ | ❌ |
+| `useSellerChat.ts` | New chat (60s throttle) | Recipient | ✅ | ❌ |
+| `GuardManualEntryTab.tsx` | Gate entry | Resident | ✅ | ❌ |
+| `manage-delivery` edge fn | Delivery OTP/arrival | Buyer | ✅ | ✅ |
+| `update-delivery-location` edge fn | Delivery delay | Buyer | ✅ | ✅ |
 
-Container height = `visualViewport.height` (shrinks when keyboard opens), positioned at `visualViewport.offsetTop`. This ensures the entire chat UI fits exactly in the visible area above the keyboard.
+---
 
-### Why This Works
+## Future Gaps (To-Be)
 
-- Full-screen fixed overlay is independent of Vaul's transform/position logic
-- `visualViewport.height` correctly reports available space above keyboard regardless of Capacitor's resize mode
-- Same pattern as `OrderChat` which is already proven to work
-- No conflicting event listeners between library code and custom code
+### Priority 2 — Operational
+- New user pending approval → Society admins
+- New society request → Platform admins
+- Report filed → Admins
+- Delivery partner assigned → Seller
 
+### Priority 3 — Engagement
+- New product from favorite seller → Buyer
+- Seller back online → Recent buyers
+- Price drop on wishlisted item → Buyer
+- Order review reminder (24h after delivery) → Buyer
