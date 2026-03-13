@@ -3,8 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChatMessage } from '@/types/database';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 import { Send, MessageCircle, X, Check, CheckCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -32,7 +31,7 @@ export function OrderChat({
   const [isSending, setIsSending] = useState(false);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Track visual viewport for keyboard-aware layout
   useEffect(() => {
@@ -79,11 +78,17 @@ export function OrderChat({
     }
   }, [isOpen, orderId]);
 
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+      }
+    });
+  }, []);
+
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
 
   const fetchMessages = async () => {
     const { data, error } = await supabase
@@ -122,6 +127,9 @@ export function OrderChat({
 
       if (error) throw error;
       setNewMessage('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
@@ -129,24 +137,25 @@ export function OrderChat({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
+  // Auto-resize textarea
+  const handleTextChange = (value: string) => {
+    setNewMessage(value);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   };
 
   if (!isOpen) return null;
 
-  // Use visualViewport height when available (keyboard-aware), fallback to 100dvh
   const containerStyle: React.CSSProperties = viewportHeight
     ? { height: `${viewportHeight}px`, top: window.visualViewport?.offsetTop ?? 0 }
-    : {};
+    : { height: '100dvh' };
 
   return (
     <div
       className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col"
-      style={{ ...containerStyle, height: viewportHeight ? `${viewportHeight}px` : '100dvh' }}
+      style={containerStyle}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
@@ -165,7 +174,7 @@ export function OrderChat({
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 min-h-0 p-4" ref={scrollRef}>
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4">
         {messages.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <MessageCircle className="mx-auto mb-2" size={32} />
@@ -217,34 +226,40 @@ export function OrderChat({
             })}
           </div>
         )}
-      </ScrollArea>
+      </div>
 
-      {/* Input — always visible above keyboard */}
+      {/* Input — pinned above keyboard */}
       <div className="p-3 border-t bg-card shrink-0 safe-bottom">
         {disabled ? (
           <p className="text-center text-sm text-muted-foreground">
             Chat is disabled for completed orders
           </p>
         ) : (
-          <div className="flex gap-2">
-            <Input
-              ref={inputRef}
+          <div className="flex items-end gap-2">
+            <Textarea
+              ref={textareaRef}
               placeholder="Type a message..."
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={handleKeyPress}
-              onFocus={() => {
-                // Ensure input scrolls into view on focus
-                setTimeout(() => inputRef.current?.scrollIntoView({ block: 'nearest' }), 300);
+              onChange={(e) => handleTextChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
               }}
-              className="flex-1"
+              onFocus={() => {
+                setTimeout(scrollToBottom, 300);
+              }}
+              rows={1}
+              className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl text-sm py-2.5"
             />
             <Button
               size="icon"
+              className="shrink-0 h-10 w-10 rounded-xl"
               onClick={sendMessage}
               disabled={!newMessage.trim() || isSending}
             >
-              <Send size={18} />
+              <Send size={16} />
             </Button>
           </div>
         )}
