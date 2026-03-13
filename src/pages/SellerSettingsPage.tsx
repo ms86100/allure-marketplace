@@ -15,7 +15,7 @@ import { CroppableImageUpload } from '@/components/ui/croppable-image-upload';
 import { DAYS_OF_WEEK } from '@/types/database';
 import { Slider } from '@/components/ui/slider';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2, Globe, Truck, Eye } from 'lucide-react';
+import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2, Globe, Truck, Eye, MapPin, Navigation } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { cn } from '@/lib/utils';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
