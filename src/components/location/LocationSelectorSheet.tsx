@@ -55,6 +55,7 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
       draggable: true,
       animation: google.maps.Animation.DROP,
     });
+    markerInstanceRef.current = marker;
 
     // Update location when pin is dragged
     marker.addListener('dragend', async () => {
