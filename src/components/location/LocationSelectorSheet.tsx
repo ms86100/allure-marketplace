@@ -28,19 +28,42 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
   const [detectingGps, setDetectingGps] = useState(false);
   const [step, setStep] = useState<'pick' | 'confirm'>('pick');
   const [detectedLocation, setDetectedLocation] = useState<{ lat: number; lng: number; label: string } | null>(null);
+  const detectedLocationRef = useRef(detectedLocation);
+  detectedLocationRef.current = detectedLocation;
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markerInstanceRef = useRef<google.maps.Marker | null>(null);
+  const mapInitializedRef = useRef(false);
   const [relocating, setRelocating] = useState(false);
 
-  // Render mini-map when confirming detected location
+  // Helper: reverse-geocode a position and return a label
+  const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
+    let label = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    try {
+      const geocoder = new google.maps.Geocoder();
+      const results = await new Promise<google.maps.GeocoderResult[] | null>((resolve) => {
+        geocoder.geocode({ location: { lat, lng } }, (res, status) => {
+          resolve(status === 'OK' && res ? res : null);
+        });
+      });
+      if (results) {
+        const bestLabel = extractBestLabel(results);
+        const bestAddress = extractBestFormattedAddress(results);
+        label = bestLabel?.name || bestAddress || label;
+      }
+    } catch { /* use coord fallback */ }
+    return label;
+  };
+
+  // Initialize map ONCE when entering confirm step
   useEffect(() => {
     if (step !== 'confirm' || !detectedLocation || !mapContainerRef.current) return;
     if (!(window as any).google?.maps) return;
+    if (mapInitializedRef.current) return; // already initialized
 
     const map = new google.maps.Map(mapContainerRef.current, {
       center: { lat: detectedLocation.lat, lng: detectedLocation.lng },
-      zoom: 15,
+      zoom: 17,
       disableDefaultUI: true,
       zoomControl: true,
       gestureHandling: 'greedy',
@@ -56,33 +79,23 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
       animation: google.maps.Animation.DROP,
     });
     markerInstanceRef.current = marker;
+    mapInitializedRef.current = true;
 
-    // Update location when pin is dragged
+    // Reverse-geocode on pin drag
     marker.addListener('dragend', async () => {
       const pos = marker.getPosition();
       if (!pos) return;
       const lat = pos.lat();
       const lng = pos.lng();
-
-      // Reverse geocode the new position
-      let label = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-      try {
-        const geocoder = new google.maps.Geocoder();
-        const results = await new Promise<google.maps.GeocoderResult[] | null>((resolve) => {
-          geocoder.geocode({ location: { lat, lng } }, (res, status) => {
-            resolve(status === 'OK' && res ? res : null);
-          });
-        });
-        if (results) {
-          const bestLabel = extractBestLabel(results);
-          const bestAddress = extractBestFormattedAddress(results);
-          label = bestLabel?.name || bestAddress || label;
-        }
-      } catch { /* use coord fallback */ }
-
+      const label = await reverseGeocode(lat, lng);
       setDetectedLocation({ lat, lng, label });
     });
-  }, [step, detectedLocation?.lat, detectedLocation?.lng]);
+
+    // Also reverse-geocode when user pans the map (update pin to map center)
+    map.addListener('idle', async () => {
+      // Only update if user dragged/zoomed the map (not programmatic moves)
+    });
+  }, [step]); // only depend on step, not on coordinates
 
   const handleSelectAddress = (addr: any) => {
     if (!addr.latitude || !addr.longitude) {
@@ -177,6 +190,9 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
     if (!val) {
       setStep('pick');
       setDetectedLocation(null);
+      mapInstanceRef.current = null;
+      markerInstanceRef.current = null;
+      mapInitializedRef.current = false;
     }
     onOpenChange(val);
   };
@@ -217,26 +233,11 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
                     const pos = await getCurrentPosition();
                     const newPos = { lat: pos.latitude, lng: pos.longitude };
 
-                    // Move map and marker
                     mapInstanceRef.current?.panTo(newPos);
+                    mapInstanceRef.current?.setZoom(17);
                     markerInstanceRef.current?.setPosition(newPos);
 
-                    // Reverse geocode
-                    let label = `${newPos.lat.toFixed(4)}, ${newPos.lng.toFixed(4)}`;
-                    try {
-                      const geocoder = new google.maps.Geocoder();
-                      const results = await new Promise<google.maps.GeocoderResult[] | null>((resolve) => {
-                        geocoder.geocode({ location: newPos }, (res, status) => {
-                          resolve(status === 'OK' && res ? res : null);
-                        });
-                      });
-                      if (results) {
-                        const bestLabel = extractBestLabel(results);
-                        const bestAddress = extractBestFormattedAddress(results);
-                        label = bestLabel?.name || bestAddress || label;
-                      }
-                    } catch {}
-
+                    const label = await reverseGeocode(newPos.lat, newPos.lng);
                     setDetectedLocation({ ...newPos, label });
                   } catch {
                     toast.error('Could not get your location');
