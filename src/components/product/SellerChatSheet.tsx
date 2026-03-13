@@ -85,14 +85,16 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
 
   if (!open) return null;
 
-  const containerStyle: React.CSSProperties = viewportHeight
-    ? { height: `${viewportHeight}px`, top: window.visualViewport?.offsetTop ?? 0 }
-    : { height: '100dvh' };
+  const containerStyle: React.CSSProperties = {
+    height: viewportHeight ? `${viewportHeight}px` : '100dvh',
+    top: viewportHeight ? (window.visualViewport?.offsetTop ?? 0) : 0,
+    pointerEvents: 'auto' as const,
+  };
 
   return createPortal(
     <div
-      className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col animate-in slide-in-from-bottom duration-200"
-      style={{ ...containerStyle, pointerEvents: 'auto' }}
+      className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col animate-in slide-in-from-bottom duration-200 overflow-hidden"
+      style={containerStyle}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
