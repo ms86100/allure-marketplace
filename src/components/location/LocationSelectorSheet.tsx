@@ -244,7 +244,7 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
                     setRelocating(false);
                   }
                 }}
-                className="absolute bottom-3 right-3 h-9 w-9 rounded-full bg-background border border-border shadow-md flex items-center justify-center hover:bg-muted transition-colors"
+                className="absolute bottom-3 right-3 z-10 h-10 w-10 rounded-full bg-background border border-border shadow-lg flex items-center justify-center hover:bg-muted transition-colors"
                 aria-label="Go to my location"
               >
                 {relocating ? <Loader2 size={16} className="animate-spin text-primary" /> : <Navigation size={16} className="text-primary" />}
