@@ -12,7 +12,7 @@ import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
  * BUILD FINGERPRINT — if the device logs this, the bundle is current.
  * If not, the device is running stale JS.
  */
-export const PUSH_BUILD_ID = '2026-03-04-TIMEOUT-ALL-NATIVE';
+export const PUSH_BUILD_ID = '2026-03-13-DEDUP-IMPORTS-BOOT-GATE';
 
 /**
  * NEW APPROACH: Uses @capacitor/push-notifications for permissions + registration
