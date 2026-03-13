@@ -76,7 +76,7 @@ export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: Onboa
 
   return (
     <Drawer open={open} onOpenChange={handleOpenChange}>
-      <DrawerContent className="max-h-[85vh]">
+      <DrawerContent className="max-h-[85vh] overflow-y-auto">
         <DrawerHeader className="pb-2">
           <DrawerTitle className="text-base">Set Store Location</DrawerTitle>
           <p className="text-xs text-muted-foreground">
