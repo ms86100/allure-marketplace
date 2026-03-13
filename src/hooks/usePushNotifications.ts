@@ -953,6 +953,9 @@ export function usePushNotificationsInternal() {
       })();
     }
 
+    // ── Boot-complete gate: prevents app_resume from racing the main IIFE ──
+    let bootComplete = false;
+
     // ── App resume: re-check permission and retry if now granted ──
     let appListenerCleanup: (() => void) | undefined;
 
@@ -966,8 +969,11 @@ export function usePushNotificationsInternal() {
             let state = registrationStateRef.current;
             let hasRuntimeToken = Boolean(tokenRef.current);
 
-            // Attempt an early runtime reconciliation before logging, to avoid stale "hasToken:false" snapshots.
-            if (!hasRuntimeToken && userRef.current) {
+            // ── BOOT GATE: skip prelog reconcile if the main IIFE hasn't finished yet ──
+            // This prevents the concurrent plugin import that causes the native bridge deadlock.
+            if (!bootComplete) {
+              pushLog('info', 'RESUME_SKIPPED_BOOT_INCOMPLETE', { platform, ts: Date.now() });
+            } else if (!hasRuntimeToken && userRef.current) {
               try {
                 const reconciledEarly = await withTimeout(reconcileRuntimeTokenRef.current('app_resume_prelog'), LOGIN_RECONCILE_TIMEOUT_MS, 'app_resume_prelog reconcile timed out');
                 hasRuntimeToken = Boolean(tokenRef.current);
