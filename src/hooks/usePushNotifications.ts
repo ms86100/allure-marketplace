@@ -191,6 +191,59 @@ export function usePushNotificationsInternal() {
   // Store captured APNs token for direct delivery
   const apnsTokenRef = useRef<string | null>(null);
   const finalizationPromiseRef = useRef<Promise<boolean> | null>(null);
+  const apnsSavedRef = useRef(false);
+
+  /**
+   * Save APNs token to DB immediately — even before FCM token is available.
+   * Uses 'apns:{hex}' as the token column value so the edge function knows
+   * to deliver via APNs directly. If FCM getToken() later succeeds,
+   * claim_device_token will replace this placeholder row.
+   */
+  const saveApnsTokenImmediately = useCallback(async (apnsToken: string) => {
+    if (apnsSavedRef.current) return; // already saved this session
+    const currentUser = userRef.current;
+    if (!currentUser) {
+      pushLog('warn', 'APNS_IMMEDIATE_SAVE_NO_USER', { apnsPrefix: apnsToken.substring(0, 16) });
+      return;
+    }
+
+    const placeholderToken = `apns:${apnsToken}`;
+    pushLog('info', 'APNS_IMMEDIATE_SAVE_START', {
+      userId: currentUser.id,
+      apnsPrefix: apnsToken.substring(0, 16),
+    });
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const { error } = await withTimeout(
+          supabase.rpc('claim_device_token', {
+            p_user_id: currentUser.id,
+            p_token: placeholderToken,
+            p_platform: 'ios',
+            p_apns_token: apnsToken,
+          }),
+          RPC_TIMEOUT_MS,
+          `saveApnsTokenImmediately timed out (attempt ${attempt})`
+        );
+
+        if (!error) {
+          apnsSavedRef.current = true;
+          pushLog('info', 'APNS_IMMEDIATE_SAVE_SUCCESS', {
+            userId: currentUser.id,
+            apnsPrefix: apnsToken.substring(0, 16),
+            attempt,
+          });
+          console.log(`[Push] ✓ APNs token saved immediately: ${apnsToken.substring(0, 16)}…`);
+          return;
+        }
+
+        pushLog('error', 'APNS_IMMEDIATE_SAVE_FAILED', { attempt, error: error.message });
+      } catch (err) {
+        pushLog('error', 'APNS_IMMEDIATE_SAVE_ERROR', { attempt, error: String(err) });
+      }
+      if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 400));
+    }
+  }, []);
 
   const waitForListenersReady = useCallback(async (source: string) => {
     pushLog('info', 'LISTENER_GATE_WAIT_START', { source, ts: Date.now() });
