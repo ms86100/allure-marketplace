@@ -2,14 +2,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-const HARDCODED_FALLBACK_KEY = 'AIzaSyC96Rzpof_eGJc-QycAw1aHXZ6rMx4bRvU';
+const HARDCODED_FALLBACK_KEY = 'AIzaSyC96Rzpof_eGJc-QycAw1aHltM1inw8vU';
 const SCRIPT_ID = 'google-maps-script';
 
 let loadPromise: Promise<void> | null = null;
-let resolvedApiKey: string | null = null;
 
 async function fetchGoogleMapsApiKey(): Promise<string> {
-  if (resolvedApiKey) return resolvedApiKey;
   try {
     const { data } = await supabase
       .from('admin_settings')
@@ -18,30 +16,34 @@ async function fetchGoogleMapsApiKey(): Promise<string> {
       .maybeSingle();
     if (data?.value && data.is_active !== false) {
       console.info('useGoogleMaps: API key loaded from database (admin_settings)');
-      resolvedApiKey = data.value;
       return data.value;
     }
   } catch (e) {
     console.warn('Failed to fetch Google Maps key from DB, using fallback:', e);
   }
   console.warn('useGoogleMaps: Using HARDCODED FALLBACK API key — DB key not found or inactive');
-  resolvedApiKey = HARDCODED_FALLBACK_KEY;
   return HARDCODED_FALLBACK_KEY;
 }
 
 export async function loadGoogleMapsScript(): Promise<void> {
   if (loadPromise) return loadPromise;
-  if ((window as any).google?.maps) return Promise.resolve();
 
   loadPromise = (async () => {
     const apiKey = await fetchGoogleMapsApiKey();
 
-    if (document.getElementById(SCRIPT_ID)) {
-      await new Promise<void>((resolve, reject) => {
-        const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement;
-        existing.addEventListener('load', () => resolve());
-        existing.addEventListener('error', () => reject(new Error('Failed to load Google Maps')));
-      });
+    // If script already exists but was loaded with a different key, remove it and reload
+    const existingScript = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
+    if (existingScript) {
+      const existingSrc = existingScript.getAttribute('src') || '';
+      if (existingSrc.includes(apiKey) && (window as any).google?.maps) {
+        // Same key, already loaded
+        return;
+      }
+      // Different key or not yet loaded — remove old script and google object
+      existingScript.remove();
+      delete (window as any).google;
+      loadPromise = null;
+    } else if ((window as any).google?.maps) {
       return;
     }
 
