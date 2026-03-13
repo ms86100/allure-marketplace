@@ -218,7 +218,7 @@ export function useCartPage() {
       else toast.success('Payment successful! Order placed.');
     }
     supabase.functions.invoke('process-notification-queue').catch(() => {});
-    await refresh();
+    clearCart(); await refresh();
     navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
     setPendingOrderIds([]);
   };
