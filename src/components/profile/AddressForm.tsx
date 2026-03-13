@@ -32,10 +32,9 @@ interface AddressFormProps {
   saving?: boolean;
 }
 
-const LABEL_OPTIONS = [
+const FIXED_LABELS = [
   { value: 'Home', icon: Home },
   { value: 'Work', icon: Briefcase },
-  { value: 'Other', icon: Tag },
 ];
 
 export function AddressForm({ initial, onSave, onCancel, saving }: AddressFormProps) {
