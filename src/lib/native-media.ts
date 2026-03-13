@@ -77,19 +77,35 @@ export async function pickImageFromGallery(): Promise<Blob | null> {
 export async function capturePhotoFromCamera(): Promise<Blob | null> {
   if (!Capacitor.isNativePlatform()) return null;
 
-  await ensureCameraPermissions('camera');
   const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
+
+  // Ensure permissions with delay for iOS
+  const permStatus = await Camera.checkPermissions();
+  if (permStatus.camera !== 'granted') {
+    const requested = await Camera.requestPermissions({ permissions: ['camera'] });
+    if (requested.camera === 'denied') {
+      throw new Error('Camera permission denied. Please enable it in your device Settings.');
+    }
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
   const photo = await Camera.getPhoto({
     source: CameraSource.Camera,
-    resultType: CameraResultType.Uri,
+    resultType: CameraResultType.DataUrl,
     quality: 85,
     width: 640,
     height: 480,
   });
 
-  if (!photo.webPath) throw new Error('No photo captured');
-  const response = await fetch(photo.webPath);
-  return response.blob();
+  if (photo.dataUrl) {
+    const response = await fetch(photo.dataUrl);
+    return response.blob();
+  }
+  if (photo.webPath) {
+    const response = await fetch(photo.webPath);
+    return response.blob();
+  }
+  throw new Error('No photo captured');
 }
 
 /**
