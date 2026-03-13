@@ -216,12 +216,15 @@ export function usePushNotificationsInternal() {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         const { error } = await withTimeout(
-          supabase.rpc('claim_device_token', {
-            p_user_id: currentUser.id,
-            p_token: placeholderToken,
-            p_platform: 'ios',
-            p_apns_token: apnsToken,
-          }),
+          (async () => {
+            const result = await supabase.rpc('claim_device_token', {
+              p_user_id: currentUser.id,
+              p_token: placeholderToken,
+              p_platform: 'ios',
+              p_apns_token: apnsToken,
+            });
+            return result;
+          })(),
           RPC_TIMEOUT_MS,
           `saveApnsTokenImmediately timed out (attempt ${attempt})`
         );
