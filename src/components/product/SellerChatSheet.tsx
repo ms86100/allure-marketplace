@@ -165,6 +165,7 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
           <Send size={16} />
         </Button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
