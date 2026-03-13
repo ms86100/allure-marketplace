@@ -29,6 +29,9 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
   const [step, setStep] = useState<'pick' | 'confirm'>('pick');
   const [detectedLocation, setDetectedLocation] = useState<{ lat: number; lng: number; label: string } | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markerInstanceRef = useRef<google.maps.Marker | null>(null);
+  const [relocating, setRelocating] = useState(false);
 
   // Render mini-map when confirming detected location
   useEffect(() => {
@@ -44,12 +47,15 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
       styles: [{ featureType: 'poi', stylers: [{ visibility: 'simplified' }] }],
     });
 
+    mapInstanceRef.current = map;
+
     const marker = new google.maps.Marker({
       position: { lat: detectedLocation.lat, lng: detectedLocation.lng },
       map,
       draggable: true,
       animation: google.maps.Animation.DROP,
     });
+    markerInstanceRef.current = marker;
 
     // Update location when pin is dragged
     marker.addListener('dragend', async () => {
@@ -199,8 +205,51 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
               </div>
             </div>
 
-            {/* Mini map */}
-            <div ref={mapContainerRef} className="w-full h-64 sm:h-72 rounded-xl border border-border overflow-hidden bg-muted" />
+            {/* Map with "my location" button */}
+            <div className="relative">
+              <div ref={mapContainerRef} className="w-full h-64 sm:h-72 rounded-xl border border-border overflow-hidden bg-muted" />
+              <button
+                type="button"
+                disabled={relocating}
+                onClick={async () => {
+                  setRelocating(true);
+                  try {
+                    const pos = await getCurrentPosition();
+                    const newPos = { lat: pos.latitude, lng: pos.longitude };
+
+                    // Move map and marker
+                    mapInstanceRef.current?.panTo(newPos);
+                    markerInstanceRef.current?.setPosition(newPos);
+
+                    // Reverse geocode
+                    let label = `${newPos.lat.toFixed(4)}, ${newPos.lng.toFixed(4)}`;
+                    try {
+                      const geocoder = new google.maps.Geocoder();
+                      const results = await new Promise<google.maps.GeocoderResult[] | null>((resolve) => {
+                        geocoder.geocode({ location: newPos }, (res, status) => {
+                          resolve(status === 'OK' && res ? res : null);
+                        });
+                      });
+                      if (results) {
+                        const bestLabel = extractBestLabel(results);
+                        const bestAddress = extractBestFormattedAddress(results);
+                        label = bestLabel?.name || bestAddress || label;
+                      }
+                    } catch {}
+
+                    setDetectedLocation({ ...newPos, label });
+                  } catch {
+                    toast.error('Could not get your location');
+                  } finally {
+                    setRelocating(false);
+                  }
+                }}
+                className="absolute bottom-3 right-3 h-9 w-9 rounded-full bg-background border border-border shadow-md flex items-center justify-center hover:bg-muted transition-colors"
+                aria-label="Go to my location"
+              >
+                {relocating ? <Loader2 size={16} className="animate-spin text-primary" /> : <Navigation size={16} className="text-primary" />}
+              </button>
+            </div>
 
             <p className="text-[10px] text-muted-foreground text-center">
               Is this the correct location? Confirm to browse stores nearby.
