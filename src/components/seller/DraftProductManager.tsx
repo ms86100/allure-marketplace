@@ -562,6 +562,7 @@ export function DraftProductManager({
                     productName={newProduct.name}
                     categoryName={newProduct.category}
                     description={newProduct.description}
+                    beforePick={beforePick}
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground">Sign in to upload images</p>
