@@ -79,6 +79,14 @@ export default function ProfileEditPage() {
 
     setShowAddressForm(false);
     setEditingAddress(null);
+
+    // Auto-advance to step 2 after first address save
+    setTimeout(() => {
+      setStep(2);
+      setTimeout(() => {
+        detailsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }, 300);
   };
 
   const handleEditAddress = (addr: any) => {
