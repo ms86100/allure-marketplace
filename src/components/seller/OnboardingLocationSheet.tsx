@@ -17,6 +17,7 @@ interface OnboardingLocationSheetProps {
 export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: OnboardingLocationSheetProps) {
   const [step, setStep] = useState<'pick' | 'confirm'>('pick');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedPlaceName, setSelectedPlaceName] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const { isLoaded: mapsLoaded } = useGoogleMaps();
@@ -35,6 +36,7 @@ export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: Onboa
       const details = await getPlaceDetails(placeId);
       if (details && details.latitude && details.longitude) {
         setCoords({ lat: details.latitude, lng: details.longitude });
+        setSelectedPlaceName(details.name || details.formattedAddress || '');
         setStep('confirm');
       } else {
         toast.error('Could not get location details. Try another place.');
@@ -51,6 +53,7 @@ export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: Onboa
     try {
       const pos = await getCurrentPosition();
       setCoords({ lat: pos.latitude, lng: pos.longitude });
+      setSelectedPlaceName('');
       setStep('confirm');
     } catch {
       toast.error('Could not get your location. Please allow location access and try again.');
@@ -146,7 +149,7 @@ export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: Onboa
             <GoogleMapConfirm
               latitude={coords.lat}
               longitude={coords.lng}
-              name="Store Location"
+              name={selectedPlaceName || 'Store Location'}
               onConfirm={(lat, lng, updatedName) => onConfirm(lat, lng, updatedName)}
               onBack={handleBack}
             />
