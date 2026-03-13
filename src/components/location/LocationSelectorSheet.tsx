@@ -172,7 +172,7 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
       }
       marker.setMap(null);
     };
-  }, [step, detectedLocation, reverseGeocode]);
+  }, [step, reverseGeocode]);
   const handleSelectAddress = (addr: any) => {
     if (!addr.latitude || !addr.longitude) {
       toast.error('This address has no location coordinates');
