@@ -58,8 +58,8 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
       // Try Places fallback for neighborhood/route-level labels and for manual pin moves.
       const shouldTryPlaces =
         !geocoderLabel ||
-        geocoderLabel.quality <= 3 ||
-        (!preserveInitial && geocoderLabel.quality === 4);
+        geocoderLabel.quality <= LabelQuality.Neighborhood ||
+        (!preserveInitial && geocoderLabel.quality === LabelQuality.Premise);
 
       if (shouldTryPlaces && mapInstanceRef.current) {
         const placesLabel = await findNearbyPlaceName(mapInstanceRef.current, lat, lng, { maxDistanceMeters: 45 });
