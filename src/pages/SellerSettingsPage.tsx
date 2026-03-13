@@ -128,6 +128,9 @@ export default function SellerSettingsPage() {
             </div>
           </div>
 
+          {/* Store Location */}
+          <StoreLocationSection sellerId={sellerProfile.id} sellerProfile={sellerProfile} />
+
           {/* Business Name & Description */}
           <div className="space-y-2">
             <Label htmlFor="business_name">Business Name *</Label>
