@@ -80,9 +80,13 @@ export function ImageUpload({
       const blob = await pickOrCaptureImage();
       if (blob) await uploadBlob(blob);
     } catch (err: any) {
-      if (err?.message?.includes('cancelled') || err?.message?.includes('canceled')) return;
+      if (err?.message?.includes('cancelled') || err?.message?.includes('canceled') || err?.message?.includes('User cancelled')) return;
       console.error('Native pick error:', err);
-      toast.error('Failed to select image');
+      if (err?.message?.includes('permission') || err?.message?.includes('Permission')) {
+        toast.error(err.message);
+      } else {
+        toast.error(err?.message || 'Failed to select image');
+      }
     }
   }, [uploadBlob]);
 

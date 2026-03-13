@@ -71,12 +71,12 @@ export function CroppableImageUpload({
         setCropSrc(objectUrl);
       }
     } catch (err: any) {
-      if (err?.message?.includes('cancelled') || err?.message?.includes('canceled')) return;
+      if (err?.message?.includes('cancelled') || err?.message?.includes('canceled') || err?.message?.includes('User cancelled')) return;
       console.error('Native pick error:', err);
-      if (err?.message?.includes('permission denied') || err?.message?.includes('Permission denied')) {
+      if (err?.message?.includes('permission') || err?.message?.includes('Permission')) {
         toast.error(err.message);
       } else {
-        toast.error('Failed to select image');
+        toast.error(err?.message || 'Failed to select image');
       }
     }
   }, []);

@@ -22,7 +22,10 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
   useEffect(() => { displayNameRef.current = displayName; }, [displayName]);
 
   useEffect(() => {
-    if (!mapRef.current || !(window as any).google?.maps) return;
+    if (!mapRef.current || !(window as any).google?.maps) {
+      console.warn('GoogleMapConfirm: Google Maps not loaded');
+      return;
+    }
 
     const map = new google.maps.Map(mapRef.current, {
       center: { lat: latitude, lng: longitude },
