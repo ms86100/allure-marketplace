@@ -878,6 +878,10 @@ export function usePushNotificationsInternal() {
               apnsTokenRef.current = rawToken;
               pushLog('info', 'APNS_TOKEN_CAPTURED_MAIN_LISTENER', { prefix: rawToken.substring(0, 16), ts: Date.now() });
               console.log(`[Push][iOS] ✓ APNs token captured in main listener: ${rawToken.substring(0, 16)}…`);
+              // ── DUAL SAVE: persist APNs token to DB immediately (no FCM dependency) ──
+              saveApnsTokenImmediatelyRef.current(rawToken).catch(e =>
+                pushLog('error', 'APNS_IMMEDIATE_SAVE_FIRE_FORGET_FAILED', { error: String(e) })
+              );
             }
             // Now convert to FCM token for cross-platform addressing.
             console.log('[Push][iOS] Converting APNs → FCM token via FCM.getToken()…');
