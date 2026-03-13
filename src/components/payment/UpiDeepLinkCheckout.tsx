@@ -263,7 +263,7 @@ export function UpiDeepLinkCheckout({
                 ))}
               </div>
 
-              <Button variant="outline" className="w-full" onClick={handleClose}>
+              <Button variant="outline" className="w-full" onClick={handleCancelOrder}>
                 Cancel
               </Button>
             </div>
