@@ -37,7 +37,7 @@ export default function CartPage() {
     );
   }
 
-  if (c.items.length === 0) {
+  if (c.items.length === 0 && !c.hasActivePaymentSession) {
     return (
       <AppLayout showHeader={false} showCart={false}>
         <div className="p-4 safe-top">
