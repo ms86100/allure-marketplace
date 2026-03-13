@@ -59,32 +59,41 @@ function isValidFcmToken(token: string, platform: string): boolean {
   return token.length > 20;
 }
 
+/**
+ * Deduplicated plugin loaders — concurrent callers share ONE in-flight import.
+ * If the import fails/times out the cache resets so retries work.
+ * NO pre-warming at module load (that caused the previous regression).
+ */
+let _pnPromise: Promise<any> | null = null;
 async function getPushNotificationsPlugin() {
-  try {
-    const { PushNotifications } = await withTimeout(
-      import('@capacitor/push-notifications'),
+  if (!_pnPromise) {
+    _pnPromise = withTimeout(
+      import('@capacitor/push-notifications').then(m => m.PushNotifications),
       PLUGIN_IMPORT_TIMEOUT_MS,
       'getPushNotificationsPlugin import timed out'
-    );
-    return PushNotifications;
-  } catch (e) {
-    console.warn('[Push] @capacitor/push-notifications not available:', e);
-    return null;
+    ).catch(e => {
+      console.warn('[Push] @capacitor/push-notifications not available:', e);
+      _pnPromise = null;
+      return null;
+    });
   }
+  return _pnPromise;
 }
 
+let _fcmPromise: Promise<any> | null = null;
 async function getFcmPlugin() {
-  try {
-    const { FCM } = await withTimeout(
-      import('@capacitor-community/fcm'),
+  if (!_fcmPromise) {
+    _fcmPromise = withTimeout(
+      import('@capacitor-community/fcm').then(m => m.FCM),
       PLUGIN_IMPORT_TIMEOUT_MS,
       'getFcmPlugin import timed out'
-    );
-    return FCM;
-  } catch (e) {
-    console.warn('[Push] @capacitor-community/fcm not available:', e);
-    return null;
+    ).catch(e => {
+      console.warn('[Push] @capacitor-community/fcm not available:', e);
+      _fcmPromise = null;
+      return null;
+    });
   }
+  return _fcmPromise;
 }
 
 // Module-level singleton guard
