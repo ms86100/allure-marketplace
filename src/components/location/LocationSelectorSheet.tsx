@@ -39,17 +39,44 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
       center: { lat: detectedLocation.lat, lng: detectedLocation.lng },
       zoom: 15,
       disableDefaultUI: true,
-      zoomControl: false,
-      gestureHandling: 'none',
+      zoomControl: true,
+      gestureHandling: 'greedy',
       styles: [{ featureType: 'poi', stylers: [{ visibility: 'simplified' }] }],
     });
 
-    new google.maps.Marker({
+    const marker = new google.maps.Marker({
       position: { lat: detectedLocation.lat, lng: detectedLocation.lng },
       map,
+      draggable: true,
       animation: google.maps.Animation.DROP,
     });
-  }, [step, detectedLocation]);
+
+    // Update location when pin is dragged
+    marker.addListener('dragend', async () => {
+      const pos = marker.getPosition();
+      if (!pos) return;
+      const lat = pos.lat();
+      const lng = pos.lng();
+
+      // Reverse geocode the new position
+      let label = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      try {
+        const geocoder = new google.maps.Geocoder();
+        const results = await new Promise<google.maps.GeocoderResult[] | null>((resolve) => {
+          geocoder.geocode({ location: { lat, lng } }, (res, status) => {
+            resolve(status === 'OK' && res ? res : null);
+          });
+        });
+        if (results) {
+          const bestLabel = extractBestLabel(results);
+          const bestAddress = extractBestFormattedAddress(results);
+          label = bestLabel?.name || bestAddress || label;
+        }
+      } catch { /* use coord fallback */ }
+
+      setDetectedLocation({ lat, lng, label });
+    });
+  }, [step, detectedLocation?.lat, detectedLocation?.lng]);
 
   const handleSelectAddress = (addr: any) => {
     if (!addr.latitude || !addr.longitude) {
