@@ -140,7 +140,7 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
       </div>
 
       {/* Input bar — pinned above keyboard */}
-      <div className="shrink-0 border-t border-border p-3 flex items-end gap-2 bg-card safe-bottom">
+      <div className="shrink-0 border-t border-border p-3 flex items-end gap-2 bg-card pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <Textarea
           ref={textareaRef}
           value={text}
