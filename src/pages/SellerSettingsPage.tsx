@@ -38,7 +38,42 @@ function LicenseUploadSection({ sellerId, primaryGroup }: { sellerId: string; pr
   return <LicenseUpload sellerId={sellerId} groupId={groupId} />;
 }
 
-export default function SellerSettingsPage() {
+function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; sellerProfile: any }) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const hasCoords = !!(sellerProfile as any).latitude && !!(sellerProfile as any).longitude;
+
+  return (
+    <div className="bg-card rounded-xl p-4 shadow-sm">
+      <h3 className="font-semibold mb-3 flex items-center gap-2">
+        <MapPin size={16} className="text-primary" />
+        Store Location
+      </h3>
+      {hasCoords ? (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Navigation size={14} className="text-success" />
+            <span>Location set</span>
+          </div>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setSheetOpen(true)}>
+            Update Location
+          </Button>
+        </div>
+      ) : (
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+          <p className="text-sm font-medium text-destructive">No location set</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Your store won't be visible to buyers without a location.</p>
+          <Button variant="destructive" size="sm" className="mt-2 h-8 text-xs" onClick={() => setSheetOpen(true)}>
+            <MapPin size={12} className="mr-1" />
+            Set Location Now
+          </Button>
+        </div>
+      )}
+      <SetStoreLocationSheet open={sheetOpen} onOpenChange={setSheetOpen} sellerId={sellerId} />
+    </div>
+  );
+}
+
+
   const {
     user, sellerProfile, primaryGroup, isLoading, isSaving,
     formData, setFormData, currencySymbol,
