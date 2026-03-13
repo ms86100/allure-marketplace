@@ -34,6 +34,7 @@ const MAX_POLL_MS = 30000;
 const BACKOFF_FACTOR = 1.5;
 const SNOOZE_MS = 60000;
 const LOOKBACK_MS = 5 * 60 * 1000; // 5 minutes (used for subsequent polls only)
+const MAX_EMPTY_AT_MAX_DELAY = 3; // Stop polling after this many consecutive empty results at max delay
 
 export function useNewOrderAlert(sellerId: string | null) {
   const queryClient = useQueryClient();
