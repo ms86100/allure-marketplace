@@ -29,6 +29,9 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
   const [step, setStep] = useState<'pick' | 'confirm'>('pick');
   const [detectedLocation, setDetectedLocation] = useState<{ lat: number; lng: number; label: string } | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markerInstanceRef = useRef<google.maps.Marker | null>(null);
+  const [relocating, setRelocating] = useState(false);
 
   // Render mini-map when confirming detected location
   useEffect(() => {
