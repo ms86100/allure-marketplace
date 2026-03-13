@@ -133,24 +133,11 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
         await loadGoogleMapsScript();
       } catch { /* proceed with fallback */ }
 
-      // Use unified reverse geocoding via Geocoder + quality resolver
+      // Use unified reverse geocoding (Geocoder + Places API fallback)
       if ((window as any).google?.maps) {
         try {
-          const geocoder = new google.maps.Geocoder();
-          const geocodeResults = await new Promise<google.maps.GeocoderResult[] | null>((resolve) => {
-            geocoder.geocode({ location: { lat: pos.latitude, lng: pos.longitude } }, (results, status) => {
-              console.info('[LocationSelector] Geocode status:', status, 'results:', results?.length ?? 0);
-              resolve(status === 'OK' && results ? results : null);
-            });
-          });
-
-          if (geocodeResults) {
-            const bestLabel = extractBestLabel(geocodeResults);
-            const bestAddress = extractBestFormattedAddress(geocodeResults);
-            // Prefer POI name, fall back to formatted address
-            label = bestLabel?.name || bestAddress || '';
-            console.info('[LocationSelector] Resolved label:', label);
-          }
+          label = await reverseGeocode(pos.latitude, pos.longitude);
+          console.info('[LocationSelector] Resolved label:', label);
         } catch (err) {
           console.warn('[LocationSelector] Geocode error:', err);
         }
