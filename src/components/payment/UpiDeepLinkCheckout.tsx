@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,6 +43,7 @@ export function UpiDeepLinkCheckout({
   const [utrValue, setUtrValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hasOpenedApp = useRef(false);
+  const completionTriggeredRef = useRef(false);
 
   const shortOrderId = orderId.slice(0, 8).toUpperCase();
   const transactionNote = `ORD_${shortOrderId}`;
@@ -63,10 +64,16 @@ export function UpiDeepLinkCheckout({
       setStep('pay');
       setUtrValue('');
       hasOpenedApp.current = false;
+      completionTriggeredRef.current = false;
     }
   }, [isOpen]);
 
-  // When user returns to the app after paying, advance to confirm step
+  const completeFlow = useCallback(() => {
+    if (completionTriggeredRef.current) return;
+    completionTriggeredRef.current = true;
+    setStep('done');
+    setTimeout(() => onPaymentConfirmed(), 1500);
+  }, [onPaymentConfirmed]);
 
   useEffect(() => {
     if (isOpen && !sellerUpiId) {
@@ -74,7 +81,38 @@ export function UpiDeepLinkCheckout({
       onPaymentFailed();
       onClose();
     }
-  }, [isOpen, sellerUpiId]);
+  }, [isOpen, sellerUpiId, onPaymentFailed, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState !== 'visible' || !hasOpenedApp.current || completionTriggeredRef.current) return;
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select('payment_status, status')
+        .eq('id', orderId)
+        .maybeSingle();
+
+      if (error || !data) return;
+
+      if (data.payment_status === 'paid') {
+        completeFlow();
+        return;
+      }
+
+      if (data.status === 'cancelled') {
+        setStep('failed');
+        return;
+      }
+
+      setStep((prev) => (prev === 'pay' ? 'confirm' : prev));
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isOpen, orderId, completeFlow]);
 
   const handlePayWithApp = (scheme: string) => {
     hasOpenedApp.current = true;
@@ -136,8 +174,7 @@ export function UpiDeepLinkCheckout({
         }
       }
 
-      setStep('done');
-      setTimeout(() => onPaymentConfirmed(), 1500);
+      completeFlow();
     } catch (err) {
       console.error('Failed to submit UTR:', err);
       toast.error('Failed to submit payment confirmation');
@@ -146,7 +183,10 @@ export function UpiDeepLinkCheckout({
     }
   };
 
-  const handleClose = () => {
+  const dismissLocked = hasOpenedApp.current && (step === 'confirm' || step === 'utr' || isSubmitting);
+
+  const handleSystemClose = () => {
+    if (dismissLocked) return;
     // Only auto-cancel order if user never opened a payment app
     if (step === 'pay' && !hasOpenedApp.current) {
       onPaymentFailed();
@@ -154,9 +194,27 @@ export function UpiDeepLinkCheckout({
     onClose();
   };
 
+  const handleCancelOrder = () => {
+    onPaymentFailed();
+    onClose();
+  };
+
+  const handleSheetOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) handleSystemClose();
+  };
+
   return (
-    <Sheet open={isOpen} onOpenChange={handleClose}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto">
+    <Sheet open={isOpen} onOpenChange={handleSheetOpenChange}>
+      <SheetContent
+        side="bottom"
+        className="rounded-t-2xl max-h-[90vh] overflow-y-auto"
+        onPointerDownOutside={(event) => {
+          if (dismissLocked) event.preventDefault();
+        }}
+        onEscapeKeyDown={(event) => {
+          if (dismissLocked) event.preventDefault();
+        }}
+      >
         <SheetHeader className="text-center pb-4">
           <SheetTitle>Pay via UPI</SheetTitle>
           <SheetDescription>
@@ -205,7 +263,7 @@ export function UpiDeepLinkCheckout({
                 ))}
               </div>
 
-              <Button variant="outline" className="w-full" onClick={handleClose}>
+              <Button variant="outline" className="w-full" onClick={handleCancelOrder}>
                 Cancel
               </Button>
             </div>
@@ -232,7 +290,7 @@ export function UpiDeepLinkCheckout({
                   <RefreshCw size={16} />
                   Pay again
                 </Button>
-                <Button variant="ghost" className="w-full text-muted-foreground" onClick={handleClose}>
+                <Button variant="ghost" className="w-full text-muted-foreground" onClick={handleCancelOrder}>
                   Cancel order
                 </Button>
               </div>
@@ -320,7 +378,7 @@ export function UpiDeepLinkCheckout({
                 </p>
               </div>
               <div className="flex gap-3 pt-4">
-                <Button variant="outline" className="flex-1" onClick={handleClose}>
+                <Button variant="outline" className="flex-1" onClick={handleCancelOrder}>
                   Cancel
                 </Button>
                 <Button className="flex-1" onClick={() => setStep('pay')}>

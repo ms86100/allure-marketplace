@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { CallFeedbackModal } from './CallFeedbackModal';
 import { SellerChatSheet } from './SellerChatSheet';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface ContactSellerModalProps {
   open: boolean;
@@ -45,6 +46,11 @@ export function ContactSellerModal({
   };
 
   const handleMessage = async () => {
+    if (!buyerId) {
+      toast.error('Please sign in to message this seller.');
+      onOpenChange(false);
+      return;
+    }
     await logInteraction('message');
     onOpenChange(false);
     setChatOpen(true);
