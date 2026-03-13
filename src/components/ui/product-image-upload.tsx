@@ -91,6 +91,7 @@ export function ProductImageUpload({
         placeholder="Upload product photo"
         className={className}
         cropAspect={1}
+        beforePick={beforePick}
       />
     );
   }
