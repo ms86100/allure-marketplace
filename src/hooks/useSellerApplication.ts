@@ -104,7 +104,10 @@ export function useSellerApplication() {
             setSelectedGroup((draft as any).primary_group);
             loadSellerDataIntoForm(draft);
             await reloadProducts(draft.id);
-            setStep(3);
+            // Restore persisted step (survives WebView reload during image picker)
+            const savedStep = parseInt(localStorage.getItem('seller_onboarding_step') || '3', 10);
+            const restoredStep = Math.max(3, Math.min(savedStep, 6));
+            setStep(restoredStep);
           } else {
             // For rejected profiles, set existingSeller so the rejection screen shows first
             const rejected = data.find((s: any) => s.verification_status === 'rejected');
