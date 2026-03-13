@@ -1,79 +1,71 @@
 
 
-# Round 2 Audit Report
+# Notification System — Comprehensive Audit & Plan
 
-## Summary
+## Root Cause Fix (Implemented)
 
-Most critical issues from Round 1 have been fixed. The RPC now persists `delivery_fee` and `discount_amount`, validates `auth.uid()`, and handles overnight store hours. The favorites `.single()` bug was fixed. UPI amount now uses `finalAmount`. Cart is cleared optimistically after COD orders.
+Admin users were not notified when a new store or product was submitted for review. Fixed by:
 
-However, several remaining issues were found.
-
----
-
-## Issues Found
-
-### MEDIUM SEVERITY
-
-**1. Coupon ID Not Persisted in Orders**
-- **Location**: `create_multi_vendor_orders` RPC (line 120-132 of migration)
-- **Bug**: The orders table has a `coupon_id` column (uuid, nullable), and the RPC receives `_coupon_id` as a parameter, but the INSERT does not include `coupon_id`. Every order is stored with `coupon_id = NULL` even when a coupon was applied. This breaks coupon usage tracking, prevents coupon redemption limits from being enforced correctly, and makes order auditing incomplete.
-- **Fix**: Add `coupon_id` to the INSERT statement, populated with `NULLIF(_coupon_id, '')::uuid` for the first seller group's order.
-
-**2. Cart Not Cleared After Razorpay/UPI Success**
-- **Location**: `useCartPage.ts` lines 211-224 (Razorpay) and 238-244 (UPI)
-- **Bug**: After successful Razorpay or UPI payment, the code calls `await refresh()` but NOT `clearCart()`. While the RPC deletes cart_items server-side, the `refresh()` call only invalidates the query — during the gap before refetch completes, the user could momentarily see stale cart items (e.g., if they hit back). The COD path (line 200) correctly calls `clearCart()` first.
-- **Fix**: Add `clearCart()` before `refresh()` in both `handleRazorpaySuccess` and `handleUpiDeepLinkSuccess`, matching the COD flow.
-
-**3. Seller Order Polling Never Stops**
-- **Location**: `useNewOrderAlert.ts` lines 156-202
-- **Bug**: The polling fallback runs indefinitely with exponential backoff up to 30s. For sellers who leave the dashboard open for hours with no orders, this generates continuous network traffic (confirmed in network logs — empty `[]` responses every ~30s). The realtime subscription is the primary mechanism; polling is just a fallback.
-- **Fix**: After reaching `MAX_POLL_MS`, stop polling entirely and rely solely on the realtime subscription. Restart polling only when a realtime event fires (indicating connectivity is active).
-
-### LOW SEVERITY
-
-**4. `_coupon_code` Parameter Unused in RPC**
-- **Location**: `create_multi_vendor_orders` RPC
-- **Bug**: The `_coupon_code` parameter is accepted but never used in any INSERT or logic. It exists as dead code. No functional impact, but it adds confusion.
-- **Fix**: Either persist it alongside `coupon_id` (if the schema supports a `coupon_code` text column) or remove the parameter.
-
-**5. Distance Calculation Duplicated Across Files**
-- **Location**: `BrowsingLocationContext.tsx` (line 63), `SellerDetailPage.tsx` (lines 136-146), `useSearchPage.ts` (implicit via RPC)
-- **Bug**: The Haversine formula is implemented inline in at least 2 places. Not a bug per se, but a maintenance risk — if the formula needs updating, multiple files must be changed.
-- **Fix**: Extract to a shared utility (e.g., `src/lib/geo-utils.ts`). Low priority — no functional issue.
-
-**6. Duplicate `NewOrderAlertOverlay` Rendering**
-- **Location**: `App.tsx` (line 297) AND `SellerDashboardPage.tsx` (line 172)
-- **Bug**: Both mount `NewOrderAlertOverlay` with the same `sellerId`. When a seller is on the dashboard, two overlays render simultaneously, potentially causing duplicate alerts or visual stacking issues.
-- **Fix**: Remove the overlay from `SellerDashboardPage.tsx` since `App.tsx` already handles it globally, OR add a context flag to prevent double rendering.
+1. **`notifyAdminsNewStoreApplication()`** in `src/lib/admin-notifications.ts` — queries `user_roles` for admins, enqueues push+in-app notification via `notification_queue`
+2. **`handleSubmit` in `useSellerApplication.ts`** — calls the above after successful submission
+3. **DB trigger `trg_enqueue_product_review_notification`** on `products` table — fires when `approval_status` changes to `'pending'`, notifies all admins
 
 ---
 
-## Previously Fixed (Verified)
+## Current State (As-Is): All Notification Flows
 
-- UPI amount: Uses `c.finalAmount` — **confirmed fixed** (line 293)
-- COD cart clear: Calls `clearCart()` — **confirmed fixed** (line 200)
-- Favorites: Uses `.maybeSingle()` — **confirmed fixed** (line 42)
-- Overnight hours: Client + server both handle wrap-around — **confirmed fixed**
-- RPC auth guard: `auth.uid()` check present — **confirmed fixed** (line 33)
-- Delivery fee/discount in orders: Persisted — **confirmed fixed** (lines 124, 131)
+### A. Database Triggers
+
+| Trigger | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `enqueue_order_status_notification` | Order status changes | Buyer + Seller | ✅ | ✅ |
+| `enqueue_review_notification` | New review created | Seller | ✅ | ✅ |
+| `enqueue_dispute_status_notification` | Dispute status changes | Submitter | ✅ | ✅ |
+| `enqueue_settlement_notification` | Settlement created | Seller | ✅ | ✅ |
+| `trg_enqueue_product_review_notification` | Product submitted for review | Admins | ✅ | ✅ |
+
+### B. Edge Functions
+
+| Function | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `send-booking-reminders` | 1h before appointment | Buyer + Seller | ✅ | ✅ |
+| `process-notification-queue` | Queue processor | N/A | ✅ | ✅ |
+| `send-campaign` | Admin broadcast | Targeted users | ✅ | ✅ |
+| `generate-weekly-digest` | Weekly digest | Society members | ✅ | ✅ |
+| `generate-society-report` | Monthly report | Society members | ✅ | ✅ |
+| `detect-collective-issues` | Pattern detection | Society admins | ✅ | ✅ |
+
+### C. Client-Side (inserts to `notification_queue`)
+
+| Location | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `admin-notifications.ts` → `notifySellerStatusChange` | Admin approves/rejects seller | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyLicenseStatusChange` | Admin approves/rejects license | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyProductStatusChange` | Admin approves/rejects product | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyAdminsNewStoreApplication` | Seller submits store | Admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyAdmins` | Dispute/snag | Society admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyMembers` | Bulletin posts | Society members | ✅ | ✅ |
+| `ServiceBookingFlow.tsx` | New booking | Seller | ✅ | ❌ |
+| `BuyerCancelBooking.tsx` | Buyer cancels | Seller | ✅ | ❌ |
+| `SellerPaymentConfirmation.tsx` | Payment confirmed | Buyer | ✅ | ❌ |
+| `UpiDeepLinkCheckout.tsx` | UPI payment | Seller | ✅ | ❌ |
+| `useSellerChat.ts` | New chat (60s throttle) | Recipient | ✅ | ❌ |
+| `GuardManualEntryTab.tsx` | Gate entry | Resident | ✅ | ❌ |
+| `manage-delivery` edge fn | Delivery OTP/arrival | Buyer | ✅ | ✅ |
+| `update-delivery-location` edge fn | Delivery delay | Buyer | ✅ | ✅ |
 
 ---
 
-## Implementation Plan
+## Future Gaps (To-Be)
 
-### Phase 1 — Medium Fixes
+### Priority 2 — Operational
+- New user pending approval → Society admins
+- New society request → Platform admins
+- Report filed → Admins
+- Delivery partner assigned → Seller
 
-1. **Persist coupon_id in RPC**: New migration to add `coupon_id` to the INSERT in `create_multi_vendor_orders`, using `NULLIF(_coupon_id, '')::uuid`.
-
-2. **Clear cart after payment success**: Add `clearCart()` calls in `handleRazorpaySuccess` and `handleUpiDeepLinkSuccess` in `useCartPage.ts`.
-
-3. **Stop idle polling**: In `useNewOrderAlert.ts`, after backoff reaches `MAX_POLL_MS` and 3 consecutive empty polls, stop the timer. Re-trigger polling only on realtime subscription events.
-
-### Phase 2 — Low Fixes
-
-4. **Remove duplicate overlay**: Remove `NewOrderAlertOverlay` from `SellerDashboardPage.tsx`.
-
-5. **Extract Haversine utility**: Optional cleanup — extract shared distance calculation.
-
-All fixes are backward-compatible and do not introduce new features.
-
+### Priority 3 — Engagement
+- New product from favorite seller → Buyer
+- Seller back online → Recent buyers
+- Price drop on wishlisted item → Buyer
+- Order review reminder (24h after delivery) → Buyer

@@ -34,6 +34,7 @@ const MAX_POLL_MS = 30000;
 const BACKOFF_FACTOR = 1.5;
 const SNOOZE_MS = 60000;
 const LOOKBACK_MS = 5 * 60 * 1000; // 5 minutes (used for subsequent polls only)
+const MAX_EMPTY_AT_MAX_DELAY = 3; // Stop polling after this many consecutive empty results at max delay
 
 export function useNewOrderAlert(sellerId: string | null) {
   const queryClient = useQueryClient();
@@ -47,6 +48,8 @@ export function useNewOrderAlert(sellerId: string | null) {
   const seenIdsRef = useRef<Set<string>>(new Set());
   const dismissedIdsRef = useRef<Set<string>>(new Set());
   const snoozedUntilRef = useRef<Record<string, number>>({});
+  const emptyAtMaxRef = useRef(0);
+  const pollingStoppedRef = useRef(false);
 
   const handleNewOrder = useCallback((order: NewOrder) => {
     if (seenIdsRef.current.has(order.id)) return;
@@ -59,6 +62,8 @@ export function useNewOrderAlert(sellerId: string | null) {
       lastSeenAtRef.current = order.created_at;
     }
     pollDelayRef.current = MIN_POLL_MS;
+    emptyAtMaxRef.current = 0;
+    pollingStoppedRef.current = false;
     setPendingAlerts(prev => [...prev, order]);
     queryClient.invalidateQueries({ queryKey: ['seller-orders', sellerId] });
     queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats', sellerId] });
@@ -181,8 +186,16 @@ export function useNewOrderAlert(sellerId: string | null) {
 
         if (data && data.length > 0) {
           data.forEach(order => handleNewOrder(order as NewOrder));
+          emptyAtMaxRef.current = 0;
         } else {
           pollDelayRef.current = Math.min(pollDelayRef.current * BACKOFF_FACTOR, MAX_POLL_MS);
+          if (pollDelayRef.current >= MAX_POLL_MS) {
+            emptyAtMaxRef.current += 1;
+            if (emptyAtMaxRef.current >= MAX_EMPTY_AT_MAX_DELAY) {
+              pollingStoppedRef.current = true;
+              return; // Stop polling, rely on realtime
+            }
+          }
         }
       } catch {
         // Silently ignore poll errors

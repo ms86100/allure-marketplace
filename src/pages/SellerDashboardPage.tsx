@@ -26,13 +26,13 @@ import { SellerOrderCard } from '@/components/seller/SellerOrderCard';
 import { CouponManager } from '@/components/seller/CouponManager';
 import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
 import { DemandInsights } from '@/components/seller/DemandInsights';
-import { NewOrderAlertOverlay } from '@/components/seller/NewOrderAlertOverlay';
+
 import { ServiceBookingStats } from '@/components/seller/ServiceBookingStats';
 import { SellerDayAgenda } from '@/components/seller/SellerDayAgenda';
 import { AvailabilityPromptBanner } from '@/components/seller/AvailabilityPromptBanner';
 import { MissingLocationBanner } from '@/components/seller/MissingLocationBanner';
 import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCounts } from '@/hooks/queries/useSellerOrders';
-import { useNewOrderAlert } from '@/hooks/useNewOrderAlert';
+
 
 export default function SellerDashboardPage() {
   const { user, sellerProfiles = [], currentSellerId } = useAuth();
@@ -43,7 +43,7 @@ export default function SellerDashboardPage() {
   const [renderError, setRenderError] = useState<string | null>(null);
 
   const activeSellerId = currentSellerId || (Array.isArray(sellerProfiles) && sellerProfiles.length > 0 ? sellerProfiles[0].id : null);
-  const { pendingAlerts, dismiss: dismissAlert, snooze: snoozeAlert } = useNewOrderAlert(activeSellerId);
+  // NewOrderAlert hook + overlay handled globally in App.tsx
 
   useEffect(() => {
     console.log('[SellerDashboard] Auth state:', { userId: user?.id, sellerProfilesCount: sellerProfiles?.length, activeSellerId, currentSellerId });
@@ -169,7 +169,7 @@ export default function SellerDashboardPage() {
 
   return (
     <AppLayout headerTitle="Seller Dashboard" showLocation={false}>
-      <NewOrderAlertOverlay orders={pendingAlerts} onDismiss={dismissAlert} onSnooze={snoozeAlert} />
+      {/* NewOrderAlertOverlay is rendered globally in App.tsx — removed here to prevent duplicates */}
       <div className="p-4 space-y-4">
         {/* Rejection / Pending banner */}
         {sellerProfile.verification_status !== 'approved' && (
