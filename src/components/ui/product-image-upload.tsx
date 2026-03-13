@@ -26,6 +26,7 @@ export function ProductImageUpload({
   categoryName,
   description,
   className,
+  beforePick,
 }: ProductImageUploadProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
