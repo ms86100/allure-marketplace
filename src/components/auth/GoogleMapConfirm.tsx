@@ -2,40 +2,33 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MapPin, Check, Loader2 } from 'lucide-react';
-
-const PLUS_CODE_REGEX = /^[23456789CFGHJMPQRVWX]+\+/;
+import {
+  extractBestLabel,
+  findNearbyPlaceName,
+  pickBetterLabel,
+  isLowQualityLabel,
+  formatCoords,
+  LabelQuality,
+  type ResolvedLabel,
+} from '@/lib/location-label-resolver';
 
 interface GoogleMapConfirmProps {
   latitude: number;
   longitude: number;
+  /** Initial name from the caller (e.g. selected autocomplete result). Treated as a high-quality candidate if meaningful. */
   name: string;
   onConfirm: (lat: number, lng: number, updatedName?: string) => void;
   onBack: () => void;
 }
 
-/**
- * Given an array of geocoder results, find the best human-readable name,
- * skipping any result whose formatted_address starts with a Plus Code.
- */
-function extractBestName(results: google.maps.GeocoderResult[]): string | null {
-  for (const result of results) {
-    // Skip plus-code results
-    if (PLUS_CODE_REGEX.test(result.formatted_address)) continue;
-    // Skip results that only have plus_code type
-    if (result.types.includes('plus_code' as any)) continue;
-
-    const components = result.address_components || [];
-    const get = (type: string) => components.find(c => c.types.includes(type))?.long_name;
-
-    const name = get('premise') || get('point_of_interest') || get('establishment')
-      || get('neighborhood') || get('sublocality_level_1') || get('route');
-    if (name) return name;
-
-    // If we have a non-plus-code formatted_address, use its first segment
-    const firstSegment = result.formatted_address.split(',')[0]?.trim();
-    if (firstSegment && !PLUS_CODE_REGEX.test(firstSegment)) return firstSegment;
-  }
-  return null;
+/** Check if a caller-provided name is a meaningful initial label (not a generic placeholder). */
+function callerNameToLabel(name: string): ResolvedLabel | null {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  const genericPlaceholders = ['store location', 'your location', 'location pinned'];
+  if (genericPlaceholders.includes(trimmed.toLowerCase())) return null;
+  // Treat caller-provided names as POI quality since they come from autocomplete / user selection
+  return { name: trimmed, quality: LabelQuality.POI };
 }
 
 export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack }: GoogleMapConfirmProps) {
@@ -46,6 +39,9 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
 
   const displayNameRef = useRef(name);
   useEffect(() => { displayNameRef.current = displayName; }, [displayName]);
+
+  // Track the quality of the current initial name from the caller
+  const initialLabelRef = useRef<ResolvedLabel | null>(callerNameToLabel(name));
 
   useEffect(() => {
     if (!mapRef.current || !(window as any).google?.maps) {
@@ -75,53 +71,46 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
 
     const geocoder = new google.maps.Geocoder();
 
-    const reverseGeocodeViaPlaces = (lat: number, lng: number): Promise<string | null> => {
-      return new Promise((resolve) => {
-        try {
-          const service = new google.maps.places.PlacesService(map);
-          service.nearbySearch(
-            { location: { lat, lng }, radius: 50, rankBy: google.maps.places.RankBy.PROMINENCE },
-            (results, status) => {
-              if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]) {
-                resolve(results[0].name || results[0].vicinity || null);
-              } else {
-                resolve(null);
-              }
-            }
-          );
-        } catch {
-          resolve(null);
-        }
-      });
-    };
-
-    const reverseGeocode = (lat: number, lng: number) => {
+    const resolveLabel = async (lat: number, lng: number, preserveInitial: boolean) => {
       setIsGeocoding(true);
-      geocoder.geocode({ location: { lat, lng } }, async (results, status) => {
-        if (status === 'OK' && results && results.length > 0) {
-          const bestName = extractBestName(results);
-          if (bestName) {
-            setDisplayName(bestName);
-            setIsGeocoding(false);
-            return;
-          }
-          // All results were plus codes — try Places fallback
-          console.warn('GoogleMapConfirm: All geocoder results are Plus Codes, trying Places fallback');
-        } else {
-          console.warn('GoogleMapConfirm: Geocoder failed with status:', status);
+
+      // Start with the initial label if preserving (first load, not dragged)
+      let currentBest: ResolvedLabel | null = preserveInitial ? initialLabelRef.current : null;
+
+      try {
+        // Step 1: Geocode
+        const geocodeResult = await new Promise<google.maps.GeocoderResult[] | null>((resolve) => {
+          geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+            resolve(status === 'OK' && results ? results : null);
+          });
+        });
+
+        if (geocodeResult) {
+          const geocodeLabel = extractBestLabel(geocodeResult);
+          currentBest = pickBetterLabel(currentBest, geocodeLabel);
         }
 
-        const placeName = await reverseGeocodeViaPlaces(lat, lng);
-        if (placeName) {
-          setDisplayName(placeName);
-        } else {
-          setDisplayName(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+        // Step 2: If geocode result is low quality, try Places fallback
+        if (isLowQualityLabel(currentBest)) {
+          console.info('GoogleMapConfirm: Geocode label is low quality, trying Places fallback');
+          const placesLabel = await findNearbyPlaceName(map, lat, lng);
+          currentBest = pickBetterLabel(currentBest, placesLabel);
         }
-        setIsGeocoding(false);
-      });
+      } catch (err) {
+        console.warn('GoogleMapConfirm: Label resolution error:', err);
+      }
+
+      // Final fallback to coordinates
+      if (!currentBest) {
+        currentBest = formatCoords(lat, lng);
+      }
+
+      setDisplayName(currentBest.name);
+      setIsGeocoding(false);
     };
 
-    reverseGeocode(latitude, longitude);
+    // Initial resolve — preserve the caller-provided name if it's high quality
+    resolveLabel(latitude, longitude, true);
 
     pin.addListener('dragend', () => {
       const pos = pin.getPosition();
@@ -129,7 +118,8 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
         const newLat = pos.lat();
         const newLng = pos.lng();
         setMarker({ lat: newLat, lng: newLng });
-        reverseGeocode(newLat, newLng);
+        // After drag, don't preserve initial — resolve fresh
+        resolveLabel(newLat, newLng, false);
       }
     });
 
