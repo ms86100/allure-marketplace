@@ -21,6 +21,7 @@ import { hapticImpact } from '@/lib/haptics';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { computeStoreStatus, formatStoreClosedMessage, type StoreAvailability } from '@/lib/store-availability';
+import { useAuth } from '@/contexts/AuthContext';
 
 function formatSellerLastActive(lastActiveAt: string, ml: ReturnType<typeof useMarketplaceLabels>): string {
   try {
@@ -46,6 +47,7 @@ interface ProductDetailSheetProps {
 export { type ProductDetail };
 
 export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduct, categoryIcon, categoryName }: ProductDetailSheetProps) {
+  const { user } = useAuth();
   const d = useProductDetail(product, open, onOpenChange);
   const ml = useMarketplaceLabels();
   const [bookingOpen, setBookingOpen] = useState(false);
