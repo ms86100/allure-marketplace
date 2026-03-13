@@ -42,11 +42,29 @@ export function UpiDeepLinkCheckout({
   onPaymentFailed,
 }: UpiDeepLinkCheckoutProps) {
   const { formatPrice } = useCurrency();
-  const [step, setStep] = useState<CheckoutStep>('pay');
+  // Restore persisted step on mount (survives app-switch remounts)
+  const [step, setStepRaw] = useState<CheckoutStep>(() => {
+    try {
+      const saved = sessionStorage.getItem(UPI_STEP_KEY);
+      if (saved && ['pay', 'confirm', 'utr'].includes(saved)) return saved as CheckoutStep;
+    } catch {}
+    return 'pay';
+  });
   const [utrValue, setUtrValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const hasOpenedApp = useRef(false);
+  const hasOpenedApp = useRef(() => {
+    try { return sessionStorage.getItem(UPI_OPENED_APP_KEY) === 'true'; } catch { return false; }
+  });
   const completionTriggeredRef = useRef(false);
+
+  // Wrapper to persist step changes
+  const setStep = useCallback((nextStep: CheckoutStep | ((prev: CheckoutStep) => CheckoutStep)) => {
+    setStepRaw(prev => {
+      const resolved = typeof nextStep === 'function' ? nextStep(prev) : nextStep;
+      try { sessionStorage.setItem(UPI_STEP_KEY, resolved); } catch {}
+      return resolved;
+    });
+  }, []);
 
   const shortOrderId = orderId.slice(0, 8).toUpperCase();
   const transactionNote = `ORD_${shortOrderId}`;
