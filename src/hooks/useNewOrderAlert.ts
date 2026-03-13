@@ -48,6 +48,8 @@ export function useNewOrderAlert(sellerId: string | null) {
   const seenIdsRef = useRef<Set<string>>(new Set());
   const dismissedIdsRef = useRef<Set<string>>(new Set());
   const snoozedUntilRef = useRef<Record<string, number>>({});
+  const emptyAtMaxRef = useRef(0);
+  const pollingStoppedRef = useRef(false);
 
   const handleNewOrder = useCallback((order: NewOrder) => {
     if (seenIdsRef.current.has(order.id)) return;
