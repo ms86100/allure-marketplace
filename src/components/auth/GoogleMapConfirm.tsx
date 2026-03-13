@@ -17,6 +17,10 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
   const [displayName, setDisplayName] = useState(name);
   const [isGeocoding, setIsGeocoding] = useState(false);
 
+  // Keep a ref for the latest geocoded name so the confirm button always uses it
+  const displayNameRef = useRef(name);
+  useEffect(() => { displayNameRef.current = displayName; }, [displayName]);
+
   useEffect(() => {
     if (!mapRef.current || !(window as any).google?.maps) return;
 
@@ -41,27 +45,33 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
 
     const geocoder = new google.maps.Geocoder();
 
+    // Also reverse-geocode the initial position so the displayed address is always accurate
+    const reverseGeocode = (lat: number, lng: number) => {
+      setIsGeocoding(true);
+      geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+        setIsGeocoding(false);
+        if (status === 'OK' && results && results[0]) {
+          const result = results[0];
+          const premise = result.address_components?.find(c => c.types.includes('premise'))?.long_name;
+          const sublocality = result.address_components?.find(c => c.types.includes('sublocality_level_1'))?.long_name;
+          const neighborhood = result.address_components?.find(c => c.types.includes('neighborhood'))?.long_name;
+          const route = result.address_components?.find(c => c.types.includes('route'))?.long_name;
+          const updatedName = premise || neighborhood || sublocality || route || result.formatted_address.split(',')[0];
+          setDisplayName(updatedName);
+        }
+      });
+    };
+
+    // Reverse geocode initial position for accuracy
+    reverseGeocode(latitude, longitude);
+
     pin.addListener('dragend', () => {
       const pos = pin.getPosition();
       if (pos) {
         const newLat = pos.lat();
         const newLng = pos.lng();
         setMarker({ lat: newLat, lng: newLng });
-
-        // Reverse geocode to update address
-        setIsGeocoding(true);
-        geocoder.geocode({ location: { lat: newLat, lng: newLng } }, (results, status) => {
-          setIsGeocoding(false);
-          if (status === 'OK' && results && results[0]) {
-            // Try to find a meaningful name from address components
-            const result = results[0];
-            const premise = result.address_components?.find(c => c.types.includes('premise'))?.long_name;
-            const sublocality = result.address_components?.find(c => c.types.includes('sublocality_level_1'))?.long_name;
-            const neighborhood = result.address_components?.find(c => c.types.includes('neighborhood'))?.long_name;
-            const updatedName = premise || neighborhood || sublocality || result.formatted_address.split(',')[0];
-            setDisplayName(updatedName);
-          }
-        });
+        reverseGeocode(newLat, newLng);
       }
     });
 
@@ -88,7 +98,7 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
         <Button variant="outline" onClick={onBack} className="flex-1 h-12 rounded-xl">
           Back
         </Button>
-        <Button onClick={() => onConfirm(marker.lat, marker.lng, displayName)} className="flex-1 h-12 rounded-xl font-semibold">
+        <Button onClick={() => onConfirm(marker.lat, marker.lng, displayNameRef.current)} className="flex-1 h-12 rounded-xl font-semibold">
           <Check size={16} className="mr-1" /> Confirm Location
         </Button>
       </div>
