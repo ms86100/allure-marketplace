@@ -232,6 +232,8 @@ export function useCartPage() {
       try { await supabase.from('orders').update({ status: 'cancelled' } as any).in('id', pendingOrderIds).eq('payment_status', 'pending').eq('buyer_id', user.id); } catch (err) { console.error('Failed to cancel unpaid orders:', err); }
     }
     setPendingOrderIds([]);
+    clearCart();
+    await refresh();
     toast.error('Payment was not completed. Your order has been cancelled.');
   };
 
