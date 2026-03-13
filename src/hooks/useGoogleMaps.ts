@@ -23,6 +23,7 @@ async function fetchGoogleMapsApiKey(): Promise<string> {
   } catch (e) {
     console.warn('Failed to fetch Google Maps key from DB, using fallback:', e);
   }
+  console.warn('useGoogleMaps: Using HARDCODED FALLBACK API key — DB key not found or inactive');
   resolvedApiKey = HARDCODED_FALLBACK_KEY;
   return HARDCODED_FALLBACK_KEY;
 }
