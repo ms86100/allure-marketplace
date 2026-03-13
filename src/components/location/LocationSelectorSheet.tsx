@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBrowsingLocation, BrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { getCurrentPosition } from '@/lib/native-location';
 import { loadGoogleMapsScript } from '@/hooks/useGoogleMaps';
+import { extractBestLabel, extractBestFormattedAddress } from '@/lib/location-label-resolver';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
@@ -80,28 +81,27 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
         await loadGoogleMapsScript();
       } catch { /* proceed with fallback */ }
 
-      if ((window as any).google?.maps?.places) {
+      // Use unified reverse geocoding via Geocoder + quality resolver
+      if ((window as any).google?.maps) {
         try {
-          const div = document.createElement('div');
-          const service = new google.maps.places.PlacesService(div);
-          const result = await new Promise<string>((resolve) => {
-            service.nearbySearch(
-              {
-                location: { lat: pos.latitude, lng: pos.longitude },
-                rankBy: google.maps.places.RankBy.DISTANCE,
-                type: 'point_of_interest',
-              },
-              (results, status) => {
-                if (status === google.maps.places.PlacesServiceStatus.OK && results?.[0]) {
-                  resolve(results[0].name || results[0].vicinity || '');
-                } else {
-                  resolve('');
-                }
-              }
-            );
+          const geocoder = new google.maps.Geocoder();
+          const geocodeResults = await new Promise<google.maps.GeocoderResult[] | null>((resolve) => {
+            geocoder.geocode({ location: { lat: pos.latitude, lng: pos.longitude } }, (results, status) => {
+              console.info('[LocationSelector] Geocode status:', status, 'results:', results?.length ?? 0);
+              resolve(status === 'OK' && results ? results : null);
+            });
           });
-          if (result) label = result;
-        } catch { /* fallback below */ }
+
+          if (geocodeResults) {
+            const bestLabel = extractBestLabel(geocodeResults);
+            const bestAddress = extractBestFormattedAddress(geocodeResults);
+            // Prefer POI name, fall back to formatted address
+            label = bestLabel?.name || bestAddress || '';
+            console.info('[LocationSelector] Resolved label:', label);
+          }
+        } catch (err) {
+          console.warn('[LocationSelector] Geocode error:', err);
+        }
       }
 
       if (!label) {
