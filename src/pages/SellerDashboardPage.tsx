@@ -32,7 +32,7 @@ import { SellerDayAgenda } from '@/components/seller/SellerDayAgenda';
 import { AvailabilityPromptBanner } from '@/components/seller/AvailabilityPromptBanner';
 import { MissingLocationBanner } from '@/components/seller/MissingLocationBanner';
 import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCounts } from '@/hooks/queries/useSellerOrders';
-import { useNewOrderAlert } from '@/hooks/useNewOrderAlert';
+
 
 export default function SellerDashboardPage() {
   const { user, sellerProfiles = [], currentSellerId } = useAuth();
