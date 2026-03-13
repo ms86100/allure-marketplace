@@ -74,6 +74,8 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId }: SetStore
       if (error) throw error;
       toast.success('Store location set successfully!');
       queryClient.invalidateQueries({ queryKey: ['seller-health', sellerId] });
+      queryClient.invalidateQueries({ queryKey: ['seller-profile'] });
+      queryClient.invalidateQueries({ queryKey: ['seller-settings'] });
       onOpenChange(false);
       setStep('pick');
       setCoords(null);

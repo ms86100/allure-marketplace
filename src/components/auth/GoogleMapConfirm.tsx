@@ -61,6 +61,10 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
           const route = result.address_components?.find(c => c.types.includes('route'))?.long_name;
           const updatedName = premise || neighborhood || sublocality || route || result.formatted_address.split(',')[0];
           setDisplayName(updatedName);
+        } else {
+          console.warn('GoogleMapConfirm: Geocode failed', status);
+          // Fallback: show coordinates so user knows pin moved
+          setDisplayName(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
         }
       });
     };

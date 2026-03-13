@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { SetStoreLocationSheet } from '@/components/seller/SetStoreLocationSheet';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -14,7 +15,7 @@ import { CroppableImageUpload } from '@/components/ui/croppable-image-upload';
 import { DAYS_OF_WEEK } from '@/types/database';
 import { Slider } from '@/components/ui/slider';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2, Globe, Truck, Eye } from 'lucide-react';
+import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2, Globe, Truck, Eye, MapPin, Navigation } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { cn } from '@/lib/utils';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
@@ -35,6 +36,41 @@ function LicenseUploadSection({ sellerId, primaryGroup }: { sellerId: string; pr
 
   if (!groupId || !requiresLicense) return null;
   return <LicenseUpload sellerId={sellerId} groupId={groupId} />;
+}
+
+function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; sellerProfile: any }) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const hasCoords = !!(sellerProfile as any).latitude && !!(sellerProfile as any).longitude;
+
+  return (
+    <div className="bg-card rounded-xl p-4 shadow-sm">
+      <h3 className="font-semibold mb-3 flex items-center gap-2">
+        <MapPin size={16} className="text-primary" />
+        Store Location
+      </h3>
+      {hasCoords ? (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Navigation size={14} className="text-success" />
+            <span>Location set</span>
+          </div>
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setSheetOpen(true)}>
+            Update Location
+          </Button>
+        </div>
+      ) : (
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+          <p className="text-sm font-medium text-destructive">No location set</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Your store won't be visible to buyers without a location.</p>
+          <Button variant="destructive" size="sm" className="mt-2 h-8 text-xs" onClick={() => setSheetOpen(true)}>
+            <MapPin size={12} className="mr-1" />
+            Set Location Now
+          </Button>
+        </div>
+      )}
+      <SetStoreLocationSheet open={sheetOpen} onOpenChange={setSheetOpen} sellerId={sellerId} />
+    </div>
+  );
 }
 
 export default function SellerSettingsPage() {
@@ -126,6 +162,9 @@ export default function SellerSettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* Store Location */}
+          <StoreLocationSection sellerId={sellerProfile.id} sellerProfile={sellerProfile} />
 
           {/* Business Name & Description */}
           <div className="space-y-2">
