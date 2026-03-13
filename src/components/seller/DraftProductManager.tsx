@@ -52,6 +52,7 @@ export function DraftProductManager({
   categories,
   products,
   onProductsChange,
+  beforePick,
 }: DraftProductManagerProps) {
   const { user } = useAuth();
   const DRAFT_KEY = `draft-product-form-${sellerId}`;
