@@ -83,21 +83,27 @@ export function UpiDeepLinkCheckout({
     }
   }, [isOpen, sellerUpiId, onPaymentFailed, onClose]);
 
+  // On app resume from UPI app, check payment status and show confirmation UI
   useEffect(() => {
     if (!isOpen) return;
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState !== 'visible' || !hasOpenedApp.current || completionTriggeredRef.current) return;
 
+      // Check if payment was already confirmed server-side
       const { data, error } = await supabase
         .from('orders')
         .select('payment_status, status')
         .eq('id', orderId)
         .maybeSingle();
 
-      if (error || !data) return;
+      if (error || !data) {
+        // On error, still show confirm step so user can manually confirm
+        setStep((prev) => (prev === 'pay' ? 'confirm' : prev));
+        return;
+      }
 
-      if (data.payment_status === 'paid') {
+      if (data.payment_status === 'paid' || data.payment_status === 'buyer_confirmed') {
         completeFlow();
         return;
       }
@@ -107,7 +113,8 @@ export function UpiDeepLinkCheckout({
         return;
       }
 
-      setStep((prev) => (prev === 'pay' ? 'confirm' : prev));
+      // CRITICAL: Always advance to confirm step so "I Paid / Pay Again" stays visible
+      setStep('confirm');
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
