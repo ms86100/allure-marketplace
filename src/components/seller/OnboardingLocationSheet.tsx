@@ -149,7 +149,7 @@ export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: Onboa
             <GoogleMapConfirm
               latitude={coords.lat}
               longitude={coords.lng}
-              name="Store Location"
+              name={selectedPlaceName || 'Store Location'}
               onConfirm={(lat, lng, updatedName) => onConfirm(lat, lng, updatedName)}
               onBack={handleBack}
             />

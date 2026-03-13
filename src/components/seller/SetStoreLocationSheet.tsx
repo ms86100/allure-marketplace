@@ -182,7 +182,7 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
             <GoogleMapConfirm
               latitude={coords.lat}
               longitude={coords.lng}
-              name="Store Location"
+              name={selectedPlaceName || 'Store Location'}
               onConfirm={(lat, lng) => handleConfirm(lat, lng)}
               onBack={handleBack}
             />

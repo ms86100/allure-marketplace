@@ -121,14 +121,18 @@ export function AddressForm({ initial, onSave, onCancel, saving }: AddressFormPr
       clearPredictions();
       setShowMap(true);
 
-      // Reverse geocode
+      // Reverse geocode with quality resolver
       if ((window as any).google?.maps) {
         const geocoder = new google.maps.Geocoder();
         geocoder.geocode({ location: { lat: pos.latitude, lng: pos.longitude } }, (results, status) => {
-          if (status === 'OK' && results?.[0]) {
-            const r = results[0];
-            const pincode = r.address_components?.find(c => c.types.includes('postal_code'))?.long_name || '';
-            setForm(f => ({ ...f, full_address: r.formatted_address, pincode: pincode || f.pincode }));
+          if (status === 'OK' && results && results.length > 0) {
+            const bestLabel = extractBestLabel(results);
+            const pincode = results[0].address_components?.find(c => c.types.includes('postal_code'))?.long_name || '';
+            setForm(f => ({
+              ...f,
+              full_address: bestLabel?.formattedAddress || results[0].formatted_address,
+              pincode: pincode || f.pincode,
+            }));
           }
         });
       }
