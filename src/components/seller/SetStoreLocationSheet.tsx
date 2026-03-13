@@ -20,6 +20,7 @@ interface SetStoreLocationSheetProps {
 export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess }: SetStoreLocationSheetProps) {
   const [step, setStep] = useState<'pick' | 'confirm'>('pick');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedPlaceName, setSelectedPlaceName] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchInput, setSearchInput] = useState('');
