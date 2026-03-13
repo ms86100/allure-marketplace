@@ -36,6 +36,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 
 export default function SellerDetailPage() {
   const { id } = useParams();
@@ -44,6 +45,7 @@ export default function SellerDetailPage() {
   const { configs: allCategoryConfigs } = useCategoryConfigs();
   const { items, totalAmount } = useCart();
   const { formatPrice } = useCurrency();
+  const { browsingLocation: browsingLoc } = useBrowsingLocation();
   const [seller, setSeller] = useState<SellerProfile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -113,13 +115,11 @@ export default function SellerDetailPage() {
           let buyerLat: number | null = null;
           let buyerLng: number | null = null;
 
-          try {
-            const browsing = JSON.parse(localStorage.getItem('sociva_browsing_location') || 'null');
-            if (browsing?.lat && browsing?.lng) {
-              buyerLat = browsing.lat;
-              buyerLng = browsing.lng;
-            }
-          } catch { /* ignore */ }
+          // Use browsing location from context (passed via browsingLoc prop)
+          if (browsingLoc?.lat && browsingLoc?.lng) {
+            buyerLat = browsingLoc.lat;
+            buyerLng = browsingLoc.lng;
+          }
 
           // Fallback to buyer's society coordinates
           if (!buyerLat && !buyerLng && effectiveSocietyId) {

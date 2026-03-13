@@ -84,7 +84,7 @@ export function useOrderDetail(id: string | undefined) {
       if (cancelled) return;
       setOrder(data as any);
       if (data?.status === 'completed' || data?.status === 'delivered') {
-        const { data: reviewData } = await supabase.from('reviews').select('id').eq('order_id', id).single();
+        const { data: reviewData } = await supabase.from('reviews').select('id').eq('order_id', id).maybeSingle();
         if (!cancelled) setHasReview(!!reviewData);
       } else { if (!cancelled) setHasReview(false); }
     } catch (error) { console.error('Error fetching order:', error); }
