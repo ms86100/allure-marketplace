@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MapPin, Navigation, Loader2, Home, Briefcase, Tag, Search, X } from 'lucide-react';
+import { MapPin, Navigation, Loader2, Home, Briefcase, Tag, Search, X, Plus, Pencil, Trash2 } from 'lucide-react';
 import { getCurrentPosition } from '@/lib/native-location';
 import { GoogleMapConfirm } from '@/components/auth/GoogleMapConfirm';
 import { useAutocomplete } from '@/hooks/useGoogleMaps';
