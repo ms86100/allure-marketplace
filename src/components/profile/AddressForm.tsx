@@ -6,7 +6,7 @@ import { MapPin, Navigation, Loader2, Home, Briefcase, Tag, Search, X } from 'lu
 import { getCurrentPosition } from '@/lib/native-location';
 import { GoogleMapConfirm } from '@/components/auth/GoogleMapConfirm';
 import { useAutocomplete } from '@/hooks/useGoogleMaps';
-import { extractBestLabel } from '@/lib/location-label-resolver';
+import { extractBestLabel, extractBestFormattedAddress } from '@/lib/location-label-resolver';
 import { toast } from 'sonner';
 
 interface AddressData {
@@ -127,10 +127,11 @@ export function AddressForm({ initial, onSave, onCancel, saving }: AddressFormPr
         geocoder.geocode({ location: { lat: pos.latitude, lng: pos.longitude } }, (results, status) => {
           if (status === 'OK' && results && results.length > 0) {
             const bestLabel = extractBestLabel(results);
+            const bestAddress = extractBestFormattedAddress(results);
             const pincode = results[0].address_components?.find(c => c.types.includes('postal_code'))?.long_name || '';
             setForm(f => ({
               ...f,
-              full_address: bestLabel?.formattedAddress || results[0].formatted_address,
+              full_address: bestAddress || bestLabel?.formattedAddress || results[0].formatted_address,
               pincode: pincode || f.pincode,
             }));
           }
@@ -143,12 +144,14 @@ export function AddressForm({ initial, onSave, onCancel, saving }: AddressFormPr
     }
   };
 
-  const handleMapConfirm = (lat: number, lng: number, name?: string) => {
+  const handleMapConfirm = (lat: number, lng: number, name?: string, formattedAddress?: string) => {
     setForm(f => ({
       ...f,
       latitude: lat,
       longitude: lng,
-      full_address: name || f.full_address,
+      // Use formattedAddress (full postal address) for full_address field
+      // Fall back to name (display label) only if no formatted address available
+      full_address: formattedAddress || name || f.full_address,
       // If building_name was already cleared (GPS flow), keep it cleared
       building_name: f.building_name || '',
     }));

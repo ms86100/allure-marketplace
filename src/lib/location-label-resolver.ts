@@ -34,34 +34,45 @@ function isPlusCode(text: string): boolean {
 
 /**
  * Score a single geocoder result and return the best candidate from it.
+ * NOTE: We no longer reject results whose formatted_address starts with a plus code,
+ * because the address_components may still contain a useful POI name.
  */
 function scoreGeocoderResult(result: google.maps.GeocoderResult): ResolvedLabel | null {
-  if (isPlusCode(result.formatted_address)) return null;
-  if (result.types.includes('plus_code' as any)) return null;
+  // Skip results that are purely plus_code type with no useful components
+  if (result.types.includes('plus_code' as any) && (!result.address_components || result.address_components.length <= 2)) {
+    return null;
+  }
 
   const components = result.address_components || [];
   const get = (type: string) => components.find(c => c.types.includes(type))?.long_name;
 
+  // Derive the best formatted address: prefer the one from this result if it's not a plus code
+  const formattedAddr = isPlusCode(result.formatted_address)
+    ? undefined // will be filled by extractBestFormattedAddress separately
+    : result.formatted_address;
+
   // POI-level
   const poi = get('point_of_interest') || get('establishment');
-  if (poi && !isGeneric(poi)) return { name: poi, quality: LabelQuality.POI, formattedAddress: result.formatted_address };
+  if (poi && !isGeneric(poi)) return { name: poi, quality: LabelQuality.POI, formattedAddress: formattedAddr };
 
   const premise = get('premise');
-  if (premise && !isGeneric(premise)) return { name: premise, quality: LabelQuality.Premise, formattedAddress: result.formatted_address };
+  if (premise && !isGeneric(premise)) return { name: premise, quality: LabelQuality.Premise, formattedAddress: formattedAddr };
 
   const neighborhood = get('neighborhood');
-  if (neighborhood && !isGeneric(neighborhood)) return { name: neighborhood, quality: LabelQuality.Neighborhood, formattedAddress: result.formatted_address };
+  if (neighborhood && !isGeneric(neighborhood)) return { name: neighborhood, quality: LabelQuality.Neighborhood, formattedAddress: formattedAddr };
 
   const sublocality = get('sublocality_level_1') || get('sublocality');
-  if (sublocality && !isGeneric(sublocality)) return { name: sublocality, quality: LabelQuality.Sublocality, formattedAddress: result.formatted_address };
+  if (sublocality && !isGeneric(sublocality)) return { name: sublocality, quality: LabelQuality.Sublocality, formattedAddress: formattedAddr };
 
   const route = get('route');
-  if (route && !isGeneric(route)) return { name: route, quality: LabelQuality.Route, formattedAddress: result.formatted_address };
+  if (route && !isGeneric(route)) return { name: route, quality: LabelQuality.Route, formattedAddress: formattedAddr };
 
-  // Fallback to first segment of formatted address
-  const firstSeg = result.formatted_address.split(',')[0]?.trim();
-  if (firstSeg && !isPlusCode(firstSeg) && !isGeneric(firstSeg)) {
-    return { name: firstSeg, quality: LabelQuality.Route, formattedAddress: result.formatted_address };
+  // Fallback to first segment of formatted address (only if it's not a plus code)
+  if (formattedAddr) {
+    const firstSeg = formattedAddr.split(',')[0]?.trim();
+    if (firstSeg && !isPlusCode(firstSeg) && !isGeneric(firstSeg)) {
+      return { name: firstSeg, quality: LabelQuality.Route, formattedAddress: formattedAddr };
+    }
   }
 
   return null;
@@ -80,11 +91,53 @@ export function extractBestLabel(results: google.maps.GeocoderResult[]): Resolve
     // Short-circuit if we already found a POI
     if (best?.quality === LabelQuality.POI) break;
   }
+
+  // If best label has no formattedAddress yet, try to get one from the results
+  if (best && !best.formattedAddress) {
+    const addr = extractBestFormattedAddress(results);
+    if (addr) best.formattedAddress = addr;
+  }
+
   return best;
 }
 
 /**
- * Use the modern Places API to find a nearby POI name.
+ * Extract the best human-readable formatted address from geocoder results.
+ * Skips plus-code addresses and overly generic ones (just city/state).
+ * Returns a street-level or area-level formatted address.
+ */
+export function extractBestFormattedAddress(results: google.maps.GeocoderResult[]): string | null {
+  for (const result of results) {
+    const addr = result.formatted_address;
+    if (!addr) continue;
+    if (isPlusCode(addr)) continue;
+    // Skip overly generic (just locality/political)
+    const types = result.types || [];
+    if (types.length === 1 && (types[0] === 'locality' || types[0] === 'political' || types[0] === 'country')) continue;
+    // Must have at least a route or sublocality for street-level detail
+    const components = result.address_components || [];
+    const hasDetail = components.some(c =>
+      c.types.includes('route') ||
+      c.types.includes('sublocality') ||
+      c.types.includes('sublocality_level_1') ||
+      c.types.includes('neighborhood') ||
+      c.types.includes('premise') ||
+      c.types.includes('street_number')
+    );
+    if (hasDetail) return addr;
+  }
+  // If nothing with street detail, return first non-plus-code address
+  for (const result of results) {
+    if (result.formatted_address && !isPlusCode(result.formatted_address)) {
+      return result.formatted_address;
+    }
+  }
+  return null;
+}
+
+/**
+ * Use Places API to find a nearby POI name.
+ * Filters out overly generic results like city names.
  */
 export async function findNearbyPlaceName(
   map: google.maps.Map,
@@ -97,11 +150,20 @@ export async function findNearbyPlaceName(
       service.nearbySearch(
         { location: { lat, lng }, radius: 50, rankBy: google.maps.places.RankBy.PROMINENCE },
         (results, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && results?.[0]) {
-            const name = results[0].name || results[0].vicinity;
-            if (name && !isGeneric(name) && !isPlusCode(name)) {
-              resolve({ name, quality: LabelQuality.POI });
-              return;
+          if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+            // Iterate through results to find an actual POI, not a city/locality
+            for (const place of results) {
+              const types = place.types || [];
+              // Skip generic locality/political results
+              if (types.includes('locality') || types.includes('administrative_area_level_1') || types.includes('country')) {
+                continue;
+              }
+              const name = place.name;
+              if (name && !isGeneric(name) && !isPlusCode(name)) {
+                console.info('[LocationResolver] Places fallback found:', name, 'types:', types);
+                resolve({ name, quality: LabelQuality.POI });
+                return;
+              }
             }
           }
           resolve(null);
@@ -115,7 +177,6 @@ export async function findNearbyPlaceName(
 
 /**
  * Pick the better of two resolved labels. Returns the higher quality one.
- * If existingLabel is provided and is higher quality, it wins.
  */
 export function pickBetterLabel(
   a: ResolvedLabel | null,

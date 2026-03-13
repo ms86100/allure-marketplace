@@ -150,7 +150,7 @@ export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: Onboa
               latitude={coords.lat}
               longitude={coords.lng}
               name={selectedPlaceName || 'Store Location'}
-              onConfirm={(lat, lng, updatedName) => onConfirm(lat, lng, updatedName)}
+              onConfirm={(lat, lng, updatedName, _formattedAddress) => onConfirm(lat, lng, updatedName)}
               onBack={handleBack}
             />
           )}
