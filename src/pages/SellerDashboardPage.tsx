@@ -10,7 +10,7 @@ import { Package, Loader2, Eye, Star, Clock, CheckCircle, XCircle, ShieldCheck, 
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { friendlyError } from '@/lib/utils';
+import { friendlyError, cn } from '@/lib/utils';
 import { logAudit } from '@/lib/audit';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
