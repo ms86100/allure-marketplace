@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Send, MessageCircle, X, Check, CheckCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useChatViewport } from '@/hooks/useChatViewport';
 
 interface OrderChatProps {
   orderId: string;
@@ -30,38 +31,9 @@ export function OrderChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
-  const [viewportTop, setViewportTop] = useState(0);
+  const { viewportHeight, viewportTop, keyboardInset } = useChatViewport(isOpen);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Track visual viewport for keyboard-aware layout (mobile web + native webview)
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const updateViewport = () => {
-      const vv = window.visualViewport;
-      if (vv) {
-        setViewportHeight(vv.height);
-        setViewportTop(vv.offsetTop);
-        return;
-      }
-      setViewportHeight(window.innerHeight);
-      setViewportTop(0);
-    };
-
-    updateViewport();
-    const vv = window.visualViewport;
-    window.addEventListener('resize', updateViewport);
-    vv?.addEventListener('resize', updateViewport);
-    vv?.addEventListener('scroll', updateViewport);
-
-    return () => {
-      window.removeEventListener('resize', updateViewport);
-      vv?.removeEventListener('resize', updateViewport);
-      vv?.removeEventListener('scroll', updateViewport);
-    };
-  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && orderId) {
@@ -165,13 +137,15 @@ export function OrderChat({
   if (!isOpen) return null;
 
   const containerStyle: React.CSSProperties = {
-    height: `${viewportHeight ?? window.innerHeight}px`,
+    height: `${Math.max(viewportHeight, 320)}px`,
     top: viewportTop,
+    paddingTop: 'env(safe-area-inset-top, 0px)',
+    paddingBottom: keyboardInset ? `${keyboardInset}px` : undefined,
     pointerEvents: 'auto' as const,
   };
 
   return createPortal(
-    <div className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col overflow-hidden" style={containerStyle}>
+    <div className="fixed inset-x-0 z-[60] bg-background flex flex-col overflow-hidden" style={containerStyle}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
         <div className="flex items-center gap-3 min-w-0">
@@ -183,13 +157,13 @@ export function OrderChat({
             <p className="text-xs text-muted-foreground">Order #{orderId.slice(0, 8)}</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0">
+        <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0" aria-label="Close chat">
           <X size={20} />
         </Button>
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 overscroll-contain">
         {messages.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <MessageCircle className="mx-auto mb-2" size={32} />
@@ -229,7 +203,7 @@ export function OrderChat({
       </div>
 
       {/* Input — pinned above keyboard */}
-      <div className="px-3 pt-3 border-t bg-card shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] relative z-10">
+      <div className="sticky bottom-0 px-3 pt-3 border-t bg-card shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] z-10">
         {disabled ? (
           <p className="text-center text-sm text-muted-foreground">Chat is disabled for completed orders</p>
         ) : (
@@ -251,7 +225,7 @@ export function OrderChat({
               rows={1}
               className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl text-base md:text-sm py-2.5"
             />
-            <Button size="icon" className="shrink-0 h-10 w-10 rounded-xl" onClick={sendMessage} disabled={!newMessage.trim() || isSending}>
+            <Button size="icon" className="shrink-0 h-10 w-10 rounded-xl" onClick={sendMessage} disabled={!newMessage.trim() || isSending} aria-label="Send message">
               <Send size={16} />
             </Button>
           </div>

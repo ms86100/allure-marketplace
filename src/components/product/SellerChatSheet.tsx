@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useSellerChat } from '@/hooks/useSellerChat';
+import { useChatViewport } from '@/hooks/useChatViewport';
 import { Send, MessageCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -19,43 +20,14 @@ interface SellerChatSheetProps {
 
 export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, productId, productName, sellerName }: SellerChatSheetProps) {
   const { messages, isLoading, getOrCreate, sendMessage, isSending } = useSellerChat(buyerId, sellerId, productId);
+  const { viewportHeight, viewportTop, keyboardInset } = useChatViewport(open);
   const [text, setText] = useState('');
-  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
-  const [viewportTop, setViewportTop] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (open) getOrCreate();
   }, [open, getOrCreate]);
-
-  // Track visual viewport for keyboard-aware layout (mobile web + native webview)
-  useEffect(() => {
-    if (!open) return;
-
-    const updateViewport = () => {
-      const vv = window.visualViewport;
-      if (vv) {
-        setViewportHeight(vv.height);
-        setViewportTop(vv.offsetTop);
-        return;
-      }
-      setViewportHeight(window.innerHeight);
-      setViewportTop(0);
-    };
-
-    updateViewport();
-    const vv = window.visualViewport;
-    window.addEventListener('resize', updateViewport);
-    vv?.addEventListener('resize', updateViewport);
-    vv?.addEventListener('scroll', updateViewport);
-
-    return () => {
-      window.removeEventListener('resize', updateViewport);
-      vv?.removeEventListener('resize', updateViewport);
-      vv?.removeEventListener('scroll', updateViewport);
-    };
-  }, [open]);
 
   // Auto-scroll to bottom on new messages
   const scrollToBottom = useCallback(() => {
@@ -96,14 +68,16 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
   if (!open) return null;
 
   const containerStyle: React.CSSProperties = {
-    height: `${viewportHeight ?? window.innerHeight}px`,
+    height: `${Math.max(viewportHeight, 320)}px`,
     top: viewportTop,
+    paddingTop: 'env(safe-area-inset-top, 0px)',
+    paddingBottom: keyboardInset ? `${keyboardInset}px` : undefined,
     pointerEvents: 'auto' as const,
   };
 
   return createPortal(
     <div
-      className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col overflow-hidden"
+      className="fixed inset-x-0 z-[60] bg-background flex flex-col overflow-hidden"
       style={containerStyle}
     >
       {/* Header */}
@@ -117,13 +91,13 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
             <p className="text-xs text-muted-foreground truncate">Re: {productName}</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="shrink-0">
+        <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="shrink-0" aria-label="Close chat">
           <X size={20} />
         </Button>
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-2">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-2 overscroll-contain">
         {isLoading && <p className="text-xs text-muted-foreground text-center py-8">Loading messages…</p>}
         {!isLoading && messages.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
@@ -150,7 +124,7 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
       </div>
 
       {/* Input bar — pinned above keyboard */}
-      <div className="shrink-0 border-t border-border px-3 pt-3 flex items-end gap-2 bg-card pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] relative z-10">
+      <div className="sticky bottom-0 shrink-0 border-t border-border px-3 pt-3 flex items-end gap-2 bg-card pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] z-10">
         <Textarea
           ref={textareaRef}
           value={text}
@@ -173,6 +147,7 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
           className="shrink-0 h-10 w-10 rounded-xl"
           onClick={() => void handleSend()}
           disabled={!text.trim() || isSending}
+          aria-label="Send message"
         >
           <Send size={16} />
         </Button>
