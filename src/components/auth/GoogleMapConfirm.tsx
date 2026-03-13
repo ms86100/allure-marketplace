@@ -181,7 +181,7 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       geocoderRef.current = null;
       mapInitializedRef.current = false;
     };
-  }, [latitude, longitude, resolveLabel]);
+  }, [resolveLabel]);
 
   // If parent updates coordinates, move marker without forcing zoom reset.
   useEffect(() => {
