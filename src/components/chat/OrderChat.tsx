@@ -31,21 +31,36 @@ export function OrderChat({
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [viewportTop, setViewportTop] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Track visual viewport for keyboard-aware layout
+  // Track visual viewport for keyboard-aware layout (mobile web + native webview)
   useEffect(() => {
     if (!isOpen) return;
-    const vv = window.visualViewport;
-    if (!vv) return;
 
-    const handleResize = () => {
-      setViewportHeight(vv.height);
+    const updateViewport = () => {
+      const vv = window.visualViewport;
+      if (vv) {
+        setViewportHeight(vv.height);
+        setViewportTop(vv.offsetTop);
+        return;
+      }
+      setViewportHeight(window.innerHeight);
+      setViewportTop(0);
     };
-    handleResize();
-    vv.addEventListener('resize', handleResize);
-    return () => vv.removeEventListener('resize', handleResize);
+
+    updateViewport();
+    const vv = window.visualViewport;
+    window.addEventListener('resize', updateViewport);
+    vv?.addEventListener('resize', updateViewport);
+    vv?.addEventListener('scroll', updateViewport);
+
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('scroll', updateViewport);
+    };
   }, [isOpen]);
 
   useEffect(() => {

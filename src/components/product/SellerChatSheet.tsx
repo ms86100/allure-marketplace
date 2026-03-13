@@ -21,6 +21,7 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
   const { messages, isLoading, getOrCreate, sendMessage, isSending } = useSellerChat(buyerId, sellerId, productId);
   const [text, setText] = useState('');
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [viewportTop, setViewportTop] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -28,22 +29,31 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
     if (open) getOrCreate();
   }, [open, getOrCreate]);
 
-  // Track visual viewport for keyboard-aware layout
+  // Track visual viewport for keyboard-aware layout (mobile web + native webview)
   useEffect(() => {
     if (!open) return;
-    const vv = window.visualViewport;
-    if (!vv) return;
 
-    const update = () => {
-      setViewportHeight(vv.height);
+    const updateViewport = () => {
+      const vv = window.visualViewport;
+      if (vv) {
+        setViewportHeight(vv.height);
+        setViewportTop(vv.offsetTop);
+        return;
+      }
+      setViewportHeight(window.innerHeight);
+      setViewportTop(0);
     };
-    update();
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
+
+    updateViewport();
+    const vv = window.visualViewport;
+    window.addEventListener('resize', updateViewport);
+    vv?.addEventListener('resize', updateViewport);
+    vv?.addEventListener('scroll', updateViewport);
 
     return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
+      window.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('resize', updateViewport);
+      vv?.removeEventListener('scroll', updateViewport);
     };
   }, [open]);
 
