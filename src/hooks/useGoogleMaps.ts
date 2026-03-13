@@ -2,10 +2,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-const HARDCODED_FALLBACK_KEY = 'AIzaSyC96Rzpof_eGJc-QycAw1aHltM1inw8vU';
+const HARDCODED_FALLBACK_KEY = 'AIzaSyAGqPf40RaQ16EW8HQKASZLtrfGUH8rmSg';
 const SCRIPT_ID = 'google-maps-script';
-
-let loadPromise: Promise<void> | null = null;
 
 async function fetchGoogleMapsApiKey(): Promise<string> {
   try {
@@ -26,40 +24,32 @@ async function fetchGoogleMapsApiKey(): Promise<string> {
 }
 
 export async function loadGoogleMapsScript(): Promise<void> {
-  if (loadPromise) return loadPromise;
+  const apiKey = await fetchGoogleMapsApiKey();
 
-  loadPromise = (async () => {
-    const apiKey = await fetchGoogleMapsApiKey();
-
-    // If script already exists but was loaded with a different key, remove it and reload
-    const existingScript = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
-    if (existingScript) {
-      const existingSrc = existingScript.getAttribute('src') || '';
-      if (existingSrc.includes(apiKey) && (window as any).google?.maps) {
-        // Same key, already loaded
-        return;
-      }
-      // Different key or not yet loaded — remove old script and google object
-      existingScript.remove();
-      delete (window as any).google;
-      loadPromise = null;
-    } else if ((window as any).google?.maps) {
-      return;
+  // Check if script already exists with the SAME key
+  const existingScript = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
+  if (existingScript) {
+    const existingSrc = existingScript.getAttribute('src') || '';
+    if (existingSrc.includes(apiKey) && (window as any).google?.maps) {
+      return; // Already loaded with correct key
     }
+    // Wrong key or not loaded — nuke it
+    existingScript.remove();
+    delete (window as any).google;
+  } else if ((window as any).google?.maps) {
+    return; // Loaded externally, assume OK
+  }
 
-    await new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script');
-      script.id = SCRIPT_ID;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Google Maps'));
-      document.head.appendChild(script);
-    });
-  })();
-
-  return loadPromise;
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement('script');
+    script.id = SCRIPT_ID;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load Google Maps'));
+    document.head.appendChild(script);
+  });
 }
 
 export function useGoogleMaps() {
