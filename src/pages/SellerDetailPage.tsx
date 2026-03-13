@@ -36,6 +36,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 
 export default function SellerDetailPage() {
   const { id } = useParams();
