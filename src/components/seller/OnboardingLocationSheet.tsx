@@ -53,6 +53,7 @@ export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: Onboa
     try {
       const pos = await getCurrentPosition();
       setCoords({ lat: pos.latitude, lng: pos.longitude });
+      setSelectedPlaceName('');
       setStep('confirm');
     } catch {
       toast.error('Could not get your location. Please allow location access and try again.');
