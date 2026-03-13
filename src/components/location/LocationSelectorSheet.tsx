@@ -88,6 +88,7 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
     const map = new google.maps.Map(mapContainerRef.current, {
       center: { lat: detectedLocation.lat, lng: detectedLocation.lng },
       zoom: 17,
+      maxZoom: 21,
       disableDefaultUI: true,
       zoomControl: true,
       gestureHandling: 'greedy',
@@ -102,25 +103,76 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
       draggable: true,
       animation: google.maps.Animation.DROP,
     });
+
     markerInstanceRef.current = marker;
     mapInitializedRef.current = true;
 
+    const updateFromPosition = async (lat: number, lng: number, preserveInitial = false) => {
+      const label = await reverseGeocode(lat, lng, preserveInitial);
+      setDetectedLocation({ lat, lng, label });
+    };
+
     // Reverse-geocode on pin drag
-    marker.addListener('dragend', async () => {
+    const dragStartListener = marker.addListener('dragstart', () => {
+      ignoreIdleUntilRef.current = Date.now() + 500;
+    });
+
+    const dragEndListener = marker.addListener('dragend', async () => {
       const pos = marker.getPosition();
       if (!pos) return;
+      ignoreIdleUntilRef.current = Date.now() + 500;
       const lat = pos.lat();
       const lng = pos.lng();
-      const label = await reverseGeocode(lat, lng);
-      setDetectedLocation({ lat, lng, label });
+      await updateFromPosition(lat, lng, false);
     });
 
-    // Also reverse-geocode when user pans the map (update pin to map center)
-    map.addListener('idle', async () => {
-      // Only update if user dragged/zoomed the map (not programmatic moves)
+    // Tap to place pin (mobile-friendly)
+    const clickListener = map.addListener('click', async (event: google.maps.MapMouseEvent) => {
+      if (!event.latLng) return;
+      const lat = event.latLng.lat();
+      const lng = event.latLng.lng();
+      ignoreIdleUntilRef.current = Date.now() + 500;
+      marker.setPosition({ lat, lng });
+      await updateFromPosition(lat, lng, false);
     });
-  }, [step]); // only depend on step, not on coordinates
 
+    // Move pin to map center after pan/zoom idle for easier Zomato/Blinkit-style adjustment
+    const idleListener = map.addListener('idle', () => {
+      if (Date.now() < ignoreIdleUntilRef.current) return;
+      if (idleDebounceRef.current) window.clearTimeout(idleDebounceRef.current);
+
+      idleDebounceRef.current = window.setTimeout(async () => {
+        const center = map.getCenter();
+        if (!center) return;
+
+        const centerLat = center.lat();
+        const centerLng = center.lng();
+
+        const currentPos = marker.getPosition();
+        const currentLat = currentPos?.lat() ?? centerLat;
+        const currentLng = currentPos?.lng() ?? centerLng;
+
+        // Skip tiny map movement noise
+        const moved = Math.abs(centerLat - currentLat) > 0.00001 || Math.abs(centerLng - currentLng) > 0.00001;
+        if (!moved) return;
+
+        marker.setPosition({ lat: centerLat, lng: centerLng });
+        await updateFromPosition(centerLat, centerLng, false);
+      }, 220);
+    });
+
+    return () => {
+      dragStartListener.remove();
+      dragEndListener.remove();
+      clickListener.remove();
+      idleListener.remove();
+      if (idleDebounceRef.current) {
+        window.clearTimeout(idleDebounceRef.current);
+        idleDebounceRef.current = null;
+      }
+      marker.setMap(null);
+    };
+  }, [step, detectedLocation, reverseGeocode]);
   const handleSelectAddress = (addr: any) => {
     if (!addr.latitude || !addr.longitude) {
       toast.error('This address has no location coordinates');
