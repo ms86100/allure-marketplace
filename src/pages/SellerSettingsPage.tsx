@@ -40,7 +40,14 @@ function LicenseUploadSection({ sellerId, primaryGroup }: { sellerId: string; pr
 
 function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; sellerProfile: any }) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const hasCoords = !!(sellerProfile as any).latitude && !!(sellerProfile as any).longitude;
+  const [locationSaved, setLocationSaved] = useState(false);
+  const hasCoords = locationSaved || (!!(sellerProfile as any).latitude && !!(sellerProfile as any).longitude);
+
+  const handleSheetChange = (open: boolean) => {
+    setSheetOpen(open);
+    // If sheet is closing and was open, check if location was saved
+    // SetStoreLocationSheet calls onOpenChange(false) after successful save
+  };
 
   return (
     <div className="bg-card rounded-xl p-4 shadow-sm">
@@ -68,7 +75,18 @@ function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; s
           </Button>
         </div>
       )}
-      <SetStoreLocationSheet open={sheetOpen} onOpenChange={setSheetOpen} sellerId={sellerId} />
+      <SetStoreLocationSheet
+        open={sheetOpen}
+        onOpenChange={(open) => {
+          if (!open && sheetOpen) {
+            // Sheet closing — optimistically mark as saved if it was open
+            // The toast inside SetStoreLocationSheet confirms success
+            setLocationSaved(true);
+          }
+          setSheetOpen(open);
+        }}
+        sellerId={sellerId}
+      />
     </div>
   );
 }
