@@ -190,6 +190,9 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
     if (!val) {
       setStep('pick');
       setDetectedLocation(null);
+      mapInstanceRef.current = null;
+      markerInstanceRef.current = null;
+      mapInitializedRef.current = false;
     }
     onOpenChange(val);
   };
