@@ -62,6 +62,8 @@ export function useNewOrderAlert(sellerId: string | null) {
       lastSeenAtRef.current = order.created_at;
     }
     pollDelayRef.current = MIN_POLL_MS;
+    emptyAtMaxRef.current = 0;
+    pollingStoppedRef.current = false;
     setPendingAlerts(prev => [...prev, order]);
     queryClient.invalidateQueries({ queryKey: ['seller-orders', sellerId] });
     queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats', sellerId] });
