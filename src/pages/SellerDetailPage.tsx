@@ -45,6 +45,7 @@ export default function SellerDetailPage() {
   const { configs: allCategoryConfigs } = useCategoryConfigs();
   const { items, totalAmount } = useCart();
   const { formatPrice } = useCurrency();
+  const { browsingLocation: browsingLoc } = useBrowsingLocation();
   const [seller, setSeller] = useState<SellerProfile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
