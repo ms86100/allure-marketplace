@@ -52,7 +52,7 @@ export function useDeliveryAddresses() {
         const { error } = await supabase.from('delivery_addresses').update(payload).eq('id', addr.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('delivery_addresses').insert(payload);
+        const { error } = await supabase.from('delivery_addresses').insert(payload as any);
         if (error) throw error;
       }
     },
