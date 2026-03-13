@@ -148,7 +148,7 @@ export async function findNearbyPlaceName(
     const service = new google.maps.places.PlacesService(map);
     return new Promise((resolve) => {
       service.nearbySearch(
-        { location: { lat, lng }, radius: 50, rankBy: google.maps.places.RankBy.PROMINENCE },
+        { location: { lat, lng }, rankBy: google.maps.places.RankBy.DISTANCE, type: 'establishment' },
         (results, status) => {
           if (status === google.maps.places.PlacesServiceStatus.OK && results) {
             // Iterate through results to find an actual POI, not a city/locality
