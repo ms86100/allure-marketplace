@@ -36,6 +36,7 @@ export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: Onboa
       const details = await getPlaceDetails(placeId);
       if (details && details.latitude && details.longitude) {
         setCoords({ lat: details.latitude, lng: details.longitude });
+        setSelectedPlaceName(details.name || details.formattedAddress || '');
         setStep('confirm');
       } else {
         toast.error('Could not get location details. Try another place.');
