@@ -73,7 +73,7 @@ function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; s
   );
 }
 
-
+export default function SellerSettingsPage() {
   const {
     user, sellerProfile, primaryGroup, isLoading, isSaving,
     formData, setFormData, currencySymbol,
