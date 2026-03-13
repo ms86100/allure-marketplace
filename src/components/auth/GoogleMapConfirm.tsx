@@ -159,7 +159,7 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
         {isGeocoding && <Loader2 size={14} className="animate-spin text-muted-foreground shrink-0 ml-auto" />}
       </div>
 
-      <div ref={mapRef} className="w-full h-48 rounded-xl border border-border overflow-hidden bg-muted" />
+      <div ref={mapRef} className="w-full h-72 sm:h-80 rounded-xl border border-border overflow-hidden bg-muted" />
 
       <p className="text-xs text-muted-foreground text-center">
         Drag the pin to adjust your exact location

@@ -173,7 +173,7 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
             </div>
 
             {/* Mini map */}
-            <div ref={mapContainerRef} className="w-full h-40 rounded-xl border border-border overflow-hidden bg-muted" />
+            <div ref={mapContainerRef} className="w-full h-64 sm:h-72 rounded-xl border border-border overflow-hidden bg-muted" />
 
             <p className="text-[10px] text-muted-foreground text-center">
               Is this the correct location? Confirm to browse stores nearby.
