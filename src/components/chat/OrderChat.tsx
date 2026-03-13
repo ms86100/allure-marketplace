@@ -153,7 +153,7 @@ export function OrderChat({
     ? { height: `${viewportHeight}px`, top: window.visualViewport?.offsetTop ?? 0 }
     : { height: '100dvh' };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-x-0 top-0 z-[60] bg-background flex flex-col"
       style={containerStyle}
