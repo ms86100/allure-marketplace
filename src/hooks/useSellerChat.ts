@@ -86,6 +86,7 @@ export function useSellerChat(buyerId: string | undefined, sellerId: string | un
       let cid = conversationId;
       if (!cid) cid = await getOrCreate();
       if (!cid) throw new Error('Could not create conversation');
+      if (conversationId !== cid) setConversationId(cid);
 
       const { error } = await supabase
         .from('seller_conversation_messages')
@@ -111,9 +112,11 @@ export function useSellerChat(buyerId: string | undefined, sellerId: string | un
           });
         }
       }
+
+      return cid;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['seller-chat', conversationId] });
+    onSuccess: (cid) => {
+      qc.invalidateQueries({ queryKey: ['seller-chat', cid] });
     },
   });
 
