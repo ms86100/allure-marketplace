@@ -152,21 +152,30 @@ export default function AuthPage() {
                     Verify & Continue
                   </Button>
 
-                  <div className="text-center">
-                    {auth.resendCooldown > 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        Resend OTP in <span className="font-semibold text-primary">{auth.resendCooldown}s</span>
-                      </p>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => auth.handleSendOtp(true)}
-                        disabled={auth.isLoading}
-                        className="text-sm text-primary font-medium hover:underline inline-flex items-center gap-1"
-                      >
-                        <RefreshCw size={14} /> Resend OTP
-                      </button>
-                    )}
+                  <div className="flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => { auth.setStep('phone'); auth.setOtp(''); }}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
+                    >
+                      <ArrowLeft size={12} /> Change number
+                    </button>
+                    <div>
+                      {auth.resendCooldown > 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          Resend in <span className="font-semibold text-primary">{auth.resendCooldown}s</span>
+                        </p>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => auth.handleSendOtp(true)}
+                          disabled={auth.isLoading}
+                          className="text-xs text-primary font-medium hover:underline inline-flex items-center gap-1"
+                        >
+                          <RefreshCw size={12} /> Resend OTP
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               )}

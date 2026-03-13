@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 interface OnboardingLocationSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (lat: number, lng: number) => void;
+  onConfirm: (lat: number, lng: number, name?: string) => void;
 }
 
 export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: OnboardingLocationSheetProps) {
