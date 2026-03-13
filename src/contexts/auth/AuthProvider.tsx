@@ -27,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isApproved = profile?.verification_status === 'approved';
   const isSeller = roles.includes('seller') && sellerProfiles.some(s => (s as any).verification_status === 'approved');
+  const hasSellerProfile = roles.includes('seller') && sellerProfiles.length > 0;
   const isAdmin = roles.includes('admin');
   const isSocietyAdmin = !!societyAdminRole || isAdmin;
   const isBuilderMember = managedBuilderIds.length > 0;
