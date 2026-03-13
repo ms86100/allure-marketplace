@@ -12,7 +12,7 @@ import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
  * BUILD FINGERPRINT — if the device logs this, the bundle is current.
  * If not, the device is running stale JS.
  */
-export const PUSH_BUILD_ID = '2026-03-04-TIMEOUT-ALL-NATIVE';
+export const PUSH_BUILD_ID = '2026-03-13-DEDUP-IMPORTS-BOOT-GATE';
 
 /**
  * NEW APPROACH: Uses @capacitor/push-notifications for permissions + registration
@@ -59,32 +59,41 @@ function isValidFcmToken(token: string, platform: string): boolean {
   return token.length > 20;
 }
 
-async function getPushNotificationsPlugin() {
-  try {
-    const { PushNotifications } = await withTimeout(
-      import('@capacitor/push-notifications'),
+/**
+ * Deduplicated plugin loaders — concurrent callers share ONE in-flight import.
+ * If the import fails/times out the cache resets so retries work.
+ * NO pre-warming at module load (that caused the previous regression).
+ */
+let _pnPromise: Promise<any> | null = null;
+async function getPushNotificationsPlugin(): Promise<typeof import('@capacitor/push-notifications').PushNotifications | null> {
+  if (!_pnPromise) {
+    _pnPromise = withTimeout(
+      import('@capacitor/push-notifications').then(m => m.PushNotifications),
       PLUGIN_IMPORT_TIMEOUT_MS,
       'getPushNotificationsPlugin import timed out'
-    );
-    return PushNotifications;
-  } catch (e) {
-    console.warn('[Push] @capacitor/push-notifications not available:', e);
-    return null;
+    ).catch(e => {
+      console.warn('[Push] @capacitor/push-notifications not available:', e);
+      _pnPromise = null;
+      return null;
+    }) as any;
   }
+  return _pnPromise as any;
 }
 
-async function getFcmPlugin() {
-  try {
-    const { FCM } = await withTimeout(
-      import('@capacitor-community/fcm'),
+let _fcmPromise: Promise<any> | null = null;
+async function getFcmPlugin(): Promise<typeof import('@capacitor-community/fcm').FCM | null> {
+  if (!_fcmPromise) {
+    _fcmPromise = withTimeout(
+      import('@capacitor-community/fcm').then(m => m.FCM),
       PLUGIN_IMPORT_TIMEOUT_MS,
       'getFcmPlugin import timed out'
-    );
-    return FCM;
-  } catch (e) {
-    console.warn('[Push] @capacitor-community/fcm not available:', e);
-    return null;
+    ).catch(e => {
+      console.warn('[Push] @capacitor-community/fcm not available:', e);
+      _fcmPromise = null;
+      return null;
+    });
   }
+  return _fcmPromise;
 }
 
 // Module-level singleton guard
@@ -783,6 +792,7 @@ export function usePushNotificationsInternal() {
 
     const platform = Capacitor.getPlatform();
     const cleanups: (() => void)[] = [];
+    let bootComplete = false;
 
     (async () => {
       const PN = await getPushNotificationsPlugin();
@@ -926,6 +936,10 @@ export function usePushNotificationsInternal() {
         listenersReadyResolveRef.current();
         listenersReadyResolveRef.current = null;
       }
+
+      // ── Mark boot complete so appStateChange handler can proceed ──
+      bootComplete = true;
+      pushLog('info', 'BOOT_COMPLETE', { platform, ts: Date.now() });
     })();
 
     // ── iOS: also listen for FCM token refresh ──
@@ -944,6 +958,8 @@ export function usePushNotificationsInternal() {
       })();
     }
 
+    // (bootComplete declared above, before the main IIFE)
+
     // ── App resume: re-check permission and retry if now granted ──
     let appListenerCleanup: (() => void) | undefined;
 
@@ -957,8 +973,11 @@ export function usePushNotificationsInternal() {
             let state = registrationStateRef.current;
             let hasRuntimeToken = Boolean(tokenRef.current);
 
-            // Attempt an early runtime reconciliation before logging, to avoid stale "hasToken:false" snapshots.
-            if (!hasRuntimeToken && userRef.current) {
+            // ── BOOT GATE: skip prelog reconcile if the main IIFE hasn't finished yet ──
+            // This prevents the concurrent plugin import that causes the native bridge deadlock.
+            if (!bootComplete) {
+              pushLog('info', 'RESUME_SKIPPED_BOOT_INCOMPLETE', { platform, ts: Date.now() });
+            } else if (!hasRuntimeToken && userRef.current) {
               try {
                 const reconciledEarly = await withTimeout(reconcileRuntimeTokenRef.current('app_resume_prelog'), LOGIN_RECONCILE_TIMEOUT_MS, 'app_resume_prelog reconcile timed out');
                 hasRuntimeToken = Boolean(tokenRef.current);
@@ -1148,6 +1167,13 @@ export function usePushNotificationsInternal() {
           // ── ALWAYS attempt registration on login ──
           registrationStateRef.current = 'idle';
           retryCountRef.current = 0;
+
+          // ── GATE: Wait for listener gate before reconciling ──
+          // This ensures the main IIFE's PN plugin import is complete
+          // before login tries a second concurrent plugin import.
+          pushLog('info', 'LOGIN_WAITING_FOR_LISTENER_GATE', { ts: Date.now() });
+          const listenersOk = await waitForListenersReady('login_block');
+          pushLog('info', 'LOGIN_LISTENER_GATE_RESULT', { listenersOk, ts: Date.now() });
 
           // First try reconcileRuntimeToken (fast path for iOS)
           pushLog('info', 'RECONCILE_STARTING', { ts: Date.now() });
