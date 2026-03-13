@@ -264,7 +264,7 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
             </div>
 
             <p className="text-[10px] text-muted-foreground text-center">
-              Is this the correct location? Confirm to browse stores nearby.
+              Drag/tap pin or move map to center it, then confirm this location.
             </p>
 
             {/* Action buttons */}
