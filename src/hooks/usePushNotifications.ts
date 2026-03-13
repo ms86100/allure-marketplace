@@ -792,6 +792,7 @@ export function usePushNotificationsInternal() {
 
     const platform = Capacitor.getPlatform();
     const cleanups: (() => void)[] = [];
+    let bootComplete = false;
 
     (async () => {
       const PN = await getPushNotificationsPlugin();
