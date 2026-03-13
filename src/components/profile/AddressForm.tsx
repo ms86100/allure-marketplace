@@ -55,6 +55,17 @@ export function AddressForm({ initial, onSave, onCancel, saving }: AddressFormPr
   });
   const [detecting, setDetecting] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [customLabels, setCustomLabels] = useState<string[]>(() => {
+    // If initial label is not Home/Work, it's a custom label
+    const fixed = ['Home', 'Work'];
+    if (initial?.label && !fixed.includes(initial.label)) {
+      return [initial.label];
+    }
+    return [];
+  });
+  const [isAddingCustom, setIsAddingCustom] = useState(false);
+  const [editingCustomIndex, setEditingCustomIndex] = useState<number | null>(null);
+  const [customInput, setCustomInput] = useState('');
 
   // Autocomplete state
   const [searchQuery, setSearchQuery] = useState('');
