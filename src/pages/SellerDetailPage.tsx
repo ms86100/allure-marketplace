@@ -357,10 +357,19 @@ export default function SellerDetailPage() {
 
               if (!lat || !lng) return null;
 
-              const openMaps = (e: React.MouseEvent) => {
+              const openMaps = async (e: React.MouseEvent) => {
                 e.preventDefault();
                 e.stopPropagation();
-                window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
+                const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                try {
+                  const { Capacitor } = await import('@capacitor/core');
+                  if (Capacitor.isNativePlatform()) {
+                    const { Browser } = await import('@capacitor/browser');
+                    await Browser.open({ url: mapsUrl });
+                    return;
+                  }
+                } catch {}
+                window.open(mapsUrl, '_blank', 'noopener');
               };
 
               return (
