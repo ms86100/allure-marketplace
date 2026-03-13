@@ -20,7 +20,7 @@ interface SellerChatSheetProps {
 export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, productId, productName, sellerName }: SellerChatSheetProps) {
   const { messages, isLoading, getOrCreate, sendMessage, isSending } = useSellerChat(buyerId, sellerId, productId);
   const [text, setText] = useState('');
-  const [containerHeight, setContainerHeight] = useState('85dvh');
+  const [containerHeight, setContainerHeight] = useState('85vh');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
