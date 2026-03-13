@@ -1,39 +1,71 @@
 
 
-# Fix: Image Upload Causes Step Reset in Seller Onboarding
+# Notification System — Comprehensive Audit & Plan
 
-## Root Cause
+## Root Cause Fix (Implemented)
 
-When uploading images on native iOS/Android, the camera or gallery picker opens as a native overlay. On iOS especially, the system can reclaim WebView memory while the picker is open. When the user returns, the entire React app reloads from scratch.
+Admin users were not notified when a new store or product was submitted for review. Fixed by:
 
-The `useSellerApplication` hook has this logic on reload (line 90-96):
-```typescript
-const draft = data.find(s => s.verification_status === 'draft');
-if (draft) {
-  // ...
-  setStep(3);  // ← ALWAYS resets to step 3
-}
-```
+1. **`notifyAdminsNewStoreApplication()`** in `src/lib/admin-notifications.ts` — queries `user_roles` for admins, enqueues push+in-app notification via `notification_queue`
+2. **`handleSubmit` in `useSellerApplication.ts`** — calls the above after successful submission
+3. **DB trigger `trg_enqueue_product_review_notification`** on `products` table — fires when `approval_status` changes to `'pending'`, notifies all admins
 
-So regardless of whether the user was on step 4 (store images) or step 5 (product images), they get sent back to step 3 every time the app reloads after a native picker interaction.
+---
 
-The draft data (business name, location, etc.) IS persisted to the database, but the **current step number is not**. This is why it looks like "redirecting back to the same page."
+## Current State (As-Is): All Notification Flows
 
-## Fix
+### A. Database Triggers
 
-**1. Persist onboarding step to localStorage** in `useSellerApplication.ts`:
-- Whenever `step` changes (or `setStep` is called), write it to `localStorage` with key like `seller_onboarding_step`.
-- When restoring a draft on mount, read the persisted step instead of hardcoding `3`. Clamp it to be at least `3` (since steps 1-2 are category selection, already encoded in the draft).
-- Clear the persisted step on submission complete or save-and-exit.
+| Trigger | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `enqueue_order_status_notification` | Order status changes | Buyer + Seller | ✅ | ✅ |
+| `enqueue_review_notification` | New review created | Seller | ✅ | ✅ |
+| `enqueue_dispute_status_notification` | Dispute status changes | Submitter | ✅ | ✅ |
+| `enqueue_settlement_notification` | Settlement created | Seller | ✅ | ✅ |
+| `trg_enqueue_product_review_notification` | Product submitted for review | Admins | ✅ | ✅ |
 
-**2. Auto-save formData before native picker opens** in `CroppableImageUpload` / `ImageUpload`:
-- The `saveDraft()` in `handleProceedToSettings` already saves before entering step 4, so step 4 data is in the DB. But if the user changes images without explicitly saving, that state lives only in React.
-- Add an auto-save of the current draft when step 4 is active and the user taps an image upload button. This ensures the draft in the DB reflects the latest form state before the WebView potentially dies.
+### B. Edge Functions
 
-**3. Restore formData from draft on reload** — this already works (line 121-142 `loadSellerDataIntoForm`), so uploaded images that were saved to the DB will be restored correctly.
+| Function | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `send-booking-reminders` | 1h before appointment | Buyer + Seller | ✅ | ✅ |
+| `process-notification-queue` | Queue processor | N/A | ✅ | ✅ |
+| `send-campaign` | Admin broadcast | Targeted users | ✅ | ✅ |
+| `generate-weekly-digest` | Weekly digest | Society members | ✅ | ✅ |
+| `generate-society-report` | Monthly report | Society members | ✅ | ✅ |
+| `detect-collective-issues` | Pattern detection | Society admins | ✅ | ✅ |
 
-## Files Changed
+### C. Client-Side (inserts to `notification_queue`)
 
-- **`src/hooks/useSellerApplication.ts`**: Persist `step` to localStorage on change; restore persisted step instead of hardcoding `3`; clear on submit/exit.
-- **`src/pages/BecomeSellerPage.tsx`**: Before opening native image picker on step 4/5, trigger a draft save so formData is persisted to DB. This can be done by passing a `beforePick` callback to `CroppableImageUpload` or by saving draft whenever formData changes on step 4+ with a debounce.
+| Location | Event | Recipient | Push | In-App |
+|---|---|---|---|---|
+| `admin-notifications.ts` → `notifySellerStatusChange` | Admin approves/rejects seller | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyLicenseStatusChange` | Admin approves/rejects license | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyProductStatusChange` | Admin approves/rejects product | Seller | ✅ | ✅ |
+| `admin-notifications.ts` → `notifyAdminsNewStoreApplication` | Seller submits store | Admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyAdmins` | Dispute/snag | Society admins | ✅ | ✅ |
+| `society-notifications.ts` → `notifySocietyMembers` | Bulletin posts | Society members | ✅ | ✅ |
+| `ServiceBookingFlow.tsx` | New booking | Seller | ✅ | ❌ |
+| `BuyerCancelBooking.tsx` | Buyer cancels | Seller | ✅ | ❌ |
+| `SellerPaymentConfirmation.tsx` | Payment confirmed | Buyer | ✅ | ❌ |
+| `UpiDeepLinkCheckout.tsx` | UPI payment | Seller | ✅ | ❌ |
+| `useSellerChat.ts` | New chat (60s throttle) | Recipient | ✅ | ❌ |
+| `GuardManualEntryTab.tsx` | Gate entry | Resident | ✅ | ❌ |
+| `manage-delivery` edge fn | Delivery OTP/arrival | Buyer | ✅ | ✅ |
+| `update-delivery-location` edge fn | Delivery delay | Buyer | ✅ | ✅ |
 
+---
+
+## Future Gaps (To-Be)
+
+### Priority 2 — Operational
+- New user pending approval → Society admins
+- New society request → Platform admins
+- Report filed → Admins
+- Delivery partner assigned → Seller
+
+### Priority 3 — Engagement
+- New product from favorite seller → Buyer
+- Seller back online → Recent buyers
+- Price drop on wishlisted item → Buyer
+- Order review reminder (24h after delivery) → Buyer

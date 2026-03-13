@@ -141,6 +141,13 @@ export default function BecomeSellerPage() {
     loadSellerDataIntoForm, reloadProducts, rejectionFeedback, setRejectionFeedback,
   } = app;
 
+  // Auto-save draft before opening native image picker (survives WebView reload)
+  const beforeImagePick = useCallback(async () => {
+    if (draftSellerId) {
+      await app.saveDraft();
+    }
+  }, [draftSellerId, app]);
+
   const fulfillmentLabel = FULFILLMENT_OPTIONS.find(o => o.value === formData.fulfillment_mode)?.label || formData.fulfillment_mode;
   const paymentMethods = [formData.accepts_cod && 'COD', formData.accepts_upi && 'UPI'].filter(Boolean).join(', ') || 'None';
 
@@ -389,7 +396,7 @@ export default function BecomeSellerPage() {
             <div className="border rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-2"><ImageIcon size={16} className="text-primary" /><h3 className="font-semibold text-sm">Store Images</h3><span className="text-[10px] text-muted-foreground ml-auto">Optional</span></div>
               <p className="text-xs text-muted-foreground">Add a profile photo and cover image to make your store stand out</p>
-              {user && <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Profile Photo</Label><CroppableImageUpload value={formData.profile_image_url} onChange={(url) => setFormData({ ...formData, profile_image_url: url })} folder="sellers" userId={user.id} aspectRatio="square" placeholder="Profile" cropAspect={1} /></div><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Cover Image</Label><CroppableImageUpload value={formData.cover_image_url} onChange={(url) => setFormData({ ...formData, cover_image_url: url })} folder="sellers" userId={user.id} aspectRatio="video" placeholder="Cover" cropAspect={16 / 9} /></div></div>}
+              {user && <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Profile Photo</Label><CroppableImageUpload value={formData.profile_image_url} onChange={(url) => setFormData({ ...formData, profile_image_url: url })} folder="sellers" userId={user.id} aspectRatio="square" placeholder="Profile" cropAspect={1} beforePick={beforeImagePick} /></div><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Cover Image</Label><CroppableImageUpload value={formData.cover_image_url} onChange={(url) => setFormData({ ...formData, cover_image_url: url })} folder="sellers" userId={user.id} aspectRatio="video" placeholder="Cover" cropAspect={16 / 9} beforePick={beforeImagePick} /></div></div>}
             </div>
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Add at least one product or service to your catalog</p>
             <Button className="w-full" onClick={handleProceedToProducts} disabled={isLoading || formData.operating_days.length === 0}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Add Products<ChevronRight size={16} className="ml-1" /></Button>
@@ -408,7 +415,7 @@ export default function BecomeSellerPage() {
         {step === 5 && draftSellerId && (
           <div className="space-y-5">
             <button onClick={() => handleStepBack(4)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store settings</button>
-            <DraftProductManager sellerId={draftSellerId} categories={formData.categories} products={draftProducts} onProductsChange={setDraftProducts} />
+            <DraftProductManager sellerId={draftSellerId} categories={formData.categories} products={draftProducts} onProductsChange={setDraftProducts} beforePick={beforeImagePick} />
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Review everything and submit for approval</p>
             <Button className="w-full" onClick={() => setStep(6)} disabled={draftProducts.length === 0}>Review & Submit<ChevronRight size={16} className="ml-1" /></Button>
           </div>

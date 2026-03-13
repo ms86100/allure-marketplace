@@ -15,6 +15,7 @@ interface ProductImageUploadProps {
   categoryName?: string;
   description?: string;
   className?: string;
+  beforePick?: () => void | Promise<void>;
 }
 
 export function ProductImageUpload({
@@ -25,6 +26,7 @@ export function ProductImageUpload({
   categoryName,
   description,
   className,
+  beforePick,
 }: ProductImageUploadProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -89,6 +91,7 @@ export function ProductImageUpload({
         placeholder="Upload product photo"
         className={className}
         cropAspect={1}
+        beforePick={beforePick}
       />
     );
   }
@@ -115,6 +118,7 @@ export function ProductImageUpload({
           aspectRatio="square"
           placeholder="Upload product photo"
           cropAspect={1}
+          beforePick={beforePick}
         />
       </TabsContent>
 

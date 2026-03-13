@@ -16,6 +16,8 @@ interface CroppableImageUploadProps {
   aspectRatio?: 'square' | 'video' | 'portrait';
   placeholder?: string;
   cropAspect?: number;
+  /** Called before opening the native image picker — use to persist state before WebView may reload */
+  beforePick?: () => void | Promise<void>;
 }
 
 export function CroppableImageUpload({
@@ -27,6 +29,7 @@ export function CroppableImageUpload({
   aspectRatio = 'square',
   placeholder = 'Upload Image',
   cropAspect,
+  beforePick,
 }: CroppableImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
@@ -122,7 +125,8 @@ export function CroppableImageUpload({
     onChange(null);
   };
 
-  const handlePickImage = () => {
+  const handlePickImage = async () => {
+    await beforePick?.();
     if (Capacitor.isNativePlatform()) {
       handleNativePick();
     } else {
@@ -130,7 +134,8 @@ export function CroppableImageUpload({
     }
   };
 
-  const handleCameraCapture = () => {
+  const handleCameraCapture = async () => {
+    await beforePick?.();
     if (Capacitor.isNativePlatform()) {
       handleNativePick();
     } else {

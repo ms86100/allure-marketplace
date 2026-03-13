@@ -38,6 +38,7 @@ interface DraftProductManagerProps {
   categories: string[];
   products: DraftProduct[];
   onProductsChange: (products: DraftProduct[]) => void;
+  beforePick?: () => void | Promise<void>;
 }
 
 function isServiceCategory(category: string, configs: any[]): boolean {
@@ -51,6 +52,7 @@ export function DraftProductManager({
   categories,
   products,
   onProductsChange,
+  beforePick,
 }: DraftProductManagerProps) {
   const { user } = useAuth();
   const DRAFT_KEY = `draft-product-form-${sellerId}`;
@@ -560,6 +562,7 @@ export function DraftProductManager({
                     productName={newProduct.name}
                     categoryName={newProduct.category}
                     description={newProduct.description}
+                    beforePick={beforePick}
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground">Sign in to upload images</p>
