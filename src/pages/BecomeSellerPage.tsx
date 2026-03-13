@@ -57,14 +57,13 @@ function SubCategorySelector({ selectedGroup, selectedCategories, onCategorySele
 function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }: {
   latitude: number | null;
   longitude: number | null;
-  onLocationSet: (lat: number, lng: number) => void;
+  onLocationSet: (lat: number, lng: number, name?: string) => void;
   hasSociety: boolean;
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [locationName, setLocationName] = useState<string | null>(null);
   const hasCoords = !!(latitude && longitude);
 
-  // We need a dummy sellerId for the sheet since it saves via RPC;
-  // we'll intercept the confirm differently. Let's use a wrapper approach.
   return (
     <div className="border rounded-lg p-4 space-y-3">
       <div className="flex items-center gap-2">
@@ -76,7 +75,7 @@ function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }:
           <CheckCircle size={16} className="text-success" />
           <div className="flex-1">
             <p className="text-sm font-medium text-success">Location set</p>
-            <p className="text-[10px] text-muted-foreground">{latitude?.toFixed(5)}, {longitude?.toFixed(5)}</p>
+            <p className="text-xs text-muted-foreground">{locationName || `${latitude?.toFixed(5)}, ${longitude?.toFixed(5)}`}</p>
           </div>
           <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => setSheetOpen(true)}>Change</Button>
         </div>
@@ -99,8 +98,9 @@ function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }:
       <OnboardingLocationSheet
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        onConfirm={(lat, lng) => {
-          onLocationSet(lat, lng);
+        onConfirm={(lat, lng, name) => {
+          if (name) setLocationName(name);
+          onLocationSet(lat, lng, name);
           setSheetOpen(false);
         }}
       />

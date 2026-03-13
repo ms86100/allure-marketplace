@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 interface OnboardingLocationSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (lat: number, lng: number) => void;
+  onConfirm: (lat: number, lng: number, name?: string) => void;
 }
 
 export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: OnboardingLocationSheetProps) {
@@ -76,7 +76,7 @@ export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: Onboa
 
   return (
     <Drawer open={open} onOpenChange={handleOpenChange}>
-      <DrawerContent className="max-h-[85vh]">
+      <DrawerContent className="max-h-[85vh] overflow-y-auto">
         <DrawerHeader className="pb-2">
           <DrawerTitle className="text-base">Set Store Location</DrawerTitle>
           <p className="text-xs text-muted-foreground">
@@ -146,7 +146,7 @@ export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: Onboa
               latitude={coords.lat}
               longitude={coords.lng}
               name="Store Location"
-              onConfirm={(lat, lng) => onConfirm(lat, lng)}
+              onConfirm={(lat, lng, updatedName) => onConfirm(lat, lng, updatedName)}
               onBack={handleBack}
             />
           )}

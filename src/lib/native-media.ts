@@ -83,11 +83,34 @@ export async function capturePhotoFromCamera(): Promise<Blob | null> {
 export async function pickOrCaptureImage(): Promise<Blob | null> {
   if (!Capacitor.isNativePlatform()) return null;
 
-  await ensureCameraPermissions('prompt');
   const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');
 
-  // Use DataUrl as fallback — Uri can fail on some iOS versions when
-  // the user selects from the gallery via the prompt action sheet.
+  // Request permissions first, separately from the getPhoto call
+  // This prevents the permission dialog from breaking the gesture context
+  const permStatus = await Camera.checkPermissions();
+  const needsCamera = permStatus.camera !== 'granted';
+  const needsPhotos = permStatus.photos !== 'granted' && permStatus.photos !== 'limited';
+
+  if (needsCamera || needsPhotos) {
+    const requested = await Camera.requestPermissions({
+      permissions: [
+        ...(needsCamera ? ['camera' as const] : []),
+        ...(needsPhotos ? ['photos' as const] : []),
+      ],
+    });
+
+    if (requested.camera === 'denied') {
+      throw new Error('Camera permission denied. Please enable it in your device Settings.');
+    }
+    if (requested.photos === 'denied') {
+      throw new Error('Photo library permission denied. Please enable it in your device Settings.');
+    }
+
+    // Wait a moment for iOS to finish dismissing the permission dialog
+    // before invoking the image picker — this prevents "Failed to select image"
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
   const photo = await Camera.getPhoto({
     source: CameraSource.Prompt,
     resultType: CameraResultType.DataUrl,
@@ -99,7 +122,6 @@ export async function pickOrCaptureImage(): Promise<Blob | null> {
     return response.blob();
   }
 
-  // Fallback for webPath (shouldn't happen with DataUrl but just in case)
   if (photo.webPath) {
     const response = await fetch(photo.webPath);
     return response.blob();
