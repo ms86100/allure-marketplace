@@ -21,6 +21,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "startLiveActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateLiveActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endLiveActivity", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getActiveActivities", returnType: CAPPluginReturnPromise),
     ]
 
     // MARK: - Start
@@ -98,5 +99,20 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             call.resolve()
         }
+    }
+
+    // MARK: - Get Active Activities
+
+    @objc func getActiveActivities(_ call: CAPPluginCall) {
+        var result: [[String: String]] = []
+
+        for activity in Activity<LiveDeliveryAttributes>.activities {
+            result.append([
+                "activityId": activity.id,
+                "entityId": activity.attributes.entityId,
+            ])
+        }
+
+        call.resolve(["activities": result])
     }
 }

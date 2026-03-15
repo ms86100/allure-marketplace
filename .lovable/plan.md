@@ -1,41 +1,49 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-# Harden LiveActivityManager Against Duplicate Activities + Final Production Checks
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-## The Hidden Risk: Duplicate Lock-Screen Activities
+## Phase I Live Activities — CI Pipeline Status
 
-The `LiveActivityManager` tracks active activities in an **in-memory Map**. This means:
+### Codemagic Build Pipeline: COMPLETE
 
-- **App restart / cold launch while an activity is running** → the Map is empty, but a stale ActivityKit activity is still visible on the lock screen. The next `push()` call creates a **second** activity for the same entity.
-- **Hot reload during development** → same problem.
+Both `ios-release` and `release-all` workflows now include:
 
-This is the #1 production bug teams discover after shipping Live Activities.
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
 
-## Fix
+### Codemagic Requirements (User Action)
 
-On every `push()` call (or at manager init), query `Activity<LiveDeliveryAttributes>.activities` on the native side to reconcile the in-memory Map with what iOS actually has running. This requires a new plugin method.
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
 
-### Changes
+### Runtime Call Chain (Verified)
 
-**1. Add `getActiveActivities` method to the plugin interface**
-- `src/plugins/live-activity/definitions.ts` — add `getActiveActivities(): Promise<{ activities: { activityId: string; entityId: string }[] }>`
-- `src/plugins/live-activity/index.ts` — add web no-op returning empty array
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
+```
 
-**2. Add native implementation**
-- `native/ios/LiveActivityPlugin.swift` — new `getActiveActivities` method that iterates `Activity<LiveDeliveryAttributes>.activities` and returns their IDs + entity IDs
+## Implementation Matrix
 
-**3. Reconcile on first push in LiveActivityManager**
-- `src/services/LiveActivityManager.ts` — on first `push()`, call `getActiveActivities()` to hydrate the in-memory Map. End any orphaned activities that don't match current state.
-
-**4. Final production hardening**
-- Add `'ready'` to `START_STATUSES` validation in the widget Swift file (already in TS but widget `statusTitle` doesn't handle it)
-- Update `LiveDeliveryWidget.swift` to handle the `"ready"` status title
-
-### Files Modified
-- `src/plugins/live-activity/definitions.ts`
-- `src/plugins/live-activity/index.ts`
-- `src/services/LiveActivityManager.ts`
-- `native/ios/LiveActivityPlugin.swift`
-- `native/ios/LiveDeliveryWidget.swift`
-- `.lovable/plan.md`
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |

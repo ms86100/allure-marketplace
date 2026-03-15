@@ -24,6 +24,11 @@ export interface LiveActivityData {
   progress_stage: string | null;
 }
 
+export interface ActiveActivityEntry {
+  activityId: string;
+  entityId: string;
+}
+
 export interface LiveActivityPlugin {
   /**
    * Start a new lock-screen live activity.
@@ -41,4 +46,10 @@ export interface LiveActivityPlugin {
    * End (dismiss) the live activity for a given entity.
    */
   endLiveActivity(opts: { activityId: string }): Promise<void>;
+
+  /**
+   * Query all currently-running native activities.
+   * Used to reconcile in-memory state after app restart / cold launch.
+   */
+  getActiveActivities(): Promise<{ activities: ActiveActivityEntry[] }>;
 }

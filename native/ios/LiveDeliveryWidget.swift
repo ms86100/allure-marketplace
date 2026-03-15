@@ -96,6 +96,7 @@ struct LiveDeliveryWidget: Widget {
         case "picked_up":  return "Picked Up"
         case "en_route":   return "On the Way"
         case "confirmed":  return "Booking Confirmed"
+        case "ready":      return "Ready for Pickup"
         default:           return "Order Update"
         }
     }
