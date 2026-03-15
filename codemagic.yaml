@@ -1035,13 +1035,19 @@ workflows:
           # Restore widget extension bundle ID (sed above overwrites it)
           ruby - << 'RUBY'
           require 'xcodeproj'
+          TEAM_ID = '6HBR38JB8Z'
+
           project = Xcodeproj::Project.open('App.xcodeproj')
           project.targets.each do |target|
             next unless target.name.start_with?('LiveDeliveryWidgetExtension')
             target.build_configurations.each do |config|
-              config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'app.sociva.community.LiveDeliveryWidget'
-              config.build_settings['PRODUCT_NAME'] = 'LiveDeliveryWidgetExtension'
-              config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.1'
+              settings = config.build_settings
+              settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'app.sociva.community.LiveDeliveryWidget'
+              settings['PRODUCT_NAME'] = 'LiveDeliveryWidgetExtension'
+              settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.1'
+              settings['CODE_SIGN_STYLE'] = 'Manual'
+              settings['DEVELOPMENT_TEAM'] = TEAM_ID
+              settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'Apple Distribution'
             end
           end
           project.save
