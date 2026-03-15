@@ -55,6 +55,7 @@ const MODULE_COMPONENTS: Record<string, React.FC> = {
   'service-booking': ServiceBookingDocs,
   seller: SellerToolsDocs,
   delivery: DeliveryDocs,
+  workflows: WorkflowEngineDocs,
   admin: AdminCommunityDocs,
 };
 
