@@ -90,6 +90,10 @@ export default function HomePage() {
         {/* ═══ RICH NOTIFICATION BANNER ═══ */}
         <HomeNotificationBanner />
 
+        {/* ═══ SMART SUGGESTIONS ═══ */}
+        <ArrivalSuggestionCard />
+        <SmartSuggestionBanner />
+
         {/* ═══ DISCOVER ═══ */}
         <HomeSearchSuggestions />
         <div className="px-4 mt-3">

@@ -74,3 +74,9 @@ verify_jwt = false
 
 [functions.manage-cron-jobs]
 verify_jwt = false
+
+[functions.generate-order-suggestions]
+verify_jwt = false
+
+[functions.quick-reorder]
+verify_jwt = false
