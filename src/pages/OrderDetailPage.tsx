@@ -64,7 +64,7 @@ export default function OrderDetailPage() {
   const isInTransit = o.isInTransit;
 
   return (
-    <AppLayout showHeader={false} showNav={(!o.isSellerView || order.status === 'completed' || order.status === 'cancelled') && !o.isChatOpen}>
+    <AppLayout showHeader={false} showNav={(!o.isSellerView || isTerminalStatus(o.flow, order.status)) && !o.isChatOpen}>
       <div className="pb-28">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 const PAGE_SIZE = 20;
 
