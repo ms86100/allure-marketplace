@@ -1,80 +1,38 @@
-# Dynamic Workflow Engine — Implementation Complete
+# Smart Phone-Native Capabilities — Final Audit Status
 
-## What Was Built
+## Status: ✅ COMPLETE (Phases A–H Implemented, Phase I Deferred)
 
-### Phase 1: Database ✅
-- **`category_status_transitions`** table — stores actor-based transition rules (from_status → to_status → allowed_actor) per workflow
-- **Display columns** added to `category_status_flows`: `display_label`, `color`, `icon`, `buyer_hint`
-- **`validate_order_status_transition`** trigger — validates transitions against `category_status_transitions` table with actor enforcement
-- **Seeded workflows**: `default` parent_group for `cart_purchase`, `self_fulfillment`, `service_booking`, `request_service`
-- **Seeded transitions** for all 7 parent_groups × service_booking + education_learning × request_service + all default workflows
-- **Performance index**: `idx_cst_lookup` on (parent_group, transaction_type, from_status)
+All 8 implementable phases are fully operational. No critical or high-priority gaps remain.
 
-### Phase 2: Frontend Cleanup ✅
-- **`useCategoryStatusFlow.ts`** — extended with `display_label`, `color`, `icon`, `buyer_hint` fields; added `booking` → `service_booking` type mapping; fallback to `default` parent_group; new `useStatusTransitions` hook
-- **`useOrderDetail.ts`** — removed ALL hardcoded status arrays (legacyOrder, fallback displayStatuses); added `getFlowStepLabel()` and `getBuyerHint()` helpers that use DB flow data
-- **`OrderDetailPage.tsx`** — timeline labels now come from `getFlowStepLabel()`; buyer hints now come from `getBuyerHint()` (DB-driven)
-- **`OrdersMonitor.tsx`** — replaced hardcoded `ORDER_STATUS_LABELS` with `useStatusLabels()` hook
+## Implementation Matrix
 
-### Phase 3: Admin Workflow Manager ✅
-- **`AdminWorkflowManager.tsx`** — full workflow editor with:
-  - List view of all (parent_group, transaction_type) workflows
-  - Status pipeline editor: add/remove/reorder steps, configure actor/terminal/display_label/color/icon/buyer_hint
-  - Transition rules editor: for each status, toggle which actors can move to which next statuses (supports non-linear transitions like cancellations)
-  - Save: upserts all flow steps + transitions
-- **Admin nav**: "Workflows" item added under Commerce group
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity (en_route, 500m, 200m) | ✅ Implemented |
+| B | Multi-Interval Booking Reminders (1hr, 30m, 10m) | ✅ Implemented |
+| C | Predictive Ordering Engine | ✅ Implemented |
+| D | One-Tap Server-Side Reorder | ✅ Implemented |
+| E | Historical ETA Intelligence | ✅ Implemented |
+| F | Smart Arrival Detection | ✅ Implemented |
+| G | Smart Delay Detection | ✅ Implemented |
+| H | Notification Payload Standardization | ✅ Implemented |
+| I | Lock Screen Dashboard | ⏸️ Deferred (native plugin required) |
 
-### Phase 4: Fixes ✅
-- **Calendar**: native Capacitor call wrapped in try/catch, falls back to ICS download on failure
+## Key Files
 
-### Phase 5: Deep Audit Fixes ✅
-- **C1**: Added `requested`, `confirmed`, `rescheduled`, `no_show`, `at_gate` to `OrderStatus` type and `ORDER_STATUS_MAP`
-- **C2**: `OrderCancellation` now accepts `canCancel` prop from workflow transitions instead of hardcoded status check
-- **C3**: `getNextStatusForActor` rewritten to use `category_status_transitions` for accurate non-linear transition lookups
-- **C5**: Added skeleton loading state while flow is loading in timeline UI
-- **S2**: `getNextStatus` and `canChat` now use `isTerminalStatus()` from flow metadata instead of hardcoded status lists
-- **S3**: Seller reject button now uses `canSellerReject` derived from transitions table (supports `requested`, `enquired`, etc.)
-- **S4**: Removed hardcoded "Awaiting Pickup" override in `SellerOrderCard`
-- **S5**: Added missing status entries to `ORDER_STATUS_MAP`
-- **U2**: `isInTransit` now derived from flow metadata (delivery actor steps) instead of hardcoded array
-- **U3**: `canChat` uses `isTerminalStatus()` — properly disables chat for `no_show` and other terminal statuses
-- **D2**: `auto-cancel-orders` edge function now clears `auto_cancel_at` on cancellation
-- **New helpers**: `isTerminalStatus()`, `canActorCancel()`, `getNextStatusesForActor()` in `useCategoryStatusFlow.ts`
+- `supabase/functions/update-delivery-location/index.ts` — Phases A, E, G
+- `supabase/functions/send-booking-reminders/index.ts` — Phase B
+- `supabase/functions/generate-order-suggestions/index.ts` — Phase C
+- `supabase/functions/quick-reorder/index.ts` — Phase D
+- `src/hooks/useReorderInterceptor.ts` — Phase D deep-link handler
+- `src/hooks/useArrivalDetection.ts` — Phase F
+- `src/components/order/DeliveryArrivalOverlay.tsx` — Phase A UI
+- `src/components/notifications/RichNotificationCard.tsx` — Phase H UI
+- `src/components/home/SmartSuggestionBanner.tsx` — Phase C UI
+- `src/components/home/ArrivalSuggestionCard.tsx` — Phase F UI
 
-### Phase 6: Workflow-Driven Buyer Notifications ✅
+## Low-Priority Remaining Gaps
 
-#### What Changed
-- **Database**: Added `notify_buyer`, `notification_title`, `notification_body`, `notification_action` columns to `category_status_flows`
-- **Backfill**: All 16 existing hardcoded notification statuses backfilled into the new columns
-- **Trigger**: Replaced `fn_enqueue_order_status_notification()` — now does a dynamic lookup on `category_status_flows` by `parent_group + transaction_type + status_key` instead of a hardcoded CASE statement. Falls back to `default` parent_group. Supports `{seller_name}` placeholder substitution.
-- **Admin UI**: Each workflow step now has a "🔔 Send Buyer Notification" toggle with title, body, and action button fields
-- **Types**: `FlowStep` extended with 4 notification fields
-
-#### Architecture
-```
-Order status changes → trigger fires
-  → Looks up category_status_flows for matching (parent_group, transaction_type, status_key)
-  → If notify_buyer=true and notification_title set → inserts into notification_queue
-  → {seller_name} replaced with actual seller business_name
-  → notification_action included in payload for frontend action buttons
-  → Falls back to 'default' parent_group if no specific match
-```
-
-#### Files Changed
-- `category_status_flows` table — 4 new columns
-- `fn_enqueue_order_status_notification()` — rewritten to be workflow-driven
-- `src/components/admin/workflow/types.ts` — 4 new FlowStep fields
-- `src/components/admin/AdminWorkflowManager.tsx` — notification config UI per step + updated selects/inserts
-- `src/components/admin/workflow/WorkflowSimulator.tsx` — updated selects
-
-## Architecture
-
-```
-category_status_flows          → ordered status pipeline per (parent_group, transaction_type)
-category_status_transitions    → who can move between statuses (actor-based)
-validate_order_status_transition → DB trigger enforces transition rules
-useCategoryStatusFlow          → frontend loads flow + falls back to 'default'
-useStatusTransitions           → frontend loads allowed transitions
-AdminWorkflowManager           → admin UI to manage both
-```
-
+1. **50m doorstep** — No separate notification (covered by 200m alert + visual distinction in overlay)
+2. **Cron cleanup** — Duplicate pg_cron jobs (6, 11) scheduled for removal; dedup prevents duplicates regardless
+3. **Booking quick actions** — Generic labels ("View Details") vs specific ("Contact Provider")
