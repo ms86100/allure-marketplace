@@ -1,70 +1,58 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented)
 
-# Phase I — Lock Screen Live Activities Implementation
+All 9 phases are fully implemented. Phase I provides TypeScript infrastructure and native reference files for iOS/Android lock-screen live activities.
 
-## Scope and Constraints
+## Implementation Matrix
 
-Lovable can create all TypeScript/web-layer code and provide native code files (Swift, Kotlin) as reference implementations. However, native iOS/Android code cannot be compiled or tested within Lovable — the user must build locally with Xcode/Android Studio after exporting to GitHub.
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity (en_route, 500m, 200m) | Implemented |
+| B | Multi-Interval Booking Reminders (1hr, 30m, 10m) | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (native build required) |
 
-## What Will Be Created
+## Phase I Key Files
 
-### 1. Capacitor Plugin Bridge (TypeScript definitions)
-**File**: `src/plugins/live-activity/definitions.ts`
+- `src/plugins/live-activity/definitions.ts` — Plugin interface (LiveActivityData, start/update/end)
+- `src/plugins/live-activity/index.ts` — Capacitor plugin registration with web no-op fallback
+- `src/services/LiveActivityManager.ts` — Singleton: dedup, throttle (5s), lifecycle management
+- `src/hooks/useLiveActivity.ts` — React hook bridging order/delivery state to LiveActivityManager
+- `native/ios/LiveDeliveryActivity.swift` — ActivityKit attributes
+- `native/ios/LiveDeliveryWidget.swift` — SwiftUI lock screen + Dynamic Island UI
+- `native/ios/LiveActivityPlugin.swift` — Capacitor-to-ActivityKit bridge
+- `native/android/LiveDeliveryService.kt` — Foreground service with ongoing notification
+- `native/android/LiveActivityPlugin.kt` — Capacitor-to-Service bridge
 
-Define the `LiveActivityPlugin` interface with three methods:
-- `startLiveActivity(data: LiveActivityData): Promise<{ activityId: string }>`
-- `updateLiveActivity(data: LiveActivityData): Promise<void>`
-- `endLiveActivity(opts: { activityId: string }): Promise<void>`
+## Phase I Native Build Steps
 
-**File**: `src/plugins/live-activity/index.ts`
+1. Export to GitHub and git pull
+2. Copy `native/ios/` files into Xcode Widget Extension target
+3. Copy `native/android/` files into Android Studio project
+4. Register plugins in native bridge (see file comments)
+5. Run `npx cap sync` then build via Xcode / Android Studio
 
-Register the plugin via `registerPlugin('LiveActivity')` with web fallback (no-op).
+## Previous Phase Key Files
 
-### 2. LiveActivityManager Service
-**File**: `src/services/LiveActivityManager.ts`
+- `supabase/functions/update-delivery-location/index.ts` — Phases A, E, G
+- `supabase/functions/send-booking-reminders/index.ts` — Phase B
+- `supabase/functions/generate-order-suggestions/index.ts` — Phase C
+- `supabase/functions/quick-reorder/index.ts` — Phase D
+- `src/hooks/useReorderInterceptor.ts` — Phase D deep-link handler
+- `src/hooks/useArrivalDetection.ts` — Phase F
+- `src/components/order/DeliveryArrivalOverlay.tsx` — Phase A UI
+- `src/components/notifications/RichNotificationCard.tsx` — Phase H UI
+- `src/components/home/SmartSuggestionBanner.tsx` — Phase C UI
+- `src/components/home/ArrivalSuggestionCard.tsx` — Phase F UI
 
-Singleton service responsible for:
-- Tracking which entity currently has an active live activity (one at a time)
-- Throttling updates (max once per 5 seconds)
-- Starting activity on order accepted/picked_up or booking confirmed
-- Updating on delivery tracking changes (GPS, ETA, status)
-- Ending on terminal states (delivered, completed, cancelled, no_show)
-- Platform check — only runs on native iOS/Android
+## Low-Priority Remaining Gaps
 
-### 3. Integration Hook
-**File**: `src/hooks/useLiveActivity.ts`
-
-Hook that connects `useDeliveryTracking` state and order status to `LiveActivityManager`. Mounted in `OrderDetailPage.tsx` — when tracking data changes, it calls start/update/end as appropriate.
-
-### 4. Native iOS Files (Reference Implementation)
-**Files created in project for user to copy into Xcode**:
-- `native/ios/LiveDeliveryActivity.swift` — ActivityKit activity definition with `LiveActivityData` attributes
-- `native/ios/LiveDeliveryWidget.swift` — SwiftUI widget rendering ETA, distance, status progress bar, Dynamic Island compact/expanded views
-- `native/ios/LiveActivityPlugin.swift` — Capacitor plugin bridge calling ActivityKit APIs
-
-### 5. Native Android Files (Reference Implementation)
-- `native/android/LiveDeliveryService.kt` — Foreground service with ongoing notification showing ETA/distance/status, `setOnlyAlertOnce(true)` for silent updates
-- `native/android/LiveActivityPlugin.kt` — Capacitor plugin bridge starting/updating/stopping the service
-
-### 6. Config Updates
-- Add plugin registration guidance to `capacitor.config.ts` comments
-- Update `.lovable/plan.md` to mark Phase I as implemented
-
-## Integration Points
-
-The `useLiveActivity` hook will:
-1. Watch `deliveryTracking` state from `useDeliveryTracking`
-2. Watch order `status` from `useOrderDetail`
-3. On status entering active states → `startLiveActivity`
-4. On tracking updates (eta, distance, status change) → `updateLiveActivity` (throttled)
-5. On terminal status → `endLiveActivity`
-
-## Safety
-
-- Dedup: one active activity per entity, tracked by `entity_id`
-- Throttle: updates batched to max 1 per 5 seconds
-- Graceful degradation: web platform returns no-op, errors are caught silently
-- Auto-cleanup: terminal status always ends the activity
-
-## File Count: ~8 new files, 2 modified files
-
+1. **50m doorstep** — No separate notification (covered by 200m alert + visual distinction in overlay)
+2. **Cron cleanup** — Duplicate pg_cron jobs scheduled for removal; dedup prevents duplicates regardless
+3. **Booking quick actions** — Generic labels ("View Details") vs specific ("Contact Provider")
