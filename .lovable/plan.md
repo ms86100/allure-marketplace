@@ -4,6 +4,61 @@
 
 All 9 phases are fully implemented. Phase I provides TypeScript infrastructure and native reference files for iOS/Android lock-screen live activities.
 
+## Phase I Live Activities — Production Readiness Audit
+
+### Final Verdict
+
+| Layer | Status |
+|---|---|
+| TypeScript integration | **Production Ready** |
+| iOS native code | **Code Complete** |
+| iOS configuration | **Not Ready** — requires Xcode setup (widget extension, entitlements, deployment target) |
+| Android native code | **Code Complete** |
+| Android configuration | **Not Ready** — requires manifest permissions & service declaration |
+
+### iOS Requirements
+
+| Requirement | Status |
+|---|---|
+| Deployment target ≥ 16.1 | NOT CONFIGURED (set during Xcode project creation) |
+| ActivityKit imported | Present in all Swift reference files |
+| Widget extension target | MISSING (manual Xcode creation required) |
+| Live Activities capability / entitlements | MISSING (Xcode Signing & Capabilities) |
+
+### Android Requirements
+
+| Requirement | Status |
+|---|---|
+| `FOREGROUND_SERVICE` permission | MISSING (no AndroidManifest.xml in repo) |
+| `POST_NOTIFICATIONS` permission | MISSING |
+| `LiveDeliveryService` manifest declaration | MISSING |
+| Notification channel created (code) | Present (`LiveDeliveryService.kt`) |
+| `startForeground()` called (code) | Present (`LiveDeliveryService.kt`) |
+
+### Runtime Call Chain (Verified)
+
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit / Android Foreground Service
+  → On web: silent no-op
+```
+
+### Remaining Steps Before Release
+
+**iOS (after `npx cap add ios`):**
+1. Copy `native/ios/*.swift` into Xcode project
+2. Set deployment target ≥ iOS 16.1
+3. Create Widget Extension target (`app.sociva.community.LiveDeliveryWidget`)
+4. Add `LiveDeliveryActivity.swift` to both main app + widget extension targets
+5. Enable Live Activities capability (adds `com.apple.developer.activitykit`)
+6. Register plugin: `bridge.registerPlugin(LiveActivityPlugin.self)`
+
+**Android (after `npx cap add android`):**
+1. Copy `native/android/*.kt` into `android/app/src/main/java/app/sociva/community/`
+2. Add manifest permissions: `FOREGROUND_SERVICE`, `POST_NOTIFICATIONS`
+3. Declare service: `<service android:name=".LiveDeliveryService" android:foregroundServiceType="specialUse" android:exported="false" />`
+4. Register plugin: `registerPlugin(LiveActivityPlugin::class.java)`
+
 ## Implementation Matrix
 
 | Phase | Feature | Status |
@@ -16,43 +71,16 @@ All 9 phases are fully implemented. Phase I provides TypeScript infrastructure a
 | F | Smart Arrival Detection | Implemented |
 | G | Smart Delay Detection | Implemented |
 | H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (native build required) |
+| I | Lock Screen Live Activities | Code Complete (native config required) |
 
-## Phase I Key Files
+## Key Files
 
-- `src/plugins/live-activity/definitions.ts` — Plugin interface (LiveActivityData, start/update/end)
+- `src/plugins/live-activity/definitions.ts` — Plugin interface
 - `src/plugins/live-activity/index.ts` — Capacitor plugin registration with web no-op fallback
-- `src/services/LiveActivityManager.ts` — Singleton: dedup, throttle (5s), lifecycle management
-- `src/hooks/useLiveActivity.ts` — React hook bridging order/delivery state to LiveActivityManager
+- `src/services/LiveActivityManager.ts` — Singleton: dedup, throttle, lifecycle
+- `src/hooks/useLiveActivity.ts` — React hook bridging order/delivery state
 - `native/ios/LiveDeliveryActivity.swift` — ActivityKit attributes
 - `native/ios/LiveDeliveryWidget.swift` — SwiftUI lock screen + Dynamic Island UI
 - `native/ios/LiveActivityPlugin.swift` — Capacitor-to-ActivityKit bridge
 - `native/android/LiveDeliveryService.kt` — Foreground service with ongoing notification
 - `native/android/LiveActivityPlugin.kt` — Capacitor-to-Service bridge
-
-## Phase I Native Build Steps
-
-1. Export to GitHub and git pull
-2. Copy `native/ios/` files into Xcode Widget Extension target
-3. Copy `native/android/` files into Android Studio project
-4. Register plugins in native bridge (see file comments)
-5. Run `npx cap sync` then build via Xcode / Android Studio
-
-## Previous Phase Key Files
-
-- `supabase/functions/update-delivery-location/index.ts` — Phases A, E, G
-- `supabase/functions/send-booking-reminders/index.ts` — Phase B
-- `supabase/functions/generate-order-suggestions/index.ts` — Phase C
-- `supabase/functions/quick-reorder/index.ts` — Phase D
-- `src/hooks/useReorderInterceptor.ts` — Phase D deep-link handler
-- `src/hooks/useArrivalDetection.ts` — Phase F
-- `src/components/order/DeliveryArrivalOverlay.tsx` — Phase A UI
-- `src/components/notifications/RichNotificationCard.tsx` — Phase H UI
-- `src/components/home/SmartSuggestionBanner.tsx` — Phase C UI
-- `src/components/home/ArrivalSuggestionCard.tsx` — Phase F UI
-
-## Low-Priority Remaining Gaps
-
-1. **50m doorstep** — No separate notification (covered by 200m alert + visual distinction in overlay)
-2. **Cron cleanup** — Duplicate pg_cron jobs scheduled for removal; dedup prevents duplicates regardless
-3. **Booking quick actions** — Generic labels ("View Details") vs specific ("Contact Provider")
