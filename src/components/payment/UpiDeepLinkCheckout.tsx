@@ -186,19 +186,56 @@ export function UpiDeepLinkCheckout({
     setShowUtrField(false);
   };
 
-  const handleSubmitUtr = async () => {
-    const trimmed = utrValue.trim();
-    if (!trimmed || trimmed.length < 6) {
-      toast.error('Please enter a valid Transaction ID (at least 6 characters)');
+  const handleScreenshotSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB');
       return;
     }
+    setScreenshotFile(file);
+    setScreenshotPreview(URL.createObjectURL(file));
+  };
 
+  const handleRemoveScreenshot = () => {
+    setScreenshotFile(null);
+    if (screenshotPreview) URL.revokeObjectURL(screenshotPreview);
+    setScreenshotPreview(null);
+  };
+
+  const handleSubmitConfirmation = async () => {
     setIsSubmitting(true);
     try {
+      let screenshotUrl: string | null = null;
+
+      // Upload screenshot if provided
+      if (screenshotFile) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Not authenticated');
+        const ext = screenshotFile.name.split('.').pop() || 'jpg';
+        const path = `${user.id}/${orderId}.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from('payment-proofs')
+          .upload(path, screenshotFile, { upsert: true });
+        if (uploadErr) throw uploadErr;
+
+        const { data: urlData } = supabase.storage
+          .from('payment-proofs')
+          .getPublicUrl(path);
+        // For private buckets, use signed URL
+        const { data: signedData } = await supabase.storage
+          .from('payment-proofs')
+          .createSignedUrl(path, 60 * 60 * 24 * 30); // 30 days
+        screenshotUrl = signedData?.signedUrl || urlData?.publicUrl || null;
+      }
+
+      const trimmed = utrValue.trim();
+
       const { error } = await supabase.rpc('confirm_upi_payment', {
         _order_id: orderId,
-        _upi_transaction_ref: trimmed,
-      });
+        _upi_transaction_ref: trimmed || '',
+        _payment_screenshot_url: screenshotUrl,
+      } as any);
 
       if (error) throw error;
 
@@ -217,11 +254,18 @@ export function UpiDeepLinkCheckout({
           .single();
 
         if (sellerProfile) {
+          const evidenceParts: string[] = [];
+          if (trimmed) evidenceParts.push(`UTR: ${trimmed}`);
+          if (screenshotUrl) evidenceParts.push('Screenshot attached');
+          const evidenceText = evidenceParts.length > 0
+            ? evidenceParts.join('. ') + '.'
+            : 'No evidence provided.';
+
           await supabase.from('notification_queue').insert({
             user_id: sellerProfile.user_id,
             type: 'order',
             title: '💳 Payment Confirmation Needed',
-            body: `Buyer claims UPI payment for Order #${shortOrderId}. UTR: ${trimmed}. Please verify and confirm.`,
+            body: `Buyer claims UPI payment for Order #${shortOrderId}. ${evidenceText} Please verify and confirm.`,
             reference_path: `/orders/${orderId}`,
             payload: { orderId, status: 'buyer_confirmed', type: 'order' },
           } as any);
@@ -232,7 +276,7 @@ export function UpiDeepLinkCheckout({
 
       completeFlow();
     } catch (err) {
-      console.error('Failed to submit UTR:', err);
+      console.error('Failed to submit payment confirmation:', err);
       toast.error('Failed to submit payment confirmation');
     } finally {
       setIsSubmitting(false);
