@@ -24,8 +24,8 @@ function getProximity(distanceMeters: number): 'at_doorstep' | 'arriving' | 'nea
   return 'en_route';
 }
 
-/** ETA in minutes with state-based overrides */
-function calculateEta(distanceMeters: number, speedKmh: number | null, accuracyMeters: number | null): { eta: number | null; skipUpdate: boolean } {
+/** ETA in minutes with state-based overrides and optional historical blend */
+function calculateEta(distanceMeters: number, speedKmh: number | null, accuracyMeters: number | null, historicalAvgMin: number | null = null): { eta: number | null; skipUpdate: boolean } {
   if (accuracyMeters != null && accuracyMeters > 100) {
     return { eta: null, skipUpdate: true };
   }
@@ -36,7 +36,13 @@ function calculateEta(distanceMeters: number, speedKmh: number | null, accuracyM
   const effectiveSpeed = speed > 2 ? speed : 15;
   const roadFactor = 1.3;
   const distKm = (distanceMeters * roadFactor) / 1000;
-  const etaMin = Math.max(1, Math.round((distKm / effectiveSpeed) * 60));
+  let etaMin = Math.max(1, Math.round((distKm / effectiveSpeed) * 60));
+
+  // Phase E: Blend with historical average when GPS speed is unreliable
+  if (historicalAvgMin != null && historicalAvgMin > 0 && speed < 2) {
+    etaMin = Math.max(1, Math.round((etaMin + historicalAvgMin) / 2));
+  }
+
   return { eta: etaMin, skipUpdate: false };
 }
 
@@ -93,7 +99,7 @@ serve(async (req) => {
     // Get assignment
     const { data: assignment, error: aErr } = await supabase
       .from('delivery_assignments')
-      .select('id, status, order_id, society_id, partner_id, rider_id, last_location_at, stalled_notified, eta_minutes, last_location_lat, last_location_lng')
+      .select('id, status, order_id, society_id, partner_id, rider_id, last_location_at, stalled_notified, eta_minutes, last_location_lat, last_location_lng, rider_name')
       .eq('id', assignment_id)
       .single();
 
@@ -142,16 +148,17 @@ serve(async (req) => {
 
     if (locErr) console.error('Error inserting location:', locErr);
 
-    // Get destination coordinates
+    // Get destination coordinates and seller info for ETA blending
     const { data: orderForDest } = await supabase
       .from('orders')
-      .select('delivery_lat, delivery_lng, buyer_id')
+      .select('delivery_lat, delivery_lng, buyer_id, seller_id')
       .eq('id', assignment.order_id)
       .single();
 
     let destLat = orderForDest?.delivery_lat;
     let destLng = orderForDest?.delivery_lng;
     const buyerId = orderForDest?.buyer_id;
+    const sellerId = orderForDest?.seller_id;
 
     if (!destLat || !destLng) {
       const { data: society } = await supabase
@@ -172,7 +179,23 @@ serve(async (req) => {
       distanceMeters = Math.round(haversineDistance(latitude, longitude, destLat, destLng));
       proximity = getProximity(distanceMeters);
 
-      const etaResult = calculateEta(distanceMeters, speed_kmh, accuracy_meters);
+      // Phase E: Query historical ETA data when speed is poor
+      let historicalAvgMin: number | null = null;
+      if ((speed_kmh == null || speed_kmh < 2) && sellerId) {
+        const currentHour = new Date().getUTCHours();
+        const { data: stats } = await supabase
+          .from('delivery_time_stats')
+          .select('avg_delivery_minutes')
+          .eq('seller_id', sellerId)
+          .eq('society_id', assignment.society_id)
+          .eq('time_bucket', currentHour)
+          .maybeSingle();
+        if (stats?.avg_delivery_minutes) {
+          historicalAvgMin = Number(stats.avg_delivery_minutes);
+        }
+      }
+
+      const etaResult = calculateEta(distanceMeters, speed_kmh, accuracy_meters, historicalAvgMin);
       skipEtaUpdate = etaResult.skipUpdate;
       if (!skipEtaUpdate) {
         etaMinutes = etaResult.eta;
@@ -311,6 +334,17 @@ serve(async (req) => {
 
     // ═══ PHASE A: Proximity notifications — 500m and 200m (separate dedup keys) ═══
     if (distanceMeters !== null && buyerId && assignment.status === 'picked_up') {
+      // Fetch vehicle_type for payloads
+      let vehicleType: string | null = null;
+      if (assignment.rider_id) {
+        const { data: riderInfo } = await supabase
+          .from('delivery_partner_pool')
+          .select('vehicle_type')
+          .eq('id', assignment.rider_id)
+          .single();
+        vehicleType = riderInfo?.vehicle_type ?? null;
+      }
+
       // 500m — "nearby" notification
       if (distanceMeters < 500) {
         const { count } = await supabase
@@ -334,6 +368,7 @@ serve(async (req) => {
               workflow_status: 'arriving',
               action: 'View Tracking',
               distance: distanceMeters,
+              vehicle_type: vehicleType,
             },
           });
         }
@@ -364,6 +399,7 @@ serve(async (req) => {
               distance: distanceMeters,
               eta: etaMinutes,
               driver_name: assignment.rider_name ?? null,
+              vehicle_type: vehicleType,
             },
           });
         }

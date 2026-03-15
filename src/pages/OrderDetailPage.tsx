@@ -10,6 +10,8 @@ import { UrgentOrderTimer } from '@/components/order/UrgentOrderTimer';
 import { OrderRejectionDialog } from '@/components/order/OrderRejectionDialog';
 import { DeliveryStatusCard } from '@/components/delivery/DeliveryStatusCard';
 import { LiveDeliveryTracker } from '@/components/delivery/LiveDeliveryTracker';
+import { DeliveryArrivalOverlay } from '@/components/order/DeliveryArrivalOverlay';
+import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
 import { OrderItemCard } from '@/components/order/OrderItemCard';
 import { AppointmentDetailsCard } from '@/components/order/AppointmentDetailsCard';
 import { useServiceBookingForOrder } from '@/hooks/useServiceBookings';
@@ -35,6 +37,8 @@ export default function OrderDetailPage() {
   const order = o.order;
   const orderId = order?.id;
   const fulfillmentType = o.orderFulfillmentType;
+
+  const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
 
   useEffect(() => {
     if (fulfillmentType === 'delivery' && orderId) {
@@ -257,6 +261,18 @@ export default function OrderDetailPage() {
 
       <OrderRejectionDialog open={o.isRejectionDialogOpen} onOpenChange={o.setIsRejectionDialogOpen} onReject={o.handleReject} orderNumber={order.id} />
       {o.chatRecipientId && <OrderChat orderId={order.id} otherUserId={o.chatRecipientId} otherUserName={o.chatRecipientName || 'User'} isOpen={o.isChatOpen} onClose={() => { o.setIsChatOpen(false); o.fetchUnreadCount(); }} disabled={!o.canChat} />}
+
+      {/* DeliveryArrivalOverlay — imminent arrival full-screen alert */}
+      {deliveryAssignmentId && (
+        <DeliveryArrivalOverlay
+          distance={deliveryTracking.distance}
+          eta={deliveryTracking.eta}
+          riderName={deliveryTracking.riderName}
+          riderPhone={deliveryTracking.riderPhone}
+          status={deliveryTracking.status}
+          onDismiss={() => {}}
+        />
+      )}
     </AppLayout>
   );
 }
