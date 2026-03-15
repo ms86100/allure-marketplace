@@ -1,40 +1,47 @@
 
-# Dynamic Workflow Engine — Implementation Complete
 
-## What Was Built
+# Workflow Engine — Final Hardening
 
-### Phase 1: Database ✅
-- **`category_status_transitions`** table — stores actor-based transition rules (from_status → to_status → allowed_actor) per workflow
-- **Display columns** added to `category_status_flows`: `display_label`, `color`, `icon`, `buyer_hint`
-- **`validate_order_status_transition`** trigger — validates transitions against `category_status_transitions` table with actor enforcement
-- **Seeded workflows**: `default` parent_group for `cart_purchase`, `self_fulfillment`, `service_booking`, `request_service`
-- **Seeded transitions** for all 7 parent_groups × service_booking + education_learning × request_service + all default workflows
-- **Performance index**: `idx_cst_lookup` on (parent_group, transaction_type, from_status)
+## Already Implemented (Confirmed)
+- Transition table with actor-based rules
+- DB trigger using transition table with fallback to `default` parent_group
+- Delivery/system actor enforcement in trigger
+- Admin workflow editor with validation (terminal, duplicates, orphan warnings)
+- Booking review step
+- Calendar ICS fallback
+- Performance index
 
-### Phase 2: Frontend Cleanup ✅
-- **`useCategoryStatusFlow.ts`** — extended with `display_label`, `color`, `icon`, `buyer_hint` fields; added `booking` → `service_booking` type mapping; fallback to `default` parent_group; new `useStatusTransitions` hook
-- **`useOrderDetail.ts`** — removed ALL hardcoded status arrays (legacyOrder, fallback displayStatuses); added `getFlowStepLabel()` and `getBuyerHint()` helpers that use DB flow data
-- **`OrderDetailPage.tsx`** — timeline labels now come from `getFlowStepLabel()`; buyer hints now come from `getBuyerHint()` (DB-driven)
-- **`OrdersMonitor.tsx`** — replaced hardcoded `ORDER_STATUS_LABELS` with `useStatusLabels()` hook
+## What the Architect Flagged (Still Actionable)
 
-### Phase 3: Admin Workflow Manager ✅
-- **`AdminWorkflowManager.tsx`** — full workflow editor with:
-  - List view of all (parent_group, transaction_type) workflows
-  - Status pipeline editor: add/remove/reorder steps, configure actor/terminal/display_label/color/icon/buyer_hint
-  - Transition rules editor: for each status, toggle which actors can move to which next statuses (supports non-linear transitions like cancellations)
-  - Save: upserts all flow steps + transitions
-- **Admin nav**: "Workflows" item added under Commerce group
+### 1. Add `seller_hint` column to `category_status_flows`
+Mirrors `buyer_hint` but for seller-facing guidance (e.g., "Prepare the order", "Hand over to delivery"). Simple schema addition — no code changes required now, just schema readiness.
 
-### Phase 4: Fixes ✅
-- **Calendar**: native Capacitor call wrapped in try/catch, falls back to ICS download on failure
-
-## Architecture
-
+**Migration:**
+```sql
+ALTER TABLE public.category_status_flows
+  ADD COLUMN IF NOT EXISTS seller_hint text;
 ```
-category_status_flows          → ordered status pipeline per (parent_group, transaction_type)
-category_status_transitions    → who can move between statuses (actor-based)
-validate_order_status_transition → DB trigger enforces transition rules
-useCategoryStatusFlow          → frontend loads flow + falls back to 'default'
-useStatusTransitions           → frontend loads allowed transitions
-AdminWorkflowManager           → admin UI to manage both
-```
+
+### 2. Cycle detection warning in Admin Workflow Editor
+Currently an admin could create backward transitions like `accepted → placed`. Add a warning (not a block, since rescheduling is a valid backward flow) when a transition goes to a lower `sort_order` step.
+
+**Change in `AdminWorkflowManager.tsx`:**
+- In `saveWorkflow()`, after the orphan check, add a warning if any transition goes from a higher `sort_order` step to a lower one
+- Simple check: for each transition, compare `fromStep.sort_order` vs `toStep.sort_order`
+- Show `toast.warning("Backward transition detected: X → Y. Ensure this is intentional.")`
+
+### 3. Extend Admin editor to show `seller_hint` field
+Add a `seller_hint` input field next to `buyer_hint` in the step editor card.
+
+## Files
+
+| File | Change |
+|---|---|
+| DB migration | Add `seller_hint` column |
+| `src/components/admin/AdminWorkflowManager.tsx` | Add cycle warning + seller_hint input |
+
+## What We're NOT Doing (Future)
+- Full actor identity validation in trigger (would require passing caller identity via `app.actor` setting — significant refactor of all status-update callsites)
+- Event-driven workflow automation (`trigger_event` column) — excellent idea for v2
+- `workflow_id` abstraction — current `(parent_group, transaction_type)` key works for now
+
