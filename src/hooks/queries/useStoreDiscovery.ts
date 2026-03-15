@@ -131,7 +131,7 @@ export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM
 
         const societyMap: Record<string, { distanceKm: number; sellers: NearbySeller[] }> = {};
         for (const s of bandSellers) {
-          const key = s.society_name || 'Independent Stores';
+          const key = s.society_name || (s.distance_km <= 2 ? 'Near Your Society' : 'Independent Stores');
           if (!societyMap[key]) {
             societyMap[key] = { distanceKm: s.distance_km, sellers: [] };
           }
