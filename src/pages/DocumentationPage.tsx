@@ -37,6 +37,7 @@ const NAV_SECTIONS = [
     group: 'Operations',
     items: [
       { id: 'delivery', label: 'Delivery & Logistics', icon: Truck },
+      { id: 'workflows', label: 'Workflow Engine', icon: Package },
     ],
   },
   {
