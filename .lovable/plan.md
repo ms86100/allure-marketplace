@@ -1,4 +1,3 @@
-
 # Dynamic Workflow Engine — Implementation Complete
 
 ## What Was Built
@@ -42,6 +41,32 @@
 - **D2**: `auto-cancel-orders` edge function now clears `auto_cancel_at` on cancellation
 - **New helpers**: `isTerminalStatus()`, `canActorCancel()`, `getNextStatusesForActor()` in `useCategoryStatusFlow.ts`
 
+### Phase 6: Workflow-Driven Buyer Notifications ✅
+
+#### What Changed
+- **Database**: Added `notify_buyer`, `notification_title`, `notification_body`, `notification_action` columns to `category_status_flows`
+- **Backfill**: All 16 existing hardcoded notification statuses backfilled into the new columns
+- **Trigger**: Replaced `fn_enqueue_order_status_notification()` — now does a dynamic lookup on `category_status_flows` by `parent_group + transaction_type + status_key` instead of a hardcoded CASE statement. Falls back to `default` parent_group. Supports `{seller_name}` placeholder substitution.
+- **Admin UI**: Each workflow step now has a "🔔 Send Buyer Notification" toggle with title, body, and action button fields
+- **Types**: `FlowStep` extended with 4 notification fields
+
+#### Architecture
+```
+Order status changes → trigger fires
+  → Looks up category_status_flows for matching (parent_group, transaction_type, status_key)
+  → If notify_buyer=true and notification_title set → inserts into notification_queue
+  → {seller_name} replaced with actual seller business_name
+  → notification_action included in payload for frontend action buttons
+  → Falls back to 'default' parent_group if no specific match
+```
+
+#### Files Changed
+- `category_status_flows` table — 4 new columns
+- `fn_enqueue_order_status_notification()` — rewritten to be workflow-driven
+- `src/components/admin/workflow/types.ts` — 4 new FlowStep fields
+- `src/components/admin/AdminWorkflowManager.tsx` — notification config UI per step + updated selects/inserts
+- `src/components/admin/workflow/WorkflowSimulator.tsx` — updated selects
+
 ## Architecture
 
 ```
@@ -52,3 +77,4 @@ useCategoryStatusFlow          → frontend loads flow + falls back to 'default'
 useStatusTransitions           → frontend loads allowed transitions
 AdminWorkflowManager           → admin UI to manage both
 ```
+
