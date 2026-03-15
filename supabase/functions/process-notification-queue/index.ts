@@ -75,6 +75,7 @@ Deno.serve(async (req) => {
             type: item.type,
             reference_path: item.reference_path,
             queue_item_id: item.id,
+            payload: item.payload || null,
           });
 
         if (insertError) {
@@ -90,12 +91,17 @@ Deno.serve(async (req) => {
         let pushFailed = false;
         let pushErrorMsg = "";
         try {
+          const pushData = { ...(item.payload || {}) };
+          if (pushData.action) pushData.action = String(pushData.action);
+          if (pushData.reference_path) pushData.reference_path = String(pushData.reference_path);
+          else if (item.reference_path) pushData.reference_path = item.reference_path;
+
           const { data: pushResult, error: pushError } = await supabase.functions.invoke("send-push-notification", {
             body: {
               userId: item.user_id,
               title: item.title,
               body: item.body,
-              data: item.payload || {},
+              data: pushData,
             },
           });
 

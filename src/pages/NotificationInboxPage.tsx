@@ -6,6 +6,7 @@ import { Bell, CheckCheck, Inbox, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '@/hooks/queries/useNotifications';
+import { RichNotificationCard } from '@/components/notifications/RichNotificationCard';
 
 export default function NotificationInboxPage() {
   const { user } = useAuth();
@@ -17,7 +18,6 @@ export default function NotificationInboxPage() {
   const handleTap = (n: typeof notifications[0]) => {
     if (!n.is_read) markRead.mutate(n.id);
     if (n.reference_path) {
-      // #11: Validate reference_path starts with /
       if (n.reference_path.startsWith('/')) {
         navigate(n.reference_path);
       }
@@ -52,37 +52,47 @@ export default function NotificationInboxPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {notifications.map(n => (
-               <button
-                key={n.id}
-                onClick={() => handleTap(n)}
-                className={`w-full text-left rounded-xl p-3 transition-colors border min-h-[44px] ${
-                  n.is_read 
-                    ? 'bg-card border-border' 
-                    : 'bg-primary/5 border-primary/20'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                    n.is_read ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'
-                  }`}>
-                    <Bell size={14} />
+            {notifications.map(n => {
+              const hasAction = n.payload?.action;
+
+              if (hasAction) {
+                return (
+                  <RichNotificationCard key={n.id} notification={n} />
+                );
+              }
+
+              return (
+                <button
+                  key={n.id}
+                  onClick={() => handleTap(n)}
+                  className={`w-full text-left rounded-xl p-3 transition-colors border min-h-[44px] ${
+                    n.is_read
+                      ? 'bg-card border-border'
+                      : 'bg-primary/5 border-primary/20'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                      n.is_read ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'
+                    }`}>
+                      <Bell size={14} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm leading-tight ${!n.is_read ? 'font-semibold' : 'font-medium'}`}>
+                        {n.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                      </p>
+                    </div>
+                    {!n.is_read && (
+                      <div className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5" />
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm leading-tight ${!n.is_read ? 'font-semibold' : 'font-medium'}`}>
-                      {n.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
-                    </p>
-                  </div>
-                  {!n.is_read && (
-                    <div className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1.5" />
-                  )}
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

@@ -11,6 +11,7 @@ import { SocietyQuickLinks } from '@/components/home/SocietyQuickLinks';
 import { HomeSearchSuggestions } from '@/components/home/HomeSearchSuggestions';
 import { CommunityTeaser } from '@/components/home/CommunityTeaser';
 import { UpcomingAppointmentBanner } from '@/components/home/UpcomingAppointmentBanner';
+import { HomeNotificationBanner } from '@/components/notifications/HomeNotificationBanner';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { motion } from 'framer-motion';
@@ -83,6 +84,9 @@ export default function HomePage() {
             </motion.div>
           );
         })()}
+
+        {/* ═══ RICH NOTIFICATION BANNER ═══ */}
+        <HomeNotificationBanner />
 
         {/* ═══ DISCOVER ═══ */}
         <HomeSearchSuggestions />
