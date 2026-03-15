@@ -1,49 +1,91 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+# Fix Widget Extension Provisioning Profile Assignment
 
-## Phase I Live Activities — CI Pipeline Status
+## Root Cause
 
-### Codemagic Build Pipeline: COMPLETE
+The `xcode-project use-profiles` command from Codemagic CLI tools is **not matching** the downloaded provisioning profile to the `LiveDeliveryWidgetExtension` target. This is likely because:
 
-Both `ios-release` and `release-all` workflows now include:
+1. The `CODE_SIGN_IDENTITY` is only set with the conditional key `CODE_SIGN_IDENTITY[sdk=iphoneos*]`, but `use-profiles` may need the plain `CODE_SIGN_IDENTITY` key
+2. There's no explicit `PROVISIONING_PROFILE_SPECIFIER` fallback if automatic matching fails
 
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+The duplicate `.appex` error is now gone (previous fix worked), but the signing issue persists.
 
-### Codemagic Requirements (User Action)
+## Fix — Two Changes in `codemagic.yaml`
 
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
+### Change 1: Set plain `CODE_SIGN_IDENTITY` on widget target
 
-### Runtime Call Chain (Verified)
+In both Ruby blocks (lines 392-410 for `ios-release`, equivalent in `release-all`), add the plain key alongside the conditional one:
 
-```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
+```ruby
+settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
+settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'Apple Distribution'
 ```
 
-## Implementation Matrix
+### Change 2: Add post-signing verification + manual profile assignment
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+After `xcode-project use-profiles` (line 489 and line 1078), add a new step that:
+
+1. Finds the downloaded provisioning profile for the widget bundle ID
+2. Explicitly sets `PROVISIONING_PROFILE_SPECIFIER` on the widget target if `use-profiles` didn't
+
+```bash
+# After use-profiles, force-assign widget profile
+cd ios/App
+ruby - << 'RUBY'
+require 'xcodeproj'
+
+project = Xcodeproj::Project.open('App.xcodeproj')
+widget = project.targets.find { |t| t.name == 'LiveDeliveryWidgetExtension' }
+abort('Widget target not found') unless widget
+
+# Check if use-profiles already set a specifier
+needs_fix = widget.build_configurations.any? do |config|
+  s = config.build_settings
+  s['PROVISIONING_PROFILE_SPECIFIER'].nil? || s['PROVISIONING_PROFILE_SPECIFIER'].empty?
+end
+
+if needs_fix
+  # Find the profile from ~/Library/MobileDevice
+  profiles_dir = File.expand_path('~/Library/MobileDevice/Provisioning Profiles')
+  profile_files = Dir.glob("#{profiles_dir}/*.mobileprovision")
+  
+  widget_profile = profile_files.find do |f|
+    content = File.read(f, encoding: 'binary')
+    content.include?('app.sociva.community.LiveDeliveryWidget')
+  end
+  
+  if widget_profile
+    # Extract profile name using security cms
+    profile_plist = `security cms -D -i "#{widget_profile}" 2>/dev/null`
+    name_match = profile_plist.match(/<key>Name<\/key>\s*<string>([^<]+)<\/string>/)
+    profile_name = name_match ? name_match[1] : nil
+    
+    uuid_match = profile_plist.match(/<key>UUID<\/key>\s*<string>([^<]+)<\/string>/)
+    profile_uuid = uuid_match ? uuid_match[1] : nil
+    
+    if profile_name && profile_uuid
+      widget.build_configurations.each do |config|
+        config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = profile_name
+        config.build_settings['PROVISIONING_PROFILE'] = profile_uuid
+      end
+      project.save
+      puts "=== Manually assigned profile '#{profile_name}' (#{profile_uuid}) to widget ==="
+    else
+      abort('ERROR: Could not parse widget provisioning profile')
+    end
+  else
+    abort("ERROR: No provisioning profile found for app.sociva.community.LiveDeliveryWidget in #{profiles_dir}")
+  end
+else
+  puts '=== Widget already has provisioning profile assigned ==='
+end
+RUBY
+```
+
+### Files Modified
+
+- `codemagic.yaml` — both `ios-release` and `release-all` workflows:
+  - Add `CODE_SIGN_IDENTITY` (plain key) to widget build settings
+  - Add new step after signing to force-assign provisioning profile to widget target
+
