@@ -75,6 +75,7 @@ Deno.serve(async (req) => {
             type: item.type,
             reference_path: item.reference_path,
             queue_item_id: item.id,
+            payload: item.payload || null,
           });
 
         if (insertError) {
