@@ -5,6 +5,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface ReminderWindow {
+  label: string;
+  fromMin: number;
+  toMin: number;
+  titleEmoji: string;
+  urgency: string;
+}
+
+const REMINDER_WINDOWS: ReminderWindow[] = [
+  { label: '1_hour', fromMin: 55, toMin: 65, titleEmoji: '⏰', urgency: 'standard' },
+  { label: '30_min', fromMin: 25, toMin: 35, titleEmoji: '⏱️', urgency: 'soon' },
+  { label: '10_min', fromMin: 7, toMin: 13, titleEmoji: '🔔', urgency: 'imminent' },
+];
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -15,87 +29,123 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Find bookings starting within the next 55-65 minutes (run every 10 min, catch 1hr window)
     const now = new Date();
-    const from55min = new Date(now.getTime() + 55 * 60_000);
-    const to65min = new Date(now.getTime() + 65 * 60_000);
     const todayStr = now.toISOString().split("T")[0];
+    let totalReminded = 0;
 
-    const { data: bookings, error } = await supabase
-      .from("service_bookings")
-      .select("id, buyer_id, seller_id, product_id, booking_date, start_time, end_time")
-      .eq("booking_date", todayStr)
-      .in("status", ["confirmed", "scheduled", "rescheduled", "requested"])
-      .gte("start_time", from55min.toTimeString().slice(0, 8))
-      .lte("start_time", to65min.toTimeString().slice(0, 8));
+    for (const window of REMINDER_WINDOWS) {
+      const fromTime = new Date(now.getTime() + window.fromMin * 60_000);
+      const toTime = new Date(now.getTime() + window.toMin * 60_000);
 
-    if (error) {
-      console.error("Error fetching bookings:", error);
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+      const { data: bookings, error } = await supabase
+        .from("service_bookings")
+        .select("id, buyer_id, seller_id, product_id, booking_date, start_time, end_time")
+        .eq("booking_date", todayStr)
+        .in("status", ["confirmed", "scheduled", "rescheduled", "requested"])
+        .gte("start_time", fromTime.toTimeString().slice(0, 8))
+        .lte("start_time", toTime.toTimeString().slice(0, 8));
 
-    if (!bookings || bookings.length === 0) {
-      return new Response(JSON.stringify({ reminded: 0 }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    let reminded = 0;
-
-    for (const booking of bookings) {
-      const timeStr = booking.start_time?.slice(0, 5) || "soon";
-
-      // Get product name
-      const { data: product } = await supabase
-        .from("products")
-        .select("name")
-        .eq("id", booking.product_id)
-        .single();
-
-      const productName = product?.name || "your appointment";
-
-      // Get seller user_id
-      const { data: seller } = await supabase
-        .from("seller_profiles")
-        .select("user_id, business_name")
-        .eq("id", booking.seller_id)
-        .single();
-
-      // Notify buyer
-      await supabase.from("notification_queue").insert({
-        user_id: booking.buyer_id,
-        title: "⏰ Appointment in 1 hour",
-        body: `Your appointment for ${productName} is at ${timeStr} today.`,
-        type: "booking_reminder",
-        reference_path: `/orders`,
-        payload: { type: "booking_reminder", bookingId: booking.id },
-      });
-
-      // Notify seller
-      if (seller?.user_id) {
-        const { data: buyer } = await supabase
-          .from("profiles")
-          .select("name")
-          .eq("id", booking.buyer_id)
-          .single();
-
-        await supabase.from("notification_queue").insert({
-          user_id: seller.user_id,
-          title: "⏰ Upcoming Appointment",
-          body: `${buyer?.name || "A customer"} has an appointment for ${productName} at ${timeStr}.`,
-          type: "booking_reminder",
-          reference_path: `/orders`,
-          payload: { type: "booking_reminder", bookingId: booking.id },
-        });
+      if (error) {
+        console.error(`Error fetching bookings for ${window.label}:`, error);
+        continue;
       }
 
-      reminded++;
+      if (!bookings || bookings.length === 0) continue;
+
+      for (const booking of bookings) {
+        const timeStr = booking.start_time?.slice(0, 5) || "soon";
+        const reminderType = `booking_reminder_${window.label}`;
+
+        // Dedup: check if this exact reminder already sent for this booking
+        const { count: existingCount } = await supabase
+          .from("notification_queue")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", booking.buyer_id)
+          .eq("type", reminderType)
+          .contains("payload", { bookingId: booking.id });
+
+        if (existingCount && existingCount > 0) continue;
+
+        // Get product name
+        const { data: product } = await supabase
+          .from("products")
+          .select("name")
+          .eq("id", booking.product_id)
+          .single();
+
+        const productName = product?.name || "your appointment";
+
+        // Get seller info
+        const { data: seller } = await supabase
+          .from("seller_profiles")
+          .select("user_id, business_name")
+          .eq("id", booking.seller_id)
+          .single();
+
+        const timeLabel = window.label === '1_hour' ? '1 hour' :
+                          window.label === '30_min' ? '30 minutes' : '10 minutes';
+
+        // Determine action based on urgency
+        const action = window.urgency === 'imminent' ? 'Open Now' :
+                       window.urgency === 'soon' ? 'Get Ready' : 'View Details';
+
+        // Notify buyer
+        await supabase.from("notification_queue").insert({
+          user_id: booking.buyer_id,
+          title: `${window.titleEmoji} Appointment in ${timeLabel}`,
+          body: `Your appointment for ${productName} is at ${timeStr} today.`,
+          type: reminderType,
+          reference_path: `/orders`,
+          payload: {
+            type: reminderType,
+            entity_type: 'booking',
+            entity_id: booking.id,
+            workflow_status: 'reminder',
+            action,
+            bookingId: booking.id,
+          },
+        });
+
+        // Notify seller
+        if (seller?.user_id) {
+          // Dedup for seller too
+          const { count: sellerCount } = await supabase
+            .from("notification_queue")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", seller.user_id)
+            .eq("type", reminderType)
+            .contains("payload", { bookingId: booking.id });
+
+          if (!sellerCount || sellerCount === 0) {
+            const { data: buyer } = await supabase
+              .from("profiles")
+              .select("name")
+              .eq("id", booking.buyer_id)
+              .single();
+
+            await supabase.from("notification_queue").insert({
+              user_id: seller.user_id,
+              title: `${window.titleEmoji} Upcoming Appointment`,
+              body: `${buyer?.name || "A customer"} has an appointment for ${productName} at ${timeStr}.`,
+              type: reminderType,
+              reference_path: `/seller/orders`,
+              payload: {
+                type: reminderType,
+                entity_type: 'booking',
+                entity_id: booking.id,
+                workflow_status: 'reminder',
+                action,
+                bookingId: booking.id,
+              },
+            });
+          }
+        }
+
+        totalReminded++;
+      }
     }
 
-    return new Response(JSON.stringify({ reminded, total: bookings.length }), {
+    return new Response(JSON.stringify({ reminded: totalReminded }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

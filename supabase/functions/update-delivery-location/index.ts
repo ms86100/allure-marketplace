@@ -40,6 +40,14 @@ function calculateEta(distanceMeters: number, speedKmh: number | null, accuracyM
   return { eta: etaMin, skipUpdate: false };
 }
 
+/** Phase G: Detect significant heading change (>90° reversal) */
+function hasSignificantHeadingChange(prevHeading: number | null, currentHeading: number | null): boolean {
+  if (prevHeading == null || currentHeading == null) return false;
+  let diff = Math.abs(currentHeading - prevHeading);
+  if (diff > 180) diff = 360 - diff;
+  return diff > 90;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -59,7 +67,6 @@ serve(async (req) => {
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // Verify JWT using getUser (standard Supabase pattern)
     const authClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
@@ -83,10 +90,10 @@ serve(async (req) => {
       });
     }
 
-    // Get assignment including rider_id for auth check
+    // Get assignment
     const { data: assignment, error: aErr } = await supabase
       .from('delivery_assignments')
-      .select('id, status, order_id, society_id, partner_id, rider_id, last_location_at, stalled_notified')
+      .select('id, status, order_id, society_id, partner_id, rider_id, last_location_at, stalled_notified, eta_minutes, last_location_lat, last_location_lng')
       .eq('id', assignment_id)
       .single();
 
@@ -104,7 +111,7 @@ serve(async (req) => {
       });
     }
 
-    // Auth check: verify caller is the assigned rider via rider_id → pool → user_id
+    // Auth check: verify caller is the assigned rider
     if (assignment.rider_id) {
       const { data: poolRider } = await supabase
         .from('delivery_partner_pool')
@@ -119,7 +126,6 @@ serve(async (req) => {
         });
       }
     }
-    // If no rider_id set (3PL or unassigned), allow — 3PL uses external tracking
 
     // Insert location record
     const { error: locErr } = await supabase
@@ -136,17 +142,17 @@ serve(async (req) => {
 
     if (locErr) console.error('Error inserting location:', locErr);
 
-    // Get destination: prefer order delivery coords, fall back to society coords
+    // Get destination coordinates
     const { data: orderForDest } = await supabase
       .from('orders')
-      .select('delivery_lat, delivery_lng')
+      .select('delivery_lat, delivery_lng, buyer_id')
       .eq('id', assignment.order_id)
       .single();
 
     let destLat = orderForDest?.delivery_lat;
     let destLng = orderForDest?.delivery_lng;
+    const buyerId = orderForDest?.buyer_id;
 
-    // Fallback to society coordinates if order doesn't have delivery coords
     if (!destLat || !destLng) {
       const { data: society } = await supabase
         .from('societies')
@@ -190,7 +196,38 @@ serve(async (req) => {
       .update(updateData)
       .eq('id', assignment_id);
 
-    // Stale detection — check if previous update was >3 min ago
+    // ═══ PHASE A: First GPS update after picked_up → en_route notification ═══
+    if (
+      assignment.status === 'picked_up' &&
+      !assignment.last_location_at &&
+      buyerId
+    ) {
+      const { count } = await supabase
+        .from('notification_queue')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', buyerId)
+        .eq('type', 'delivery_en_route')
+        .eq('reference_path', `/orders/${assignment.order_id}`);
+
+      if (!count || count === 0) {
+        await supabase.from('notification_queue').insert({
+          user_id: buyerId,
+          title: '🛵 Your order is on the way!',
+          body: 'Your delivery partner has picked up your order and is heading to you.',
+          type: 'delivery_en_route',
+          reference_path: `/orders/${assignment.order_id}`,
+          payload: {
+            type: 'delivery_en_route',
+            entity_type: 'order',
+            entity_id: assignment.order_id,
+            workflow_status: 'picked_up',
+            action: 'View Tracking',
+          },
+        });
+      }
+    }
+
+    // ═══ STALE DETECTION ═══
     if (
       assignment.last_location_at &&
       !assignment.stalled_notified &&
@@ -198,24 +235,21 @@ serve(async (req) => {
     ) {
       const lastAt = new Date(assignment.last_location_at).getTime();
       const staleDiffMs = Date.now() - lastAt;
-      if (staleDiffMs > 3 * 60 * 1000) {
-        const { data: order } = await supabase
-          .from('orders')
-          .select('buyer_id')
-          .eq('id', assignment.order_id)
-          .single();
-
-        if (order?.buyer_id) {
-          await supabase.from('notification_queue').insert({
-            user_id: order.buyer_id,
-            title: '⏳ Delivery may be delayed',
-            body: 'Your delivery partner appears to have paused. We\'re keeping an eye on it.',
+      if (staleDiffMs > 3 * 60 * 1000 && buyerId) {
+        await supabase.from('notification_queue').insert({
+          user_id: buyerId,
+          title: '⏳ Delivery may be delayed',
+          body: 'Your delivery partner appears to have paused. We\'re keeping an eye on it.',
+          type: 'delivery_stalled',
+          reference_path: `/orders/${assignment.order_id}`,
+          payload: {
             type: 'delivery_stalled',
-            reference_path: `/orders/${assignment.order_id}`,
-            payload: { orderId: assignment.order_id },
-          });
-          supabase.functions.invoke('process-notification-queue').catch(() => {});
-        }
+            entity_type: 'order',
+            entity_id: assignment.order_id,
+            workflow_status: assignment.status,
+            action: 'View Tracking',
+          },
+        });
 
         await supabase
           .from('delivery_assignments')
@@ -224,34 +258,114 @@ serve(async (req) => {
       }
     }
 
-    // Proximity notifications (one-time at < 500m)
-    if (distanceMeters !== null && distanceMeters < 500 && assignment.status === 'picked_up') {
-      const { data: order } = await supabase
-        .from('orders')
-        .select('buyer_id')
-        .eq('id', assignment.order_id)
-        .single();
+    // ═══ PHASE G: Smart Delay Detection — ETA spike or heading reversal ═══
+    if (
+      distanceMeters !== null &&
+      buyerId &&
+      ['picked_up', 'at_gate'].includes(assignment.status)
+    ) {
+      const prevEta = assignment.eta_minutes;
+      const etaSpike = prevEta != null && etaMinutes != null && (etaMinutes - prevEta) > 5;
 
-      if (order?.buyer_id) {
+      // Check heading reversal using previous location
+      let headingReversal = false;
+      if (assignment.last_location_lat && assignment.last_location_lng && heading != null) {
+        // Calculate implied heading from previous → current position
+        const prevBearing = Math.atan2(
+          longitude - assignment.last_location_lng,
+          latitude - assignment.last_location_lat
+        ) * (180 / Math.PI);
+        headingReversal = hasSignificantHeadingChange(prevBearing, heading);
+      }
+
+      if (etaSpike || headingReversal) {
+        // Dedup: one delay notification per order
+        const { count: delayCount } = await supabase
+          .from('notification_queue')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', buyerId)
+          .eq('type', 'delivery_delayed')
+          .eq('reference_path', `/orders/${assignment.order_id}`);
+
+        if (!delayCount || delayCount === 0) {
+          const reason = etaSpike ? 'Traffic or route change detected.' : 'Your delivery partner may have taken a different route.';
+          await supabase.from('notification_queue').insert({
+            user_id: buyerId,
+            title: '🔄 Delivery slightly delayed',
+            body: `${reason} Updated ETA: ${etaMinutes ?? '—'} min.`,
+            type: 'delivery_delayed',
+            reference_path: `/orders/${assignment.order_id}`,
+            payload: {
+              type: 'delivery_delayed',
+              entity_type: 'order',
+              entity_id: assignment.order_id,
+              workflow_status: assignment.status,
+              action: 'View Tracking',
+              eta: etaMinutes,
+              distance: distanceMeters,
+            },
+          });
+        }
+      }
+    }
+
+    // ═══ PHASE A: Proximity notifications — 500m and 200m (separate dedup keys) ═══
+    if (distanceMeters !== null && buyerId && assignment.status === 'picked_up') {
+      // 500m — "nearby" notification
+      if (distanceMeters < 500) {
         const { count } = await supabase
           .from('notification_queue')
           .select('id', { count: 'exact', head: true })
-          .eq('user_id', order.buyer_id)
+          .eq('user_id', buyerId)
           .eq('type', 'delivery_proximity')
           .eq('reference_path', `/orders/${assignment.order_id}`);
 
         if (!count || count === 0) {
           await supabase.from('notification_queue').insert({
-            user_id: order.buyer_id,
+            user_id: buyerId,
             title: '📍 Almost there!',
-            body: distanceMeters < 200
-              ? 'Your delivery partner is almost at your doorstep!'
-              : 'Your delivery partner is nearby and arriving soon!',
+            body: 'Your delivery partner is nearby and arriving soon!',
             type: 'delivery_proximity',
             reference_path: `/orders/${assignment.order_id}`,
-            payload: { orderId: assignment.order_id, distance: distanceMeters },
+            payload: {
+              type: 'delivery_proximity',
+              entity_type: 'order',
+              entity_id: assignment.order_id,
+              workflow_status: 'arriving',
+              action: 'View Tracking',
+              distance: distanceMeters,
+            },
           });
-          supabase.functions.invoke('process-notification-queue').catch(() => {});
+        }
+      }
+
+      // 200m — "imminent" notification (separate type for dedup)
+      if (distanceMeters < 200) {
+        const { count: imminentCount } = await supabase
+          .from('notification_queue')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', buyerId)
+          .eq('type', 'delivery_proximity_imminent')
+          .eq('reference_path', `/orders/${assignment.order_id}`);
+
+        if (!imminentCount || imminentCount === 0) {
+          await supabase.from('notification_queue').insert({
+            user_id: buyerId,
+            title: '🏃 Driver arriving now!',
+            body: 'Your delivery partner is almost at your doorstep. Please get ready to receive your order.',
+            type: 'delivery_proximity_imminent',
+            reference_path: `/orders/${assignment.order_id}`,
+            payload: {
+              type: 'delivery_proximity_imminent',
+              entity_type: 'order',
+              entity_id: assignment.order_id,
+              workflow_status: 'at_doorstep',
+              action: 'View Tracking',
+              distance: distanceMeters,
+              eta: etaMinutes,
+              driver_name: assignment.rider_name ?? null,
+            },
+          });
         }
       }
     }
