@@ -9,6 +9,10 @@ export interface FlowStep {
   icon: string;
   buyer_hint: string;
   seller_hint: string;
+  notify_buyer: boolean;
+  notification_title: string;
+  notification_body: string;
+  notification_action: string;
 }
 
 export interface Transition {
