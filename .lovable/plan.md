@@ -1,49 +1,49 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+# Fix Codemagic Build: Duplicate Widget Extension Target
 
-## Phase I Live Activities — CI Pipeline Status
+## Problem
 
-### Codemagic Build Pipeline: COMPLETE
-
-Both `ios-release` and `release-all` workflows now include:
-
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
-
-### Codemagic Requirements (User Action)
-
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
-
-### Runtime Call Chain (Verified)
+The Ruby script in both `ios-release` and `release-all` workflows always calls `project.new_target(:app_extension, 'LiveDeliveryWidgetExtension', ...)` without checking if the target already exists. This creates a duplicate target, and both produce the same `.appex` output — causing the Xcode error:
 
 ```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
+Multiple commands produce '.appex'
 ```
 
-## Implementation Matrix
+## Fix
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+Add an `existing` guard in the Ruby block of both workflows. If a target named `LiveDeliveryWidgetExtension` already exists, skip creation and reuse it.
+
+### Changes to `codemagic.yaml`
+
+**Workflow 1: `ios-release`** (lines 355-412)
+
+Replace the Ruby block so it checks for an existing target first:
+
+```ruby
+existing = project.targets.find { |t| t.name == 'LiveDeliveryWidgetExtension' }
+if existing
+  puts "=== LiveDeliveryWidgetExtension already exists, skipping creation ==="
+else
+  widget_target = project.new_target(...)
+  # ... rest of setup ...
+end
+```
+
+**Workflow 2: `release-all`** (lines 898-945)
+
+Same guard added to the identical Ruby block.
+
+### Files Modified
+- `codemagic.yaml` — add duplicate-target guard in both workflow Ruby scripts
+
+### What You Still Need To Do (Outside Lovable)
+
+1. **Register the widget bundle ID** in Apple Developer Portal:
+   - Go to Identifiers → Add → `app.sociva.community.LiveDeliveryWidget`
+   - Enable the "Live Activities" capability on it
+
+   Without this, `app-store-connect fetch-signing-files` will fail even though the command is already in your YAML (line 442).
+
+2. **Re-run the Codemagic build** after this fix is pushed.
+
