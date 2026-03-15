@@ -180,6 +180,10 @@ export function UpiDeepLinkCheckout({
 
   const handleConfirmPaid = () => {
     setStep('utr');
+    setScreenshotFile(null);
+    setScreenshotPreview(null);
+    setUtrValue('');
+    setShowUtrField(false);
   };
 
   const handleSubmitUtr = async () => {
