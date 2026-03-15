@@ -89,7 +89,7 @@ export function AdminWorkflowManager() {
         });
       }
       const group = groupMap.get(key)!;
-      group.steps.push(row as FlowStep);
+      group.steps.push({ ...row, seller_hint: (row as any).seller_hint || '' } as FlowStep);
       group.step_count++;
     }
 
