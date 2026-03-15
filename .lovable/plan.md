@@ -1,70 +1,49 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline)
 
-# Add Live Activities to Codemagic iOS Build Pipeline
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-## What We're Doing
+## Phase I Live Activities — CI Pipeline Status
 
-Adding CI build steps to the existing `codemagic.yaml` so that Live Activities (lock screen + Dynamic Island) are automatically compiled and included in the TestFlight build — no Xcode required.
+### Codemagic Build Pipeline: COMPLETE
 
-## Current State
+Both `ios-release` and `release-all` workflows now include:
 
-- `codemagic.yaml` already has a working `ios-release` workflow (L10-329)
-- Native Swift files exist in `native/ios/` (3 files)
-- Deployment target is currently set to `16.0` (L268) — needs `16.1` for ActivityKit
-- Entitlements file exists (L178-191) but lacks `com.apple.developer.activitykit`
-- No step copies native plugin files into `ios/App/App/`
-- No Widget Extension target is created
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
 
-## Plan
+### Codemagic Requirements (User Action)
 
-### 1. Update `codemagic.yaml` — Insert new build steps into `ios-release` workflow
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
 
-Insert **after** the "Copy custom notification sound" step (L251) and **before** "Update iOS project settings" (L263):
+### Runtime Call Chain (Verified)
 
-**Step A: Copy Live Activity plugin files**
-```bash
-cp native/ios/LiveActivityPlugin.swift ios/App/App/
-cp native/ios/LiveDeliveryActivity.swift ios/App/App/
 ```
-Uses Ruby/xcodeproj to add them to the App target so they compile.
-
-**Step B: Create Widget Extension target programmatically**
-Uses Ruby `xcodeproj` gem (already available on Codemagic) to:
-- Create a new native target `LiveDeliveryWidgetExtension` (type: app_extension)
-- Set bundle ID to `app.sociva.community.LiveDeliveryWidget`
-- Add `LiveDeliveryWidget.swift` and `LiveDeliveryActivity.swift` to it
-- Set deployment target to 16.1
-- Embed the extension in the main App target
-- Create a widget extension `Info.plist` with `NSExtension` keys
-
-**Step C: Add ActivityKit entitlement**
-Adds `com.apple.developer.activitykit` to the existing `App.entitlements` and creates a separate entitlements file for the widget extension.
-
-### 2. Update deployment target from 16.0 → 16.1
-
-Modify the existing "Update iOS project settings" step (L268) to use `16.1`.
-
-### 3. Update code signing step
-
-Add the widget extension bundle ID to the signing fetch:
-```bash
-app-store-connect fetch-signing-files "app.sociva.community.LiveDeliveryWidget" \
-  --type IOS_APP_STORE --create
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
 ```
 
-### 4. Update Podfile generation
+## Implementation Matrix
 
-Add the `LiveDeliveryActivity.swift` shared model to the widget extension target in the Podfile so it compiles correctly.
-
-### 5. Register LiveActivity plugin in AppDelegate
-
-Add `import ActivityKit` and plugin registration to the patched `AppDelegate.swift`.
-
-## Files Modified
-
-- `codemagic.yaml` — Add 4 new build steps, modify 3 existing steps
-
-## Technical Details
-
-The Widget Extension is the critical piece. On Codemagic, we use the `xcodeproj` Ruby gem to programmatically create a widget extension target, which is equivalent to doing "File → New → Target → Widget Extension" in Xcode. This avoids needing any manual Xcode setup.
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
