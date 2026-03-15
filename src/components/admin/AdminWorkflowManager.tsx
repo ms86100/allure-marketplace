@@ -161,6 +161,8 @@ export function AdminWorkflowManager() {
         color: s.color, icon: s.icon, buyer_hint: s.buyer_hint, seller_hint: s.seller_hint,
         notify_buyer: s.notify_buyer, notification_title: s.notification_title || null,
         notification_body: s.notification_body || null, notification_action: s.notification_action || null,
+        notify_seller: s.notify_seller, seller_notification_title: s.seller_notification_title || null,
+        seller_notification_body: s.seller_notification_body || null,
       }));
       const { error: insertError } = await supabase.from('category_status_flows').insert(stepsToInsert);
       if (insertError) throw insertError;
