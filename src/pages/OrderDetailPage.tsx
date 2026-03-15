@@ -261,6 +261,18 @@ export default function OrderDetailPage() {
 
       <OrderRejectionDialog open={o.isRejectionDialogOpen} onOpenChange={o.setIsRejectionDialogOpen} onReject={o.handleReject} orderNumber={order.id} />
       {o.chatRecipientId && <OrderChat orderId={order.id} otherUserId={o.chatRecipientId} otherUserName={o.chatRecipientName || 'User'} isOpen={o.isChatOpen} onClose={() => { o.setIsChatOpen(false); o.fetchUnreadCount(); }} disabled={!o.canChat} />}
+
+      {/* DeliveryArrivalOverlay — imminent arrival full-screen alert */}
+      {deliveryAssignmentId && (
+        <DeliveryArrivalOverlay
+          distance={deliveryTracking.distance}
+          eta={deliveryTracking.eta}
+          riderName={deliveryTracking.riderName}
+          riderPhone={deliveryTracking.riderPhone}
+          status={deliveryTracking.status}
+          onDismiss={() => {}}
+        />
+      )}
     </AppLayout>
   );
 }

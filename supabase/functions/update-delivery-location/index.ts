@@ -24,8 +24,8 @@ function getProximity(distanceMeters: number): 'at_doorstep' | 'arriving' | 'nea
   return 'en_route';
 }
 
-/** ETA in minutes with state-based overrides */
-function calculateEta(distanceMeters: number, speedKmh: number | null, accuracyMeters: number | null): { eta: number | null; skipUpdate: boolean } {
+/** ETA in minutes with state-based overrides and optional historical blend */
+function calculateEta(distanceMeters: number, speedKmh: number | null, accuracyMeters: number | null, historicalAvgMin: number | null = null): { eta: number | null; skipUpdate: boolean } {
   if (accuracyMeters != null && accuracyMeters > 100) {
     return { eta: null, skipUpdate: true };
   }
@@ -36,7 +36,13 @@ function calculateEta(distanceMeters: number, speedKmh: number | null, accuracyM
   const effectiveSpeed = speed > 2 ? speed : 15;
   const roadFactor = 1.3;
   const distKm = (distanceMeters * roadFactor) / 1000;
-  const etaMin = Math.max(1, Math.round((distKm / effectiveSpeed) * 60));
+  let etaMin = Math.max(1, Math.round((distKm / effectiveSpeed) * 60));
+
+  // Phase E: Blend with historical average when GPS speed is unreliable
+  if (historicalAvgMin != null && historicalAvgMin > 0 && speed < 2) {
+    etaMin = Math.max(1, Math.round((etaMin + historicalAvgMin) / 2));
+  }
+
   return { eta: etaMin, skipUpdate: false };
 }
 

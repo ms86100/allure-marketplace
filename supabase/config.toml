@@ -80,3 +80,6 @@ verify_jwt = false
 
 [functions.quick-reorder]
 verify_jwt = false
+
+[functions.send-booking-reminders]
+verify_jwt = false

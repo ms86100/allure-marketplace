@@ -62,7 +62,7 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView }: LiveDeliveryT
         {tracking.eta && isInTransit && (
           <Badge variant="secondary" className="bg-primary/10 text-primary">
             <Clock size={10} className="mr-1" />
-            {tracking.eta} min
+            {tracking.eta > 3 ? `${tracking.eta - 2}–${tracking.eta + 2} min` : `${tracking.eta} min`}
           </Badge>
         )}
       </div>
