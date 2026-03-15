@@ -99,7 +99,7 @@ serve(async (req) => {
     // Get assignment
     const { data: assignment, error: aErr } = await supabase
       .from('delivery_assignments')
-      .select('id, status, order_id, society_id, partner_id, rider_id, last_location_at, stalled_notified, eta_minutes, last_location_lat, last_location_lng')
+      .select('id, status, order_id, society_id, partner_id, rider_id, last_location_at, stalled_notified, eta_minutes, last_location_lat, last_location_lng, rider_name')
       .eq('id', assignment_id)
       .single();
 
