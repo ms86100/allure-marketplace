@@ -53,7 +53,7 @@ export function RichNotificationCard({ notification, onDismiss }: Props) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+              <CheckCircle2 size={16} className="text-primary shrink-0" />
               <h3 className="font-bold text-base text-foreground leading-tight truncate">
                 {notification.title}
               </h3>
