@@ -297,6 +297,20 @@ export function AdminWorkflowManager() {
                         <Input value={step.buyer_hint} onChange={(e) => updateStep(index, 'buyer_hint', e.target.value)} placeholder="Buyer hint message" className="h-7 text-xs rounded-lg" />
                         <Input value={step.seller_hint} onChange={(e) => updateStep(index, 'seller_hint', e.target.value)} placeholder="Seller hint message" className="h-7 text-xs rounded-lg" />
                       </div>
+                      {/* Notification Config */}
+                      <div className="border-t border-border/30 pt-2 mt-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Checkbox checked={step.notify_buyer} onCheckedChange={(v) => updateStep(index, 'notify_buyer', !!v)} id={`notify-${index}`} />
+                          <label htmlFor={`notify-${index}`} className="text-xs text-muted-foreground">🔔 Send Buyer Notification</label>
+                        </div>
+                        {step.notify_buyer && (
+                          <div className="space-y-1.5 pl-6">
+                            <Input value={step.notification_title} onChange={(e) => updateStep(index, 'notification_title', e.target.value)} placeholder="Notification title (e.g. ✅ Order Accepted!)" className="h-7 text-xs rounded-lg" />
+                            <Input value={step.notification_body} onChange={(e) => updateStep(index, 'notification_body', e.target.value)} placeholder="Notification body — use {seller_name} placeholder" className="h-7 text-xs rounded-lg" />
+                            <Input value={step.notification_action} onChange={(e) => updateStep(index, 'notification_action', e.target.value)} placeholder="Action button (e.g. Rate Order)" className="h-7 text-xs rounded-lg" />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
