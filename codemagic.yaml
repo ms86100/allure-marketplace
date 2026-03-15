@@ -1013,10 +1013,11 @@ workflows:
           require 'xcodeproj'
           project = Xcodeproj::Project.open('App.xcodeproj')
           project.targets.each do |target|
-            if target.name == 'LiveDeliveryWidgetExtension'
-              target.build_configurations.each do |config|
-                config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'app.sociva.community.LiveDeliveryWidget'
-              end
+            next unless target.name.start_with?('LiveDeliveryWidgetExtension')
+            target.build_configurations.each do |config|
+              config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'app.sociva.community.LiveDeliveryWidget'
+              config.build_settings['PRODUCT_NAME'] = 'LiveDeliveryWidgetExtension'
+              config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.1'
             end
           end
           project.save
