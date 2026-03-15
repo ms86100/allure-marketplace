@@ -3227,6 +3227,7 @@ export type Database = {
           order_type: string | null
           payment_confirmed_at: string | null
           payment_confirmed_by_seller: boolean | null
+          payment_screenshot_url: string | null
           payment_status: string | null
           payment_type: string | null
           razorpay_order_id: string | null
@@ -3270,6 +3271,7 @@ export type Database = {
           order_type?: string | null
           payment_confirmed_at?: string | null
           payment_confirmed_by_seller?: boolean | null
+          payment_screenshot_url?: string | null
           payment_status?: string | null
           payment_type?: string | null
           razorpay_order_id?: string | null
@@ -3313,6 +3315,7 @@ export type Database = {
           order_type?: string | null
           payment_confirmed_at?: string | null
           payment_confirmed_by_seller?: boolean | null
+          payment_screenshot_url?: string | null
           payment_status?: string | null
           payment_type?: string | null
           razorpay_order_id?: string | null
@@ -8274,10 +8277,19 @@ export type Database = {
         }
         Returns: Json
       }
-      confirm_upi_payment: {
-        Args: { _order_id: string; _upi_transaction_ref: string }
-        Returns: undefined
-      }
+      confirm_upi_payment:
+        | {
+            Args: { _order_id: string; _upi_transaction_ref: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              _order_id: string
+              _payment_screenshot_url?: string
+              _upi_transaction_ref?: string
+            }
+            Returns: undefined
+          }
       create_multi_vendor_orders:
         | {
             Args: {

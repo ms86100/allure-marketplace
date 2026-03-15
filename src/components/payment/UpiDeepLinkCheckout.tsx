@@ -9,7 +9,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Loader2, CheckCircle, XCircle, RefreshCw, Copy } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, RefreshCw, Copy, ImagePlus, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -52,6 +52,9 @@ export function UpiDeepLinkCheckout({
     return 'pay';
   });
   const [utrValue, setUtrValue] = useState('');
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [showUtrField, setShowUtrField] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hasOpenedApp = useRef<boolean>(
     (() => { try { return sessionStorage.getItem(UPI_OPENED_APP_KEY) === 'true'; } catch { return false; } })()
@@ -177,21 +180,62 @@ export function UpiDeepLinkCheckout({
 
   const handleConfirmPaid = () => {
     setStep('utr');
+    setScreenshotFile(null);
+    setScreenshotPreview(null);
+    setUtrValue('');
+    setShowUtrField(false);
   };
 
-  const handleSubmitUtr = async () => {
-    const trimmed = utrValue.trim();
-    if (!trimmed || trimmed.length < 6) {
-      toast.error('Please enter a valid Transaction ID (at least 6 characters)');
+  const handleScreenshotSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB');
       return;
     }
+    setScreenshotFile(file);
+    setScreenshotPreview(URL.createObjectURL(file));
+  };
 
+  const handleRemoveScreenshot = () => {
+    setScreenshotFile(null);
+    if (screenshotPreview) URL.revokeObjectURL(screenshotPreview);
+    setScreenshotPreview(null);
+  };
+
+  const handleSubmitConfirmation = async () => {
     setIsSubmitting(true);
     try {
+      let screenshotUrl: string | null = null;
+
+      // Upload screenshot if provided
+      if (screenshotFile) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Not authenticated');
+        const ext = screenshotFile.name.split('.').pop() || 'jpg';
+        const path = `${user.id}/${orderId}.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from('payment-proofs')
+          .upload(path, screenshotFile, { upsert: true });
+        if (uploadErr) throw uploadErr;
+
+        const { data: urlData } = supabase.storage
+          .from('payment-proofs')
+          .getPublicUrl(path);
+        // For private buckets, use signed URL
+        const { data: signedData } = await supabase.storage
+          .from('payment-proofs')
+          .createSignedUrl(path, 60 * 60 * 24 * 30); // 30 days
+        screenshotUrl = signedData?.signedUrl || urlData?.publicUrl || null;
+      }
+
+      const trimmed = utrValue.trim();
+
       const { error } = await supabase.rpc('confirm_upi_payment', {
         _order_id: orderId,
-        _upi_transaction_ref: trimmed,
-      });
+        _upi_transaction_ref: trimmed || '',
+        _payment_screenshot_url: screenshotUrl,
+      } as any);
 
       if (error) throw error;
 
@@ -210,11 +254,18 @@ export function UpiDeepLinkCheckout({
           .single();
 
         if (sellerProfile) {
+          const evidenceParts: string[] = [];
+          if (trimmed) evidenceParts.push(`UTR: ${trimmed}`);
+          if (screenshotUrl) evidenceParts.push('Screenshot attached');
+          const evidenceText = evidenceParts.length > 0
+            ? evidenceParts.join('. ') + '.'
+            : 'No evidence provided.';
+
           await supabase.from('notification_queue').insert({
             user_id: sellerProfile.user_id,
             type: 'order',
             title: '💳 Payment Confirmation Needed',
-            body: `Buyer claims UPI payment for Order #${shortOrderId}. UTR: ${trimmed}. Please verify and confirm.`,
+            body: `Buyer claims UPI payment for Order #${shortOrderId}. ${evidenceText} Please verify and confirm.`,
             reference_path: `/orders/${orderId}`,
             payload: { orderId, status: 'buyer_confirmed', type: 'order' },
           } as any);
@@ -225,7 +276,7 @@ export function UpiDeepLinkCheckout({
 
       completeFlow();
     } catch (err) {
-      console.error('Failed to submit UTR:', err);
+      console.error('Failed to submit payment confirmation:', err);
       toast.error('Failed to submit payment confirmation');
     } finally {
       setIsSubmitting(false);
@@ -348,48 +399,85 @@ export function UpiDeepLinkCheckout({
             </div>
           )}
 
-          {/* Step 3: Enter UTR */}
+          {/* Step 3: Confirm Payment */}
           {step === 'utr' && (
-            <div className="space-y-5">
+            <div className="space-y-4">
               <div className="text-center">
-                <p className="font-semibold text-lg">Enter Transaction ID</p>
+                <p className="font-semibold text-lg">Confirm Your Payment</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Find the UTR/Transaction ID in your UPI app's payment confirmation
+                  {formatPrice(amount)} to {sellerName}
                 </p>
               </div>
 
+              {/* Empathetic explanation */}
+              <div className="bg-muted/50 rounded-xl p-3.5">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  💡 Sociva doesn't track payments automatically yet. To help your seller confirm your payment quickly, you can share a screenshot of the payment confirmation. This is <span className="font-medium text-foreground">completely optional</span> — you can simply tap "Confirm Payment" to proceed.
+                </p>
+              </div>
+
+              {/* Screenshot upload */}
               <div className="space-y-2">
-                <Label htmlFor="utr-input" className="text-sm font-medium">
-                  UPI Transaction ID (UTR)
-                </Label>
-                <Input
-                  id="utr-input"
-                  placeholder="e.g. 546738264728"
-                  value={utrValue}
-                  onChange={(e) => setUtrValue(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
-                  className="font-mono text-center text-lg tracking-wider"
-                  maxLength={22}
-                  autoFocus
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  This helps the seller verify your payment quickly
-                </p>
+                <Label className="text-sm font-medium">Payment Screenshot <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                {screenshotPreview ? (
+                  <div className="relative rounded-xl overflow-hidden border border-border">
+                    <img src={screenshotPreview} alt="Payment proof" className="w-full max-h-48 object-contain bg-muted/30" />
+                    <button
+                      onClick={handleRemoveScreenshot}
+                      className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm rounded-full p-1 border border-border hover:bg-destructive/10 transition-colors"
+                    >
+                      <X size={14} className="text-muted-foreground" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center gap-1.5 py-6 rounded-xl border-2 border-dashed border-muted-foreground/25 hover:border-primary/40 transition-colors cursor-pointer bg-muted/20">
+                    <ImagePlus size={24} className="text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Tap to upload screenshot</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleScreenshotSelect}
+                    />
+                  </label>
+                )}
               </div>
 
-              <div className="bg-muted/50 rounded-xl p-3">
-                <p className="text-xs text-muted-foreground">
-                  💡 <span className="font-medium">Where to find UTR?</span> Open your UPI app → Go to transaction history → Tap on this payment → Copy the Transaction ID / UTR number
-                </p>
+              {/* Collapsible UTR field */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowUtrField(!showUtrField)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showUtrField ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  Add Transaction ID (UTR)
+                </button>
+                {showUtrField && (
+                  <div className="mt-2 space-y-1.5">
+                    <Input
+                      id="utr-input"
+                      placeholder="e.g. 546738264728"
+                      value={utrValue}
+                      onChange={(e) => setUtrValue(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
+                      className="font-mono text-center tracking-wider"
+                      maxLength={22}
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Find this in your UPI app's transaction history
+                    </p>
+                  </div>
+                )}
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-1">
                 <Button variant="outline" className="flex-1" onClick={() => setStep('confirm')}>
                   Back
                 </Button>
                 <Button
                   className="flex-1"
-                  onClick={handleSubmitUtr}
-                  disabled={isSubmitting || utrValue.trim().length < 6}
+                  onClick={handleSubmitConfirmation}
+                  disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     <><Loader2 className="mr-2 animate-spin" size={16} />Submitting...</>
