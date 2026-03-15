@@ -52,7 +52,7 @@ export function OrdersMonitor() {
             <SelectTrigger className="w-28 h-8 text-xs rounded-xl"><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              {['placed','accepted','preparing','ready','delivered','completed','cancelled'].map(s => (
+              {statusOptions.map(s => (
                 <SelectItem key={s} value={s}>{s}</SelectItem>
               ))}
             </SelectContent>
