@@ -21,7 +21,21 @@ export function OrdersMonitor() {
   const [status, setStatus] = useState('all');
   const [paymentStatus, setPaymentStatus] = useState('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [statusOptions, setStatusOptions] = useState<string[]>([]);
   const { getOrderStatus } = useStatusLabels();
+
+  // Load distinct statuses from workflow engine
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('category_status_flows')
+        .select('status_key');
+      if (data) {
+        const unique = [...new Set(data.map(d => d.status_key))].sort();
+        setStatusOptions(unique);
+      }
+    })();
+  }, []);
 
   const { data, isLoading } = useOrdersMonitor({
     status, paymentStatus, page, pageSize: PAGE_SIZE,
