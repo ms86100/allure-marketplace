@@ -212,7 +212,7 @@ export function useOrderDetail(id: string | undefined) {
     orderFulfillmentType, currentStatusIndex, statusOrder,
     displayStatuses, timelineSteps, flow,
     getOrderStatus, getPaymentStatus, getItemStatus,
-    getFlowStepLabel, getBuyerHint,
+    getFlowStepLabel, getBuyerHint, getSellerHint,
     formatPrice, user,
     updateOrderStatus, handleReject, handleTimeout, copyOrderId,
   };
