@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 const PAGE_SIZE = 20;
 
@@ -20,7 +21,21 @@ export function OrdersMonitor() {
   const [status, setStatus] = useState('all');
   const [paymentStatus, setPaymentStatus] = useState('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [statusOptions, setStatusOptions] = useState<string[]>([]);
   const { getOrderStatus } = useStatusLabels();
+
+  // Load distinct statuses from workflow engine
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('category_status_flows')
+        .select('status_key');
+      if (data) {
+        const unique = [...new Set(data.map(d => d.status_key))].sort();
+        setStatusOptions(unique);
+      }
+    })();
+  }, []);
 
   const { data, isLoading } = useOrdersMonitor({
     status, paymentStatus, page, pageSize: PAGE_SIZE,
@@ -37,7 +52,7 @@ export function OrdersMonitor() {
             <SelectTrigger className="w-28 h-8 text-xs rounded-xl"><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
-              {['placed','accepted','preparing','ready','delivered','completed','cancelled'].map(s => (
+              {statusOptions.map(s => (
                 <SelectItem key={s} value={s}>{s}</SelectItem>
               ))}
             </SelectContent>

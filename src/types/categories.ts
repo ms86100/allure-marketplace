@@ -105,10 +105,7 @@ export function getOrderType(behavior: CategoryBehavior): OrderType {
   return 'purchase';
 }
 
-export type ExtendedOrderStatus = 
-  | 'placed' | 'accepted' | 'preparing' | 'ready' | 'picked_up' | 'delivered' | 'completed' | 'cancelled'
-  | 'enquired' | 'quoted' | 'scheduled' | 'in_progress' | 'returned';
-
+// ExtendedOrderStatus removed — workflow engine DB tables are the source of truth
 // EXTENDED_ORDER_STATUS_LABELS removed — now in order_status_config DB table
 // ITEM_CONDITION_LABELS removed — now in system_settings.item_condition_labels
 // RENTAL_PERIOD_LABELS removed — now in system_settings.rental_period_labels

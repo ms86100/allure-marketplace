@@ -1,102 +1,54 @@
 
+# Dynamic Workflow Engine — Implementation Complete
 
-# Round 2 Audit Report — Workflow Engine Integration
+## What Was Built
 
-## Status of Round 1 Fixes
+### Phase 1: Database ✅
+- **`category_status_transitions`** table — stores actor-based transition rules (from_status → to_status → allowed_actor) per workflow
+- **Display columns** added to `category_status_flows`: `display_label`, `color`, `icon`, `buyer_hint`
+- **`validate_order_status_transition`** trigger — validates transitions against `category_status_transitions` table with actor enforcement
+- **Seeded workflows**: `default` parent_group for `cart_purchase`, `self_fulfillment`, `service_booking`, `request_service`
+- **Seeded transitions** for all 7 parent_groups × service_booking + education_learning × request_service + all default workflows
+- **Performance index**: `idx_cst_lookup` on (parent_group, transaction_type, from_status)
 
-The P0 fixes from Round 1 are **confirmed implemented**:
-- `OrderStatus` type expanded (C1 — fixed)
-- `getNextStatusForActor` uses transitions table (C3 — fixed)
-- `OrderCancellation` accepts `canCancel` prop from workflow (C2 — fixed)
-- `canChat` uses `isTerminalStatus()` (U3 — fixed)
-- `isInTransit` derived from flow actor metadata (U2 — fixed)
-- `auto-cancel-orders` sets `auto_cancel_at: null` (D2 — fixed)
-- `canSellerReject` derived from transitions (S3 — fixed)
-- `SellerOrderCard` no longer overrides labels (S4 — fixed)
+### Phase 2: Frontend Cleanup ✅
+- **`useCategoryStatusFlow.ts`** — extended with `display_label`, `color`, `icon`, `buyer_hint` fields; added `booking` → `service_booking` type mapping; fallback to `default` parent_group; new `useStatusTransitions` hook
+- **`useOrderDetail.ts`** — removed ALL hardcoded status arrays (legacyOrder, fallback displayStatuses); added `getFlowStepLabel()` and `getBuyerHint()` helpers that use DB flow data
+- **`OrderDetailPage.tsx`** — timeline labels now come from `getFlowStepLabel()`; buyer hints now come from `getBuyerHint()` (DB-driven)
+- **`OrdersMonitor.tsx`** — replaced hardcoded `ORDER_STATUS_LABELS` with `useStatusLabels()` hook
 
-## Remaining Issues Found
+### Phase 3: Admin Workflow Manager ✅
+- **`AdminWorkflowManager.tsx`** — full workflow editor with:
+  - List view of all (parent_group, transaction_type) workflows
+  - Status pipeline editor: add/remove/reorder steps, configure actor/terminal/display_label/color/icon/buyer_hint
+  - Transition rules editor: for each status, toggle which actors can move to which next statuses (supports non-linear transitions like cancellations)
+  - Save: upserts all flow steps + transitions
+- **Admin nav**: "Workflows" item added under Commerce group
 
-### R1: `OrdersPage` hardcodes terminal status checks (Medium)
-**File:** `src/pages/OrdersPage.tsx:28-29`
-```typescript
-const canReorder = type === 'buyer' && (order.status === 'completed' || order.status === 'delivered');
-const isCompleted = order.status === 'completed' || order.status === 'delivered';
+### Phase 4: Fixes ✅
+- **Calendar**: native Capacitor call wrapped in try/catch, falls back to ICS download on failure
+
+### Phase 5: Deep Audit Fixes ✅
+- **C1**: Added `requested`, `confirmed`, `rescheduled`, `no_show`, `at_gate` to `OrderStatus` type and `ORDER_STATUS_MAP`
+- **C2**: `OrderCancellation` now accepts `canCancel` prop from workflow transitions instead of hardcoded status check
+- **C3**: `getNextStatusForActor` rewritten to use `category_status_transitions` for accurate non-linear transition lookups
+- **C5**: Added skeleton loading state while flow is loading in timeline UI
+- **S2**: `getNextStatus` and `canChat` now use `isTerminalStatus()` from flow metadata instead of hardcoded status lists
+- **S3**: Seller reject button now uses `canSellerReject` derived from transitions table (supports `requested`, `enquired`, etc.)
+- **S4**: Removed hardcoded "Awaiting Pickup" override in `SellerOrderCard`
+- **S5**: Added missing status entries to `ORDER_STATUS_MAP`
+- **U2**: `isInTransit` now derived from flow metadata (delivery actor steps) instead of hardcoded array
+- **U3**: `canChat` uses `isTerminalStatus()` — properly disables chat for `no_show` and other terminal statuses
+- **D2**: `auto-cancel-orders` edge function now clears `auto_cancel_at` on cancellation
+- **New helpers**: `isTerminalStatus()`, `canActorCancel()`, `getNextStatusesForActor()` in `useCategoryStatusFlow.ts`
+
+## Architecture
+
 ```
-`OrdersPage.OrderCard` does not load workflow flow data, so it cannot use `isTerminalStatus()`. For service bookings that end at `no_show`, the completed styling won't apply. **Acceptable tradeoff** — these are cosmetic (green checkmark icon, reorder button). Loading flows per-card in a list would be expensive.
-
-**Recommendation:** No change needed. `completed` and `delivered` are the correct positive-terminal statuses for reorder/review eligibility. `no_show` and `cancelled` should NOT show reorder.
-
-### R2: `OrderDetailPage` hardcodes `showNav` terminal check (Low)
-**File:** `src/pages/OrderDetailPage.tsx:66`
-```typescript
-showNav={(!o.isSellerView || order.status === 'completed' || order.status === 'cancelled') && !o.isChatOpen}
+category_status_flows          → ordered status pipeline per (parent_group, transaction_type)
+category_status_transitions    → who can move between statuses (actor-based)
+validate_order_status_transition → DB trigger enforces transition rules
+useCategoryStatusFlow          → frontend loads flow + falls back to 'default'
+useStatusTransitions           → frontend loads allowed transitions
+AdminWorkflowManager           → admin UI to manage both
 ```
-This hides bottom nav for sellers on active orders (so the action bar takes its place). Missing `delivered` and `no_show` as terminal — seller action bar won't show for those statuses, but bottom nav also won't show. **Net effect:** seller sees neither action bar nor nav on `delivered`/`no_show` orders.
-
-**Fix:** Replace with `isTerminalStatus(flow, order.status)`:
-```typescript
-showNav={(!o.isSellerView || isTerminalStatus(o.flow, order.status)) && !o.isChatOpen}
-```
-
-### R3: `OrderDetailPage` hardcodes "Awaiting delivery pickup" at `ready` (Low)
-**File:** `src/pages/OrderDetailPage.tsx:248`
-```typescript
-{o.orderFulfillmentType === 'delivery' && order.status === 'ready' ? (
-  <div>Awaiting delivery pickup</div>
-) : ...}
-```
-This is actually correct behavior — when status is `ready` and fulfillment is delivery, the seller cannot advance (the delivery partner picks up). The `getNextStatusForActor` will return `null` for seller at `ready` in delivery workflows, so the fallback would also show nothing. This hardcoded check just adds a better UX message. **No fix needed.**
-
-### R4: `LiveDeliveryTracker` hardcodes delivery assignment statuses (Not a workflow issue)
-**File:** `src/components/delivery/LiveDeliveryTracker.tsx:51`
-```typescript
-const isInTransit = ['picked_up', 'on_the_way', 'at_gate'].includes(tracking.status);
-```
-This checks `delivery_assignments.status`, NOT `orders.status`. These are delivery-specific statuses in a separate table. **Not a workflow issue — no fix needed.**
-
-### R5: `ExtendedOrderStatus` in `categories.ts` is stale (Low)
-**File:** `src/types/categories.ts:108-110`
-Missing `requested`, `confirmed`, `rescheduled`, `no_show`, `at_gate`, `assigned`, `on_the_way`, `arrived`. However, this type is **not used anywhere** in the codebase (0 imports found). 
-
-**Fix:** Delete the dead type to avoid confusion.
-
-### R6: `OrdersMonitor` hardcodes status filter dropdown (Medium)
-**File:** `src/components/admin/analytics/OrdersMonitor.tsx:40-42`
-```typescript
-{['placed','accepted','preparing','ready','delivered','completed','cancelled'].map(s => (
-```
-Missing `enquired`, `quoted`, `requested`, `confirmed`, `scheduled`, `in_progress`, etc. Admin cannot filter by these statuses.
-
-**Fix:** Load distinct statuses from `category_status_flows` or use the full `OrderStatus` type.
-
-### R7: `useCartPage` cancels unpaid orders without transition validation error handling (Low)
-**File:** `src/hooks/useCartPage.ts:322, 354`
-```typescript
-await supabase.from('orders').update({ status: 'cancelled' }).in('id', pendingOrderIds)...
-```
-These cancel freshly created `placed` orders on payment failure. The `placed → cancelled` transition exists for buyer in all workflows. The `.catch()` swallows errors. **Acceptable** — this is a payment failure cleanup path for brand-new orders.
-
-### R8: Tests still use hardcoded cancellation logic (Low)
-**File:** `src/test/orders-payments.test.ts:361-385`
-Tests check `['placed', 'accepted'].includes(status)` for cancellation eligibility. These tests don't reflect the new workflow-driven logic. **Low priority** — tests are unit tests for business rules, not integration tests.
-
-## Performance Verification
-
-**Indexes confirmed present:**
-- `idx_flows_lookup` on `(parent_group, transaction_type, sort_order)` 
-- `idx_cst_lookup` on `(parent_group, transaction_type, from_status)` 
-- Unique constraint on transitions `(parent_group, transaction_type, from_status, to_status, allowed_actor)`
-
-No performance concerns.
-
-## Summary of Required Fixes
-
-| Priority | Issue | Fix |
-|----------|-------|-----|
-| **P1** | R2 | Use `isTerminalStatus()` for `showNav` in OrderDetailPage |
-| **P2** | R6 | Load status filter options dynamically in OrdersMonitor |
-| **P2** | R5 | Delete dead `ExtendedOrderStatus` type |
-| **P3** | R8 | Update test assertions to match workflow-driven cancellation |
-
-Only **3 actionable fixes** remain. The system is substantially workflow-aware after Round 1.
-

@@ -17,6 +17,7 @@ import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
 import { SellerPaymentConfirmation } from '@/components/payment/SellerPaymentConfirmation';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
+import { isTerminalStatus } from '@/hooks/useCategoryStatusFlow';
 import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -63,7 +64,7 @@ export default function OrderDetailPage() {
   const isInTransit = o.isInTransit;
 
   return (
-    <AppLayout showHeader={false} showNav={(!o.isSellerView || order.status === 'completed' || order.status === 'cancelled') && !o.isChatOpen}>
+    <AppLayout showHeader={false} showNav={(!o.isSellerView || isTerminalStatus(o.flow, order.status)) && !o.isChatOpen}>
       <div className="pb-28">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
