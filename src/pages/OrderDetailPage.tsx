@@ -41,6 +41,18 @@ export default function OrderDetailPage() {
 
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
 
+  // Phase I — Lock Screen Live Activity
+  useLiveActivity({
+    entityType: 'order',
+    entityId: order?.id,
+    status: order?.status ?? null,
+    eta: deliveryTracking.eta,
+    distance: deliveryTracking.distance != null ? deliveryTracking.distance / 1000 : null,
+    driverName: deliveryTracking.riderName,
+    vehicleType: null,
+    progressStage: order?.status ?? null,
+  });
+
   useEffect(() => {
     if (fulfillmentType === 'delivery' && orderId) {
       supabase
