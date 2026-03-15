@@ -22,6 +22,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AdminSidebarNav } from '@/components/admin/AdminSidebarNav';
 import { SellerApplicationReview } from '@/components/admin/SellerApplicationReview';
 import { AdminProductApprovals } from '@/components/admin/AdminProductApprovals';
+import { AdminWorkflowManager } from '@/components/admin/AdminWorkflowManager';
 
 import { AdminDisputesTab } from '@/components/admin/AdminDisputesTab';
 import { AdminAnalyticsTab } from '@/components/admin/AdminAnalyticsTab';
