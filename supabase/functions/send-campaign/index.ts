@@ -403,9 +403,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── Prepare delivery infrastructure ──
-    const serviceAccountJson = Deno.env.get("FIREBASE_SERVICE_ACCOUNT");
-    if (!serviceAccountJson) throw new Error("FIREBASE_SERVICE_ACCOUNT not configured");
+    // ── Prepare delivery infrastructure (DB-first, env fallback) ──
+    const [serviceAccountJson, p8Key, apnsKeyId, apnsTeamId, bundleId] = await Promise.all([
+      getCredential(adminClient, "firebase_service_account", "FIREBASE_SERVICE_ACCOUNT"),
+      getCredential(adminClient, "apns_key_p8", "APNS_KEY_P8"),
+      getCredential(adminClient, "apns_key_id", "APNS_KEY_ID"),
+      getCredential(adminClient, "apns_team_id", "APNS_TEAM_ID"),
+      getCredential(adminClient, "apns_bundle_id", "APNS_BUNDLE_ID"),
+    ]);
+
+    if (!serviceAccountJson) throw new Error("FIREBASE_SERVICE_ACCOUNT not configured (checked DB + env)");
 
     let serviceAccount: FirebaseServiceAccount;
     try { serviceAccount = JSON.parse(serviceAccountJson); }
@@ -414,10 +421,6 @@ Deno.serve(async (req) => {
     const fcmAccessToken = await generateAccessToken(serviceAccount);
 
     // APNs setup
-    const p8Key = Deno.env.get("APNS_KEY_P8");
-    const apnsKeyId = Deno.env.get("APNS_KEY_ID");
-    const apnsTeamId = Deno.env.get("APNS_TEAM_ID");
-    const bundleId = Deno.env.get("APNS_BUNDLE_ID");
     const apnsConfigured = !!(p8Key && apnsKeyId && apnsTeamId && bundleId);
 
     let apnsJwt = "";

@@ -83,8 +83,8 @@ Deno.serve(async (req) => {
 
       if (!members || members.length === 0) continue;
 
-      // Get Firebase service account for sending
-      const serviceAccountJson = Deno.env.get("FIREBASE_SERVICE_ACCOUNT");
+      // Get Firebase service account from DB first, env fallback
+      const serviceAccountJson = await getCredential(supabase, "firebase_service_account", "FIREBASE_SERVICE_ACCOUNT");
       if (!serviceAccountJson) continue;
 
       // Send to each member via the send-push-notification function internally
