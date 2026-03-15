@@ -1,47 +1,40 @@
 
+# Dynamic Workflow Engine — Implementation Complete
 
-# Add "Create New Workflow" to Admin Workflow Manager
+## What Was Built
 
-## Current State
+### Phase 1: Database ✅
+- **`category_status_transitions`** table — stores actor-based transition rules (from_status → to_status → allowed_actor) per workflow
+- **Display columns** added to `category_status_flows`: `display_label`, `color`, `icon`, `buyer_hint`
+- **`validate_order_status_transition`** trigger — validates transitions against `category_status_transitions` table with actor enforcement
+- **Seeded workflows**: `default` parent_group for `cart_purchase`, `self_fulfillment`, `service_booking`, `request_service`
+- **Seeded transitions** for all 7 parent_groups × service_booking + education_learning × request_service + all default workflows
+- **Performance index**: `idx_cst_lookup` on (parent_group, transaction_type, from_status)
 
-The admin **can edit** existing workflows but **cannot create new ones**. The `AdminWorkflowManager` only lists workflows already seeded in `category_status_flows`. There is no "Create Workflow" button.
+### Phase 2: Frontend Cleanup ✅
+- **`useCategoryStatusFlow.ts`** — extended with `display_label`, `color`, `icon`, `buyer_hint` fields; added `booking` → `service_booking` type mapping; fallback to `default` parent_group; new `useStatusTransitions` hook
+- **`useOrderDetail.ts`** — removed ALL hardcoded status arrays (legacyOrder, fallback displayStatuses); added `getFlowStepLabel()` and `getBuyerHint()` helpers that use DB flow data
+- **`OrderDetailPage.tsx`** — timeline labels now come from `getFlowStepLabel()`; buyer hints now come from `getBuyerHint()` (DB-driven)
+- **`OrdersMonitor.tsx`** — replaced hardcoded `ORDER_STATUS_LABELS` with `useStatusLabels()` hook
 
-**How workflows link to categories today:**
-The DB trigger `validate_order_status_transition` resolves workflow by joining `orders → products → category_config` to get `(parent_group, transaction_type)`, then looks up `category_status_flows` with that key. If no match, it falls back to `parent_group = 'default'`.
+### Phase 3: Admin Workflow Manager ✅
+- **`AdminWorkflowManager.tsx`** — full workflow editor with:
+  - List view of all (parent_group, transaction_type) workflows
+  - Status pipeline editor: add/remove/reorder steps, configure actor/terminal/display_label/color/icon/buyer_hint
+  - Transition rules editor: for each status, toggle which actors can move to which next statuses (supports non-linear transitions like cancellations)
+  - Save: upserts all flow steps + transitions
+- **Admin nav**: "Workflows" item added under Commerce group
 
-So when an admin adds a new category (e.g., `pet_care` under a new parent group `pets`), they currently have no way to create a matching workflow — it silently falls back to the `default` workflow.
+### Phase 4: Fixes ✅
+- **Calendar**: native Capacitor call wrapped in try/catch, falls back to ICS download on failure
 
-## Plan
+## Architecture
 
-### 1. Add "Create Workflow" dialog to `AdminWorkflowManager.tsx`
-- Add a `+ New Workflow` button in the header
-- Dialog with two fields:
-  - **Parent Group**: dropdown populated from `parent_groups` table (existing groups) + free-text option for new slugs
-  - **Transaction Type**: dropdown from the existing `TRANSACTION_TYPES` constant
-- On create: insert a minimal starter workflow (e.g., single `placed` step marked non-terminal) and open the editor immediately
-- Validate: prevent duplicates (check if `parent_group + transaction_type` combo already exists)
-
-### 2. Add "Clone Workflow" action on each workflow card
-- Small copy icon button on each workflow card
-- Opens a dialog asking for the target `parent_group` + `transaction_type`
-- Copies all steps and transitions from the source workflow into the new combo
-- This is the fastest way to set up a new category's workflow — clone from `default` and tweak
-
-### 3. Add "Delete Workflow" option in the editor
-- Button in the editor sheet (with confirmation dialog)
-- Deletes all `category_status_flows` and `category_status_transitions` rows for that combo
-- Warn if any `category_config` rows reference this `parent_group + transaction_type`
-
-### 4. Show workflow linkage info
-- In the editor header, show which categories currently use this workflow
-- Query: `SELECT category, display_name FROM category_config WHERE parent_group = X AND transaction_type = Y`
-- Helps admin understand the blast radius of changes
-
-## Files to Modify
-
-| File | Change |
-|---|---|
-| `src/components/admin/AdminWorkflowManager.tsx` | Add create dialog, clone action, delete action, category linkage display |
-
-No database changes needed — the tables already support arbitrary `parent_group` + `transaction_type` values.
-
+```
+category_status_flows          → ordered status pipeline per (parent_group, transaction_type)
+category_status_transitions    → who can move between statuses (actor-based)
+validate_order_status_transition → DB trigger enforces transition rules
+useCategoryStatusFlow          → frontend loads flow + falls back to 'default'
+useStatusTransitions           → frontend loads allowed transitions
+AdminWorkflowManager           → admin UI to manage both
+```
