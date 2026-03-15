@@ -7,6 +7,7 @@ import { useChatViewport } from '@/hooks/useChatViewport';
 import { Send, MessageCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { ChatProductHeader } from './ChatProductHeader';
 
 interface SellerChatSheetProps {
   open: boolean;
