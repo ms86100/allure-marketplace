@@ -1,49 +1,40 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+# Harden Live Activities: Stale Cleanup, Persistent State, Android Dedup
 
-## Phase I Live Activities — CI Pipeline Status
+## Changes
 
-### Codemagic Build Pipeline: COMPLETE
+### 1. `src/plugins/live-activity/definitions.ts`
+Add `cleanupStaleActivities` method to the plugin interface.
 
-Both `ios-release` and `release-all` workflows now include:
+### 2. `src/plugins/live-activity/index.ts`
+Add web no-op for `cleanupStaleActivities`.
 
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+### 3. `src/services/LiveActivityManager.ts`
+- **Persistent state**: Save/load activity map via `persistent-kv` with versioned schema (`{ version: 1, activities: {...} }`)
+- **Hydration order**: Load persisted map → query native activities → cleanup stale → then proceed with start/update
+- **Stale cleanup**: After hydration, call `cleanupStaleActivities` with current valid entity IDs before creating new activities
+- **Map size guard**: Cap at 10 entries, clean up oldest if exceeded
+- **Persist on every start/end**: Write map to `live_activity_map` key
 
-### Codemagic Requirements (User Action)
+### 4. `native/ios/LiveActivityPlugin.swift`
+- Add `cleanupStaleActivities` method that accepts `validEntityIds` array, ends all activities not in the list with a final content state
+- Register in `pluginMethods` array
+- Pass final `activity.content.state` to `activity.end()` to avoid stale widget content
 
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
+### 5. `native/android/LiveDeliveryService.kt`
+- Add `SharedPreferences` tracking of `active_entity_id`
+- Check for duplicate before `startForeground()`
+- Clear on `ACTION_STOP`
+- Change `START_STICKY` → `START_NOT_STICKY` to prevent auto-restart
+- Add `"ready"` to `statusTitle()`
+- Add `@Synchronized` guard on service start logic
 
-### Runtime Call Chain (Verified)
+### Files Modified
+- `src/plugins/live-activity/definitions.ts`
+- `src/plugins/live-activity/index.ts`
+- `src/services/LiveActivityManager.ts`
+- `native/ios/LiveActivityPlugin.swift`
+- `native/android/LiveDeliveryService.kt`
+- `.lovable/plan.md`
 
-```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
-```
-
-## Implementation Matrix
-
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
