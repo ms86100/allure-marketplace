@@ -40,6 +40,7 @@ import { useDeepLinks } from "@/hooks/useDeepLinks";
 import { useSecurityOfficer } from "@/hooks/useSecurityOfficer";
 import { useAppLifecycle } from "@/hooks/useAppLifecycle";
 import { useBuyerOrderAlerts } from "@/hooks/useBuyerOrderAlerts";
+import { useReorderInterceptor } from "@/hooks/useReorderInterceptor";
 import { useNewOrderAlert } from "@/hooks/useNewOrderAlert";
 import { NewOrderAlertOverlay } from "@/components/seller/NewOrderAlertOverlay";
 import { Skeleton } from "@/components/ui/skeleton";
