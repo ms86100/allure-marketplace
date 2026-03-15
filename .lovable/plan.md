@@ -1,71 +1,40 @@
 
+# Dynamic Workflow Engine — Implementation Complete
 
-# Notification System — Comprehensive Audit & Plan
+## What Was Built
 
-## Root Cause Fix (Implemented)
+### Phase 1: Database ✅
+- **`category_status_transitions`** table — stores actor-based transition rules (from_status → to_status → allowed_actor) per workflow
+- **Display columns** added to `category_status_flows`: `display_label`, `color`, `icon`, `buyer_hint`
+- **`validate_order_status_transition`** trigger — validates transitions against `category_status_transitions` table with actor enforcement
+- **Seeded workflows**: `default` parent_group for `cart_purchase`, `self_fulfillment`, `service_booking`, `request_service`
+- **Seeded transitions** for all 7 parent_groups × service_booking + education_learning × request_service + all default workflows
+- **Performance index**: `idx_cst_lookup` on (parent_group, transaction_type, from_status)
 
-Admin users were not notified when a new store or product was submitted for review. Fixed by:
+### Phase 2: Frontend Cleanup ✅
+- **`useCategoryStatusFlow.ts`** — extended with `display_label`, `color`, `icon`, `buyer_hint` fields; added `booking` → `service_booking` type mapping; fallback to `default` parent_group; new `useStatusTransitions` hook
+- **`useOrderDetail.ts`** — removed ALL hardcoded status arrays (legacyOrder, fallback displayStatuses); added `getFlowStepLabel()` and `getBuyerHint()` helpers that use DB flow data
+- **`OrderDetailPage.tsx`** — timeline labels now come from `getFlowStepLabel()`; buyer hints now come from `getBuyerHint()` (DB-driven)
+- **`OrdersMonitor.tsx`** — replaced hardcoded `ORDER_STATUS_LABELS` with `useStatusLabels()` hook
 
-1. **`notifyAdminsNewStoreApplication()`** in `src/lib/admin-notifications.ts` — queries `user_roles` for admins, enqueues push+in-app notification via `notification_queue`
-2. **`handleSubmit` in `useSellerApplication.ts`** — calls the above after successful submission
-3. **DB trigger `trg_enqueue_product_review_notification`** on `products` table — fires when `approval_status` changes to `'pending'`, notifies all admins
+### Phase 3: Admin Workflow Manager ✅
+- **`AdminWorkflowManager.tsx`** — full workflow editor with:
+  - List view of all (parent_group, transaction_type) workflows
+  - Status pipeline editor: add/remove/reorder steps, configure actor/terminal/display_label/color/icon/buyer_hint
+  - Transition rules editor: for each status, toggle which actors can move to which next statuses (supports non-linear transitions like cancellations)
+  - Save: upserts all flow steps + transitions
+- **Admin nav**: "Workflows" item added under Commerce group
 
----
+### Phase 4: Fixes ✅
+- **Calendar**: native Capacitor call wrapped in try/catch, falls back to ICS download on failure
 
-## Current State (As-Is): All Notification Flows
+## Architecture
 
-### A. Database Triggers
-
-| Trigger | Event | Recipient | Push | In-App |
-|---|---|---|---|---|
-| `enqueue_order_status_notification` | Order status changes | Buyer + Seller | ✅ | ✅ |
-| `enqueue_review_notification` | New review created | Seller | ✅ | ✅ |
-| `enqueue_dispute_status_notification` | Dispute status changes | Submitter | ✅ | ✅ |
-| `enqueue_settlement_notification` | Settlement created | Seller | ✅ | ✅ |
-| `trg_enqueue_product_review_notification` | Product submitted for review | Admins | ✅ | ✅ |
-
-### B. Edge Functions
-
-| Function | Event | Recipient | Push | In-App |
-|---|---|---|---|---|
-| `send-booking-reminders` | 1h before appointment | Buyer + Seller | ✅ | ✅ |
-| `process-notification-queue` | Queue processor | N/A | ✅ | ✅ |
-| `send-campaign` | Admin broadcast | Targeted users | ✅ | ✅ |
-| `generate-weekly-digest` | Weekly digest | Society members | ✅ | ✅ |
-| `generate-society-report` | Monthly report | Society members | ✅ | ✅ |
-| `detect-collective-issues` | Pattern detection | Society admins | ✅ | ✅ |
-
-### C. Client-Side (inserts to `notification_queue`)
-
-| Location | Event | Recipient | Push | In-App |
-|---|---|---|---|---|
-| `admin-notifications.ts` → `notifySellerStatusChange` | Admin approves/rejects seller | Seller | ✅ | ✅ |
-| `admin-notifications.ts` → `notifyLicenseStatusChange` | Admin approves/rejects license | Seller | ✅ | ✅ |
-| `admin-notifications.ts` → `notifyProductStatusChange` | Admin approves/rejects product | Seller | ✅ | ✅ |
-| `admin-notifications.ts` → `notifyAdminsNewStoreApplication` | Seller submits store | Admins | ✅ | ✅ |
-| `society-notifications.ts` → `notifySocietyAdmins` | Dispute/snag | Society admins | ✅ | ✅ |
-| `society-notifications.ts` → `notifySocietyMembers` | Bulletin posts | Society members | ✅ | ✅ |
-| `ServiceBookingFlow.tsx` | New booking | Seller | ✅ | ❌ |
-| `BuyerCancelBooking.tsx` | Buyer cancels | Seller | ✅ | ❌ |
-| `SellerPaymentConfirmation.tsx` | Payment confirmed | Buyer | ✅ | ❌ |
-| `UpiDeepLinkCheckout.tsx` | UPI payment | Seller | ✅ | ❌ |
-| `useSellerChat.ts` | New chat (60s throttle) | Recipient | ✅ | ❌ |
-| `GuardManualEntryTab.tsx` | Gate entry | Resident | ✅ | ❌ |
-| `manage-delivery` edge fn | Delivery OTP/arrival | Buyer | ✅ | ✅ |
-| `update-delivery-location` edge fn | Delivery delay | Buyer | ✅ | ✅ |
-
----
-
-## Future Gaps (To-Be)
-
-### Priority 2 — Operational
-- New user pending approval → Society admins
-- New society request → Platform admins
-- Report filed → Admins
-- Delivery partner assigned → Seller
-
-### Priority 3 — Engagement
-- New product from favorite seller → Buyer
-- Seller back online → Recent buyers
-- Price drop on wishlisted item → Buyer
-- Order review reminder (24h after delivery) → Buyer
+```
+category_status_flows          → ordered status pipeline per (parent_group, transaction_type)
+category_status_transitions    → who can move between statuses (actor-based)
+validate_order_status_transition → DB trigger enforces transition rules
+useCategoryStatusFlow          → frontend loads flow + falls back to 'default'
+useStatusTransitions           → frontend loads allowed transitions
+AdminWorkflowManager           → admin UI to manage both
+```
