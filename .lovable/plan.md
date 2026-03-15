@@ -1,80 +1,71 @@
-# Dynamic Workflow Engine — Implementation Complete
 
-## What Was Built
 
-### Phase 1: Database ✅
-- **`category_status_transitions`** table — stores actor-based transition rules (from_status → to_status → allowed_actor) per workflow
-- **Display columns** added to `category_status_flows`: `display_label`, `color`, `icon`, `buyer_hint`
-- **`validate_order_status_transition`** trigger — validates transitions against `category_status_transitions` table with actor enforcement
-- **Seeded workflows**: `default` parent_group for `cart_purchase`, `self_fulfillment`, `service_booking`, `request_service`
-- **Seeded transitions** for all 7 parent_groups × service_booking + education_learning × request_service + all default workflows
-- **Performance index**: `idx_cst_lookup` on (parent_group, transaction_type, from_status)
+# Round 3 Audit: Workflow-Driven Notification System
 
-### Phase 2: Frontend Cleanup ✅
-- **`useCategoryStatusFlow.ts`** — extended with `display_label`, `color`, `icon`, `buyer_hint` fields; added `booking` → `service_booking` type mapping; fallback to `default` parent_group; new `useStatusTransitions` hook
-- **`useOrderDetail.ts`** — removed ALL hardcoded status arrays (legacyOrder, fallback displayStatuses); added `getFlowStepLabel()` and `getBuyerHint()` helpers that use DB flow data
-- **`OrderDetailPage.tsx`** — timeline labels now come from `getFlowStepLabel()`; buyer hints now come from `getBuyerHint()` (DB-driven)
-- **`OrdersMonitor.tsx`** — replaced hardcoded `ORDER_STATUS_LABELS` with `useStatusLabels()` hook
+## Verdict: 1 Critical Bug, 1 Minor Cleanup
 
-### Phase 3: Admin Workflow Manager ✅
-- **`AdminWorkflowManager.tsx`** — full workflow editor with:
-  - List view of all (parent_group, transaction_type) workflows
-  - Status pipeline editor: add/remove/reorder steps, configure actor/terminal/display_label/color/icon/buyer_hint
-  - Transition rules editor: for each status, toggle which actors can move to which next statuses (supports non-linear transitions like cancellations)
-  - Save: upserts all flow steps + transitions
-- **Admin nav**: "Workflows" item added under Commerce group
+---
 
-### Phase 4: Fixes ✅
-- **Calendar**: native Capacitor call wrapped in try/catch, falls back to ICS download on failure
+## Fully Working (No Issues)
 
-### Phase 5: Deep Audit Fixes ✅
-- **C1**: Added `requested`, `confirmed`, `rescheduled`, `no_show`, `at_gate` to `OrderStatus` type and `ORDER_STATUS_MAP`
-- **C2**: `OrderCancellation` now accepts `canCancel` prop from workflow transitions instead of hardcoded status check
-- **C3**: `getNextStatusForActor` rewritten to use `category_status_transitions` for accurate non-linear transition lookups
-- **C5**: Added skeleton loading state while flow is loading in timeline UI
-- **S2**: `getNextStatus` and `canChat` now use `isTerminalStatus()` from flow metadata instead of hardcoded status lists
-- **S3**: Seller reject button now uses `canSellerReject` derived from transitions table (supports `requested`, `enquired`, etc.)
-- **S4**: Removed hardcoded "Awaiting Pickup" override in `SellerOrderCard`
-- **S5**: Added missing status entries to `ORDER_STATUS_MAP`
-- **U2**: `isInTransit` now derived from flow metadata (delivery actor steps) instead of hardcoded array
-- **U3**: `canChat` uses `isTerminalStatus()` — properly disables chat for `no_show` and other terminal statuses
-- **D2**: `auto-cancel-orders` edge function now clears `auto_cancel_at` on cancellation
-- **New helpers**: `isTerminalStatus()`, `canActorCancel()`, `getNextStatusesForActor()` in `useCategoryStatusFlow.ts`
+| Area | Status |
+|---|---|
+| Workflow-driven DB trigger (buyer side) | Working |
+| Admin UI — buyer + seller notification config | Working |
+| Notification queue pipeline + payload passthrough | Working |
+| RichNotificationCard + HomeNotificationBanner | Working |
+| NotificationInboxPage (rich cards for actions) | Working |
+| Push notification with action data | Working |
+| Booking reminders (cron-based) | Working |
+| Retry / dead-letter / dedup | Working |
+| Security (RLS, SECURITY DEFINER) | Working |
+| Icon type matching (`order` + `order_status`) | Working |
+| Fallback to `default` parent_group | Working |
+| `{seller_name}` placeholder substitution | Working |
 
-### Phase 6: Workflow-Driven Buyer Notifications ✅
+---
 
-#### What Changed
-- **Database**: Added `notify_buyer`, `notification_title`, `notification_body`, `notification_action` columns to `category_status_flows`
-- **Backfill**: All 16 existing hardcoded notification statuses backfilled into the new columns
-- **Trigger**: Replaced `fn_enqueue_order_status_notification()` — now does a dynamic lookup on `category_status_flows` by `parent_group + transaction_type + status_key` instead of a hardcoded CASE statement. Falls back to `default` parent_group. Supports `{seller_name}` placeholder substitution.
-- **Admin UI**: Each workflow step now has a "🔔 Send Buyer Notification" toggle with title, body, and action button fields
-- **Types**: `FlowStep` extended with 4 notification fields
+## BUG (Critical): Seller notifications go to wrong user_id
 
-#### Architecture
-```
-Order status changes → trigger fires
-  → Looks up category_status_flows for matching (parent_group, transaction_type, status_key)
-  → If notify_buyer=true and notification_title set → inserts into notification_queue
-  → {seller_name} replaced with actual seller business_name
-  → notification_action included in payload for frontend action buttons
-  → Falls back to 'default' parent_group if no specific match
+The trigger inserts `NEW.seller_id` directly as `user_id` in `notification_queue` (line 98 of the migration). But `orders.seller_id` references `seller_profiles.id` — NOT `auth.users.id`.
+
+Result: seller notifications are inserted with a seller_profile UUID as the user_id. Since RLS on `user_notifications` filters by `auth.uid()`, these notifications are **invisible to everyone**. They exist in the DB but no seller will ever see them.
+
+**Fix**: The trigger must look up `seller_profiles.user_id` (the actual auth user UUID) and use that instead. The trigger already fetches from `seller_profiles` for the business name — just also grab `user_id` in the same query.
+
+```sql
+-- Current (broken):
+INSERT INTO notification_queue (user_id, ...) VALUES (NEW.seller_id, ...);
+
+-- Fix: use the seller's auth user_id
+DECLARE v_seller_user_id uuid;
+-- In the existing SELECT that gets business_name:
+SELECT sp.business_name, sp.user_id, COALESCE(sp.primary_group, 'default')
+INTO v_seller_name, v_seller_user_id, v_parent_group
+FROM seller_profiles sp WHERE sp.id = NEW.seller_id;
+
+-- Then use v_seller_user_id in the insert:
+INSERT INTO notification_queue (user_id, ...) VALUES (v_seller_user_id, ...);
 ```
 
-#### Files Changed
-- `category_status_flows` table — 4 new columns
-- `fn_enqueue_order_status_notification()` — rewritten to be workflow-driven
-- `src/components/admin/workflow/types.ts` — 4 new FlowStep fields
-- `src/components/admin/AdminWorkflowManager.tsx` — notification config UI per step + updated selects/inserts
-- `src/components/admin/workflow/WorkflowSimulator.tsx` — updated selects
+---
 
-## Architecture
+## Minor: Stale file `src/lib/order-notification-titles.ts`
 
-```
-category_status_flows          → ordered status pipeline per (parent_group, transaction_type)
-category_status_transitions    → who can move between statuses (actor-based)
-validate_order_status_transition → DB trigger enforces transition rules
-useCategoryStatusFlow          → frontend loads flow + falls back to 'default'
-useStatusTransitions           → frontend loads allowed transitions
-AdminWorkflowManager           → admin UI to manage both
-```
+Still exists with hardcoded maps. Only referenced from `src/test/helpers/business-rules.ts`. Not used in production code — maintenance hazard only. Can be cleaned up by removing the file and updating the test helper.
+
+---
+
+## Implementation Plan
+
+### Step 1: Database migration
+Replace `fn_enqueue_order_status_notification` — add `v_seller_user_id` variable, fetch `sp.user_id` alongside `sp.business_name`, use `v_seller_user_id` instead of `NEW.seller_id` in the seller notification insert.
+
+### Step 2: (Optional) Delete stale file
+Remove `src/lib/order-notification-titles.ts` and update `src/test/helpers/business-rules.ts` to remove the import.
+
+### Files changed
+- Database migration (1 file — trigger replacement)
+- `src/lib/order-notification-titles.ts` (delete)
+- `src/test/helpers/business-rules.ts` (remove stale import)
 
