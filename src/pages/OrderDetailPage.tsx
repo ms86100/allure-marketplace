@@ -59,7 +59,8 @@ export default function OrderDetailPage() {
   const statusInfo = o.getOrderStatus(order.status);
   const paymentStatusInfo = o.getPaymentStatus((order.payment_status as PaymentStatus) || 'pending');
   const displayStatuses = o.displayStatuses;
-  const isInTransit = ['picked_up', 'on_the_way', 'at_gate'].includes(order.status);
+  // Use flow-derived isInTransit from useOrderDetail
+  const isInTransit = o.isInTransit;
 
   return (
     <AppLayout showHeader={false} showNav={(!o.isSellerView || order.status === 'completed' || order.status === 'cancelled') && !o.isChatOpen}>
@@ -95,7 +96,17 @@ export default function OrderDetailPage() {
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusInfo.color}`}>{statusInfo.label}</span>
               <span className="text-xs text-muted-foreground">{format(new Date(order.created_at), 'MMM d, h:mm a')}</span>
             </div>
-            {order.status !== 'cancelled' && (
+            {order.status !== 'cancelled' && o.isFlowLoading && (
+              <div className="flex items-center justify-between mt-4 gap-1">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="flex flex-col items-center flex-1">
+                    <Skeleton className="w-7 h-7 rounded-full" />
+                    <Skeleton className="h-2 w-10 mt-1" />
+                  </div>
+                ))}
+              </div>
+            )}
+            {order.status !== 'cancelled' && !o.isFlowLoading && (
               <div className="flex items-center justify-between mt-4 gap-1">
                 {displayStatuses.map((status, index) => {
                   const statusIndex = o.statusOrder.indexOf(status as OrderStatus);
@@ -119,7 +130,7 @@ export default function OrderDetailPage() {
               ) : null;
             })()}
             {o.isBuyerView && (
-              <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => window.location.reload()} />
+              <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => window.location.reload()} canCancel={o.canBuyerCancel} />
             )}
           </div>
 
@@ -233,7 +244,7 @@ export default function OrderDetailPage() {
       {o.isSellerView && order.status !== 'completed' && order.status !== 'cancelled' && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
           <div className="px-4 py-3 flex gap-3">
-            {(order.status === 'placed' || order.status === 'enquired') && <Button variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground h-12" onClick={() => o.setIsRejectionDialogOpen(true)} disabled={o.isUpdating}><XCircle size={16} className="mr-1.5" />Reject</Button>}
+            {o.canSellerReject && <Button variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground h-12" onClick={() => o.setIsRejectionDialogOpen(true)} disabled={o.isUpdating}><XCircle size={16} className="mr-1.5" />Reject</Button>}
             {o.orderFulfillmentType === 'delivery' && order.status === 'ready' ? (
               <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground"><Truck size={16} className="text-primary" /><span>Awaiting delivery pickup</span></div>
             ) : o.nextStatus ? (

@@ -69,6 +69,7 @@ app.post("/", async (c) => {
           .update({
             status: "cancelled",
             rejection_reason: "Order automatically cancelled - seller did not respond within the time limit",
+            auto_cancel_at: null,
             updated_at: now,
           })
           .eq("id", order.id);
