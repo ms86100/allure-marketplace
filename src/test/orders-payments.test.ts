@@ -678,18 +678,32 @@ describe('Orders & Payments Module', () => {
       expect(showBanner).toBe(true);
     });
 
-    it('OD-07: seller nav hidden during active order processing', () => {
+    it('OD-07: seller nav hidden during active order processing (workflow-driven)', () => {
       const isSellerView = true;
-      const status: string = 'preparing';
-      const showNav = !isSellerView || status === 'completed' || status === 'cancelled';
+      const flow = [
+        { status_key: 'placed', is_terminal: false },
+        { status_key: 'preparing', is_terminal: false },
+        { status_key: 'completed', is_terminal: true },
+      ];
+      const status = 'preparing';
+      const isTerminal = flow.find(s => s.status_key === status)?.is_terminal === true;
+      const showNav = !isSellerView || isTerminal;
       expect(showNav).toBe(false);
     });
 
-    it('OD-08: seller nav shown for completed orders', () => {
+    it('OD-08: seller nav shown for terminal orders (workflow-driven)', () => {
       const isSellerView = true;
-      const status = 'completed';
-      const showNav = !isSellerView || status === 'completed' || status === 'cancelled';
-      expect(showNav).toBe(true);
+      const flow = [
+        { status_key: 'placed', is_terminal: false },
+        { status_key: 'completed', is_terminal: true },
+        { status_key: 'cancelled', is_terminal: true },
+        { status_key: 'no_show', is_terminal: true },
+      ];
+      for (const terminal of ['completed', 'cancelled', 'no_show']) {
+        const isTerminal = flow.find(s => s.status_key === terminal)?.is_terminal === true;
+        const showNav = !isSellerView || isTerminal;
+        expect(showNav).toBe(true);
+      }
     });
   });
 

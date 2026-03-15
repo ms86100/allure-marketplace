@@ -188,6 +188,12 @@ export function useOrderDetail(id: string | undefined) {
     return step?.buyer_hint || null;
   };
 
+  // Helper: get seller hint from flow step
+  const getSellerHint = (statusKey: string): string | null => {
+    const step = flow.find(s => s.status_key === statusKey);
+    return (step as any)?.seller_hint || null;
+  };
+
   // Derive isInTransit from flow metadata (delivery actor steps)
   const isInTransit = useMemo(() => {
     if (!order) return false;
@@ -206,7 +212,7 @@ export function useOrderDetail(id: string | undefined) {
     orderFulfillmentType, currentStatusIndex, statusOrder,
     displayStatuses, timelineSteps, flow,
     getOrderStatus, getPaymentStatus, getItemStatus,
-    getFlowStepLabel, getBuyerHint,
+    getFlowStepLabel, getBuyerHint, getSellerHint,
     formatPrice, user,
     updateOrderStatus, handleReject, handleTimeout, copyOrderId,
   };
