@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { CheckCircle2, Package, Star, Calendar, Bell } from 'lucide-react';
+import { CheckCircle2, Package, Star, Calendar, Bell, MapPin, AlertTriangle, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import type { UserNotification } from '@/hooks/queries/useNotifications';
 import { useMarkNotificationRead } from '@/hooks/queries/useNotifications';
 
@@ -15,10 +16,25 @@ function getIcon(type: string) {
       return <Star className="text-accent-foreground" size={28} />;
     case 'booking':
     case 'reminder':
+    case 'booking_reminder_1_hour':
+    case 'booking_reminder_30_min':
+    case 'booking_reminder_10_min':
       return <Calendar className="text-primary" size={28} />;
+    case 'delivery_en_route':
+    case 'delivery_proximity':
+      return <Truck className="text-primary" size={28} />;
+    case 'delivery_proximity_imminent':
+      return <MapPin className="text-destructive" size={28} />;
+    case 'delivery_stalled':
+    case 'delivery_delayed':
+      return <AlertTriangle className="text-warning" size={28} />;
     default:
       return <Bell className="text-primary" size={28} />;
   }
+}
+
+function isUrgentType(type: string): boolean {
+  return ['delivery_proximity_imminent', 'booking_reminder_10_min'].includes(type);
 }
 
 interface Props {
@@ -31,6 +47,7 @@ export function RichNotificationCard({ notification, onDismiss }: Props) {
   const markRead = useMarkNotificationRead();
   const action = notification.payload?.action;
   const referencePath = notification.reference_path || (notification.payload?.reference_path as string);
+  const urgent = isUrgentType(notification.type);
 
   const handleAction = () => {
     if (!notification.is_read) markRead.mutate(notification.id);
@@ -46,15 +63,23 @@ export function RichNotificationCard({ notification, onDismiss }: Props) {
   };
 
   return (
-    <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/5 to-background shadow-lg">
+    <Card className={cn(
+      "overflow-hidden shadow-lg",
+      urgent
+        ? "border-destructive/30 bg-gradient-to-br from-destructive/10 to-background animate-pulse"
+        : "border-primary/20 bg-gradient-to-br from-primary/5 to-background"
+    )}>
       <div className="p-4">
         <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <div className={cn(
+            "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
+            urgent ? "bg-destructive/10" : "bg-primary/10"
+          )}>
             {getIcon(notification.type)}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-primary shrink-0" />
+              <CheckCircle2 size={16} className={cn("shrink-0", urgent ? "text-destructive" : "text-primary")} />
               <h3 className="font-bold text-base text-foreground leading-tight truncate">
                 {notification.title}
               </h3>
@@ -68,7 +93,7 @@ export function RichNotificationCard({ notification, onDismiss }: Props) {
 
         {action && (
           <div className="mt-3 flex gap-2">
-            <Button size="sm" className="flex-1" onClick={handleAction}>
+            <Button size="sm" className={cn("flex-1", urgent && "bg-destructive hover:bg-destructive/90")} onClick={handleAction}>
               {String(action)}
             </Button>
             <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={handleDismiss}>
