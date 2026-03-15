@@ -1,86 +1,70 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented)
 
-All 9 phases are fully implemented. Phase I provides TypeScript infrastructure and native reference files for iOS/Android lock-screen live activities.
+# Add Live Activities to Codemagic iOS Build Pipeline
 
-## Phase I Live Activities — Production Readiness Audit
+## What We're Doing
 
-### Final Verdict
+Adding CI build steps to the existing `codemagic.yaml` so that Live Activities (lock screen + Dynamic Island) are automatically compiled and included in the TestFlight build — no Xcode required.
 
-| Layer | Status |
-|---|---|
-| TypeScript integration | **Production Ready** |
-| iOS native code | **Code Complete** |
-| iOS configuration | **Not Ready** — requires Xcode setup (widget extension, entitlements, deployment target) |
-| Android native code | **Code Complete** |
-| Android configuration | **Not Ready** — requires manifest permissions & service declaration |
+## Current State
 
-### iOS Requirements
+- `codemagic.yaml` already has a working `ios-release` workflow (L10-329)
+- Native Swift files exist in `native/ios/` (3 files)
+- Deployment target is currently set to `16.0` (L268) — needs `16.1` for ActivityKit
+- Entitlements file exists (L178-191) but lacks `com.apple.developer.activitykit`
+- No step copies native plugin files into `ios/App/App/`
+- No Widget Extension target is created
 
-| Requirement | Status |
-|---|---|
-| Deployment target ≥ 16.1 | NOT CONFIGURED (set during Xcode project creation) |
-| ActivityKit imported | Present in all Swift reference files |
-| Widget extension target | MISSING (manual Xcode creation required) |
-| Live Activities capability / entitlements | MISSING (Xcode Signing & Capabilities) |
+## Plan
 
-### Android Requirements
+### 1. Update `codemagic.yaml` — Insert new build steps into `ios-release` workflow
 
-| Requirement | Status |
-|---|---|
-| `FOREGROUND_SERVICE` permission | MISSING (no AndroidManifest.xml in repo) |
-| `POST_NOTIFICATIONS` permission | MISSING |
-| `LiveDeliveryService` manifest declaration | MISSING |
-| Notification channel created (code) | Present (`LiveDeliveryService.kt`) |
-| `startForeground()` called (code) | Present (`LiveDeliveryService.kt`) |
+Insert **after** the "Copy custom notification sound" step (L251) and **before** "Update iOS project settings" (L263):
 
-### Runtime Call Chain (Verified)
-
+**Step A: Copy Live Activity plugin files**
+```bash
+cp native/ios/LiveActivityPlugin.swift ios/App/App/
+cp native/ios/LiveDeliveryActivity.swift ios/App/App/
 ```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit / Android Foreground Service
-  → On web: silent no-op
+Uses Ruby/xcodeproj to add them to the App target so they compile.
+
+**Step B: Create Widget Extension target programmatically**
+Uses Ruby `xcodeproj` gem (already available on Codemagic) to:
+- Create a new native target `LiveDeliveryWidgetExtension` (type: app_extension)
+- Set bundle ID to `app.sociva.community.LiveDeliveryWidget`
+- Add `LiveDeliveryWidget.swift` and `LiveDeliveryActivity.swift` to it
+- Set deployment target to 16.1
+- Embed the extension in the main App target
+- Create a widget extension `Info.plist` with `NSExtension` keys
+
+**Step C: Add ActivityKit entitlement**
+Adds `com.apple.developer.activitykit` to the existing `App.entitlements` and creates a separate entitlements file for the widget extension.
+
+### 2. Update deployment target from 16.0 → 16.1
+
+Modify the existing "Update iOS project settings" step (L268) to use `16.1`.
+
+### 3. Update code signing step
+
+Add the widget extension bundle ID to the signing fetch:
+```bash
+app-store-connect fetch-signing-files "app.sociva.community.LiveDeliveryWidget" \
+  --type IOS_APP_STORE --create
 ```
 
-### Remaining Steps Before Release
+### 4. Update Podfile generation
 
-**iOS (after `npx cap add ios`):**
-1. Copy `native/ios/*.swift` into Xcode project
-2. Set deployment target ≥ iOS 16.1
-3. Create Widget Extension target (`app.sociva.community.LiveDeliveryWidget`)
-4. Add `LiveDeliveryActivity.swift` to both main app + widget extension targets
-5. Enable Live Activities capability (adds `com.apple.developer.activitykit`)
-6. Register plugin: `bridge.registerPlugin(LiveActivityPlugin.self)`
+Add the `LiveDeliveryActivity.swift` shared model to the widget extension target in the Podfile so it compiles correctly.
 
-**Android (after `npx cap add android`):**
-1. Copy `native/android/*.kt` into `android/app/src/main/java/app/sociva/community/`
-2. Add manifest permissions: `FOREGROUND_SERVICE`, `POST_NOTIFICATIONS`
-3. Declare service: `<service android:name=".LiveDeliveryService" android:foregroundServiceType="specialUse" android:exported="false" />`
-4. Register plugin: `registerPlugin(LiveActivityPlugin::class.java)`
+### 5. Register LiveActivity plugin in AppDelegate
 
-## Implementation Matrix
+Add `import ActivityKit` and plugin registration to the patched `AppDelegate.swift`.
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity (en_route, 500m, 200m) | Implemented |
-| B | Multi-Interval Booking Reminders (1hr, 30m, 10m) | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Code Complete (native config required) |
+## Files Modified
 
-## Key Files
+- `codemagic.yaml` — Add 4 new build steps, modify 3 existing steps
 
-- `src/plugins/live-activity/definitions.ts` — Plugin interface
-- `src/plugins/live-activity/index.ts` — Capacitor plugin registration with web no-op fallback
-- `src/services/LiveActivityManager.ts` — Singleton: dedup, throttle, lifecycle
-- `src/hooks/useLiveActivity.ts` — React hook bridging order/delivery state
-- `native/ios/LiveDeliveryActivity.swift` — ActivityKit attributes
-- `native/ios/LiveDeliveryWidget.swift` — SwiftUI lock screen + Dynamic Island UI
-- `native/ios/LiveActivityPlugin.swift` — Capacitor-to-ActivityKit bridge
-- `native/android/LiveDeliveryService.kt` — Foreground service with ongoing notification
-- `native/android/LiveActivityPlugin.kt` — Capacitor-to-Service bridge
+## Technical Details
+
+The Widget Extension is the critical piece. On Codemagic, we use the `xcodeproj` Ruby gem to programmatically create a widget extension target, which is equivalent to doing "File → New → Target → Widget Extension" in Xcode. This avoids needing any manual Xcode setup.
+
