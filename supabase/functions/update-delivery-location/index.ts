@@ -148,16 +148,17 @@ serve(async (req) => {
 
     if (locErr) console.error('Error inserting location:', locErr);
 
-    // Get destination coordinates
+    // Get destination coordinates and seller info for ETA blending
     const { data: orderForDest } = await supabase
       .from('orders')
-      .select('delivery_lat, delivery_lng, buyer_id')
+      .select('delivery_lat, delivery_lng, buyer_id, seller_id')
       .eq('id', assignment.order_id)
       .single();
 
     let destLat = orderForDest?.delivery_lat;
     let destLng = orderForDest?.delivery_lng;
     const buyerId = orderForDest?.buyer_id;
+    const sellerId = orderForDest?.seller_id;
 
     if (!destLat || !destLng) {
       const { data: society } = await supabase
@@ -178,7 +179,23 @@ serve(async (req) => {
       distanceMeters = Math.round(haversineDistance(latitude, longitude, destLat, destLng));
       proximity = getProximity(distanceMeters);
 
-      const etaResult = calculateEta(distanceMeters, speed_kmh, accuracy_meters);
+      // Phase E: Query historical ETA data when speed is poor
+      let historicalAvgMin: number | null = null;
+      if ((speed_kmh == null || speed_kmh < 2) && sellerId) {
+        const currentHour = new Date().getUTCHours();
+        const { data: stats } = await supabase
+          .from('delivery_time_stats')
+          .select('avg_delivery_minutes')
+          .eq('seller_id', sellerId)
+          .eq('society_id', assignment.society_id)
+          .eq('time_bucket', currentHour)
+          .maybeSingle();
+        if (stats?.avg_delivery_minutes) {
+          historicalAvgMin = Number(stats.avg_delivery_minutes);
+        }
+      }
+
+      const etaResult = calculateEta(distanceMeters, speed_kmh, accuracy_meters, historicalAvgMin);
       skipEtaUpdate = etaResult.skipUpdate;
       if (!skipEtaUpdate) {
         etaMinutes = etaResult.eta;
