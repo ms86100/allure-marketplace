@@ -83,6 +83,7 @@ export function AdminWorkflowManager() {
       status_key: '', sort_order: maxOrder + 10, actor: 'seller', is_terminal: false,
       display_label: '', color: 'bg-gray-100 text-gray-600', icon: 'Circle', buyer_hint: '', seller_hint: '',
       notify_buyer: false, notification_title: '', notification_body: '', notification_action: '',
+      notify_seller: false, seller_notification_title: '', seller_notification_body: '',
     }]);
   };
 
