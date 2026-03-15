@@ -399,48 +399,85 @@ export function UpiDeepLinkCheckout({
             </div>
           )}
 
-          {/* Step 3: Enter UTR */}
+          {/* Step 3: Confirm Payment */}
           {step === 'utr' && (
-            <div className="space-y-5">
+            <div className="space-y-4">
               <div className="text-center">
-                <p className="font-semibold text-lg">Enter Transaction ID</p>
+                <p className="font-semibold text-lg">Confirm Your Payment</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Find the UTR/Transaction ID in your UPI app's payment confirmation
+                  {formatPrice(amount)} to {sellerName}
                 </p>
               </div>
 
+              {/* Empathetic explanation */}
+              <div className="bg-muted/50 rounded-xl p-3.5">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  💡 Sociva doesn't track payments automatically yet. To help your seller confirm your payment quickly, you can share a screenshot of the payment confirmation. This is <span className="font-medium text-foreground">completely optional</span> — you can simply tap "Confirm Payment" to proceed.
+                </p>
+              </div>
+
+              {/* Screenshot upload */}
               <div className="space-y-2">
-                <Label htmlFor="utr-input" className="text-sm font-medium">
-                  UPI Transaction ID (UTR)
-                </Label>
-                <Input
-                  id="utr-input"
-                  placeholder="e.g. 546738264728"
-                  value={utrValue}
-                  onChange={(e) => setUtrValue(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
-                  className="font-mono text-center text-lg tracking-wider"
-                  maxLength={22}
-                  autoFocus
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  This helps the seller verify your payment quickly
-                </p>
+                <Label className="text-sm font-medium">Payment Screenshot <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                {screenshotPreview ? (
+                  <div className="relative rounded-xl overflow-hidden border border-border">
+                    <img src={screenshotPreview} alt="Payment proof" className="w-full max-h-48 object-contain bg-muted/30" />
+                    <button
+                      onClick={handleRemoveScreenshot}
+                      className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm rounded-full p-1 border border-border hover:bg-destructive/10 transition-colors"
+                    >
+                      <X size={14} className="text-muted-foreground" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center gap-1.5 py-6 rounded-xl border-2 border-dashed border-muted-foreground/25 hover:border-primary/40 transition-colors cursor-pointer bg-muted/20">
+                    <ImagePlus size={24} className="text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Tap to upload screenshot</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleScreenshotSelect}
+                    />
+                  </label>
+                )}
               </div>
 
-              <div className="bg-muted/50 rounded-xl p-3">
-                <p className="text-xs text-muted-foreground">
-                  💡 <span className="font-medium">Where to find UTR?</span> Open your UPI app → Go to transaction history → Tap on this payment → Copy the Transaction ID / UTR number
-                </p>
+              {/* Collapsible UTR field */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowUtrField(!showUtrField)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showUtrField ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  Add Transaction ID (UTR)
+                </button>
+                {showUtrField && (
+                  <div className="mt-2 space-y-1.5">
+                    <Input
+                      id="utr-input"
+                      placeholder="e.g. 546738264728"
+                      value={utrValue}
+                      onChange={(e) => setUtrValue(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
+                      className="font-mono text-center tracking-wider"
+                      maxLength={22}
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Find this in your UPI app's transaction history
+                    </p>
+                  </div>
+                )}
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-1">
                 <Button variant="outline" className="flex-1" onClick={() => setStep('confirm')}>
                   Back
                 </Button>
                 <Button
                   className="flex-1"
-                  onClick={handleSubmitUtr}
-                  disabled={isSubmitting || utrValue.trim().length < 6}
+                  onClick={handleSubmitConfirmation}
+                  disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     <><Loader2 className="mr-2 animate-spin" size={16} />Submitting...</>
