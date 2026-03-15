@@ -9,6 +9,7 @@ import { MarketplaceShoppingDocs } from '@/components/docs/MarketplaceShoppingDo
 import { SellerToolsDocs } from '@/components/docs/SellerToolsDocs';
 import { DeliveryDocs } from '@/components/docs/DeliveryDocs';
 import { AdminCommunityDocs } from '@/components/docs/AdminCommunityDocs';
+import { WorkflowEngineDocs } from '@/components/docs/WorkflowEngineDocs';
 import { cn } from '@/lib/utils';
 
 const NAV_SECTIONS = [
@@ -36,6 +37,7 @@ const NAV_SECTIONS = [
     group: 'Operations',
     items: [
       { id: 'delivery', label: 'Delivery & Logistics', icon: Truck },
+      { id: 'workflows', label: 'Workflow Engine', icon: Package },
     ],
   },
   {
@@ -53,6 +55,7 @@ const MODULE_COMPONENTS: Record<string, React.FC> = {
   'service-booking': ServiceBookingDocs,
   seller: SellerToolsDocs,
   delivery: DeliveryDocs,
+  workflows: WorkflowEngineDocs,
   admin: AdminCommunityDocs,
 };
 
