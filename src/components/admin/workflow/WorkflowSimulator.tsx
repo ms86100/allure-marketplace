@@ -12,7 +12,7 @@ import {
   AlertTriangle, User, Store, Truck, Bot, ShieldCheck, XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { type FlowStep, type Transition, type WorkflowGroup, ACTORS, TRANSACTION_TYPES, formatName } from './workflow/types';
+import { type FlowStep, type Transition, type WorkflowGroup, ACTORS, TRANSACTION_TYPES, formatName } from './types';
 
 const ACTOR_ICONS: Record<string, React.ReactNode> = {
   buyer: <User size={12} />,
