@@ -1,80 +1,162 @@
-# Dynamic Workflow Engine — Implementation Complete
 
-## What Was Built
 
-### Phase 1: Database ✅
-- **`category_status_transitions`** table — stores actor-based transition rules (from_status → to_status → allowed_actor) per workflow
-- **Display columns** added to `category_status_flows`: `display_label`, `color`, `icon`, `buyer_hint`
-- **`validate_order_status_transition`** trigger — validates transitions against `category_status_transitions` table with actor enforcement
-- **Seeded workflows**: `default` parent_group for `cart_purchase`, `self_fulfillment`, `service_booking`, `request_service`
-- **Seeded transitions** for all 7 parent_groups × service_booking + education_learning × request_service + all default workflows
-- **Performance index**: `idx_cst_lookup` on (parent_group, transaction_type, from_status)
+# Smart Phone-Native Capabilities — Implementation Plan
 
-### Phase 2: Frontend Cleanup ✅
-- **`useCategoryStatusFlow.ts`** — extended with `display_label`, `color`, `icon`, `buyer_hint` fields; added `booking` → `service_booking` type mapping; fallback to `default` parent_group; new `useStatusTransitions` hook
-- **`useOrderDetail.ts`** — removed ALL hardcoded status arrays (legacyOrder, fallback displayStatuses); added `getFlowStepLabel()` and `getBuyerHint()` helpers that use DB flow data
-- **`OrderDetailPage.tsx`** — timeline labels now come from `getFlowStepLabel()`; buyer hints now come from `getBuyerHint()` (DB-driven)
-- **`OrdersMonitor.tsx`** — replaced hardcoded `ORDER_STATUS_LABELS` with `useStatusLabels()` hook
+## Current State Assessment
 
-### Phase 3: Admin Workflow Manager ✅
-- **`AdminWorkflowManager.tsx`** — full workflow editor with:
-  - List view of all (parent_group, transaction_type) workflows
-  - Status pipeline editor: add/remove/reorder steps, configure actor/terminal/display_label/color/icon/buyer_hint
-  - Transition rules editor: for each status, toggle which actors can move to which next statuses (supports non-linear transitions like cancellations)
-  - Save: upserts all flow steps + transitions
-- **Admin nav**: "Workflows" item added under Commerce group
+**Already implemented**: Proximity alerts (500m, with 200m variant), stale detection (3min GPS silence), Haversine ETA, ReorderButton (client-side cart replacement), booking reminders (1hr cron), society geofence, background location tracking (10s interval), rich notification cards, home notification banner.
 
-### Phase 4: Fixes ✅
-- **Calendar**: native Capacitor call wrapped in try/catch, falls back to ICS download on failure
+**Key gaps vs. the 12-phase plan**: No predictive ordering, no server-side quick-reorder, no historical ETA stats, no arrival detection, no 200m dedicated alert, no lock-screen live activity, no multi-interval reminders, no smart delay detection.
 
-### Phase 5: Deep Audit Fixes ✅
-- **C1**: Added `requested`, `confirmed`, `rescheduled`, `no_show`, `at_gate` to `OrderStatus` type and `ORDER_STATUS_MAP`
-- **C2**: `OrderCancellation` now accepts `canCancel` prop from workflow transitions instead of hardcoded status check
-- **C3**: `getNextStatusForActor` rewritten to use `category_status_transitions` for accurate non-linear transition lookups
-- **C5**: Added skeleton loading state while flow is loading in timeline UI
-- **S2**: `getNextStatus` and `canChat` now use `isTerminalStatus()` from flow metadata instead of hardcoded status lists
-- **S3**: Seller reject button now uses `canSellerReject` derived from transitions table (supports `requested`, `enquired`, etc.)
-- **S4**: Removed hardcoded "Awaiting Pickup" override in `SellerOrderCard`
-- **S5**: Added missing status entries to `ORDER_STATUS_MAP`
-- **U2**: `isInTransit` now derived from flow metadata (delivery actor steps) instead of hardcoded array
-- **U3**: `canChat` uses `isTerminalStatus()` — properly disables chat for `no_show` and other terminal statuses
-- **D2**: `auto-cancel-orders` edge function now clears `auto_cancel_at` on cancellation
-- **New helpers**: `isTerminalStatus()`, `canActorCancel()`, `getNextStatusesForActor()` in `useCategoryStatusFlow.ts`
+---
 
-### Phase 6: Workflow-Driven Buyer Notifications ✅
+## Implementation Phases (Prioritized by Impact × Feasibility)
 
-#### What Changed
-- **Database**: Added `notify_buyer`, `notification_title`, `notification_body`, `notification_action` columns to `category_status_flows`
-- **Backfill**: All 16 existing hardcoded notification statuses backfilled into the new columns
-- **Trigger**: Replaced `fn_enqueue_order_status_notification()` — now does a dynamic lookup on `category_status_flows` by `parent_group + transaction_type + status_key` instead of a hardcoded CASE statement. Falls back to `default` parent_group. Supports `{seller_name}` placeholder substitution.
-- **Admin UI**: Each workflow step now has a "🔔 Send Buyer Notification" toggle with title, body, and action button fields
-- **Types**: `FlowStep` extended with 4 notification fields
+### Phase A: Enhanced Delivery Proximity (your Phases 6, 10)
+**Why first**: Smallest delta, highest UX impact. Existing code handles 500m as a single event.
 
-#### Architecture
+- Update `update-delivery-location` edge function:
+  - Add `delivery_proximity_imminent` type at <200m (separate dedup key from existing `delivery_proximity`)
+  - Include `distance`, `eta`, driver info in payload
+  - Add `delivery_en_route` notification at first GPS update after `picked_up` status
+- Update `RichNotificationCard` to handle `delivery_proximity_imminent` with urgent styling
+- Add full-screen `DeliveryArrivalOverlay` component on order tracking page when distance <200m
+
+### Phase B: Multi-Interval Booking Reminders (your Phase 9)
+**Why**: Simple cron enhancement, directly addresses the "10 minutes" requirement.
+
+- Update `send-booking-reminders` to run every 5 minutes (currently every 10)
+- Add 30-minute and 10-minute reminder windows alongside existing 1-hour
+- Add dedup: check `notification_queue` for existing reminder at same interval before inserting
+- Include quick actions in payload: `{ action: "Open Directions", reference_path: "/orders" }`
+- Notify both buyer and seller at each interval
+
+### Phase C: Predictive Ordering Engine (your Phases 2, 5)
+**Database**:
+- New table `order_suggestions` (id, user_id, product_id, seller_id, trigger_type, day_of_week, time_bucket, confidence_score, suggested_at, dismissed, acted_on, created_at)
+
+**Backend**:
+- New edge function `generate-order-suggestions`:
+  - Runs daily at 6 AM via cron
+  - Queries completed orders per user, groups by (product_id, seller_id, day_of_week, hour)
+  - If ≥2 occurrences on same day-of-week within 30 days → insert suggestion with `trigger_type: 'time_pattern'`
+  - At predicted time (±30min window), insert into `notification_queue` with action payload
+
+**Frontend**:
+- New `SmartSuggestionBanner` on HomePage — fetches today's suggestions, shows "Order again?" card with product image, seller name, and Reorder/Dismiss buttons
+- New `useOrderSuggestions` hook
+
+### Phase D: One-Tap Server-Side Reorder (your Phase 3)
+**Backend**:
+- New edge function `quick-reorder`:
+  - Accepts `order_id`, validates buyer ownership
+  - Checks product availability + approval status
+  - Calls existing `create_multi_vendor_orders` DB function
+  - Returns new order ID
+- Push notification payload includes `action: "Reorder"`, `order_id`
+
+**Frontend**:
+- When notification with `action: "Reorder"` is tapped → call `quick-reorder` → show confirmation toast → navigate to order detail
+- Falls back to existing cart-based reorder if server call fails
+
+### Phase E: Historical ETA Intelligence (your Phase 4)
+**Database**:
+- New table `delivery_time_stats` (seller_id, society_id, time_bucket, avg_prep_minutes, avg_delivery_minutes, sample_count, updated_at)
+
+**Backend**:
+- New trigger: on delivery completion (`status = 'delivered'`), calculate actual prep and delivery durations, upsert into `delivery_time_stats`
+- Update `update-delivery-location` to blend historical avg with live GPS-based ETA when speed data is poor
+
+**Frontend**:
+- Show ETA as range ("11–14 min") instead of single number in order tracking UI
+
+### Phase F: Smart Arrival Detection (your Phase 5)
+**Frontend only** (no new backend):
+- New `useArrivalDetection` hook:
+  - Uses `navigator.geolocation.watchPosition` (or Capacitor Geolocation)
+  - Compares against user's society coordinates + `geofence_radius_meters`
+  - When entering geofence → check `order_suggestions` for arrival-triggered suggestions
+  - Show `ArrivalSuggestionCard` on HomePage
+
+### Phase G: Smart Delay Detection (your Phase 8)
+- Enhance `update-delivery-location`:
+  - Track heading changes — if driver reverses direction significantly, flag as "route changed"
+  - If ETA increases by >5 min between updates, send `delivery_delayed` notification
+  - Dedup via `notification_queue` type + reference_path
+
+### Phase H: Notification Payload Standardization (your Phase 1 enhancement)
+- Ensure every notification inserted into `notification_queue` includes standardized payload:
+  ```json
+  { "type": "...", "entity_type": "order|booking", "entity_id": "...", "workflow_status": "...", "action": "..." }
+  ```
+- Update DB trigger, booking reminders, and delivery location function to use this format
+- Update `RichNotificationCard` to use `entity_type` for icon selection
+
+### Phase I: Lock Screen Live Activities (your Phase 7)
+**Note**: This requires native iOS/Android code (Swift LiveActivity API / Android Foreground Service). Cannot be implemented purely in web/Capacitor without a native plugin.
+
+- **Feasible now**: Persistent push notification updates (Android) — update existing notification instead of creating new ones
+- **Requires native plugin**: iOS Live Activities — would need a custom Capacitor plugin
+- **Recommendation**: Defer iOS Live Activities. Implement Android persistent notification via updated push payloads with `tag` field for replacement
+
+---
+
+## Database Changes
+
+```sql
+-- Phase C
+CREATE TABLE order_suggestions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  product_id uuid REFERENCES products(id) ON DELETE CASCADE,
+  seller_id uuid REFERENCES seller_profiles(id) ON DELETE CASCADE,
+  trigger_type text NOT NULL DEFAULT 'time_pattern',
+  day_of_week int, -- 0=Sun..6=Sat
+  time_bucket int, -- hour of day 0-23
+  confidence_score numeric(3,2) DEFAULT 0.5,
+  suggested_at timestamptz,
+  dismissed boolean DEFAULT false,
+  acted_on boolean DEFAULT false,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE order_suggestions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users see own suggestions" ON order_suggestions FOR SELECT TO authenticated USING (user_id = auth.uid());
+CREATE POLICY "Users update own suggestions" ON order_suggestions FOR UPDATE TO authenticated USING (user_id = auth.uid());
+
+-- Phase E
+CREATE TABLE delivery_time_stats (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  seller_id uuid REFERENCES seller_profiles(id) ON DELETE CASCADE NOT NULL,
+  society_id uuid REFERENCES societies(id) ON DELETE CASCADE,
+  time_bucket int, -- hour 0-23
+  avg_prep_minutes numeric(6,1) DEFAULT 0,
+  avg_delivery_minutes numeric(6,1) DEFAULT 0,
+  sample_count int DEFAULT 0,
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(seller_id, society_id, time_bucket)
+);
 ```
-Order status changes → trigger fires
-  → Looks up category_status_flows for matching (parent_group, transaction_type, status_key)
-  → If notify_buyer=true and notification_title set → inserts into notification_queue
-  → {seller_name} replaced with actual seller business_name
-  → notification_action included in payload for frontend action buttons
-  → Falls back to 'default' parent_group if no specific match
-```
 
-#### Files Changed
-- `category_status_flows` table — 4 new columns
-- `fn_enqueue_order_status_notification()` — rewritten to be workflow-driven
-- `src/components/admin/workflow/types.ts` — 4 new FlowStep fields
-- `src/components/admin/AdminWorkflowManager.tsx` — notification config UI per step + updated selects/inserts
-- `src/components/admin/workflow/WorkflowSimulator.tsx` — updated selects
+## Files to Create/Modify
 
-## Architecture
+| File | Phase | Action |
+|---|---|---|
+| `supabase/functions/update-delivery-location/index.ts` | A, G | Add 200m alert, delay detection |
+| `supabase/functions/send-booking-reminders/index.ts` | B | Add 30min + 10min intervals, dedup |
+| `supabase/functions/generate-order-suggestions/index.ts` | C | New — pattern analysis cron |
+| `supabase/functions/quick-reorder/index.ts` | D | New — server-side reorder |
+| `src/components/home/SmartSuggestionBanner.tsx` | C | New — suggestion cards |
+| `src/components/order/DeliveryArrivalOverlay.tsx` | A | New — full-screen arrival alert |
+| `src/components/home/ArrivalSuggestionCard.tsx` | F | New — geofence-triggered card |
+| `src/hooks/useOrderSuggestions.ts` | C | New |
+| `src/hooks/useArrivalDetection.ts` | F | New |
+| `src/components/notifications/RichNotificationCard.tsx` | A, H | Add imminent styling + entity_type |
+| `src/pages/HomePage.tsx` | C, F | Mount new banners |
+| Database migration | A–H | Tables + cron jobs |
 
-```
-category_status_flows          → ordered status pipeline per (parent_group, transaction_type)
-category_status_transitions    → who can move between statuses (actor-based)
-validate_order_status_transition → DB trigger enforces transition rules
-useCategoryStatusFlow          → frontend loads flow + falls back to 'default'
-useStatusTransitions           → frontend loads allowed transitions
-AdminWorkflowManager           → admin UI to manage both
-```
+## Execution Order
+
+Phase A → B → C → D → E → F → G → H (each independently deployable)
+
+Phase I (Live Activities) deferred — requires native plugin development outside Lovable scope.
 
