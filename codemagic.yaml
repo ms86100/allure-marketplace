@@ -1121,14 +1121,20 @@ workflows:
           fi
           echo "=== IPA push entitlement verified ==="
 
-      - name: Validate IPA contains widget extension (release-all)
+      - name: Validate IPA contains a single widget extension (release-all)
         script: |
           cd /tmp/ipa-check-all
-          if [ ! -d "Payload/App.app/PlugIns/LiveDeliveryWidgetExtension.appex" ]; then
-            echo "WARNING: Widget extension not found in IPA — Live Activities may not work"
-          else
-            echo "=== LiveDeliveryWidgetExtension.appex found in IPA ==="
+          COUNT=$(find Payload/App.app/PlugIns -maxdepth 1 -name "*.appex" | wc -l | tr -d ' ')
+          if [ "$COUNT" -ne 1 ]; then
+            echo "ERROR: Expected exactly one widget extension .appex, found $COUNT"
+            find Payload/App.app/PlugIns -maxdepth 1 -name "*.appex" -print
+            exit 1
           fi
+          if [ ! -d "Payload/App.app/PlugIns/LiveDeliveryWidgetExtension.appex" ]; then
+            echo "ERROR: LiveDeliveryWidgetExtension.appex not found"
+            exit 1
+          fi
+          echo "=== Single LiveDeliveryWidgetExtension.appex verified ==="
 
       - name: Add Android platform
         script: |
