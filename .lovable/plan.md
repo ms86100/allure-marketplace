@@ -1,84 +1,80 @@
+# Dynamic Workflow Engine — Implementation Complete
 
+## What Was Built
 
-# Workflow-Driven Buyer Notifications on Status Change
+### Phase 1: Database ✅
+- **`category_status_transitions`** table — stores actor-based transition rules (from_status → to_status → allowed_actor) per workflow
+- **Display columns** added to `category_status_flows`: `display_label`, `color`, `icon`, `buyer_hint`
+- **`validate_order_status_transition`** trigger — validates transitions against `category_status_transitions` table with actor enforcement
+- **Seeded workflows**: `default` parent_group for `cart_purchase`, `self_fulfillment`, `service_booking`, `request_service`
+- **Seeded transitions** for all 7 parent_groups × service_booking + education_learning × request_service + all default workflows
+- **Performance index**: `idx_cst_lookup` on (parent_group, transaction_type, from_status)
 
-## Current State
-- `fn_enqueue_order_status_notification()` trigger uses a hardcoded CASE statement with 17 status-specific notification messages
-- No notification configuration exists in `category_status_flows`
-- The booking reminder system (`send-booking-reminders`) already works independently via cron
+### Phase 2: Frontend Cleanup ✅
+- **`useCategoryStatusFlow.ts`** — extended with `display_label`, `color`, `icon`, `buyer_hint` fields; added `booking` → `service_booking` type mapping; fallback to `default` parent_group; new `useStatusTransitions` hook
+- **`useOrderDetail.ts`** — removed ALL hardcoded status arrays (legacyOrder, fallback displayStatuses); added `getFlowStepLabel()` and `getBuyerHint()` helpers that use DB flow data
+- **`OrderDetailPage.tsx`** — timeline labels now come from `getFlowStepLabel()`; buyer hints now come from `getBuyerHint()` (DB-driven)
+- **`OrdersMonitor.tsx`** — replaced hardcoded `ORDER_STATUS_LABELS` with `useStatusLabels()` hook
 
-## Plan
+### Phase 3: Admin Workflow Manager ✅
+- **`AdminWorkflowManager.tsx`** — full workflow editor with:
+  - List view of all (parent_group, transaction_type) workflows
+  - Status pipeline editor: add/remove/reorder steps, configure actor/terminal/display_label/color/icon/buyer_hint
+  - Transition rules editor: for each status, toggle which actors can move to which next statuses (supports non-linear transitions like cancellations)
+  - Save: upserts all flow steps + transitions
+- **Admin nav**: "Workflows" item added under Commerce group
 
-### 1. Database Migration — Add notification columns to `category_status_flows`
+### Phase 4: Fixes ✅
+- **Calendar**: native Capacitor call wrapped in try/catch, falls back to ICS download on failure
 
-Add 4 optional columns:
-```sql
-ALTER TABLE category_status_flows ADD COLUMN notify_buyer boolean DEFAULT false;
-ALTER TABLE category_status_flows ADD COLUMN notification_title text;
-ALTER TABLE category_status_flows ADD COLUMN notification_body text;
-ALTER TABLE category_status_flows ADD COLUMN notification_action text;
+### Phase 5: Deep Audit Fixes ✅
+- **C1**: Added `requested`, `confirmed`, `rescheduled`, `no_show`, `at_gate` to `OrderStatus` type and `ORDER_STATUS_MAP`
+- **C2**: `OrderCancellation` now accepts `canCancel` prop from workflow transitions instead of hardcoded status check
+- **C3**: `getNextStatusForActor` rewritten to use `category_status_transitions` for accurate non-linear transition lookups
+- **C5**: Added skeleton loading state while flow is loading in timeline UI
+- **S2**: `getNextStatus` and `canChat` now use `isTerminalStatus()` from flow metadata instead of hardcoded status lists
+- **S3**: Seller reject button now uses `canSellerReject` derived from transitions table (supports `requested`, `enquired`, etc.)
+- **S4**: Removed hardcoded "Awaiting Pickup" override in `SellerOrderCard`
+- **S5**: Added missing status entries to `ORDER_STATUS_MAP`
+- **U2**: `isInTransit` now derived from flow metadata (delivery actor steps) instead of hardcoded array
+- **U3**: `canChat` uses `isTerminalStatus()` — properly disables chat for `no_show` and other terminal statuses
+- **D2**: `auto-cancel-orders` edge function now clears `auto_cancel_at` on cancellation
+- **New helpers**: `isTerminalStatus()`, `canActorCancel()`, `getNextStatusesForActor()` in `useCategoryStatusFlow.ts`
+
+### Phase 6: Workflow-Driven Buyer Notifications ✅
+
+#### What Changed
+- **Database**: Added `notify_buyer`, `notification_title`, `notification_body`, `notification_action` columns to `category_status_flows`
+- **Backfill**: All 16 existing hardcoded notification statuses backfilled into the new columns
+- **Trigger**: Replaced `fn_enqueue_order_status_notification()` — now does a dynamic lookup on `category_status_flows` by `parent_group + transaction_type + status_key` instead of a hardcoded CASE statement. Falls back to `default` parent_group. Supports `{seller_name}` placeholder substitution.
+- **Admin UI**: Each workflow step now has a "🔔 Send Buyer Notification" toggle with title, body, and action button fields
+- **Types**: `FlowStep` extended with 4 notification fields
+
+#### Architecture
+```
+Order status changes → trigger fires
+  → Looks up category_status_flows for matching (parent_group, transaction_type, status_key)
+  → If notify_buyer=true and notification_title set → inserts into notification_queue
+  → {seller_name} replaced with actual seller business_name
+  → notification_action included in payload for frontend action buttons
+  → Falls back to 'default' parent_group if no specific match
 ```
 
-Backfill existing workflows with the current hardcoded messages (so nothing changes for existing users):
-```sql
-UPDATE category_status_flows SET notify_buyer = true, notification_title = '✅ Order Accepted!', ...
-WHERE status_key = 'accepted';
--- (repeat for all 17 existing statuses)
+#### Files Changed
+- `category_status_flows` table — 4 new columns
+- `fn_enqueue_order_status_notification()` — rewritten to be workflow-driven
+- `src/components/admin/workflow/types.ts` — 4 new FlowStep fields
+- `src/components/admin/AdminWorkflowManager.tsx` — notification config UI per step + updated selects/inserts
+- `src/components/admin/workflow/WorkflowSimulator.tsx` — updated selects
+
+## Architecture
+
 ```
-
-### 2. Replace `fn_enqueue_order_status_notification()` with workflow-driven version
-
-New trigger logic:
-1. Skip if `OLD.status = NEW.status`
-2. Look up the workflow step from `category_status_flows` matching the order's `parent_group + transaction_type + status_key`
-3. If `notify_buyer = true` and `notification_title` is not null, insert into `notification_queue`
-4. Use `{seller_name}` placeholder substitution in title/body
-5. Fallback to `parent_group = 'default'` if no specific workflow found
-6. If no matching step or `notify_buyer = false`, skip silently
-
-This completely eliminates hardcoded status notification mapping.
-
-### 3. Update Admin Workflow Editor UI
-
-In `AdminWorkflowManager.tsx`, add to each step's editor card:
-- **Notify Buyer** toggle (checkbox)
-- **Notification Title** input (shown when toggle is on)
-- **Notification Body** input
-- **Notification Action** input (e.g., "Rate order", "Open order")
-
-These fields are saved alongside existing step data in the `saveWorkflow()` function.
-
-### 4. Update FlowStep type
-
-In `src/components/admin/workflow/types.ts`, add:
-```typescript
-notify_buyer: boolean;
-notification_title: string;
-notification_body: string;
-notification_action: string;
+category_status_flows          → ordered status pipeline per (parent_group, transaction_type)
+category_status_transitions    → who can move between statuses (actor-based)
+validate_order_status_transition → DB trigger enforces transition rules
+useCategoryStatusFlow          → frontend loads flow + falls back to 'default'
+useStatusTransitions           → frontend loads allowed transitions
+AdminWorkflowManager           → admin UI to manage both
 ```
-
-### 5. Update data loading in WorkflowSimulator and hook
-
-Add the new columns to all `select()` calls on `category_status_flows` in:
-- `AdminWorkflowManager.tsx` (line 43)
-- `WorkflowSimulator.tsx` (line 60)
-- `useCategoryStatusFlow.ts` (line 44, 52)
-
-### 6. Booking Reminders
-
-The existing `send-booking-reminders` edge function already handles 1-hour-before reminders via cron. No changes needed — this is independent of the workflow notification system.
-
-### Files Changed
-- **Migration**: New columns + backfill + replace trigger function
-- `src/components/admin/workflow/types.ts` — add 4 fields to FlowStep
-- `src/components/admin/AdminWorkflowManager.tsx` — notification config UI per step
-- `src/components/admin/workflow/WorkflowSimulator.tsx` — load new columns
-- `src/hooks/useCategoryStatusFlow.ts` — load new columns
-
-### What This Achieves
-- Admins can configure per-step buyer notifications with custom title, body, and action
-- No hardcoded status-to-notification mapping anywhere
-- New workflows automatically get notifications when admin configures them
-- Existing notifications preserved via backfill migration
 

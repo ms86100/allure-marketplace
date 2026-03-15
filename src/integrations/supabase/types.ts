@@ -1056,6 +1056,10 @@ export type Database = {
           icon: string | null
           id: string
           is_terminal: boolean | null
+          notification_action: string | null
+          notification_body: string | null
+          notification_title: string | null
+          notify_buyer: boolean | null
           parent_group: string
           seller_hint: string | null
           sort_order: number
@@ -1071,6 +1075,10 @@ export type Database = {
           icon?: string | null
           id?: string
           is_terminal?: boolean | null
+          notification_action?: string | null
+          notification_body?: string | null
+          notification_title?: string | null
+          notify_buyer?: boolean | null
           parent_group: string
           seller_hint?: string | null
           sort_order: number
@@ -1086,6 +1094,10 @@ export type Database = {
           icon?: string | null
           id?: string
           is_terminal?: boolean | null
+          notification_action?: string | null
+          notification_body?: string | null
+          notification_title?: string | null
+          notify_buyer?: boolean | null
           parent_group?: string
           seller_hint?: string | null
           sort_order?: number
