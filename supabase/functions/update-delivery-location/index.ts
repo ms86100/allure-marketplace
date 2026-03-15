@@ -368,6 +368,8 @@ serve(async (req) => {
               workflow_status: 'arriving',
               action: 'View Tracking',
               distance: distanceMeters,
+              eta: etaMinutes,
+              driver_name: assignment.rider_name ?? null,
               vehicle_type: vehicleType,
             },
           });
