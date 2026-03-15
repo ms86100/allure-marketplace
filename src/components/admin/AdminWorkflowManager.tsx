@@ -200,6 +200,18 @@ export function AdminWorkflowManager() {
       toast.warning(`Warning: "${orphaned.join('", "')}" have no outgoing transitions`);
     }
 
+    // Warn: backward transitions (cycle detection)
+    const stepOrderMap = new Map(editSteps.map(s => [s.status_key, s.sort_order]));
+    const backwardTransitions = transitions.filter(t => {
+      const fromOrder = stepOrderMap.get(t.from_status);
+      const toOrder = stepOrderMap.get(t.to_status);
+      return fromOrder !== undefined && toOrder !== undefined && toOrder < fromOrder;
+    });
+    if (backwardTransitions.length > 0) {
+      const labels = backwardTransitions.map(t => `${t.from_status} → ${t.to_status}`).join(', ');
+      toast.warning(`Backward transition detected: ${labels}. Ensure this is intentional.`);
+    }
+
     setIsSaving(true);
     try {
       const { parent_group, transaction_type } = selectedWorkflow;
