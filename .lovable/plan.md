@@ -28,6 +28,20 @@
 ### Phase 4: Fixes ✅
 - **Calendar**: native Capacitor call wrapped in try/catch, falls back to ICS download on failure
 
+### Phase 5: Deep Audit Fixes ✅
+- **C1**: Added `requested`, `confirmed`, `rescheduled`, `no_show`, `at_gate` to `OrderStatus` type and `ORDER_STATUS_MAP`
+- **C2**: `OrderCancellation` now accepts `canCancel` prop from workflow transitions instead of hardcoded status check
+- **C3**: `getNextStatusForActor` rewritten to use `category_status_transitions` for accurate non-linear transition lookups
+- **C5**: Added skeleton loading state while flow is loading in timeline UI
+- **S2**: `getNextStatus` and `canChat` now use `isTerminalStatus()` from flow metadata instead of hardcoded status lists
+- **S3**: Seller reject button now uses `canSellerReject` derived from transitions table (supports `requested`, `enquired`, etc.)
+- **S4**: Removed hardcoded "Awaiting Pickup" override in `SellerOrderCard`
+- **S5**: Added missing status entries to `ORDER_STATUS_MAP`
+- **U2**: `isInTransit` now derived from flow metadata (delivery actor steps) instead of hardcoded array
+- **U3**: `canChat` uses `isTerminalStatus()` — properly disables chat for `no_show` and other terminal statuses
+- **D2**: `auto-cancel-orders` edge function now clears `auto_cancel_at` on cancellation
+- **New helpers**: `isTerminalStatus()`, `canActorCancel()`, `getNextStatusesForActor()` in `useCategoryStatusFlow.ts`
+
 ## Architecture
 
 ```
