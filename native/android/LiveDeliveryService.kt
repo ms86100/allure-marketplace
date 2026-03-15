@@ -8,11 +8,16 @@
  *
  * Notification updates reuse the same ID and setOnlyAlertOnce(true) so
  * the user sees a silent, persistent card that refreshes in place.
+ *
+ * Safety:
+ * - SharedPreferences dedup prevents duplicate services for the same entity
+ * - START_NOT_STICKY prevents auto-restart after process death
  */
 
 package app.sociva.community
 
 import android.app.*
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
@@ -26,6 +31,12 @@ class LiveDeliveryService : Service() {
         const val ACTION_START = "START"
         const val ACTION_UPDATE = "UPDATE"
         const val ACTION_STOP = "STOP"
+        private const val PREFS_NAME = "sociva_live_delivery_prefs"
+        private const val KEY_ACTIVE_ENTITY = "active_entity_id"
+    }
+
+    private val prefs by lazy {
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -38,24 +49,41 @@ class LiveDeliveryService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START, ACTION_UPDATE -> {
-                val status = intent.getStringExtra("workflow_status") ?: "Update"
-                val eta = intent.getIntExtra("eta_minutes", -1)
-                val distance = intent.getDoubleExtra("driver_distance", -1.0)
-                val driverName = intent.getStringExtra("driver_name") ?: ""
-                val stage = intent.getStringExtra("progress_stage") ?: ""
-
-                val title = statusTitle(status)
-                val body = buildBody(eta, distance, driverName, stage)
-
-                val notification = buildNotification(title, body)
-                startForeground(NOTIFICATION_ID, notification)
+                handleStartOrUpdate(intent)
             }
             ACTION_STOP -> {
+                prefs.edit().remove(KEY_ACTIVE_ENTITY).apply()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
         }
-        return START_STICKY
+        return START_NOT_STICKY
+    }
+
+    @Synchronized
+    private fun handleStartOrUpdate(intent: Intent) {
+        val entityId = intent.getStringExtra("entity_id") ?: ""
+        val status = intent.getStringExtra("workflow_status") ?: "Update"
+        val eta = intent.getIntExtra("eta_minutes", -1)
+        val distance = intent.getDoubleExtra("driver_distance", -1.0)
+        val driverName = intent.getStringExtra("driver_name") ?: ""
+        val stage = intent.getStringExtra("progress_stage") ?: ""
+
+        // Dedup: if already tracking a different entity, skip
+        val currentEntity = prefs.getString(KEY_ACTIVE_ENTITY, null)
+        if (intent.action == ACTION_START && currentEntity != null && currentEntity != entityId) {
+            // Already tracking a different entity — don't create duplicate
+            return
+        }
+
+        // Track active entity
+        prefs.edit().putString(KEY_ACTIVE_ENTITY, entityId).apply()
+
+        val title = statusTitle(status)
+        val body = buildBody(eta, distance, driverName, stage)
+
+        val notification = buildNotification(title, body)
+        startForeground(NOTIFICATION_ID, notification)
     }
 
     private fun buildNotification(title: String, body: String): Notification {
@@ -96,6 +124,7 @@ class LiveDeliveryService : Service() {
     private fun statusTitle(status: String): String = when (status) {
         "accepted"  -> "Order Accepted"
         "preparing" -> "Preparing Your Order"
+        "ready"     -> "Ready for Pickup"
         "picked_up" -> "Order Picked Up"
         "en_route"  -> "Order On the Way"
         "confirmed" -> "Booking Confirmed"

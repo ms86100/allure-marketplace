@@ -13,6 +13,7 @@ const LiveActivity = registerPlugin<LiveActivityPlugin>('LiveActivity', {
     updateLiveActivity: async () => {},
     endLiveActivity: async () => {},
     getActiveActivities: async () => ({ activities: [] }),
+    cleanupStaleActivities: async () => {},
   } as any,
 });
 
