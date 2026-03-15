@@ -20,6 +20,7 @@ export function OrdersMonitor() {
   const [status, setStatus] = useState('all');
   const [paymentStatus, setPaymentStatus] = useState('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { getOrderStatus } = useStatusLabels();
 
   const { data, isLoading } = useOrdersMonitor({
     status, paymentStatus, page, pageSize: PAGE_SIZE,
