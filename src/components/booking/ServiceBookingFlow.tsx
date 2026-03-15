@@ -16,7 +16,7 @@ import { useSubcategories } from '@/hooks/useSubcategories';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrency } from '@/hooks/useCurrency';
 import { toast } from 'sonner';
-import { Clock, MapPin, MessageCircle, Loader2 } from 'lucide-react';
+import { Clock, MapPin, MessageCircle, Loader2, ArrowLeft, Calendar, User, Sparkles } from 'lucide-react';
 import type { ServiceCategory } from '@/types/categories';
 
 interface ServiceBookingFlowProps {
@@ -37,6 +37,8 @@ interface ServiceBookingFlowProps {
 const MAX_NOTES_LENGTH = 500;
 const MAX_ADDRESS_LENGTH = 300;
 
+type BookingStep = 'select' | 'review';
+
 export function ServiceBookingFlow({
   open, onOpenChange, productId, productName, sellerId, sellerName,
   price, category, imageUrl, durationMinutes, locationType, subcategoryId,
@@ -55,6 +57,7 @@ export function ServiceBookingFlow({
     [serviceSlots]
   );
 
+  const [step, setStep] = useState<BookingStep>('select');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [selectedTime, setSelectedTime] = useState<string | undefined>();
   const [notes, setNotes] = useState('');
@@ -65,6 +68,7 @@ export function ServiceBookingFlow({
 
   useEffect(() => {
     if (open) {
+      setStep('select');
       setSelectedDate(undefined);
       setSelectedTime(undefined);
       setNotes('');
@@ -76,7 +80,6 @@ export function ServiceBookingFlow({
     }
   }, [open]);
 
-  // Resolve subcategory overrides for service feature flags
   const { data: subcategories = [] } = useSubcategories(config?.id || null);
   const activeSubcategory = useMemo(() => {
     if (!subcategoryId) return null;
@@ -91,11 +94,20 @@ export function ServiceBookingFlow({
   const totalAmount = price + addonTotal;
 
   const isDateValid = selectedDate && !isBefore(selectedDate, startOfToday());
-  const isValid = isDateValid && selectedTime && (!needsAddress || buyerAddress.trim().length > 0);
+  const isSelectValid = isDateValid && selectedTime && (!needsAddress || buyerAddress.trim().length > 0);
 
   const handleDateSelect = (date: Date | undefined) => {
     setSelectedDate(date);
     setSelectedTime(undefined);
+  };
+
+  const handleContinueToReview = () => {
+    if (!isSelectValid) return;
+    setStep('review');
+  };
+
+  const handleBackToSelect = () => {
+    setStep('select');
   };
 
   const handleConfirm = async () => {
@@ -285,98 +297,214 @@ export function ServiceBookingFlow({
     }
   };
 
+  const resolvedLocationType = locationType || 'at_seller';
+  const locationLabel = resolvedLocationType === 'home_visit' || resolvedLocationType === 'at_buyer'
+    ? 'Home Visit'
+    : resolvedLocationType === 'online'
+    ? 'Online'
+    : 'At Seller Location';
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl">
         <SheetHeader className="pb-4">
-          <SheetTitle>Book Service</SheetTitle>
+          <SheetTitle className="flex items-center gap-2">
+            {step === 'review' && (
+              <Button variant="ghost" size="icon" className="h-7 w-7 -ml-1" onClick={handleBackToSelect}>
+                <ArrowLeft size={16} />
+              </Button>
+            )}
+            {step === 'select' ? 'Book Service' : 'Review Booking'}
+          </SheetTitle>
         </SheetHeader>
 
         <div className="space-y-6 overflow-y-auto pb-20">
-          {/* Summary */}
-          <div className="flex gap-3 p-3 bg-muted rounded-lg">
-            {imageUrl && (
-              <img src={imageUrl} alt={productName} className="w-16 h-16 rounded-lg object-cover" />
-            )}
-            <div className="flex-1">
-              <h4 className="font-medium">{productName}</h4>
-              <p className="text-xs text-muted-foreground">{sellerName}</p>
-              <p className="text-lg font-bold text-primary tabular-nums">{formatPrice(price)}</p>
-              {durationMinutes && (
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock size={10} />{durationMinutes} min session
-                </p>
-              )}
-            </div>
-          </div>
+          {step === 'select' && (
+            <>
+              {/* Summary */}
+              <div className="flex gap-3 p-3 bg-muted rounded-lg">
+                {imageUrl && (
+                  <img src={imageUrl} alt={productName} className="w-16 h-16 rounded-lg object-cover" />
+                )}
+                <div className="flex-1">
+                  <h4 className="font-medium">{productName}</h4>
+                  <p className="text-xs text-muted-foreground">{sellerName}</p>
+                  <p className="text-lg font-bold text-primary tabular-nums">{formatPrice(price)}</p>
+                  {durationMinutes && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock size={10} />{durationMinutes} min session
+                    </p>
+                  )}
+                </div>
+              </div>
 
-          {/* Time Slot Picker */}
-          <TimeSlotPicker
-            selectedDate={selectedDate}
-            selectedTime={selectedTime}
-            onDateSelect={handleDateSelect}
-            onTimeSelect={setSelectedTime}
-            serviceDuration={durationMinutes}
-            availableSlots={availableSlots}
-          />
-
-          {/* Address for home visit */}
-          {needsAddress && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <MapPin size={14} />Your Address (required for home visit)
-              </label>
-              <Input
-                placeholder="Enter your full address..."
-                value={buyerAddress}
-                onChange={(e) => setBuyerAddress(e.target.value.slice(0, MAX_ADDRESS_LENGTH))}
-                maxLength={MAX_ADDRESS_LENGTH}
+              {/* Time Slot Picker */}
+              <TimeSlotPicker
+                selectedDate={selectedDate}
+                selectedTime={selectedTime}
+                onDateSelect={handleDateSelect}
+                onTimeSelect={setSelectedTime}
+                serviceDuration={durationMinutes}
+                availableSlots={availableSlots}
               />
-              {needsAddress && buyerAddress.trim().length === 0 && (
-                <p className="text-[10px] text-destructive">Address is required for home visit services</p>
+
+              {/* Address for home visit */}
+              {needsAddress && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <MapPin size={14} />Your Address (required for home visit)
+                  </label>
+                  <Input
+                    placeholder="Enter your full address..."
+                    value={buyerAddress}
+                    onChange={(e) => setBuyerAddress(e.target.value.slice(0, MAX_ADDRESS_LENGTH))}
+                    maxLength={MAX_ADDRESS_LENGTH}
+                  />
+                  {needsAddress && buyerAddress.trim().length === 0 && (
+                    <p className="text-[10px] text-destructive">Address is required for home visit services</p>
+                  )}
+                </div>
               )}
+
+              {/* Add-ons */}
+              {supportsAddons && (
+                <ServiceAddonPicker
+                  productId={productId}
+                  selectedAddons={selectedAddons}
+                  onAddonsChange={setSelectedAddons}
+                />
+              )}
+
+              {/* Recurring */}
+              {supportsRecurring && selectedDate && selectedTime && (
+                <RecurringBookingSelector
+                  config={recurringConfig}
+                  onChange={setRecurringConfig}
+                />
+              )}
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <MessageCircle size={14} />Special Requests (Optional)
+                </label>
+                <Textarea
+                  placeholder="Any specific requirements or requests..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value.slice(0, MAX_NOTES_LENGTH))}
+                  rows={3}
+                  maxLength={MAX_NOTES_LENGTH}
+                />
+                <p className="text-[10px] text-muted-foreground text-right">{notes.length}/{MAX_NOTES_LENGTH}</p>
+              </div>
+            </>
+          )}
+
+          {step === 'review' && selectedDate && selectedTime && (
+            <div className="space-y-4">
+              {/* Service info */}
+              <div className="flex gap-3 p-3 bg-muted rounded-lg">
+                {imageUrl && (
+                  <img src={imageUrl} alt={productName} className="w-16 h-16 rounded-lg object-cover" />
+                )}
+                <div className="flex-1">
+                  <h4 className="font-medium">{productName}</h4>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <User size={10} />{sellerName}
+                  </p>
+                </div>
+              </div>
+
+              {/* Date & Time */}
+              <div className="p-3 rounded-lg border border-border space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar size={14} className="text-primary" />
+                  <span className="font-medium">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock size={14} className="text-primary" />
+                  <span>{selectedTime?.slice(0, 5)}</span>
+                  {durationMinutes && (
+                    <span className="text-muted-foreground">· {durationMinutes} min</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <MapPin size={14} className="text-primary" />
+                  <span>{locationLabel}</span>
+                </div>
+                {needsAddress && buyerAddress.trim() && (
+                  <p className="text-xs text-muted-foreground pl-5">{buyerAddress}</p>
+                )}
+              </div>
+
+              {/* Add-ons */}
+              {selectedAddons.length > 0 && (
+                <div className="p-3 rounded-lg border border-border space-y-1.5">
+                  <p className="text-xs font-medium flex items-center gap-1 text-muted-foreground">
+                    <Sparkles size={10} className="text-primary" />Add-ons
+                  </p>
+                  {selectedAddons.map((addon) => (
+                    <div key={addon.id} className="flex items-center justify-between text-xs">
+                      <span>{addon.name}</span>
+                      <span className="font-medium tabular-nums">{formatPrice(addon.price)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Notes */}
+              {notes.trim() && (
+                <div className="p-3 rounded-lg border border-border">
+                  <p className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                    <MessageCircle size={10} />Notes
+                  </p>
+                  <p className="text-sm">{notes}</p>
+                </div>
+              )}
+
+              {/* Recurring */}
+              {recurringConfig.enabled && (
+                <div className="p-3 rounded-lg border border-border">
+                  <p className="text-xs text-muted-foreground">
+                    Recurring: <span className="font-medium capitalize">{recurringConfig.frequency}</span>
+                    {recurringConfig.endDate && ` until ${recurringConfig.endDate}`}
+                  </p>
+                </div>
+              )}
+
+              {/* Price breakdown */}
+              <div className="p-3 rounded-lg bg-muted space-y-1.5">
+                <div className="flex justify-between text-sm">
+                  <span>Service</span>
+                  <span className="tabular-nums">{formatPrice(price)}</span>
+                </div>
+                {addonTotal > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span>Add-ons</span>
+                    <span className="tabular-nums">{formatPrice(addonTotal)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm font-bold pt-1.5 border-t border-border">
+                  <span>Total</span>
+                  <span className="text-primary tabular-nums">{formatPrice(totalAmount)}</span>
+                </div>
+              </div>
             </div>
           )}
-
-          {/* Add-ons */}
-          {supportsAddons && (
-            <ServiceAddonPicker
-              productId={productId}
-              selectedAddons={selectedAddons}
-              onAddonsChange={setSelectedAddons}
-            />
-          )}
-
-          {/* Recurring */}
-          {supportsRecurring && selectedDate && selectedTime && (
-            <RecurringBookingSelector
-              config={recurringConfig}
-              onChange={setRecurringConfig}
-            />
-          )}
-
-          {/* Notes */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium flex items-center gap-2">
-              <MessageCircle size={14} />Special Requests (Optional)
-            </label>
-            <Textarea
-              placeholder="Any specific requirements or requests..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value.slice(0, MAX_NOTES_LENGTH))}
-              rows={3}
-              maxLength={MAX_NOTES_LENGTH}
-            />
-            <p className="text-[10px] text-muted-foreground text-right">{notes.length}/{MAX_NOTES_LENGTH}</p>
-          </div>
         </div>
 
-        {/* Confirm */}
+        {/* Bottom CTA */}
         <div className="absolute bottom-0 left-0 right-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-background border-t">
-          <Button className="w-full" size="lg" disabled={!isValid || isLoading} onClick={handleConfirm}>
-            {isLoading && <Loader2 className="animate-spin mr-2" size={18} />}
-            Confirm Booking{addonTotal > 0 ? ` · ${formatPrice(totalAmount)}` : ` · ${formatPrice(price)}`}
-          </Button>
+          {step === 'select' ? (
+            <Button className="w-full" size="lg" disabled={!isSelectValid} onClick={handleContinueToReview}>
+              Continue · {formatPrice(totalAmount)}
+            </Button>
+          ) : (
+            <Button className="w-full" size="lg" disabled={isLoading} onClick={handleConfirm}>
+              {isLoading && <Loader2 className="animate-spin mr-2" size={18} />}
+              Confirm Booking · {formatPrice(totalAmount)}
+            </Button>
+          )}
         </div>
       </SheetContent>
     </Sheet>
