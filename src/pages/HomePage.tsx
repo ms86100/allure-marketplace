@@ -12,6 +12,8 @@ import { HomeSearchSuggestions } from '@/components/home/HomeSearchSuggestions';
 import { CommunityTeaser } from '@/components/home/CommunityTeaser';
 import { UpcomingAppointmentBanner } from '@/components/home/UpcomingAppointmentBanner';
 import { HomeNotificationBanner } from '@/components/notifications/HomeNotificationBanner';
+import { SmartSuggestionBanner } from '@/components/home/SmartSuggestionBanner';
+import { ArrivalSuggestionCard } from '@/components/home/ArrivalSuggestionCard';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { motion } from 'framer-motion';
