@@ -13,6 +13,9 @@ export interface FlowStep {
   notification_title: string;
   notification_body: string;
   notification_action: string;
+  notify_seller: boolean;
+  seller_notification_title: string;
+  seller_notification_body: string;
 }
 
 export interface Transition {

@@ -1,78 +1,80 @@
+# Dynamic Workflow Engine — Implementation Complete
 
+## What Was Built
 
-# Round 2 Audit: Workflow-Driven Notification System
+### Phase 1: Database ✅
+- **`category_status_transitions`** table — stores actor-based transition rules (from_status → to_status → allowed_actor) per workflow
+- **Display columns** added to `category_status_flows`: `display_label`, `color`, `icon`, `buyer_hint`
+- **`validate_order_status_transition`** trigger — validates transitions against `category_status_transitions` table with actor enforcement
+- **Seeded workflows**: `default` parent_group for `cart_purchase`, `self_fulfillment`, `service_booking`, `request_service`
+- **Seeded transitions** for all 7 parent_groups × service_booking + education_learning × request_service + all default workflows
+- **Performance index**: `idx_cst_lookup` on (parent_group, transaction_type, from_status)
 
-## Verdict: Mostly Complete — 4 Issues Found (2 bugs, 2 gaps)
+### Phase 2: Frontend Cleanup ✅
+- **`useCategoryStatusFlow.ts`** — extended with `display_label`, `color`, `icon`, `buyer_hint` fields; added `booking` → `service_booking` type mapping; fallback to `default` parent_group; new `useStatusTransitions` hook
+- **`useOrderDetail.ts`** — removed ALL hardcoded status arrays (legacyOrder, fallback displayStatuses); added `getFlowStepLabel()` and `getBuyerHint()` helpers that use DB flow data
+- **`OrderDetailPage.tsx`** — timeline labels now come from `getFlowStepLabel()`; buyer hints now come from `getBuyerHint()` (DB-driven)
+- **`OrdersMonitor.tsx`** — replaced hardcoded `ORDER_STATUS_LABELS` with `useStatusLabels()` hook
 
----
+### Phase 3: Admin Workflow Manager ✅
+- **`AdminWorkflowManager.tsx`** — full workflow editor with:
+  - List view of all (parent_group, transaction_type) workflows
+  - Status pipeline editor: add/remove/reorder steps, configure actor/terminal/display_label/color/icon/buyer_hint
+  - Transition rules editor: for each status, toggle which actors can move to which next statuses (supports non-linear transitions like cancellations)
+  - Save: upserts all flow steps + transitions
+- **Admin nav**: "Workflows" item added under Commerce group
 
-## Implemented and Working
+### Phase 4: Fixes ✅
+- **Calendar**: native Capacitor call wrapped in try/catch, falls back to ICS download on failure
 
-1. **Workflow-driven DB trigger** — `fn_enqueue_order_status_notification` reads `notify_buyer`, `notification_title`, `notification_body`, `notification_action` from `category_status_flows`. Fallback to `default` parent_group. `{seller_name}` placeholder substitution. No hardcoded statuses.
+### Phase 5: Deep Audit Fixes ✅
+- **C1**: Added `requested`, `confirmed`, `rescheduled`, `no_show`, `at_gate` to `OrderStatus` type and `ORDER_STATUS_MAP`
+- **C2**: `OrderCancellation` now accepts `canCancel` prop from workflow transitions instead of hardcoded status check
+- **C3**: `getNextStatusForActor` rewritten to use `category_status_transitions` for accurate non-linear transition lookups
+- **C5**: Added skeleton loading state while flow is loading in timeline UI
+- **S2**: `getNextStatus` and `canChat` now use `isTerminalStatus()` from flow metadata instead of hardcoded status lists
+- **S3**: Seller reject button now uses `canSellerReject` derived from transitions table (supports `requested`, `enquired`, etc.)
+- **S4**: Removed hardcoded "Awaiting Pickup" override in `SellerOrderCard`
+- **S5**: Added missing status entries to `ORDER_STATUS_MAP`
+- **U2**: `isInTransit` now derived from flow metadata (delivery actor steps) instead of hardcoded array
+- **U3**: `canChat` uses `isTerminalStatus()` — properly disables chat for `no_show` and other terminal statuses
+- **D2**: `auto-cancel-orders` edge function now clears `auto_cancel_at` on cancellation
+- **New helpers**: `isTerminalStatus()`, `canActorCancel()`, `getNextStatusesForActor()` in `useCategoryStatusFlow.ts`
 
-2. **Admin Workflow Editor** — Toggle + title/body/action fields per step. Saves and loads correctly. All 4 notification columns fetched in `loadWorkflows()` and persisted in `saveWorkflow()`.
+### Phase 6: Workflow-Driven Buyer Notifications ✅
 
-3. **Notification queue pipeline** — Trigger inserts to `notification_queue` → `pg_net` instantly invokes `process-notification-queue` → inserts to `user_notifications` with `payload` (including `action`) → sends push with `data` payload. Deduplication via `queue_item_id`.
+#### What Changed
+- **Database**: Added `notify_buyer`, `notification_title`, `notification_body`, `notification_action` columns to `category_status_flows`
+- **Backfill**: All 16 existing hardcoded notification statuses backfilled into the new columns
+- **Trigger**: Replaced `fn_enqueue_order_status_notification()` — now does a dynamic lookup on `category_status_flows` by `parent_group + transaction_type + status_key` instead of a hardcoded CASE statement. Falls back to `default` parent_group. Supports `{seller_name}` placeholder substitution.
+- **Admin UI**: Each workflow step now has a "🔔 Send Buyer Notification" toggle with title, body, and action button fields
+- **Types**: `FlowStep` extended with 4 notification fields
 
-4. **Rich notification UI** — `RichNotificationCard` renders large card with icon, title, body, action button. `HomeNotificationBanner` shows latest unread action notification on home screen. `NotificationInboxPage` renders rich cards for action-bearing notifications.
+#### Architecture
+```
+Order status changes → trigger fires
+  → Looks up category_status_flows for matching (parent_group, transaction_type, status_key)
+  → If notify_buyer=true and notification_title set → inserts into notification_queue
+  → {seller_name} replaced with actual seller business_name
+  → notification_action included in payload for frontend action buttons
+  → Falls back to 'default' parent_group if no specific match
+```
 
-5. **Booking reminders** — `send-booking-reminders` edge function handles 1-hour-before cron reminders. Independent of workflow engine (appropriate).
+#### Files Changed
+- `category_status_flows` table — 4 new columns
+- `fn_enqueue_order_status_notification()` — rewritten to be workflow-driven
+- `src/components/admin/workflow/types.ts` — 4 new FlowStep fields
+- `src/components/admin/AdminWorkflowManager.tsx` — notification config UI per step + updated selects/inserts
+- `src/components/admin/workflow/WorkflowSimulator.tsx` — updated selects
 
-6. **Queueing, retries, dead-lettering** — `claim_notification_queue` atomic batch claim, exponential backoff retries, max 3 attempts, `queue_item_id` dedup.
+## Architecture
 
-7. **Security** — Trigger uses `SECURITY DEFINER`. Queue processes via service-role key. RLS on `user_notifications` ensures users only see their own.
-
----
-
-## Issues Found
-
-### BUG-1: Notification type mismatch — icon always shows default (P2)
-
-The DB trigger inserts `type: 'order'` (migration line 174: `NEW.buyer_id, 'order', v_title, ...`). But `RichNotificationCard.getIcon()` checks for `'order_status'`, not `'order'`. The icon will always fall through to the `default` case (generic Bell icon) instead of showing the Package icon for orders.
-
-**Fix**: Change the trigger to insert `'order_status'` instead of `'order'`, OR update `getIcon()` to match on `'order'`.
-
-### BUG-2: Stale hardcoded title map still exists (P3 — low risk)
-
-`src/lib/order-notification-titles.ts` still contains the old hardcoded `ORDER_NOTIF_TITLES_BUYER` and `ORDER_NOTIF_TITLES_SELLER` maps. If any code still references `getOrderNotifTitle()`, it would use stale data instead of the workflow-configured values. This is a maintenance hazard.
-
-**Fix**: Search for usages. If no code references it, delete the file. If referenced, replace with a DB lookup or remove the references.
-
-### GAP-1: Seller notifications are not workflow-driven (P2)
-
-The trigger only sends buyer notifications (`notify_buyer`). There is no `notify_seller` column or equivalent logic. Seller notifications for statuses like `placed`, `enquired`, `requested` are no longer being sent (the old hardcoded CASE block was replaced). The `ORDER_NOTIF_TITLES_SELLER` map in the stale file confirms these were previously sent.
-
-**Fix**: Either add `notify_seller`, `seller_notification_title`, `seller_notification_body` columns to `category_status_flows` and extend the trigger, OR handle seller notifications separately. This is a **functional regression** — sellers may not be receiving "New Order Received!" notifications.
-
-### GAP-2: Backfill UPDATEs lack parent_group/transaction_type scoping (P3)
-
-The backfill migration updates by `status_key` alone (e.g., `WHERE status_key = 'completed'`), which sets notification config on ALL workflows that have that status key. If a `completed` step in one workflow should have a different message than another, they'd all get the same text. Not a current bug (all share the same messages now), but could cause confusion if workflows diverge.
-
-**Fix**: No immediate action needed — just awareness for future.
-
----
-
-## Summary
-
-| Area | Status |
-|---|---|
-| Workflow-driven trigger | Working |
-| Admin UI config | Working |
-| Queue pipeline + payload passthrough | Working |
-| Rich notification card | Working |
-| Home screen banner | Working |
-| Notification inbox (rich cards) | Working |
-| Push notification with action data | Working |
-| Booking reminders | Working (independent) |
-| Retry/dead-letter | Working |
-| Security | Working |
-| Icon type mismatch | **Bug — fix needed** |
-| Seller notifications | **Regression — not sent** |
-| Stale hardcoded title map | **Cleanup needed** |
-
-## Recommended Fixes (Priority Order)
-
-1. **Fix seller notification regression** — Add `notify_seller` + seller notification fields to `category_status_flows` and extend the trigger to also notify sellers. This is the most impactful gap.
-2. **Fix type mismatch** — Change trigger `'order'` → `'order_status'` so icons render correctly.
-3. **Delete stale file** — Remove `src/lib/order-notification-titles.ts` if unused, or remove references to it.
+```
+category_status_flows          → ordered status pipeline per (parent_group, transaction_type)
+category_status_transitions    → who can move between statuses (actor-based)
+validate_order_status_transition → DB trigger enforces transition rules
+useCategoryStatusFlow          → frontend loads flow + falls back to 'default'
+useStatusTransitions           → frontend loads allowed transitions
+AdminWorkflowManager           → admin UI to manage both
+```
 

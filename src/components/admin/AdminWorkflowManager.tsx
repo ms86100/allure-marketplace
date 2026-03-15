@@ -40,7 +40,7 @@ export function AdminWorkflowManager() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('category_status_flows')
-      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint, seller_hint, id, notify_buyer, notification_title, notification_body, notification_action')
+      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint, seller_hint, id, notify_buyer, notification_title, notification_body, notification_action, notify_seller, seller_notification_title, seller_notification_body')
       .order('parent_group')
       .order('transaction_type')
       .order('sort_order', { ascending: true });
@@ -58,7 +58,7 @@ export function AdminWorkflowManager() {
         groupMap.set(key, { parent_group: row.parent_group, transaction_type: row.transaction_type, steps: [], step_count: 0 });
       }
       const group = groupMap.get(key)!;
-      group.steps.push({ ...row, seller_hint: (row as any).seller_hint || '', notify_buyer: (row as any).notify_buyer || false, notification_title: (row as any).notification_title || '', notification_body: (row as any).notification_body || '', notification_action: (row as any).notification_action || '' } as FlowStep);
+      group.steps.push({ ...row, seller_hint: (row as any).seller_hint || '', notify_buyer: (row as any).notify_buyer || false, notification_title: (row as any).notification_title || '', notification_body: (row as any).notification_body || '', notification_action: (row as any).notification_action || '', notify_seller: (row as any).notify_seller || false, seller_notification_title: (row as any).seller_notification_title || '', seller_notification_body: (row as any).seller_notification_body || '' } as FlowStep);
       group.step_count++;
     }
 
@@ -83,6 +83,7 @@ export function AdminWorkflowManager() {
       status_key: '', sort_order: maxOrder + 10, actor: 'seller', is_terminal: false,
       display_label: '', color: 'bg-gray-100 text-gray-600', icon: 'Circle', buyer_hint: '', seller_hint: '',
       notify_buyer: false, notification_title: '', notification_body: '', notification_action: '',
+      notify_seller: false, seller_notification_title: '', seller_notification_body: '',
     }]);
   };
 
@@ -160,6 +161,8 @@ export function AdminWorkflowManager() {
         color: s.color, icon: s.icon, buyer_hint: s.buyer_hint, seller_hint: s.seller_hint,
         notify_buyer: s.notify_buyer, notification_title: s.notification_title || null,
         notification_body: s.notification_body || null, notification_action: s.notification_action || null,
+        notify_seller: s.notify_seller, seller_notification_title: s.seller_notification_title || null,
+        seller_notification_body: s.seller_notification_body || null,
       }));
       const { error: insertError } = await supabase.from('category_status_flows').insert(stepsToInsert);
       if (insertError) throw insertError;
@@ -308,6 +311,16 @@ export function AdminWorkflowManager() {
                             <Input value={step.notification_title} onChange={(e) => updateStep(index, 'notification_title', e.target.value)} placeholder="Notification title (e.g. ✅ Order Accepted!)" className="h-7 text-xs rounded-lg" />
                             <Input value={step.notification_body} onChange={(e) => updateStep(index, 'notification_body', e.target.value)} placeholder="Notification body — use {seller_name} placeholder" className="h-7 text-xs rounded-lg" />
                             <Input value={step.notification_action} onChange={(e) => updateStep(index, 'notification_action', e.target.value)} placeholder="Action button (e.g. Rate Order)" className="h-7 text-xs rounded-lg" />
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Checkbox checked={step.notify_seller} onCheckedChange={(v) => updateStep(index, 'notify_seller', !!v)} id={`notify-seller-${index}`} />
+                          <label htmlFor={`notify-seller-${index}`} className="text-xs text-muted-foreground">📣 Send Seller Notification</label>
+                        </div>
+                        {step.notify_seller && (
+                          <div className="space-y-1.5 pl-6">
+                            <Input value={step.seller_notification_title} onChange={(e) => updateStep(index, 'seller_notification_title', e.target.value)} placeholder="Seller notification title (e.g. 🆕 New Order!)" className="h-7 text-xs rounded-lg" />
+                            <Input value={step.seller_notification_body} onChange={(e) => updateStep(index, 'seller_notification_body', e.target.value)} placeholder="Seller notification body" className="h-7 text-xs rounded-lg" />
                           </div>
                         )}
                       </div>

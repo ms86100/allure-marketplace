@@ -8,6 +8,7 @@ import { useMarkNotificationRead } from '@/hooks/queries/useNotifications';
 
 function getIcon(type: string) {
   switch (type) {
+    case 'order':
     case 'order_status':
       return <Package className="text-primary" size={28} />;
     case 'review':
