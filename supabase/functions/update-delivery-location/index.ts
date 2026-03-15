@@ -334,6 +334,17 @@ serve(async (req) => {
 
     // ═══ PHASE A: Proximity notifications — 500m and 200m (separate dedup keys) ═══
     if (distanceMeters !== null && buyerId && assignment.status === 'picked_up') {
+      // Fetch vehicle_type for payloads
+      let vehicleType: string | null = null;
+      if (assignment.rider_id) {
+        const { data: riderInfo } = await supabase
+          .from('delivery_partner_pool')
+          .select('vehicle_type')
+          .eq('id', assignment.rider_id)
+          .single();
+        vehicleType = riderInfo?.vehicle_type ?? null;
+      }
+
       // 500m — "nearby" notification
       if (distanceMeters < 500) {
         const { count } = await supabase
@@ -357,6 +368,7 @@ serve(async (req) => {
               workflow_status: 'arriving',
               action: 'View Tracking',
               distance: distanceMeters,
+              vehicle_type: vehicleType,
             },
           });
         }
@@ -387,6 +399,7 @@ serve(async (req) => {
               distance: distanceMeters,
               eta: etaMinutes,
               driver_name: assignment.rider_name ?? null,
+              vehicle_type: vehicleType,
             },
           });
         }
