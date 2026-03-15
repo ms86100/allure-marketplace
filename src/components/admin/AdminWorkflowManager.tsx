@@ -313,6 +313,16 @@ export function AdminWorkflowManager() {
                             <Input value={step.notification_action} onChange={(e) => updateStep(index, 'notification_action', e.target.value)} placeholder="Action button (e.g. Rate Order)" className="h-7 text-xs rounded-lg" />
                           </div>
                         )}
+                        <div className="flex items-center gap-2">
+                          <Checkbox checked={step.notify_seller} onCheckedChange={(v) => updateStep(index, 'notify_seller', !!v)} id={`notify-seller-${index}`} />
+                          <label htmlFor={`notify-seller-${index}`} className="text-xs text-muted-foreground">📣 Send Seller Notification</label>
+                        </div>
+                        {step.notify_seller && (
+                          <div className="space-y-1.5 pl-6">
+                            <Input value={step.seller_notification_title} onChange={(e) => updateStep(index, 'seller_notification_title', e.target.value)} placeholder="Seller notification title (e.g. 🆕 New Order!)" className="h-7 text-xs rounded-lg" />
+                            <Input value={step.seller_notification_body} onChange={(e) => updateStep(index, 'seller_notification_body', e.target.value)} placeholder="Seller notification body" className="h-7 text-xs rounded-lg" />
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
