@@ -26,6 +26,7 @@ interface FlowStep {
   color: string;
   icon: string;
   buyer_hint: string;
+  seller_hint: string;
 }
 
 interface Transition {
@@ -64,7 +65,7 @@ export function AdminWorkflowManager() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('category_status_flows')
-      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint, id')
+      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint, seller_hint, id')
       .order('parent_group')
       .order('transaction_type')
       .order('sort_order', { ascending: true });
@@ -88,7 +89,7 @@ export function AdminWorkflowManager() {
         });
       }
       const group = groupMap.get(key)!;
-      group.steps.push(row as FlowStep);
+      group.steps.push({ ...row, seller_hint: (row as any).seller_hint || '' } as FlowStep);
       group.step_count++;
     }
 
@@ -121,6 +122,7 @@ export function AdminWorkflowManager() {
       color: 'bg-gray-100 text-gray-600',
       icon: 'Circle',
       buyer_hint: '',
+      seller_hint: '',
     }]);
   };
 
@@ -198,6 +200,18 @@ export function AdminWorkflowManager() {
       toast.warning(`Warning: "${orphaned.join('", "')}" have no outgoing transitions`);
     }
 
+    // Warn: backward transitions (cycle detection)
+    const stepOrderMap = new Map(editSteps.map(s => [s.status_key, s.sort_order]));
+    const backwardTransitions = transitions.filter(t => {
+      const fromOrder = stepOrderMap.get(t.from_status);
+      const toOrder = stepOrderMap.get(t.to_status);
+      return fromOrder !== undefined && toOrder !== undefined && toOrder < fromOrder;
+    });
+    if (backwardTransitions.length > 0) {
+      const labels = backwardTransitions.map(t => `${t.from_status} → ${t.to_status}`).join(', ');
+      toast.warning(`Backward transition detected: ${labels}. Ensure this is intentional.`);
+    }
+
     setIsSaving(true);
     try {
       const { parent_group, transaction_type } = selectedWorkflow;
@@ -221,6 +235,7 @@ export function AdminWorkflowManager() {
         color: s.color,
         icon: s.icon,
         buyer_hint: s.buyer_hint,
+        seller_hint: s.seller_hint,
       }));
 
       const { error: insertError } = await supabase
@@ -386,12 +401,20 @@ export function AdminWorkflowManager() {
                           <label htmlFor={`terminal-${index}`} className="text-xs text-muted-foreground">Terminal</label>
                         </div>
                       </div>
-                      <Input
-                        value={step.buyer_hint}
-                        onChange={(e) => updateStep(index, 'buyer_hint', e.target.value)}
-                        placeholder="Buyer hint message"
-                        className="h-7 text-xs rounded-lg"
-                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          value={step.buyer_hint}
+                          onChange={(e) => updateStep(index, 'buyer_hint', e.target.value)}
+                          placeholder="Buyer hint message"
+                          className="h-7 text-xs rounded-lg"
+                        />
+                        <Input
+                          value={step.seller_hint}
+                          onChange={(e) => updateStep(index, 'seller_hint', e.target.value)}
+                          placeholder="Seller hint message"
+                          className="h-7 text-xs rounded-lg"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -1057,6 +1057,7 @@ export type Database = {
           id: string
           is_terminal: boolean | null
           parent_group: string
+          seller_hint: string | null
           sort_order: number
           status_key: string
           transaction_type: string
@@ -1071,6 +1072,7 @@ export type Database = {
           id?: string
           is_terminal?: boolean | null
           parent_group: string
+          seller_hint?: string | null
           sort_order: number
           status_key: string
           transaction_type: string
@@ -1085,6 +1087,7 @@ export type Database = {
           id?: string
           is_terminal?: boolean | null
           parent_group?: string
+          seller_hint?: string | null
           sort_order?: number
           status_key?: string
           transaction_type?: string
