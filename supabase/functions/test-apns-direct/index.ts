@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createAdminClient, getCredential } from "../_shared/credentials.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -76,10 +77,13 @@ serve(async (req) => {
       );
     }
 
-    const p8Key = Deno.env.get("APNS_KEY_P8");
-    const keyId = Deno.env.get("APNS_KEY_ID");
-    const teamId = Deno.env.get("APNS_TEAM_ID");
-    const bundleId = Deno.env.get("APNS_BUNDLE_ID");
+    const adminClient = createAdminClient();
+    const [p8Key, keyId, teamId, bundleId] = await Promise.all([
+      getCredential(adminClient, "apns_key_p8", "APNS_KEY_P8"),
+      getCredential(adminClient, "apns_key_id", "APNS_KEY_ID"),
+      getCredential(adminClient, "apns_team_id", "APNS_TEAM_ID"),
+      getCredential(adminClient, "apns_bundle_id", "APNS_BUNDLE_ID"),
+    ]);
 
     if (!p8Key || !keyId || !teamId || !bundleId) {
       return new Response(

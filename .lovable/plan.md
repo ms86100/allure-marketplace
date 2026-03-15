@@ -1,52 +1,49 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-# Migrate Hardcoded Credentials to DB-First (`admin_settings`) Pattern
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-## Problem
+## Phase I Live Activities — CI Pipeline Status
 
-Three edge functions still read credentials directly from `Deno.env.get()` instead of checking `admin_settings` first:
+### Codemagic Build Pipeline: COMPLETE
 
-| Function | Hardcoded credentials |
+Both `ios-release` and `release-all` workflows now include:
+
+| Step | Description |
 |---|---|
-| `send-campaign` | `FIREBASE_SERVICE_ACCOUNT`, `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID` |
-| `daily-society-digest` | `FIREBASE_SERVICE_ACCOUNT` |
-| `test-apns-direct` | `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID` |
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
 
-The other functions (`send-push-notification`, `msg91-send-otp`, `msg91-verify-otp`, `create-razorpay-order`, `razorpay-webhook`) already use the DB-first pattern correctly.
+### Codemagic Requirements (User Action)
 
-## What Changes
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
 
-### 1. Create shared `getCredential` helper — `supabase/functions/_shared/credentials.ts`
+### Runtime Call Chain (Verified)
 
-Extract the duplicated `getCredential` function into one shared file so all edge functions use the same logic: check `admin_settings` first, fall back to env.
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
+```
 
-### 2. Update `send-campaign/index.ts`
+## Implementation Matrix
 
-Replace `Deno.env.get("FIREBASE_SERVICE_ACCOUNT")` and all APNs env reads (lines 406-420) with `getCredential()` calls using the shared helper. Create a service-role Supabase client at the top of the handler (already has one).
-
-### 3. Update `daily-society-digest/index.ts`
-
-Replace `Deno.env.get("FIREBASE_SERVICE_ACCOUNT")` (line 86) with `getCredential()` call.
-
-### 4. Update `test-apns-direct/index.ts`
-
-Replace all four `Deno.env.get()` calls for APNs credentials (lines 79-82) with `getCredential()` calls.
-
-### 5. Update existing functions to use shared helper
-
-Refactor `send-push-notification`, `msg91-send-otp`, and `msg91-verify-otp` to import `getCredential` from `_shared/credentials.ts` instead of duplicating the function inline.
-
-## Files Modified
-
-- `supabase/functions/_shared/credentials.ts` — **new** shared helper
-- `supabase/functions/send-campaign/index.ts` — use DB-first credentials
-- `supabase/functions/daily-society-digest/index.ts` — use DB-first credentials
-- `supabase/functions/test-apns-direct/index.ts` — use DB-first credentials
-- `supabase/functions/send-push-notification/index.ts` — use shared import
-- `supabase/functions/msg91-send-otp/index.ts` — use shared import
-- `supabase/functions/msg91-verify-otp/index.ts` — use shared import
-
-## No UI changes needed
-
-The `CredentialsManager.tsx` already has all the correct tabs and keys defined (Payment, SMS/OTP, Push, Maps). Once credentials are saved via the admin panel, the edge functions will read them from DB automatically.
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |

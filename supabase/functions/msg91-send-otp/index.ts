@@ -1,29 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
+import { getCredential } from "../_shared/credentials.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-/** Read credential from admin_settings, fall back to env secret */
-async function getCredential(
-  supabase: any,
-  dbKey: string,
-  envKey: string
-): Promise<string | undefined> {
-  try {
-    const { data } = await supabase
-      .from("admin_settings")
-      .select("value, is_active")
-      .eq("key", dbKey)
-      .maybeSingle();
-    if (data?.value && data.is_active !== false) return data.value;
-  } catch (e) {
-    console.warn(`DB credential lookup failed for ${dbKey}:`, e);
-  }
-  return Deno.env.get(envKey);
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
