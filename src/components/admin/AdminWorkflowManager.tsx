@@ -168,11 +168,34 @@ export function AdminWorkflowManager() {
   const saveWorkflow = async () => {
     if (!selectedWorkflow) return;
 
-    // Validate
+    // Validate: empty keys
     const emptyKeys = editSteps.filter(s => !s.status_key.trim());
     if (emptyKeys.length > 0) {
       toast.error('All steps must have a status key');
       return;
+    }
+
+    // Validate: duplicate status keys
+    const keys = editSteps.map(s => s.status_key.trim().toLowerCase());
+    const dupes = keys.filter((k, i) => keys.indexOf(k) !== i);
+    if (dupes.length > 0) {
+      toast.error(`Duplicate status key: "${dupes[0]}"`);
+      return;
+    }
+
+    // Validate: at least one terminal status
+    const hasTerminal = editSteps.some(s => s.is_terminal);
+    if (!hasTerminal) {
+      toast.error('Workflow must have at least one terminal status');
+      return;
+    }
+
+    // Warn: non-terminal statuses without outgoing transitions
+    const nonTerminalKeys = new Set(editSteps.filter(s => !s.is_terminal).map(s => s.status_key));
+    const fromKeys = new Set(transitions.map(t => t.from_status));
+    const orphaned = [...nonTerminalKeys].filter(k => !fromKeys.has(k));
+    if (orphaned.length > 0) {
+      toast.warning(`Warning: "${orphaned.join('", "')}" have no outgoing transitions`);
     }
 
     setIsSaving(true);
