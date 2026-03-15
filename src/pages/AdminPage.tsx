@@ -23,6 +23,7 @@ import { AdminSidebarNav } from '@/components/admin/AdminSidebarNav';
 import { SellerApplicationReview } from '@/components/admin/SellerApplicationReview';
 import { AdminProductApprovals } from '@/components/admin/AdminProductApprovals';
 import { AdminWorkflowManager } from '@/components/admin/AdminWorkflowManager';
+import { WorkflowSimulator } from '@/components/admin/workflow/WorkflowSimulator';
 
 import { AdminDisputesTab } from '@/components/admin/AdminDisputesTab';
 import { AdminAnalyticsTab } from '@/components/admin/AdminAnalyticsTab';
