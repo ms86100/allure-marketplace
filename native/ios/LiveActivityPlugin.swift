@@ -1,0 +1,102 @@
+/**
+ * LiveActivityPlugin.swift
+ *
+ * Reference Capacitor plugin bridge for iOS.
+ * Copy into your Xcode App target and register in the Capacitor bridge.
+ *
+ * Registration (AppDelegate or Bridge config):
+ *   bridge.registerPlugin(LiveActivityPlugin.self)
+ */
+
+import Capacitor
+import ActivityKit
+import Foundation
+
+@available(iOS 16.1, *)
+@objc(LiveActivityPlugin)
+public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "LiveActivityPlugin"
+    public let jsName = "LiveActivity"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "startLiveActivity", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "updateLiveActivity", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "endLiveActivity", returnType: CAPPluginReturnPromise),
+    ]
+
+    // MARK: - Start
+
+    @objc func startLiveActivity(_ call: CAPPluginCall) {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            call.reject("Live Activities not enabled")
+            return
+        }
+
+        let attributes = LiveDeliveryAttributes(
+            entityType: call.getString("entity_type") ?? "order",
+            entityId: call.getString("entity_id") ?? ""
+        )
+
+        let state = LiveDeliveryAttributes.ContentState(
+            workflowStatus: call.getString("workflow_status") ?? "",
+            etaMinutes: call.getInt("eta_minutes"),
+            driverDistance: call.getDouble("driver_distance"),
+            driverName: call.getString("driver_name"),
+            vehicleType: call.getString("vehicle_type"),
+            progressStage: call.getString("progress_stage")
+        )
+
+        do {
+            let activity = try Activity.request(
+                attributes: attributes,
+                content: .init(state: state, staleDate: nil),
+                pushType: nil
+            )
+            call.resolve(["activityId": activity.id])
+        } catch {
+            call.reject("Failed to start live activity: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Update
+
+    @objc func updateLiveActivity(_ call: CAPPluginCall) {
+        let entityId = call.getString("entity_id") ?? ""
+
+        let state = LiveDeliveryAttributes.ContentState(
+            workflowStatus: call.getString("workflow_status") ?? "",
+            etaMinutes: call.getInt("eta_minutes"),
+            driverDistance: call.getDouble("driver_distance"),
+            driverName: call.getString("driver_name"),
+            vehicleType: call.getString("vehicle_type"),
+            progressStage: call.getString("progress_stage")
+        )
+
+        Task {
+            for activity in Activity<LiveDeliveryAttributes>.activities {
+                if activity.attributes.entityId == entityId {
+                    await activity.update(.init(state: state, staleDate: nil))
+                    call.resolve()
+                    return
+                }
+            }
+            call.resolve() // no-op if not found
+        }
+    }
+
+    // MARK: - End
+
+    @objc func endLiveActivity(_ call: CAPPluginCall) {
+        let activityId = call.getString("activityId") ?? ""
+
+        Task {
+            for activity in Activity<LiveDeliveryAttributes>.activities {
+                if activity.id == activityId {
+                    await activity.end(.init(state: activity.content.state, staleDate: nil),
+                                       dismissalPolicy: .immediate)
+                    break
+                }
+            }
+            call.resolve()
+        }
+    }
+}
