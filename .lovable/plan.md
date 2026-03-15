@@ -1,80 +1,95 @@
-# Dynamic Workflow Engine — Implementation Complete
 
-## What Was Built
 
-### Phase 1: Database ✅
-- **`category_status_transitions`** table — stores actor-based transition rules (from_status → to_status → allowed_actor) per workflow
-- **Display columns** added to `category_status_flows`: `display_label`, `color`, `icon`, `buyer_hint`
-- **`validate_order_status_transition`** trigger — validates transitions against `category_status_transitions` table with actor enforcement
-- **Seeded workflows**: `default` parent_group for `cart_purchase`, `self_fulfillment`, `service_booking`, `request_service`
-- **Seeded transitions** for all 7 parent_groups × service_booking + education_learning × request_service + all default workflows
-- **Performance index**: `idx_cst_lookup` on (parent_group, transaction_type, from_status)
+# Audit Report: Workflow-Driven Notification System
 
-### Phase 2: Frontend Cleanup ✅
-- **`useCategoryStatusFlow.ts`** — extended with `display_label`, `color`, `icon`, `buyer_hint` fields; added `booking` → `service_booking` type mapping; fallback to `default` parent_group; new `useStatusTransitions` hook
-- **`useOrderDetail.ts`** — removed ALL hardcoded status arrays (legacyOrder, fallback displayStatuses); added `getFlowStepLabel()` and `getBuyerHint()` helpers that use DB flow data
-- **`OrderDetailPage.tsx`** — timeline labels now come from `getFlowStepLabel()`; buyer hints now come from `getBuyerHint()` (DB-driven)
-- **`OrdersMonitor.tsx`** — replaced hardcoded `ORDER_STATUS_LABELS` with `useStatusLabels()` hook
+## What IS Implemented (Working)
 
-### Phase 3: Admin Workflow Manager ✅
-- **`AdminWorkflowManager.tsx`** — full workflow editor with:
-  - List view of all (parent_group, transaction_type) workflows
-  - Status pipeline editor: add/remove/reorder steps, configure actor/terminal/display_label/color/icon/buyer_hint
-  - Transition rules editor: for each status, toggle which actors can move to which next statuses (supports non-linear transitions like cancellations)
-  - Save: upserts all flow steps + transitions
-- **Admin nav**: "Workflows" item added under Commerce group
+1. **Workflow-driven DB trigger** — `fn_enqueue_order_status_notification` dynamically reads `notify_buyer`, `notification_title`, `notification_body`, `notification_action` from `category_status_flows`. No hardcoded statuses. Includes `{seller_name}` placeholder substitution and fallback to `default` parent_group.
 
-### Phase 4: Fixes ✅
-- **Calendar**: native Capacitor call wrapped in try/catch, falls back to ICS download on failure
+2. **Admin Workflow Editor** — Toggle, title, body, and action fields per step. Saves correctly to DB.
 
-### Phase 5: Deep Audit Fixes ✅
-- **C1**: Added `requested`, `confirmed`, `rescheduled`, `no_show`, `at_gate` to `OrderStatus` type and `ORDER_STATUS_MAP`
-- **C2**: `OrderCancellation` now accepts `canCancel` prop from workflow transitions instead of hardcoded status check
-- **C3**: `getNextStatusForActor` rewritten to use `category_status_transitions` for accurate non-linear transition lookups
-- **C5**: Added skeleton loading state while flow is loading in timeline UI
-- **S2**: `getNextStatus` and `canChat` now use `isTerminalStatus()` from flow metadata instead of hardcoded status lists
-- **S3**: Seller reject button now uses `canSellerReject` derived from transitions table (supports `requested`, `enquired`, etc.)
-- **S4**: Removed hardcoded "Awaiting Pickup" override in `SellerOrderCard`
-- **S5**: Added missing status entries to `ORDER_STATUS_MAP`
-- **U2**: `isInTransit` now derived from flow metadata (delivery actor steps) instead of hardcoded array
-- **U3**: `canChat` uses `isTerminalStatus()` — properly disables chat for `no_show` and other terminal statuses
-- **D2**: `auto-cancel-orders` edge function now clears `auto_cancel_at` on cancellation
-- **New helpers**: `isTerminalStatus()`, `canActorCancel()`, `getNextStatusesForActor()` in `useCategoryStatusFlow.ts`
+3. **Notification queue pipeline** — Trigger inserts into `notification_queue` → `pg_net` trigger invokes `process-notification-queue` edge function instantly → copies to `user_notifications` + sends push notification. Deduplication via `queue_item_id`.
 
-### Phase 6: Workflow-Driven Buyer Notifications ✅
+4. **Booking reminders** — `send-booking-reminders` edge function runs via cron, sends 1-hour-before reminders. Works independently of workflow engine (appropriate — reminders are time-based, not status-based).
 
-#### What Changed
-- **Database**: Added `notify_buyer`, `notification_title`, `notification_body`, `notification_action` columns to `category_status_flows`
-- **Backfill**: All 16 existing hardcoded notification statuses backfilled into the new columns
-- **Trigger**: Replaced `fn_enqueue_order_status_notification()` — now does a dynamic lookup on `category_status_flows` by `parent_group + transaction_type + status_key` instead of a hardcoded CASE statement. Falls back to `default` parent_group. Supports `{seller_name}` placeholder substitution.
-- **Admin UI**: Each workflow step now has a "🔔 Send Buyer Notification" toggle with title, body, and action button fields
-- **Types**: `FlowStep` extended with 4 notification fields
+5. **Backfill** — All 17 previously hardcoded notification messages migrated to `category_status_flows` table rows.
 
-#### Architecture
-```
-Order status changes → trigger fires
-  → Looks up category_status_flows for matching (parent_group, transaction_type, status_key)
-  → If notify_buyer=true and notification_title set → inserts into notification_queue
-  → {seller_name} replaced with actual seller business_name
-  → notification_action included in payload for frontend action buttons
-  → Falls back to 'default' parent_group if no specific match
-```
+---
 
-#### Files Changed
-- `category_status_flows` table — 4 new columns
-- `fn_enqueue_order_status_notification()` — rewritten to be workflow-driven
-- `src/components/admin/workflow/types.ts` — 4 new FlowStep fields
-- `src/components/admin/AdminWorkflowManager.tsx` — notification config UI per step + updated selects/inserts
-- `src/components/admin/workflow/WorkflowSimulator.tsx` — updated selects
+## Gaps Found
 
-## Architecture
+### GAP-1: `notification_action` is lost in the pipeline (P1)
 
-```
-category_status_flows          → ordered status pipeline per (parent_group, transaction_type)
-category_status_transitions    → who can move between statuses (actor-based)
-validate_order_status_transition → DB trigger enforces transition rules
-useCategoryStatusFlow          → frontend loads flow + falls back to 'default'
-useStatusTransitions           → frontend loads allowed transitions
-AdminWorkflowManager           → admin UI to manage both
-```
+The DB trigger stores `action` in `notification_queue.payload` as JSON, but `process-notification-queue` (line 69-78) **never copies the payload** to `user_notifications`. The `user_notifications` table likely doesn't even have a `payload` or `action` column.
+
+**Impact**: Action buttons configured by admins (e.g. "Rate Order") are stored but never reach the frontend.
+
+**Fix**: Add a `payload` (jsonb) column to `user_notifications`. Update `process-notification-queue` to copy `item.payload` into the insert. Update `useNotifications` query to include `payload`.
+
+### GAP-2: No rich "Blinkit-style" notification card in the in-app inbox (P1)
+
+`NotificationInboxPage.tsx` renders a plain list of small items with a Bell icon, title, body, and timestamp. There is:
+- No large card layout
+- No action button ("Rate Order", "Open Order")
+- No illustration/icon from the workflow config
+- No visual distinction for important terminal notifications
+
+**Impact**: The "Blinkit-style rich notification" from the user's request is completely missing from the frontend.
+
+**Fix**: Create a `RichNotificationCard` component that renders important notifications (those with an action in payload) as large cards with icon, bold title, message, and an action button. Use this in NotificationInboxPage and optionally as a home-screen overlay for the most recent unread important notification.
+
+### GAP-3: No home-screen notification banner/overlay (P2)
+
+The user specifically requested "large home-screen notifications" similar to Blinkit (the uploaded image shows a big overlay card on the home screen). Currently, there is no such component — notifications only appear in the inbox page and as push notifications.
+
+**Fix**: Create a `HomeNotificationBanner` component that shows the latest unread notification with an action button as a prominent card on the home screen. Auto-dismiss after a few seconds or on tap.
+
+### GAP-4: Push notification payload doesn't include `notification_action` for deep linking (P2)
+
+The `send-push-notification` edge function sends title + body but the action button context (e.g. navigate to rating page) is not included in the push payload's `data` field for the mobile app to handle.
+
+**Fix**: Pass `payload.action` from `notification_queue` through to the push notification `data` field so the native app can handle action-specific deep linking on tap.
+
+### GAP-5: Booking reminders use hardcoded title/body (P3 — Informational)
+
+`send-booking-reminders` uses `"⏰ Appointment in 1 hour"` — not configurable from the workflow editor. This is acceptable because reminders are time-triggered, not status-triggered. The workflow engine handles status changes; cron handles time-based reminders. No fix needed.
+
+---
+
+## Implementation Plan
+
+### Step 1: Database migration
+- Add `payload jsonb` column to `user_notifications` table
+
+### Step 2: Update `process-notification-queue` edge function
+- Copy `item.payload` into the `user_notifications` insert
+- Pass `payload.action` to `send-push-notification` call's data field
+
+### Step 3: Update `useNotifications` hook
+- Include `payload` in the select query
+- Type the payload interface
+
+### Step 4: Create `RichNotificationCard` component
+- Large card with icon, bold title, body text, and action button
+- Action button navigates based on payload (e.g. "Rate Order" → `/orders/{orderId}?action=rate`)
+- Used for notifications that have a `payload.action` value
+
+### Step 5: Update `NotificationInboxPage`
+- Render notifications with actions using `RichNotificationCard`
+- Keep simple layout for standard notifications
+
+### Step 6: Create `HomeNotificationBanner`
+- Overlay component on home screen showing latest important unread notification
+- Shows as a large dismissible card with action button
+- Auto-fetches latest unread notification with action on mount
+- Dismisses on tap or after timeout
+
+### Files to change:
+- `supabase/functions/process-notification-queue/index.ts` — pass payload through
+- `src/hooks/queries/useNotifications.ts` — add payload to query
+- `src/pages/NotificationInboxPage.tsx` — render rich cards for action notifications
+- **New**: `src/components/notifications/RichNotificationCard.tsx`
+- **New**: `src/components/notifications/HomeNotificationBanner.tsx`
+- Home page component — mount `HomeNotificationBanner`
+- Database migration for `user_notifications.payload`
 
