@@ -26,6 +26,7 @@ interface FlowStep {
   color: string;
   icon: string;
   buyer_hint: string;
+  seller_hint: string;
 }
 
 interface Transition {
