@@ -20,6 +20,8 @@ interface OrderCancellationProps {
   orderId: string;
   orderStatus: string;
   onCancelled: () => void;
+  /** Whether buyer→cancelled transition is allowed by the workflow engine */
+  canCancel?: boolean;
 }
 
 const CANCELLATION_REASONS = [
@@ -31,17 +33,17 @@ const CANCELLATION_REASONS = [
   { value: 'other', label: 'Other reason' },
 ];
 
-export function OrderCancellation({ orderId, orderStatus, onCancelled }: OrderCancellationProps) {
+export function OrderCancellation({ orderId, orderStatus, onCancelled, canCancel }: OrderCancellationProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
 
-  // Can only cancel before "preparing" status
-  const canCancel = ['placed', 'accepted'].includes(orderStatus);
+  // Use workflow-driven eligibility if provided, otherwise fall back to legacy check
+  const isEligible = canCancel !== undefined ? canCancel : ['placed', 'accepted'].includes(orderStatus);
 
-  if (!canCancel) {
+  if (!isEligible) {
     return null;
   }
 
@@ -76,9 +78,10 @@ export function OrderCancellation({ orderId, orderStatus, onCancelled }: OrderCa
       toast.success('Order cancelled');
 
       onCancelled();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error cancelling order:', error);
-      toast.error('Failed to cancel order');
+      const errMsg = error?.message || error?.details || '';
+      toast.error(errMsg.includes('Invalid status transition') ? 'This order cannot be cancelled at this stage' : 'Failed to cancel order');
     } finally {
       setIsSubmitting(false);
     }

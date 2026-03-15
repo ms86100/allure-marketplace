@@ -88,13 +88,43 @@ function resolveTransactionType(
 }
 
 /**
+ * Given a flow, transitions, current status, and actor, returns valid next statuses
+ * the actor can transition to. Uses category_status_transitions for accurate results.
+ */
+export function getNextStatusesForActor(
+  transitions: StatusTransition[],
+  currentStatus: string,
+  actor: string
+): string[] {
+  return transitions
+    .filter(t => t.from_status === currentStatus && t.allowed_actor === actor)
+    .map(t => t.to_status);
+}
+
+/**
  * Given a flow + current status + actor, returns the next status the actor can move to.
+ * Now uses transitions table instead of array position.
+ * Falls back to linear flow if no transitions loaded.
  */
 export function getNextStatusForActor(
   flow: StatusFlowStep[],
   currentStatus: string,
-  actor: string
+  actor: string,
+  transitions?: StatusTransition[]
 ): string | null {
+  // If transitions are available, use them (accurate non-linear lookup)
+  if (transitions && transitions.length > 0) {
+    const validNextStatuses = getNextStatusesForActor(transitions, currentStatus, actor);
+    if (validNextStatuses.length === 0) return null;
+    // If multiple valid transitions, pick the one that's next in sort_order (forward progression)
+    const flowOrder = flow.map(s => s.status_key);
+    const sorted = validNextStatuses
+      .filter(s => s !== 'cancelled') // Don't offer cancel as "next action"
+      .sort((a, b) => flowOrder.indexOf(a) - flowOrder.indexOf(b));
+    return sorted[0] || null;
+  }
+
+  // Fallback: linear flow (legacy behavior)
   const currentIndex = flow.findIndex(s => s.status_key === currentStatus);
   if (currentIndex === -1) return null;
 
@@ -112,6 +142,27 @@ export function getNextStatusForActor(
  */
 export function getTimelineSteps(flow: StatusFlowStep[]): StatusFlowStep[] {
   return flow.filter(s => !s.is_terminal && s.status_key !== 'cancelled');
+}
+
+/**
+ * Check if a given status is terminal in the flow.
+ */
+export function isTerminalStatus(flow: StatusFlowStep[], status: string): boolean {
+  const step = flow.find(s => s.status_key === status);
+  return step?.is_terminal === true;
+}
+
+/**
+ * Check if a specific actor can transition from currentStatus to 'cancelled'.
+ */
+export function canActorCancel(
+  transitions: StatusTransition[],
+  currentStatus: string,
+  actor: string
+): boolean {
+  return transitions.some(
+    t => t.from_status === currentStatus && t.to_status === 'cancelled' && t.allowed_actor === actor
+  );
 }
 
 /**

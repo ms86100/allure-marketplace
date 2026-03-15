@@ -4,10 +4,24 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { useUrgentOrderSound } from '@/hooks/useUrgentOrderSound';
 import { useCurrency } from '@/hooks/useCurrency';
-import { useCategoryStatusFlow, getNextStatusForActor, getTimelineSteps } from '@/hooks/useCategoryStatusFlow';
+import { useCategoryStatusFlow, getNextStatusForActor, getTimelineSteps, isTerminalStatus, canActorCancel, useStatusTransitions } from '@/hooks/useCategoryStatusFlow';
 import { logAudit } from '@/lib/audit';
 import { Order, OrderStatus } from '@/types/database';
 import { toast } from 'sonner';
+
+function resolveTransactionType(
+  parentGroup: string,
+  orderType: string | null | undefined,
+  fulfillmentType?: string | null
+): string {
+  if (orderType === 'enquiry') {
+    if (['classes', 'events'].includes(parentGroup)) return 'book_slot';
+    return 'request_service';
+  }
+  if (orderType === 'booking') return 'service_booking';
+  if (fulfillmentType && ['self_pickup', 'seller_delivery'].includes(fulfillmentType)) return 'self_fulfillment';
+  return 'cart_purchase';
+}
 
 export function useOrderDetail(id: string | undefined) {
   const { user, isSeller } = useAuth();
@@ -46,7 +60,14 @@ export function useOrderDetail(id: string | undefined) {
   const effectiveParentGroup = sellerPrimaryGroup || derivedParentGroup;
   const isEnquiryOrder = (order as any)?.order_type === 'enquiry';
   const orderFulfillmentType = (order as any)?.fulfillment_type || 'self_pickup';
-  const { flow } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType);
+  const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType);
+
+  // Load transitions for accurate next-status and cancellation checks
+  const resolvedTxnType = useMemo(
+    () => resolveTransactionType(effectiveParentGroup || 'default', orderType, orderFulfillmentType),
+    [effectiveParentGroup, orderType, orderFulfillmentType]
+  );
+  const transitions = useStatusTransitions(effectiveParentGroup || 'default', resolvedTxnType);
 
   const timelineSteps = useMemo(() => getTimelineSteps(flow), [flow]);
 
@@ -59,13 +80,27 @@ export function useOrderDetail(id: string | undefined) {
   const currentStatusIndex = order ? statusOrder.indexOf(order.status) : -1;
 
   const getNextStatus = (): OrderStatus | null => {
-    if (!order || order.status === 'cancelled' || order.status === 'completed' || order.status === 'delivered') return null;
+    if (!order) return null;
+    // Use is_terminal from flow instead of hardcoded status checks
+    if (isTerminalStatus(flow, order.status)) return null;
     if (flow.length > 0) {
-      const next = getNextStatusForActor(flow, order.status, 'seller');
+      const next = getNextStatusForActor(flow, order.status, 'seller', transitions);
       return next as OrderStatus | null;
     }
     return null;
   };
+
+  // Check if seller can reject (transition to cancelled exists for seller)
+  const canSellerReject = useMemo(() => {
+    if (!order || !isSellerView) return false;
+    return canActorCancel(transitions, order.status, 'seller');
+  }, [order?.status, isSellerView, transitions]);
+
+  // Check if buyer can cancel (transition to cancelled exists for buyer)
+  const canBuyerCancel = useMemo(() => {
+    if (!order) return false;
+    return canActorCancel(transitions, order.status, 'buyer');
+  }, [order?.status, transitions]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { let cancelled = false; if (id) { fetchOrder(cancelled); fetchUnreadCount(); } return () => { cancelled = true; }; }, [id]);
@@ -124,7 +159,8 @@ export function useOrderDetail(id: string | undefined) {
   const isBuyerView = order ? order.buyer_id === user?.id : false;
   const nextStatus = getNextStatus();
   const canReview = isBuyerView && (order?.status === 'completed' || order?.status === 'delivered') && !hasReview;
-  const canChat = order ? !['completed', 'cancelled'].includes(order.status) : false;
+  // Use is_terminal from flow instead of hardcoded status list
+  const canChat = order ? !isTerminalStatus(flow, order.status) : false;
   const canReorder = isBuyerView && (order?.status === 'completed' || order?.status === 'delivered');
   const chatRecipientId = isSellerView ? order?.buyer_id : seller?.user_id;
   const chatRecipientName = isSellerView ? (order as any)?.buyer?.name : seller?.business_name;
@@ -152,12 +188,20 @@ export function useOrderDetail(id: string | undefined) {
     return step?.buyer_hint || null;
   };
 
+  // Derive isInTransit from flow metadata (delivery actor steps)
+  const isInTransit = useMemo(() => {
+    if (!order) return false;
+    const step = flow.find(s => s.status_key === order.status);
+    return step?.actor === 'delivery' && !step?.is_terminal;
+  }, [order?.status, flow]);
+
   return {
     order, setOrder, isLoading, isUpdating, hasReview, setHasReview,
     isChatOpen, setIsChatOpen, unreadMessages, fetchUnreadCount,
     isRejectionDialogOpen, setIsRejectionDialogOpen,
     seller, isSellerView, isUrgentOrder, isBuyerView, isEnquiryOrder,
     nextStatus, canReview, canChat, canReorder,
+    canSellerReject, canBuyerCancel, isInTransit, isFlowLoading,
     chatRecipientId, chatRecipientName,
     orderFulfillmentType, currentStatusIndex, statusOrder,
     displayStatuses, timelineSteps, flow,

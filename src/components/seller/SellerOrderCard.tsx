@@ -74,9 +74,7 @@ export function SellerOrderCard({ order }: SellerOrderCardProps) {
             </div>
             <div className="flex flex-col items-end gap-1">
               <span className={`text-[10px] px-2 py-0.5 rounded-full ${statusInfo.color}`}>
-                {order.fulfillment_type === 'delivery' && order.status === 'ready'
-                  ? 'Awaiting Pickup'
-                  : statusInfo.label}
+                {statusInfo.label}
               </span>
               <div className="flex items-center gap-1">
                 {order.fulfillment_type === 'delivery' ? (
