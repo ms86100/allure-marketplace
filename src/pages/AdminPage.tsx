@@ -23,6 +23,7 @@ import { AdminSidebarNav } from '@/components/admin/AdminSidebarNav';
 import { SellerApplicationReview } from '@/components/admin/SellerApplicationReview';
 import { AdminProductApprovals } from '@/components/admin/AdminProductApprovals';
 import { AdminWorkflowManager } from '@/components/admin/AdminWorkflowManager';
+import { WorkflowSimulator } from '@/components/admin/workflow/WorkflowSimulator';
 
 import { AdminDisputesTab } from '@/components/admin/AdminDisputesTab';
 import { AdminAnalyticsTab } from '@/components/admin/AdminAnalyticsTab';
@@ -321,7 +322,16 @@ export default function AdminPage() {
           {admin.activeTab === 'features' && <FeatureManagement />}
           {admin.activeTab === 'services' && <AdminServiceBookingsTab />}
           {admin.activeTab === 'catalog' && <AdminCatalogManager />}
-          {admin.activeTab === 'workflows' && <AdminWorkflowManager />}
+          {admin.activeTab === 'workflows' && (
+            <Tabs defaultValue="editor" className="w-full">
+              <TabsList className="w-full grid grid-cols-2 rounded-xl h-9 mb-4">
+                <TabsTrigger value="editor" className="text-xs rounded-lg font-semibold">Workflow Editor</TabsTrigger>
+                <TabsTrigger value="simulator" className="text-xs rounded-lg font-semibold">🧪 Simulator</TabsTrigger>
+              </TabsList>
+              <TabsContent value="editor"><AdminWorkflowManager /></TabsContent>
+              <TabsContent value="simulator"><WorkflowSimulator /></TabsContent>
+            </Tabs>
+          )}
 
           {admin.activeTab === 'settings' && (
             <Tabs defaultValue="platform" className="w-full">
