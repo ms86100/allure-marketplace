@@ -12,8 +12,9 @@ const LiveActivity = registerPlugin<LiveActivityPlugin>('LiveActivity', {
     startLiveActivity: async () => ({ activityId: 'web-noop' }),
     updateLiveActivity: async () => {},
     endLiveActivity: async () => {},
+    getActiveActivities: async () => ({ activities: [] }),
   } as any,
 });
 
 export { LiveActivity };
-export type { LiveActivityPlugin, LiveActivityData } from './definitions';
+export type { LiveActivityPlugin, LiveActivityData, ActiveActivityEntry } from './definitions';

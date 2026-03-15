@@ -38,18 +38,50 @@ interface ActiveEntry {
  * - Updates throttled to max 1 per 5 seconds
  * - Graceful degradation on web (no-op plugin)
  * - Auto-cleanup on terminal status
+ * - Reconciles with native state on first push (prevents duplicates after app restart)
  */
 class _LiveActivityManager {
   private active = new Map<string, ActiveEntry>();
+  private hydrated = false;
 
   /** True only on native iOS / Android */
   private get isSupported(): boolean {
     return Capacitor.isNativePlatform();
   }
 
+  /**
+   * Reconcile in-memory Map with native ActivityKit state.
+   * Called once on first push() to prevent orphaned / duplicate activities.
+   */
+  private async hydrate(): Promise<void> {
+    if (this.hydrated) return;
+    this.hydrated = true;
+
+    try {
+      const { activities } = await LiveActivity.getActiveActivities();
+      const knownEntityIds = new Set(this.active.keys());
+
+      for (const { activityId, entityId } of activities) {
+        if (!knownEntityIds.has(entityId)) {
+          // Native activity exists but manager doesn't know about it — track it
+          this.active.set(entityId, {
+            activityId,
+            entityId,
+            lastUpdate: Date.now(),
+            pendingTimer: null,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[LiveActivityManager] hydrate failed:', e);
+    }
+  }
+
   /** Start or update a live activity based on workflow status */
   async push(data: LiveActivityData): Promise<void> {
     if (!this.isSupported) return;
+
+    await this.hydrate();
 
     const { entity_id, workflow_status } = data;
 
