@@ -11,7 +11,7 @@ function getIcon(type: string) {
     case 'order_status':
       return <Package className="text-primary" size={28} />;
     case 'review':
-      return <Star className="text-amber-500" size={28} />;
+      return <Star className="text-accent-foreground" size={28} />;
     case 'booking':
     case 'reminder':
       return <Calendar className="text-primary" size={28} />;
