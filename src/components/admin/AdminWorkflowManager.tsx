@@ -400,12 +400,20 @@ export function AdminWorkflowManager() {
                           <label htmlFor={`terminal-${index}`} className="text-xs text-muted-foreground">Terminal</label>
                         </div>
                       </div>
-                      <Input
-                        value={step.buyer_hint}
-                        onChange={(e) => updateStep(index, 'buyer_hint', e.target.value)}
-                        placeholder="Buyer hint message"
-                        className="h-7 text-xs rounded-lg"
-                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          value={step.buyer_hint}
+                          onChange={(e) => updateStep(index, 'buyer_hint', e.target.value)}
+                          placeholder="Buyer hint message"
+                          className="h-7 text-xs rounded-lg"
+                        />
+                        <Input
+                          value={step.seller_hint}
+                          onChange={(e) => updateStep(index, 'seller_hint', e.target.value)}
+                          placeholder="Seller hint message"
+                          className="h-7 text-xs rounded-lg"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
