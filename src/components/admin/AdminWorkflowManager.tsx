@@ -58,7 +58,7 @@ export function AdminWorkflowManager() {
         groupMap.set(key, { parent_group: row.parent_group, transaction_type: row.transaction_type, steps: [], step_count: 0 });
       }
       const group = groupMap.get(key)!;
-      group.steps.push({ ...row, seller_hint: (row as any).seller_hint || '' } as FlowStep);
+      group.steps.push({ ...row, seller_hint: (row as any).seller_hint || '', notify_buyer: (row as any).notify_buyer || false, notification_title: (row as any).notification_title || '', notification_body: (row as any).notification_body || '', notification_action: (row as any).notification_action || '' } as FlowStep);
       group.step_count++;
     }
 
