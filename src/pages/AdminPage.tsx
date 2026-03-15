@@ -321,6 +321,7 @@ export default function AdminPage() {
           {admin.activeTab === 'features' && <FeatureManagement />}
           {admin.activeTab === 'services' && <AdminServiceBookingsTab />}
           {admin.activeTab === 'catalog' && <AdminCatalogManager />}
+          {admin.activeTab === 'workflows' && <AdminWorkflowManager />}
 
           {admin.activeTab === 'settings' && (
             <Tabs defaultValue="platform" className="w-full">
