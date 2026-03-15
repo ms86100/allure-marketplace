@@ -82,6 +82,7 @@ export function AdminWorkflowManager() {
     setEditSteps([...editSteps, {
       status_key: '', sort_order: maxOrder + 10, actor: 'seller', is_terminal: false,
       display_label: '', color: 'bg-gray-100 text-gray-600', icon: 'Circle', buyer_hint: '', seller_hint: '',
+      notify_buyer: false, notification_title: '', notification_body: '', notification_action: '',
     }]);
   };
 
