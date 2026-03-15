@@ -38,6 +38,8 @@ export default function OrderDetailPage() {
   const orderId = order?.id;
   const fulfillmentType = o.orderFulfillmentType;
 
+  const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
+
   useEffect(() => {
     if (fulfillmentType === 'delivery' && orderId) {
       supabase
