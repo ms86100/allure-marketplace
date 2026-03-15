@@ -6,8 +6,7 @@ export type PeriodFilter = 'today' | '7d' | '30d' | 'all';
 
 // Status buckets for grouping
 const DELIVERED_STATUSES = ['delivered', 'completed'];
-const CANCELLED_STATUSES = ['cancelled'];
-const ACTIVE_STATUSES = ['placed', 'accepted', 'preparing', 'ready', 'assigned', 'picked_up', 'on_the_way', 'requested', 'confirmed', 'scheduled', 'enquired', 'quoted', 'in_progress', 'arrived', 'rescheduled'];
+const CANCELLED_STATUSES = ['cancelled', 'no_show'];
 
 type StatusBucket = 'delivered' | 'cancelled' | 'active';
 

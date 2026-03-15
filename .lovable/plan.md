@@ -1,63 +1,54 @@
 
+# Dynamic Workflow Engine — Implementation Complete
 
-# Round 4 Audit Report — Checkout, Payment & Workflow Engine
+## What Was Built
 
-## Checkout & Payment Flow Audit
+### Phase 1: Database ✅
+- **`category_status_transitions`** table — stores actor-based transition rules (from_status → to_status → allowed_actor) per workflow
+- **Display columns** added to `category_status_flows`: `display_label`, `color`, `icon`, `buyer_hint`
+- **`validate_order_status_transition`** trigger — validates transitions against `category_status_transitions` table with actor enforcement
+- **Seeded workflows**: `default` parent_group for `cart_purchase`, `self_fulfillment`, `service_booking`, `request_service`
+- **Seeded transitions** for all 7 parent_groups × service_booking + education_learning × request_service + all default workflows
+- **Performance index**: `idx_cst_lookup` on (parent_group, transaction_type, from_status)
 
-### Payment flows do NOT update order `status` — only `payment_status`
+### Phase 2: Frontend Cleanup ✅
+- **`useCategoryStatusFlow.ts`** — extended with `display_label`, `color`, `icon`, `buyer_hint` fields; added `booking` → `service_booking` type mapping; fallback to `default` parent_group; new `useStatusTransitions` hook
+- **`useOrderDetail.ts`** — removed ALL hardcoded status arrays (legacyOrder, fallback displayStatuses); added `getFlowStepLabel()` and `getBuyerHint()` helpers that use DB flow data
+- **`OrderDetailPage.tsx`** — timeline labels now come from `getFlowStepLabel()`; buyer hints now come from `getBuyerHint()` (DB-driven)
+- **`OrdersMonitor.tsx`** — replaced hardcoded `ORDER_STATUS_LABELS` with `useStatusLabels()` hook
 
-Both Razorpay and UPI flows correctly separate payment status from order status:
+### Phase 3: Admin Workflow Manager ✅
+- **`AdminWorkflowManager.tsx`** — full workflow editor with:
+  - List view of all (parent_group, transaction_type) workflows
+  - Status pipeline editor: add/remove/reorder steps, configure actor/terminal/display_label/color/icon/buyer_hint
+  - Transition rules editor: for each status, toggle which actors can move to which next statuses (supports non-linear transitions like cancellations)
+  - Save: upserts all flow steps + transitions
+- **Admin nav**: "Workflows" item added under Commerce group
 
-- **Razorpay webhook** (`razorpay-webhook/index.ts:160-168`): Updates `payment_status: 'paid'` and `razorpay_payment_id`. Does NOT change `status`. Guards against cancelled orders with `.neq('status', 'cancelled')`. **No workflow trigger conflict.**
-- **Razorpay checkout** (`useCartPage.ts:299-314`): On success, polls `payment_status` for confirmation. Never updates `status`. **Clean.**
-- **UPI deep link** (`UpiDeepLinkCheckout.tsx:182-232`): Calls `confirm_upi_payment` RPC which updates `payment_status` to `buyer_confirmed`. Does NOT change order `status`. **Clean.**
-- **Payment failure** (`useCartPage.ts:316-328, 340-360`): Cancels orders via `.update({ status: 'cancelled' }).eq('payment_status', 'pending')`. The `placed → cancelled` transition exists for buyer in all workflows. The DB trigger runs with the authenticated user's role, and the transition is valid. **Safe.**
+### Phase 4: Fixes ✅
+- **Calendar**: native Capacitor call wrapped in try/catch, falls back to ICS download on failure
 
-**Verdict: No bugs in checkout/payment flows related to the workflow engine.**
+### Phase 5: Deep Audit Fixes ✅
+- **C1**: Added `requested`, `confirmed`, `rescheduled`, `no_show`, `at_gate` to `OrderStatus` type and `ORDER_STATUS_MAP`
+- **C2**: `OrderCancellation` now accepts `canCancel` prop from workflow transitions instead of hardcoded status check
+- **C3**: `getNextStatusForActor` rewritten to use `category_status_transitions` for accurate non-linear transition lookups
+- **C5**: Added skeleton loading state while flow is loading in timeline UI
+- **S2**: `getNextStatus` and `canChat` now use `isTerminalStatus()` from flow metadata instead of hardcoded status lists
+- **S3**: Seller reject button now uses `canSellerReject` derived from transitions table (supports `requested`, `enquired`, etc.)
+- **S4**: Removed hardcoded "Awaiting Pickup" override in `SellerOrderCard`
+- **S5**: Added missing status entries to `ORDER_STATUS_MAP`
+- **U2**: `isInTransit` now derived from flow metadata (delivery actor steps) instead of hardcoded array
+- **U3**: `canChat` uses `isTerminalStatus()` — properly disables chat for `no_show` and other terminal statuses
+- **D2**: `auto-cancel-orders` edge function now clears `auto_cancel_at` on cancellation
+- **New helpers**: `isTerminalStatus()`, `canActorCancel()`, `getNextStatusesForActor()` in `useCategoryStatusFlow.ts`
 
----
+## Architecture
 
-## Remaining Issues Found
-
-### R4-1: `useAdminAnalytics` misclassifies `no_show` as "active" (P2)
-**File:** `src/hooks/queries/useAdminAnalytics.ts:8-17`
-
-`getStatusBucket()` classifies anything not in `DELIVERED_STATUSES` or `CANCELLED_STATUSES` as `active`. The `no_show` status is terminal but gets bucketed as "active", inflating active order counts and revenue in admin analytics.
-
-**Fix:** Add `no_show` to a new terminal-negative bucket, or add it to `CANCELLED_STATUSES` since it represents a failed outcome:
-```typescript
-const CANCELLED_STATUSES = ['cancelled', 'no_show'];
 ```
-
-### R4-2: `BuyerCancelBooking` bypasses workflow actor context (P2)
-**File:** `src/components/booking/BuyerCancelBooking.tsx:86-90`
-
-Direct `.update({ status: 'cancelled' })` without checking if the buyer has a `cancelled` transition from the current booking status. The DB trigger will validate, but error handling shows generic "Failed to cancel booking" — not the specific "Invalid status transition" message from the trigger.
-
-**Fix:** Extract trigger error message in the catch block (same pattern as `useOrderDetail.ts:151-152`).
-
-### R4-3: `ACTIVE_STATUSES` array is decorative but misleading (P3)
-**File:** `src/hooks/queries/useAdminAnalytics.ts:10`
-
-The constant lists 15 statuses but `getStatusBucket` doesn't use it — it uses fallback logic. Missing `at_gate` and `no_show` from the array. Since it's unused in code logic, it's just a maintenance hazard.
-
-**Fix:** Delete the `ACTIVE_STATUSES` constant or add a comment that it's informational only.
-
-### R4-4: Razorpay webhook doesn't handle `payment.authorized` event (Informational)
-**File:** `supabase/functions/razorpay-webhook/index.ts:114`
-
-Only handles `payment.captured`, `payment.failed`, and `refund.created`. If Razorpay is configured for manual capture, `payment.authorized` fires first and `payment.captured` never fires until manual capture. Currently fine if auto-capture is enabled (default).
-
----
-
-## Summary
-
-| Priority | Issue | Description | Fix |
-|----------|-------|-------------|-----|
-| **P2** | R4-1 | `no_show` counted as active in admin analytics | Add to `CANCELLED_STATUSES` |
-| **P2** | R4-2 | `BuyerCancelBooking` error handling doesn't surface trigger message | Extract error like `useOrderDetail` |
-| **P3** | R4-3 | `ACTIVE_STATUSES` is unused and stale | Delete or annotate |
-| **Info** | R4-4 | Razorpay `payment.authorized` not handled | Fine with auto-capture |
-
-**Checkout and payment flows are clean.** No workflow conflicts found in Razorpay, UPI deep link, or payment failure cancellation paths. The webhook correctly updates only `payment_status`, never `status`.
-
+category_status_flows          → ordered status pipeline per (parent_group, transaction_type)
+category_status_transitions    → who can move between statuses (actor-based)
+validate_order_status_transition → DB trigger enforces transition rules
+useCategoryStatusFlow          → frontend loads flow + falls back to 'default'
+useStatusTransitions           → frontend loads allowed transitions
+AdminWorkflowManager           → admin UI to manage both
+```

@@ -130,8 +130,11 @@ export function BuyerCancelBooking({ bookingId, orderId, slotId, status }: Buyer
 
       toast.success('Booking cancelled');
       setIsOpen(false);
-    } catch {
-      toast.error('Failed to cancel booking');
+    } catch (err: any) {
+      const msg = err?.message?.includes('Invalid status transition')
+        ? 'This booking cannot be cancelled from its current status.'
+        : 'Failed to cancel booking';
+      toast.error(msg);
     } finally {
       setIsCancelling(false);
     }
