@@ -97,6 +97,9 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
         </Button>
       </div>
 
+      {/* Product context card */}
+      <ChatProductHeader productId={productId} sellerName={sellerName} />
+
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-2 overscroll-contain">
         {isLoading && <p className="text-xs text-muted-foreground text-center py-8">Loading messages…</p>}
