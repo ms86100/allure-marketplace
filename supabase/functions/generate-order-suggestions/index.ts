@@ -105,8 +105,8 @@ Deno.serve(async (req) => {
 
         const confidence = Math.min(0.99, 0.3 + (pattern.count * 0.15));
 
-        // Insert suggestion
-        await supabase.from('order_suggestions').insert({
+        // Insert suggestion and capture ID
+        const { data: insertedSuggestion } = await supabase.from('order_suggestions').insert({
           user_id: userId,
           product_id: pattern.productId,
           seller_id: pattern.sellerId,
@@ -115,9 +115,10 @@ Deno.serve(async (req) => {
           time_bucket: pattern.hour,
           confidence_score: confidence,
           suggested_at: now.toISOString(),
-        });
+        }).select('id').single();
 
         suggestionsCreated++;
+        const suggestionId = insertedSuggestion?.id;
 
         // Send push notification if within ±1 hour of predicted time
         if (Math.abs(currentHour - pattern.hour) <= 1) {
@@ -134,20 +135,25 @@ Deno.serve(async (req) => {
             .eq('id', pattern.sellerId)
             .single();
 
+          const reorderPath = suggestionId
+            ? `/marketplace?reorder=${suggestionId}`
+            : '/marketplace';
+
           await supabase.from('notification_queue').insert({
             user_id: userId,
             title: '🛒 Order again?',
             body: `You usually order ${product?.name || 'this item'} from ${seller?.business_name || 'this seller'} around this time.`,
             type: 'order_suggestion',
-            reference_path: '/marketplace',
+            reference_path: reorderPath,
             payload: {
               type: 'order_suggestion',
               entity_type: 'suggestion',
-              entity_id: pattern.productId,
+              entity_id: suggestionId ?? pattern.productId,
               workflow_status: 'suggested',
               action: 'Reorder',
               product_id: pattern.productId,
               seller_id: pattern.sellerId,
+              suggestion_id: suggestionId,
             },
           });
 
