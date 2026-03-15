@@ -235,6 +235,7 @@ export function AdminWorkflowManager() {
         color: s.color,
         icon: s.icon,
         buyer_hint: s.buyer_hint,
+        seller_hint: s.seller_hint,
       }));
 
       const { error: insertError } = await supabase
