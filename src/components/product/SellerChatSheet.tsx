@@ -7,6 +7,7 @@ import { useChatViewport } from '@/hooks/useChatViewport';
 import { Send, MessageCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { ChatProductHeader } from './ChatProductHeader';
 
 interface SellerChatSheetProps {
   open: boolean;
@@ -95,6 +96,9 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
           <X size={20} />
         </Button>
       </div>
+
+      {/* Product context card */}
+      <ChatProductHeader productId={productId} sellerName={sellerName} />
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-2 space-y-2 overscroll-contain">
