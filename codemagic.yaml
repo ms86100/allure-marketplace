@@ -1029,8 +1029,11 @@ workflows:
 
           target_names = project.targets.map(&:name)
           puts "=== Xcode targets: #{target_names.join(', ')} ==="
-          widget_count = project.targets.count { |t| t.name == 'LiveDeliveryWidgetExtension' }
-          abort('Expected exactly one LiveDeliveryWidgetExtension target') unless widget_count == 1
+          expected_targets = ['App', 'LiveDeliveryWidgetExtension']
+          missing_targets = expected_targets - target_names
+          unexpected_targets = target_names - expected_targets
+          abort("Missing expected targets: #{missing_targets.join(', ')}") unless missing_targets.empty?
+          abort("Unexpected targets present: #{unexpected_targets.join(', ')}") unless unexpected_targets.empty?
 
           project.save
           puts '=== LiveDeliveryWidgetExtension target reconciled and embedded ==='
