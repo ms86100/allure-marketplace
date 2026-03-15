@@ -22,6 +22,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "updateLiveActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endLiveActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getActiveActivities", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cleanupStaleActivities", returnType: CAPPluginReturnPromise),
     ]
 
     // MARK: - Start
@@ -92,8 +93,10 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         Task {
             for activity in Activity<LiveDeliveryAttributes>.activities {
                 if activity.id == activityId {
-                    await activity.end(.init(state: activity.content.state, staleDate: nil),
-                                       dismissalPolicy: .immediate)
+                    await activity.end(
+                        .init(state: activity.content.state, staleDate: nil),
+                        dismissalPolicy: .immediate
+                    )
                     break
                 }
             }
@@ -114,5 +117,23 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
 
         call.resolve(["activities": result])
+    }
+
+    // MARK: - Cleanup Stale Activities
+
+    @objc func cleanupStaleActivities(_ call: CAPPluginCall) {
+        let validIds = call.getArray("validEntityIds", String.self) ?? []
+
+        Task {
+            for activity in Activity<LiveDeliveryAttributes>.activities {
+                if !validIds.contains(activity.attributes.entityId) {
+                    await activity.end(
+                        .init(state: activity.content.state, staleDate: nil),
+                        dismissalPolicy: .immediate
+                    )
+                }
+            }
+            call.resolve()
+        }
     }
 }

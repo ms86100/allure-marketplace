@@ -52,4 +52,10 @@ export interface LiveActivityPlugin {
    * Used to reconcile in-memory state after app restart / cold launch.
    */
   getActiveActivities(): Promise<{ activities: ActiveActivityEntry[] }>;
+
+  /**
+   * End all native activities whose entityId is NOT in the provided list.
+   * Called during hydration to remove orphaned / stale activities.
+   */
+  cleanupStaleActivities(opts: { validEntityIds: string[] }): Promise<void>;
 }
