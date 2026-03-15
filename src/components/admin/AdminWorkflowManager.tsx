@@ -122,6 +122,7 @@ export function AdminWorkflowManager() {
       color: 'bg-gray-100 text-gray-600',
       icon: 'Circle',
       buyer_hint: '',
+      seller_hint: '',
     }]);
   };
 
