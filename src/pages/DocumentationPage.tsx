@@ -9,6 +9,7 @@ import { MarketplaceShoppingDocs } from '@/components/docs/MarketplaceShoppingDo
 import { SellerToolsDocs } from '@/components/docs/SellerToolsDocs';
 import { DeliveryDocs } from '@/components/docs/DeliveryDocs';
 import { AdminCommunityDocs } from '@/components/docs/AdminCommunityDocs';
+import { WorkflowEngineDocs } from '@/components/docs/WorkflowEngineDocs';
 import { cn } from '@/lib/utils';
 
 const NAV_SECTIONS = [
