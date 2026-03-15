@@ -6,11 +6,21 @@ export interface StatusFlowStep {
   sort_order: number;
   actor: string;
   is_terminal: boolean;
+  display_label: string | null;
+  color: string | null;
+  icon: string | null;
+  buyer_hint: string | null;
+}
+
+export interface StatusTransition {
+  from_status: string;
+  to_status: string;
+  allowed_actor: string;
 }
 
 /**
  * Fetches category-driven status flow for an order based on its seller's
- * parent_group and the order's type (purchase vs enquiry).
+ * parent_group and the order's type (purchase vs enquiry vs booking).
  */
 export function useCategoryStatusFlow(
   sellerPrimaryGroup: string | null | undefined,
@@ -21,21 +31,32 @@ export function useCategoryStatusFlow(
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!sellerPrimaryGroup) {
-      setIsLoading(false);
-      return;
-    }
-
-    const transactionType = resolveTransactionType(sellerPrimaryGroup, orderType, fulfillmentType);
+    const transactionType = resolveTransactionType(sellerPrimaryGroup || 'default', orderType, fulfillmentType);
 
     (async () => {
-      const { data, error } = await supabase
+      // Try specific parent_group first, then fallback to 'default'
+      const parentGroup = sellerPrimaryGroup || 'default';
+      
+      let { data, error } = await supabase
         .from('category_status_flows')
-        .select('status_key, sort_order, actor, is_terminal')
-        .eq('parent_group', sellerPrimaryGroup)
+        .select('status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint')
+        .eq('parent_group', parentGroup)
         .eq('transaction_type', transactionType)
-        .neq('status_key', 'cancelled')
         .order('sort_order', { ascending: true });
+
+      // Fallback to 'default' if no rows found for specific parent_group
+      if (!error && (!data || data.length === 0) && parentGroup !== 'default') {
+        const fallback = await supabase
+          .from('category_status_flows')
+          .select('status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint')
+          .eq('parent_group', 'default')
+          .eq('transaction_type', transactionType)
+          .order('sort_order', { ascending: true });
+        
+        if (!fallback.error && fallback.data) {
+          data = fallback.data;
+        }
+      }
 
       if (!error && data) {
         setFlow(data as StatusFlowStep[]);
@@ -55,6 +76,9 @@ function resolveTransactionType(
   if (orderType === 'enquiry') {
     if (['classes', 'events'].includes(parentGroup)) return 'book_slot';
     return 'request_service';
+  }
+  if (orderType === 'booking') {
+    return 'service_booking';
   }
   // Self-pickup or seller-delivery → self_fulfillment (no delivery partner steps)
   if (fulfillmentType && ['self_pickup', 'seller_delivery'].includes(fulfillmentType)) {
@@ -88,4 +112,30 @@ export function getNextStatusForActor(
  */
 export function getTimelineSteps(flow: StatusFlowStep[]): StatusFlowStep[] {
   return flow.filter(s => !s.is_terminal && s.status_key !== 'cancelled');
+}
+
+/**
+ * Hook to fetch allowed transitions for a workflow.
+ */
+export function useStatusTransitions(
+  parentGroup: string | null | undefined,
+  transactionType: string | null | undefined
+) {
+  const [transitions, setTransitions] = useState<StatusTransition[]>([]);
+
+  useEffect(() => {
+    if (!parentGroup || !transactionType) return;
+
+    (async () => {
+      const { data } = await supabase
+        .from('category_status_transitions')
+        .select('from_status, to_status, allowed_actor')
+        .eq('parent_group', parentGroup)
+        .eq('transaction_type', transactionType);
+
+      if (data) setTransitions(data as StatusTransition[]);
+    })();
+  }, [parentGroup, transactionType]);
+
+  return transitions;
 }

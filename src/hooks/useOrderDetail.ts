@@ -50,22 +50,21 @@ export function useOrderDetail(id: string | undefined) {
 
   const timelineSteps = useMemo(() => getTimelineSteps(flow), [flow]);
 
+  // Status order derived entirely from DB flow — no hardcoded fallbacks
   const statusOrder = useMemo(() => {
     if (flow.length > 0) return flow.map(s => s.status_key as OrderStatus);
-    return isEnquiryOrder
-      ? ['enquired' as OrderStatus, 'quoted' as OrderStatus, 'accepted' as OrderStatus, 'preparing' as OrderStatus, 'ready' as OrderStatus, 'completed' as OrderStatus]
-      : ['placed' as OrderStatus, 'accepted' as OrderStatus, 'preparing' as OrderStatus, 'ready' as OrderStatus, 'picked_up' as OrderStatus, 'delivered' as OrderStatus, 'completed' as OrderStatus];
-  }, [flow, isEnquiryOrder]);
+    return [] as OrderStatus[];
+  }, [flow]);
+
   const currentStatusIndex = order ? statusOrder.indexOf(order.status) : -1;
 
   const getNextStatus = (): OrderStatus | null => {
     if (!order || order.status === 'cancelled' || order.status === 'completed' || order.status === 'delivered') return null;
-    if (flow.length > 0) { const next = getNextStatusForActor(flow, order.status, 'seller'); return next as OrderStatus | null; }
-    const legacyOrder: OrderStatus[] = isEnquiryOrder ? ['enquired', 'accepted', 'preparing', 'ready', 'completed'] : ['placed', 'accepted', 'preparing', 'ready', 'picked_up', 'delivered', 'completed'];
-    if (!isEnquiryOrder && orderFulfillmentType === 'delivery' && order.status === 'ready') return null;
-    if (!isEnquiryOrder && orderFulfillmentType !== 'delivery' && order.status === 'ready') return 'completed';
-    const idx = legacyOrder.indexOf(order.status);
-    return idx + 1 < legacyOrder.length ? legacyOrder[idx + 1] : null;
+    if (flow.length > 0) {
+      const next = getNextStatusForActor(flow, order.status, 'seller');
+      return next as OrderStatus | null;
+    }
+    return null;
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,10 +131,26 @@ export function useOrderDetail(id: string | undefined) {
 
   const copyOrderId = () => { if (!order) return; navigator.clipboard.writeText(order.id.slice(0, 8)); toast.success('Order ID copied'); };
 
+  // Display statuses derived entirely from DB flow
   const displayStatuses = useMemo(() => {
     if (timelineSteps.length > 0) return timelineSteps.map(s => s.status_key);
-    return isEnquiryOrder ? ['enquired', 'accepted', 'preparing', 'ready'] : ['placed', 'accepted', 'preparing', 'ready'];
-  }, [timelineSteps, isEnquiryOrder]);
+    return [];
+  }, [timelineSteps]);
+
+  // Helper: get label from flow step if available, else fall back to useStatusLabels
+  const getFlowStepLabel = (statusKey: string): { label: string; color: string } => {
+    const step = flow.find(s => s.status_key === statusKey);
+    if (step?.display_label) {
+      return { label: step.display_label, color: step.color || 'bg-gray-100 text-gray-600' };
+    }
+    return getOrderStatus(statusKey);
+  };
+
+  // Helper: get buyer hint from flow step
+  const getBuyerHint = (statusKey: string): string | null => {
+    const step = flow.find(s => s.status_key === statusKey);
+    return step?.buyer_hint || null;
+  };
 
   return {
     order, setOrder, isLoading, isUpdating, hasReview, setHasReview,
@@ -145,8 +160,9 @@ export function useOrderDetail(id: string | undefined) {
     nextStatus, canReview, canChat, canReorder,
     chatRecipientId, chatRecipientName,
     orderFulfillmentType, currentStatusIndex, statusOrder,
-    displayStatuses, timelineSteps,
+    displayStatuses, timelineSteps, flow,
     getOrderStatus, getPaymentStatus, getItemStatus,
+    getFlowStepLabel, getBuyerHint,
     formatPrice, user,
     updateOrderStatus, handleReject, handleTimeout, copyOrderId,
   };

@@ -7,7 +7,7 @@ import {
   Store, Users, Building2, AlertCircle, LayoutGrid, Flag,
   CreditCard, Star, Megaphone, Layers, Settings2, Bot,
   Menu, ChevronRight, FileCode, Send, Package, Wrench, MessageSquare, KeyRound,
-  BarChart3,
+  BarChart3, GitBranch,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -19,6 +19,7 @@ const NAV_GROUPS = [
       { value: 'payments', label: 'Payments', icon: CreditCard },
       { value: 'services', label: 'Services', icon: Wrench },
       { value: 'catalog', label: 'Catalog', icon: LayoutGrid },
+      { value: 'workflows', label: 'Workflows', icon: GitBranch },
       { value: 'featured', label: 'Featured', icon: Megaphone },
     ],
   },

@@ -6,18 +6,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useOrdersMonitor } from '@/hooks/queries/useAdminAnalytics';
-import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '@/types/database';
+import { PAYMENT_STATUS_LABELS } from '@/types/database';
+import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 20;
 
+// Component needs to be inside function to use hooks
 export function OrdersMonitor() {
   const [page, setPage] = useState(0);
   const [status, setStatus] = useState('all');
   const [paymentStatus, setPaymentStatus] = useState('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { getOrderStatus } = useStatusLabels();
 
   const { data, isLoading } = useOrdersMonitor({
     status, paymentStatus, page, pageSize: PAGE_SIZE,
@@ -58,7 +61,7 @@ export function OrdersMonitor() {
       ) : (
         <div className="space-y-2">
           {(data?.orders || []).map((order: any) => {
-            const statusInfo = ORDER_STATUS_LABELS[order.status as keyof typeof ORDER_STATUS_LABELS] || { label: order.status, color: 'bg-muted text-muted-foreground' };
+            const statusInfo = getOrderStatus(order.status);
             const payInfo = PAYMENT_STATUS_LABELS[order.payment_status as keyof typeof PAYMENT_STATUS_LABELS] || { label: order.payment_status, color: 'bg-muted text-muted-foreground' };
             const isOpen = expandedId === order.id;
 

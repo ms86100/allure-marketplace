@@ -1049,7 +1049,11 @@ export type Database = {
       category_status_flows: {
         Row: {
           actor: string
+          buyer_hint: string | null
+          color: string | null
           created_at: string | null
+          display_label: string | null
+          icon: string | null
           id: string
           is_terminal: boolean | null
           parent_group: string
@@ -1059,7 +1063,11 @@ export type Database = {
         }
         Insert: {
           actor?: string
+          buyer_hint?: string | null
+          color?: string | null
           created_at?: string | null
+          display_label?: string | null
+          icon?: string | null
           id?: string
           is_terminal?: boolean | null
           parent_group: string
@@ -1069,12 +1077,46 @@ export type Database = {
         }
         Update: {
           actor?: string
+          buyer_hint?: string | null
+          color?: string | null
           created_at?: string | null
+          display_label?: string | null
+          icon?: string | null
           id?: string
           is_terminal?: boolean | null
           parent_group?: string
           sort_order?: number
           status_key?: string
+          transaction_type?: string
+        }
+        Relationships: []
+      }
+      category_status_transitions: {
+        Row: {
+          allowed_actor: string
+          created_at: string | null
+          from_status: string
+          id: string
+          parent_group: string
+          to_status: string
+          transaction_type: string
+        }
+        Insert: {
+          allowed_actor: string
+          created_at?: string | null
+          from_status: string
+          id?: string
+          parent_group: string
+          to_status: string
+          transaction_type: string
+        }
+        Update: {
+          allowed_actor?: string
+          created_at?: string | null
+          from_status?: string
+          id?: string
+          parent_group?: string
+          to_status?: string
           transaction_type?: string
         }
         Relationships: []
