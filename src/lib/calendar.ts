@@ -21,18 +21,23 @@ export async function addToCalendar(data: CalendarEventData): Promise<void> {
 }
 
 async function addToNativeCalendar(data: CalendarEventData): Promise<void> {
-  const { CapacitorCalendar } = await import('@ebarooni/capacitor-calendar');
+  try {
+    const { CapacitorCalendar } = await import('@ebarooni/capacitor-calendar');
 
-  // Request write permission first
-  await CapacitorCalendar.requestWriteOnlyCalendarAccess();
+    // Request write permission first
+    await CapacitorCalendar.requestWriteOnlyCalendarAccess();
 
-  await CapacitorCalendar.createEventWithPrompt({
-    title: data.title,
-    startDate: data.startDate.getTime(),
-    endDate: data.endDate.getTime(),
-    location: data.location,
-    description: data.description,
-  });
+    await CapacitorCalendar.createEventWithPrompt({
+      title: data.title,
+      startDate: data.startDate.getTime(),
+      endDate: data.endDate.getTime(),
+      location: data.location,
+      description: data.description,
+    });
+  } catch (error) {
+    console.warn('Native calendar failed, falling back to ICS:', error);
+    downloadICS(data);
+  }
 }
 
 function downloadICS(data: CalendarEventData): void {
