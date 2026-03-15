@@ -85,6 +85,9 @@ export default function HomePage() {
           );
         })()}
 
+        {/* ═══ RICH NOTIFICATION BANNER ═══ */}
+        <HomeNotificationBanner />
+
         {/* ═══ DISCOVER ═══ */}
         <HomeSearchSuggestions />
         <div className="px-4 mt-3">

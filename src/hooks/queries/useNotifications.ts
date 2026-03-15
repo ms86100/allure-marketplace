@@ -1,7 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-interface UserNotification {
+export interface NotificationPayload {
+  action?: string;
+  reference_path?: string;
+  order_id?: string;
+  [key: string]: unknown;
+}
+
+export interface UserNotification {
   id: string;
   title: string;
   body: string;
@@ -9,6 +16,7 @@ interface UserNotification {
   reference_path: string | null;
   is_read: boolean;
   created_at: string;
+  payload: NotificationPayload | null;
 }
 
 export function useNotifications(userId: string | undefined) {
@@ -28,6 +36,29 @@ export function useNotifications(userId: string | undefined) {
   });
 }
 
+export function useLatestActionNotification(userId: string | undefined) {
+  return useQuery({
+    queryKey: ['latest-action-notification', userId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('user_notifications')
+        .select('*')
+        .eq('user_id', userId!)
+        .eq('is_read', false)
+        .not('payload', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const notifications = (data as unknown as UserNotification[]) || [];
+      const n = notifications[0];
+      if (n?.payload?.action) return n;
+      return null;
+    },
+    enabled: !!userId,
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+  });
+}
+
 export function useMarkNotificationRead() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -37,6 +68,7 @@ export function useMarkNotificationRead() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
     },
   });
 }
@@ -50,6 +82,7 @@ export function useMarkAllNotificationsRead() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
     },
   });
 }
