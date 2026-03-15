@@ -60,7 +60,7 @@ export function OrdersMonitor() {
       ) : (
         <div className="space-y-2">
           {(data?.orders || []).map((order: any) => {
-            const statusInfo = ORDER_STATUS_LABELS[order.status as keyof typeof ORDER_STATUS_LABELS] || { label: order.status, color: 'bg-muted text-muted-foreground' };
+            const statusInfo = getOrderStatus(order.status);
             const payInfo = PAYMENT_STATUS_LABELS[order.payment_status as keyof typeof PAYMENT_STATUS_LABELS] || { label: order.payment_status, color: 'bg-muted text-muted-foreground' };
             const isOpen = expandedId === order.id;
 
