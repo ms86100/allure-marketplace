@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 20;
 
+// Component needs to be inside function to use hooks
 export function OrdersMonitor() {
   const [page, setPage] = useState(0);
   const [status, setStatus] = useState('all');
