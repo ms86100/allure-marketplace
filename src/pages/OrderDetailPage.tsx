@@ -112,23 +112,12 @@ export default function OrderDetailPage() {
                 })}
               </div>
             )}
-            {order.status !== 'cancelled' && o.isBuyerView && (
-              <p className="text-xs text-muted-foreground mt-3 bg-muted/50 rounded-lg px-3 py-2">
-                {order.status === 'enquired' && '📋 Booking request sent. Awaiting response.'}
-                {order.status === 'placed' && '⏳ Waiting for seller to accept.'}
-                {order.status === 'accepted' && '✅ Your order has been confirmed.'}
-                {order.status === 'preparing' && '👨‍🍳 Your order is being prepared.'}
-                {order.status === 'ready' && (o.orderFulfillmentType === 'delivery' ? '📦 Ready for dispatch.' : '📦 Ready for pickup!')}
-                {order.status === 'picked_up' && '🚚 On the way!'}
-                {order.status === 'on_the_way' && '🛵 Your order is on the way!'}
-                {order.status === 'assigned' && '👤 A partner has been assigned.'}
-                {order.status === 'arrived' && '🏠 Service provider has arrived.'}
-                {order.status === 'in_progress' && '🔧 Service is in progress.'}
-                {order.status === 'delivered' && '🎉 Delivered. Enjoy!'}
-                {order.status === 'completed' && '⭐ Completed. Thank you!'}
-                {order.status === 'scheduled' && '📅 Your booking is confirmed.'}
-              </p>
-            )}
+            {order.status !== 'cancelled' && o.isBuyerView && (() => {
+              const hint = o.getBuyerHint(order.status);
+              return hint ? (
+                <p className="text-xs text-muted-foreground mt-3 bg-muted/50 rounded-lg px-3 py-2">{hint}</p>
+              ) : null;
+            })()}
             {o.isBuyerView && (
               <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => window.location.reload()} />
             )}
