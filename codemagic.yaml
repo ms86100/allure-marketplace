@@ -490,6 +490,56 @@ workflows:
           keychain add-certificates
           xcode-project use-profiles
 
+      - name: Force-assign widget provisioning profile
+        script: |
+          cd ios/App
+          ruby - << 'RUBY'
+          require 'xcodeproj'
+
+          project = Xcodeproj::Project.open('App.xcodeproj')
+          widget = project.targets.find { |t| t.name == 'LiveDeliveryWidgetExtension' }
+          abort('Widget target not found') unless widget
+
+          needs_fix = widget.build_configurations.any? do |config|
+            s = config.build_settings
+            s['PROVISIONING_PROFILE_SPECIFIER'].nil? || s['PROVISIONING_PROFILE_SPECIFIER'].to_s.empty?
+          end
+
+          if needs_fix
+            profiles_dir = File.expand_path('~/Library/MobileDevice/Provisioning Profiles')
+            profile_files = Dir.glob("#{profiles_dir}/*.mobileprovision")
+
+            widget_profile = profile_files.find do |f|
+              content = File.read(f, encoding: 'binary')
+              content.include?('app.sociva.community.LiveDeliveryWidget')
+            end
+
+            if widget_profile
+              profile_plist = `security cms -D -i "#{widget_profile}" 2>/dev/null`
+              name_match = profile_plist.match(/<key>Name<\/key>\s*<string>([^<]+)<\/string>/)
+              profile_name = name_match ? name_match[1] : nil
+
+              uuid_match = profile_plist.match(/<key>UUID<\/key>\s*<string>([^<]+)<\/string>/)
+              profile_uuid = uuid_match ? uuid_match[1] : nil
+
+              if profile_name && profile_uuid
+                widget.build_configurations.each do |config|
+                  config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = profile_name
+                  config.build_settings['PROVISIONING_PROFILE'] = profile_uuid
+                end
+                project.save
+                puts "=== Manually assigned profile '#{profile_name}' (#{profile_uuid}) to widget ==="
+              else
+                abort('ERROR: Could not parse widget provisioning profile')
+              end
+            else
+              abort("ERROR: No provisioning profile found for app.sociva.community.LiveDeliveryWidget in #{profiles_dir}")
+            end
+          else
+            puts '=== Widget already has provisioning profile assigned ==='
+          end
+          RUBY
+
       - name: Set export compliance & increment build number
         script: |
           cd ios/App
