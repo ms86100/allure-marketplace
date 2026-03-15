@@ -12,7 +12,7 @@ import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
  * BUILD FINGERPRINT — if the device logs this, the bundle is current.
  * If not, the device is running stale JS.
  */
-export const PUSH_BUILD_ID = '2026-03-13-DEDUP-IMPORTS-BOOT-GATE';
+export const PUSH_BUILD_ID = '2026-03-04-TIMEOUT-ALL-NATIVE';
 
 /**
  * NEW APPROACH: Uses @capacitor/push-notifications for permissions + registration
@@ -59,41 +59,32 @@ function isValidFcmToken(token: string, platform: string): boolean {
   return token.length > 20;
 }
 
-/**
- * Deduplicated plugin loaders — concurrent callers share ONE in-flight import.
- * If the import fails/times out the cache resets so retries work.
- * NO pre-warming at module load (that caused the previous regression).
- */
-let _pnPromise: Promise<any> | null = null;
-async function getPushNotificationsPlugin(): Promise<typeof import('@capacitor/push-notifications').PushNotifications | null> {
-  if (!_pnPromise) {
-    _pnPromise = withTimeout(
-      import('@capacitor/push-notifications').then(m => m.PushNotifications),
+async function getPushNotificationsPlugin() {
+  try {
+    const { PushNotifications } = await withTimeout(
+      import('@capacitor/push-notifications'),
       PLUGIN_IMPORT_TIMEOUT_MS,
       'getPushNotificationsPlugin import timed out'
-    ).catch(e => {
-      console.warn('[Push] @capacitor/push-notifications not available:', e);
-      _pnPromise = null;
-      return null;
-    }) as any;
+    );
+    return PushNotifications;
+  } catch (e) {
+    console.warn('[Push] @capacitor/push-notifications not available:', e);
+    return null;
   }
-  return _pnPromise as any;
 }
 
-let _fcmPromise: Promise<any> | null = null;
-async function getFcmPlugin(): Promise<typeof import('@capacitor-community/fcm').FCM | null> {
-  if (!_fcmPromise) {
-    _fcmPromise = withTimeout(
-      import('@capacitor-community/fcm').then(m => m.FCM),
+async function getFcmPlugin() {
+  try {
+    const { FCM } = await withTimeout(
+      import('@capacitor-community/fcm'),
       PLUGIN_IMPORT_TIMEOUT_MS,
       'getFcmPlugin import timed out'
-    ).catch(e => {
-      console.warn('[Push] @capacitor-community/fcm not available:', e);
-      _fcmPromise = null;
-      return null;
-    });
+    );
+    return FCM;
+  } catch (e) {
+    console.warn('[Push] @capacitor-community/fcm not available:', e);
+    return null;
   }
-  return _fcmPromise;
 }
 
 // Module-level singleton guard
@@ -191,62 +182,6 @@ export function usePushNotificationsInternal() {
   // Store captured APNs token for direct delivery
   const apnsTokenRef = useRef<string | null>(null);
   const finalizationPromiseRef = useRef<Promise<boolean> | null>(null);
-  const apnsSavedRef = useRef(false);
-
-  /**
-   * Save APNs token to DB immediately — even before FCM token is available.
-   * Uses 'apns:{hex}' as the token column value so the edge function knows
-   * to deliver via APNs directly. If FCM getToken() later succeeds,
-   * claim_device_token will replace this placeholder row.
-   */
-  const saveApnsTokenImmediately = useCallback(async (apnsToken: string) => {
-    if (apnsSavedRef.current) return; // already saved this session
-    const currentUser = userRef.current;
-    if (!currentUser) {
-      pushLog('warn', 'APNS_IMMEDIATE_SAVE_NO_USER', { apnsPrefix: apnsToken.substring(0, 16) });
-      return;
-    }
-
-    const placeholderToken = `apns:${apnsToken}`;
-    pushLog('info', 'APNS_IMMEDIATE_SAVE_START', {
-      userId: currentUser.id,
-      apnsPrefix: apnsToken.substring(0, 16),
-    });
-
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const { error } = await withTimeout(
-          (async () => {
-            const result = await supabase.rpc('claim_device_token', {
-              p_user_id: currentUser.id,
-              p_token: placeholderToken,
-              p_platform: 'ios',
-              p_apns_token: apnsToken,
-            });
-            return result;
-          })(),
-          RPC_TIMEOUT_MS,
-          `saveApnsTokenImmediately timed out (attempt ${attempt})`
-        );
-
-        if (!error) {
-          apnsSavedRef.current = true;
-          pushLog('info', 'APNS_IMMEDIATE_SAVE_SUCCESS', {
-            userId: currentUser.id,
-            apnsPrefix: apnsToken.substring(0, 16),
-            attempt,
-          });
-          console.log(`[Push] ✓ APNs token saved immediately: ${apnsToken.substring(0, 16)}…`);
-          return;
-        }
-
-        pushLog('error', 'APNS_IMMEDIATE_SAVE_FAILED', { attempt, error: error.message });
-      } catch (err) {
-        pushLog('error', 'APNS_IMMEDIATE_SAVE_ERROR', { attempt, error: String(err) });
-      }
-      if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 400));
-    }
-  }, []);
 
   const waitForListenersReady = useCallback(async (source: string) => {
     pushLog('info', 'LISTENER_GATE_WAIT_START', { source, ts: Date.now() });
@@ -816,8 +751,6 @@ export function usePushNotificationsInternal() {
   markFailedRef.current = markFailed;
   const reconcileRuntimeTokenRef = useRef(reconcileRuntimeToken);
   reconcileRuntimeTokenRef.current = reconcileRuntimeToken;
-  const saveApnsTokenImmediatelyRef = useRef(saveApnsTokenImmediately);
-  saveApnsTokenImmediatelyRef.current = saveApnsTokenImmediately;
 
   // ── Listeners + lifecycle ──
   // LIFECYCLE FIX: Depend ONLY on user?.id to prevent effect remounts
@@ -850,7 +783,6 @@ export function usePushNotificationsInternal() {
 
     const platform = Capacitor.getPlatform();
     const cleanups: (() => void)[] = [];
-    let bootComplete = false;
 
     (async () => {
       const PN = await getPushNotificationsPlugin();
@@ -878,10 +810,6 @@ export function usePushNotificationsInternal() {
               apnsTokenRef.current = rawToken;
               pushLog('info', 'APNS_TOKEN_CAPTURED_MAIN_LISTENER', { prefix: rawToken.substring(0, 16), ts: Date.now() });
               console.log(`[Push][iOS] ✓ APNs token captured in main listener: ${rawToken.substring(0, 16)}…`);
-              // ── DUAL SAVE: persist APNs token to DB immediately (no FCM dependency) ──
-              saveApnsTokenImmediatelyRef.current(rawToken).catch(e =>
-                pushLog('error', 'APNS_IMMEDIATE_SAVE_FIRE_FORGET_FAILED', { error: String(e) })
-              );
             }
             // Now convert to FCM token for cross-platform addressing.
             console.log('[Push][iOS] Converting APNs → FCM token via FCM.getToken()…');
@@ -998,10 +926,6 @@ export function usePushNotificationsInternal() {
         listenersReadyResolveRef.current();
         listenersReadyResolveRef.current = null;
       }
-
-      // ── Mark boot complete so appStateChange handler can proceed ──
-      bootComplete = true;
-      pushLog('info', 'BOOT_COMPLETE', { platform, ts: Date.now() });
     })();
 
     // ── iOS: also listen for FCM token refresh ──
@@ -1020,8 +944,6 @@ export function usePushNotificationsInternal() {
       })();
     }
 
-    // (bootComplete declared above, before the main IIFE)
-
     // ── App resume: re-check permission and retry if now granted ──
     let appListenerCleanup: (() => void) | undefined;
 
@@ -1035,11 +957,8 @@ export function usePushNotificationsInternal() {
             let state = registrationStateRef.current;
             let hasRuntimeToken = Boolean(tokenRef.current);
 
-            // ── BOOT GATE: skip prelog reconcile if the main IIFE hasn't finished yet ──
-            // This prevents the concurrent plugin import that causes the native bridge deadlock.
-            if (!bootComplete) {
-              pushLog('info', 'RESUME_SKIPPED_BOOT_INCOMPLETE', { platform, ts: Date.now() });
-            } else if (!hasRuntimeToken && userRef.current) {
+            // Attempt an early runtime reconciliation before logging, to avoid stale "hasToken:false" snapshots.
+            if (!hasRuntimeToken && userRef.current) {
               try {
                 const reconciledEarly = await withTimeout(reconcileRuntimeTokenRef.current('app_resume_prelog'), LOGIN_RECONCILE_TIMEOUT_MS, 'app_resume_prelog reconcile timed out');
                 hasRuntimeToken = Boolean(tokenRef.current);
@@ -1229,13 +1148,6 @@ export function usePushNotificationsInternal() {
           // ── ALWAYS attempt registration on login ──
           registrationStateRef.current = 'idle';
           retryCountRef.current = 0;
-
-          // ── GATE: Wait for listener gate before reconciling ──
-          // This ensures the main IIFE's PN plugin import is complete
-          // before login tries a second concurrent plugin import.
-          pushLog('info', 'LOGIN_WAITING_FOR_LISTENER_GATE', { ts: Date.now() });
-          const listenersOk = await waitForListenersReady('login_block');
-          pushLog('info', 'LOGIN_LISTENER_GATE_RESULT', { listenersOk, ts: Date.now() });
 
           // First try reconcileRuntimeToken (fast path for iOS)
           pushLog('info', 'RECONCILE_STARTING', { ts: Date.now() });
