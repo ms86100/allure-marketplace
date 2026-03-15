@@ -52,6 +52,9 @@ export function UpiDeepLinkCheckout({
     return 'pay';
   });
   const [utrValue, setUtrValue] = useState('');
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [showUtrField, setShowUtrField] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hasOpenedApp = useRef<boolean>(
     (() => { try { return sessionStorage.getItem(UPI_OPENED_APP_KEY) === 'true'; } catch { return false; } })()
