@@ -1902,6 +1902,54 @@ export type Database = {
           },
         ]
       }
+      delivery_time_stats: {
+        Row: {
+          avg_delivery_minutes: number | null
+          avg_prep_minutes: number | null
+          id: string
+          sample_count: number | null
+          seller_id: string
+          society_id: string | null
+          time_bucket: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          avg_delivery_minutes?: number | null
+          avg_prep_minutes?: number | null
+          id?: string
+          sample_count?: number | null
+          seller_id: string
+          society_id?: string | null
+          time_bucket?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          avg_delivery_minutes?: number | null
+          avg_prep_minutes?: number | null
+          id?: string
+          sample_count?: number | null
+          seller_id?: string
+          society_id?: string | null
+          time_bucket?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_time_stats_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "seller_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_time_stats_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_tracking_logs: {
         Row: {
           assignment_id: string
@@ -3222,6 +3270,66 @@ export type Database = {
           status_key?: string
         }
         Relationships: []
+      }
+      order_suggestions: {
+        Row: {
+          acted_on: boolean | null
+          confidence_score: number | null
+          created_at: string | null
+          day_of_week: number | null
+          dismissed: boolean | null
+          id: string
+          product_id: string | null
+          seller_id: string | null
+          suggested_at: string | null
+          time_bucket: number | null
+          trigger_type: string
+          user_id: string
+        }
+        Insert: {
+          acted_on?: boolean | null
+          confidence_score?: number | null
+          created_at?: string | null
+          day_of_week?: number | null
+          dismissed?: boolean | null
+          id?: string
+          product_id?: string | null
+          seller_id?: string | null
+          suggested_at?: string | null
+          time_bucket?: number | null
+          trigger_type?: string
+          user_id: string
+        }
+        Update: {
+          acted_on?: boolean | null
+          confidence_score?: number | null
+          created_at?: string | null
+          day_of_week?: number | null
+          dismissed?: boolean | null
+          id?: string
+          product_id?: string | null
+          seller_id?: string | null
+          suggested_at?: string | null
+          time_bucket?: number | null
+          trigger_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_suggestions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_suggestions_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "seller_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       orders: {
         Row: {
