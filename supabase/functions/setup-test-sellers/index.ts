@@ -11,7 +11,7 @@ const SOCIETY_ID = "a0000000-0000-0000-0000-000000000001"; // Shriram Greenfield
 
 const TEST_SELLERS = [
   {
-    phone: "8448802907",
+    phone: "+918448802907",
     name: "Sagar Sharma",
     email: "sagar.sharma@test.sociva.app",
     flat_number: "A-304",
