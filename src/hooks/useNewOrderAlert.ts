@@ -5,7 +5,22 @@ import { hapticVibrate, hapticNotification } from '@/lib/haptics';
 
 const ACTIONABLE_STATUSES = ['placed', 'enquired', 'quoted'] as const;
 
-const ALERT_SOUND_URL = '/sounds/new-order-alert.mp3';
+function createAlarmSound(audioContext: AudioContext) {
+  const now = audioContext.currentTime;
+  for (let i = 0; i < 3; i++) {
+    const osc = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    osc.connect(gain);
+    gain.connect(audioContext.destination);
+    osc.frequency.value = i % 2 === 0 ? 880 : 660;
+    osc.type = 'square';
+    const start = now + i * 0.2;
+    gain.gain.setValueAtTime(0.25, start);
+    gain.gain.exponentialRampToValueAtTime(0.01, start + 0.18);
+    osc.start(start);
+    osc.stop(start + 0.2);
+  }
+}
 
 export interface NewOrder {
   id: string;
@@ -23,7 +38,7 @@ const LOOKBACK_MS = 5 * 60 * 1000;
 export function useNewOrderAlert(sellerId: string | null) {
   const queryClient = useQueryClient();
   const [pendingAlerts, setPendingAlerts] = useState<NewOrder[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSeenAtRef = useRef<string | null>(null);
   const pollDelayRef = useRef(MIN_POLL_MS);
@@ -49,39 +64,42 @@ export function useNewOrderAlert(sellerId: string | null) {
     queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats', sellerId] });
   }, [sellerId, queryClient]);
 
-  const playSound = useCallback(() => {
-    try {
-      if (!audioRef.current) {
-        audioRef.current = new Audio(ALERT_SOUND_URL);
-        audioRef.current.loop = false;
-      }
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
-    } catch (e) {
-      console.warn('[OrderAlert] Sound play failed:', e);
-    }
-  }, []);
-
   const stopBuzzing = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
+    try {
+      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+        audioCtxRef.current.close();
+        audioCtxRef.current = null;
+      }
+    } catch {}
   }, []);
 
   const startBuzzing = useCallback(() => {
     if (intervalRef.current) return;
     hapticNotification('warning');
-    playSound();
+    try {
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+      createAlarmSound(audioCtxRef.current);
+    } catch (e) {
+      console.warn('[OrderAlert] Sound failed:', e);
+    }
     intervalRef.current = setInterval(() => {
       hapticVibrate(500);
-      playSound();
-    }, 4000);
-  }, [playSound]);
+      try {
+        if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+          createAlarmSound(audioCtxRef.current);
+        }
+      } catch {}
+    }, 3000);
+  }, []);
 
   const dismiss = useCallback(() => {
     setPendingAlerts(prev => {

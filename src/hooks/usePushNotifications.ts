@@ -309,6 +309,13 @@ export function usePushNotificationsInternal() {
           body: notification?.body,
         });
         hapticNotification('success');
+
+        // Play the custom alert sound for seller order/inquiry notifications
+        try {
+          const audio = new Audio('/sounds/new-order-alert.mp3');
+          audio.play().catch(() => {});
+        } catch {}
+
         toast(notification?.title ?? 'New Notification', {
           description: notification?.body,
         });
