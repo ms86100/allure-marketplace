@@ -5,7 +5,22 @@ import { hapticVibrate, hapticNotification } from '@/lib/haptics';
 
 const ACTIONABLE_STATUSES = ['placed', 'enquired', 'quoted'] as const;
 
-const ALERT_SOUND_URL = '/sounds/new-order-alert.mp3';
+function createAlarmSound(audioContext: AudioContext) {
+  const now = audioContext.currentTime;
+  for (let i = 0; i < 3; i++) {
+    const osc = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    osc.connect(gain);
+    gain.connect(audioContext.destination);
+    osc.frequency.value = i % 2 === 0 ? 880 : 660;
+    osc.type = 'square';
+    const start = now + i * 0.2;
+    gain.gain.setValueAtTime(0.25, start);
+    gain.gain.exponentialRampToValueAtTime(0.01, start + 0.18);
+    osc.start(start);
+    osc.stop(start + 0.2);
+  }
+}
 
 export interface NewOrder {
   id: string;
