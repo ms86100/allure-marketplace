@@ -40,6 +40,8 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
   const mapInitializedRef = useRef(false);
   const hasUserInteractedRef = useRef(false);
   const resolveRequestIdRef = useRef(0);
+  const idleDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const ignoreIdleUntilRef = useRef(0);
 
   const [marker, setMarker] = useState<{ lat: number; lng: number }>({ lat: latitude, lng: longitude });
   const [displayName, setDisplayName] = useState(name);
