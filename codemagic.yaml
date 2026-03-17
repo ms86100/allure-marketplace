@@ -493,13 +493,19 @@ workflows:
               team = s['DEVELOPMENT_TEAM']
               dep = s['IPHONEOS_DEPLOYMENT_TARGET']
               ent = s['CODE_SIGN_ENTITLEMENTS']
-              puts "#{name} [#{config.name}]: bundle=#{bid} team=#{team} deploy=#{dep} entitlements=#{ent}"
+              mach_o = s['MACH_O_TYPE']
+              exec_name = s['EXECUTABLE_NAME']
+              puts "#{name} [#{config.name}]: bundle=#{bid} team=#{team} deploy=#{dep} entitlements=#{ent} mach_o=#{mach_o} executable=#{exec_name}"
               errors << "#{name} missing DEVELOPMENT_TEAM" unless team && !team.empty?
               errors << "#{name} deployment target #{dep} < 16.1" if dep && dep.to_f < 16.1
+              errors << "#{name} MACH_O_TYPE is #{mach_o.inspect}, expected mh_execute" if name == 'LiveDeliveryWidgetExtension' && mach_o != 'mh_execute'
+              errors << "#{name} EXECUTABLE_NAME is #{exec_name.inspect}, expected LiveDeliveryWidgetExtension" if name == 'LiveDeliveryWidgetExtension' && exec_name != 'LiveDeliveryWidgetExtension'
             end
           end
 
-          # Check widget is embedded exactly once
+          widget_source = File.read('LiveDeliveryWidgetExtension/LiveDeliveryWidget.swift')
+          errors << 'Widget source is missing @main entry point' unless widget_source.match?(/^@main\s*$/)
+
           app = project.targets.find { |t| t.name == 'App' }
           if app
             embed_phases = app.build_phases.select { |p|
