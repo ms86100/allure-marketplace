@@ -374,6 +374,8 @@ workflows:
           end
 
           widget_group = project.main_group.find_subpath('LiveDeliveryWidgetExtension', true)
+          widget_group.path = 'LiveDeliveryWidgetExtension'
+          widget_group.source_tree = '<group>'
 
           %w[LiveDeliveryWidget.swift LiveDeliveryActivity.swift].each do |filename|
             ref = widget_group.files.find { |f| f.path == filename } || widget_group.new_file(filename)
@@ -1010,6 +1012,8 @@ workflows:
           end
 
           widget_group = project.main_group.find_subpath('LiveDeliveryWidgetExtension', true)
+          widget_group.path = 'LiveDeliveryWidgetExtension'
+          widget_group.source_tree = '<group>'
 
           %w[LiveDeliveryWidget.swift LiveDeliveryActivity.swift].each do |filename|
             ref = widget_group.files.find { |f| f.path == filename } || widget_group.new_file(filename)
