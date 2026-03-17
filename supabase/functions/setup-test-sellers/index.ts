@@ -149,24 +149,19 @@ Deno.serve(async (req) => {
       if (profErr) console.error(`Profile error: ${profErr.message}`);
 
       // Create seller profile
-      const slug = seller.store_name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "");
       const { data: sellerData, error: sellerErr } = await supabase.from("seller_profiles").insert({
         user_id: uid,
         business_name: seller.store_name,
-        slug,
         description: seller.store_description,
         seller_type: "society_resident",
         society_id: SOCIETY_ID,
         latitude: seller.latitude,
         longitude: seller.longitude,
-        address: "Shriram Greenfield, Budigere Cross, Bangalore 560049",
         categories: seller.categories,
         verification_status: "approved",
-        is_active: true,
+        is_available: true,
         sell_beyond_community: true,
         delivery_radius_km: 5,
-        has_completed_onboarding: true,
-        contact_phone: seller.phone,
       }).select("id").single();
 
       if (sellerErr) {
