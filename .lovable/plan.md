@@ -1,37 +1,49 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-## Fix: Codemagic YAML Validation Error
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-### Problem
-Codemagic's `ios_signing.bundle_identifier` field expects a **string**, not a list. Lines 21-23 and 651-653 use an array, which Codemagic rejects.
+## Phase I Live Activities — CI Pipeline Status
 
-### Fix
+### Codemagic Build Pipeline: COMPLETE
 
-**Both `ios-release` (line 19-23) and `release-all` (line 649-653) workflows** — change from:
+Both `ios-release` and `release-all` workflows now include:
 
-```yaml
-ios_signing:
-  distribution_type: app_store
-  bundle_identifier:
-    - app.sociva.community
-    - app.sociva.community.LiveDeliveryWidget
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+
+### Codemagic Requirements (User Action)
+
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
+
+### Runtime Call Chain (Verified)
+
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
 ```
 
-To:
+## Implementation Matrix
 
-```yaml
-ios_signing:
-  distribution_type: app_store
-  bundle_identifier: app.sociva.community
-```
-
-The widget signing is already handled by the `app-store-connect fetch-signing-files` call for the widget bundle ID + `xcode-project use-profiles` in the "Set up code signing" step. That step explicitly fetches profiles for both bundle IDs and applies them — so the widget will still be signed correctly.
-
-### What stays the same
-- The `Set up code signing` step already fetches profiles for **both** `app.sociva.community` and `app.sociva.community.LiveDeliveryWidget` — no changes needed there
-- The Ruby scripts that configure the widget target — no changes needed
-- The build command using `xcode-project use-profiles` — already correct
-
-### Summary
-Two lines changed in total (one per workflow). Everything else stays as-is.
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
