@@ -121,7 +121,7 @@ export function useLiveActivityOrchestrator(): void {
           try {
             const { data } = await supabase
               .from('delivery_assignments')
-              .select('eta_minutes, distance_meters, rider_name, vehicle_type')
+              .select('eta_minutes, distance_meters, rider_name')
               .eq('order_id', orderId)
               .not('status', 'in', '("cancelled","failed")')
               .maybeSingle();
