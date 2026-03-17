@@ -178,7 +178,7 @@ export function useLiveActivityOrchestrator(): void {
               eta_minutes: row?.eta_minutes,
               distance_meters: row?.distance_meters,
               rider_name: row?.rider_name,
-              vehicle_type: row.vehicle_type,
+              vehicle_type: null,
             });
             await LiveActivityManager.push(data);
           } catch { /* best-effort */ }
