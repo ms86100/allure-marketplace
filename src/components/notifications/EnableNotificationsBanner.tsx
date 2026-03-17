@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Bell, X, ExternalLink } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { PushNotifications } from '@capacitor/push-notifications';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 const DISMISSED_KEY = 'notif_banner_dismissed';
 const GRANTED_KEY = 'notif_permission_granted';
+const DENIED_CONFIRMED_KEY = 'notif_permission_denied_confirmed';
 
 export function EnableNotificationsBanner() {
   const { token, permissionStatus, requestFullPermission } = usePushNotifications();
@@ -15,37 +15,43 @@ export function EnableNotificationsBanner() {
     () => sessionStorage.getItem(DISMISSED_KEY) === '1'
   );
   const [loading, setLoading] = useState(false);
-  const [failedSilently, setFailedSilently] = useState(false);
-  const [grantedLocally, setGrantedLocally] = useState(() => sessionStorage.getItem(GRANTED_KEY) === '1');
+  const [grantedLocally, setGrantedLocally] = useState(
+    () => sessionStorage.getItem(GRANTED_KEY) === '1'
+  );
+  const [confirmedDenied, setConfirmedDenied] = useState(
+    () => localStorage.getItem(DENIED_CONFIRMED_KEY) === '1'
+  );
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
     if (permissionStatus === 'granted' || !!token) {
       sessionStorage.setItem(GRANTED_KEY, '1');
+      localStorage.removeItem(DENIED_CONFIRMED_KEY);
       setGrantedLocally(true);
+      setConfirmedDenied(false);
       return;
     }
 
-    (async () => {
-      try {
-        const result = await PushNotifications.checkPermissions();
+    // Double-check via native plugin
+    import('@capacitor/push-notifications').then(({ PushNotifications }) => {
+      PushNotifications.checkPermissions().then((result) => {
         if (result.receive === 'granted') {
           sessionStorage.setItem(GRANTED_KEY, '1');
+          localStorage.removeItem(DENIED_CONFIRMED_KEY);
           setGrantedLocally(true);
+          setConfirmedDenied(false);
         }
-      } catch {
-        // no-op
-      }
-    })();
+      }).catch(() => {});
+    }).catch(() => {});
   }, [permissionStatus, token]);
 
   if (!Capacitor.isNativePlatform()) return null;
   if (permissionStatus === 'granted' || !!token || grantedLocally) return null;
-  if (dismissed && permissionStatus === 'prompt' && !failedSilently) return null;
+  if (dismissed && !confirmedDenied) return null;
 
-  // If denied, show "Open Settings" variant
-  if (permissionStatus === 'denied' || failedSilently) {
+  // ── "Notifications Blocked" variant ──
+  if (confirmedDenied) {
     const openSettings = async () => {
       try {
         const platform = Capacitor.getPlatform();
@@ -89,26 +95,29 @@ export function EnableNotificationsBanner() {
     );
   }
 
+  // ── "Turn On" prompt — calls requestFullPermission which uses @capacitor/push-notifications ──
   const handleTurnOn = async () => {
     setLoading(true);
     try {
-      const permResult = await PushNotifications.requestPermissions();
+      await requestFullPermission();
 
-      if (permResult.receive !== 'granted') {
-        sessionStorage.removeItem(GRANTED_KEY);
-        setFailedSilently(true);
-        return;
-      }
-
-      // Immediately hide banner on all pages in this session
-      sessionStorage.setItem(GRANTED_KEY, '1');
-      setGrantedLocally(true);
-
-      // Let requestFullPermission handle register() with listener gate (fire-and-forget)
-      requestFullPermission().catch(e => console.warn('[Push] Background reconciliation:', e));
+      // Re-check permission after the call
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const result = await PushNotifications.checkPermissions();
+        if (result.receive === 'granted') {
+          sessionStorage.setItem(GRANTED_KEY, '1');
+          localStorage.removeItem(DENIED_CONFIRMED_KEY);
+          setGrantedLocally(true);
+          setConfirmedDenied(false);
+        } else if (result.receive === 'denied') {
+          localStorage.setItem(DENIED_CONFIRMED_KEY, '1');
+          setConfirmedDenied(true);
+        }
+      } catch {}
     } catch {
-      sessionStorage.removeItem(GRANTED_KEY);
-      setFailedSilently(true);
+      sessionStorage.setItem(DISMISSED_KEY, '1');
+      setDismissed(true);
     } finally {
       setLoading(false);
     }
