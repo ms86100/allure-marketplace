@@ -191,8 +191,6 @@ workflows:
               <array>
                   <string>applinks:block-eats.lovable.app</string>
               </array>
-              <key>com.apple.developer.activitykit</key>
-              <true/>
           </dict>
           </plist>
           ENTITLEMENTS
