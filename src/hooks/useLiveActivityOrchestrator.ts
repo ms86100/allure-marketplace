@@ -175,9 +175,9 @@ export function useLiveActivityOrchestrator(): void {
             console.log(TAG, `Delivery update for order ${order.id}: eta=${row.eta_minutes}, distance=${row.distance_meters}`);
 
             const data = buildLiveActivityData(order, {
-              eta_minutes: row.eta_minutes,
-              distance_meters: row.distance_meters,
-              rider_name: row.rider_name,
+              eta_minutes: row?.eta_minutes,
+              distance_meters: row?.distance_meters,
+              rider_name: row?.rider_name,
               vehicle_type: row.vehicle_type,
             });
             await LiveActivityManager.push(data);
