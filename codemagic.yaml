@@ -1187,12 +1187,13 @@ workflows:
             exit 1
           fi
 
-      - name: Verify ActivityKit entitlement exists (release-all)
+      - name: Verify NSSupportsLiveActivities in Info.plist (release-all)
         script: |
-          if ! grep -q "com.apple.developer.activitykit" ios/App/App/App.entitlements; then
-            echo "ERROR: ActivityKit entitlement missing from App.entitlements"
+          if ! grep -q "NSSupportsLiveActivities" ios/App/App/Info.plist; then
+            echo "ERROR: NSSupportsLiveActivities missing from Info.plist"
             exit 1
           fi
+          echo "NSSupportsLiveActivities confirmed in Info.plist"
 
       - name: Verify AppDelegate push registration (release-all)
         script: |
