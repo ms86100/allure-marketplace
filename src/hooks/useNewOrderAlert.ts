@@ -77,26 +77,29 @@ export function useNewOrderAlert(sellerId: string | null) {
     } catch {}
   }, []);
 
-  const stopBuzzing = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-  }, []);
-
   const startBuzzing = useCallback(() => {
     if (intervalRef.current) return;
     hapticNotification('warning');
-    playSound();
+    try {
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+      createAlarmSound(audioCtxRef.current);
+    } catch (e) {
+      console.warn('[OrderAlert] Sound failed:', e);
+    }
     intervalRef.current = setInterval(() => {
       hapticVibrate(500);
-      playSound();
-    }, 4000);
-  }, [playSound]);
+      try {
+        if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+          createAlarmSound(audioCtxRef.current);
+        }
+      } catch {}
+    }, 3000);
+  }, []);
 
   const dismiss = useCallback(() => {
     setPendingAlerts(prev => {
