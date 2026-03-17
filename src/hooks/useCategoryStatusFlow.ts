@@ -64,7 +64,7 @@ export function useCategoryStatusFlow(
       }
       setIsLoading(false);
     })();
-  }, [sellerPrimaryGroup, orderType, fulfillmentType]);
+  }, [sellerPrimaryGroup, orderType, fulfillmentType, deliveryHandledBy]);
 
   return { flow, isLoading };
 }
