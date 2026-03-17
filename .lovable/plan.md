@@ -1,49 +1,27 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+## Problem
 
-## Phase I Live Activities — CI Pipeline Status
+Two of the five frozen push notification files were overwritten with older/broken versions:
 
-### Codemagic Build Pipeline: COMPLETE
+| File | Current (broken) | Frozen backup (working) |
+|------|------------------|------------------------|
+| `src/hooks/usePushNotifications.ts` | BUILD_ID `2026-03-04-TIMEOUT-ALL-NATIVE`, 1394 lines, over-engineered with excessive timeouts, missing direct `saveTokenToDb` with fallback upsert | BUILD_ID `2026-03-07-DUAL-PLUGIN-V2-LISTENER-GATE`, 373 lines, clean dual-plugin architecture with RPC + upsert fallback |
+| `src/components/notifications/EnableNotificationsBanner.tsx` | Imports `PushNotifications` at top-level (crashes on web), missing `DENIED_CONFIRMED_KEY` persistence, different `handleTurnOn` flow | Uses dynamic imports, has `confirmedDenied` state with localStorage, delegates to `requestFullPermission` cleanly |
 
-Both `ios-release` and `release-all` workflows now include:
+The other 3 frozen files (`PushNotificationProvider.tsx`, `PushNotificationContext.tsx`, `capacitor.ts`) are unchanged and correct.
 
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+### Why tokens aren't being stored
 
-### Codemagic Requirements (User Action)
+The current broken `usePushNotifications.ts` has an overly complex finalization pipeline with multiple timeout gates (`waitForApnsToken`, `waitForListenersReady`, etc.). The `handleValidToken` function requires APNs token to be present before saving, and if timing is off, it calls `markFailed('apns_missing')` and never persists. The working backup has a simpler flow: the `registration` listener fires → gets APNs token → immediately calls `FCM.getToken()` → saves both tokens via `saveTokenToDb` with a fallback upsert.
 
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
+## Plan
 
-### Runtime Call Chain (Verified)
+### 1. Restore `src/hooks/usePushNotifications.ts` from frozen backup
+Replace the entire 1394-line file with the 373-line frozen backup version (BUILD_ID `2026-03-07-DUAL-PLUGIN-V2-LISTENER-GATE`).
 
-```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
-```
+### 2. Restore `src/components/notifications/EnableNotificationsBanner.tsx` from frozen backup
+Replace the entire 154-line file with the 163-line frozen backup version that uses dynamic imports and has proper `DENIED_CONFIRMED_KEY` handling.
 
-## Implementation Matrix
+No other files need changes. The `pushPermissionStage` import used by the broken version can remain in the codebase (unused import won't cause runtime issues, and tree-shaking removes it from the bundle).
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
