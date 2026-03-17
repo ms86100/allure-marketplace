@@ -64,17 +64,17 @@ export function useNewOrderAlert(sellerId: string | null) {
     queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats', sellerId] });
   }, [sellerId, queryClient]);
 
-  const playSound = useCallback(() => {
-    try {
-      if (!audioRef.current) {
-        audioRef.current = new Audio(ALERT_SOUND_URL);
-        audioRef.current.loop = false;
-      }
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
-    } catch (e) {
-      console.warn('[OrderAlert] Sound play failed:', e);
+  const stopBuzzing = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
+    try {
+      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+        audioCtxRef.current.close();
+        audioCtxRef.current = null;
+      }
+    } catch {}
   }, []);
 
   const stopBuzzing = useCallback(() => {
