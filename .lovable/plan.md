@@ -1,51 +1,49 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-# Simplify Widget Extension Signing — Remove Manual Profile Parsing
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-## Problem
+## Phase I Live Activities — CI Pipeline Status
 
-The `xcode-project use-profiles` command should automatically assign provisioning profiles to the widget target. The manual profile-parsing steps (lines 493-541 in `ios-release`, lines 1134-1182 in `release-all`) are brittle and unnecessary. The widget target already has the correct signing settings (`CODE_SIGN_STYLE = Manual`, `DEVELOPMENT_TEAM`, `CODE_SIGN_IDENTITY`, `PRODUCT_BUNDLE_IDENTIFIER`), so `use-profiles` should match them automatically.
+### Codemagic Build Pipeline: COMPLETE
 
-The manual parsing may actually be interfering — or at minimum adding fragile complexity for no benefit.
+Both `ios-release` and `release-all` workflows now include:
 
-## Changes to `codemagic.yaml`
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
 
-### 1. Remove "Force-assign widget provisioning profile" step from `ios-release`
-Delete lines 493-541 entirely (the step that parses `.mobileprovision` files with `security cms`).
+### Codemagic Requirements (User Action)
 
-### 2. Remove "Force-assign widget provisioning profile (release-all)" step from `release-all`
-Delete lines 1134-1182 entirely (same manual parsing logic).
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
 
-### 3. Add debug logging after `use-profiles`
-In both workflows, add a small verification step after `xcode-project use-profiles` that prints the widget target's signing settings — so if the build still fails, we'll see exactly what `use-profiles` assigned:
+### Runtime Call Chain (Verified)
 
-```bash
-- name: Verify widget signing settings
-  script: |
-    cd ios/App
-    ruby - << 'RUBY'
-    require 'xcodeproj'
-    project = Xcodeproj::Project.open('App.xcodeproj')
-    widget = project.targets.find { |t| t.name == 'LiveDeliveryWidgetExtension' }
-    abort('Widget target not found') unless widget
-    widget.build_configurations.each do |config|
-      s = config.build_settings
-      puts "=== #{config.name} ==="
-      puts "  BUNDLE_ID: #{s['PRODUCT_BUNDLE_IDENTIFIER']}"
-      puts "  TEAM: #{s['DEVELOPMENT_TEAM']}"
-      puts "  SIGN_STYLE: #{s['CODE_SIGN_STYLE']}"
-      puts "  SIGN_IDENTITY: #{s['CODE_SIGN_IDENTITY']}"
-      puts "  PROFILE_SPECIFIER: #{s['PROVISIONING_PROFILE_SPECIFIER']}"
-      puts "  PROFILE: #{s['PROVISIONING_PROFILE']}"
-    end
-    RUBY
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
 ```
 
-This gives us diagnostic output without modifying anything.
+## Implementation Matrix
 
-## Summary
-
-- Delete 2 "Force-assign" steps (manual `.mobileprovision` parsing)
-- Add 2 lightweight "Verify widget signing settings" steps (read-only diagnostics)
-- No other changes — the signing settings on the target are already correct
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
