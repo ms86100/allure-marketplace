@@ -5,22 +5,7 @@ import { hapticVibrate, hapticNotification } from '@/lib/haptics';
 
 const ACTIONABLE_STATUSES = ['placed', 'enquired', 'quoted'] as const;
 
-function createAlarmSound(audioContext: AudioContext) {
-  const now = audioContext.currentTime;
-  for (let i = 0; i < 3; i++) {
-    const osc = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    osc.connect(gain);
-    gain.connect(audioContext.destination);
-    osc.frequency.value = i % 2 === 0 ? 880 : 660;
-    osc.type = 'square';
-    const start = now + i * 0.2;
-    gain.gain.setValueAtTime(0.25, start);
-    gain.gain.exponentialRampToValueAtTime(0.01, start + 0.18);
-    osc.start(start);
-    osc.stop(start + 0.2);
-  }
-}
+const ALERT_SOUND_URL = '/sounds/new-order-alert.mp3';
 
 export interface NewOrder {
   id: string;
@@ -33,23 +18,20 @@ const MIN_POLL_MS = 3000;
 const MAX_POLL_MS = 30000;
 const BACKOFF_FACTOR = 1.5;
 const SNOOZE_MS = 60000;
-const LOOKBACK_MS = 5 * 60 * 1000; // 5 minutes (used for subsequent polls only)
-const MAX_EMPTY_AT_MAX_DELAY = 3; // Stop polling after this many consecutive empty results at max delay
+const LOOKBACK_MS = 5 * 60 * 1000;
 
 export function useNewOrderAlert(sellerId: string | null) {
   const queryClient = useQueryClient();
   const [pendingAlerts, setPendingAlerts] = useState<NewOrder[]>([]);
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastSeenAtRef = useRef<string | null>(null); // null = first poll fetches ALL actionable
+  const lastSeenAtRef = useRef<string | null>(null);
   const pollDelayRef = useRef(MIN_POLL_MS);
   const mountedAtRef = useRef(new Date().toISOString());
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const dismissedIdsRef = useRef<Set<string>>(new Set());
   const snoozedUntilRef = useRef<Record<string, number>>({});
-  const emptyAtMaxRef = useRef(0);
-  const pollingStoppedRef = useRef(false);
 
   const handleNewOrder = useCallback((order: NewOrder) => {
     if (seenIdsRef.current.has(order.id)) return;
@@ -62,50 +44,44 @@ export function useNewOrderAlert(sellerId: string | null) {
       lastSeenAtRef.current = order.created_at;
     }
     pollDelayRef.current = MIN_POLL_MS;
-    emptyAtMaxRef.current = 0;
-    pollingStoppedRef.current = false;
     setPendingAlerts(prev => [...prev, order]);
     queryClient.invalidateQueries({ queryKey: ['seller-orders', sellerId] });
     queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats', sellerId] });
   }, [sellerId, queryClient]);
+
+  const playSound = useCallback(() => {
+    try {
+      if (!audioRef.current) {
+        audioRef.current = new Audio(ALERT_SOUND_URL);
+        audioRef.current.loop = false;
+      }
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+    } catch (e) {
+      console.warn('[OrderAlert] Sound play failed:', e);
+    }
+  }, []);
 
   const stopBuzzing = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    try {
-      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
-        audioCtxRef.current.close();
-        audioCtxRef.current = null;
-      }
-    } catch {}
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
   }, []);
 
   const startBuzzing = useCallback(() => {
-    // DEFECT 8 FIX: Prevent overlapping buzzing intervals
     if (intervalRef.current) return;
     hapticNotification('warning');
-    try {
-      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      }
-      if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume();
-      }
-      createAlarmSound(audioCtxRef.current);
-    } catch (e) {
-      console.warn('[OrderAlert] Sound failed:', e);
-    }
+    playSound();
     intervalRef.current = setInterval(() => {
       hapticVibrate(500);
-      try {
-        if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
-          createAlarmSound(audioCtxRef.current);
-        }
-      } catch {}
-    }, 3000);
-  }, []);
+      playSound();
+    }, 4000);
+  }, [playSound]);
 
   const dismiss = useCallback(() => {
     setPendingAlerts(prev => {
@@ -153,12 +129,33 @@ export function useNewOrderAlert(sellerId: string | null) {
           });
         }
       )
+      // Also listen to UPDATE events (e.g. order created just before subscription was ready)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `seller_id=eq.${sellerId}`,
+        },
+        (payload) => {
+          const n = payload.new as any;
+          if (ACTIONABLE_STATUSES.includes(n.status)) {
+            handleNewOrder({
+              id: n.id,
+              status: n.status,
+              created_at: n.created_at,
+              total_amount: n.total_amount,
+            });
+          }
+        }
+      )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [sellerId, handleNewOrder]);
 
-  // ── Polling fallback — fetches ALL actionable orders ──
+  // ── Polling fallback — never stops, always keeps a safety net ──
   useEffect(() => {
     if (!sellerId) return;
 
@@ -167,7 +164,6 @@ export function useNewOrderAlert(sellerId: string | null) {
     const poll = async () => {
       if (cancelled) return;
       try {
-        // DEFECT 6 FIX: On first poll (lastSeenAtRef.current is null), fetch ALL actionable orders
         let query = supabase
           .from('orders')
           .select('id, status, total_amount, created_at')
@@ -178,7 +174,6 @@ export function useNewOrderAlert(sellerId: string | null) {
         if (lastSeenAtRef.current) {
           query = query.gt('created_at', lastSeenAtRef.current);
         } else {
-          // Only alert on orders created AFTER this session started
           query = query.gt('created_at', mountedAtRef.current);
         }
 
@@ -186,16 +181,9 @@ export function useNewOrderAlert(sellerId: string | null) {
 
         if (data && data.length > 0) {
           data.forEach(order => handleNewOrder(order as NewOrder));
-          emptyAtMaxRef.current = 0;
+          pollDelayRef.current = MIN_POLL_MS;
         } else {
           pollDelayRef.current = Math.min(pollDelayRef.current * BACKOFF_FACTOR, MAX_POLL_MS);
-          if (pollDelayRef.current >= MAX_POLL_MS) {
-            emptyAtMaxRef.current += 1;
-            if (emptyAtMaxRef.current >= MAX_EMPTY_AT_MAX_DELAY) {
-              pollingStoppedRef.current = true;
-              return; // Stop polling, rely on realtime
-            }
-          }
         }
       } catch {
         // Silently ignore poll errors
