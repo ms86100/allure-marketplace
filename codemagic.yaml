@@ -448,38 +448,75 @@ workflows:
       - name: Update iOS project settings
         script: |
           cd ios/App
-          sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = .*;/PRODUCT_BUNDLE_IDENTIFIER = $BUNDLE_ID;/g" App.xcodeproj/project.pbxproj
-          # Set deployment target to 16.1 for ActivityKit Live Activities support
-          sed -i '' "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*/IPHONEOS_DEPLOYMENT_TARGET = 16.1/g" App.xcodeproj/project.pbxproj
-          # Restore widget extension bundle ID (sed above overwrites it)
           ruby - << 'RUBY'
           require 'xcodeproj'
           TEAM_ID = '6HBR38JB8Z'
 
           project = Xcodeproj::Project.open('App.xcodeproj')
           project.targets.each do |target|
-            next unless target.name.start_with?('LiveDeliveryWidgetExtension')
             target.build_configurations.each do |config|
               settings = config.build_settings
-              settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'app.sociva.community.LiveDeliveryWidget'
-              settings['PRODUCT_NAME'] = 'LiveDeliveryWidgetExtension'
               settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.1'
               settings['DEVELOPMENT_TEAM'] = TEAM_ID
+
+              case target.name
+              when 'App'
+                settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'app.sociva.community'
+              when 'LiveDeliveryWidgetExtension'
+                settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'app.sociva.community.LiveDeliveryWidget'
+                settings['PRODUCT_NAME'] = 'LiveDeliveryWidgetExtension'
+              end
             end
           end
           project.save
+          puts '=== Project settings updated (Ruby-only, no sed) ==='
+          RUBY
+
+      - name: Preflight signing check
+        script: |
+          cd ios/App
+          ruby - << 'RUBY'
+          require 'xcodeproj'
+          project = Xcodeproj::Project.open('App.xcodeproj')
+          errors = []
+
+          %w[App LiveDeliveryWidgetExtension].each do |name|
+            t = project.targets.find { |t| t.name == name }
+            unless t
+              errors << "Target '#{name}' NOT FOUND"
+              next
+            end
+            t.build_configurations.each do |config|
+              s = config.build_settings
+              bid = s['PRODUCT_BUNDLE_IDENTIFIER']
+              team = s['DEVELOPMENT_TEAM']
+              dep = s['IPHONEOS_DEPLOYMENT_TARGET']
+              ent = s['CODE_SIGN_ENTITLEMENTS']
+              puts "#{name} [#{config.name}]: bundle=#{bid} team=#{team} deploy=#{dep} entitlements=#{ent}"
+              errors << "#{name} missing DEVELOPMENT_TEAM" unless team && !team.empty?
+              errors << "#{name} deployment target #{dep} < 16.1" if dep && dep.to_f < 16.1
+            end
+          end
+
+          # Check widget is embedded exactly once
+          app = project.targets.find { |t| t.name == 'App' }
+          if app
+            embed_phases = app.build_phases.select { |p|
+              p.is_a?(Xcodeproj::Project::Object::PBXCopyFilesBuildPhase) && p.name == 'Embed App Extensions'
+            }
+            appex_count = embed_phases.flat_map { |p| p.files.to_a }.count { |f| f.file_ref&.path.to_s.include?('LiveDeliveryWidgetExtension') }
+            errors << "Widget embedded #{appex_count} times (expected 1)" unless appex_count == 1
+          end
+
+          unless errors.empty?
+            errors.each { |e| puts "PREFLIGHT ERROR: #{e}" }
+            abort("Preflight failed with #{errors.size} error(s)")
+          end
+          puts '=== Preflight passed ==='
           RUBY
 
       - name: Set up code signing
         script: |
-          keychain initialize
-          app-store-connect fetch-signing-files "app.sociva.community" \
-            --type IOS_APP_STORE \
-            --create
-          app-store-connect fetch-signing-files "app.sociva.community.LiveDeliveryWidget" \
-            --type IOS_APP_STORE \
-            --create
-          keychain add-certificates
           xcode-project use-profiles
 
       - name: Verify widget signing settings
