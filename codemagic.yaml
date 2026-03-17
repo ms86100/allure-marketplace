@@ -648,7 +648,9 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: app.sociva.community
+        bundle_identifier:
+          - app.sociva.community
+          - app.sociva.community.LiveDeliveryWidget
       android_signing:
         - sociva_keystore
       groups:
