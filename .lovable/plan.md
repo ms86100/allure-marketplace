@@ -1,49 +1,38 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+## Fix: Remove `com.apple.developer.activitykit` from entitlements files
 
-## Phase I Live Activities — CI Pipeline Status
+### Root cause (confirmed via Apple Developer Forums)
 
-### Codemagic Build Pipeline: COMPLETE
+`com.apple.developer.activitykit` is **not a real provisioning profile entitlement**. Apple does not list it as a capability in the Developer Portal, and it cannot be included in any provisioning profile. When Xcode sees it in an `.entitlements` file, it tries to match it against the profile, fails, and produces the exact error you are seeing.
 
-Both `ios-release` and `release-all` workflows now include:
+Live Activities are enabled solely through `NSSupportsLiveActivities = YES` in `Info.plist` (which your pipeline already sets). No entitlements key is required.
 
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+This is the same issue described in [this Apple Developer Forums thread](https://developer.apple.com/forums/thread/808712) — the fix is to remove the entitlement key from both `.entitlements` files.
 
-### Codemagic Requirements (User Action)
+### Changes to `codemagic.yaml`
 
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
+**Both `ios-release` and `release-all` workflows:**
 
-### Runtime Call Chain (Verified)
+1. **Remove `com.apple.developer.activitykit` from `App/App.entitlements`** (lines ~194-195 and ~850-851)
+   - Keep `aps-environment` and `associated-domains` — only remove the activitykit key
 
-```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
-```
+2. **Remove `com.apple.developer.activitykit` from `LiveDeliveryWidgetExtension.entitlements`** (lines ~348-349 and ~992-993)
+   - The widget entitlements file becomes an empty dict (or can be omitted entirely)
 
-## Implementation Matrix
+3. **Remove the "Verify ActivityKit entitlement exists" steps** (lines ~560-568 and ~1201-1206)
+   - These checks are now invalid since the entitlement is intentionally removed
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+4. **Keep `NSSupportsLiveActivities = YES` in Info.plist** — this is the correct mechanism and is already present
+
+### What stays the same
+- Widget extension target creation (Ruby xcodeproj scripts)
+- All Swift source files (LiveDeliveryWidget.swift, LiveDeliveryActivity.swift, LiveActivityPlugin.swift)
+- `NSSupportsLiveActivities` in Info.plist
+- Push notification entitlements (`aps-environment`)
+- Signing flow (`xcode-project use-profiles`)
+- All preflight checks except the removed activitykit verification
+
+### Expected result
+The archive should pass the signing/entitlement validation stage and proceed to compilation. If there are further Swift compilation errors in the widget target, those will now surface clearly instead of being masked by the entitlement failure.
+
