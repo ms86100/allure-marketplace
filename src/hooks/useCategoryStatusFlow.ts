@@ -25,13 +25,14 @@ export interface StatusTransition {
 export function useCategoryStatusFlow(
   sellerPrimaryGroup: string | null | undefined,
   orderType: string | null | undefined,
-  fulfillmentType?: string | null
+  fulfillmentType?: string | null,
+  deliveryHandledBy?: string | null
 ) {
   const [flow, setFlow] = useState<StatusFlowStep[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const transactionType = resolveTransactionType(sellerPrimaryGroup || 'default', orderType, fulfillmentType);
+    const transactionType = resolveTransactionType(sellerPrimaryGroup || 'default', orderType, fulfillmentType, deliveryHandledBy);
 
     (async () => {
       // Try specific parent_group first, then fallback to 'default'
