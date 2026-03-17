@@ -29,7 +29,7 @@ const TEST_SELLERS = [
     ],
   },
   {
-    phone: "7838459432",
+    phone: "+917838459432",
     name: "Priya Reddy",
     email: "priya.reddy@test.sociva.app",
     flat_number: "B-512",
