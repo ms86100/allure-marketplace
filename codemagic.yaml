@@ -487,6 +487,15 @@ workflows:
           app-store-connect fetch-signing-files "app.sociva.community.LiveDeliveryWidget" \
             --type IOS_APP_STORE \
             --create
+          # Verify widget profile was actually fetched
+          WIDGET_PROFILE=$(find ~/Library/MobileDevice/Provisioning\ Profiles -name '*.mobileprovision' -exec grep -l 'LiveDeliveryWidget' {} \; 2>/dev/null | head -1)
+          if [ -z "$WIDGET_PROFILE" ]; then
+            echo "⚠️  WARNING: Widget provisioning profile not found after fetch. Listing available profiles:"
+            ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles directory"
+            echo "Continuing — use-profiles may still handle it..."
+          else
+            echo "✅ Widget profile found: $WIDGET_PROFILE"
+          fi
           keychain add-certificates
           xcode-project use-profiles
 
