@@ -553,16 +553,13 @@ workflows:
             exit 1
           fi
 
-      - name: Verify ActivityKit entitlement exists
+      - name: Verify NSSupportsLiveActivities in Info.plist
         script: |
-          if ! grep -q "com.apple.developer.activitykit" ios/App/App/App.entitlements; then
-            echo "ERROR: ActivityKit entitlement missing from App.entitlements"
+          if ! grep -q "NSSupportsLiveActivities" ios/App/App/Info.plist; then
+            echo "ERROR: NSSupportsLiveActivities missing from Info.plist"
             exit 1
           fi
-          if ! grep -q "com.apple.developer.activitykit" ios/App/LiveDeliveryWidgetExtension/LiveDeliveryWidgetExtension.entitlements; then
-            echo "ERROR: ActivityKit entitlement missing from widget extension"
-            exit 1
-          fi
+          echo "NSSupportsLiveActivities confirmed in Info.plist"
 
       - name: Verify AppDelegate push registration
         script: |
