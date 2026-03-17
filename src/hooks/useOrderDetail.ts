@@ -63,12 +63,13 @@ export function useOrderDetail(id: string | undefined) {
   const effectiveParentGroup = sellerPrimaryGroup || derivedParentGroup;
   const isEnquiryOrder = (order as any)?.order_type === 'enquiry';
   const orderFulfillmentType = (order as any)?.fulfillment_type || 'self_pickup';
-  const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType);
+  const deliveryHandledBy = (order as any)?.delivery_handled_by || null;
+  const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy);
 
   // Load transitions for accurate next-status and cancellation checks
   const resolvedTxnType = useMemo(
-    () => resolveTransactionType(effectiveParentGroup || 'default', orderType, orderFulfillmentType),
-    [effectiveParentGroup, orderType, orderFulfillmentType]
+    () => resolveTransactionType(effectiveParentGroup || 'default', orderType, orderFulfillmentType, deliveryHandledBy),
+    [effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy]
   );
   const transitions = useStatusTransitions(effectiveParentGroup || 'default', resolvedTxnType);
 
