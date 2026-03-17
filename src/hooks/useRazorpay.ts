@@ -94,15 +94,17 @@ export function useRazorpay() {
         prefill: data.prefill,
         notes: data.notes,
         theme: {
-          color: '#F37254',
+          color: '#2D4A3E',
         },
         handler: function (response: any) {
           console.log('Payment successful:', response);
+          document.body.classList.remove('razorpay-active');
           options.onSuccess(response.razorpay_payment_id, response.razorpay_order_id);
         },
         modal: {
           ondismiss: function () {
             console.log('Payment modal closed');
+            document.body.classList.remove('razorpay-active');
             setIsLoading(false);
             options.onDismiss?.();
           },
@@ -113,9 +115,11 @@ export function useRazorpay() {
       
       razorpay.on('payment.failed', function (response: any) {
         console.error('Payment failed:', response.error);
+        document.body.classList.remove('razorpay-active');
         options.onFailure(response.error);
       });
 
+      document.body.classList.add('razorpay-active');
       razorpay.open();
     } catch (error: any) {
       console.error('Razorpay error:', error);

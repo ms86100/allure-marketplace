@@ -1,70 +1,49 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-# Fix Razorpay Checkout Layout Issues in Native App
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-## Problem
+## Phase I Live Activities — CI Pipeline Status
 
-When Razorpay checkout opens inside the native app webview (Median.js), the Razorpay overlay renders behind the device status bar. The `viewport-fit=cover` meta tag makes the webview extend edge-to-edge, but Razorpay's internal iframe/overlay does not account for safe area insets, causing:
+### Codemagic Build Pipeline: COMPLETE
 
-1. The red/orange header (`#F37254` theme) bleeds into the status bar area
-2. Back button and store name overlap with time/battery indicators
-3. No way for the user to navigate back if they can't reach the Razorpay back button
+Both `ios-release` and `release-all` workflows now include:
 
-## Root Cause
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
 
-- `viewport-fit=cover` + `apple-mobile-web-app-status-bar-style=black-translucent` extends the webview behind the status bar
-- Razorpay's checkout overlay (iframe) does not apply `env(safe-area-inset-top)` padding
-- We cannot modify Razorpay's internal UI, but we can inject CSS that targets the Razorpay iframe container
+### Codemagic Requirements (User Action)
 
-## Fix — Two Changes
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
 
-### 1. Add global CSS to pad the Razorpay overlay container (`src/index.css`)
+### Runtime Call Chain (Verified)
 
-Razorpay's checkout creates a container div with class `.razorpay-container` or a full-screen iframe. We add a CSS rule to push it below the safe area:
-
-```css
-/* Razorpay checkout safe area fix for notched devices */
-.razorpay-container,
-.razorpay-checkout-frame {
-  top: env(safe-area-inset-top, 0px) !important;
-  height: calc(100% - env(safe-area-inset-top, 0px)) !important;
-}
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
 ```
 
-### 2. Dynamically add safe-area padding when Razorpay opens (`src/hooks/useRazorpay.ts`)
+## Implementation Matrix
 
-Since we can't control Razorpay's iframe styling reliably via CSS alone, we apply a `padding-top` to `document.body` when the Razorpay modal opens and remove it on dismiss/completion. This pushes the entire Razorpay overlay down below the status bar:
-
-```typescript
-// Before razorpay.open()
-document.body.style.setProperty('--rzp-safe-top', 'env(safe-area-inset-top, 0px)');
-document.body.classList.add('razorpay-active');
-
-// On dismiss/success/failure — remove it
-document.body.classList.remove('razorpay-active');
-```
-
-And in CSS:
-```css
-body.razorpay-active .razorpay-container,
-body.razorpay-active iframe[src*="razorpay"] {
-  top: env(safe-area-inset-top, 0px) !important;
-}
-```
-
-### 3. Update Razorpay theme color to match app branding
-
-Change `theme.color` from `#F37254` (harsh red/orange) to the app's primary color `#2D4A3E` (dark green matching the app theme-color meta tag), so even if the header overlaps slightly, it blends with the status bar style.
-
-In `src/hooks/useRazorpay.ts`, line 97:
-```typescript
-theme: {
-  color: '#2D4A3E',  // Match app theme instead of Razorpay default orange
-},
-```
-
-## Files Modified
-
-- `src/index.css` — Add Razorpay safe area CSS rules
-- `src/hooks/useRazorpay.ts` — Add/remove `razorpay-active` class on body, change theme color
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
