@@ -469,3 +469,16 @@ html.large-font a {
   left: auto !important;
   right: 0 !important;
 }
+
+/* Razorpay checkout safe area fix for notched devices */
+.razorpay-container,
+.razorpay-checkout-frame {
+  top: env(safe-area-inset-top, 0px) !important;
+  height: calc(100% - env(safe-area-inset-top, 0px)) !important;
+}
+
+body.razorpay-active .razorpay-container,
+body.razorpay-active iframe[src*="razorpay"] {
+  top: env(safe-area-inset-top, 0px) !important;
+  height: calc(100% - env(safe-area-inset-top, 0px)) !important;
+}
