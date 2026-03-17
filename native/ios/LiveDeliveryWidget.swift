@@ -12,6 +12,7 @@ import WidgetKit
 import ActivityKit
 
 @available(iOS 16.1, *)
+@main
 struct LiveDeliveryWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: LiveDeliveryAttributes.self) { context in
