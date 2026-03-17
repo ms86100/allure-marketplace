@@ -1226,10 +1226,21 @@ workflows:
       - name: Build iOS IPA
         script: |
           cd ios/App
+          set -o pipefail
+          xcodebuild \
+            -workspace "App.xcworkspace" \
+            -scheme "App" \
+            -config "Release" \
+            -archivePath build/ios/xcarchive/App.xcarchive \
+            archive \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            2>&1 | tee /tmp/xcodebuild-archive.log
+          echo "=== Archive succeeded ==="
           xcode-project build-ipa \
             --workspace "App.xcworkspace" \
             --scheme "App" \
-            --config "Release"
+            --config "Release" \
+            --archive-path build/ios/xcarchive/App.xcarchive
 
       - name: Validate IPA push entitlement (release-all)
         script: |
