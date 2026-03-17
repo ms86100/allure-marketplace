@@ -19,6 +19,7 @@ const START_STATUSES = new Set([
   'confirmed',
   'preparing',
   'en_route',
+  'on_the_way',
   'ready',
 ]);
 

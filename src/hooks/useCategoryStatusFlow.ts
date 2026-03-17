@@ -25,13 +25,14 @@ export interface StatusTransition {
 export function useCategoryStatusFlow(
   sellerPrimaryGroup: string | null | undefined,
   orderType: string | null | undefined,
-  fulfillmentType?: string | null
+  fulfillmentType?: string | null,
+  deliveryHandledBy?: string | null
 ) {
   const [flow, setFlow] = useState<StatusFlowStep[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const transactionType = resolveTransactionType(sellerPrimaryGroup || 'default', orderType, fulfillmentType);
+    const transactionType = resolveTransactionType(sellerPrimaryGroup || 'default', orderType, fulfillmentType, deliveryHandledBy);
 
     (async () => {
       // Try specific parent_group first, then fallback to 'default'
@@ -63,7 +64,7 @@ export function useCategoryStatusFlow(
       }
       setIsLoading(false);
     })();
-  }, [sellerPrimaryGroup, orderType, fulfillmentType]);
+  }, [sellerPrimaryGroup, orderType, fulfillmentType, deliveryHandledBy]);
 
   return { flow, isLoading };
 }
@@ -71,7 +72,8 @@ export function useCategoryStatusFlow(
 function resolveTransactionType(
   parentGroup: string,
   orderType: string | null | undefined,
-  fulfillmentType?: string | null
+  fulfillmentType?: string | null,
+  deliveryHandledBy?: string | null
 ): string {
   if (orderType === 'enquiry') {
     if (['classes', 'events'].includes(parentGroup)) return 'book_slot';
@@ -82,6 +84,10 @@ function resolveTransactionType(
   }
   // Self-pickup or seller-delivery → self_fulfillment (no delivery partner steps)
   if (fulfillmentType && ['self_pickup', 'seller_delivery'].includes(fulfillmentType)) {
+    return 'self_fulfillment';
+  }
+  // Delivery orders where seller handles delivery → self_fulfillment
+  if (fulfillmentType === 'delivery' && deliveryHandledBy === 'seller') {
     return 'self_fulfillment';
   }
   return 'cart_purchase';

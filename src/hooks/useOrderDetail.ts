@@ -12,7 +12,8 @@ import { toast } from 'sonner';
 function resolveTransactionType(
   parentGroup: string,
   orderType: string | null | undefined,
-  fulfillmentType?: string | null
+  fulfillmentType?: string | null,
+  deliveryHandledBy?: string | null
 ): string {
   if (orderType === 'enquiry') {
     if (['classes', 'events'].includes(parentGroup)) return 'book_slot';
@@ -20,6 +21,8 @@ function resolveTransactionType(
   }
   if (orderType === 'booking') return 'service_booking';
   if (fulfillmentType && ['self_pickup', 'seller_delivery'].includes(fulfillmentType)) return 'self_fulfillment';
+  // Delivery orders where seller handles delivery → self_fulfillment (no delivery partner steps)
+  if (fulfillmentType === 'delivery' && deliveryHandledBy === 'seller') return 'self_fulfillment';
   return 'cart_purchase';
 }
 
@@ -60,12 +63,13 @@ export function useOrderDetail(id: string | undefined) {
   const effectiveParentGroup = sellerPrimaryGroup || derivedParentGroup;
   const isEnquiryOrder = (order as any)?.order_type === 'enquiry';
   const orderFulfillmentType = (order as any)?.fulfillment_type || 'self_pickup';
-  const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType);
+  const deliveryHandledBy = (order as any)?.delivery_handled_by || null;
+  const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy);
 
   // Load transitions for accurate next-status and cancellation checks
   const resolvedTxnType = useMemo(
-    () => resolveTransactionType(effectiveParentGroup || 'default', orderType, orderFulfillmentType),
-    [effectiveParentGroup, orderType, orderFulfillmentType]
+    () => resolveTransactionType(effectiveParentGroup || 'default', orderType, orderFulfillmentType, deliveryHandledBy),
+    [effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy]
   );
   const transitions = useStatusTransitions(effectiveParentGroup || 'default', resolvedTxnType);
 
