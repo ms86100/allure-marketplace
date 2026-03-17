@@ -3,6 +3,8 @@ import { LiveActivity } from '@/plugins/live-activity';
 import type { LiveActivityData } from '@/plugins/live-activity/definitions';
 import { getString, setString, removeKey } from '@/lib/persistent-kv';
 
+const TAG = '[LiveActivity]';
+
 /** Terminal workflow statuses that should end any live activity */
 const TERMINAL_STATUSES = new Set([
   'delivered',
@@ -90,19 +92,17 @@ class _LiveActivityManager {
 
   // ── Hydration & Cleanup ──────────────────────────────────
 
-  /**
-   * Reconcile in-memory Map with persisted state and native ActivityKit state.
-   * Called once on first push() to prevent orphaned / duplicate activities.
-   *
-   * Order: load persisted → query native → cleanup stale → ready
-   */
   private async hydrate(): Promise<void> {
     if (this.hydrated) return;
     this.hydrated = true;
 
+    console.log(TAG, 'HYDRATE START — reconciling persisted + native state');
+
     try {
-      // Step 1: Restore from persistent storage
       const persisted = this.loadPersistedMap();
+      const persistedCount = Object.keys(persisted).length;
+      console.log(TAG, `HYDRATE persisted entries: ${persistedCount}`);
+
       for (const [entityId, activityId] of Object.entries(persisted)) {
         if (!this.active.has(entityId)) {
           this.active.set(entityId, {
@@ -114,15 +114,14 @@ class _LiveActivityManager {
         }
       }
 
-      // Step 2: Query native activities and reconcile
       const { activities } = await LiveActivity.getActiveActivities();
+      console.log(TAG, `HYDRATE native activities: ${activities.length}`);
       const nativeEntityIds = new Set<string>();
 
       for (const { activityId, entityId } of activities) {
         nativeEntityIds.add(entityId);
         const existing = this.active.get(entityId);
         if (!existing) {
-          // Native activity exists but we don't know about it — track it
           this.active.set(entityId, {
             activityId,
             entityId,
@@ -130,27 +129,25 @@ class _LiveActivityManager {
             pendingTimer: null,
           });
         } else if (existing.activityId !== activityId) {
-          // Activity ID mismatch (stale persisted data) — update to native truth
           existing.activityId = activityId;
         }
       }
 
-      // Step 3: Remove entries that exist in our map but not natively
-      // (they were already dismissed by the OS or user)
+      // Remove entries that exist in our map but not natively
       for (const [entityId] of this.active) {
         if (!nativeEntityIds.has(entityId)) {
+          console.log(TAG, `HYDRATE removing stale entry: ${entityId}`);
           this.active.delete(entityId);
         }
       }
 
-      // Step 4: Cleanup stale native activities not in our valid set
       const validIds = Array.from(this.active.keys());
       await LiveActivity.cleanupStaleActivities({ validEntityIds: validIds });
 
-      // Persist reconciled state
       this.persistMap();
+      console.log(TAG, `HYDRATE COMPLETE — tracking ${this.active.size} activities`);
     } catch (e) {
-      console.warn('[LiveActivityManager] hydrate failed:', e);
+      console.warn(TAG, 'HYDRATE FAILED:', e);
     }
   }
 
@@ -159,7 +156,6 @@ class _LiveActivityManager {
   private enforceMaxActive(): void {
     if (this.active.size <= MAX_ACTIVE) return;
 
-    // Find the oldest entry by lastUpdate and remove it
     let oldestKey: string | null = null;
     let oldestTime = Infinity;
     for (const [entityId, entry] of this.active) {
@@ -169,6 +165,7 @@ class _LiveActivityManager {
       }
     }
     if (oldestKey) {
+      console.log(TAG, `MAX_ACTIVE exceeded, evicting oldest: ${oldestKey}`);
       void this.end(oldestKey);
     }
   }
@@ -177,7 +174,12 @@ class _LiveActivityManager {
 
   /** Start or update a live activity based on workflow status */
   async push(data: LiveActivityData): Promise<void> {
-    if (!this.isSupported) return;
+    console.log(TAG, `TRIGGER entity=${data.entity_id} status=${data.workflow_status} native=${this.isSupported}`);
+
+    if (!this.isSupported) {
+      console.log(TAG, 'SKIP — not a native platform');
+      return;
+    }
 
     await this.hydrate();
 
@@ -185,6 +187,7 @@ class _LiveActivityManager {
 
     // Terminal → end activity
     if (TERMINAL_STATUSES.has(workflow_status)) {
+      console.log(TAG, `END (terminal) entity=${entity_id} status=${workflow_status}`);
       await this.end(entity_id);
       return;
     }
@@ -194,7 +197,9 @@ class _LiveActivityManager {
     // No active entry and status qualifies → start
     if (!existing && START_STATUSES.has(workflow_status)) {
       try {
+        console.log(TAG, `START entity=${entity_id} status=${workflow_status}`);
         const { activityId } = await LiveActivity.startLiveActivity(data);
+        console.log(TAG, `START SUCCESS entity=${entity_id} activityId=${activityId}`);
         this.active.set(entity_id, {
           activityId,
           entityId: entity_id,
@@ -204,38 +209,52 @@ class _LiveActivityManager {
         this.persistMap();
         this.enforceMaxActive();
       } catch (e) {
-        console.warn('[LiveActivityManager] start failed:', e);
+        console.error(TAG, `START FAILED entity=${entity_id}:`, e);
       }
       return;
     }
 
     // Active entry exists → throttled update
     if (existing) {
+      console.log(TAG, `UPDATE (throttled) entity=${entity_id} status=${workflow_status}`);
       this.throttledUpdate(existing, data);
+    } else {
+      console.log(TAG, `SKIP — no active entry and status '${workflow_status}' not in START_STATUSES`);
     }
   }
 
   /** End the live activity for an entity */
   async end(entityId: string): Promise<void> {
     const entry = this.active.get(entityId);
-    if (!entry) return;
+    if (!entry) {
+      console.log(TAG, `END SKIP — no active entry for ${entityId}`);
+      return;
+    }
 
     if (entry.pendingTimer) clearTimeout(entry.pendingTimer);
     this.active.delete(entityId);
     this.persistMap();
 
     try {
+      console.log(TAG, `END entity=${entityId} activityId=${entry.activityId}`);
       await LiveActivity.endLiveActivity({ activityId: entry.activityId });
+      console.log(TAG, `END SUCCESS entity=${entityId}`);
     } catch (e) {
-      console.warn('[LiveActivityManager] end failed:', e);
+      console.error(TAG, `END FAILED entity=${entityId}:`, e);
     }
   }
 
   /** End all active activities (e.g. on logout) */
   async endAll(): Promise<void> {
+    console.log(TAG, `END ALL — ${this.active.size} activities`);
     const ids = Array.from(this.active.keys());
     await Promise.all(ids.map((id) => this.end(id)));
     this.clearPersistedMap();
+  }
+
+  /** Force re-hydration (e.g. on app resume) */
+  resetHydration(): void {
+    this.hydrated = false;
   }
 
   // ── internal ──────────────────────────────────────────────
@@ -248,7 +267,6 @@ class _LiveActivityManager {
       return;
     }
 
-    // Schedule deferred update (replaces any pending)
     if (entry.pendingTimer) clearTimeout(entry.pendingTimer);
     entry.pendingTimer = setTimeout(() => {
       this.doUpdate(entry, data);
@@ -259,9 +277,11 @@ class _LiveActivityManager {
     entry.lastUpdate = Date.now();
     entry.pendingTimer = null;
     try {
+      console.log(TAG, `UPDATE EXEC entity=${data.entity_id} status=${data.workflow_status}`);
       await LiveActivity.updateLiveActivity(data);
+      console.log(TAG, `UPDATE SUCCESS entity=${data.entity_id}`);
     } catch (e) {
-      console.warn('[LiveActivityManager] update failed:', e);
+      console.error(TAG, `UPDATE FAILED entity=${data.entity_id}:`, e);
     }
   }
 }

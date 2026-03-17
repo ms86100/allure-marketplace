@@ -12,7 +12,7 @@ import { DeliveryStatusCard } from '@/components/delivery/DeliveryStatusCard';
 import { LiveDeliveryTracker } from '@/components/delivery/LiveDeliveryTracker';
 import { DeliveryArrivalOverlay } from '@/components/order/DeliveryArrivalOverlay';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
-import { useLiveActivity } from '@/hooks/useLiveActivity';
+
 import { OrderItemCard } from '@/components/order/OrderItemCard';
 import { AppointmentDetailsCard } from '@/components/order/AppointmentDetailsCard';
 import { useServiceBookingForOrder } from '@/hooks/useServiceBookings';
@@ -41,17 +41,7 @@ export default function OrderDetailPage() {
 
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
 
-  // Phase I — Lock Screen Live Activity
-  useLiveActivity({
-    entityType: 'order',
-    entityId: order?.id,
-    status: order?.status ?? null,
-    eta: deliveryTracking.eta,
-    distance: deliveryTracking.distance != null ? deliveryTracking.distance / 1000 : null,
-    driverName: deliveryTracking.riderName,
-    vehicleType: null,
-    progressStage: order?.status ?? null,
-  });
+  // Live Activity is now handled globally by useLiveActivityOrchestrator
 
   useEffect(() => {
     if (fulfillmentType === 'delivery' && orderId) {

@@ -40,6 +40,7 @@ import { useDeepLinks } from "@/hooks/useDeepLinks";
 import { useSecurityOfficer } from "@/hooks/useSecurityOfficer";
 import { useAppLifecycle } from "@/hooks/useAppLifecycle";
 import { useBuyerOrderAlerts } from "@/hooks/useBuyerOrderAlerts";
+import { useLiveActivityOrchestrator } from "@/hooks/useLiveActivityOrchestrator";
 import { useReorderInterceptor } from "@/hooks/useReorderInterceptor";
 import { useNewOrderAlert } from "@/hooks/useNewOrderAlert";
 import { NewOrderAlertOverlay } from "@/components/seller/NewOrderAlertOverlay";
@@ -311,6 +312,7 @@ class SafeSellerAlert extends React.Component<
 function AppRoutes() {
   const { user, profile } = useAuth();
   useBuyerOrderAlerts();
+  useLiveActivityOrchestrator();
   useReorderInterceptor();
   return (
     <Suspense fallback={<PageLoadingFallback />}>
