@@ -10,8 +10,8 @@ const TAG = '[LiveActivityOrchestrator]';
 /** Non-terminal statuses where a live activity should be active */
 const ACTIVE_STATUSES = [
   'accepted', 'preparing', 'ready', 'picked_up',
-  'on_the_way', 'en_route', 'confirmed',
-];
+  'on_the_way', 'confirmed',
+] as const;
 
 const TERMINAL_STATUSES = new Set([
   'delivered', 'completed', 'cancelled', 'no_show', 'failed',
