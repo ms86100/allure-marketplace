@@ -12,7 +12,7 @@ import Capacitor
 import ActivityKit
 import Foundation
 
-@available(iOS 16.1, *)
+@available(iOS 16.2, *)
 @objc(LiveActivityPlugin)
 public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "LiveActivityPlugin"
