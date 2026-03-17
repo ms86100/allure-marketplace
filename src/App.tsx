@@ -312,6 +312,7 @@ class SafeSellerAlert extends React.Component<
 function AppRoutes() {
   const { user, profile } = useAuth();
   useBuyerOrderAlerts();
+  useLiveActivityOrchestrator();
   useReorderInterceptor();
   return (
     <Suspense fallback={<PageLoadingFallback />}>
