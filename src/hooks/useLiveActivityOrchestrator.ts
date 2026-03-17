@@ -63,12 +63,12 @@ export function useLiveActivityOrchestrator(): void {
         const orderIds = orders.map((o) => o.id);
         const { data: deliveries } = await supabase
           .from('delivery_assignments')
-          .select('order_id, eta_minutes, distance_meters, rider_name, vehicle_type')
+          .select('order_id, eta_minutes, distance_meters, rider_name')
           .in('order_id', orderIds)
           .not('status', 'in', '("cancelled","failed")');
 
         const deliveryMap = new Map(
-          (deliveries ?? []).map((d) => [d.order_id, d])
+          (deliveries ?? []).map((d: any) => [d.order_id, d])
         );
 
         for (const order of orders) {
