@@ -38,7 +38,7 @@ const LOOKBACK_MS = 5 * 60 * 1000;
 export function useNewOrderAlert(sellerId: string | null) {
   const queryClient = useQueryClient();
   const [pendingAlerts, setPendingAlerts] = useState<NewOrder[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSeenAtRef = useRef<string | null>(null);
   const pollDelayRef = useRef(MIN_POLL_MS);
