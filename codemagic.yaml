@@ -18,7 +18,9 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: app.sociva.community
+        bundle_identifier:
+          - app.sociva.community
+          - app.sociva.community.LiveDeliveryWidget
       vars:
         BUNDLE_ID: "app.sociva.community"
         WIDGET_BUNDLE_ID: "app.sociva.community.LiveDeliveryWidget"
