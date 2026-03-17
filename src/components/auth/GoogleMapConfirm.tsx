@@ -194,6 +194,8 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       clickListener.remove();
       mapDragListener.remove();
       mapZoomListener.remove();
+      idleListener.remove();
+      if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
       pin.setMap(null);
       mapInstanceRef.current = null;
       markerInstanceRef.current = null;
