@@ -12,7 +12,7 @@ import { DeliveryStatusCard } from '@/components/delivery/DeliveryStatusCard';
 import { LiveDeliveryTracker } from '@/components/delivery/LiveDeliveryTracker';
 import { DeliveryArrivalOverlay } from '@/components/order/DeliveryArrivalOverlay';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
-import { useLiveActivity } from '@/hooks/useLiveActivity';
+
 import { OrderItemCard } from '@/components/order/OrderItemCard';
 import { AppointmentDetailsCard } from '@/components/order/AppointmentDetailsCard';
 import { useServiceBookingForOrder } from '@/hooks/useServiceBookings';
