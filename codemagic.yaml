@@ -18,7 +18,9 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: app.sociva.community
+        bundle_identifier:
+          - app.sociva.community
+          - app.sociva.community.LiveDeliveryWidget
       vars:
         BUNDLE_ID: "app.sociva.community"
         WIDGET_BUNDLE_ID: "app.sociva.community.LiveDeliveryWidget"
@@ -403,10 +405,7 @@ workflows:
             settings['MARKETING_VERSION'] = '1.0'
             settings['SKIP_INSTALL'] = 'YES'
             settings['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
-            settings['CODE_SIGN_STYLE'] = 'Manual'
             settings['DEVELOPMENT_TEAM'] = TEAM_ID
-            settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
-            settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'Apple Distribution'
             settings['LD_RUNPATH_SEARCH_PATHS'] = ['$(inherited)', '@executable_path/Frameworks', '@executable_path/../../Frameworks']
           end
 
@@ -467,10 +466,7 @@ workflows:
               settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'app.sociva.community.LiveDeliveryWidget'
               settings['PRODUCT_NAME'] = 'LiveDeliveryWidgetExtension'
               settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.1'
-              settings['CODE_SIGN_STYLE'] = 'Manual'
               settings['DEVELOPMENT_TEAM'] = TEAM_ID
-              settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
-              settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'Apple Distribution'
             end
           end
           project.save
@@ -479,46 +475,14 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
-          # Fetch signing for main app
           app-store-connect fetch-signing-files "app.sociva.community" \
             --type IOS_APP_STORE \
             --create
-          # Fetch signing for widget extension
           app-store-connect fetch-signing-files "app.sociva.community.LiveDeliveryWidget" \
             --type IOS_APP_STORE \
             --create
           keychain add-certificates
           xcode-project use-profiles
-          WIDGET_PROFILE=$(find ~/Library/MobileDevice/Provisioning\ Profiles -name '*.mobileprovision' -exec grep -l 'LiveDeliveryWidget' {} \; 2>/dev/null | head -1)
-          if [ -z "$WIDGET_PROFILE" ]; then
-            echo "ERROR: Widget provisioning profile not found after fetch."
-            ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles directory"
-            exit 1
-          fi
-          WIDGET_PROFILE_PLIST=$(mktemp)
-          security cms -D -i "$WIDGET_PROFILE" > "$WIDGET_PROFILE_PLIST"
-          export WIDGET_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$WIDGET_PROFILE_PLIST")
-          export WIDGET_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$WIDGET_PROFILE_PLIST")
-          echo "✅ Widget profile found: $WIDGET_PROFILE_NAME ($WIDGET_PROFILE_UUID)"
-          cd ios/App
-          ruby - << 'RUBY'
-          require 'xcodeproj'
-          project = Xcodeproj::Project.open('App.xcodeproj')
-          widget = project.targets.find { |t| t.name == 'LiveDeliveryWidgetExtension' }
-          abort('Widget target not found') unless widget
-          widget.build_configurations.each do |config|
-            settings = config.build_settings
-            settings['CODE_SIGN_STYLE'] = 'Manual'
-            settings['DEVELOPMENT_TEAM'] = '6HBR38JB8Z'
-            settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
-            settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'Apple Distribution'
-            settings['PROVISIONING_PROFILE_SPECIFIER'] = ENV.fetch('WIDGET_PROFILE_NAME')
-            settings['PROVISIONING_PROFILE'] = ENV.fetch('WIDGET_PROFILE_UUID')
-          end
-          project.save
-          RUBY
-          cd ../..
-          rm -f "$WIDGET_PROFILE_PLIST"
 
       - name: Verify widget signing settings
         script: |
@@ -579,18 +543,6 @@ workflows:
       - name: Build iOS app
         script: |
           cd ios/App
-          set -o pipefail
-          xcodebuild \
-            -workspace "App.xcworkspace" \
-            -scheme "App" \
-            -configuration "Release" \
-            -archivePath "$PWD/build/ios/xcarchive/App.xcarchive" \
-            archive \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            DEVELOPMENT_TEAM=6HBR38JB8Z \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            CODE_SIGN_STYLE=Manual \
-            2>&1 | tee /tmp/xcodebuild-archive.log
           xcode-project build-ipa \
             --workspace "App.xcworkspace" \
             --scheme "App" \
@@ -696,7 +648,9 @@ workflows:
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: app.sociva.community
+        bundle_identifier:
+          - app.sociva.community
+          - app.sociva.community.LiveDeliveryWidget
       android_signing:
         - sociva_keystore
       groups:
@@ -1059,10 +1013,7 @@ workflows:
             settings['MARKETING_VERSION'] = '1.0'
             settings['SKIP_INSTALL'] = 'YES'
             settings['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
-            settings['CODE_SIGN_STYLE'] = 'Manual'
             settings['DEVELOPMENT_TEAM'] = TEAM_ID
-            settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
-            settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'Apple Distribution'
             settings['LD_RUNPATH_SEARCH_PATHS'] = ['$(inherited)', '@executable_path/Frameworks', '@executable_path/../../Frameworks']
           end
 
@@ -1122,10 +1073,7 @@ workflows:
               settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'app.sociva.community.LiveDeliveryWidget'
               settings['PRODUCT_NAME'] = 'LiveDeliveryWidgetExtension'
               settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.1'
-              settings['CODE_SIGN_STYLE'] = 'Manual'
               settings['DEVELOPMENT_TEAM'] = TEAM_ID
-              settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
-              settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'Apple Distribution'
             end
           end
           project.save
@@ -1142,36 +1090,6 @@ workflows:
             --create
           keychain add-certificates
           xcode-project use-profiles
-          WIDGET_PROFILE=$(find ~/Library/MobileDevice/Provisioning\ Profiles -name '*.mobileprovision' -exec grep -l 'LiveDeliveryWidget' {} \; 2>/dev/null | head -1)
-          if [ -z "$WIDGET_PROFILE" ]; then
-            echo "ERROR: Widget provisioning profile not found after fetch."
-            ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles directory"
-            exit 1
-          fi
-          WIDGET_PROFILE_PLIST=$(mktemp)
-          security cms -D -i "$WIDGET_PROFILE" > "$WIDGET_PROFILE_PLIST"
-          export WIDGET_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$WIDGET_PROFILE_PLIST")
-          export WIDGET_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$WIDGET_PROFILE_PLIST")
-          echo "✅ Widget profile found: $WIDGET_PROFILE_NAME ($WIDGET_PROFILE_UUID)"
-          cd ios/App
-          ruby - << 'RUBY'
-          require 'xcodeproj'
-          project = Xcodeproj::Project.open('App.xcodeproj')
-          widget = project.targets.find { |t| t.name == 'LiveDeliveryWidgetExtension' }
-          abort('Widget target not found') unless widget
-          widget.build_configurations.each do |config|
-            settings = config.build_settings
-            settings['CODE_SIGN_STYLE'] = 'Manual'
-            settings['DEVELOPMENT_TEAM'] = '6HBR38JB8Z'
-            settings['CODE_SIGN_IDENTITY'] = 'Apple Distribution'
-            settings['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'Apple Distribution'
-            settings['PROVISIONING_PROFILE_SPECIFIER'] = ENV.fetch('WIDGET_PROFILE_NAME')
-            settings['PROVISIONING_PROFILE'] = ENV.fetch('WIDGET_PROFILE_UUID')
-          end
-          project.save
-          RUBY
-          cd ../..
-          rm -f "$WIDGET_PROFILE_PLIST"
 
       - name: Verify widget signing settings (release-all)
         script: |
