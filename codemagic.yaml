@@ -579,6 +579,18 @@ workflows:
       - name: Build iOS app
         script: |
           cd ios/App
+          set -o pipefail
+          xcodebuild \
+            -workspace "App.xcworkspace" \
+            -scheme "App" \
+            -configuration "Release" \
+            -archivePath "$PWD/build/ios/xcarchive/App.xcarchive" \
+            archive \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            DEVELOPMENT_TEAM=6HBR38JB8Z \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_STYLE=Manual \
+            2>&1 | tee /tmp/xcodebuild-archive.log
           xcode-project build-ipa \
             --workspace "App.xcworkspace" \
             --scheme "App" \
