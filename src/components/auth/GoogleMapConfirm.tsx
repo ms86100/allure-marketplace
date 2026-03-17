@@ -40,6 +40,8 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
   const mapInitializedRef = useRef(false);
   const hasUserInteractedRef = useRef(false);
   const resolveRequestIdRef = useRef(0);
+  const idleDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const ignoreIdleUntilRef = useRef(0);
 
   const [marker, setMarker] = useState<{ lat: number; lng: number }>({ lat: latitude, lng: longitude });
   const [displayName, setDisplayName] = useState(name);
@@ -167,6 +169,23 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       hasUserInteractedRef.current = true;
     });
 
+    // Move pin to map center after pan/zoom settles (Zomato/Blinkit-style)
+    ignoreIdleUntilRef.current = Date.now() + 1000; // ignore initial idle
+    const idleListener = map.addListener('idle', () => {
+      if (Date.now() < ignoreIdleUntilRef.current) return;
+      if (!hasUserInteractedRef.current) return;
+      if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
+      idleDebounceRef.current = setTimeout(() => {
+        const center = map.getCenter();
+        if (!center) return;
+        const newLat = center.lat();
+        const newLng = center.lng();
+        pin.setPosition({ lat: newLat, lng: newLng });
+        setMarker({ lat: newLat, lng: newLng });
+        resolveLabel(newLat, newLng, false);
+      }, 300);
+    });
+
     // Initial resolve — preserve caller name if already meaningful.
     resolveLabel(latitude, longitude, true);
 
@@ -175,6 +194,8 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       clickListener.remove();
       mapDragListener.remove();
       mapZoomListener.remove();
+      idleListener.remove();
+      if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
       pin.setMap(null);
       mapInstanceRef.current = null;
       markerInstanceRef.current = null;
