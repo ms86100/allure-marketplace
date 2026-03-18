@@ -239,8 +239,11 @@ class _LiveActivityManager {
         });
         this.persistMap();
         this.enforceMaxActive();
+        addOpsEntry({ timestamp: Date.now(), action: 'start', entityId: entity_id, status: workflow_status, success: true, activityId });
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
         recordLAError('START', entity_id, e);
+        addOpsEntry({ timestamp: Date.now(), action: 'start', entityId: entity_id, status: workflow_status, success: false, error: msg });
       }
       return;
     }
