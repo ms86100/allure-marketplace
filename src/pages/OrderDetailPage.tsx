@@ -212,7 +212,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Live Delivery Tracking or Static Card */}
-          {o.orderFulfillmentType === 'delivery' && isInTransit && deliveryAssignmentId && (
+          {isDeliveryOrder && isInTransit && deliveryAssignmentId && (
             <>
               {/* Buyer map view — show when rider has GPS data (lazy-loaded) */}
               {o.isBuyerView && deliveryTracking.riderLocation && (order as any).delivery_lat && (order as any).delivery_lng && (
