@@ -196,6 +196,20 @@ export default function OrderDetailPage() {
             />
           )}
 
+          {/* Gap 11: ETA banner for buyer — shown from acceptance until delivery */}
+          {o.isBuyerView && o.orderFulfillmentType === 'delivery' && (order as any).estimated_delivery_at && !['delivered', 'completed', 'cancelled'].includes(order.status) && (
+            <DeliveryETABanner estimatedDeliveryAt={(order as any).estimated_delivery_at} />
+          )}
+
+          {/* Gap 8: Buyer delivery confirmation — shown when seller marks delivered */}
+          {o.isBuyerView && order.status === 'delivered' && o.orderFulfillmentType === 'delivery' && (
+            <BuyerDeliveryConfirmation
+              orderId={order.id}
+              sellerName={seller?.business_name}
+              onConfirmed={() => window.location.reload()}
+            />
+          )}
+
           {/* Live Delivery Tracking or Static Card */}
           {o.orderFulfillmentType === 'delivery' && isInTransit && deliveryAssignmentId && (
             <>
