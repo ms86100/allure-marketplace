@@ -253,7 +253,7 @@ export function useSellerProducts() {
           max_bookings_per_slot: parseInt(serviceFields.max_bookings_per_slot) || 1, cancellation_notice_hours: parseInt(serviceFields.cancellation_notice_hours) || 24,
           rescheduling_notice_hours: parseInt(serviceFields.rescheduling_notice_hours) || 12,
         }, { onConflict: 'product_id' });
-        if (slError) { console.error('Service listing upsert failed:', slError); toast.error('Product saved but service settings failed. Please try editing again.'); }
+        if (slError) { console.error('Service listing upsert failed:', slError); toast.error('Product saved but service settings failed. Please try editing again.', { id: 'product-service-error' }); }
       }
       setIsDialogOpen(false); resetForm();
       if (sellerProfile) fetchData(sellerProfile.id);
