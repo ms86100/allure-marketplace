@@ -224,7 +224,7 @@ export function useSellerApplication() {
 
   const saveDraft = async (): Promise<string | null> => {
     if (!user) return null;
-    if (!formData.business_name.trim()) { toast.error('Please enter a business name'); return null; }
+    if (!formData.business_name.trim()) { toast.error('Please enter a business name', { id: 'seller-app-validation' }); return null; }
     setIsLoading(true);
     try {
       const draftPayload = {
