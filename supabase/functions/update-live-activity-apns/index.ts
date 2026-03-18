@@ -28,9 +28,28 @@ interface LAUpdatePayload {
   parent_group?: string;
 }
 
-const TERMINAL_STATUSES = new Set([
+/** Safety-net fallback — overridden by DB query below */
+const FALLBACK_TERMINAL = new Set([
   "delivered", "completed", "cancelled", "no_show", "failed",
 ]);
+
+async function loadTerminalStatuses(
+  supabase: ReturnType<typeof createClient>,
+): Promise<Set<string>> {
+  try {
+    const { data, error } = await supabase
+      .from("category_status_flows")
+      .select("status_key")
+      .eq("is_terminal", true);
+    if (error || !data || data.length === 0) return FALLBACK_TERMINAL;
+    const dbSet = new Set(data.map((r: any) => r.status_key));
+    // Union with fallbacks for safety
+    for (const s of FALLBACK_TERMINAL) dbSet.add(s);
+    return dbSet;
+  } catch {
+    return FALLBACK_TERMINAL;
+  }
+}
 
 function b64url(data: Uint8Array): string {
   return btoa(String.fromCharCode(...data))
