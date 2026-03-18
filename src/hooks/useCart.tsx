@@ -119,11 +119,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     ), [items]);
 
   const addItem = useCallback(async (product: Product, quantity = 1, silent = false) => {
-    if (!user) { toast.error('Please sign in to add items to cart'); return; }
+    if (!user) { toast.error('Please sign in to add items to cart', { id: 'cart-sign-in' }); return; }
 
     const pActionType = (product as any).action_type;
-    if (pActionType && !['add_to_cart', 'buy_now'].includes(pActionType)) { toast.error('This item cannot be added to cart'); return; }
-
+    if (pActionType && !['add_to_cart', 'buy_now'].includes(pActionType)) { toast.error('This item cannot be added to cart', { id: 'cart-not-allowed' }); return; }
     const inlineAvailability = getInlineSellerAvailability(product);
     let availability = computeStoreStatus(inlineAvailability.availabilityStart, inlineAvailability.availabilityEnd, inlineAvailability.operatingDays, inlineAvailability.isAvailable);
 
