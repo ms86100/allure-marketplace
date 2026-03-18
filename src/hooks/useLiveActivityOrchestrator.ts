@@ -13,7 +13,7 @@ const TERMINAL_STATUSES = new Set([
   'delivered', 'completed', 'cancelled', 'no_show', 'failed',
 ]);
 
-const POLL_INTERVAL_MS = 15_000; // 15s fallback poll
+
 
 /**
  * Global hook that drives Live Activity from order status changes.
@@ -30,7 +30,6 @@ export function useLiveActivityOrchestrator(): void {
   const identity = useContext(IdentityContext);
   const userId = identity?.user?.id ?? null;
   const mountedRef = useRef(false);
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const doSync = useCallback(async () => {
     if (!userId || !mountedRef.current) return;
@@ -202,22 +201,9 @@ export function useLiveActivityOrchestrator(): void {
     };
   }, [userId]);
 
-  // ── Polling fallback ──
-  useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
+  // Polling fallback removed — pure realtime. App-resume one-shot sync remains below.
 
-    console.log(TAG, 'Starting polling fallback every', POLL_INTERVAL_MS, 'ms');
-    pollTimerRef.current = setInterval(doSync, POLL_INTERVAL_MS);
-
-    return () => {
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
-        pollTimerRef.current = null;
-      }
-    };
-  }, [userId, doSync]);
-
-  // ── App resume re-hydration (pauses poll to avoid race) ──
+  // ── App resume re-hydration (one-shot sync) ──
   useEffect(() => {
     if (!userId || !Capacitor.isNativePlatform()) return;
 
@@ -228,21 +214,10 @@ export function useLiveActivityOrchestrator(): void {
         const { App } = await import('@capacitor/app');
         const listener = await App.addListener('appStateChange', async ({ isActive }) => {
           if (!isActive || !mountedRef.current) return;
-          console.log(TAG, 'App resumed — re-hydrating (poll paused)');
-
-          // Pause poll timer to prevent racing with resume sync
-          if (pollTimerRef.current) {
-            clearInterval(pollTimerRef.current);
-            pollTimerRef.current = null;
-          }
+          console.log(TAG, 'App resumed — re-hydrating');
 
           LiveActivityManager.resetHydration();
           await doSync();
-
-          // Resume poll timer after sync completes
-          if (mountedRef.current) {
-            pollTimerRef.current = setInterval(doSync, POLL_INTERVAL_MS);
-          }
         });
         cleanup = () => listener.remove();
       } catch (e) {

@@ -10,7 +10,7 @@ const TAG = '[LA-Sync]';
 
 const ACTIVE_STATUSES = [
   'accepted', 'preparing', 'ready', 'picked_up',
-  'on_the_way', 'confirmed',
+  'on_the_way', 'arrived', 'confirmed',
 ] as const;
 
 /** Prevents concurrent syncActiveOrders calls from racing */
