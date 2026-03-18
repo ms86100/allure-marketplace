@@ -255,7 +255,10 @@ export function useCartPage() {
     if (paymentMethod === 'cod' && !acceptsCod) { toast.error('This seller does not accept Cash on Delivery. Please select UPI.'); setIsPlacingOrder(false); return; }
 
     if (paymentMethod === 'upi') {
-      if (!acceptsUpi) { toast.error('UPI payment not available for this seller'); setIsPlacingOrder(false); return; }
+      if (!acceptsUpi) { toast.error('UPI payment not available for this seller', { id: 'upi-unavailable' }); setIsPlacingOrder(false); return; }
+      // Pre-validate seller UPI ID before creating orders
+      const firstSeller = sellerGroups[0]?.items[0]?.product?.seller as any;
+      if (!firstSeller?.upi_id) { toast.error('This seller is not accepting UPI payments right now', { id: 'upi-no-id' }); setIsPlacingOrder(false); return; }
       setOrderStep('creating');
       try {
         const orderIds = await createOrdersForAllSellers('pending');
@@ -329,7 +332,7 @@ export function useCartPage() {
 
   const handleUpiDeepLinkSuccess = async () => {
     setShowUpiDeepLink(false);
-    toast.success('Payment submitted! Seller will verify shortly.');
+    toast.success('Payment submitted! Seller will verify shortly.', { id: 'upi-success' });
     // Clear cart and payment session ONLY after payment confirmation submitted
     clearCart(); await refresh();
     clearPaymentSession();
@@ -344,7 +347,7 @@ export function useCartPage() {
       // Check if payment was actually completed before cancelling
       const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
       if (recheckOrder?.payment_status === 'paid' || recheckOrder?.payment_status === 'buyer_confirmed') {
-        toast.success('Payment was already confirmed! Your order is active.');
+        toast.success('Payment was already confirmed! Your order is active.', { id: 'upi-already-confirmed' });
         clearCart(); await refresh();
         clearPaymentSession();
         navigate(`/orders/${pendingOrderIds[0]}`);
@@ -356,7 +359,7 @@ export function useCartPage() {
     setPendingOrderIds([]);
     clearPaymentSession();
     // Do NOT clear cart on payment failure — user can retry with the same items
-    toast.error('Payment was not completed. Your order has been cancelled. You can try again.');
+    toast.error('Payment was not completed. Your order has been cancelled. You can try again.', { id: 'upi-failed' });
   };
 
   // Compute whether we have an active payment session (for rendering payment UI even if cart is empty)

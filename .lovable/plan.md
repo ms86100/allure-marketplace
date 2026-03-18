@@ -1,71 +1,75 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Silent Push Optimization)
 
-## Fix UPI Payment UX: Keyboard Overlap, Flow Simplification, Toast Noise
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-### Problems (from screenshots)
+## Silent Push Optimization: COMPLETE
 
-1. **Keyboard covers UTR input** -- user can't see what they type
-2. **UTR field accepts garbage** ("Hhh") -- optional, unvalidated, unused reliably
-3. **Multiple conflicting toasts** -- "Payment submitted", "Seller UPI ID not configured", "Payment already confirmed" all appear simultaneously
-4. **3-step flow is unnecessary** -- pay → "did you pay?" → UTR/screenshot → confirm is too many steps
+### What It Does
+Reduces push notification noise for mid-flow order statuses when Live Activity is already tracking the order on the lock screen. In-app notification history and badge counts are always preserved.
 
-### Changes
+### Notification Matrix
 
-#### 1. Simplify to 2-step flow (remove UTR step entirely)
+| Status | Push? | Live Activity? | Rationale |
+|--------|-------|----------------|-----------|
+| `accepted` | ✅ Always | Yes | Critical — order confirmed |
+| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
+| `ready` | ✅ Always | Yes | Pickup moment — user must know |
+| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
+| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
+| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
+| `delivered` | ✅ Always | Yes | Critical endpoint |
+| `completed` | ✅ Always | No | Critical endpoint |
+| `cancelled` | ✅ Always | No | Critical — must alert |
+| All service/booking | ✅ Always | No | No Live Activity for these |
 
-**File: `src/components/payment/UpiDeepLinkCheckout.tsx`**
+### Implementation
 
-- Remove `CheckoutStep = 'utr'` -- merge confirm + submission into one step
-- Remove UTR input field, screenshot upload, and all related state (`utrValue`, `screenshotFile`, `screenshotPreview`, `showUtrField`)
-- The `confirm` step becomes the final step: "Yes, I paid" button directly calls `handleSubmitConfirmation` (with empty UTR and no screenshot)
-- Keep screenshot upload as a future dispute-flow feature only (remove from payment flow)
-- Update copy: replace "Sociva doesn't track payments..." with "Complete the payment using your UPI app. Once done, tap 'Confirm Payment' to notify the seller."
-- The `handleConfirmPaid` function becomes `handleSubmitConfirmation` directly
+1. **DB column**: `category_status_flows.silent_push` (boolean, default false)
+2. **DB trigger**: `fn_enqueue_order_status_notification` includes `silent_push` in notification payload
+3. **Edge function**: `process-notification-queue` skips APNs/FCM delivery when `silent_push = true`, but still inserts `user_notifications` for in-app history
 
-New flow: `pay` → `confirm` (with "Confirm Payment" CTA) → `done`
+## Phase I Live Activities — CI Pipeline Status
 
-#### 2. Pre-validate seller UPI ID before starting payment
+### Codemagic Build Pipeline: COMPLETE
 
-**File: `src/hooks/useCartPage.ts`**
+Both `ios-release` and `release-all` workflows now include:
 
-- In the UPI payment branch (line ~257), before creating orders, check if seller has `upi_id` configured
-- If not, show a blocking toast: "This seller is not accepting UPI payments right now" and abort
-- This prevents the current bug where orders are created, UPI sheet opens, then immediately shows "Seller UPI ID not configured" error and cancels
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
 
-#### 3. Fix keyboard overlap
+### Codemagic Requirements (User Action)
 
-**File: `src/components/payment/UpiDeepLinkCheckout.tsx`**
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
 
-- Since we're removing the UTR input field entirely, the keyboard overlap issue is eliminated
-- The confirm step will have no text inputs -- just buttons
+### Runtime Call Chain (Verified)
 
-#### 4. Deduplicate toasts
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
+```
 
-**File: `src/components/payment/UpiDeepLinkCheckout.tsx`**
+## Implementation Matrix
 
-- Remove the `toast.error('Seller UPI ID is not configured...')` -- this is now handled by pre-validation in useCartPage
-- In `completeFlow`, use `toast.success` with a unique `id` to prevent duplicates: `toast.success('...', { id: 'upi-confirmed' })`
-
-**File: `src/hooks/useCartPage.ts`**
-
-- In `handleUpiDeepLinkSuccess`, use toast with `id: 'upi-success'` to deduplicate
-- In `handleUpiDeepLinkFailed`, the "Payment was already confirmed" toast should also use a unique id
-
-#### 5. Make confirm_upi_payment idempotent (already is)
-
-The existing `confirm_upi_payment` RPC updates `payment_status` to `buyer_confirmed` -- calling it twice is safe (same update). No change needed.
-
-### Files to Change
-
-| File | Change |
-|------|--------|
-| `src/components/payment/UpiDeepLinkCheckout.tsx` | Remove UTR step, screenshot upload, simplify to 2-step flow, update copy, deduplicate toasts |
-| `src/hooks/useCartPage.ts` | Add seller UPI ID pre-validation before order creation, deduplicate toast IDs |
-
-### What This Does NOT Change
-
-- `confirm_upi_payment` RPC (already works without UTR)
-- Session recovery logic (still works, just fewer steps to restore)
-- Razorpay flow (unaffected)
-- Screenshot storage bucket (kept for future dispute flow)
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
