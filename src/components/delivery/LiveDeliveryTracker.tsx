@@ -1,4 +1,4 @@
-import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
+import { useDeliveryTracking, type DeliveryTrackingState } from '@/hooks/useDeliveryTracking';
 import { Phone, Truck, Navigation, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -6,6 +6,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 interface LiveDeliveryTrackerProps {
   assignmentId: string;
   isBuyerView: boolean;
+  /** Gap D: Accept pre-existing tracking state to avoid duplicate subscriptions */
+  trackingState?: DeliveryTrackingState;
+  /** Gap F: Road-based ETA from OSRM, more accurate than Haversine */
+  roadEtaMinutes?: number | null;
 }
 
 function formatDistance(meters: number | null): string {
