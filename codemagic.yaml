@@ -136,11 +136,13 @@ workflows:
                                didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
                   FirebaseApp.configure()
 
-                  // Deterministic: always use our custom bridge VC, bypassing storyboard class
-                  let vc = SocivaBridgeViewController()
-                  window?.rootViewController = vc
-                  window?.makeKeyAndVisible()
-                  print("✅ rootViewController = \(type(of: window?.rootViewController))")
+                   // Deterministic: create window + use custom bridge VC
+                   let vc = SocivaBridgeViewController()
+                   let win = UIWindow(frame: UIScreen.main.bounds)
+                   win.rootViewController = vc
+                   win.makeKeyAndVisible()
+                   self.window = win
+                   print("✅ rootViewController = \(type(of: self.window?.rootViewController))")
 
                   return true
               }
