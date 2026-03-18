@@ -4,6 +4,12 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
 
+interface StatusHint {
+  buyer_hint?: string | null;
+  seller_hint?: string | null;
+  display_label?: string | null;
+}
+
 interface LiveDeliveryTrackerProps {
   assignmentId: string;
   isBuyerView: boolean;
@@ -11,6 +17,8 @@ interface LiveDeliveryTrackerProps {
   trackingState?: DeliveryTrackingState;
   /** Gap F: Road-based ETA from OSRM, more accurate than Haversine */
   roadEtaMinutes?: number | null;
+  /** Gap 1 R5: DB-backed status hints keyed by status_key */
+  statusHints?: Record<string, StatusHint>;
 }
 
 interface ProximityThreshold {
