@@ -180,8 +180,8 @@ Deno.serve(async (req) => {
 
     console.log(`[LA-APNs] Updating LA for order=${order_id} status=${status} token=${push_token.substring(0, 16)}…`);
 
-    // Fetch delivery data + DB-backed status flow in parallel
-    const [deliveryRes, itemCountRes, flowMap] = await Promise.all([
+    // Fetch delivery data, DB-backed status flow, and terminal statuses in parallel
+    const [deliveryRes, itemCountRes, flowMap, terminalStatuses] = await Promise.all([
       supabase
         .from("delivery_assignments")
         .select("eta_minutes, distance_meters, rider_name, status")
@@ -191,11 +191,8 @@ Deno.serve(async (req) => {
         .from("order_items")
         .select("id", { count: "exact", head: true })
         .eq("order_id", order_id),
-      getStatusFlowData(
-        supabase,
-        transaction_type || "cart_purchase",
-        parent_group || "default",
-      ),
+      getStatusFlowData(supabase),
+      loadTerminalStatuses(supabase),
     ]);
 
     let etaMinutes: number | null = null;
