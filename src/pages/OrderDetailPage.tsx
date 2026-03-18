@@ -79,7 +79,7 @@ export default function OrderDetailPage() {
 
       return () => { supabase.removeChannel(channel); };
     }
-  }, [orderId, fulfillmentType]);
+  }, [orderId, isDeliveryOrder]);
 
   if (o.isLoading) return <AppLayout showHeader={false}><div className="p-4 space-y-3"><Skeleton className="h-8 w-32" /><Skeleton className="h-28 w-full rounded-xl" /><Skeleton className="h-40 w-full rounded-xl" /></div></AppLayout>;
   if (!order) return <AppLayout showHeader={false}><div className="p-4 text-center py-16"><p className="text-sm text-muted-foreground">Order not found</p><Link to="/orders"><Button size="sm" className="mt-4">View Orders</Button></Link></div></AppLayout>;
