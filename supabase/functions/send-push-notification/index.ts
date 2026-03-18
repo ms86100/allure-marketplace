@@ -109,15 +109,20 @@ async function sendApnsDirectNotification(
     const url = `https://api.push.apple.com/3/device/${apnsToken}`;
     console.log(`[APNs] Sending to production APNs, token prefix: ${apnsToken.substring(0, 16)}…`);
 
+    const apnsHeaders: Record<string, string> = {
+      Authorization: `bearer ${jwt}`,
+      "apns-topic": bundleId,
+      "apns-push-type": "alert",
+      "apns-priority": "10",
+      "Content-Type": "application/json",
+    };
+    if (threadId) {
+      apnsHeaders["apns-collapse-id"] = threadId.substring(0, 64);
+    }
+
     const apnsResponse = await fetch(url, {
       method: "POST",
-      headers: {
-        Authorization: `bearer ${jwt}`,
-        "apns-topic": bundleId,
-        "apns-push-type": "alert",
-        "apns-priority": "10",
-        "Content-Type": "application/json",
-      },
+      headers: apnsHeaders,
       body: JSON.stringify(apnsPayload),
     });
 
