@@ -1,68 +1,71 @@
 
 
-## Verification Audit: Live Activity & Push Notification Fixes
+## Reduce Push Noise: Silent Push for Mid-Flow Statuses
 
-### 1. Wording Consistency — PARTIALLY FIXED, STILL MISMATCHED
+### Approach
 
-The `PROGRESS_DESCRIPTIONS` in `liveActivityMapper.ts` were updated to shorter forms, but they still **do not match** the push notification titles:
+Add a `silent_push` boolean column to `category_status_flows`. The DB trigger already reads from this table — it will pass the flag through the notification payload. The `process-notification-queue` edge function will check this flag and skip calling `send-push-notification` for silent items (while still inserting into `user_notifications` for in-app history).
 
-| Status | Live Activity (`liveActivityMapper.ts`) | Push Title (`order-notification-titles.ts`) | Match? |
-|--------|---------------------------------------|---------------------------------------------|--------|
-| accepted | "Order Accepted" | "✅ Order Accepted!" | Close but not identical (emoji + exclamation) |
-| preparing | "Order Being Prepared" | "👨‍🍳 Order Being Prepared" | Close but emoji differs |
-| ready | "Order Ready" | "🎉 Order Ready!" | Close but emoji + exclamation |
-| picked_up | "Order Picked Up" | "📦 Order Picked Up" | Close but emoji |
-| on_the_way | "Order On The Way" | "🛵 Order On The Way!" | Close but emoji + exclamation |
+### Adjusted Matrix (per your feedback)
 
-**Verdict**: The base text is now aligned, but push notifications include emojis and exclamation marks that Live Activity does not. This is acceptable — lock-screen widgets typically use plain text while notification banners use richer formatting. However, if strict parity is desired, this should be called out.
+| Status | `silent_push` | Rationale |
+|--------|--------------|-----------|
+| `accepted` | false | Critical — order confirmed |
+| `preparing` | **true** | Mid-flow, Live Activity handles it |
+| `ready` | **false** | Pickup moment — keep push (your Condition 1) |
+| `picked_up` | **true** | Mid-flow tracking |
+| `on_the_way` | **true** | Mid-flow tracking |
+| `arrived` | **true** | Live Activity shows this on lock screen |
+| `delivered` | false | Critical endpoint |
+| `completed` | false | Critical endpoint |
+| `cancelled` | false | Critical — must alert |
+| `no_show` | false | Critical |
+| All service/booking statuses | false | No Live Activity for these |
 
-**Important caveat**: The push notification titles in `order-notification-titles.ts` are labeled as needing to stay in sync with the **DB trigger** (`enqueue_order_status_notification`). The actual push notification body text comes from `category_status_flows` table rows, not this file. The real wording comparison requires checking what the edge function sends as the notification body, which may differ from these title constants.
+Key decision: **`ready` stays as a full push** per your recommendation that it's a pickup-critical moment.
 
-### 2. Duplicate Alert Suppression — IMPLEMENTED AND WORKING
+### Changes
 
-Code at `usePushNotifications.ts` lines 313-319:
-```typescript
-const data = notification?.data as Record<string, string> | undefined;
-const orderId = data?.order_id ?? data?.entity_id;
-if (orderId && LiveActivityManager.isTracking(orderId)) {
-  pushLog('info', 'FOREGROUND_SUPPRESSED_LA_ACTIVE', { orderId });
-  return;  // Skips haptic, sound, and toast
-}
+**1. Database migration** — Add column + backfill:
+```sql
+ALTER TABLE category_status_flows 
+  ADD COLUMN IF NOT EXISTS silent_push boolean DEFAULT false;
+
+UPDATE category_status_flows 
+  SET silent_push = true 
+  WHERE status_key IN ('preparing', 'picked_up', 'on_the_way', 'arrived');
 ```
 
-This correctly suppresses the foreground toast, sound, and haptics when a Live Activity is already tracking the order. The `isTracking` method exists at `LiveActivityManager.ts` line 344 and checks the in-memory `active` map.
+**2. DB trigger `fn_enqueue_order_status_notification`** — Include `silent_push` in the payload:
+```sql
+-- Add to v_payload when silent_push is true
+v_payload := v_payload || jsonb_build_object('silent_push', v_silent_push);
+```
 
-**One gap**: This suppression only works when the **app is in the foreground**. When the app is backgrounded, the OS delivers the push notification banner natively — the app code never runs, so suppression cannot happen. This is a platform limitation, not a bug.
+**3. `process-notification-queue/index.ts`** — Skip push delivery for silent items:
+```typescript
+const silentPush = item.payload?.silent_push === true;
 
-### 3. Live Activity Tracking Check — IMPLEMENTED
+// Always insert in-app notification (unchanged)
+// ...
 
-`LiveActivityManager.isTracking(entityId)` exists at line 344, checks the `active` Map, and is actively used in the push notification handler. Working as designed.
+if (silentPush) {
+  // Mark processed without sending push — in-app record already saved
+  await supabase.from("notification_queue")
+    .update({ status: "processed", processed_at: new Date().toISOString() })
+    .eq("id", item.id);
+  processed++;
+  continue;
+}
 
-### 4. Real Device Testing — CANNOT BE DONE IN THIS ENVIRONMENT
+// Existing push delivery logic continues for non-silent items
+```
 
-This audit environment is code-only. Actual device behavior (lock screen, background state, app-killed scenarios) must be tested on a physical iOS/Android device via TestFlight or debug build.
+**4. No client-side changes** — The existing `isTracking` foreground suppression remains as a secondary safety net. Badge counts and in-app notification center continue to update for all notifications (silent or not) since `user_notifications` insert is unaffected.
 
-### 5. Remaining Gaps (Honest Assessment)
+### Safety Guarantees (Conditions Met)
 
-| Item | Status | Notes |
-|------|--------|-------|
-| Wording alignment (base text) | Done | Emoji/punctuation still differ — acceptable for different surfaces |
-| Foreground duplicate suppression | Done | Works via `isTracking` check |
-| Background duplicate suppression | Not possible | OS delivers push natively; app code doesn't execute |
-| App-killed Live Activity divergence | Known gap | Deferred to server-side APNs phase |
-| Push notification body vs title mismatch | Unknown | Need to check edge function + DB `category_status_flows` for actual body text sent |
-
-### 6. Answer to Final Question
-
-> "When an order status updates while the app is open, does the user see only one clean update, or still multiple signals?"
-
-**If Live Activity is active**: User sees only the Live Activity widget update. Push toast/sound/haptics are suppressed. One clean signal.
-
-**If Live Activity is NOT active** (e.g., non-trackable status, or web): User sees the push notification toast with sound. One signal.
-
-**If app is backgrounded**: Both the OS-delivered push banner AND the Live Activity widget update will appear. Two signals — this cannot be suppressed client-side.
-
-### No Code Changes Needed
-
-All three planned fixes are implemented in the codebase. The remaining gaps are platform-level limitations that require server-side APNs integration (deferred).
+- **Condition 1 (Don't over-silence)**: `ready` keeps full push. Only truly mid-flow statuses are silenced.
+- **Condition 2 (Visibility fallback)**: In-app notification history + badge count always update regardless of `silent_push` flag. User can always check notification center.
+- **Fallback answer**: If phone is in pocket and Live Activity is not visible, user will still see `ready` and `delivered` push banners — the two moments that matter most.
 
