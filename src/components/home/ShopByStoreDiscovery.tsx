@@ -170,7 +170,7 @@ function SocietyCard({ society }: { society: SocietyGroup }) {
               </div>
               <div className="px-1.5 pb-2 pt-1.5 text-center">
                 <p className="font-bold text-foreground line-clamp-2 leading-tight text-[9px]">
-                  {seller.business_name}
+                  {sanitizeSellerName(seller.business_name)}
                 </p>
                 {seller.rating > 0 && (
                   <div className="flex items-center justify-center gap-0.5 mt-0.5">
