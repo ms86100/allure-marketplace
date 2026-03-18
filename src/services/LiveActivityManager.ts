@@ -241,7 +241,7 @@ class _LiveActivityManager {
       await LiveActivity.endLiveActivity({ activityId: entry.activityId });
       console.log(TAG, `END SUCCESS entity=${entityId}`);
     } catch (e) {
-      console.error(TAG, `END FAILED entity=${entityId}:`, e);
+      recordLAError('END', entityId, e);
     }
   }
 
