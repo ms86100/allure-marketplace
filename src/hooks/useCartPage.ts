@@ -359,7 +359,7 @@ export function useCartPage() {
     setPendingOrderIds([]);
     clearPaymentSession();
     // Do NOT clear cart on payment failure — user can retry with the same items
-    toast.error('Payment was not completed. Your order has been cancelled. You can try again.');
+    toast.error('Payment was not completed. Your order has been cancelled. You can try again.', { id: 'upi-failed' });
   };
 
   // Compute whether we have an active payment session (for rendering payment UI even if cart is empty)
