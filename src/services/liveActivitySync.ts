@@ -44,11 +44,19 @@ export async function syncActiveOrders(userId: string): Promise<number> {
   syncing = true;
   try {
     console.log(TAG, 'Syncing active buyer orders for', userId);
+
+    // DB-backed active statuses from category_status_flows
+    const activeStatuses = [...await getStartStatuses()];
+    if (activeStatuses.length === 0) {
+      console.warn(TAG, 'No active statuses from DB, skipping sync');
+      return 0;
+    }
+
     const { data: orders, error } = await supabase
       .from('orders')
       .select('id, status, seller_id')
       .eq('buyer_id', userId)
-      .in('status', ACTIVE_STATUSES);
+      .in('status', activeStatuses);
 
     if (error) {
       console.error(TAG, 'Failed to fetch active orders:', error.message);
