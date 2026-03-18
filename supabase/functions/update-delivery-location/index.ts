@@ -23,7 +23,6 @@ const DEFAULT_PROXIMITY = {
   nearby: 500,
 };
 
-/** Load proximity thresholds from system_settings */
 async function loadProximityThresholds(
   supabase: ReturnType<typeof createClient>,
 ): Promise<typeof DEFAULT_PROXIMITY> {
@@ -45,7 +44,6 @@ async function loadProximityThresholds(
   }
 }
 
-/** Proximity state based on distance and thresholds */
 function getProximity(distanceMeters: number, thresholds: typeof DEFAULT_PROXIMITY): 'at_doorstep' | 'arriving' | 'nearby' | 'en_route' {
   if (distanceMeters < thresholds.at_doorstep) return 'at_doorstep';
   if (distanceMeters < thresholds.arriving) return 'arriving';
@@ -53,7 +51,6 @@ function getProximity(distanceMeters: number, thresholds: typeof DEFAULT_PROXIMI
   return 'en_route';
 }
 
-/** ETA in minutes with state-based overrides and optional historical blend */
 function calculateEta(distanceMeters: number, speedKmh: number | null, accuracyMeters: number | null, historicalAvgMin: number | null = null): { eta: number | null; skipUpdate: boolean } {
   if (accuracyMeters != null && accuracyMeters > 100) {
     return { eta: null, skipUpdate: true };
@@ -74,7 +71,6 @@ function calculateEta(distanceMeters: number, speedKmh: number | null, accuracyM
   return { eta: etaMin, skipUpdate: false };
 }
 
-/** Detect significant heading change (>90° reversal) */
 function hasSignificantHeadingChange(prevHeading: number | null, currentHeading: number | null): boolean {
   if (prevHeading == null || currentHeading == null) return false;
   let diff = Math.abs(currentHeading - prevHeading);
@@ -82,10 +78,18 @@ function hasSignificantHeadingChange(prevHeading: number | null, currentHeading:
   return diff > 90;
 }
 
+// ═══ Live Activity delta-based push constants ═══
+const LA_THROTTLE_FLOOR_MS = 15_000;
+const LA_DISTANCE_DELTA_M = 50;
+const LA_ETA_DELTA_MIN = 1;
+const LA_STALE_RETRY_MS = 60_000;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const fnStartMs = Date.now();
 
   try {
     const authHeader = req.headers.get('Authorization');
@@ -145,22 +149,18 @@ serve(async (req) => {
       });
     }
 
-    // ═══ AUTH CHECK: verify caller is the assigned rider OR the seller ═══
+    // ═══ AUTH CHECK ═══
     let isAuthorized = false;
 
-    // Check 1: Is caller the assigned rider from delivery_partner_pool?
     if (assignment.rider_id) {
       const { data: poolRider } = await supabase
         .from('delivery_partner_pool')
         .select('user_id')
         .eq('id', assignment.rider_id)
         .single();
-      if (poolRider?.user_id === callerId) {
-        isAuthorized = true;
-      }
+      if (poolRider?.user_id === callerId) isAuthorized = true;
     }
 
-    // Check 2: Is caller the seller for this order? (seller self-delivery)
     if (!isAuthorized) {
       const { data: orderData } = await supabase
         .from('orders')
@@ -174,10 +174,7 @@ serve(async (req) => {
           .select('user_id')
           .eq('id', orderData.seller_id)
           .single();
-
-        if (sellerProfile?.user_id === callerId) {
-          isAuthorized = true;
-        }
+        if (sellerProfile?.user_id === callerId) isAuthorized = true;
       }
     }
 
@@ -194,16 +191,12 @@ serve(async (req) => {
       .insert({
         assignment_id,
         partner_id: callerId,
-        latitude,
-        longitude,
-        speed_kmh,
-        heading,
-        accuracy_meters,
+        latitude, longitude, speed_kmh, heading, accuracy_meters,
       });
 
     if (locErr) console.error('Error inserting location:', locErr);
 
-    // Get destination coordinates and seller info for ETA blending
+    // Get destination coordinates and seller info
     const { data: orderForDest } = await supabase
       .from('orders')
       .select('delivery_lat, delivery_lng, buyer_id, seller_id')
@@ -230,7 +223,6 @@ serve(async (req) => {
     let proximity: string = 'en_route';
     let skipEtaUpdate = false;
 
-    // Load DB-backed proximity thresholds
     const proximityThresholds = await loadProximityThresholds(supabase);
 
     if (destLat && destLng) {
@@ -254,9 +246,7 @@ serve(async (req) => {
 
       const etaResult = calculateEta(distanceMeters, speed_kmh, accuracy_meters, historicalAvgMin);
       skipEtaUpdate = etaResult.skipUpdate;
-      if (!skipEtaUpdate) {
-        etaMinutes = etaResult.eta;
-      }
+      if (!skipEtaUpdate) etaMinutes = etaResult.eta;
     }
 
     // Build update payload
@@ -272,17 +262,15 @@ serve(async (req) => {
       updateData.eta_minutes = etaMinutes;
     }
 
+    const dbStartMs = Date.now();
     await supabase
       .from('delivery_assignments')
       .update(updateData)
       .eq('id', assignment_id);
+    const dbMs = Date.now() - dbStartMs;
 
     // ═══ PHASE A: First GPS update after picked_up → en_route notification ═══
-    if (
-      assignment.status === 'picked_up' &&
-      !assignment.last_location_at &&
-      buyerId
-    ) {
+    if (assignment.status === 'picked_up' && !assignment.last_location_at && buyerId) {
       const { count } = await supabase
         .from('notification_queue')
         .select('id', { count: 'exact', head: true })
@@ -339,12 +327,8 @@ serve(async (req) => {
       }
     }
 
-    // ═══ Smart Delay Detection — ETA spike or heading reversal ═══
-    if (
-      distanceMeters !== null &&
-      buyerId &&
-      ['picked_up', 'at_gate'].includes(assignment.status)
-    ) {
+    // ═══ Smart Delay Detection ═══
+    if (distanceMeters !== null && buyerId && ['picked_up', 'at_gate'].includes(assignment.status)) {
       const prevEta = assignment.eta_minutes;
       const etaSpike = prevEta != null && etaMinutes != null && (etaMinutes - prevEta) > 5;
 
@@ -387,7 +371,7 @@ serve(async (req) => {
       }
     }
 
-    // ═══ Proximity notifications — 500m and 200m ═══
+    // ═══ Proximity notifications ═══
     if (distanceMeters !== null && buyerId && ['picked_up', 'on_the_way'].includes(assignment.status)) {
       let vehicleType: string | null = null;
       if (assignment.rider_id) {
@@ -459,6 +443,87 @@ serve(async (req) => {
         }
       }
     }
+
+    // ═══ Live Activity delta-based APNs push ═══
+    let laPushMs: number | null = null;
+    if (['picked_up', 'on_the_way', 'at_gate'].includes(assignment.status)) {
+      try {
+        const { data: laToken } = await supabase
+          .from('live_activity_tokens')
+          .select('id, push_token, updated_at, last_pushed_eta, last_pushed_distance')
+          .eq('order_id', assignment.order_id)
+          .maybeSingle();
+
+        if (laToken?.push_token) {
+          const lastPushedAt = laToken.updated_at ? new Date(laToken.updated_at).getTime() : 0;
+          const timeSinceLastPush = Date.now() - lastPushedAt;
+          const prevPushedEta = laToken.last_pushed_eta;
+          const prevPushedDist = laToken.last_pushed_distance;
+
+          // Delta checks
+          const distanceDelta = (prevPushedDist != null && distanceMeters != null)
+            ? Math.abs(distanceMeters - prevPushedDist)
+            : Infinity;
+          const etaDelta = (prevPushedEta != null && etaMinutes != null)
+            ? Math.abs(etaMinutes - prevPushedEta)
+            : Infinity;
+          const proximityChanged = false; // proximity_status change tracked above
+
+          const isStale = timeSinceLastPush > LA_STALE_RETRY_MS;
+          const hasMeaningfulChange = distanceDelta > LA_DISTANCE_DELTA_M || etaDelta >= LA_ETA_DELTA_MIN;
+          const throttleOk = timeSinceLastPush >= LA_THROTTLE_FLOOR_MS;
+
+          if (throttleOk && (hasMeaningfulChange || isStale)) {
+            const laPushStart = Date.now();
+
+            // Fetch seller info for the push
+            let sellerName: string | null = null;
+            let sellerLogoUrl: string | null = null;
+            if (sellerId) {
+              const { data: sp } = await supabase
+                .from('seller_profiles')
+                .select('business_name, logo_url')
+                .eq('id', sellerId)
+                .single();
+              sellerName = sp?.business_name ?? null;
+              sellerLogoUrl = sp?.logo_url ?? null;
+            }
+
+            // Invoke APNs push
+            const pushResp = await supabase.functions.invoke('update-live-activity-apns', {
+              body: {
+                order_id: assignment.order_id,
+                status: assignment.status,
+                push_token: laToken.push_token,
+                seller_name: sellerName,
+                seller_logo_url: sellerLogoUrl,
+              },
+            });
+
+            laPushMs = Date.now() - laPushStart;
+
+            // Update push state in DB
+            if (!pushResp.error) {
+              await supabase
+                .from('live_activity_tokens')
+                .update({
+                  updated_at: new Date().toISOString(),
+                  last_pushed_eta: etaMinutes ?? prevPushedEta,
+                  last_pushed_distance: distanceMeters ?? prevPushedDist,
+                })
+                .eq('id', laToken.id);
+            }
+
+            console.log(`[Location] LA push for order=${assignment.order_id} distDelta=${Math.round(distanceDelta)}m etaDelta=${etaDelta}min pushMs=${laPushMs}`);
+          }
+        }
+      } catch (laErr) {
+        console.error('[Location] LA push error:', laErr);
+      }
+    }
+
+    const totalMs = Date.now() - fnStartMs;
+    console.log(`[Location] assignment=${assignment_id} db=${dbMs}ms total=${totalMs}ms${laPushMs != null ? ` la_push=${laPushMs}ms` : ''}`);
 
     return new Response(JSON.stringify({
       success: true,

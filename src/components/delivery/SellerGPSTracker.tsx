@@ -1,5 +1,5 @@
 import { useBackgroundLocationTracking } from '@/hooks/useBackgroundLocationTracking';
-import { Navigation, Loader2 } from 'lucide-react';
+import { Navigation, Loader2, AlertTriangle, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useEffect, useRef, useState } from 'react';
@@ -14,7 +14,10 @@ interface SellerGPSTrackerProps {
 }
 
 export function SellerGPSTracker({ assignmentId, autoStart = true, deliveryStatus }: SellerGPSTrackerProps) {
-  const { isTracking, permissionDenied, lastSentAt, startTracking, stopTracking } = useBackgroundLocationTracking(assignmentId);
+  const {
+    isTracking, permissionDenied, permissionLevel, lastSentAt,
+    trackingPaused, startTracking, stopTracking,
+  } = useBackgroundLocationTracking(assignmentId);
   const [now, setNow] = useState(Date.now());
   const wakeLockRef = useRef<any>(null);
   const isNative = Capacitor.isNativePlatform();
@@ -57,32 +60,41 @@ export function SellerGPSTracker({ assignmentId, autoStart = true, deliveryStatu
     return () => clearInterval(interval);
   }, [isTracking]);
 
+  // Web-only wake lock (native doesn't need it with background geolocation plugin)
   useEffect(() => {
     if (isNative || !isTracking || !('wakeLock' in navigator)) return;
 
     const requestWakeLock = async () => {
       try {
         wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
-      } catch {
-        // ignore
-      }
+      } catch { /* ignore */ }
     };
 
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && isTracking) {
-        requestWakeLock();
-      }
+      if (document.visibilityState === 'visible' && isTracking) requestWakeLock();
     };
 
     requestWakeLock();
     document.addEventListener('visibilitychange', handleVisibility);
-
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
       wakeLockRef.current?.release?.().catch?.(() => {});
       wakeLockRef.current = null;
     };
   }, [isNative, isTracking]);
+
+  const openNativeSettings = async () => {
+    try {
+      const { NativeSettings, IOSSettings, AndroidSettings } = await import('capacitor-native-settings');
+      if (Capacitor.getPlatform() === 'ios') {
+        await NativeSettings.openIOS({ optionIOS: IOSSettings.App });
+      } else {
+        await NativeSettings.openAndroid({ optionAndroid: AndroidSettings.ApplicationDetails });
+      }
+    } catch {
+      // Plugin not available
+    }
+  };
 
   const lastSentText = lastSentAt ? `Updated ${Math.round((now - lastSentAt) / 1000)}s ago` : null;
 
@@ -93,23 +105,55 @@ export function SellerGPSTracker({ assignmentId, autoStart = true, deliveryStatu
           <Navigation size={16} className="text-primary" />
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{gpsBroadcastingTitle}</p>
         </div>
-        {isTracking && (
+        {isTracking && !trackingPaused && (
           <Badge variant="secondary" className="bg-primary/10 text-primary gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
             Live
           </Badge>
         )}
+        {isTracking && trackingPaused && (
+          <Badge variant="secondary" className="bg-destructive/10 text-destructive gap-1">
+            <AlertTriangle size={10} />
+            Paused
+          </Badge>
+        )}
       </div>
 
+      {/* Web-only keep-open warning (native handles background natively) */}
       {!isNative && (
         <div className="bg-warning/10 border border-warning/20 rounded-lg p-2.5">
           <p className="text-xs text-foreground">{keepOpenWarning}</p>
         </div>
       )}
 
+      {/* Tracking paused alert (native only — watchdog detected stale) */}
+      {isNative && trackingPaused && (
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-2.5 space-y-2">
+          <p className="text-xs text-destructive font-medium">Location updates paused</p>
+          <p className="text-xs text-muted-foreground">Keep the app open to resume tracking. The system will attempt to restart automatically.</p>
+        </div>
+      )}
+
+      {/* Permission upgrade banner (native: WhenInUse → Always) */}
+      {isNative && isTracking && permissionLevel === 'when_in_use' && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5 space-y-2">
+          <p className="text-xs text-foreground">For uninterrupted delivery tracking, enable "Always" location access.</p>
+          <Button variant="outline" size="sm" onClick={openNativeSettings} className="h-7 text-xs gap-1.5">
+            <Settings size={12} />
+            Open Settings
+          </Button>
+        </div>
+      )}
+
       {permissionDenied && (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-2.5">
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-2.5 space-y-2">
           <p className="text-xs text-destructive">{permDeniedMsg}</p>
+          {isNative && (
+            <Button variant="outline" size="sm" onClick={openNativeSettings} className="h-7 text-xs gap-1.5">
+              <Settings size={12} />
+              Open Settings
+            </Button>
+          )}
         </div>
       )}
 
