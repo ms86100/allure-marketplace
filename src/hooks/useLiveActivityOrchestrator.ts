@@ -228,11 +228,11 @@ export function useLiveActivityOrchestrator(): void {
         if (order.seller_id) {
           const { data: seller } = await supabase
             .from('seller_profiles')
-            .select('business_name, logo_url')
+            .select('business_name, profile_image_url')
             .eq('id', order.seller_id)
             .maybeSingle();
           sellerName = seller?.business_name ?? null;
-          sellerLogoUrl = seller?.logo_url ?? null;
+          sellerLogoUrl = seller?.profile_image_url ?? null;
         }
 
         console.log(TAG, `Delivery ${payload.eventType} for order ${order.id}: eta=${row.eta_minutes}, distance=${row.distance_meters}`);
