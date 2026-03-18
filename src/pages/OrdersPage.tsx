@@ -52,7 +52,7 @@ function OrderCard({ order, type }: { order: Order; type: 'buyer' | 'seller' }) 
 
             <div className="flex items-center gap-2 mt-0.5">
               {isCompleted && <CheckCircle size={12} className="text-accent shrink-0" />}
-              {(order as any).fulfillment_type === 'delivery' && (
+              {['delivery', 'seller_delivery'].includes((order as any).fulfillment_type) && (
                 <span className="text-[11px] px-1.5 py-0.5 rounded bg-accent/15 text-accent flex items-center gap-0.5">
                   <Truck size={10} /> Delivery
                 </span>
