@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useOrderSuggestions, useDismissSuggestion, useMarkSuggestionActed } from '@/hooks/useOrderSuggestions';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 export function SmartSuggestionBanner() {
   const { data: suggestions, isLoading } = useOrderSuggestions();
@@ -13,11 +13,16 @@ export function SmartSuggestionBanner() {
   const actMutation = useMarkSuggestionActed();
   const navigate = useNavigate();
   const [reorderingId, setReorderingId] = useState<string | null>(null);
+  const isReorderingRef = useRef(false); // Global mutex across all suggestions
 
   if (isLoading || !suggestions || suggestions.length === 0) return null;
 
   const handleReorder = async (suggestion: typeof suggestions[0]) => {
+    // Global mutex — block ALL reorders while one is in-flight
+    if (isReorderingRef.current) return;
+    isReorderingRef.current = true;
     setReorderingId(suggestion.id);
+
     try {
       // Check store availability before reordering
       const { data: seller } = await supabase
@@ -32,7 +37,6 @@ export function SmartSuggestionBanner() {
         if (status.status !== 'open') {
           const msg = formatStoreClosedMessage(status);
           toast.error(msg || 'Store is currently closed. Please try later.');
-          setReorderingId(null);
           return;
         }
       }
@@ -51,8 +55,8 @@ export function SmartSuggestionBanner() {
         });
 
         if (error || data?.error) {
+          toast.info('Could not reorder automatically. Showing product details.');
           navigate(`/product/${suggestion.product_id}`);
-          toast.success('Added to cart. Review your cart to complete the order.');
         } else {
           actMutation.mutate(suggestion.id);
           toast.success('Order placed successfully!');
@@ -64,9 +68,11 @@ export function SmartSuggestionBanner() {
         navigate(`/product/${suggestion.product_id}`);
       }
     } catch {
+      toast.info('Could not reorder automatically. Showing product details.');
       navigate(`/product/${suggestion.product_id}`);
     } finally {
       setReorderingId(null);
+      isReorderingRef.current = false;
     }
   };
 
@@ -105,7 +111,7 @@ export function SmartSuggestionBanner() {
               size="sm"
               className="h-8 text-xs px-3"
               onClick={() => handleReorder(suggestion)}
-              disabled={reorderingId === suggestion.id}
+              disabled={isReorderingRef.current || reorderingId === suggestion.id}
             >
               {reorderingId === suggestion.id ? '...' : 'Reorder'}
             </Button>
