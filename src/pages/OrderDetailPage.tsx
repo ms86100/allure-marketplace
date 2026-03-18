@@ -477,6 +477,9 @@ export default function OrderDetailPage() {
           status={deliveryTracking.status}
           onDismiss={() => {}}
           deliveryCode={buyerOtp}
+          transitStatuses={trackingConfig.transit_statuses}
+          overlayDistanceMeters={trackingConfig.arrival_overlay_distance_meters}
+          doorstepDistanceMeters={trackingConfig.arrival_doorstep_distance_meters}
           proximityMessages={(() => {
             try {
               const raw = getSetting('proximity_thresholds');
