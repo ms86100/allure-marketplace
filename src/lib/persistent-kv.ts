@@ -52,6 +52,9 @@ export async function restoreAppPreferences(): Promise<void> {
     'app_has_seen_onboarding',
     'seller_onboarding_completed',
     'seller_onboarding_step',
+    'live_activity_map',
+    'live_activity_diagnostics',
+    'live_activity_diagnostics_errors',
   ];
 
   for (const prefix of prefixes) {

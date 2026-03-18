@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { LiveActivity } from '@/plugins/live-activity';
 import type { LiveActivityData } from '@/plugins/live-activity/definitions';
 import { getString, setString, removeKey } from '@/lib/persistent-kv';
+import { recordLAError } from '@/services/liveActivityDiagnostics';
 
 const TAG = '[LiveActivity]';
 
@@ -209,7 +210,7 @@ class _LiveActivityManager {
         this.persistMap();
         this.enforceMaxActive();
       } catch (e) {
-        console.error(TAG, `START FAILED entity=${entity_id}:`, e);
+        recordLAError('START', entity_id, e);
       }
       return;
     }
@@ -240,7 +241,7 @@ class _LiveActivityManager {
       await LiveActivity.endLiveActivity({ activityId: entry.activityId });
       console.log(TAG, `END SUCCESS entity=${entityId}`);
     } catch (e) {
-      console.error(TAG, `END FAILED entity=${entityId}:`, e);
+      recordLAError('END', entityId, e);
     }
   }
 
@@ -281,7 +282,7 @@ class _LiveActivityManager {
       await LiveActivity.updateLiveActivity(data);
       console.log(TAG, `UPDATE SUCCESS entity=${data.entity_id}`);
     } catch (e) {
-      console.error(TAG, `UPDATE FAILED entity=${data.entity_id}:`, e);
+      recordLAError('UPDATE', data.entity_id, e);
     }
   }
 }
