@@ -58,11 +58,12 @@ function buildCategoryMeta(
 
 /* ── Collage component (inline) ──────────────────────────── */
 
-function ImageCollage({ images, fallbackIcon, fallbackUrl, alt }: {
+function ImageCollage({ images, fallbackIcon, fallbackUrl, alt, color }: {
   images: string[];
   fallbackIcon: string;
   fallbackUrl?: string | null;
   alt: string;
+  color?: string | null;
 }) {
   if (images.length === 0 && fallbackUrl) {
     return (
@@ -71,8 +72,10 @@ function ImageCollage({ images, fallbackIcon, fallbackUrl, alt }: {
   }
   if (images.length === 0) {
     return (
-      <div className="absolute inset-0 bg-muted flex items-center justify-center">
-        <span className="text-4xl">{fallbackIcon}</span>
+      <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: color ? `${color}15` : undefined }}>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: color ? `${color}25` : undefined }}>
+          <DynamicIcon name={fallbackIcon} size={28} className="text-foreground/60" style={color ? { color } : undefined} />
+        </div>
       </div>
     );
   }
