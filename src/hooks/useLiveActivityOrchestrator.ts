@@ -5,11 +5,13 @@ import { LiveActivityManager } from '@/services/LiveActivityManager';
 import { buildLiveActivityData, type StatusFlowEntry } from '@/services/liveActivityMapper';
 import { syncActiveOrders } from '@/services/liveActivitySync';
 import { runLiveActivityDiagnostics } from '@/services/liveActivityDiagnostics';
+import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statusFlowCache';
 import { Capacitor } from '@capacitor/core';
 
 const TAG = '[LiveActivityOrchestrator]';
 
-const TERMINAL_STATUSES = new Set([
+/** DB-backed terminal statuses — loaded once at init */
+let terminalStatusesCache: Set<string> = new Set([
   'delivered', 'completed', 'cancelled', 'no_show', 'failed',
 ]);
 
