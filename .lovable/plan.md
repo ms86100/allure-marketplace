@@ -1,30 +1,49 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-## Fix: Working Directory Mismatch in Verification Grep
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-### Root Cause
+## Phase I Live Activities — CI Pipeline Status
 
-Line 201 runs `cd ios/App` for the Ruby xcodeproj script. The shell stays in that directory for the rest of the step. Lines 221-222 then grep using paths relative to the project root (`ios/App/App/...`), but the CWD is already `ios/App/`, so the actual path resolved is `ios/App/ios/App/App/...` — file not found.
+### Codemagic Build Pipeline: COMPLETE
 
-### Fix
+Both `ios-release` and `release-all` workflows now include:
 
-After the Ruby block completes (line 217), add `cd ../..` to return to the project root before the verification greps run. Alternatively, change the grep paths to be relative to `ios/App/` (i.e., `App/SocivaBridgeViewController.swift` and `App/AppDelegate.swift`).
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
 
-**Preferred approach** — add `cd` back to root (clearest):
+### Codemagic Requirements (User Action)
 
-**Line 219** — insert `cd ../..` before the verification block:
-```bash
-          cd ../..
-          echo "=== Build verification ==="
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
+
+### Runtime Call Chain (Verified)
+
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
 ```
 
-Lines 221-222 remain unchanged.
+## Implementation Matrix
 
-**Same fix needed in the `release-all` workflow** — find the equivalent `cd ios/App` + verification block and apply the same `cd ../..`.
-
-### Why This Fixes It
-- File is correctly written to `ios/App/App/SocivaBridgeViewController.swift` (line 185-198)
-- Ruby correctly adds it to the Xcode project (lines 202-217)
-- Verification grep will now find the file at the correct absolute path
-- Build proceeds past the assertion
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |

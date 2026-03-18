@@ -216,6 +216,9 @@ workflows:
           puts "=== SocivaBridgeViewController.swift added to App target ==="
           RUBY
 
+          # Return to project root before verification
+          cd ../..
+
           # Verification — no storyboard patching needed, AppDelegate sets root VC programmatically
           echo "=== Build verification ==="
           grep -q "registerPluginInstance" ios/App/App/SocivaBridgeViewController.swift && echo "✅ Plugin registration in BridgeVC" || { echo "❌ FATAL: Missing plugin registration"; exit 1; }
@@ -922,6 +925,9 @@ workflows:
           project.save
           puts "=== SocivaBridgeViewController.swift added to App target ==="
           RUBY
+
+          # Return to project root before verification
+          cd ../..
 
           # Verification — no storyboard patching needed, AppDelegate sets root VC programmatically
           echo "=== Build verification ==="
