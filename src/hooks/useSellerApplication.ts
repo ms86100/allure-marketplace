@@ -301,7 +301,7 @@ export function useSellerApplication() {
       // Verify society actually has coordinates
       const { data: society } = await supabase.from('societies').select('latitude, longitude').eq('id', profile.society_id).single();
       if (!society?.latitude || !society?.longitude) {
-        toast.error('Your society has no location set. Please set your store location manually.');
+        toast.error('Your society has no location set. Please set your store location manually.', { id: 'seller-app-validation' });
         setIsLoading(false);
         return;
       }
