@@ -409,7 +409,7 @@ export function useCartPage() {
     selectedDeliveryAddress, setSelectedDeliveryAddress, addresses, addressesLoading,
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed,
     handleUpiDeepLinkSuccess, handleUpiDeepLinkFailed,
-    hasActivePaymentSession,
+    hasActivePaymentSession, sessionSellerUpiId, sessionSellerName, sessionAmount,
     cancelPlacingOrder: () => setIsPlacingOrder(false),
   };
 }
