@@ -41,9 +41,31 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        let entityId = call.getString("entity_id") ?? ""
+
+        // ── Dedup: check if an activity with the same entityId already exists ──
+        for activity in Activity<LiveDeliveryAttributes>.activities {
+            if activity.attributes.entityId == entityId {
+                // Update existing activity instead of creating a duplicate
+                let state = LiveDeliveryAttributes.ContentState(
+                    workflowStatus: call.getString("workflow_status") ?? "",
+                    etaMinutes: call.getInt("eta_minutes"),
+                    driverDistance: call.getDouble("driver_distance"),
+                    driverName: call.getString("driver_name"),
+                    vehicleType: call.getString("vehicle_type"),
+                    progressStage: call.getString("progress_stage")
+                )
+                Task {
+                    await activity.update(.init(state: state, staleDate: nil))
+                    call.resolve(["activityId": activity.id])
+                }
+                return
+            }
+        }
+
         let attributes = LiveDeliveryAttributes(
             entityType: call.getString("entity_type") ?? "order",
-            entityId: call.getString("entity_id") ?? ""
+            entityId: entityId
         )
 
         let state = LiveDeliveryAttributes.ContentState(

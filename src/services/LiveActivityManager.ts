@@ -341,8 +341,12 @@ class _LiveActivityManager {
     this.clearPersistedMap();
   }
 
-  /** Force re-hydration (e.g. on app resume) */
+  /** Force re-hydration (e.g. on app resume). Skips if hydration is currently running. */
   resetHydration(): void {
+    if (this.hydrating) {
+      console.log(TAG, 'RESET HYDRATION SKIPPED — hydration in progress');
+      return;
+    }
     this.hydrationPromise = null;
   }
 
