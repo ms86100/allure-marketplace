@@ -60,9 +60,15 @@ struct LiveDeliveryWidget: Widget {
             DynamicIsland {
                 // ── Expanded Regions ────────────────────────
                 DynamicIslandExpandedRegion(.leading) {
-                    Label(context.state.driverName ?? "Driver",
-                          systemImage: "person.fill")
-                        .font(.caption)
+                    HStack(spacing: 4) {
+                        Image("SocivaIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 24, height: 24)
+                            .clipShape(Circle())
+                        Text(context.state.driverName ?? "Sociva")
+                            .font(.caption)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     if let eta = context.state.etaMinutes {
@@ -80,8 +86,11 @@ struct LiveDeliveryWidget: Widget {
                     }
                 }
             } compactLeading: {
-                Image(systemName: "bag.fill")
-                    .foregroundColor(.orange)
+                Image("SocivaIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 20, height: 20)
+                    .clipShape(Circle())
             } compactTrailing: {
                 if let eta = context.state.etaMinutes {
                     Text("\(eta)m")
@@ -89,8 +98,10 @@ struct LiveDeliveryWidget: Widget {
                         .bold()
                 }
             } minimal: {
-                Image(systemName: "bag.fill")
-                    .foregroundColor(.orange)
+                Image("SocivaIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(Circle())
             }
         }
     }
