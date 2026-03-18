@@ -286,6 +286,7 @@ export function useCartPage() {
           sellerName: sellerGroups[0]?.sellerName || undefined,
         });
         // Do NOT clear cart — cart stays until payment is confirmed
+        upiCompletionRef.current = false; // Reset guard for new payment session
         if (paymentMode.isUpiDeepLink) {
           setShowUpiDeepLink(true);
         } else {
