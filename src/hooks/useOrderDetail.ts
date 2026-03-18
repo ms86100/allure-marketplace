@@ -143,7 +143,7 @@ export function useOrderDetail(id: string | undefined) {
     try {
       const updateData: any = { status: newStatus, auto_cancel_at: null };
       if (rejectionReason) updateData.rejection_reason = rejectionReason;
-      let query = supabase.from('orders').update(updateData).eq('id', order.id).eq('status', order.status as string);
+      let query = supabase.from('orders').update(updateData).eq('id', order.id).eq('status', order.status as any);
       if (isSellerView) query = query.eq('seller_id', seller?.id);
       else query = query.eq('buyer_id', user.id);
       const { error } = await query;
