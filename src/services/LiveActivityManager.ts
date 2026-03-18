@@ -84,10 +84,16 @@ interface PersistedMap {
  * - Persistent activity map survives app restarts
  * - Stale activities cleaned up before new ones are created
  * - Map capped at MAX_ACTIVE entries
+ * - Promise-based hydration lock prevents race conditions
  */
 class _LiveActivityManager {
   private active = new Map<string, ActiveEntry>();
-  private hydrated = false;
+
+  /** Promise-based hydration lock — all concurrent callers await the same promise */
+  private hydrationPromise: Promise<void> | null = null;
+
+  /** Set during hydration — if native plugin is unavailable, skip all starts */
+  private canStart = true;
 
   /** True only on native iOS / Android */
   private get isSupported(): boolean {
@@ -123,10 +129,20 @@ class _LiveActivityManager {
 
   // ── Hydration & Cleanup ──────────────────────────────────
 
+  /**
+   * Promise-based hydration lock.
+   * First caller creates the promise; all concurrent callers await the same one.
+   * This prevents the race where concurrent push() calls see an empty active map
+   * and each creates a new native activity.
+   */
   private async hydrate(): Promise<void> {
-    if (this.hydrated) return;
-    this.hydrated = true;
+    if (!this.hydrationPromise) {
+      this.hydrationPromise = this._doHydrate();
+    }
+    return this.hydrationPromise;
+  }
 
+  private async _doHydrate(): Promise<void> {
     console.log(TAG, 'HYDRATE START — reconciling persisted + native state');
 
     try {
@@ -176,9 +192,17 @@ class _LiveActivityManager {
       await LiveActivity.cleanupStaleActivities({ validEntityIds: validIds });
 
       this.persistMap();
+      this.canStart = true;
       console.log(TAG, `HYDRATE COMPLETE — tracking ${this.active.size} activities`);
     } catch (e) {
-      console.warn(TAG, 'HYDRATE FAILED:', e);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(TAG, 'HYDRATE FAILED:', msg);
+
+      // If native plugin is not available / permission denied, disable starts
+      if (msg.includes('not implemented') || msg.includes('not enabled') || msg.includes('not available')) {
+        this.canStart = false;
+        console.warn(TAG, 'HYDRATE — native Live Activities not available, disabling starts');
+      }
     }
   }
 
@@ -212,7 +236,13 @@ class _LiveActivityManager {
       return;
     }
 
+    // Await hydration — all concurrent callers block here until hydration completes
     await this.hydrate();
+
+    if (!this.canStart) {
+      console.log(TAG, 'SKIP — native Live Activities not available');
+      return;
+    }
 
     const { entity_id, workflow_status } = data;
 
@@ -291,7 +321,7 @@ class _LiveActivityManager {
 
   /** Force re-hydration (e.g. on app resume) */
   resetHydration(): void {
-    this.hydrated = false;
+    this.hydrationPromise = null;
   }
 
   // ── internal ──────────────────────────────────────────────

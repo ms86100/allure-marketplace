@@ -1,5 +1,38 @@
 import type { LiveActivityData } from '@/plugins/live-activity/definitions';
 
+/** Human-readable progress descriptions shown as the subtitle on the lock screen widget */
+const PROGRESS_DESCRIPTIONS: Record<string, string> = {
+  accepted: 'Your order has been accepted',
+  confirmed: 'Your booking is confirmed',
+  preparing: 'Your order is being prepared',
+  ready: 'Ready for pickup',
+  picked_up: 'Order picked up by rider',
+  en_route: 'On the way to you',
+  on_the_way: 'On the way to you',
+};
+
+/**
+ * Maps order status + delivery info into a meaningful progress stage string.
+ * Returns null when the title alone is sufficient.
+ */
+function mapProgressStage(
+  status: string,
+  delivery?: {
+    eta_minutes?: number | null;
+    rider_name?: string | null;
+  } | null,
+): string | null {
+  // For delivery statuses, enrich with rider/ETA info
+  if ((status === 'en_route' || status === 'on_the_way' || status === 'picked_up') && delivery) {
+    const parts: string[] = [];
+    if (delivery.rider_name) parts.push(delivery.rider_name);
+    if (delivery.eta_minutes != null) parts.push(`ETA ${delivery.eta_minutes} min`);
+    if (parts.length > 0) return parts.join(' · ');
+  }
+
+  return PROGRESS_DESCRIPTIONS[status] ?? null;
+}
+
 /**
  * Builds a LiveActivityData payload from an order row and optional
  * delivery assignment data. Works without any React hooks.
@@ -26,6 +59,6 @@ export function buildLiveActivityData(
       : null,
     driver_name: delivery?.rider_name ?? null,
     vehicle_type: delivery?.vehicle_type ?? null,
-    progress_stage: order.status,
+    progress_stage: mapProgressStage(order.status, delivery),
   };
 }

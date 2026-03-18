@@ -31,7 +31,10 @@ struct LiveDeliveryWidget: Widget {
                     }
                 }
 
-                if let stage = context.state.progressStage {
+                // Only show progress stage when it provides info beyond the title
+                if let stage = context.state.progressStage,
+                   !stage.isEmpty,
+                   stage.lowercased() != context.state.workflowStatus.lowercased() {
                     Text(stage)
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.8))
@@ -69,7 +72,9 @@ struct LiveDeliveryWidget: Widget {
                     }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    if let stage = context.state.progressStage {
+                    if let stage = context.state.progressStage,
+                       !stage.isEmpty,
+                       stage.lowercased() != context.state.workflowStatus.lowercased() {
                         Text(stage)
                             .font(.caption2)
                     }
