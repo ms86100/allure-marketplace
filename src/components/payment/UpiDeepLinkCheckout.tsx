@@ -177,8 +177,8 @@ export function UpiDeepLinkCheckout({
       const { error } = await supabase.rpc('confirm_upi_payment', {
         _order_id: orderId,
         _upi_transaction_ref: '',
-        _payment_screenshot_url: screenshotUrl,
-      } as any);
+        _payment_screenshot_url: screenshotUrl ?? undefined,
+      });
       if (error) throw error;
 
       // Notify seller
