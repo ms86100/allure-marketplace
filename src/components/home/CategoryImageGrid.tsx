@@ -196,7 +196,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                 {meta.sellerCount > 0 && (
                   <span className="inline-flex items-center gap-1">
                     <Users size={10} className="shrink-0 text-primary/70" />
-                    <span className="font-medium">{meta.sellerCount} {meta.sellerCount === 1 ? 'seller' : 'sellers'}</span>
+                    <span className="font-medium">{meta.sellerCount} {meta.sellerCount === 1 ? ml.label('label_seller_count_singular') : ml.label('label_seller_count_plural')}</span>
                   </span>
                 )}
                 {meta.minPrice !== null && (
