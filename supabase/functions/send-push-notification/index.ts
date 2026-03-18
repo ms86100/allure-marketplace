@@ -321,7 +321,7 @@ Deno.serve(async (req) => {
     ]);
     const apnsConfigured = !!(apnsP8Key && apnsKeyId && apnsTeamId && apnsBundleId);
 
-    const { userId, title, body, data }: PushPayload = await req.json();
+    const { userId, title, body, data, threadId, imageUrl }: PushPayload = await req.json();
 
     if (!userId || !title || !body) {
       return new Response(
