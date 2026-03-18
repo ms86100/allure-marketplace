@@ -182,6 +182,9 @@ class _LiveActivityManager {
 
     this.setupTokenListener();
 
+    // Load DB-backed status sets at hydration time
+    await loadStatusSets();
+
     try {
       const persisted = this.loadPersistedMap();
       const persistedCount = Object.keys(persisted).length;

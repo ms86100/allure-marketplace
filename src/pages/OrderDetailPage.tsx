@@ -303,7 +303,13 @@ export default function OrderDetailPage() {
                   </Suspense>
                 ) : null;
               })()}
-              <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} trackingState={deliveryTracking} roadEtaMinutes={roadEtaMinutes} />
+              <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} trackingState={deliveryTracking} roadEtaMinutes={roadEtaMinutes} statusHints={(() => {
+                const hints: Record<string, { buyer_hint?: string | null; seller_hint?: string | null; display_label?: string | null }> = {};
+                for (const step of o.flow) {
+                  hints[step.status_key] = { buyer_hint: step.buyer_hint, seller_hint: (step as any).seller_hint, display_label: step.display_label };
+                }
+                return hints;
+              })()} />
               {/* Gap A: Show delivery OTP to buyer */}
               {o.isBuyerView && buyerOtp && isInTransit && (
                 <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 text-center">
