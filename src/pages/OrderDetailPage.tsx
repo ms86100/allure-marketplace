@@ -214,8 +214,8 @@ export default function OrderDetailPage() {
           {/* Live Delivery Tracking or Static Card */}
           {isDeliveryOrder && isInTransit && deliveryAssignmentId && (
             <>
-              {/* Buyer map view — show when rider has GPS data (lazy-loaded) */}
-              {o.isBuyerView && deliveryTracking.riderLocation && (order as any).delivery_lat && (order as any).delivery_lng && (
+              {/* Map view — show for both buyer and seller when rider has GPS data */}
+              {deliveryTracking.riderLocation && (order as any).delivery_lat && (order as any).delivery_lng && (
                 <Suspense fallback={<Skeleton className="h-48 w-full rounded-xl" />}>
                   <DeliveryMapView
                     riderLat={deliveryTracking.riderLocation.latitude}

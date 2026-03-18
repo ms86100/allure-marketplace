@@ -76,12 +76,15 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView }: LiveDeliveryT
           <Navigation size={16} className="text-primary" />
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Live Tracking</p>
         </div>
-        {tracking.eta && isInTransit && (
-          <Badge variant="secondary" className="bg-primary/10 text-primary">
-            <Clock size={10} className="mr-1" />
-            {tracking.eta > 3 ? `${tracking.eta - 2}–${tracking.eta + 2} min` : `${tracking.eta} min`}
-          </Badge>
-        )}
+        {(() => {
+          const smartEta = getSmartEta(tracking.distance, tracking.eta);
+          return smartEta && isInTransit ? (
+            <Badge variant="secondary" className="bg-primary/10 text-primary">
+              <Clock size={10} className="mr-1" />
+              {smartEta > 3 ? `${smartEta - 1}–${smartEta + 1} min` : `${smartEta} min`}
+            </Badge>
+          ) : null;
+        })()}
       </div>
 
       {/* Proximity / ETA message */}
