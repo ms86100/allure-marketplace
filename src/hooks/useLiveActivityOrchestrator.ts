@@ -22,8 +22,7 @@ const TERMINAL_STATUSES = new Set([
  * Hardened with:
  * - Channel subscription status monitoring
  * - INSERT + UPDATE on delivery_assignments
- * - Polling fallback for missed realtime events
- * - Shared syncActiveOrders for mount/resume/poll
+ * - One-shot syncActiveOrders on mount/resume (no polling)
  * - Runtime diagnostics on first mount
  */
 export function useLiveActivityOrchestrator(): void {
