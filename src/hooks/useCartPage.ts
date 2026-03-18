@@ -276,11 +276,14 @@ export function useCartPage() {
         if (orderIds.length === 0) throw new Error('Failed to create orders');
         setPendingOrderIds(orderIds);
         // CRITICAL: Persist payment session so it survives app-switch
+        const sellerForSession = sellerGroups[0]?.items[0]?.product?.seller as any;
         savePaymentSession({
           orderIds,
           paymentMethod: 'upi',
           amount: finalAmount,
           createdAt: Date.now(),
+          sellerUpiId: sellerForSession?.upi_id || undefined,
+          sellerName: sellerGroups[0]?.sellerName || undefined,
         });
         // Do NOT clear cart — cart stays until payment is confirmed
         if (paymentMode.isUpiDeepLink) {
