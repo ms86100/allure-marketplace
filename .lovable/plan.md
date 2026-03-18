@@ -1,82 +1,81 @@
 
 
-# Fix Plan: Live Tracking + Dynamic Island 404
+# iOS Live Activity Widget Redesign
 
-## Issue 1: Live Tracking Not Updating Continuously
+## Problems Visible in Screenshot
 
-### Root Cause
-`useDeliveryTracking.ts` relies **exclusively** on two Supabase Realtime channels:
-1. `tracking-assignment-{id}` — listens for `delivery_assignments` UPDATE
-2. `tracking-location-{id}` — listens for `delivery_locations` INSERT
+1. Three duplicate "Your Order is Ready" cards stacked on top of each other (dedup issue still manifesting on device)
+2. A fourth card shows "We're Preparing Your Order" with nested duplicate content inside it
+3. The purple gradient card looks dated and lacks information hierarchy
+4. The dark card is functional but visually flat
+5. No order short ID visible to help buyers distinguish orders
+6. Emoji-heavy titles feel unpolished ("Your Order is Ready! 🎉")
+7. No meaningful contextual info per status (e.g., "Pickup from [seller]" when ready, ETA countdown when in transit)
 
-There is **no polling fallback**. On iOS, when the app transitions between foreground/background states, Supabase Realtime WebSocket connections can silently drop without triggering `CHANNEL_ERROR`. The buyer sees stale location data until they re-mount the component (navigate away and back).
+## What Changes
 
-The Live Activity orchestrator has a 45-second polling heartbeat, but that only syncs **order status** for Dynamic Island — it does NOT update the in-app tracking map/location state.
+### A. ContentState — add `order_short_id` and `seller_logo_url`
 
-### Fix
-Add a polling fallback to `useDeliveryTracking.ts` with adaptive intervals:
-- **Poll `delivery_assignments`** every 10 seconds when in transit, 30 seconds otherwise
-- If a realtime event arrives, reset the poll timer (avoid redundant fetches)
-- On each poll, compare `last_location_at` — only update state if newer data exists
-- Add channel status monitoring: if `CHANNEL_ERROR` or `TIMED_OUT`, increase poll frequency
-- Add `visibilitychange` listener to immediately poll when app returns to foreground
+Add two new fields to `LiveDeliveryAttributes.ContentState`:
+- `orderShortId: String?` — last 4-8 chars of order ID for buyer recognition (e.g., "#7838")
+- `sellerLogoUrl: String?` — seller logo URL for a branded feel (rendered if available)
 
+Update `LiveActivityData` interface in `definitions.ts` and the mapper/APNs edge function to populate these.
+
+### B. Widget Visual Redesign
+
+Replace the current 3-branch lock screen layout with a single, unified, status-adaptive card:
+
+**Layout structure (all statuses):**
 ```text
-Architecture:
-┌─────────────────────────────────┐
-│   useDeliveryTracking           │
-│                                 │
-│  Primary: Realtime channels ────┤──► location updates
-│                                 │
-│  Fallback: Adaptive polling ────┤──► every 10s (transit) / 30s (idle)
-│                                 │
-│  Resume: visibilitychange ──────┤──► immediate poll on foreground
-│                                 │
-│  Channel monitor ───────────────┤──► if degraded, poll at 5s
-└─────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│  [SocivaIcon]  Seller Name        #7838     │
+│                                   2 items   │
+│                                             │
+│  Status Title (SF Symbol prefix)            │
+│  Contextual subtitle                        │
+│                                             │
+│  ═══════●🛵═══════════════  ETA 8 min       │
+└─────────────────────────────────────────────┘
 ```
 
-### Files Changed
-- `src/hooks/useDeliveryTracking.ts` — Add polling fallback + visibility listener + channel health monitoring
+**Design principles:**
+- Single dark card with subtle status-tinted accent (not full gradient)
+- SF Symbols instead of emojis for status icons (checkmark.circle.fill, fork.knife, bag.fill, bicycle, mappin.and.ellipse)
+- Accent color changes per phase: amber (accepted/preparing), blue (ready), green (in transit), emerald (delivered)
+- Clean typography: `.subheadline.bold` for title, `.caption` for subtitle
+- Progress bar accent matches status color
+- ETA displayed inline with progress bar when available
+- Order short ID as a subtle badge in top-right
 
----
+**Status-specific content:**
+- **accepted**: "Order Confirmed" / "Seller is reviewing your order"
+- **preparing**: "Being Prepared" / "Your order is being made"
+- **ready**: "Ready for Pickup" / "Waiting to be picked up from {seller}"
+- **picked_up/on_the_way/en_route**: "On the Way" / "{driver} · {distance} km away" + ETA badge
+- **arrived**: "At Your Location" / "{driver} has arrived"
+- **delivered/completed**: "Delivered" / full progress, green accent, auto-dismiss
 
-## Issue 2: Dynamic Island Tap → 404 Page
+**Dynamic Island (compact):**
+- Leading: SocivaIcon
+- Trailing: ETA in green if available, else mini progress ring
 
-### Root Cause
-Two compounding problems:
+**Dynamic Island (expanded):**
+- Same clean layout as lock screen but condensed
+- No gradient backgrounds, just the standard Dynamic Island dark
 
-**Problem A: Deep link lost during auth hydration.**
-When the app is cold-started from a Dynamic Island tap (`sociva://orders/{UUID}`), the sequence is:
-1. `useDeepLinks` fires `navigate('/orders/UUID')` immediately
-2. But `AuthProvider` hasn't hydrated yet — `user` is null
-3. `ProtectedRoute` sees no user → redirects to `/landing`
-4. Auth session restores from storage → user now exists, but the deep link path (`/orders/UUID`) is lost
+### C. Files to Change
 
-**Problem B: NotFound page is a dead end on cold start.**
-- "Go Back" uses `window.history.back()` — on cold start there's no history, so nothing happens
-- "Home" uses `<Link to="/">` which should work, but if auth isn't ready it may redirect to `/landing` again
+| File | Change |
+|------|--------|
+| `native/ios/LiveDeliveryAttributes.swift` | Add `orderShortId`, `sellerLogoUrl` to ContentState |
+| `native/ios/LiveDeliveryWidget.swift` | Full redesign of lock screen view, DI regions, helper functions |
+| `src/plugins/live-activity/definitions.ts` | Add `order_short_id`, `seller_logo_url` to LiveActivityData |
+| `src/services/liveActivityMapper.ts` | Populate new fields from order data |
+| `src/services/liveActivitySync.ts` | Pass `order_number` / short ID to mapper |
+| `supabase/functions/update-live-activity-apns/index.ts` | Include new fields in APNs content-state, fetch order number |
 
-### Fix
+### D. Scope Exclusion
 
-1. **`useDeepLinks.ts`**: Store the pending deep link path in `sessionStorage` before calling `navigate()`. This creates a "deferred deep link" that survives auth hydration.
-
-2. **`App.tsx` (AppRoutes or ProtectedRoute area)**: After auth hydration completes (user becomes non-null), check `sessionStorage` for a pending deep link and navigate to it.
-
-3. **`NotFound.tsx`**: Fix the "Go Back" button to use `navigate('/')` when `window.history.length <= 1` (cold start). Fix "Home" to use `useNavigate` for programmatic navigation.
-
-### Files Changed
-- `src/hooks/useDeepLinks.ts` — Save pending path to sessionStorage + add deferred navigation
-- `src/pages/NotFound.tsx` — Fix Go Back for cold-start scenarios
-- `src/App.tsx` — Add pending deep link consumer after auth ready
-
----
-
-## Summary
-
-| Issue | Root Cause | Fix | Risk |
-|-------|-----------|-----|------|
-| Tracking stops updating | No polling fallback for Realtime | Adaptive polling + visibility listener | Low — additive |
-| Dynamic Island → 404 | Deep link fires before auth ready | Deferred deep link via sessionStorage | Low — simple guard |
-| 404 page dead end | `history.back()` fails on cold start | Fallback to `navigate('/')` | None |
+The duplicate card issue (3x "Ready" cards in screenshot) is a LiveActivityManager dedup problem, not a widget design issue. That is tracked separately and is addressed by the existing hydration dedup logic. This plan focuses solely on the visual and informational quality of the widget.
 

@@ -36,7 +36,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { GlobalHapticListener } from "@/components/haptics/GlobalHapticListener";
 import { initializeMedianBridge } from "@/lib/median";
-import { useDeepLinks } from "@/hooks/useDeepLinks";
+import { useDeepLinks, consumePendingDeepLink } from "@/hooks/useDeepLinks";
 import { useSecurityOfficer } from "@/hooks/useSecurityOfficer";
 import { useAppLifecycle } from "@/hooks/useAppLifecycle";
 import { useBuyerOrderAlerts } from "@/hooks/useBuyerOrderAlerts";
@@ -312,9 +312,24 @@ class SafeSellerAlert extends React.Component<
 
 function AppRoutes() {
   const { user, profile } = useAuth();
+  const deferredNavigate = useNavigate();
   useBuyerOrderAlerts();
   useLiveActivityOrchestrator();
   useReorderInterceptor();
+
+  // Consume pending deep link after auth hydration completes
+  useEffect(() => {
+    if (!user) return;
+    const timer = setTimeout(() => {
+      const pendingPath = consumePendingDeepLink();
+      if (pendingPath) {
+        console.log('[AppRoutes] Navigating to deferred deep link:', pendingPath);
+        deferredNavigate(pendingPath, { replace: true });
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [user, deferredNavigate]);
+
   return (
     <Suspense fallback={<PageLoadingFallback />}>
       <Routes>

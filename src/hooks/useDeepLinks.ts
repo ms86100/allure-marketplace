@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App, URLOpenListenerEvent } from '@capacitor/app';
 
+const PENDING_DEEP_LINK_KEY = 'sociva_pending_deep_link';
+
 /**
  * Known top-level route segments used for deep-link fallback validation.
  */
@@ -10,6 +12,28 @@ const KNOWN_ROUTES = new Set([
   'orders', 'order', 'home', 'profile', 'cart', 'shop',
   'seller', 'settings', 'notifications', 'tracking', 'la-debug',
 ]);
+
+/**
+ * Store a pending deep link path for deferred navigation after auth hydration.
+ */
+export function setPendingDeepLink(path: string) {
+  try {
+    sessionStorage.setItem(PENDING_DEEP_LINK_KEY, path);
+  } catch { /* storage unavailable */ }
+}
+
+/**
+ * Consume and clear the pending deep link. Returns null if none.
+ */
+export function consumePendingDeepLink(): string | null {
+  try {
+    const path = sessionStorage.getItem(PENDING_DEEP_LINK_KEY);
+    if (path) sessionStorage.removeItem(PENDING_DEEP_LINK_KEY);
+    return path;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Hook to handle deep links in Capacitor native apps
@@ -22,6 +46,8 @@ const KNOWN_ROUTES = new Set([
  * Since the app uses HashRouter, deep link paths are extracted from:
  * 1. The hash fragment (e.g., /#/orders/123 -> /orders/123)
  * 2. hostname+pathname for custom schemes (sociva://orders/123 → /orders/123)
+ *
+ * Deep links are stored in sessionStorage so they survive auth hydration.
  */
 export function useDeepLinks() {
   const navigate = useNavigate();
@@ -40,14 +66,11 @@ export function useDeepLinks() {
 
         // Check if URL has a hash (for universal links with HashRouter)
         if (url.hash && url.hash.startsWith('#/')) {
-          // Extract path from hash: https://domain.com/#/orders/123 -> /orders/123
-          path = url.hash.substring(1); // Remove the leading #
+          path = url.hash.substring(1);
         } else if (url.protocol === 'sociva:') {
           // Custom URL scheme: sociva://orders/123
-          // new URL('sociva://orders/123') parses hostname='orders', pathname='/123'
-          // We need to reconstruct: /orders/123
-          const host = url.hostname; // e.g. 'orders'
-          const rest = url.pathname; // e.g. '/123' or '/'
+          const host = url.hostname;
+          const rest = url.pathname;
           path = `/${host}${rest === '/' ? '' : rest}`;
           if (url.search) {
             path += url.search;
@@ -68,12 +91,17 @@ export function useDeepLinks() {
             path = '/orders';
           }
 
-          console.log('Navigating to:', path);
+          console.log('Deep link path resolved:', path);
+
+          // Always store as pending — the deferred consumer will navigate
+          // after auth is ready. Also attempt immediate navigation for
+          // cases where auth is already hydrated.
+          setPendingDeepLink(path);
           navigate(path);
         }
       } catch (error) {
         console.error('Error parsing deep link:', error);
-        // Fallback: try to navigate to orders on any parse failure
+        setPendingDeepLink('/orders');
         navigate('/orders');
       }
     };
