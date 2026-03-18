@@ -340,6 +340,11 @@ class _LiveActivityManager {
     this.hydrationPromise = null;
   }
 
+  /** Check if a Live Activity is currently tracking the given entity */
+  isTracking(entityId: string): boolean {
+    return this.active.has(entityId);
+  }
+
   // ── internal ──────────────────────────────────────────────
 
   private throttledUpdate(entry: ActiveEntry, data: LiveActivityData): void {
