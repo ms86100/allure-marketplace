@@ -86,7 +86,7 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Live Tracking</p>
         </div>
         {(() => {
-          const smartEta = getSmartEta(tracking.distance, tracking.eta);
+          const smartEta = getSmartEta(tracking.distance, tracking.eta, roadEtaMinutes);
           return smartEta && isInTransit ? (
             <Badge variant="secondary" className="bg-primary/10 text-primary">
               <Clock size={10} className="mr-1" />
