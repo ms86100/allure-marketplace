@@ -52,11 +52,12 @@ function buildCategoryMeta(
 
 /* ── Image collage ──────────── */
 
-function ImageCollage({ images, fallbackIcon, fallbackUrl, alt }: {
+function ImageCollage({ images, fallbackIcon, fallbackUrl, alt, color }: {
   images: string[];
   fallbackIcon: string;
   fallbackUrl?: string | null;
   alt: string;
+  color?: string | null;
 }) {
   if (images.length === 0 && fallbackUrl) {
     return <img src={fallbackUrl} alt={alt} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />;
