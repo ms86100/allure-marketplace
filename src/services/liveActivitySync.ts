@@ -5,13 +5,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import { LiveActivityManager } from '@/services/LiveActivityManager';
 import { buildLiveActivityData, type StatusFlowEntry } from '@/services/liveActivityMapper';
+import { getStartStatuses } from '@/services/statusFlowCache';
 
 const TAG = '[LA-Sync]';
-
-const ACTIVE_STATUSES = [
-  'accepted', 'preparing', 'ready', 'picked_up',
-  'on_the_way', 'arrived', 'confirmed',
-] as const;
 
 /** Prevents concurrent syncActiveOrders calls from racing */
 let syncing = false;
@@ -36,7 +32,7 @@ async function getStatusFlowEntries(): Promise<StatusFlowEntry[]> {
   }
 
   cachedFlowEntries = data as StatusFlowEntry[];
-  cacheExpiry = Date.now() + 10 * 60 * 1000; // Cache for 10 minutes
+  cacheExpiry = Date.now() + 10 * 60 * 1000;
   return cachedFlowEntries;
 }
 
@@ -48,11 +44,19 @@ export async function syncActiveOrders(userId: string): Promise<number> {
   syncing = true;
   try {
     console.log(TAG, 'Syncing active buyer orders for', userId);
+
+    // DB-backed active statuses from category_status_flows
+    const activeStatuses = [...await getStartStatuses()];
+    if (activeStatuses.length === 0) {
+      console.warn(TAG, 'No active statuses from DB, skipping sync');
+      return 0;
+    }
+
     const { data: orders, error } = await supabase
       .from('orders')
       .select('id, status, seller_id')
       .eq('buyer_id', userId)
-      .in('status', ACTIVE_STATUSES);
+      .in('status', activeStatuses as any);
 
     if (error) {
       console.error(TAG, 'Failed to fetch active orders:', error.message);

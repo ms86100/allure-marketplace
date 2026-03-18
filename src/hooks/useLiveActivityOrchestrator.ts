@@ -36,8 +36,7 @@ export function useLiveActivityOrchestrator(): void {
       const { data } = await supabase
         .from('category_status_flows')
         .select('status_key, display_label, sort_order, buyer_hint')
-        .eq('transaction_type', 'cart_purchase')
-        .eq('parent_group', 'default')
+        .in('transaction_type', ['cart_purchase', 'seller_delivery'])
         .order('sort_order');
       if (data) flowEntriesRef.current = data as StatusFlowEntry[];
     } catch { /* best-effort */ }
@@ -45,13 +44,14 @@ export function useLiveActivityOrchestrator(): void {
 
   const doSync = useCallback(async () => {
     if (!userId || !mountedRef.current) return;
-    // Refresh active order IDs for delivery channel filtering
+    // Use DB-backed terminal statuses for filtering active orders
+    const terminalArr = [...terminalStatusesCache];
     try {
       const { data } = await supabase
         .from('orders')
         .select('id')
         .eq('buyer_id', userId)
-        .not('status', 'in', '("delivered","completed","cancelled","no_show","failed")');
+        .not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`);
       if (data) {
         activeOrderIdsRef.current = new Set(data.map(o => o.id));
       }

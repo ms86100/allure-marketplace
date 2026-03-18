@@ -28,6 +28,8 @@ interface StatusLabelConfig {
   seller_msg?: string;
   icon?: string;
   color?: string;
+  buyer_emoji?: string;
+  seller_emoji?: string;
 }
 
 const LUCIDE_ICON_MAP: Record<string, any> = {
@@ -140,14 +142,16 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
 
   const buyerMsg = statusConfig.buyer_msg || '';
   const sellerMsg = statusConfig.seller_msg || '';
+  const buyerEmoji = statusConfig.buyer_emoji || '';
+  const sellerEmoji = statusConfig.seller_emoji || '';
 
-  // For assigned status, prefix with rider name
+  // Use DB-backed emoji prefix, fallback empty if not configured
   const displayBuyerMsg = assignment.status === 'assigned' && assignment.rider_name
-    ? `✅ ${assignment.rider_name} ${buyerMsg}`
-    : buyerMsg ? `${assignment.status === 'pending' ? '⏳' : assignment.status === 'picked_up' ? '🚚' : assignment.status === 'at_gate' ? '🏠' : assignment.status === 'delivered' ? '🎉' : ''} ${buyerMsg}` : '';
+    ? `${buyerEmoji || '✅'} ${assignment.rider_name} ${buyerMsg}`
+    : buyerMsg ? `${buyerEmoji} ${buyerMsg}`.trim() : '';
   const displaySellerMsg = assignment.status === 'assigned' && assignment.rider_name
-    ? `🚴 ${assignment.rider_name} ${sellerMsg}`
-    : sellerMsg ? `${assignment.status === 'pending' ? '⏳' : assignment.status === 'picked_up' ? '📦' : assignment.status === 'at_gate' ? '🏠' : assignment.status === 'delivered' ? '✅' : assignment.status === 'failed' ? '❌' : ''} ${sellerMsg}` : '';
+    ? `${sellerEmoji || '🚴'} ${assignment.rider_name} ${sellerMsg}`
+    : sellerMsg ? `${sellerEmoji} ${sellerMsg}`.trim() : '';
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 space-y-3">
