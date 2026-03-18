@@ -123,7 +123,7 @@ export function AutoHighlightStrip() {
     <div className="my-4">
       <div className="flex items-center gap-1.5 px-4 mb-2.5">
         <TrendingUp size={13} className="text-primary" />
-        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Highlights</span>
+        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{ml.label('label_section_highlights')}</span>
       </div>
       <div className="flex gap-2.5 overflow-x-auto scrollbar-hide px-4 pb-1 snap-x snap-mandatory">
         {highlights.map((card, i) => (
