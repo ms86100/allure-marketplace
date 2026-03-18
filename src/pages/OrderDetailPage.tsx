@@ -121,6 +121,20 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="px-4 pt-3 space-y-3">
+          {/* Gap 11: Order placed celebration banner — shown for newly placed orders */}
+          {o.isBuyerView && order.status === 'placed' && (Date.now() - new Date(order.created_at).getTime() < 60000) && (
+            <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
+              <span className="text-3xl">🎉</span>
+              <p className="text-sm font-bold text-primary mt-1.5">Order Placed Successfully!</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Your order is being reviewed by the seller</p>
+              {(order as any).estimated_delivery_at && (
+                <p className="text-xs font-medium text-primary mt-1">
+                  Estimated delivery: {format(new Date((order as any).estimated_delivery_at), 'h:mm a')}
+                </p>
+              )}
+            </div>
+          )}
+
           {o.isUrgentOrder && order.auto_cancel_at && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} />}
 
           {order.status === 'cancelled' && order.rejection_reason && o.isBuyerView && (
