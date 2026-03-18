@@ -454,6 +454,12 @@ workflows:
           widget_group.files.find { |f| f.path == 'Info.plist' } || widget_group.new_file('Info.plist')
           widget_group.files.find { |f| f.path == 'LiveDeliveryWidgetExtension.entitlements' } || widget_group.new_file('LiveDeliveryWidgetExtension.entitlements')
 
+          # Add Assets.xcassets to widget target resources
+          assets_ref = widget_group.files.find { |f| f.path == 'Assets.xcassets' } || widget_group.new_file('Assets.xcassets')
+          unless widget_target.resources_build_phase.files_references.any? { |f| f.path.to_s == 'Assets.xcassets' }
+            widget_target.resources_build_phase.add_file_reference(assets_ref, true)
+          end
+
           widget_target.build_configurations.each do |config|
             settings = config.build_settings
             settings['PRODUCT_NAME'] = 'LiveDeliveryWidgetExtension'
