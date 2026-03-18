@@ -228,6 +228,11 @@ export function UpiDeepLinkCheckout({
 
   const handleSystemClose = () => {
     if (dismissLocked) return;
+    // Don't trigger onPaymentFailed if completion was already handled
+    if (completionTriggeredRef.current) {
+      onClose();
+      return;
+    }
     if (step === 'pay' && !hasOpenedApp.current) {
       try { sessionStorage.removeItem(UPI_STEP_KEY); sessionStorage.removeItem(UPI_OPENED_APP_KEY); } catch {}
       onPaymentFailed();

@@ -92,6 +92,9 @@ class _LiveActivityManager {
   /** Promise-based hydration lock — all concurrent callers await the same promise */
   private hydrationPromise: Promise<void> | null = null;
 
+  /** True while hydration is actively running (prevents reset during hydration) */
+  private hydrating = false;
+
   /** In-flight start lock — prevents concurrent startLiveActivity calls for the same entity */
   private starting = new Set<string>();
 
@@ -146,6 +149,7 @@ class _LiveActivityManager {
   }
 
   private async _doHydrate(): Promise<void> {
+    this.hydrating = true;
     console.log(TAG, 'HYDRATE START — reconciling persisted + native state');
 
     try {
@@ -206,6 +210,8 @@ class _LiveActivityManager {
         this.canStart = false;
         console.warn(TAG, 'HYDRATE — native Live Activities not available, disabling starts');
       }
+    } finally {
+      this.hydrating = false;
     }
   }
 
@@ -335,8 +341,12 @@ class _LiveActivityManager {
     this.clearPersistedMap();
   }
 
-  /** Force re-hydration (e.g. on app resume) */
+  /** Force re-hydration (e.g. on app resume). Skips if hydration is currently running. */
   resetHydration(): void {
+    if (this.hydrating) {
+      console.log(TAG, 'RESET HYDRATION SKIPPED — hydration in progress');
+      return;
+    }
     this.hydrationPromise = null;
   }
 
