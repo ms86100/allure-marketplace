@@ -207,7 +207,7 @@ export function MarketplaceSection() {
       {/* ── Store Discovery ── */}
       <div className="bg-secondary/30 py-5 mt-3">
         <div className="flex items-center gap-1.5 px-4 mb-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Meet your neighbors who sell</span>
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{ml.label('label_section_store_discovery')}</span>
         </div>
         <ShopByStoreDiscovery />
       </div>
