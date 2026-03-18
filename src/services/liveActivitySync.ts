@@ -5,13 +5,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import { LiveActivityManager } from '@/services/LiveActivityManager';
 import { buildLiveActivityData, type StatusFlowEntry } from '@/services/liveActivityMapper';
+import { getStartStatuses } from '@/services/statusFlowCache';
 
 const TAG = '[LA-Sync]';
-
-const ACTIVE_STATUSES = [
-  'accepted', 'preparing', 'ready', 'picked_up',
-  'on_the_way', 'arrived', 'confirmed',
-] as const;
 
 /** Prevents concurrent syncActiveOrders calls from racing */
 let syncing = false;
@@ -36,7 +32,7 @@ async function getStatusFlowEntries(): Promise<StatusFlowEntry[]> {
   }
 
   cachedFlowEntries = data as StatusFlowEntry[];
-  cacheExpiry = Date.now() + 10 * 60 * 1000; // Cache for 10 minutes
+  cacheExpiry = Date.now() + 10 * 60 * 1000;
   return cachedFlowEntries;
 }
 
