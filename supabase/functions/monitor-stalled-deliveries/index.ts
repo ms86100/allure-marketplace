@@ -16,13 +16,15 @@ serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Fetch DB-backed notification text from system_settings
+    // Fetch all DB-backed config: notification text + thresholds
     const { data: settingsRows } = await supabase
       .from('system_settings')
       .select('key, value')
       .in('key', [
         'stalled_buyer_title', 'stalled_buyer_body_soft', 'stalled_buyer_body_hard',
         'stalled_seller_title', 'stalled_seller_body_soft', 'stalled_seller_body_hard',
+        'stalled_soft_threshold_minutes', 'stalled_hard_threshold_minutes',
+        'transit_statuses',
       ]);
     const settings: Record<string, string> = {};
     for (const row of settingsRows || []) {
@@ -36,15 +38,25 @@ serve(async (req) => {
     const sellerBodySoft = settings['stalled_seller_body_soft'] || 'Location updates stopped for 10+ min. Please keep the app open while delivering.';
     const sellerBodyHard = settings['stalled_seller_body_hard'] || 'Location updates stopped for 30+ min. Please update delivery status or open the app.';
 
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const softMinutes = parseInt(settings['stalled_soft_threshold_minutes'] || '10', 10);
+    const hardMinutes = parseInt(settings['stalled_hard_threshold_minutes'] || '30', 10);
+
+    let transitStatuses: string[];
+    try {
+      transitStatuses = JSON.parse(settings['transit_statuses'] || '["picked_up","on_the_way","at_gate"]');
+    } catch {
+      transitStatuses = ['picked_up', 'on_the_way', 'at_gate'];
+    }
+
+    const softThresholdAgo = new Date(Date.now() - softMinutes * 60 * 1000).toISOString();
+    const hardThresholdAgo = new Date(Date.now() - hardMinutes * 60 * 1000).toISOString();
 
     const { data: stalledAssignments, error } = await supabase
       .from('delivery_assignments')
       .select('id, order_id, rider_name, rider_phone, last_location_at, status, stalled_notified, orders:orders!delivery_assignments_order_id_fkey(id, buyer_id, seller_id, status, needs_attention)')
-      .in('status', ['picked_up', 'on_the_way', 'at_gate'])
+      .in('status', transitStatuses)
       .not('last_location_at', 'is', null)
-      .lt('last_location_at', tenMinutesAgo);
+      .lt('last_location_at', softThresholdAgo);
 
     if (error) throw error;
 
@@ -54,15 +66,14 @@ serve(async (req) => {
       const order = Array.isArray((assignment as any).orders) ? (assignment as any).orders[0] : (assignment as any).orders;
       if (!order || order.status === 'cancelled') continue;
 
-      const isHardStall = assignment.last_location_at && new Date(assignment.last_location_at).toISOString() < thirtyMinutesAgo;
+      const isHardStall = assignment.last_location_at && new Date(assignment.last_location_at).toISOString() < hardThresholdAgo;
 
-      // Gap C: For 10-min stalls — flag needs_attention, don't cancel
       if (!order.needs_attention) {
         await supabase
           .from('orders')
           .update({
             needs_attention: true,
-            needs_attention_reason: 'GPS tracking paused for over 10 minutes during active delivery',
+            needs_attention_reason: `GPS tracking paused for over ${softMinutes} minutes during active delivery`,
           } as any)
           .eq('id', order.id);
       }

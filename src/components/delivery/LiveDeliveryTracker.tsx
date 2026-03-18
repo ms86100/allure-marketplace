@@ -3,6 +3,7 @@ import { Phone, Truck, Navigation, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
+import { useTrackingConfig } from '@/hooks/useTrackingConfig';
 
 interface StatusHint {
   buyer_hint?: string | null;
@@ -13,11 +14,8 @@ interface StatusHint {
 interface LiveDeliveryTrackerProps {
   assignmentId: string;
   isBuyerView: boolean;
-  /** Gap D: Accept pre-existing tracking state to avoid duplicate subscriptions */
   trackingState?: DeliveryTrackingState;
-  /** Gap F: Road-based ETA from OSRM, more accurate than Haversine */
   roadEtaMinutes?: number | null;
-  /** Gap 1 R5: DB-backed status hints keyed by status_key */
   statusHints?: Record<string, StatusHint>;
 }
 
@@ -112,14 +110,19 @@ function getLastSeenText(lastLocationAt: string | null): string | null {
 export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, roadEtaMinutes, statusHints }: LiveDeliveryTrackerProps) {
   const ownTracking = useDeliveryTracking(trackingState ? null : assignmentId);
   const tracking = trackingState || ownTracking;
+  const trackingConfig = useTrackingConfig();
 
   // Load proximity config from DB
-  const { getSetting } = useSystemSettingsRaw(['proximity_thresholds']);
+  const { getSetting } = useSystemSettingsRaw(['proximity_thresholds', 'ui_live_tracking_title', 'ui_delivery_partner_label', 'ui_location_stale_warning']);
   const rawProximity = getSetting('proximity_thresholds');
   let proximityConfig = DEFAULT_PROXIMITY;
   try {
     if (rawProximity) proximityConfig = { ...DEFAULT_PROXIMITY, ...JSON.parse(rawProximity) };
   } catch { /* use defaults */ }
+
+  const liveTrackingTitle = getSetting('ui_live_tracking_title') || 'Live Tracking';
+  const deliveryPartnerLabel = getSetting('ui_delivery_partner_label') || 'Delivery Partner';
+  const staleWarning = getSetting('ui_location_stale_warning') || 'Location may be outdated — GPS is not updating';
 
   if (tracking.isLoading) {
     return (
@@ -132,7 +135,8 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
 
   if (!tracking.status) return null;
 
-  const isInTransit = ['picked_up', 'on_the_way', 'at_gate'].includes(tracking.status);
+  const transitSet = new Set(trackingConfig.transit_statuses);
+  const isInTransit = transitSet.has(tracking.status);
   const lastSeen = getLastSeenText(tracking.lastLocationAt);
 
   return (
@@ -140,7 +144,7 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Navigation size={16} className="text-primary" />
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Live Tracking</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{liveTrackingTitle}</p>
         </div>
         {(() => {
           const smartEta = getSmartEta(tracking.distance, tracking.eta, roadEtaMinutes);
@@ -162,7 +166,7 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
             <p className="text-xs text-muted-foreground mt-1">{formatDistance(tracking.distance)}</p>
           )}
           {tracking.isLocationStale && (
-            <p className="text-[10px] text-destructive mt-1">⚠️ Location may be outdated — GPS is not updating</p>
+            <p className="text-[10px] text-destructive mt-1">⚠️ {staleWarning}</p>
           )}
           {!tracking.isLocationStale && lastSeen && (
             <p className="text-[10px] text-muted-foreground mt-1">⚠️ {lastSeen}</p>
@@ -175,14 +179,14 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
               {tracking.riderPhotoUrl ? (
-                <img src={tracking.riderPhotoUrl} alt="Delivery partner" className="w-full h-full object-cover" />
+                <img src={tracking.riderPhotoUrl} alt={deliveryPartnerLabel} className="w-full h-full object-cover" />
               ) : (
                 <Truck size={16} className="text-primary" />
               )}
             </div>
             <div>
               <p className="text-sm font-medium">{tracking.riderName}</p>
-              <p className="text-[11px] text-muted-foreground">Delivery Partner</p>
+              <p className="text-[11px] text-muted-foreground">{deliveryPartnerLabel}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

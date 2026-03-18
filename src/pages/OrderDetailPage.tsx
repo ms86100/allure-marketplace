@@ -17,6 +17,7 @@ import { SellerGPSTracker } from '@/components/delivery/SellerGPSTracker';
 import { UpdateBuyerLocationButton } from '@/components/delivery/UpdateBuyerLocationButton';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
 import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
+import { useTrackingConfig } from '@/hooks/useTrackingConfig';
 import { DeliveryCompletionOtpDialog } from '@/components/delivery/DeliveryCompletionOtpDialog';
 import { DeliveryFeedbackForm } from '@/components/delivery/DeliveryFeedbackForm';
 
@@ -48,7 +49,7 @@ export default function OrderDetailPage() {
   const [buyerOtp, setBuyerOtp] = useState<string | null>(null);
   const [roadEtaMinutes, setRoadEtaMinutes] = useState<number | null>(null);
   const { data: serviceBooking } = useServiceBookingForOrder(o.order?.id);
-  const { getSetting } = useSystemSettingsRaw(['proximity_thresholds']);
+  const { getSetting } = useSystemSettingsRaw(['proximity_thresholds', 'ui_setting_up_tracking']);
 
   const order = o.order;
   const orderId = order?.id;
@@ -134,8 +135,9 @@ export default function OrderDetailPage() {
   const displayStatuses = o.displayStatuses;
   const isInTransit = o.isInTransit;
 
-  // Gap G: Only show arrival overlay for BUYER when rider is close
-  const showArrivalOverlay = o.isBuyerView && deliveryAssignmentId && deliveryTracking.riderLocation && deliveryTracking.distance != null && deliveryTracking.distance < 200;
+  // Gap G: Only show arrival overlay for BUYER when rider is close — uses DB-backed threshold
+  const trackingConfig = useTrackingConfig();
+  const showArrivalOverlay = o.isBuyerView && deliveryAssignmentId && deliveryTracking.riderLocation && deliveryTracking.distance != null && deliveryTracking.distance < trackingConfig.arrival_overlay_distance_meters;
 
 
   return (
@@ -332,7 +334,7 @@ export default function OrderDetailPage() {
             <div className="bg-card border border-border rounded-xl p-4">
               <div className="flex items-center gap-3 justify-center text-muted-foreground">
                 <Loader2 size={16} className="animate-spin" />
-                <p className="text-sm">Setting up live tracking...</p>
+                <p className="text-sm">{getSetting('ui_setting_up_tracking') || 'Setting up live tracking...'}</p>
               </div>
             </div>
           )}
@@ -475,6 +477,9 @@ export default function OrderDetailPage() {
           status={deliveryTracking.status}
           onDismiss={() => {}}
           deliveryCode={buyerOtp}
+          transitStatuses={trackingConfig.transit_statuses}
+          overlayDistanceMeters={trackingConfig.arrival_overlay_distance_meters}
+          doorstepDistanceMeters={trackingConfig.arrival_doorstep_distance_meters}
           proximityMessages={(() => {
             try {
               const raw = getSetting('proximity_thresholds');

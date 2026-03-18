@@ -1,7 +1,9 @@
 /**
  * GPS noise filter with teleport rejection and exponential smoothing.
  * Inspired by Kalman-lite approaches used in delivery tracking apps.
+ * All thresholds are DB-backed via trackingConfig.
  */
+import { getTrackingConfigSync } from '@/services/trackingConfig';
 
 interface GPSPoint {
   latitude: number;
@@ -16,10 +18,6 @@ interface FilterState {
   smoothedLat: number | null;
   smoothedLng: number | null;
 }
-
-const MAX_SPEED_KMH = 120; // Reject teleports above this speed
-const SMOOTHING_FACTOR = 0.7; // Weight for new point (0.3 for previous)
-const MIN_MOVEMENT_METERS = 1; // Lowered from 3m — 3m was too aggressive for slow-moving riders
 
 /** Haversine distance in meters */
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -42,6 +40,7 @@ export function filterGPSPoint(
   point: GPSPoint,
   state: FilterState
 ): { accepted: boolean; filtered: GPSPoint; newState: FilterState } {
+  const config = getTrackingConfigSync();
   const { lastAccepted, smoothedLat, smoothedLng } = state;
 
   // First point — accept as-is
@@ -65,7 +64,7 @@ export function filterGPSPoint(
   );
 
   // Micro-jitter rejection
-  if (distMeters < MIN_MOVEMENT_METERS) {
+  if (distMeters < config.gps_min_movement_meters) {
     return {
       accepted: false,
       filtered: { ...point, latitude: smoothedLat, longitude: smoothedLng },
@@ -79,8 +78,7 @@ export function filterGPSPoint(
     new Date(lastAccepted.recorded_at).getTime();
   if (timeDiffMs > 0) {
     const impliedSpeedKmh = (distMeters / 1000) / (timeDiffMs / 3600000);
-    if (impliedSpeedKmh > MAX_SPEED_KMH) {
-      // Reject — keep previous smoothed position
+    if (impliedSpeedKmh > config.gps_max_speed_kmh) {
       return {
         accepted: false,
         filtered: { ...point, latitude: smoothedLat, longitude: smoothedLng },
@@ -90,8 +88,9 @@ export function filterGPSPoint(
   }
 
   // Exponential smoothing
-  const newSmoothedLat = SMOOTHING_FACTOR * point.latitude + (1 - SMOOTHING_FACTOR) * smoothedLat;
-  const newSmoothedLng = SMOOTHING_FACTOR * point.longitude + (1 - SMOOTHING_FACTOR) * smoothedLng;
+  const sf = config.gps_smoothing_factor;
+  const newSmoothedLat = sf * point.latitude + (1 - sf) * smoothedLat;
+  const newSmoothedLng = sf * point.longitude + (1 - sf) * smoothedLng;
 
   const filtered: GPSPoint = {
     ...point,

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useTrackingConfig } from '@/hooks/useTrackingConfig';
 
 interface DeliveryMapViewProps {
   riderLat: number;
@@ -13,7 +14,6 @@ interface DeliveryMapViewProps {
   onRoadEtaChange?: (eta: number | null) => void;
 }
 
-// Gap 7: Cache icon instances, only recreate when heading changes >10°
 function createRiderIcon(heading: number | null): L.DivIcon {
   const rotation = heading != null ? heading : 0;
   return L.divIcon({
@@ -31,7 +31,6 @@ const destinationIcon = L.divIcon({
   iconAnchor: [16, 32],
 });
 
-/** Auto-fits map bounds when rider position changes */
 function MapBoundsUpdater({ riderLat, riderLng, destinationLat, destinationLng }: {
   riderLat: number; riderLng: number; destinationLat: number; destinationLng: number;
 }) {
@@ -56,9 +55,8 @@ function MapBoundsUpdater({ riderLat, riderLng, destinationLat, destinationLng }
   return null;
 }
 
-/** Smooth marker that animates between positions */
-function AnimatedRiderMarker({ lat, lng, heading, name }: {
-  lat: number; lng: number; heading: number | null; name?: string | null;
+function AnimatedRiderMarker({ lat, lng, heading, name, animDuration }: {
+  lat: number; lng: number; heading: number | null; name?: string | null; animDuration: number;
 }) {
   const markerRef = useRef<L.Marker>(null);
   const prevPos = useRef<[number, number]>([lat, lng]);
@@ -78,14 +76,13 @@ function AnimatedRiderMarker({ lat, lng, heading, name }: {
     const dLng = Math.abs(endLng - startLng);
     if (dLat < 0.000001 && dLng < 0.000001) return;
 
-    const duration = 2000;
     const startTime = performance.now();
 
     cancelAnimationFrame(animFrameRef.current);
 
     const animate = (now: number) => {
       const elapsed = now - startTime;
-      const t = Math.min(elapsed / duration, 1);
+      const t = Math.min(elapsed / animDuration, 1);
       const ease = 1 - Math.pow(1 - t, 3);
 
       const currentLat = startLat + (endLat - startLat) * ease;
@@ -103,9 +100,8 @@ function AnimatedRiderMarker({ lat, lng, heading, name }: {
     animFrameRef.current = requestAnimationFrame(animate);
 
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [lat, lng]);
+  }, [lat, lng, animDuration]);
 
-  // Gap 7: Only update icon when heading changes by >10°
   useEffect(() => {
     const marker = markerRef.current;
     if (!marker) return;
@@ -131,34 +127,35 @@ function AnimatedRiderMarker({ lat, lng, heading, name }: {
   );
 }
 
-/** OSRM road route hook with timeout, retry, and route caching */
 function useOSRMRoute(
   riderLat: number, riderLng: number,
-  destLat: number, destLng: number
+  destLat: number, destLng: number,
+  refetchThreshold: number,
+  timeoutMs: number,
 ) {
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([]);
   const [roadEtaMinutes, setRoadEtaMinutes] = useState<number | null>(null);
   const [roadDistanceMeters, setRoadDistanceMeters] = useState<number | null>(null);
   const lastFetchPos = useRef<[number, number] | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  /** Gap 6: Cache last successful route */
   const lastSuccessfulRoute = useRef<[number, number][]>([]);
 
+  // Convert meters threshold to approximate degrees
+  const degThreshold = refetchThreshold / 111000;
+
   const fetchRoute = useCallback(async (retryCount = 0) => {
-    // Only re-fetch if rider moved > 80m from last fetch point
     if (lastFetchPos.current) {
       const [prevLat, prevLng] = lastFetchPos.current;
       const dLat = Math.abs(riderLat - prevLat);
       const dLng = Math.abs(riderLng - prevLng);
-      if (dLat < 0.0007 && dLng < 0.0007) return;
+      if (dLat < degThreshold && dLng < degThreshold) return;
     }
 
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
-    // Gap 6: 5-second timeout
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const url = `https://router.project-osrm.org/route/v1/driving/${riderLng},${riderLat};${destLng},${destLat}?overview=full&geometries=geojson`;
@@ -185,11 +182,9 @@ function useOSRMRoute(
     } catch (e) {
       clearTimeout(timeoutId);
       if ((e as Error).name === 'AbortError') {
-        // Gap 6: Retry once on timeout
         if (retryCount < 1) {
           setTimeout(() => fetchRoute(retryCount + 1), 1000);
         } else {
-          // Use cached route if available
           if (lastSuccessfulRoute.current.length > 0) {
             setRouteCoords(lastSuccessfulRoute.current);
           }
@@ -201,7 +196,7 @@ function useOSRMRoute(
         }
       }
     }
-  }, [riderLat, riderLng, destLat, destLng]);
+  }, [riderLat, riderLng, destLat, destLng, degThreshold, timeoutMs]);
 
   useEffect(() => {
     fetchRoute();
@@ -215,12 +210,17 @@ function useOSRMRoute(
 }
 
 export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinationLng, riderName, heading, onRoadEtaChange }: DeliveryMapViewProps) {
+  const config = useTrackingConfig();
   const center: [number, number] = [
     (riderLat + destinationLat) / 2,
     (riderLng + destinationLng) / 2,
   ];
 
-  const { routeCoords, roadEtaMinutes } = useOSRMRoute(riderLat, riderLng, destinationLat, destinationLng);
+  const { routeCoords, roadEtaMinutes } = useOSRMRoute(
+    riderLat, riderLng, destinationLat, destinationLng,
+    config.osrm_refetch_threshold_meters,
+    config.osrm_timeout_ms,
+  );
 
   useEffect(() => {
     onRoadEtaChange?.(roadEtaMinutes);
@@ -258,7 +258,7 @@ export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinatio
           destinationLat={destinationLat}
           destinationLng={destinationLng}
         />
-        <AnimatedRiderMarker lat={riderLat} lng={riderLng} heading={heading ?? null} name={riderName} />
+        <AnimatedRiderMarker lat={riderLat} lng={riderLng} heading={heading ?? null} name={riderName} animDuration={config.map_animation_duration_ms} />
         <Marker position={[destinationLat, destinationLng]} icon={destinationIcon}>
           <Popup>Delivery Address</Popup>
         </Marker>

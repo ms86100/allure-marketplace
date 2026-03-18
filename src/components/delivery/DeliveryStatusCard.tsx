@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Truck, Phone, MapPin, Key, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
 
 interface DeliveryAssignment {
   id: string;
@@ -21,26 +22,62 @@ interface DeliveryStatusCardProps {
   showOtp?: boolean;
 }
 
-const DELIVERY_STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
-  pending: { label: 'Assigning Rider', color: 'bg-warning/15 text-warning', icon: Clock },
-  assigned: { label: 'Rider Assigned', color: 'bg-info/15 text-info', icon: Truck },
-  picked_up: { label: 'Out for Delivery', color: 'bg-primary/15 text-primary', icon: Truck },
-  on_the_way: { label: 'On The Way', color: 'bg-primary/15 text-primary', icon: Truck },
-  at_gate: { label: 'At Your Gate', color: 'bg-info/15 text-info', icon: MapPin },
-  delivered: { label: 'Delivered', color: 'bg-success/15 text-success', icon: CheckCircle },
-  failed: { label: 'Delivery Failed', color: 'bg-destructive/15 text-destructive', icon: XCircle },
-  cancelled: { label: 'Cancelled', color: 'bg-muted text-muted-foreground', icon: XCircle },
+interface StatusLabelConfig {
+  label: string;
+  buyer_msg?: string;
+  seller_msg?: string;
+}
+
+const ICON_MAP: Record<string, any> = {
+  pending: Clock,
+  assigned: Truck,
+  picked_up: Truck,
+  on_the_way: Truck,
+  at_gate: MapPin,
+  delivered: CheckCircle,
+  failed: XCircle,
+  cancelled: XCircle,
+};
+
+const COLOR_MAP: Record<string, string> = {
+  pending: 'bg-warning/15 text-warning',
+  assigned: 'bg-info/15 text-info',
+  picked_up: 'bg-primary/15 text-primary',
+  on_the_way: 'bg-primary/15 text-primary',
+  at_gate: 'bg-info/15 text-info',
+  delivered: 'bg-success/15 text-success',
+  failed: 'bg-destructive/15 text-destructive',
+  cancelled: 'bg-muted text-muted-foreground',
+};
+
+const DEFAULT_LABELS: Record<string, StatusLabelConfig> = {
+  pending: { label: 'Assigning Rider', buyer_msg: 'Finding a delivery partner for your order...', seller_msg: 'Assigning a delivery partner...' },
+  assigned: { label: 'Rider Assigned', buyer_msg: 'will pick up your order soon.', seller_msg: 'assigned, will pick up soon.' },
+  picked_up: { label: 'Out for Delivery', buyer_msg: 'Your order is on the way!', seller_msg: 'Rider has picked up the order.' },
+  on_the_way: { label: 'On The Way', buyer_msg: 'Your order is on the way!', seller_msg: 'Rider is en route to the buyer.' },
+  at_gate: { label: 'At Your Gate', buyer_msg: 'Delivery partner is at your society gate.', seller_msg: "Rider is at the buyer's gate." },
+  delivered: { label: 'Delivered', buyer_msg: 'Your order has been delivered!', seller_msg: 'Delivery completed successfully.' },
+  failed: { label: 'Delivery Failed', buyer_msg: '', seller_msg: 'Delivery failed. Check reason above.' },
+  cancelled: { label: 'Cancelled', buyer_msg: '', seller_msg: '' },
 };
 
 export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliveryStatusCardProps) {
   const [assignment, setAssignment] = useState<DeliveryAssignment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [deliveryOtp, setDeliveryOtp] = useState<string | null>(null);
+
+  const { getSetting } = useSystemSettingsRaw(['delivery_status_labels']);
+
+  const labelsConfig = useMemo<Record<string, StatusLabelConfig>>(() => {
+    try {
+      const raw = getSetting('delivery_status_labels');
+      if (raw) return { ...DEFAULT_LABELS, ...JSON.parse(raw) };
+    } catch { /* use defaults */ }
+    return DEFAULT_LABELS;
+  }, [getSetting]);
 
   useEffect(() => {
     fetchAssignment();
 
-    // Realtime subscription
     const channel = supabase
       .channel(`delivery-${orderId}`)
       .on('postgres_changes', {
@@ -87,26 +124,36 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
 
   if (!assignment) return null;
 
-  const config = DELIVERY_STATUS_CONFIG[assignment.status] || DELIVERY_STATUS_CONFIG.pending;
-  const StatusIcon = config.icon;
+  const statusConfig = labelsConfig[assignment.status] || labelsConfig.pending || DEFAULT_LABELS.pending;
+  const StatusIcon = ICON_MAP[assignment.status] || Clock;
+  const colorClass = COLOR_MAP[assignment.status] || COLOR_MAP.pending;
 
-  const deliverySteps = ['pending', 'assigned', 'picked_up', 'on_the_way', 'at_gate', 'delivered'];
+  const deliverySteps = Object.keys(labelsConfig).filter(k => !['failed', 'cancelled'].includes(k));
   const currentStepIndex = deliverySteps.indexOf(assignment.status);
+
+  const buyerMsg = statusConfig.buyer_msg || '';
+  const sellerMsg = statusConfig.seller_msg || '';
+
+  // For assigned status, prefix with rider name
+  const displayBuyerMsg = assignment.status === 'assigned' && assignment.rider_name
+    ? `✅ ${assignment.rider_name} ${buyerMsg}`
+    : buyerMsg ? `${assignment.status === 'pending' ? '⏳' : assignment.status === 'picked_up' ? '🚚' : assignment.status === 'at_gate' ? '🏠' : assignment.status === 'delivered' ? '🎉' : ''} ${buyerMsg}` : '';
+  const displaySellerMsg = assignment.status === 'assigned' && assignment.rider_name
+    ? `🚴 ${assignment.rider_name} ${sellerMsg}`
+    : sellerMsg ? `${assignment.status === 'pending' ? '⏳' : assignment.status === 'picked_up' ? '📦' : assignment.status === 'at_gate' ? '🏠' : assignment.status === 'delivered' ? '✅' : assignment.status === 'failed' ? '❌' : ''} ${sellerMsg}` : '';
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Truck size={16} className="text-primary" />
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Delivery</p>
         </div>
-        <Badge variant="secondary" className={config.color}>
-          {config.label}
+        <Badge variant="secondary" className={colorClass}>
+          {statusConfig.label}
         </Badge>
       </div>
 
-      {/* Progress dots */}
       {!['failed', 'cancelled'].includes(assignment.status) && (
         <div className="flex items-center gap-1">
           {deliverySteps.map((step, index) => (
@@ -119,7 +166,6 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
         </div>
       )}
 
-      {/* Rider info */}
       {assignment.rider_name && (
         <div className="flex items-center justify-between bg-muted/50 rounded-lg p-2.5">
           <div className="flex items-center gap-2.5">
@@ -139,7 +185,6 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
         </div>
       )}
 
-      {/* OTP display for buyer when rider has picked up */}
       {isBuyerView && ['picked_up', 'at_gate'].includes(assignment.status) && (
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-center gap-3">
           <Key size={18} className="text-primary shrink-0" />
@@ -151,14 +196,12 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
         </div>
       )}
 
-      {/* Failed reason */}
       {assignment.status === 'failed' && assignment.failed_reason && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-2.5">
           <p className="text-xs text-destructive">{assignment.failed_reason}</p>
         </div>
       )}
 
-      {/* Failed delivery action */}
       {assignment.status === 'failed' && isBuyerView && (
         <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-3 space-y-2">
           <p className="text-xs text-destructive font-medium">Delivery could not be completed</p>
@@ -169,25 +212,11 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
         </div>
       )}
 
-      {/* Status message */}
-      {isBuyerView && (
-        <p className="text-xs text-muted-foreground">
-          {assignment.status === 'pending' && '⏳ Finding a delivery partner for your order...'}
-          {assignment.status === 'assigned' && `✅ ${assignment.rider_name || 'A rider'} will pick up your order soon.`}
-          {assignment.status === 'picked_up' && '🚚 Your order is on the way!'}
-          {assignment.status === 'at_gate' && '🏠 Delivery partner is at your society gate.'}
-          {assignment.status === 'delivered' && '🎉 Your order has been delivered!'}
-        </p>
+      {isBuyerView && displayBuyerMsg && (
+        <p className="text-xs text-muted-foreground">{displayBuyerMsg}</p>
       )}
-      {!isBuyerView && (
-        <p className="text-xs text-muted-foreground">
-          {assignment.status === 'pending' && '⏳ Assigning a delivery partner...'}
-          {assignment.status === 'assigned' && `🚴 ${assignment.rider_name || 'Rider'} assigned, will pick up soon.`}
-          {assignment.status === 'picked_up' && '📦 Rider has picked up the order.'}
-          {assignment.status === 'at_gate' && '🏠 Rider is at the buyer\'s gate.'}
-          {assignment.status === 'delivered' && '✅ Delivery completed successfully.'}
-          {assignment.status === 'failed' && '❌ Delivery failed. Check reason above.'}
-        </p>
+      {!isBuyerView && displaySellerMsg && (
+        <p className="text-xs text-muted-foreground">{displaySellerMsg}</p>
       )}
     </div>
   );

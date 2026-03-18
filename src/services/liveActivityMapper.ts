@@ -1,4 +1,5 @@
 import type { LiveActivityData } from '@/plugins/live-activity/definitions';
+import { getTrackingConfigSync } from '@/services/trackingConfig';
 
 /** Status flow entry from category_status_flows table */
 export interface StatusFlowEntry {
@@ -7,9 +8,6 @@ export interface StatusFlowEntry {
   sort_order: number;
   buyer_hint?: string | null;
 }
-
-/** Reasonable max distance (km) for progress interpolation heuristic */
-const MAX_DELIVERY_DISTANCE_KM = 10;
 
 /**
  * Derives progress_percent from sort_order within the status flow.
@@ -33,6 +31,7 @@ function deriveProgressPercent(
 /**
  * Maps order status + delivery info into a meaningful progress stage string.
  * Uses DB-backed display_label when available.
+ * Transit statuses come from system_settings via trackingConfig.
  */
 function mapProgressStage(
   status: string,
@@ -42,7 +41,8 @@ function mapProgressStage(
     rider_name?: string | null;
   } | null,
 ): string | null {
-  const TRANSIT_STATUSES = new Set(['en_route', 'on_the_way', 'picked_up']);
+  const config = getTrackingConfigSync();
+  const TRANSIT_STATUSES = new Set(config.transit_statuses_la);
 
   if (TRANSIT_STATUSES.has(status) && delivery) {
     const parts: string[] = [];
@@ -77,6 +77,7 @@ export function buildLiveActivityData(
   itemCount?: number | null,
   statusFlowEntries?: StatusFlowEntry[],
 ): LiveActivityData {
+  const config = getTrackingConfigSync();
   const distanceKm = delivery?.distance_meters != null
     ? delivery.distance_meters / 1000
     : null;
@@ -93,9 +94,10 @@ export function buildLiveActivityData(
   let progressPercent = deriveProgressPercent(order.status, flowMap);
 
   // GPS-derived progress when distance is available during transit
-  const isTransit = order.status === 'on_the_way' || order.status === 'en_route' || order.status === 'picked_up';
+  const transitSet = new Set(config.transit_statuses_la);
+  const isTransit = transitSet.has(order.status);
   if (isTransit && distanceKm != null && distanceKm >= 0) {
-    const ratio = Math.min(distanceKm / MAX_DELIVERY_DISTANCE_KM, 1);
+    const ratio = Math.min(distanceKm / config.max_delivery_distance_km, 1);
     progressPercent = Math.max(0.5, 0.95 - ratio * 0.45);
   }
 
