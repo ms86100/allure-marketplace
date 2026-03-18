@@ -481,6 +481,7 @@ workflows:
             settings['DEFINES_MODULE'] = 'YES'
             settings['CLANG_ENABLE_MODULES'] = 'YES'
             settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'NO'
+            settings['ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS'] = 'YES'
             settings['DEVELOPMENT_TEAM'] = TEAM_ID
             settings['LD_RUNPATH_SEARCH_PATHS'] = ['$(inherited)', '@executable_path/Frameworks', '@executable_path/../../Frameworks']
           end
