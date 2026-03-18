@@ -1,115 +1,136 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phases 1–3)
 
-All 9 original phases plus Blinkit parity Phases 1–3 are fully implemented.
+# Deep QA Audit: Bug Fixes & Silent Failures (Round 5)
 
-## Blinkit Gap-Fill Status
+## BUG 1: SellerGPSTracker won't render when `delivery_handled_by` is NULL
+**Severity: CRITICAL — GPS broadcasting broken for majority of seller-delivery orders**
 
-### Phase 1: APNs Push-to-Live-Activity — COMPLETE
-
-Live Activities now update even when the app process is killed by iOS, matching Blinkit's reliability.
-
-#### Architecture
-
+The database shows real orders with `fulfillment_type = 'delivery'` and `delivery_handled_by = NULL`. In `OrderDetailPage.tsx` line 233:
+```typescript
+(order as any).delivery_handled_by === 'seller'
 ```
-Order status change → DB trigger → net.http_post → update-live-activity-apns edge function
-  → APNs push (apns-push-type: liveactivity) → iOS widget receives content-state update
-  → Lock screen / Dynamic Island re-renders
+This is a strict equality check. When `delivery_handled_by` is `NULL` (which is the default), the condition is `false`. The SellerGPSTracker never renders. GPS never broadcasts. The buyer never sees live tracking.
+
+The `resolveTransactionType` handles null correctly (`COALESCE(NEW.delivery_handled_by, 'seller')`), but this UI check does not.
+
+**Fix:** Change the condition on line 233 to:
+```typescript
+(order as any).delivery_handled_by !== 'platform'
 ```
+This matches the COALESCE pattern used in all DB triggers.
 
-#### Implementation Details
+---
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB table** | `live_activity_tokens` (user_id, order_id, push_token, platform) with RLS |
-| **Swift plugin** | `LiveActivityPlugin.swift` — requests activity with `pushType: .token`, observes `Activity.pushTokenUpdates`, emits `liveActivityPushToken` event to JS |
-| **LiveActivityManager.ts** | Listens for `liveActivityPushToken` events, upserts token to `live_activity_tokens` table, cleans up on activity end |
-| **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
-| **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
+## BUG 2: Delivery fee row shows "Self Pickup" for `seller_delivery` fulfillment type
+**Severity: MEDIUM — misleading billing display**
 
-### Phase 2: System Reliability — COMPLETE
+`OrderDetailPage.tsx` line 301:
+```typescript
+o.orderFulfillmentType === 'delivery' ? <span>...</span> : <span>Self Pickup</span>
+```
+When `fulfillmentType` is `'seller_delivery'`, this falls through to the else branch and displays "Self Pickup" even though the order IS a delivery. Should use the `isDeliveryOrder` variable already defined on line 47.
 
-#### 2A. Idempotency Guard on Push Processing
+**Fix:** Replace `o.orderFulfillmentType === 'delivery'` with `isDeliveryOrder` on line 301.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB trigger** | `fn_enqueue_order_status_notification` now checks for duplicate entries (same `reference_path` + `payload->>'status'` within 30 seconds) before inserting into `notification_queue`. Skips with `RAISE NOTICE`. |
-| **DB index** | `idx_notification_queue_dedup` on `notification_queue(reference_path, created_at DESC)` for fast dedup lookups |
+---
 
-#### 2B. Realtime Channel Auto-Reconnect
+## BUG 3: `SellerOrderCard` and `OrdersPage` don't show delivery badge for `seller_delivery` type
+**Severity: LOW — cosmetic but confusing**
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`useLiveActivityOrchestrator.ts`** | Both order and delivery channels now detect `CHANNEL_ERROR` / `TIMED_OUT`, remove the dead channel, and re-subscribe after 3s delay. Max 3 reconnects per session. On successful reconnect (`SUBSCRIBED`), retry counter resets. Each reconnect triggers a one-shot `syncActiveOrders` to fill any gap. Unique channel names with `Date.now()` suffix prevent Supabase channel name conflicts. |
+`SellerOrderCard.tsx` line 80: `order.fulfillment_type === 'delivery'` — misses `seller_delivery`.
+`OrdersPage.tsx` line 55: `(order as any).fulfillment_type === 'delivery'` — same.
 
-### Phase 3: Seller Self-Delivery GPS + Buyer Live Map — COMPLETE
+**Fix:** Both should check `['delivery', 'seller_delivery'].includes(...)`.
 
-#### 3A. Seller GPS Broadcasting for Self-Delivery
+---
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`SellerGPSTracker.tsx`** | New component — shown to sellers on OrderDetailPage when `delivery_handled_by === 'seller'` and order status is `picked_up` or `on_the_way`. Uses existing `useBackgroundLocationTracking` hook. Shows Start/Stop controls, live badge, and last-sent timestamp. |
-| **`OrderDetailPage.tsx`** | Integrated `SellerGPSTracker` in the seller action area, gated by `delivery_handled_by === 'seller'` + transit statuses |
+## BUG 4: `update-delivery-location` stale detection checks wrong statuses
+**Severity: MEDIUM — missed stale alerts during active delivery**
 
-#### 3B. Buyer Live Map
+Edge function line 282: `['picked_up', 'at_gate'].includes(assignment.status)` — misses `on_the_way`. If the delivery is `on_the_way` and the seller's GPS stalls for 3+ minutes, no stalled notification fires.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`DeliveryMapView.tsx`** | New component using Leaflet + OpenStreetMap (no API key). Shows rider position (🛵 marker) and destination (📍 marker). Auto-fits bounds on mount, pans when rider moves out of view. |
-| **`OrderDetailPage.tsx`** | Integrated `DeliveryMapView` above `LiveDeliveryTracker` for buyer view when rider has GPS data and order has delivery coordinates (`delivery_lat`/`delivery_lng`). Falls back to text-only tracker when no GPS data available. |
+**Fix:** Add `'on_the_way'` to the stale detection array on line 282.
 
-### Previously Completed Blinkit Gaps
+---
 
-| Feature | Status |
-|---------|--------|
-| Push deep-link routing | ✅ Done |
-| Notification grouping (threadId) | ✅ Done |
-| Rich push images (NSE) | ✅ Done |
-| Dynamic Island tap → order page | ✅ Done |
-| Item count in DI | ✅ Done |
-| GPS-derived progress | ✅ Done |
+## BUG 5: `sync_order_to_delivery_assignment` trigger only fires for `delivery_handled_by = 'seller'` strict check
+**Severity: HIGH — assignment status never syncs when `delivery_handled_by` is NULL**
 
-### Phase 4: Live Map / Rider GPS — DEFERRED
+The trigger code:
+```sql
+IF COALESCE(NEW.delivery_handled_by, '') != 'seller' THEN RETURN NEW; END IF;
+```
+When `delivery_handled_by` is NULL, `COALESCE(NULL, '')` = `''`, which `!= 'seller'`, so the trigger returns early. The assignment status stays at `picked_up` forever for all real orders with NULL `delivery_handled_by`.
 
-Requires dedicated rider-side GPS broadcasting infrastructure (separate product workstream). Seller self-delivery GPS (Phase 3A) covers the immediate need.
+**Fix:** Change to: `IF COALESCE(NEW.delivery_handled_by, 'seller') = 'platform' THEN RETURN NEW;` — matches the same COALESCE pattern used everywhere else.
 
-### Product Thumbnails in Widget — DEFERRED
+---
 
-Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
+## BUG 6: `auto-cancel-orders` auto-complete uses service_role but no `.eq('status', 'delivered')` guard on the status transition
+**Severity: MEDIUM — validate_order_status_transition could block**
 
-## Silent Push Optimization: COMPLETE
+The auto-complete update uses `service_role` key, which correctly has the `'system'` actor permission for `delivered → completed`. However, the trigger checks:
+```sql
+IF coalesce(current_setting('app.delivery_sync', true), '') != 'true'
+   AND current_setting('role', true) != 'service_role' THEN
+   RAISE EXCEPTION ...
+```
+This only blocks when the actors are ONLY `delivery`/`system`. For `delivered → completed`, actors include `buyer` and `system`, so the check passes. No bug here — verified.
 
-### Notification Matrix
+---
 
-| Status | Push? | Live Activity? | Rationale |
-|--------|-------|----------------|-----------|
-| `accepted` | ✅ Always | Yes | Critical — order confirmed |
-| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
-| `ready` | ✅ Always | Yes | Pickup moment — user must know |
-| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
-| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
-| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
-| `delivered` | ✅ Always | Yes | Critical endpoint |
-| `completed` | ✅ Always | No | Critical endpoint |
-| `cancelled` | ✅ Always | No | Critical — must alert |
-| All service/booking | ✅ Always | No | No Live Activity for these |
+## BUG 7: `useDeliveryTracking` realtime subscription uses `delivery_assignments` with REPLICA IDENTITY DEFAULT
+**Severity: MEDIUM — realtime updates may miss column values**
 
-## Implementation Matrix
+`delivery_assignments` has `relreplident = d` (DEFAULT, primary key only). This means realtime UPDATE payloads only include `id` and changed columns. The `useDeliveryTracking` realtime handler reads `d.status`, `d.rider_name`, `d.eta_minutes`, etc. from `payload.new`. With DEFAULT replica identity, unchanged fields will be `undefined`, not their current values.
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
-| BG-1 | APNs Push-to-Live-Activity | Implemented |
-| BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
-| BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |
-| BG-4 | Buyer Delivery Confirmation (Gap 8) | Implemented |
-| BG-5 | ETA at Acceptance Time (Gap 11) | Implemented |
+The code handles this with `d.rider_name ?? prev.riderName` (fallback to previous), so it won't crash. But if the trigger updates ONLY `status` (like `sync_order_to_delivery_assignment` does — it sets `status` and `updated_at`), then `d.eta_minutes` will be `undefined`, and `d.eta_minutes ?? prev.eta` correctly keeps the previous ETA. This is actually fine.
+
+However, `d.status` could be `undefined` if only non-status columns are updated (like `last_location_at`). Line 103: `status: d.status` would set status to `undefined`, overwriting the real status. This should use `d.status ?? prev.status`.
+
+**Fix:** Change line 103 in `useDeliveryTracking.ts` to: `status: d.status ?? prev.status`.
+
+---
+
+## BUG 8: `DeliveryStatusCard` shown when `!isInTransit` but ALSO when assignment doesn't exist yet
+**Severity: LOW — confusing empty state**
+
+Line 236: `{isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}`
+
+Before `picked_up` (statuses: placed, accepted, preparing, ready), `isInTransit` is false, so `DeliveryStatusCard` renders. It fetches the assignment, finds none (assignment is created only at `picked_up`), and returns `null` — which is fine. But it's a wasted fetch on every pre-delivery status render.
+
+No fix needed — this is cosmetic only.
+
+---
+
+## Summary
+
+| # | Bug | Severity | Type |
+|---|-----|----------|------|
+| 1 | GPS tracker skipped when `delivery_handled_by` is NULL | **CRITICAL** | Silent failure |
+| 2 | Delivery fee shows "Self Pickup" for seller_delivery | MEDIUM | UI bug |
+| 3 | Missing delivery badge on order cards | LOW | UI cosmetic |
+| 4 | Stale detection misses `on_the_way` status | MEDIUM | Edge function gap |
+| 5 | Assignment status sync trigger exits early on NULL | **HIGH** | Silent failure |
+| 6 | (Verified OK — no bug) | — | — |
+| 7 | Realtime status could be set to undefined | MEDIUM | Race condition |
+| 8 | (No fix needed — cosmetic) | — | — |
+
+## Implementation Plan
+
+### DB Migration (Bugs 5)
+- Fix `sync_order_to_delivery_assignment` trigger: change NULL check to match COALESCE pattern
+
+### Edge Function (Bug 4)
+- Add `'on_the_way'` to stale detection status array in `update-delivery-location`
+
+### Frontend (Bugs 1, 2, 3, 7)
+
+| File | Change |
+|------|--------|
+| `OrderDetailPage.tsx` line 233 | `delivery_handled_by !== 'platform'` instead of `=== 'seller'` |
+| `OrderDetailPage.tsx` line 301 | Use `isDeliveryOrder` instead of `=== 'delivery'` |
+| `SellerOrderCard.tsx` line 80 | Include `seller_delivery` in check |
+| `OrdersPage.tsx` line 55 | Include `seller_delivery` in check |
+| `useDeliveryTracking.ts` line 103 | `status: d.status ?? prev.status` |
+
