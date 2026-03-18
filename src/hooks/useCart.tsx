@@ -232,10 +232,39 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [user, setOptimistic, queryClient]);
 
+  /**
+   * Replace the entire cart with the given items (used by reorder flows).
+   * Clears existing cart, inserts new items, and reconciles cache before resolving.
+   */
+  const replaceCart = useCallback(async (inserts: { product_id: string; quantity: number }[]) => {
+    if (!user || inserts.length === 0) return;
+    // Optimistically set count immediately
+    const totalQty = inserts.reduce((s, i) => s + i.quantity, 0);
+    queryClient.setQueryData(['cart-count', user.id], totalQty);
+
+    // Delete existing cart and insert new items
+    await supabase.from('cart_items').delete().eq('user_id', user.id);
+    const { error } = await supabase
+      .from('cart_items')
+      .insert(inserts.map(i => ({ user_id: user.id, product_id: i.product_id, quantity: i.quantity })));
+    if (error) throw error;
+
+    // Fetch fresh cart data and seed the cache so /cart page has data immediately
+    const { data: freshData } = await supabase
+      .from('cart_items')
+      .select(`*, product:products(*, seller:seller_profiles(*))`)
+      .eq('user_id', user.id);
+    const freshItems = ((freshData as any) || []).filter((item: any) => item.product != null && item.product.is_available !== false);
+    queryClient.setQueryData([...CART_QUERY_KEY, user.id], freshItems);
+    queryClient.setQueryData(['cart-count', user.id], freshItems.reduce((s: number, i: any) => s + (i.quantity || 0), 0));
+  }, [user, queryClient]);
+
+  const hasHydrated = isFetched;
+
   const contextValue = useMemo<CartContextType>(() => ({
-    items, itemCount, totalAmount, sellerGroups, isLoading, addItem, updateQuantity, removeItem, clearCart,
+    items, itemCount, totalAmount, sellerGroups, isLoading, hasHydrated, addItem, replaceCart, updateQuantity, removeItem, clearCart,
     refresh: async () => { invalidate(); },
-  }), [items, itemCount, totalAmount, sellerGroups, isLoading, addItem, updateQuantity, removeItem, clearCart, invalidate]);
+  }), [items, itemCount, totalAmount, sellerGroups, isLoading, hasHydrated, addItem, replaceCart, updateQuantity, removeItem, clearCart, invalidate]);
 
   return <CartContext.Provider value={contextValue}>{children}</CartContext.Provider>;
 }
