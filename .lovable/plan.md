@@ -1,145 +1,113 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phases 1–3)
 
-# Final Gap Implementation Plan — Production-Grade Real-Time UX
+All 9 original phases plus Blinkit parity Phases 1–3 are fully implemented.
 
-## Current State Assessment
+## Blinkit Gap-Fill Status
 
-**Already fully implemented and verified in code:**
-- Real-time pipeline (DB trigger -> edge fn -> device) with inline retry + dead-letter
-- Live Activity orchestrator with single entry point (`useLiveActivityOrchestrator`)
-- Native + JS dedup (hydration lock, `starting` Set, Swift entity check)
-- Dynamic Island UI with item count, widgetURL deep-link, seller name
-- Push deep-linking (`route` from `reference_path`), threadId grouping, rich push images (NSE)
-- Distance-based progress interpolation in `liveActivityMapper.ts`
-- APNs Push-to-Live-Activity (token capture, `live_activity_tokens` table, `update-live-activity-apns` edge fn)
-- GPS tracking infrastructure: `delivery_locations` table (realtime-enabled), `useBackgroundLocationTracking` hook, `useDeliveryTracking` hook, `LiveDeliveryTracker` component
-- Silent push for mid-flow statuses
-- 5s throttle, max 10 concurrent activities
-- Token cleanup on activity end
+### Phase 1: APNs Push-to-Live-Activity — COMPLETE
 
-**What is NOT yet implemented (verified by code audit):**
+Live Activities now update even when the app process is killed by iOS, matching Blinkit's reliability.
 
-| Gap | Description | Actor Impact |
-|-----|-------------|-------------|
-| **Seller self-delivery GPS** | `useBackgroundLocationTracking` only wired to `DeliveryPartnerDashboardPage`. When `delivery_handled_by = "seller"`, the seller has no GPS broadcasting UI | Seller (as rider), Buyer (no live tracking) |
-| **Buyer live map** | `LiveDeliveryTracker` shows text (ETA, distance, proximity messages) but NO actual map component | Buyer |
-| **Idempotency on status updates** | No dedup key (order_id + status) in edge function or trigger — retries can process the same status change twice | System reliability |
-| **Realtime channel failure detection** | Orchestrator logs warning on `CHANNEL_ERROR`/`TIMED_OUT` but does NOT attempt reconnection | Buyer (silent staleness) |
+#### Architecture
 
----
+```
+Order status change → DB trigger → net.http_post → update-live-activity-apns edge function
+  → APNs push (apns-push-type: liveactivity) → iOS widget receives content-state update
+  → Lock screen / Dynamic Island re-renders
+```
 
-## Phase 1: System Reliability (P0)
+#### Implementation Details
 
-### 1A. Idempotency Guard on Push Processing
+| Component | What Was Done |
+|-----------|---------------|
+| **DB table** | `live_activity_tokens` (user_id, order_id, push_token, platform) with RLS |
+| **Swift plugin** | `LiveActivityPlugin.swift` — requests activity with `pushType: .token`, observes `Activity.pushTokenUpdates`, emits `liveActivityPushToken` event to JS |
+| **LiveActivityManager.ts** | Listens for `liveActivityPushToken` events, upserts token to `live_activity_tokens` table, cleans up on activity end |
+| **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
+| **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
 
-**Problem:** The `process-notification-queue` edge function claims batches atomically, but if the same order status triggers the trigger twice (e.g., rapid DB updates), two queue entries are created. The `queue_item_id` unique constraint on `user_notifications` prevents duplicate in-app notifications, but duplicate push notifications can still be sent.
+### Phase 2: System Reliability — COMPLETE
 
-**Fix:**
-- **`fn_enqueue_order_status_notification` trigger**: Add idempotency check — before INSERT into `notification_queue`, check if a row with the same `reference_id` (order_id) and status already exists and was processed within the last 30 seconds. Use `NOT EXISTS (SELECT 1 FROM notification_queue WHERE reference_id = NEW.id AND payload->>'status' = NEW.status AND created_at > now() - interval '30 seconds')`.
-- **Migration**: Add index on `notification_queue(reference_id, created_at)` for the idempotency lookup.
+#### 2A. Idempotency Guard on Push Processing
 
-### 1B. Realtime Channel Auto-Reconnect
+| Component | What Was Done |
+|-----------|---------------|
+| **DB trigger** | `fn_enqueue_order_status_notification` now checks for duplicate entries (same `reference_path` + `payload->>'status'` within 30 seconds) before inserting into `notification_queue`. Skips with `RAISE NOTICE`. |
+| **DB index** | `idx_notification_queue_dedup` on `notification_queue(reference_path, created_at DESC)` for fast dedup lookups |
 
-**Problem:** If the Supabase Realtime channel drops (`CHANNEL_ERROR` or `TIMED_OUT`), Live Activity updates stop silently. The orchestrator logs a warning but takes no action.
+#### 2B. Realtime Channel Auto-Reconnect
 
-**Fix:**
-- **`useLiveActivityOrchestrator.ts`**: On `CHANNEL_ERROR` or `TIMED_OUT`, remove the old channel and re-subscribe after a 3-second delay. Add a retry counter (max 3 reconnects per session) to prevent infinite loops. On successful reconnect, trigger a one-shot `syncActiveOrders`.
+| Component | What Was Done |
+|-----------|---------------|
+| **`useLiveActivityOrchestrator.ts`** | Both order and delivery channels now detect `CHANNEL_ERROR` / `TIMED_OUT`, remove the dead channel, and re-subscribe after 3s delay. Max 3 reconnects per session. On successful reconnect (`SUBSCRIBED`), retry counter resets. Each reconnect triggers a one-shot `syncActiveOrders` to fill any gap. Unique channel names with `Date.now()` suffix prevent Supabase channel name conflicts. |
 
----
+### Phase 3: Seller Self-Delivery GPS + Buyer Live Map — COMPLETE
 
-## Phase 2: Seller Self-Delivery GPS Broadcasting (P1)
+#### 3A. Seller GPS Broadcasting for Self-Delivery
 
-**Problem:** When `delivery_handled_by = "seller"`, the seller transitions the order through `picked_up` -> `on_the_way` -> `delivered` themselves. But the GPS broadcasting (`useBackgroundLocationTracking`) is only available on the Delivery Partner Dashboard — not in the seller's order detail view.
+| Component | What Was Done |
+|-----------|---------------|
+| **`SellerGPSTracker.tsx`** | New component — shown to sellers on OrderDetailPage when `delivery_handled_by === 'seller'` and order status is `picked_up` or `on_the_way`. Uses existing `useBackgroundLocationTracking` hook. Shows Start/Stop controls, live badge, and last-sent timestamp. |
+| **`OrderDetailPage.tsx`** | Integrated `SellerGPSTracker` in the seller action area, gated by `delivery_handled_by === 'seller'` + transit statuses |
 
-**What exists:**
-- `useBackgroundLocationTracking` hook — fully functional, uses Capacitor Geolocation, sends to `update-delivery-location` edge fn
-- `delivery_locations` table — realtime-enabled, RLS allows buyer + seller reads
-- `useDeliveryTracking` hook — buyer-side, subscribes to `delivery_locations` + `delivery_assignments`
-- `LiveDeliveryTracker` component — shows proximity, ETA, rider info (text-based, no map)
+#### 3B. Buyer Live Map
 
-**Fix (3 changes):**
+| Component | What Was Done |
+|-----------|---------------|
+| **`DeliveryMapView.tsx`** | New component using Leaflet + OpenStreetMap (no API key). Shows rider position (🛵 marker) and destination (📍 marker). Auto-fits bounds on mount, pans when rider moves out of view. |
+| **`OrderDetailPage.tsx`** | Integrated `DeliveryMapView` above `LiveDeliveryTracker` for buyer view when rider has GPS data and order has delivery coordinates (`delivery_lat`/`delivery_lng`). Falls back to text-only tracker when no GPS data available. |
 
-**2A. Wire GPS tracking into seller's OrderDetailPage**
-- In `OrderDetailPage.tsx`: When `o.isSellerView && delivery_handled_by === "seller"` and order status is `picked_up` or `on_the_way`, show a "Start Tracking" button and use `useBackgroundLocationTracking(deliveryAssignmentId)`.
-- Show tracking state indicator (GPS active badge, last sent timestamp).
-- Auto-start tracking when seller taps "Mark Picked Up".
+### Previously Completed Blinkit Gaps
 
-**2B. Create delivery assignment for seller self-delivery**
-- Verify that the DB trigger/flow already creates a `delivery_assignments` row when seller marks `ready` for self-delivery orders. If not, ensure a row is created with `rider_name` = seller's business name and `rider_id` = seller's user ID.
-- The `update-delivery-location` edge function already writes to `delivery_locations` and updates `delivery_assignments.last_location_lat/lng` — this works for sellers too.
+| Feature | Status |
+|---------|--------|
+| Push deep-link routing | ✅ Done |
+| Notification grouping (threadId) | ✅ Done |
+| Rich push images (NSE) | ✅ Done |
+| Dynamic Island tap → order page | ✅ Done |
+| Item count in DI | ✅ Done |
+| GPS-derived progress | ✅ Done |
 
-**2C. Buyer receives live tracking for seller-delivered orders**
-- No code change needed — `OrderDetailPage` already shows `LiveDeliveryTracker` when `fulfillmentType === 'delivery'` and `isInTransit && deliveryAssignmentId`. The buyer sees the same proximity/ETA info regardless of who delivers.
+### Phase 4: Live Map / Rider GPS — DEFERRED
 
----
+Requires dedicated rider-side GPS broadcasting infrastructure (separate product workstream). Seller self-delivery GPS (Phase 3A) covers the immediate need.
 
-## Phase 3: Buyer Live Map Component (P1)
+### Product Thumbnails in Widget — DEFERRED
 
-**Problem:** `LiveDeliveryTracker` shows text-based proximity messages but no visual map. Blinkit shows an in-app map with the rider's moving dot.
+Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
 
-**Fix:**
+## Silent Push Optimization: COMPLETE
 
-**3A. Map component using Google Maps or Leaflet (free)**
-- Create `src/components/delivery/DeliveryMapView.tsx` — a lightweight map that:
-  - Shows rider's current position as a moving marker
-  - Shows buyer's delivery address as destination marker
-  - Draws a straight line or simple route between them
-  - Updates in real-time via `useDeliveryTracking` (already provides `riderLocation.latitude/longitude`)
-- Use Leaflet + OpenStreetMap tiles (no API key required) for v1. Upgrade to Google Maps later if needed.
+### Notification Matrix
 
-**3B. Integrate map into OrderDetailPage**
-- In `OrderDetailPage.tsx`: When `isInTransit && deliveryAssignmentId && riderLocation exists`, render `DeliveryMapView` above or inside `LiveDeliveryTracker`.
-- Map shows only when rider has GPS data. Falls back to text-only tracker when no location available.
-- Buyer's delivery coordinates come from `order.delivery_lat/delivery_lng` (already in the orders table).
+| Status | Push? | Live Activity? | Rationale |
+|--------|-------|----------------|-----------|
+| `accepted` | ✅ Always | Yes | Critical — order confirmed |
+| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
+| `ready` | ✅ Always | Yes | Pickup moment — user must know |
+| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
+| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
+| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
+| `delivered` | ✅ Always | Yes | Critical endpoint |
+| `completed` | ✅ Always | No | Critical endpoint |
+| `cancelled` | ✅ Always | No | Critical — must alert |
+| All service/booking | ✅ Always | No | No Live Activity for these |
 
-**3C. Map in Dynamic Island / Lock Screen — NOT possible**
-- Apple does not allow MapKit or web views in Live Activity widgets. The lock screen continues showing text-based distance/ETA. This is a platform limitation, not a gap.
+## Implementation Matrix
 
----
-
-## Phase 4: Validation & Hardening (P0)
-
-### 4A. State Consistency Audit
-- Verify that all three surfaces (push notification, Live Activity widget, in-app UI) show the same status/ETA/progress for a given order at any point in time.
-- The single source of truth is `orders.status` + `delivery_assignments` — all three surfaces already read from these tables. No fix needed, just validation.
-
-### 4B. Notification Noise Validation
-- Already implemented: `silent_push` flag on mid-flow statuses. Only `accepted`, `ready`, `delivered`, `completed`, `cancelled` trigger full push.
-- Validate the `category_status_flows.silent_push` values in the database match the expected matrix.
-
-### 4C. Deep-Link Validation
-- Push tap: `pushData.route = item.reference_path` -> `/orders/{id}` -> `OrderDetailPage`
-- Dynamic Island tap: `widgetURL("sociva://orders/{entityId}")` -> deep link handler -> `/orders/{id}`
-- Both paths lead to the same page. Works from background, killed app, and cold start (deep link is handled by Capacitor App plugin).
-
----
-
-## Implementation Order
-
-| Order | Phase | Scope | Actor |
-|-------|-------|-------|-------|
-| 1 | 1A | Idempotency guard (migration + trigger update) | System |
-| 2 | 1B | Realtime channel auto-reconnect (TS only) | Buyer |
-| 3 | 2A-2B | Seller self-delivery GPS broadcasting (TS + possibly migration) | Seller |
-| 4 | 3A-3B | Buyer live map component (new React component) | Buyer |
-| 5 | 4A-4C | Validation pass (no code changes, audit only) | All |
-
-## Files to Modify/Create
-
-| File | Change |
-|------|--------|
-| New migration | Idempotency index on `notification_queue`, trigger update |
-| `src/hooks/useLiveActivityOrchestrator.ts` | Auto-reconnect on channel error |
-| `src/pages/OrderDetailPage.tsx` | Add seller GPS tracking UI for self-delivery |
-| `src/components/delivery/DeliveryMapView.tsx` | New — Leaflet map with rider + destination markers |
-| `src/pages/OrderDetailPage.tsx` | Integrate map view for buyer |
-
-## What is NOT in scope (deferred)
-
-| Item | Reason |
-|------|--------|
-| Product thumbnails in widget | Apple 4KB payload limit, unreliable AsyncImage |
-| Map in lock screen widget | Apple platform limitation |
-| Dedicated rider app | Separate product; seller self-delivery covers the immediate need |
-| Polling fallback | Explicitly prohibited by architecture decision |
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+| BG-1 | APNs Push-to-Live-Activity | Implemented |
+| BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
+| BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |

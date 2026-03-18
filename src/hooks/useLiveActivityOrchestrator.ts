@@ -13,14 +13,15 @@ const TERMINAL_STATUSES = new Set([
   'delivered', 'completed', 'cancelled', 'no_show', 'failed',
 ]);
 
-
+const MAX_RECONNECT_RETRIES = 3;
+const RECONNECT_DELAY_MS = 3000;
 
 /**
  * Global hook that drives Live Activity from order status changes.
  * Mounted once at the app shell level.
  *
  * Hardened with:
- * - Channel subscription status monitoring
+ * - Channel subscription status monitoring with auto-reconnect
  * - INSERT + UPDATE on delivery_assignments
  * - One-shot syncActiveOrders on mount/resume (no polling)
  * - Runtime diagnostics on first mount
@@ -40,12 +41,10 @@ export function useLiveActivityOrchestrator(): void {
     if (!userId || !Capacitor.isNativePlatform()) return;
     mountedRef.current = true;
 
-    // Run diagnostics once (dry-run, no test start)
     runLiveActivityDiagnostics(true).then((diag) => {
       console.log(TAG, 'Diagnostics:', JSON.stringify(diag));
     });
 
-    // Initial sync
     doSync();
 
     return () => {
@@ -53,90 +52,121 @@ export function useLiveActivityOrchestrator(): void {
     };
   }, [userId, doSync]);
 
-  // ── Realtime: order status changes ──
+  // ── Realtime: order status changes (with auto-reconnect) ──
   useEffect(() => {
     if (!userId || !Capacitor.isNativePlatform()) return;
 
-    console.log(TAG, 'Subscribing to order updates for buyer', userId);
+    let retryCount = 0;
+    let channelRef: ReturnType<typeof supabase.channel> | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const channel = supabase
-      .channel(`la-order-status-${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'orders',
-          filter: `buyer_id=eq.${userId}`,
-        },
-        async (payload) => {
-          const newStatus = (payload.new as any)?.status as string | undefined;
-          const orderId = (payload.new as any)?.id as string | undefined;
-          if (!newStatus || !orderId) return;
+    const handleOrderUpdate = async (payload: any) => {
+      const newStatus = (payload.new as any)?.status as string | undefined;
+      const orderId = (payload.new as any)?.id as string | undefined;
+      if (!newStatus || !orderId) return;
 
-          console.log(TAG, `Order ${orderId} status → ${newStatus}`);
+      console.log(TAG, `Order ${orderId} status → ${newStatus}`);
 
-          if (TERMINAL_STATUSES.has(newStatus)) {
-            await LiveActivityManager.end(orderId);
-            return;
+      if (TERMINAL_STATUSES.has(newStatus)) {
+        await LiveActivityManager.end(orderId);
+        return;
+      }
+
+      let delivery: any = null;
+      let sellerName: string | null = null;
+      let itemCount: number | null = null;
+      try {
+        const sellerId = (payload.new as any)?.seller_id;
+        const [deliveryRes, sellerRes, itemCountRes] = await Promise.all([
+          supabase
+            .from('delivery_assignments')
+            .select('eta_minutes, distance_meters, rider_name')
+            .eq('order_id', orderId)
+            .not('status', 'in', '("cancelled","failed")')
+            .maybeSingle(),
+          sellerId
+            ? supabase.from('seller_profiles').select('business_name').eq('id', sellerId).maybeSingle()
+            : Promise.resolve({ data: null }),
+          supabase.from('order_items').select('id', { count: 'exact', head: true }).eq('order_id', orderId),
+        ]);
+        delivery = deliveryRes.data;
+        sellerName = (sellerRes.data as any)?.business_name ?? null;
+        itemCount = itemCountRes.count ?? null;
+      } catch { /* best-effort */ }
+
+      const activityData = buildLiveActivityData(
+        { id: orderId, status: newStatus },
+        delivery,
+        sellerName,
+        itemCount,
+      );
+      await LiveActivityManager.push(activityData);
+    };
+
+    const subscribe = () => {
+      console.log(TAG, `Subscribing to order updates for buyer ${userId} (attempt ${retryCount + 1})`);
+
+      const channel = supabase
+        .channel(`la-order-status-${userId}-${Date.now()}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'orders',
+            filter: `buyer_id=eq.${userId}`,
+          },
+          handleOrderUpdate,
+        )
+        .subscribe((status) => {
+          console.log(TAG, `Order channel status: ${status}`);
+          if (status === 'SUBSCRIBED') {
+            retryCount = 0; // Reset on success
           }
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn(TAG, `Order channel degraded (${status}), attempting reconnect...`);
+            attemptReconnect();
+          }
+        });
 
-          // Fetch delivery data, seller name, and item count
-          let delivery: any = null;
-          let sellerName: string | null = null;
-          let itemCount: number | null = null;
-          try {
-            const sellerId = (payload.new as any)?.seller_id;
-            const [deliveryRes, sellerRes, itemCountRes] = await Promise.all([
-              supabase
-                .from('delivery_assignments')
-                .select('eta_minutes, distance_meters, rider_name')
-                .eq('order_id', orderId)
-                .not('status', 'in', '("cancelled","failed")')
-                .maybeSingle(),
-              sellerId
-                ? supabase
-                    .from('seller_profiles')
-                    .select('business_name')
-                    .eq('id', sellerId)
-                    .maybeSingle()
-                : Promise.resolve({ data: null }),
-              supabase
-                .from('order_items')
-                .select('id', { count: 'exact', head: true })
-                .eq('order_id', orderId),
-            ]);
-            delivery = deliveryRes.data;
-            sellerName = (sellerRes.data as any)?.business_name ?? null;
-            itemCount = itemCountRes.count ?? null;
-          } catch { /* best-effort */ }
+      channelRef = channel;
+    };
 
-          const activityData = buildLiveActivityData(
-            { id: orderId, status: newStatus },
-            delivery,
-            sellerName,
-            itemCount,
-          );
-          await LiveActivityManager.push(activityData);
-        },
-      )
-      .subscribe((status) => {
-        console.log(TAG, `Order channel status: ${status}`);
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn(TAG, 'Order channel degraded, polling fallback active');
-        }
-      });
+    const attemptReconnect = () => {
+      if (!mountedRef.current) return;
+      if (retryCount >= MAX_RECONNECT_RETRIES) {
+        console.error(TAG, `Order channel: max reconnects (${MAX_RECONNECT_RETRIES}) exceeded`);
+        return;
+      }
+      retryCount++;
+      // Remove old channel
+      if (channelRef) {
+        supabase.removeChannel(channelRef);
+        channelRef = null;
+      }
+      retryTimer = setTimeout(() => {
+        if (!mountedRef.current) return;
+        subscribe();
+        // Re-sync on reconnect to fill any gap
+        doSync();
+      }, RECONNECT_DELAY_MS);
+    };
+
+    subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (retryTimer) clearTimeout(retryTimer);
+      if (channelRef) supabase.removeChannel(channelRef);
     };
-  }, [userId]);
+  }, [userId, doSync]);
 
-  // ── Realtime: delivery assignment INSERT + UPDATE ──
+  // ── Realtime: delivery assignment INSERT + UPDATE (with auto-reconnect) ──
   useEffect(() => {
     if (!userId || !Capacitor.isNativePlatform()) return;
 
-    console.log(TAG, 'Subscribing to delivery assignment INSERT+UPDATE');
+    let retryCount = 0;
+    let channelRef: ReturnType<typeof supabase.channel> | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const handleDeliveryChange = async (payload: any) => {
       const row = payload.new as any;
@@ -181,36 +211,52 @@ export function useLiveActivityOrchestrator(): void {
       } catch { /* best-effort */ }
     };
 
-    const channel = supabase
-      .channel(`la-delivery-${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'delivery_assignments',
-        },
-        handleDeliveryChange,
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'delivery_assignments',
-        },
-        handleDeliveryChange,
-      )
-      .subscribe((status) => {
-        console.log(TAG, `Delivery channel status: ${status}`);
-      });
+    const subscribe = () => {
+      console.log(TAG, `Subscribing to delivery assignment INSERT+UPDATE (attempt ${retryCount + 1})`);
+
+      const channel = supabase
+        .channel(`la-delivery-${userId}-${Date.now()}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'delivery_assignments' }, handleDeliveryChange)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'delivery_assignments' }, handleDeliveryChange)
+        .subscribe((status) => {
+          console.log(TAG, `Delivery channel status: ${status}`);
+          if (status === 'SUBSCRIBED') {
+            retryCount = 0;
+          }
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn(TAG, `Delivery channel degraded (${status}), attempting reconnect...`);
+            attemptReconnect();
+          }
+        });
+
+      channelRef = channel;
+    };
+
+    const attemptReconnect = () => {
+      if (!mountedRef.current) return;
+      if (retryCount >= MAX_RECONNECT_RETRIES) {
+        console.error(TAG, `Delivery channel: max reconnects (${MAX_RECONNECT_RETRIES}) exceeded`);
+        return;
+      }
+      retryCount++;
+      if (channelRef) {
+        supabase.removeChannel(channelRef);
+        channelRef = null;
+      }
+      retryTimer = setTimeout(() => {
+        if (!mountedRef.current) return;
+        subscribe();
+        doSync();
+      }, RECONNECT_DELAY_MS);
+    };
+
+    subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (retryTimer) clearTimeout(retryTimer);
+      if (channelRef) supabase.removeChannel(channelRef);
     };
-  }, [userId]);
-
-  // Polling fallback removed — pure realtime. App-resume one-shot sync remains below.
+  }, [userId, doSync]);
 
   // ── App resume re-hydration (one-shot sync) ──
   useEffect(() => {

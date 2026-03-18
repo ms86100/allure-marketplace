@@ -11,6 +11,8 @@ import { OrderRejectionDialog } from '@/components/order/OrderRejectionDialog';
 import { DeliveryStatusCard } from '@/components/delivery/DeliveryStatusCard';
 import { LiveDeliveryTracker } from '@/components/delivery/LiveDeliveryTracker';
 import { DeliveryArrivalOverlay } from '@/components/order/DeliveryArrivalOverlay';
+import { SellerGPSTracker } from '@/components/delivery/SellerGPSTracker';
+import { DeliveryMapView } from '@/components/delivery/DeliveryMapView';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
 
 import { OrderItemCard } from '@/components/order/OrderItemCard';
@@ -172,7 +174,23 @@ export default function OrderDetailPage() {
 
           {/* Live Delivery Tracking or Static Card */}
           {o.orderFulfillmentType === 'delivery' && isInTransit && deliveryAssignmentId && (
-            <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} />
+            <>
+              {/* Buyer map view — show when rider has GPS data */}
+              {o.isBuyerView && deliveryTracking.riderLocation && (order as any).delivery_lat && (order as any).delivery_lng && (
+                <DeliveryMapView
+                  riderLat={deliveryTracking.riderLocation.latitude}
+                  riderLng={deliveryTracking.riderLocation.longitude}
+                  destinationLat={(order as any).delivery_lat}
+                  destinationLng={(order as any).delivery_lng}
+                  riderName={deliveryTracking.riderName}
+                />
+              )}
+              <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} />
+            </>
+          )}
+          {/* Seller self-delivery GPS broadcasting */}
+          {o.orderFulfillmentType === 'delivery' && o.isSellerView && (order as any).delivery_handled_by === 'seller' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
+            <SellerGPSTracker assignmentId={deliveryAssignmentId} />
           )}
           {o.orderFulfillmentType === 'delivery' && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}
 
