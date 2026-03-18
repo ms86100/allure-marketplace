@@ -104,7 +104,6 @@ class _LiveActivityManager {
         const { entityId, pushToken } = event;
         console.log(TAG, `PUSH TOKEN received for entity=${entityId} token=${pushToken.substring(0, 16)}…`);
 
-        // Only save once per entity per session
         if (this.tokenSaved.has(entityId)) {
           console.log(TAG, `PUSH TOKEN already saved for ${entityId}, skipping`);
           return;
@@ -181,7 +180,6 @@ class _LiveActivityManager {
     this.hydrating = true;
     console.log(TAG, 'HYDRATE START — reconciling persisted + native state');
 
-    // Setup push token listener on first hydration
     this.setupTokenListener();
 
     try {
@@ -202,20 +200,52 @@ class _LiveActivityManager {
 
       const { activities } = await LiveActivity.getActiveActivities();
       console.log(TAG, `HYDRATE native activities: ${activities.length}`);
+
+      // ── DEDUP: group native activities by entityId, keep latest, end duplicates ──
+      const byEntity = new Map<string, { activityId: string; entityId: string }[]>();
+      for (const act of activities) {
+        const list = byEntity.get(act.entityId) ?? [];
+        list.push(act);
+        byEntity.set(act.entityId, list);
+      }
+
       const nativeEntityIds = new Set<string>();
 
-      for (const { activityId, entityId } of activities) {
+      for (const [entityId, acts] of byEntity) {
         nativeEntityIds.add(entityId);
-        const existing = this.active.get(entityId);
-        if (!existing) {
+
+        // If multiple native activities for same entity → end all but the last
+        if (acts.length > 1) {
+          console.warn(TAG, `HYDRATE DEDUP — ${acts.length} activities for entity=${entityId}, keeping last`);
+          const toEnd = acts.slice(0, -1);
+          const keeper = acts[acts.length - 1];
+          for (const stale of toEnd) {
+            try {
+              await LiveActivity.endLiveActivity({ activityId: stale.activityId });
+              console.log(TAG, `HYDRATE DEDUP ended stale activityId=${stale.activityId}`);
+            } catch (e) {
+              console.warn(TAG, `HYDRATE DEDUP end failed:`, e);
+            }
+          }
           this.active.set(entityId, {
-            activityId,
+            activityId: keeper.activityId,
             entityId,
             lastUpdate: Date.now(),
             pendingTimer: null,
           });
-        } else if (existing.activityId !== activityId) {
-          existing.activityId = activityId;
+        } else {
+          const act = acts[0];
+          const existing = this.active.get(entityId);
+          if (!existing) {
+            this.active.set(entityId, {
+              activityId: act.activityId,
+              entityId,
+              lastUpdate: Date.now(),
+              pendingTimer: null,
+            });
+          } else if (existing.activityId !== act.activityId) {
+            existing.activityId = act.activityId;
+          }
         }
       }
 
@@ -300,8 +330,35 @@ class _LiveActivityManager {
         console.log(TAG, `SKIP — start already in-flight for ${entity_id}`);
         return;
       }
+
+      // Re-check after hydration — hydration may have populated it
+      const hydrated = this.active.get(entity_id);
+      if (hydrated) {
+        console.log(TAG, `POST-HYDRATE: entity=${entity_id} already active, updating instead of starting`);
+        this.throttledUpdate(hydrated, data);
+        return;
+      }
+
       this.starting.add(entity_id);
       try {
+        // Native-layer dedup: check if a native activity already exists for this entity
+        // (e.g. survived an app kill but wasn't in our persisted map)
+        const { activities: nativeActivities } = await LiveActivity.getActiveActivities();
+        const nativeMatch = nativeActivities.find((a) => a.entityId === entity_id);
+        if (nativeMatch) {
+          console.log(TAG, `NATIVE DEDUP: activity already exists for ${entity_id}, updating`);
+          this.active.set(entity_id, {
+            activityId: nativeMatch.activityId,
+            entityId: entity_id,
+            lastUpdate: Date.now(),
+            pendingTimer: null,
+          });
+          this.persistMap();
+          await LiveActivity.updateLiveActivity(data);
+          addOpsEntry({ timestamp: Date.now(), action: 'update', entityId: entity_id, status: workflow_status, success: true });
+          return;
+        }
+
         console.log(TAG, `START entity=${entity_id} status=${workflow_status}`);
         const { activityId } = await LiveActivity.startLiveActivity(data);
         console.log(TAG, `START SUCCESS entity=${entity_id} activityId=${activityId}`);
@@ -350,7 +407,6 @@ class _LiveActivityManager {
     this.tokenSaved.delete(entityId);
     this.persistMap();
 
-    // Clean up token from backend (best-effort)
     this.deleteTokenFromBackend(entityId);
 
     try {
