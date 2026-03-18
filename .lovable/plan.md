@@ -1,115 +1,60 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phases 1–3)
 
-All 9 original phases plus Blinkit parity Phases 1–3 are fully implemented.
+# Fix Plan: Live Tracking + Live Activity + Deep Links
 
-## Blinkit Gap-Fill Status
+## Issue 1: Dynamic Island tap → 404
 
-### Phase 1: APNs Push-to-Live-Activity — COMPLETE
+**Root cause confirmed:** `new URL('sociva://orders/UUID')` parses as:
+- `protocol`: `sociva:`
+- `hostname`: `orders` (treated as host, NOT path)
+- `pathname`: `/UUID`
 
-Live Activities now update even when the app process is killed by iOS, matching Blinkit's reliability.
+The deep link handler uses `url.pathname` → navigates to `/UUID` → 404.
 
-#### Architecture
-
+**Fix:** In `useDeepLinks.ts`, for `sociva:` protocol, combine `url.hostname + url.pathname` to reconstruct the full path:
 ```
-Order status change → DB trigger → net.http_post → update-live-activity-apns edge function
-  → APNs push (apns-push-type: liveactivity) → iOS widget receives content-state update
-  → Lock screen / Dynamic Island re-renders
+path = `/${url.hostname}${url.pathname}` → `/orders/UUID` ✓
 ```
 
-#### Implementation Details
+Also add a fallback: if the resolved path doesn't match any known route pattern, navigate to `/orders` instead of the 404.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB table** | `live_activity_tokens` (user_id, order_id, push_token, platform) with RLS |
-| **Swift plugin** | `LiveActivityPlugin.swift` — requests activity with `pushType: .token`, observes `Activity.pushTokenUpdates`, emits `liveActivityPushToken` event to JS |
-| **LiveActivityManager.ts** | Listens for `liveActivityPushToken` events, upserts token to `live_activity_tokens` table, cleans up on activity end |
-| **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
-| **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
+---
 
-### Phase 2: System Reliability — COMPLETE
+## Issue 2: Duplicate Live Activity Cards (Screenshot shows 3× "Your Order is Ready" + 1× "Preparing")
 
-#### 2A. Idempotency Guard on Push Processing
+**Root cause:** Two interacting bugs:
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB trigger** | `fn_enqueue_order_status_notification` now checks for duplicate entries (same `reference_path` + `payload->>'status'` within 30 seconds) before inserting into `notification_queue`. Skips with `RAISE NOTICE`. |
-| **DB index** | `idx_notification_queue_dedup` on `notification_queue(reference_path, created_at DESC)` for fast dedup lookups |
+**Bug A — Sync races hydration:** `syncActiveOrders` is called on mount and runs `LiveActivityManager.push()` for each active order. `push()` calls `hydrate()` internally, but the sync fetches orders in parallel. If the first `push()` is still hydrating, subsequent `push()` calls wait on the same hydration promise — but each then calls `startLiveActivity` because the first start hasn't completed yet. The `starting` Set guards against this per entity, but if two different code paths (order channel + sync) both call `push()` for the same order near-simultaneously, they can both pass the `starting` check.
 
-#### 2B. Realtime Channel Auto-Reconnect
+**Bug B — Native duplicates not cleaned on update:** When `syncActiveOrders` runs after app resume, it may call `startLiveActivity` for an order that already has a native activity (from before app kill). The native side creates a NEW activity instead of updating the existing one. The `cleanupStaleActivities` only removes activities NOT in the valid list — it doesn't deduplicate multiple activities for the SAME entity.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`useLiveActivityOrchestrator.ts`** | Both order and delivery channels now detect `CHANNEL_ERROR` / `TIMED_OUT`, remove the dead channel, and re-subscribe after 3s delay. Max 3 reconnects per session. On successful reconnect (`SUBSCRIBED`), retry counter resets. Each reconnect triggers a one-shot `syncActiveOrders` to fill any gap. Unique channel names with `Date.now()` suffix prevent Supabase channel name conflicts. |
+**Fix (LiveActivityManager.ts):**
+1. After `hydrate()` completes in `push()`, re-check `this.active.has(entity_id)` before starting — the hydration may have populated it.
+2. In `_doHydrate()`, when native reports multiple activities for the same entityId, keep the latest and end the others.
+3. Add a native-layer dedup: before `startLiveActivity`, call `getActiveActivities()` and check if one already exists for this entityId. If so, update instead of start.
 
-### Phase 3: Seller Self-Delivery GPS + Buyer Live Map — COMPLETE
+---
 
-#### 3A. Seller GPS Broadcasting for Self-Delivery
+## Issue 3: Map Rider Not Moving Smoothly
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`SellerGPSTracker.tsx`** | New component — shown to sellers on OrderDetailPage when `delivery_handled_by === 'seller'` and order status is `picked_up` or `on_the_way`. Uses existing `useBackgroundLocationTracking` hook. Shows Start/Stop controls, live badge, and last-sent timestamp. |
-| **`OrderDetailPage.tsx`** | Integrated `SellerGPSTracker` in the seller action area, gated by `delivery_handled_by === 'seller'` + transit statuses |
+**Root cause analysis:** The `AnimatedRiderMarker` code is correct (2s ease-out animation with `requestAnimationFrame`). The real issue is **update frequency** — the GPS filter in `useDeliveryTracking` rejects points that are <3m apart (micro-jitter), which means at low speeds the marker stays still. Also, the assignment channel overwrites filtered positions with raw ones (Gap E from previous audit — the fix applied `filterGPSPoint` but may have been incomplete).
 
-#### 3B. Buyer Live Map
+**Fix:**
+1. In `useDeliveryTracking.ts`, verify the assignment channel handler applies `filterGPSPoint` correctly (check the actual code state after previous edits).
+2. Lower the micro-jitter threshold from 3m to 1m for delivery tracking context — 3m is too aggressive for a moving scooter.
+3. Ensure `speed_kmh` and `heading` from `delivery_locations` INSERT events are propagated through to `AnimatedRiderMarker` (currently they flow through but verify).
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`DeliveryMapView.tsx`** | New component using Leaflet + OpenStreetMap (no API key). Shows rider position (🛵 marker) and destination (📍 marker). Auto-fits bounds on mount, pans when rider moves out of view. |
-| **`OrderDetailPage.tsx`** | Integrated `DeliveryMapView` above `LiveDeliveryTracker` for buyer view when rider has GPS data and order has delivery coordinates (`delivery_lat`/`delivery_lng`). Falls back to text-only tracker when no GPS data available. |
+---
 
-### Previously Completed Blinkit Gaps
+## Implementation Steps
 
-| Feature | Status |
-|---------|--------|
-| Push deep-link routing | ✅ Done |
-| Notification grouping (threadId) | ✅ Done |
-| Rich push images (NSE) | ✅ Done |
-| Dynamic Island tap → order page | ✅ Done |
-| Item count in DI | ✅ Done |
-| GPS-derived progress | ✅ Done |
+| # | Task | File(s) |
+|---|------|---------|
+| 1 | Fix deep link URL parsing for `sociva://` scheme + add fallback | `src/hooks/useDeepLinks.ts` |
+| 2 | Add native dedup guard in `push()` — check native activities before starting | `src/services/LiveActivityManager.ts` |
+| 3 | Deduplicate same-entity activities during hydration | `src/services/LiveActivityManager.ts` |
+| 4 | Add `await` guard in `syncActiveOrders` to serialize `push()` calls | `src/services/liveActivitySync.ts` |
+| 5 | Lower GPS jitter threshold + verify assignment channel filtering | `src/lib/gps-filter.ts`, `src/hooks/useDeliveryTracking.ts` |
 
-### Phase 4: Live Map / Rider GPS — DEFERRED
+All changes are frontend/service-layer only — no database migrations needed.
 
-Requires dedicated rider-side GPS broadcasting infrastructure (separate product workstream). Seller self-delivery GPS (Phase 3A) covers the immediate need.
-
-### Product Thumbnails in Widget — DEFERRED
-
-Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
-
-## Silent Push Optimization: COMPLETE
-
-### Notification Matrix
-
-| Status | Push? | Live Activity? | Rationale |
-|--------|-------|----------------|-----------|
-| `accepted` | ✅ Always | Yes | Critical — order confirmed |
-| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
-| `ready` | ✅ Always | Yes | Pickup moment — user must know |
-| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
-| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
-| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
-| `delivered` | ✅ Always | Yes | Critical endpoint |
-| `completed` | ✅ Always | No | Critical endpoint |
-| `cancelled` | ✅ Always | No | Critical — must alert |
-| All service/booking | ✅ Always | No | No Live Activity for these |
-
-## Implementation Matrix
-
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
-| BG-1 | APNs Push-to-Live-Activity | Implemented |
-| BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
-| BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |
-| BG-4 | Buyer Delivery Confirmation (Gap 8) | Implemented |
-| BG-5 | ETA at Acceptance Time (Gap 11) | Implemented |
