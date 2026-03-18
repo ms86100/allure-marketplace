@@ -1,139 +1,115 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phases 1–3)
 
-# Deep Gap Analysis: Production Readiness (Round 4)
+All 9 original phases plus Blinkit parity Phases 1–3 are fully implemented.
 
-## SHOWSTOPPER: `isInTransit` is always false for seller-delivery orders
+## Blinkit Gap-Fill Status
 
-### GAP 1: `isInTransit` checks `actor === 'delivery'` but seller_delivery flow uses `actor = 'seller'`
-**Severity: CRITICAL — blocks ALL tracking UI for seller-delivery orders**
+### Phase 1: APNs Push-to-Live-Activity — COMPLETE
 
-**Issue:** `useOrderDetail.ts` line 215:
-```typescript
-return step?.actor === 'delivery' && !step?.is_terminal;
+Live Activities now update even when the app process is killed by iOS, matching Blinkit's reliability.
+
+#### Architecture
+
 ```
-In the `seller_delivery` flow (migration `20260318112122`), `picked_up`, `on_the_way`, and `delivered` all have `actor = 'seller'`, NOT `'delivery'`. This means `isInTransit` is **always false** for seller-delivery orders.
-
-**Cascade:**
-1. `OrderDetailPage.tsx` line 214: `isInTransit && deliveryAssignmentId` → false → **buyer never sees the map or LiveDeliveryTracker**
-2. `OrderDetailPage.tsx` line 235: `!isInTransit` → always true → static `DeliveryStatusCard` renders instead of live tracking, even during active delivery
-3. The `SellerGPSTracker` (line 232) is NOT affected — it uses a hardcoded status check `['picked_up', 'on_the_way']`. So GPS broadcasting works, but the buyer can't see it.
-
-**Root cause:** The `isInTransit` derivation was designed for `cart_purchase` flow where delivery steps have `actor = 'delivery'`. It was never updated when `seller_delivery` was introduced.
-
-**Fix:** Change `isInTransit` to check status-key membership instead of actor:
-```typescript
-const isInTransit = useMemo(() => {
-  if (!order) return false;
-  return ['picked_up', 'on_the_way', 'at_gate'].includes(order.status);
-}, [order?.status]);
-```
-Or better — add a `is_transit` boolean column to `category_status_flows` and check that. But for now, status-key check is sufficient and matches every other in-transit check in the codebase (`LiveDeliveryTracker` line 51, `DeliveryArrivalOverlay` line 27, `update-delivery-location` line 357).
-
----
-
-### GAP 2: `useBuyerOrderAlerts` missing `on_the_way` status toast
-**Severity: HIGH**
-
-**Issue:** `useBuyerOrderAlerts.ts` line 14-24 — the `STATUS_MESSAGES` map has no entry for `on_the_way`. When the seller marks the order as "on the way", the buyer gets NO in-app toast notification. They do get a push notification (from the trigger), but if the app is in the foreground, the toast is the primary feedback channel.
-
-**Fix:** Add `on_the_way` to STATUS_MESSAGES:
-```typescript
-on_the_way: { icon: '🛵', title: 'On The Way!', description: 'Your order is on the way to you.', haptic: 'success' },
+Order status change → DB trigger → net.http_post → update-live-activity-apns edge function
+  → APNs push (apns-push-type: liveactivity) → iOS widget receives content-state update
+  → Lock screen / Dynamic Island re-renders
 ```
 
----
+#### Implementation Details
 
-### GAP 3: `delivery_assignments.status` never updated during seller delivery flow
-**Severity: HIGH**
+| Component | What Was Done |
+|-----------|---------------|
+| **DB table** | `live_activity_tokens` (user_id, order_id, push_token, platform) with RLS |
+| **Swift plugin** | `LiveActivityPlugin.swift` — requests activity with `pushType: .token`, observes `Activity.pushTokenUpdates`, emits `liveActivityPushToken` event to JS |
+| **LiveActivityManager.ts** | Listens for `liveActivityPushToken` events, upserts token to `live_activity_tokens` table, cleans up on activity end |
+| **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
+| **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
 
-**Issue:** The `trg_create_seller_delivery_assignment` trigger creates the assignment with `status = 'picked_up'`. But as the order progresses through `on_the_way` → `delivered`, the `delivery_assignments.status` is never synced. The `LiveDeliveryTracker` component reads `tracking.status` from `delivery_assignments` and shows status-specific messages based on it. If the assignment stays at `picked_up` forever, the buyer sees "Your order has been picked up!" even when the seller is delivering.
+### Phase 2: System Reliability — COMPLETE
 
-**Root cause:** For `cart_purchase`, there's a `sync_delivery_to_order_status` trigger that syncs order status to assignment status. But it may not fire for `seller_delivery` orders, or it may only handle specific transitions.
+#### 2A. Idempotency Guard on Push Processing
 
-**Fix:** Ensure a trigger (or extend the existing one) syncs `delivery_assignments.status` when the order transitions to `on_the_way` and `delivered`.
+| Component | What Was Done |
+|-----------|---------------|
+| **DB trigger** | `fn_enqueue_order_status_notification` now checks for duplicate entries (same `reference_path` + `payload->>'status'` within 30 seconds) before inserting into `notification_queue`. Skips with `RAISE NOTICE`. |
+| **DB index** | `idx_notification_queue_dedup` on `notification_queue(reference_path, created_at DESC)` for fast dedup lookups |
 
----
+#### 2B. Realtime Channel Auto-Reconnect
 
-### GAP 4: Seller action bar shows "Mark Picked Up" when at `ready` but no delivery address context
-**Severity: MEDIUM**
+| Component | What Was Done |
+|-----------|---------------|
+| **`useLiveActivityOrchestrator.ts`** | Both order and delivery channels now detect `CHANNEL_ERROR` / `TIMED_OUT`, remove the dead channel, and re-subscribe after 3s delay. Max 3 reconnects per session. On successful reconnect (`SUBSCRIBED`), retry counter resets. Each reconnect triggers a one-shot `syncActiveOrders` to fill any gap. Unique channel names with `Date.now()` suffix prevent Supabase channel name conflicts. |
 
-**Issue:** When a seller taps "Mark Picked Up" at `ready` status, they're committing to personally deliver. But the UI doesn't show them the buyer's delivery address before they confirm. On Blinkit/Swiggy, the seller sees the destination before accepting the delivery leg.
+### Phase 3: Seller Self-Delivery GPS + Buyer Live Map — COMPLETE
 
-**Fix:** Show a confirmation sheet when transitioning from `ready` → `picked_up` for seller self-delivery orders. Include buyer's address (block, flat), estimated distance, and estimated delivery time.
+#### 3A. Seller GPS Broadcasting for Self-Delivery
 
----
+| Component | What Was Done |
+|-----------|---------------|
+| **`SellerGPSTracker.tsx`** | New component — shown to sellers on OrderDetailPage when `delivery_handled_by === 'seller'` and order status is `picked_up` or `on_the_way`. Uses existing `useBackgroundLocationTracking` hook. Shows Start/Stop controls, live badge, and last-sent timestamp. |
+| **`OrderDetailPage.tsx`** | Integrated `SellerGPSTracker` in the seller action area, gated by `delivery_handled_by === 'seller'` + transit statuses |
 
-### GAP 5: No seller notification when buyer confirms delivery
-**Severity: MEDIUM**
+#### 3B. Buyer Live Map
 
-**Issue:** When the buyer taps "Yes, I received my order" (`BuyerDeliveryConfirmation`), it updates the order to `completed`. The `fn_enqueue_order_status_notification` trigger sends a notification to the buyer (line 250: `INSERT INTO notification_queue (user_id...` uses `NEW.buyer_id`). But no notification goes to the seller about the completion.
+| Component | What Was Done |
+|-----------|---------------|
+| **`DeliveryMapView.tsx`** | New component using Leaflet + OpenStreetMap (no API key). Shows rider position (🛵 marker) and destination (📍 marker). Auto-fits bounds on mount, pans when rider moves out of view. |
+| **`OrderDetailPage.tsx`** | Integrated `DeliveryMapView` above `LiveDeliveryTracker` for buyer view when rider has GPS data and order has delivery coordinates (`delivery_lat`/`delivery_lng`). Falls back to text-only tracker when no GPS data available. |
 
-Looking at line 250: the trigger only inserts for `buyer_id`. There's no seller notification path for `completed` status in this trigger.
+### Previously Completed Blinkit Gaps
 
-**Fix:** Add a seller notification insert in the trigger for `completed` status, or handle it client-side in `BuyerDeliveryConfirmation` by invoking `process-notification-queue`.
+| Feature | Status |
+|---------|--------|
+| Push deep-link routing | ✅ Done |
+| Notification grouping (threadId) | ✅ Done |
+| Rich push images (NSE) | ✅ Done |
+| Dynamic Island tap → order page | ✅ Done |
+| Item count in DI | ✅ Done |
+| GPS-derived progress | ✅ Done |
 
----
+### Phase 4: Live Map / Rider GPS — DEFERRED
 
-### GAP 6: `DeliveryETABanner` and Live Activity show different ETA sources
-**Severity: MEDIUM**
+Requires dedicated rider-side GPS broadcasting infrastructure (separate product workstream). Seller self-delivery GPS (Phase 3A) covers the immediate need.
 
-**Issue:** `DeliveryETABanner` uses `estimated_delivery_at` (set once at acceptance, static). `LiveDeliveryTracker` uses `delivery_assignments.eta_minutes` (updated with each GPS ping, dynamic). The buyer sees two different time estimates simultaneously — the banner might say "12 min" while the tracker says "ETA: 5 min".
+### Product Thumbnails in Widget — DEFERRED
 
-**Fix:** When `deliveryAssignmentId` exists and `deliveryTracking.eta` is available (GPS-derived), hide the `DeliveryETABanner` or update it to use the dynamic ETA instead.
+Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
 
----
+## Silent Push Optimization: COMPLETE
 
-### GAP 7: `SellerGPSTracker` renders for `fulfillmentType === 'delivery'` but `FulfillmentSelector` sets `seller_delivery`
-**Severity: MEDIUM**
+### Notification Matrix
 
-**Issue:** `OrderDetailPage.tsx` line 232 checks `o.orderFulfillmentType === 'delivery'`. But looking at `useOrderDetail.ts` line 74: `const orderFulfillmentType = (order as any)?.fulfillment_type || 'self_pickup'`. The actual `fulfillment_type` stored on the order depends on the `create_multi_vendor_orders` function. For sellers with `fulfillment_mode = 'seller_delivery'`, the order's `fulfillment_type` might be `'delivery'` or `'seller_delivery'` depending on the code path.
+| Status | Push? | Live Activity? | Rationale |
+|--------|-------|----------------|-----------|
+| `accepted` | ✅ Always | Yes | Critical — order confirmed |
+| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
+| `ready` | ✅ Always | Yes | Pickup moment — user must know |
+| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
+| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
+| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
+| `delivered` | ✅ Always | Yes | Critical endpoint |
+| `completed` | ✅ Always | No | Critical endpoint |
+| `cancelled` | ✅ Always | No | Critical — must alert |
+| All service/booking | ✅ Always | No | No Live Activity for these |
 
-If it's stored as `'seller_delivery'`, the condition `o.orderFulfillmentType === 'delivery'` fails, and SellerGPSTracker never renders. Same for all delivery UI checks throughout OrderDetailPage.
+## Implementation Matrix
 
-**Fix:** All `fulfillmentType === 'delivery'` checks should also include `'seller_delivery'`:
-```typescript
-const isDeliveryOrder = ['delivery', 'seller_delivery'].includes(o.orderFulfillmentType);
-```
-
----
-
-## Summary
-
-| # | Gap | Severity | Root Cause |
-|---|-----|----------|------------|
-| 1 | `isInTransit` always false for seller delivery | **CRITICAL** | Checks `actor === 'delivery'`, but seller_delivery uses `actor = 'seller'` |
-| 2 | Missing `on_the_way` buyer toast | HIGH | Omitted from STATUS_MESSAGES map |
-| 3 | `delivery_assignments.status` never syncs | HIGH | No trigger syncs order status → assignment status for seller delivery |
-| 4 | No delivery address shown before pickup | MEDIUM | Missing confirmation UI |
-| 5 | No seller notification on buyer confirm | MEDIUM | Trigger only notifies buyer_id |
-| 6 | Dual conflicting ETA sources | MEDIUM | Static vs dynamic ETA shown simultaneously |
-| 7 | `fulfillmentType` check may miss `seller_delivery` | MEDIUM | Hardcoded `=== 'delivery'` checks |
-
-## Implementation Plan
-
-### Step 1: Fix `isInTransit` (Gap 1) — CRITICAL
-- **File:** `src/hooks/useOrderDetail.ts` line 211-216
-- Change to status-key based check: `['picked_up', 'on_the_way', 'at_gate'].includes(order.status)`
-
-### Step 2: Normalize delivery type checks (Gap 7)
-- **File:** `src/pages/OrderDetailPage.tsx`
-- Extract `const isDeliveryOrder = ['delivery', 'seller_delivery'].includes(o.orderFulfillmentType)`
-- Replace all `o.orderFulfillmentType === 'delivery'` with `isDeliveryOrder`
-
-### Step 3: Add missing buyer toast (Gap 2)
-- **File:** `src/hooks/useBuyerOrderAlerts.ts`
-- Add `on_the_way` to `STATUS_MESSAGES`
-
-### Step 4: Sync assignment status (Gap 3)
-- **Database migration:** Create trigger to update `delivery_assignments.status` when order status changes to `on_the_way` or `delivered`
-
-### Step 5: Fix dual ETA (Gap 6)
-- **File:** `src/pages/OrderDetailPage.tsx`
-- Hide `DeliveryETABanner` when `deliveryTracking.eta` is available (GPS-derived ETA takes precedence)
-
-### Step 6: Seller notification on completion (Gap 5)
-- **Database migration:** Extend `fn_enqueue_order_status_notification` to also notify seller on `completed` status
-
-### Step 7: Pickup confirmation sheet (Gap 4) — deferred
-- Requires new UI component and product design decision
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+| BG-1 | APNs Push-to-Live-Activity | Implemented |
+| BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
+| BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |
+| BG-4 | Buyer Delivery Confirmation (Gap 8) | Implemented |
+| BG-5 | ETA at Acceptance Time (Gap 11) | Implemented |

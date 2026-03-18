@@ -208,12 +208,11 @@ export function useOrderDetail(id: string | undefined) {
     return (step as any)?.seller_hint || null;
   };
 
-  // Derive isInTransit from flow metadata (delivery actor steps)
+  // Derive isInTransit from status key — works for both cart_purchase (actor=delivery) and seller_delivery (actor=seller)
   const isInTransit = useMemo(() => {
     if (!order) return false;
-    const step = flow.find(s => s.status_key === order.status);
-    return step?.actor === 'delivery' && !step?.is_terminal;
-  }, [order?.status, flow]);
+    return ['picked_up', 'on_the_way', 'at_gate'].includes(order.status);
+  }, [order?.status]);
 
   return {
     order, setOrder, isLoading, isUpdating, hasReview, setHasReview,

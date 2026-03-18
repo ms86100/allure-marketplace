@@ -44,13 +44,14 @@ export default function OrderDetailPage() {
   const order = o.order;
   const orderId = order?.id;
   const fulfillmentType = o.orderFulfillmentType;
+  const isDeliveryOrder = ['delivery', 'seller_delivery'].includes(fulfillmentType);
 
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
 
   // Live Activity is now handled globally by useLiveActivityOrchestrator
 
   useEffect(() => {
-    if (fulfillmentType === 'delivery' && orderId) {
+    if (isDeliveryOrder && orderId) {
       const fetchAssignment = () => {
         supabase
           .from('delivery_assignments')
@@ -78,7 +79,7 @@ export default function OrderDetailPage() {
 
       return () => { supabase.removeChannel(channel); };
     }
-  }, [orderId, fulfillmentType]);
+  }, [orderId, isDeliveryOrder]);
 
   if (o.isLoading) return <AppLayout showHeader={false}><div className="p-4 space-y-3"><Skeleton className="h-8 w-32" /><Skeleton className="h-28 w-full rounded-xl" /><Skeleton className="h-40 w-full rounded-xl" /></div></AppLayout>;
   if (!order) return <AppLayout showHeader={false}><div className="p-4 text-center py-16"><p className="text-sm text-muted-foreground">Order not found</p><Link to="/orders"><Button size="sm" className="mt-4">View Orders</Button></Link></div></AppLayout>;
@@ -197,12 +198,12 @@ export default function OrderDetailPage() {
           )}
 
           {/* Gap 11: ETA banner for buyer — shown from acceptance until delivery */}
-          {o.isBuyerView && o.orderFulfillmentType === 'delivery' && (order as any).estimated_delivery_at && !['delivered', 'completed', 'cancelled'].includes(order.status) && (
+          {o.isBuyerView && isDeliveryOrder && (order as any).estimated_delivery_at && !['delivered', 'completed', 'cancelled'].includes(order.status) && !(deliveryAssignmentId && deliveryTracking.eta) && (
             <DeliveryETABanner estimatedDeliveryAt={(order as any).estimated_delivery_at} />
           )}
 
           {/* Gap 8: Buyer delivery confirmation — shown when seller marks delivered */}
-          {o.isBuyerView && order.status === 'delivered' && o.orderFulfillmentType === 'delivery' && (
+          {o.isBuyerView && order.status === 'delivered' && isDeliveryOrder && (
             <BuyerDeliveryConfirmation
               orderId={order.id}
               sellerName={seller?.business_name}
@@ -211,7 +212,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Live Delivery Tracking or Static Card */}
-          {o.orderFulfillmentType === 'delivery' && isInTransit && deliveryAssignmentId && (
+          {isDeliveryOrder && isInTransit && deliveryAssignmentId && (
             <>
               {/* Buyer map view — show when rider has GPS data (lazy-loaded) */}
               {o.isBuyerView && deliveryTracking.riderLocation && (order as any).delivery_lat && (order as any).delivery_lng && (
@@ -229,10 +230,10 @@ export default function OrderDetailPage() {
             </>
           )}
           {/* Seller self-delivery GPS broadcasting */}
-          {o.orderFulfillmentType === 'delivery' && o.isSellerView && (order as any).delivery_handled_by === 'seller' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
+          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by === 'seller' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
             <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart />
           )}
-          {o.orderFulfillmentType === 'delivery' && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}
+          {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}
 
           {o.canReorder && (
             <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 flex items-center justify-between">
