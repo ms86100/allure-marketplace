@@ -127,9 +127,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     let availability = computeStoreStatus(inlineAvailability.availabilityStart, inlineAvailability.availabilityEnd, inlineAvailability.operatingDays, inlineAvailability.isAvailable);
 
     if (!inlineAvailability.hasInlineAvailability) {
-      if (!product.seller_id) { toast.error('Unable to verify store availability right now. Please try again.'); return; }
+      if (!product.seller_id) { toast.error('Unable to verify store availability right now. Please try again.', { id: 'cart-availability' }); return; }
       const { data: sellerSnapshot, error: sellerError } = await supabase.from('seller_profiles').select('availability_start, availability_end, operating_days, is_available').eq('id', product.seller_id).maybeSingle();
-      if (sellerError || !sellerSnapshot) { toast.error('Unable to verify store availability right now. Please try again.'); return; }
+      if (sellerError || !sellerSnapshot) { toast.error('Unable to verify store availability right now. Please try again.', { id: 'cart-availability' }); return; }
       availability = computeStoreStatus(sellerSnapshot.availability_start, sellerSnapshot.availability_end, sellerSnapshot.operating_days, sellerSnapshot.is_available ?? true);
     }
 
