@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCommunitySearchSuggestions } from '@/hooks/queries/useCommunitySearchSuggestions';
 import { TrendingUp, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 export function HomeSearchSuggestions() {
   const navigate = useNavigate();
