@@ -55,7 +55,7 @@ export default function OrderDetailPage() {
 
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
 
-  // Live Activity is now handled globally by useLiveActivityOrchestrator
+  // Gap A: Fetch delivery OTP for buyer display
 
   useEffect(() => {
     if (isDeliveryOrder && orderId) {
