@@ -1070,6 +1070,25 @@ workflows:
           cp ../../native/ios/LiveDeliveryWidget.swift LiveDeliveryWidgetExtension/
           cp ../../native/ios/LiveDeliveryActivity.swift LiveDeliveryWidgetExtension/
 
+          # Create widget Assets.xcassets with Sociva icon
+          mkdir -p LiveDeliveryWidgetExtension/Assets.xcassets/SocivaIcon.imageset
+          sips -z 80 80 ../../public/app-icon-1024x1024.png --out LiveDeliveryWidgetExtension/Assets.xcassets/SocivaIcon.imageset/SocivaIcon@2x.png
+          sips -z 120 120 ../../public/app-icon-1024x1024.png --out LiveDeliveryWidgetExtension/Assets.xcassets/SocivaIcon.imageset/SocivaIcon@3x.png
+
+          cat > LiveDeliveryWidgetExtension/Assets.xcassets/Contents.json << 'ASSETJSON'
+          {"info":{"version":1,"author":"xcode"}}
+          ASSETJSON
+
+          cat > LiveDeliveryWidgetExtension/Assets.xcassets/SocivaIcon.imageset/Contents.json << 'ASSETJSON'
+          {
+            "images": [
+              {"idiom":"universal","scale":"2x","filename":"SocivaIcon@2x.png"},
+              {"idiom":"universal","scale":"3x","filename":"SocivaIcon@3x.png"}
+            ],
+            "info":{"version":1,"author":"xcode"}
+          }
+          ASSETJSON
+
           cat > LiveDeliveryWidgetExtension/Info.plist << 'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

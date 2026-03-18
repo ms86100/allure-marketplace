@@ -60,9 +60,15 @@ struct LiveDeliveryWidget: Widget {
             DynamicIsland {
                 // ── Expanded Regions ────────────────────────
                 DynamicIslandExpandedRegion(.leading) {
-                    Label(context.state.driverName ?? "Driver",
-                          systemImage: "person.fill")
-                        .font(.caption)
+                    HStack(spacing: 4) {
+                        Image("SocivaIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 24, height: 24)
+                            .clipShape(Circle())
+                        Text(context.state.driverName ?? "Sociva")
+                            .font(.caption)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     if let eta = context.state.etaMinutes {
