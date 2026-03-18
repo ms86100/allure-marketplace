@@ -1,154 +1,144 @@
 
 
-# Hard Evidence QA Audit — Bug Fix Verification
+# Deep QA Audit — Round 6
 
-## BUG 1: SellerGPSTracker NULL handling
-**Status: FIXED**
-
-**Code Evidence:**
-- File: `src/pages/OrderDetailPage.tsx` line 233
-- BEFORE: `(order as any).delivery_handled_by === 'seller'`
-- AFTER: `(order as any).delivery_handled_by !== 'platform'`
-
-**Logic Validation:**
-- `NULL !== 'platform'` → `true` — GPS tracker renders
-- `'seller' !== 'platform'` → `true` — GPS tracker renders
-- `'platform' !== 'platform'` → `false` — correctly excluded
-
-**Runtime Proof:**
-- Input: `delivery_handled_by = NULL`, `status = 'picked_up'`, seller viewing, `deliveryAssignmentId` exists
-- Result: All conditions on line 233 pass → `SellerGPSTracker` renders with `autoStart`
-
-**Failure Simulation:** NULL no longer matches a strict equality, so the previous failure path is eliminated.
-
-**Regression Check:** No new issue. The `isDeliveryOrder` guard (line 233) still prevents rendering for pickup orders.
+After thorough codebase inspection, I identified the following new bugs and issues that are distinct from the Round 5 fixes.
 
 ---
 
-## BUG 2: Delivery fee mislabel
-**Status: FIXED**
+## BUG 1: `useBuyerOrderAlerts` suppresses toasts when `oldStatus === undefined` — blocks all alerts on REPLICA IDENTITY DEFAULT
+**Severity: HIGH — buyer never sees in-app toast notifications for order status changes**
 
-**Code Evidence:**
-- File: `src/pages/OrderDetailPage.tsx` line 301
-- BEFORE: `o.orderFulfillmentType === 'delivery'`
-- AFTER: `isDeliveryOrder` (defined line 47 as `['delivery', 'seller_delivery'].includes(fulfillmentType)`)
+File: `src/hooks/useBuyerOrderAlerts.ts` line 51:
+```typescript
+if (!newStatus || oldStatus === undefined || newStatus === oldStatus) return;
+```
 
-**Runtime Proof:**
-- Input: `fulfillment_type = 'seller_delivery'`, `delivery_fee = 0`
-- Result: Shows "FREE" delivery label, NOT "Self Pickup"
+The `orders` table uses REPLICA IDENTITY DEFAULT. This means `payload.old` only contains the primary key (`id`), NOT the `status` column. So `(payload.old as any)?.status` is always `undefined`. The guard `oldStatus === undefined` therefore returns early on EVERY update, silencing all buyer toasts.
 
----
+The comment on line 50 says "If old status is undefined (REPLICA IDENTITY not FULL), skip to avoid spam toasts" — but this logic prevents ALL toasts, not just spam.
 
-## BUG 3: Delivery badge missing for seller_delivery
-**Status: FIXED**
+**Fix:** Remove the `oldStatus === undefined` guard. Instead, deduplicate via the toast ID (`order-${orderId}-${newStatus}`) which already prevents duplicates. The `newStatus === oldStatus` check is unreachable due to the undefined guard, so also remove it since it can't work without FULL replica identity anyway.
 
-**Code Evidence:**
-- `SellerOrderCard.tsx` line 80: `['delivery', 'seller_delivery'].includes(order.fulfillment_type)` — VERIFIED
-- `OrdersPage.tsx` line 55: `['delivery', 'seller_delivery'].includes((order as any).fulfillment_type)` — VERIFIED
+Change line 51 to:
+```typescript
+if (!newStatus) return;
+```
 
-**Runtime Proof:** Both components now show the Truck/Delivery badge for `seller_delivery` orders.
-
----
-
-## BUG 4: Stale detection missing `on_the_way`
-**Status: FIXED**
-
-**Code Evidence:**
-- File: `supabase/functions/update-delivery-location/index.ts` line 282
-- BEFORE: `['picked_up', 'at_gate'].includes(assignment.status)`
-- AFTER: `['picked_up', 'at_gate', 'on_the_way'].includes(assignment.status)`
-
-**Runtime Proof:**
-- Input: `assignment.status = 'on_the_way'`, GPS stalls for 3+ minutes
-- Result: Stale notification fires correctly
+This is safe because:
+- Toast dedup via `id: \`order-${orderId}-${newStatus}\`` prevents repeated toasts for the same status
+- The `placed` status is already filtered on line 54
+- The cart page suppression on line 57 prevents checkout noise
 
 ---
 
-## BUG 5: Assignment sync trigger NULL bug
-**Status: FIXED**
+## BUG 2: `DeliveryStatusCard` realtime uses `event: '*'` but payload.new may not have all fields for DELETE events
+**Severity: LOW — minor, but DELETE events will set assignment to `{}`**
 
-**Code Evidence:**
-- File: `supabase/migrations/20260318113922_...sql` line 14
-- BEFORE: `COALESCE(NEW.delivery_handled_by, '') != 'seller'`
-- AFTER: `COALESCE(NEW.delivery_handled_by, 'seller') = 'platform'`
+File: `src/components/delivery/DeliveryStatusCard.tsx` line 46-53:
+```typescript
+.on('postgres_changes', { event: '*', ... }, (payload) => {
+  if (payload.new) {
+    setAssignment(payload.new as DeliveryAssignment);
+  }
+})
+```
 
-**Logic Validation:**
-- `NULL` → `COALESCE(NULL, 'seller')` = `'seller'` → `'seller' = 'platform'` = FALSE → trigger proceeds (correct)
-- `'seller'` → `'seller' = 'platform'` = FALSE → trigger proceeds (correct)
-- `'platform'` → `'platform' = 'platform'` = TRUE → returns early (correct, platform has its own sync)
+On DELETE events, `payload.new` is `{}` (empty object), which is truthy. This would set assignment to an empty object, breaking the UI. Not likely in practice (assignments rarely deleted), but it's a code smell.
 
-**Runtime Proof:**
-- Input: Order with `delivery_handled_by = NULL` transitions from `picked_up` → `on_the_way`
-- Result: `delivery_assignments.status` updated to `on_the_way`
-
----
-
-## BUG 6: Realtime status undefined overwrite
-**Status: FIXED**
-
-**Code Evidence:**
-- File: `src/hooks/useDeliveryTracking.ts` line 103
-- BEFORE: `status: d.status`
-- AFTER: `status: d.status ?? prev.status`
-
-**Logic Validation:** With REPLICA IDENTITY DEFAULT, a partial update (e.g., only `last_location_at` changes) sends `d.status = undefined`. The `??` operator preserves the previous status value.
+**Fix:** Change `event: '*'` to `event: 'UPDATE'` since we only care about status changes, or add a guard `if (payload.new?.id)`.
 
 ---
 
-## BUG 7: `isInTransit` logic
-**Status: FIXED** (from Round 4)
+## BUG 3: `DeliveryStatusCard` missing `on_the_way` in DELIVERY_STATUS_CONFIG
+**Severity: MEDIUM — `on_the_way` status shows fallback "Assigning Rider" badge**
 
-**Code Evidence:**
-- File: `src/hooks/useOrderDetail.ts` lines 212-215
-- BEFORE: `step?.actor === 'delivery' && !step?.is_terminal`
-- AFTER: `['picked_up', 'on_the_way', 'at_gate'].includes(order.status)`
+File: `src/components/delivery/DeliveryStatusCard.tsx` line 24-32:
+```typescript
+const DELIVERY_STATUS_CONFIG = {
+  pending, assigned, picked_up, at_gate, delivered, failed, cancelled
+};
+```
 
-**Logic Validation:** Status-key check works regardless of `actor` field. Both `cart_purchase` (actor=delivery) and `seller_delivery` (actor=seller) flows use the same status keys.
+The `on_the_way` status is missing. When an assignment reaches `on_the_way` (set by `sync_order_to_delivery_assignment`), the config falls back to `DELIVERY_STATUS_CONFIG.pending` (line 89: `|| DELIVERY_STATUS_CONFIG.pending`), showing "Assigning Rider" — completely wrong.
 
----
+Also, the `deliverySteps` array on line 92 (`['pending', 'assigned', 'picked_up', 'at_gate', 'delivered']`) is missing `on_the_way`, so the progress dots skip it.
 
-## BUG 8: `on_the_way` buyer toast
-**Status: FIXED** (from Round 4)
-
-**Code Evidence:**
-- File: `src/hooks/useBuyerOrderAlerts.ts` line 19
-- `on_the_way: { icon: '🛵', title: 'On The Way!', description: 'Your order is on the way to you.', haptic: 'success' }`
+**Fix:** Add `on_the_way: { label: 'On The Way', color: 'bg-primary/15 text-primary', icon: Truck }` to the config map, and add `'on_the_way'` to the `deliverySteps` array between `picked_up` and `at_gate`.
 
 ---
 
-## Full Delivery Flow Validation
+## BUG 4: `useDeliveryTracking` — `eta` and `distance` can be silently reset to `null` on realtime updates
+**Severity: MEDIUM — ETA/distance flicker to null on partial updates**
 
-| Step | Expected | Code Proof |
-|------|----------|------------|
-| 1. Order placed | Order created with `fulfillment_type` | N/A (order creation) |
-| 2. Seller accepts | Status → `accepted` | Status flow engine |
-| 3. Seller marks `picked_up` | `trg_create_seller_delivery_assignment` creates assignment | Migration verified in prior round |
-| 4. GPS starts | `SellerGPSTracker` renders (line 233: `!== 'platform'` + `['picked_up', 'on_the_way']`) | VERIFIED |
-| 5. Buyer sees tracking | `isInTransit` = true (line 214), map + LiveDeliveryTracker render (line 213-229) | VERIFIED |
-| 6. Status syncs | `sync_order_to_delivery_assignment` fires for `on_the_way`, `delivered` | VERIFIED (migration line 19) |
-| 7. Buyer toast | `on_the_way` in STATUS_MESSAGES | VERIFIED (line 19) |
-| 8. Stale detection | `on_the_way` included in check | VERIFIED (edge fn line 282) |
+File: `src/hooks/useDeliveryTracking.ts` lines 107-108:
+```typescript
+eta: d.eta_minutes ?? prev.eta,
+distance: d.distance_meters ?? prev.distance,
+```
+
+The `??` operator only guards against `null`/`undefined`. But the edge function explicitly sets `distance_meters` in every update (line 237 of edge function), and sets `eta_minutes` only when `!skipEtaUpdate`. When `skipEtaUpdate` is true (accuracy > 100m), `eta_minutes` is NOT included in the update payload.
+
+With REPLICA IDENTITY DEFAULT, `d.eta_minutes` will be `undefined` for those partial updates, so `??` correctly falls back. This is actually OK.
+
+However, when `eta_minutes` IS included and is legitimately `null` (e.g., no destination coordinates), `d.eta_minutes ?? prev.eta` would keep the stale previous ETA instead of showing null. This is a minor data staleness issue but not critical.
+
+**Status:** Minor — no fix needed for production readiness.
 
 ---
 
-## Bug Status Summary
+## BUG 5: `SellerGPSTracker` auto-start has stale closure for `isTracking`
+**Severity: LOW — double-start possible in rare timing conditions**
 
-| Bug | Status | Proof |
-|-----|--------|-------|
-| 1. GPS tracker NULL handling | **FIXED** | `!== 'platform'` handles NULL correctly |
-| 2. Delivery fee mislabel | **FIXED** | Uses `isDeliveryOrder` variable |
-| 3. Delivery badge missing | **FIXED** | Array includes `seller_delivery` |
-| 4. Stale detection `on_the_way` | **FIXED** | Added to status array |
-| 5. Assignment sync NULL bug | **FIXED** | COALESCE pattern matches codebase convention |
-| 6. Realtime status undefined | **FIXED** | Nullish coalescing operator applied |
-| 7. `isInTransit` logic | **FIXED** | Status-key membership check |
-| 8. `on_the_way` buyer toast | **FIXED** | Entry added to STATUS_MESSAGES |
+File: `src/components/delivery/SellerGPSTracker.tsx` line 18-21:
+```typescript
+useEffect(() => {
+  if (autoStart && !isTracking && !permissionDenied) {
+    startTracking();
+  }
+}, [autoStart]); // Only on mount — intentionally not tracking `isTracking`
+```
 
-## Production Readiness Verdict: **READY**
+The dependency array intentionally excludes `isTracking` and `startTracking`. The `startTracking` callback depends on `state.isTracking` (line 58 of `useBackgroundLocationTracking.ts`), which has its own guard. So double-start is prevented at the hook level. This is fine.
 
-All 8 identified bugs have verifiable code fixes with correct logic for NULL, undefined, and edge case handling. No regressions detected. The seller-delivery tracking pipeline is end-to-end consistent across DB triggers, edge functions, realtime subscriptions, and UI rendering.
+**Status:** No fix needed.
 
-### Remaining Risks (non-blocking)
-1. **Gap 4 (deferred):** No pickup confirmation sheet showing buyer address before seller starts delivery — UX improvement, not a bug.
-2. **REPLICA IDENTITY DEFAULT** on `delivery_assignments` means realtime payloads are partial — mitigated by `??` fallbacks but FULL identity would be more robust.
+---
+
+## BUG 6: `liveActivitySync` ACTIVE_STATUSES missing `'placed'` — Live Activity won't start on order placement
+**Severity: LOW — by design, Live Activities start from `accepted` onwards**
+
+The `ACTIVE_STATUSES` array in `liveActivitySync.ts` starts at `'accepted'`. The `placed` status is intentionally excluded because the order hasn't been confirmed yet. This is correct behavior.
+
+**Status:** No fix needed.
+
+---
+
+## Summary
+
+| # | Bug | Severity | Fix Required |
+|---|-----|----------|-------------|
+| 1 | Buyer toast notifications blocked by undefined guard | **HIGH** | Yes |
+| 2 | DeliveryStatusCard DELETE event handling | LOW | Yes (minor) |
+| 3 | `on_the_way` missing from DeliveryStatusCard config | **MEDIUM** | Yes |
+| 4 | ETA null staleness | Minor | No |
+| 5 | SellerGPSTracker stale closure | Low | No |
+| 6 | ACTIVE_STATUSES design | N/A | No |
+
+---
+
+## Implementation Plan
+
+### Frontend Fixes (3 files)
+
+**1. `src/hooks/useBuyerOrderAlerts.ts` (Bug 1)**
+- Line 51: Remove `oldStatus === undefined ||` and `newStatus === oldStatus` checks
+- Change to: `if (!newStatus) return;`
+
+**2. `src/components/delivery/DeliveryStatusCard.tsx` (Bugs 2 & 3)**
+- Add `on_the_way` to `DELIVERY_STATUS_CONFIG` map
+- Add `'on_the_way'` to `deliverySteps` array between `picked_up` and `at_gate`
+- Change realtime event from `'*'` to `'UPDATE'` (or add `payload.new?.id` guard)
+
+No database changes or edge function changes needed.
 
