@@ -89,6 +89,8 @@ export async function runLiveActivityDiagnostics(dryRun = true): Promise<Diagnos
         driver_name: null,
         vehicle_type: null,
         progress_stage: 'preparing',
+        progress_percent: 0.4,
+        seller_name: null,
       };
       const { activityId } = await LiveActivity.startLiveActivity(testData);
       result.checks.startTestResult = 'success';

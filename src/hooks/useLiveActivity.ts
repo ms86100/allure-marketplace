@@ -46,6 +46,8 @@ export function useLiveActivity(opts: UseLiveActivityOptions): void {
       driver_name: driverName,
       vehicle_type: vehicleType,
       progress_stage: progressStage,
+      progress_percent: null,
+      seller_name: null,
     };
 
     LiveActivityManager.push(data);

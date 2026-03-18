@@ -12,7 +12,7 @@ import ActivityKit
 import Foundation
 
 struct LiveDeliveryAttributes: ActivityAttributes {
-    /// Static context that does not change during the activity
+    /// Dynamic context that updates during the activity
     struct ContentState: Codable, Hashable {
         var workflowStatus: String
         var etaMinutes: Int?
@@ -20,6 +20,8 @@ struct LiveDeliveryAttributes: ActivityAttributes {
         var driverName: String?
         var vehicleType: String?
         var progressStage: String?
+        var progressPercent: Double?
+        var sellerName: String?
     }
 
     /// Fixed data set at start

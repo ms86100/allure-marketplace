@@ -83,21 +83,34 @@ export function useLiveActivityOrchestrator(): void {
             return;
           }
 
-          // Fetch delivery data if available
+          // Fetch delivery data and seller name
           let delivery: any = null;
+          let sellerName: string | null = null;
           try {
-            const { data } = await supabase
-              .from('delivery_assignments')
-              .select('eta_minutes, distance_meters, rider_name')
-              .eq('order_id', orderId)
-              .not('status', 'in', '("cancelled","failed")')
-              .maybeSingle();
-            delivery = data;
+            const sellerId = (payload.new as any)?.seller_id;
+            const [deliveryRes, sellerRes] = await Promise.all([
+              supabase
+                .from('delivery_assignments')
+                .select('eta_minutes, distance_meters, rider_name')
+                .eq('order_id', orderId)
+                .not('status', 'in', '("cancelled","failed")')
+                .maybeSingle(),
+              sellerId
+                ? supabase
+                    .from('seller_profiles')
+                    .select('business_name')
+                    .eq('id', sellerId)
+                    .maybeSingle()
+                : Promise.resolve({ data: null }),
+            ]);
+            delivery = deliveryRes.data;
+            sellerName = (sellerRes.data as any)?.business_name ?? null;
           } catch { /* best-effort */ }
 
           const activityData = buildLiveActivityData(
             { id: orderId, status: newStatus },
             delivery,
+            sellerName,
           );
           await LiveActivityManager.push(activityData);
         },
@@ -125,14 +138,28 @@ export function useLiveActivityOrchestrator(): void {
       if (!row?.order_id) return;
 
       try {
-        const { data: order } = await supabase
-          .from('orders')
-          .select('id, status, buyer_id')
-          .eq('id', row.order_id)
-          .eq('buyer_id', userId)
-          .maybeSingle();
+        const [orderRes, sellerRes] = await Promise.all([
+          supabase
+            .from('orders')
+            .select('id, status, buyer_id, seller_id')
+            .eq('id', row.order_id)
+            .eq('buyer_id', userId)
+            .maybeSingle(),
+          Promise.resolve(null), // placeholder, resolved below
+        ]);
 
+        const order = orderRes.data;
         if (!order) return;
+
+        let sellerName: string | null = null;
+        if (order.seller_id) {
+          const { data: seller } = await supabase
+            .from('seller_profiles')
+            .select('business_name')
+            .eq('id', order.seller_id)
+            .maybeSingle();
+          sellerName = seller?.business_name ?? null;
+        }
 
         console.log(TAG, `Delivery ${payload.eventType} for order ${order.id}: eta=${row.eta_minutes}, distance=${row.distance_meters}`);
 
@@ -141,7 +168,7 @@ export function useLiveActivityOrchestrator(): void {
           distance_meters: row?.distance_meters,
           rider_name: row?.rider_name,
           vehicle_type: null,
-        });
+        }, sellerName);
         await LiveActivityManager.push(data);
       } catch { /* best-effort */ }
     };
