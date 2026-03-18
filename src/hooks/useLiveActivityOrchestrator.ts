@@ -121,7 +121,7 @@ export function useLiveActivityOrchestrator(): void {
         ]);
         delivery = deliveryRes.data;
         sellerName = (sellerRes.data as any)?.business_name ?? null;
-        sellerLogoUrl = (sellerRes.data as any)?.logo_url ?? null;
+        sellerLogoUrl = (sellerRes.data as any)?.profile_image_url ?? null;
         itemCount = itemCountRes.count ?? null;
       } catch { /* best-effort */ }
 
