@@ -172,6 +172,52 @@ workflows:
           }
           SWIFT
 
+          # Create custom CAPBridgeViewController subclass to register app-local plugins
+          BRIDGEVC="ios/App/App/SocivaBridgeViewController.swift"
+          cat > "$BRIDGEVC" << 'SWIFT'
+          import UIKit
+          import Capacitor
+
+          /// Custom bridge view controller that registers app-local plugins
+          /// not discoverable via CocoaPods/SPM metadata (Capacitor 6+ requirement).
+          class SocivaBridgeViewController: CAPBridgeViewController {
+              override open func capacitorDidLoad() {
+                  bridge?.registerPluginInstance(LiveActivityPlugin())
+                  print("✅ SocivaBridgeViewController: LiveActivityPlugin registered with bridge")
+              }
+          }
+          SWIFT
+
+          # Add the bridge VC file to the App target
+          cd ios/App
+          ruby - << 'RUBY'
+          require 'xcodeproj'
+          project = Xcodeproj::Project.open('App.xcodeproj')
+          target = project.targets.find { |t| t.name == 'App' }
+          abort('App target not found') unless target
+          group = project.main_group.find_subpath('App', true)
+
+          filename = 'SocivaBridgeViewController.swift'
+          ref = group.files.find { |f| f.path == filename } || group.new_file(filename)
+          unless target.source_build_phase.files_references.any? { |f| f.path == filename }
+            target.source_build_phase.add_file_reference(ref, true)
+          end
+
+          project.save
+          puts "=== SocivaBridgeViewController.swift added to App target ==="
+          RUBY
+
+          # Patch Main.storyboard to use SocivaBridgeViewController instead of CAPBridgeViewController
+          STORYBOARD="ios/App/App/Base.lproj/Main.storyboard"
+          if [ -f "$STORYBOARD" ]; then
+            sed -i '' 's/customClass="CAPBridgeViewController"/customClass="SocivaBridgeViewController"/g' "$STORYBOARD"
+            echo "=== Main.storyboard patched to use SocivaBridgeViewController ==="
+          else
+            echo "⚠️ Main.storyboard not found at $STORYBOARD — checking alternate paths"
+            find ios/App -name "Main.storyboard" -exec sed -i '' 's/customClass="CAPBridgeViewController"/customClass="SocivaBridgeViewController"/g' {} \;
+            echo "=== Patched all found Main.storyboard files ==="
+          fi
+
       - name: Add Push Notification & Live Activity Entitlements
         script: |
           cd ios/App
