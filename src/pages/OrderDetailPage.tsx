@@ -12,7 +12,6 @@ import { DeliveryStatusCard } from '@/components/delivery/DeliveryStatusCard';
 import { LiveDeliveryTracker } from '@/components/delivery/LiveDeliveryTracker';
 import { DeliveryArrivalOverlay } from '@/components/order/DeliveryArrivalOverlay';
 import { SellerGPSTracker } from '@/components/delivery/SellerGPSTracker';
-import { DeliveryMapView } from '@/components/delivery/DeliveryMapView';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
 
 import { OrderItemCard } from '@/components/order/OrderItemCard';
@@ -27,8 +26,11 @@ import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCirc
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { getString, setString } from '@/lib/persistent-kv';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+
+// Gap 10: Lazy-load map to avoid bundling Leaflet for non-delivery orders
+const DeliveryMapView = lazy(() => import('@/components/delivery/DeliveryMapView').then(m => ({ default: m.DeliveryMapView })));
 
 export default function OrderDetailPage() {
   const { id } = useParams();
@@ -47,14 +49,32 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     if (fulfillmentType === 'delivery' && orderId) {
-      supabase
-        .from('delivery_assignments')
-        .select('id')
-        .eq('order_id', orderId)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data) setDeliveryAssignmentId(data.id);
-        });
+      const fetchAssignment = () => {
+        supabase
+          .from('delivery_assignments')
+          .select('id')
+          .eq('order_id', orderId)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data) setDeliveryAssignmentId(data.id);
+          });
+      };
+      fetchAssignment();
+
+      // Re-check when order status changes (assignment may be created on picked_up)
+      const channel = supabase
+        .channel(`assignment-watch-${orderId}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'delivery_assignments',
+          filter: `order_id=eq.${orderId}`,
+        }, (payload) => {
+          if (payload.new?.id) setDeliveryAssignmentId(payload.new.id as string);
+        })
+        .subscribe();
+
+      return () => { supabase.removeChannel(channel); };
     }
   }, [orderId, fulfillmentType]);
 
@@ -69,8 +89,10 @@ export default function OrderDetailPage() {
   const statusInfo = o.getOrderStatus(order.status);
   const paymentStatusInfo = o.getPaymentStatus((order.payment_status as PaymentStatus) || 'pending');
   const displayStatuses = o.displayStatuses;
-  // Use flow-derived isInTransit from useOrderDetail
   const isInTransit = o.isInTransit;
+
+  // Gap 9: Only show arrival overlay when we have actual GPS data and rider is close
+  const showArrivalOverlay = deliveryAssignmentId && deliveryTracking.riderLocation && deliveryTracking.distance != null && deliveryTracking.distance < 200;
 
   return (
     <AppLayout showHeader={false} showNav={(!o.isSellerView || isTerminalStatus(o.flow, order.status)) && !o.isChatOpen}>
@@ -175,22 +197,24 @@ export default function OrderDetailPage() {
           {/* Live Delivery Tracking or Static Card */}
           {o.orderFulfillmentType === 'delivery' && isInTransit && deliveryAssignmentId && (
             <>
-              {/* Buyer map view — show when rider has GPS data */}
+              {/* Buyer map view — show when rider has GPS data (lazy-loaded) */}
               {o.isBuyerView && deliveryTracking.riderLocation && (order as any).delivery_lat && (order as any).delivery_lng && (
-                <DeliveryMapView
-                  riderLat={deliveryTracking.riderLocation.latitude}
-                  riderLng={deliveryTracking.riderLocation.longitude}
-                  destinationLat={(order as any).delivery_lat}
-                  destinationLng={(order as any).delivery_lng}
-                  riderName={deliveryTracking.riderName}
-                />
+                <Suspense fallback={<Skeleton className="h-48 w-full rounded-xl" />}>
+                  <DeliveryMapView
+                    riderLat={deliveryTracking.riderLocation.latitude}
+                    riderLng={deliveryTracking.riderLocation.longitude}
+                    destinationLat={(order as any).delivery_lat}
+                    destinationLng={(order as any).delivery_lng}
+                    riderName={deliveryTracking.riderName}
+                  />
+                </Suspense>
               )}
               <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} />
             </>
           )}
           {/* Seller self-delivery GPS broadcasting */}
           {o.orderFulfillmentType === 'delivery' && o.isSellerView && (order as any).delivery_handled_by === 'seller' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
-            <SellerGPSTracker assignmentId={deliveryAssignmentId} />
+            <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart />
           )}
           {o.orderFulfillmentType === 'delivery' && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}
 
@@ -283,8 +307,8 @@ export default function OrderDetailPage() {
       <OrderRejectionDialog open={o.isRejectionDialogOpen} onOpenChange={o.setIsRejectionDialogOpen} onReject={o.handleReject} orderNumber={order.id} />
       {o.chatRecipientId && <OrderChat orderId={order.id} otherUserId={o.chatRecipientId} otherUserName={o.chatRecipientName || 'User'} isOpen={o.isChatOpen} onClose={() => { o.setIsChatOpen(false); o.fetchUnreadCount(); }} disabled={!o.canChat} />}
 
-      {/* DeliveryArrivalOverlay — imminent arrival full-screen alert */}
-      {deliveryAssignmentId && (
+      {/* DeliveryArrivalOverlay — only when rider GPS exists and is close (Gap 9) */}
+      {showArrivalOverlay && (
         <DeliveryArrivalOverlay
           distance={deliveryTracking.distance}
           eta={deliveryTracking.eta}

@@ -38,7 +38,6 @@ function calculateEta(distanceMeters: number, speedKmh: number | null, accuracyM
   const distKm = (distanceMeters * roadFactor) / 1000;
   let etaMin = Math.max(1, Math.round((distKm / effectiveSpeed) * 60));
 
-  // Phase E: Blend with historical average when GPS speed is unreliable
   if (historicalAvgMin != null && historicalAvgMin > 0 && speed < 2) {
     etaMin = Math.max(1, Math.round((etaMin + historicalAvgMin) / 2));
   }
@@ -46,7 +45,7 @@ function calculateEta(distanceMeters: number, speedKmh: number | null, accuracyM
   return { eta: etaMin, skipUpdate: false };
 }
 
-/** Phase G: Detect significant heading change (>90° reversal) */
+/** Detect significant heading change (>90° reversal) */
 function hasSignificantHeadingChange(prevHeading: number | null, currentHeading: number | null): boolean {
   if (prevHeading == null || currentHeading == null) return false;
   let diff = Math.abs(currentHeading - prevHeading);
@@ -60,7 +59,6 @@ serve(async (req) => {
   }
 
   try {
-    // Authenticate the caller via JWT
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -117,20 +115,47 @@ serve(async (req) => {
       });
     }
 
-    // Auth check: verify caller is the assigned rider
+    // ═══ AUTH CHECK: verify caller is the assigned rider OR the seller ═══
+    let isAuthorized = false;
+
+    // Check 1: Is caller the assigned rider from delivery_partner_pool?
     if (assignment.rider_id) {
       const { data: poolRider } = await supabase
         .from('delivery_partner_pool')
         .select('user_id')
         .eq('id', assignment.rider_id)
         .single();
-
-      if (!poolRider?.user_id || poolRider.user_id !== callerId) {
-        return new Response(JSON.stringify({ error: 'Forbidden: not assigned rider' }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      if (poolRider?.user_id === callerId) {
+        isAuthorized = true;
       }
+    }
+
+    // Check 2: Is caller the seller for this order? (seller self-delivery)
+    if (!isAuthorized) {
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('seller_id, delivery_handled_by')
+        .eq('id', assignment.order_id)
+        .single();
+
+      if (orderData) {
+        const { data: sellerProfile } = await supabase
+          .from('seller_profiles')
+          .select('user_id')
+          .eq('id', orderData.seller_id)
+          .single();
+
+        if (sellerProfile?.user_id === callerId) {
+          isAuthorized = true;
+        }
+      }
+    }
+
+    if (!isAuthorized) {
+      return new Response(JSON.stringify({ error: 'Forbidden: not assigned rider or seller' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Insert location record
@@ -179,7 +204,6 @@ serve(async (req) => {
       distanceMeters = Math.round(haversineDistance(latitude, longitude, destLat, destLng));
       proximity = getProximity(distanceMeters);
 
-      // Phase E: Query historical ETA data when speed is poor
       let historicalAvgMin: number | null = null;
       if ((speed_kmh == null || speed_kmh < 2) && sellerId) {
         const currentHour = new Date().getUTCHours();
@@ -281,7 +305,7 @@ serve(async (req) => {
       }
     }
 
-    // ═══ PHASE G: Smart Delay Detection — ETA spike or heading reversal ═══
+    // ═══ Smart Delay Detection — ETA spike or heading reversal ═══
     if (
       distanceMeters !== null &&
       buyerId &&
@@ -290,10 +314,8 @@ serve(async (req) => {
       const prevEta = assignment.eta_minutes;
       const etaSpike = prevEta != null && etaMinutes != null && (etaMinutes - prevEta) > 5;
 
-      // Check heading reversal using previous location
       let headingReversal = false;
       if (assignment.last_location_lat && assignment.last_location_lng && heading != null) {
-        // Calculate implied heading from previous → current position
         const prevBearing = Math.atan2(
           longitude - assignment.last_location_lng,
           latitude - assignment.last_location_lat
@@ -302,7 +324,6 @@ serve(async (req) => {
       }
 
       if (etaSpike || headingReversal) {
-        // Dedup: one delay notification per order
         const { count: delayCount } = await supabase
           .from('notification_queue')
           .select('id', { count: 'exact', head: true })
@@ -332,9 +353,8 @@ serve(async (req) => {
       }
     }
 
-    // ═══ PHASE A: Proximity notifications — 500m and 200m (separate dedup keys) ═══
-    if (distanceMeters !== null && buyerId && assignment.status === 'picked_up') {
-      // Fetch vehicle_type for payloads
+    // ═══ Proximity notifications — 500m and 200m ═══
+    if (distanceMeters !== null && buyerId && ['picked_up', 'on_the_way'].includes(assignment.status)) {
       let vehicleType: string | null = null;
       if (assignment.rider_id) {
         const { data: riderInfo } = await supabase
@@ -345,7 +365,6 @@ serve(async (req) => {
         vehicleType = riderInfo?.vehicle_type ?? null;
       }
 
-      // 500m — "nearby" notification
       if (distanceMeters < 500) {
         const { count } = await supabase
           .from('notification_queue')
@@ -376,7 +395,6 @@ serve(async (req) => {
         }
       }
 
-      // 200m — "imminent" notification (separate type for dedup)
       if (distanceMeters < 200) {
         const { count: imminentCount } = await supabase
           .from('notification_queue')
