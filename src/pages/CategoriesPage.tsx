@@ -13,6 +13,7 @@ import { Store, Sparkles, Clock, Star, Users, Tag } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { cn } from '@/lib/utils';
 import { useSearchPlaceholder } from '@/hooks/useSearchPlaceholder';
+import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 /* ── Helpers ─────────────────────────────────────────────── */
 
