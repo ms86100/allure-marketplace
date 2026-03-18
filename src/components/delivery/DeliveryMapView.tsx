@@ -195,6 +195,11 @@ export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinatio
 
   const { routeCoords, roadEtaMinutes } = useOSRMRoute(riderLat, riderLng, destinationLat, destinationLng);
 
+  // Gap F: Propagate OSRM ETA to parent
+  useEffect(() => {
+    onRoadEtaChange?.(roadEtaMinutes);
+  }, [roadEtaMinutes, onRoadEtaChange]);
+
   // Fallback straight line if OSRM hasn't loaded yet
   const polylinePositions = routeCoords.length > 0
     ? routeCoords

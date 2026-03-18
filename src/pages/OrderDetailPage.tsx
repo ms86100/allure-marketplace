@@ -265,7 +265,15 @@ export default function OrderDetailPage() {
                   </Suspense>
                 ) : null;
               })()}
-              <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} />
+              <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} trackingState={deliveryTracking} />
+              {/* Gap A: Show delivery OTP to buyer */}
+              {o.isBuyerView && buyerOtp && isInTransit && (
+                <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Your Delivery OTP</p>
+                  <p className="text-3xl font-bold tracking-[0.3em] text-primary">{buyerOtp}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">Share this code with the delivery partner</p>
+                </div>
+              )}
               {o.isBuyerView && (
                 <div className="flex justify-end">
                   <UpdateBuyerLocationButton orderId={order.id} />

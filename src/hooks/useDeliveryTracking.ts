@@ -122,6 +122,25 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
             (!currentRecordedAt || (incomingRecordedAt && new Date(incomingRecordedAt).getTime() > new Date(currentRecordedAt).getTime()))
           );
 
+          // Gap E: Apply GPS filter to assignment location too (same as location channel)
+          let filteredLocation = prev.riderLocation;
+          if (shouldReplaceLocation) {
+            const rawPoint: RiderLocation = {
+              latitude: d.last_location_lat,
+              longitude: d.last_location_lng,
+              speed_kmh: prev.riderLocation?.speed_kmh ?? null,
+              heading: prev.riderLocation?.heading ?? null,
+              recorded_at: d.last_location_at || new Date().toISOString(),
+            };
+            const result = filterGPSPoint(rawPoint, gpsFilterState.current);
+            gpsFilterState.current = result.newState;
+            filteredLocation = {
+              ...rawPoint,
+              latitude: result.filtered.latitude,
+              longitude: result.filtered.longitude,
+            };
+          }
+
           return {
             ...prev,
             status: d.status ?? prev.status,
@@ -132,15 +151,7 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
             distance: d.distance_meters ?? prev.distance,
             lastLocationAt: d.last_location_at ?? prev.lastLocationAt,
             proximityStatus: d.proximity_status ?? prev.proximityStatus,
-            riderLocation: shouldReplaceLocation
-              ? {
-                  latitude: d.last_location_lat,
-                  longitude: d.last_location_lng,
-                  speed_kmh: prev.riderLocation?.speed_kmh ?? null,
-                  heading: prev.riderLocation?.heading ?? null,
-                  recorded_at: d.last_location_at || new Date().toISOString(),
-                }
-              : prev.riderLocation,
+            riderLocation: filteredLocation,
           };
         });
       })
