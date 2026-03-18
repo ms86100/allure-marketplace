@@ -3370,6 +3370,7 @@ export type Database = {
       orders: {
         Row: {
           auto_cancel_at: string | null
+          auto_complete_at: string | null
           buyer_id: string | null
           buyer_society_id: string | null
           coupon_id: string | null
@@ -3415,6 +3416,7 @@ export type Database = {
         }
         Insert: {
           auto_cancel_at?: string | null
+          auto_complete_at?: string | null
           buyer_id?: string | null
           buyer_society_id?: string | null
           coupon_id?: string | null
@@ -3460,6 +3462,7 @@ export type Database = {
         }
         Update: {
           auto_cancel_at?: string | null
+          auto_complete_at?: string | null
           buyer_id?: string | null
           buyer_society_id?: string | null
           coupon_id?: string | null

@@ -16,14 +16,15 @@ export function DeliveryETABanner({ estimatedDeliveryAt }: DeliveryETABannerProp
   const targetTime = new Date(estimatedDeliveryAt).getTime();
   const diffMs = targetTime - now;
 
-  if (diffMs < 0) return null; // Past ETA, don't show
-
-  const diffMin = Math.ceil(diffMs / 60000);
-  const displayText = diffMin <= 1
-    ? 'Arriving any moment'
-    : diffMin <= 60
-      ? `Estimated arrival in ${diffMin} min`
-      : `Estimated arrival in ${Math.round(diffMin / 60)}h ${diffMin % 60}m`;
+  const isLate = diffMs < 0;
+  const diffMin = isLate ? 0 : Math.ceil(diffMs / 60000);
+  const displayText = isLate
+    ? 'Running a bit late — arriving soon'
+    : diffMin <= 1
+      ? 'Arriving any moment'
+      : diffMin <= 60
+        ? `Estimated arrival in ${diffMin} min`
+        : `Estimated arrival in ${Math.round(diffMin / 60)}h ${diffMin % 60}m`;
 
   return (
     <div className="bg-accent/10 border border-accent/20 rounded-xl px-4 py-3 flex items-center gap-3">
