@@ -16,6 +16,8 @@ import { DeliveryETABanner } from '@/components/order/DeliveryETABanner';
 import { SellerGPSTracker } from '@/components/delivery/SellerGPSTracker';
 import { UpdateBuyerLocationButton } from '@/components/delivery/UpdateBuyerLocationButton';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
+import { DeliveryCompletionOtpDialog } from '@/components/delivery/DeliveryCompletionOtpDialog';
+import { DeliveryFeedbackForm } from '@/components/delivery/DeliveryFeedbackForm';
 
 import { OrderItemCard } from '@/components/order/OrderItemCard';
 import { AppointmentDetailsCard } from '@/components/order/AppointmentDetailsCard';
@@ -25,7 +27,7 @@ import { SellerPaymentConfirmation } from '@/components/payment/SellerPaymentCon
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
 import { isTerminalStatus } from '@/hooks/useCategoryStatusFlow';
-import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck } from 'lucide-react';
+import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { getString, setString } from '@/lib/persistent-kv';
