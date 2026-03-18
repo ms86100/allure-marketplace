@@ -158,7 +158,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(['cart-count', user?.id], prevCount);
       invalidate();
       const availabilityError = parseStoreAvailabilityError(error);
-      if (availabilityError) toast.error(availabilityError);
+      if (availabilityError) toast.error(availabilityError, { id: 'cart-availability-error' });
       else handleApiError(error, 'Failed to add item');
     }
   }, [user, setOptimistic, invalidate, queryClient]);
