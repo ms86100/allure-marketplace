@@ -1,26 +1,49 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-## Fix: Remove class-level `@available` to unblock Capacitor plugin discovery
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-### Root Cause Confirmed
-The plugin file **already has** `CAPBridgedPlugin` metadata (`identifier`, `jsName`, `pluginMethods`). The sole blocker is `@available(iOS 16.2, *)` on line 15, which hides the class from the ObjC runtime at Capacitor's plugin discovery time.
+## Phase I Live Activities — CI Pipeline Status
 
-### Changes
+### Codemagic Build Pipeline: COMPLETE
 
-#### 1. `native/ios/LiveActivityPlugin.swift`
-- **Remove** `@available(iOS 16.2, *)` from line 15 (class level)
-- **Wrap** all ActivityKit usage inside each method with `if #available(iOS 16.2, *)` guards
-- **Add** `override public func load()` with a print statement for runtime verification
-- The `import ActivityKit` stays -- it compiles fine without the class-level guard; only the API calls need runtime checks
+Both `ios-release` and `release-all` workflows now include:
 
-#### 2. No other file changes needed
-- Widget file (`LiveDeliveryWidget.swift`) runs in its own extension process -- its `@available` does not affect plugin discovery
-- CI script (`codemagic.yaml`) correctly copies files and adds them to the build target
-- JS plugin registration and `LiveActivityManager` are already correct
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
 
-### After deployment
-The `/la-debug` page should show:
-- Plugin Available: **yes**
-- START operations: **success** (on iOS 16.2+ real devices)
-- Native Activities: **> 0**
+### Codemagic Requirements (User Action)
 
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
+
+### Runtime Call Chain (Verified)
+
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
+```
+
+## Implementation Matrix
+
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |

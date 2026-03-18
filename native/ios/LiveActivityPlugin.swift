@@ -12,7 +12,6 @@ import Capacitor
 import ActivityKit
 import Foundation
 
-@available(iOS 16.2, *)
 @objc(LiveActivityPlugin)
 public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "LiveActivityPlugin"
@@ -25,9 +24,18 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "cleanupStaleActivities", returnType: CAPPluginReturnPromise),
     ]
 
+    override public func load() {
+        print("✅ LiveActivityPlugin loaded — Capacitor bridge registered")
+    }
+
     // MARK: - Start
 
     @objc func startLiveActivity(_ call: CAPPluginCall) {
+        guard #available(iOS 16.2, *) else {
+            call.reject("iOS 16.2+ required for Live Activities")
+            return
+        }
+
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
             call.reject("Live Activities not enabled")
             return
@@ -62,6 +70,11 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     // MARK: - Update
 
     @objc func updateLiveActivity(_ call: CAPPluginCall) {
+        guard #available(iOS 16.2, *) else {
+            call.reject("iOS 16.2+ required for Live Activities")
+            return
+        }
+
         let entityId = call.getString("entity_id") ?? ""
 
         let state = LiveDeliveryAttributes.ContentState(
@@ -88,6 +101,11 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     // MARK: - End
 
     @objc func endLiveActivity(_ call: CAPPluginCall) {
+        guard #available(iOS 16.2, *) else {
+            call.reject("iOS 16.2+ required for Live Activities")
+            return
+        }
+
         let activityId = call.getString("activityId") ?? ""
 
         Task {
@@ -107,6 +125,11 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     // MARK: - Get Active Activities
 
     @objc func getActiveActivities(_ call: CAPPluginCall) {
+        guard #available(iOS 16.2, *) else {
+            call.resolve(["activities": []])
+            return
+        }
+
         var result: [[String: String]] = []
 
         for activity in Activity<LiveDeliveryAttributes>.activities {
@@ -122,6 +145,11 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     // MARK: - Cleanup Stale Activities
 
     @objc func cleanupStaleActivities(_ call: CAPPluginCall) {
+        guard #available(iOS 16.2, *) else {
+            call.resolve()
+            return
+        }
+
         let validIds = call.getArray("validEntityIds", String.self) ?? []
 
         Task {
