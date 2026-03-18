@@ -162,7 +162,7 @@ export function AutoHighlightStrip() {
               <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-background/80 backdrop-blur-sm rounded-full px-2 py-0.5">
                 {card.icon}
                 <span className="text-[8px] font-bold text-foreground uppercase tracking-wide">
-                  {card.type === 'bestseller' ? 'Bestseller' : card.type === 'top_seller' ? 'Top Rated' : 'Deal'}
+                  {card.type === 'bestseller' ? ml.label('label_highlight_bestseller') : card.type === 'top_seller' ? ml.label('label_highlight_top_rated') : ml.label('label_highlight_deal')}
                 </span>
               </div>
             </div>

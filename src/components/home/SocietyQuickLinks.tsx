@@ -38,7 +38,7 @@ export function SocietyQuickLinks() {
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
             <Building2 size={15} className="text-primary" />
-            Your Society
+            {ml.label('label_section_society_links')}
           </h3>
           <Link to="/society" className="text-[11px] font-bold text-primary flex items-center gap-0.5 ml-4">
             View all <ChevronRight size={12} />

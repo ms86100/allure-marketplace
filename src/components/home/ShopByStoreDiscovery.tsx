@@ -15,9 +15,9 @@ import { Store, Star, MapPin, ChevronDown, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useMemo } from 'react';
 
-/** Replaces pure-numeric business names (e.g. phone numbers) with a fallback */
+/** Replaces pure-numeric business names (e.g. phone numbers) with empty string */
 function sanitizeSellerName(name: string): string {
-  return /^\d+$/.test(name.trim()) ? 'Local Seller' : name;
+  return /^\d+$/.test(name.trim()) ? '' : name;
 }
 
 /** Deterministic hue from a string (seller ID) for colored avatars */

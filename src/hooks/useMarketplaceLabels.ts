@@ -107,6 +107,38 @@ const DEFAULTS: Record<string, string> = {
   price_history_max_points: '30',
   demand_insights_max_items: '5',
   dispute_sla_warning_hours: '48',
+  // Section headers
+  label_section_leaderboard_sellers: 'Top Sellers in Your Society',
+  label_section_leaderboard_products: 'Most Ordered Products',
+  label_section_store_discovery: 'Meet your neighbors who sell',
+  label_section_highlights: 'Highlights',
+  label_section_search_popular: 'Popular in your society',
+  label_section_community: 'Community',
+  label_section_society_links: 'Your Society',
+  // Empty states
+  label_empty_marketplace_title: 'Your marketplace is getting ready!',
+  label_empty_marketplace_desc: 'Sellers from your community are setting up shop. Products, services & more — all coming your way.',
+  label_empty_marketplace_hint: 'New listings appear here automatically',
+  label_empty_categories_title: 'Stay tuned — we\'re growing!',
+  label_empty_categories_desc: 'New sellers are joining your community. Products will be available here very soon.',
+  label_empty_categories_hint: 'Check back soon for new listings',
+  // Metadata
+  label_seller_count_singular: 'seller',
+  label_seller_count_plural: 'sellers',
+  label_item_count: 'items',
+  label_explore_cta: 'Explore →',
+  label_sellers_setting_up: 'Sellers setting up',
+  label_nearby: 'Nearby',
+  // Page titles
+  label_categories_page_title: 'Explore Categories',
+  label_categories_page_subtitle: 'Find what you love',
+  // Highlight types
+  label_highlight_bestseller: 'Bestseller',
+  label_highlight_top_rated: 'Top Rated',
+  label_highlight_deal: 'Deal',
+  // Community
+  label_community_first_post: 'Be the first to post!',
+  label_community_first_post_desc: 'Share updates, ask questions, or help a neighbor',
   dispute_categories_json: '[{"value":"noise","label":"Noise"},{"value":"parking","label":"Parking"},{"value":"pet","label":"Pet Related"},{"value":"maintenance","label":"Maintenance"},{"value":"other","label":"Other"}]',
   reputation_event_labels_json: '{"order_completed":{"label":"Order Completed","color":"text-success"},"order_cancelled":{"label":"Order Cancelled","color":"text-destructive"},"dispute_resolved":{"label":"Dispute Resolved","color":"text-success"},"dispute_lost":{"label":"Dispute Lost","color":"text-destructive"},"response_fast":{"label":"Fast Response","color":"text-primary"},"response_slow":{"label":"Slow Response","color":"text-warning"}}',
   dispute_status_options_json: '[{"value":"acknowledged","label":"Acknowledge"},{"value":"under_review","label":"Under Review"},{"value":"resolved","label":"Resolved"},{"value":"escalated","label":"Escalated"},{"value":"closed","label":"Close"}]',

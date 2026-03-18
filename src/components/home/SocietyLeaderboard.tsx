@@ -217,7 +217,7 @@ export function SocietyLeaderboard() {
                       <ShoppingBag size={24} className="text-muted-foreground/40" />
                     </div>
                   )}
-                  <span className="absolute top-1.5 left-1.5 text-sm leading-none bg-background/80 backdrop-blur-sm rounded-lg px-1.5 py-1">{medals[i]}</span>
+                  <span className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-background/80 backdrop-blur-sm" style={{ backgroundColor: rankColors[i] }}>{i + 1}</span>
                   <span className="absolute bottom-1.5 right-1.5 text-[9px] font-bold text-primary-foreground bg-primary/90 backdrop-blur-sm rounded-full px-2 py-0.5">{p.order_count}× ordered</span>
                 </div>
                 <div className="p-2.5">

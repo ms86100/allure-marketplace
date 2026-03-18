@@ -77,7 +77,7 @@ export function BuyAgainRow() {
             price: p.price,
             image_url: p.image_url,
             seller_id: p.seller_id || '',
-            seller_name: p.seller?.business_name || 'Seller',
+            seller_name: p.seller?.business_name || '',
             order_count: 0,
             count: 0,
           };

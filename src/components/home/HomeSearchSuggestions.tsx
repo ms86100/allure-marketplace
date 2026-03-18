@@ -16,7 +16,7 @@ export function HomeSearchSuggestions() {
       <div className="flex items-center gap-1.5 mb-2">
         <Sparkles size={12} className="text-primary" />
         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-          Popular in your society
+          {ml.label('label_section_search_popular')}
         </span>
       </div>
       <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">

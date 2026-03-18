@@ -114,8 +114,8 @@ export function ActiveOrderStrip() {
                 )}
               </div>
               <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                {order.seller_name}
-                {order.item_count > 0 && ` · ${order.item_count} item${order.item_count > 1 ? 's' : ''}`}
+                {order.seller_name}{order.seller_name && order.item_count > 0 ? ' · ' : ''}
+                {order.item_count > 0 && `${order.item_count} item${order.item_count > 1 ? 's' : ''}`}
                 {order.estimated_delivery_at && (() => {
                   const mins = Math.max(0, Math.ceil((new Date(order.estimated_delivery_at).getTime() - Date.now()) / 60000));
                   if (mins <= 0) return ' · Arriving soon';

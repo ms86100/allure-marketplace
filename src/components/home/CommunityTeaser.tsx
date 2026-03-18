@@ -76,7 +76,7 @@ export function CommunityTeaser() {
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
           <MessageCircle size={15} className="text-primary" />
-          Community
+            {ml.label('label_section_community')}
         </h3>
         <Link to="/community" className="text-[11px] font-bold text-primary flex items-center gap-0.5">
           View all <ChevronRight size={12} />

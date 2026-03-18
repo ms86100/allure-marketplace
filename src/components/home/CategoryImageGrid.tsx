@@ -206,10 +206,10 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                   </span>
                 )}
                 {meta.sellerCount === 0 && meta.minPrice === null && meta.count > 0 && (
-                  <span className="text-muted-foreground/60 font-medium">Explore →</span>
+                  <span className="text-muted-foreground/60 font-medium">{ml.label('label_explore_cta')}</span>
                 )}
                 {meta.sellerCount === 0 && meta.count === 0 && (
-                  <span className="text-muted-foreground/50 font-medium italic">Sellers setting up</span>
+                  <span className="text-muted-foreground/50 font-medium italic">{ml.label('label_sellers_setting_up')}</span>
                 )}
               </div>
             </Link>

@@ -390,7 +390,7 @@ export default function CategoriesPage() {
                               </span>
                             )}
                             {meta.sellerCount === 0 && meta.minPrice === null && (
-                              <span className="text-muted-foreground/60">Explore →</span>
+                              <span className="text-muted-foreground/60">{ml.label('label_explore_cta')}</span>
                             )}
                           </div>
                         </Link>

@@ -368,7 +368,7 @@ function ProductListings({
           className="mt-6 flex items-center gap-2 text-xs text-muted-foreground bg-card border border-border rounded-full px-4 py-2"
         >
           <Clock size={14} />
-          <span>New listings appear here automatically</span>
+          <span>{ml.label('label_empty_marketplace_hint')}</span>
         </motion.div>
       </div>
     );
