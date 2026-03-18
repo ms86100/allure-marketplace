@@ -114,7 +114,7 @@ export function MarketplaceSection() {
       contact_phone: product.contact_phone,
       specifications: product.specifications || null,
       seller_id: product.seller_id,
-      seller_name: product.seller_name || 'Seller',
+      seller_name: product.seller_name || '',
       seller_rating: product.seller_rating || 0,
       seller_reviews: product.seller_reviews || 0,
       society_name: (product as any).society_name || null,
