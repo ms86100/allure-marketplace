@@ -67,17 +67,22 @@ export function useBuyerOrderAlerts() {
           // Use unique ID per order+status to deduplicate with push notifications
           const toastId = `order-${orderId}-${newStatus}`;
 
+          const isTransit = TRANSIT_STATUSES.has(newStatus);
+
           toast(msg.title, {
             id: toastId,
             description: msg.description,
             icon: msg.icon,
-            duration: 6000,
-            action: {
-              label: 'View',
-              onClick: () => {
-                window.location.hash = `#/orders/${orderId}`;
+            duration: isTransit ? 3000 : 6000,
+            // Suppress "View" action for transit statuses to prevent overlap with bottom nav
+            ...(isTransit ? {} : {
+              action: {
+                label: 'View',
+                onClick: () => {
+                  window.location.hash = `#/orders/${orderId}`;
+                },
               },
-            },
+            }),
           });
 
           queryClient.invalidateQueries({ queryKey: ['orders'] });

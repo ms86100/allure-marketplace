@@ -343,6 +343,14 @@ export default function OrderDetailPage() {
           {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
             <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart deliveryStatus={order.status} />
           )}
+          {/* Persistent OTP card — visible to buyer for ALL non-terminal delivery statuses */}
+          {o.isBuyerView && isDeliveryOrder && buyerOtp && !isTerminalStatus(o.flow, order.status) && (
+            <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 text-center">
+              <p className="text-xs text-muted-foreground mb-1">Your Delivery Code</p>
+              <p className="text-3xl font-bold tracking-[0.3em] text-primary">{buyerOtp}</p>
+              <p className="text-[11px] text-muted-foreground mt-1.5">Share this code with the delivery person to confirm delivery</p>
+            </div>
+          )}
           {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}
 
           {o.canReorder && (
