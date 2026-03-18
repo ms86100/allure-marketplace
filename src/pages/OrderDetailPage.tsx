@@ -48,6 +48,7 @@ export default function OrderDetailPage() {
   const [buyerOtp, setBuyerOtp] = useState<string | null>(null);
   const [roadEtaMinutes, setRoadEtaMinutes] = useState<number | null>(null);
   const { data: serviceBooking } = useServiceBookingForOrder(o.order?.id);
+  const { getSetting } = useSystemSettingsRaw(['proximity_thresholds']);
 
   const order = o.order;
   const orderId = order?.id;
