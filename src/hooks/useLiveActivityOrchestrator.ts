@@ -13,7 +13,7 @@ const TERMINAL_STATUSES = new Set([
   'delivered', 'completed', 'cancelled', 'no_show', 'failed',
 ]);
 
-const POLL_INTERVAL_MS = 15_000; // 15s fallback poll
+
 
 /**
  * Global hook that drives Live Activity from order status changes.
