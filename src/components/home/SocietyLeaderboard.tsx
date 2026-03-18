@@ -204,7 +204,7 @@ export function SocietyLeaderboard() {
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
               <ShoppingBag size={14} className="text-primary" />
             </div>
-            <h3 className="font-bold text-sm text-foreground">Most Ordered Products</h3>
+            <h3 className="font-bold text-sm text-foreground">{ml.label('label_section_leaderboard_products')}</h3>
           </div>
           <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
             {topProducts.map((p, i) => (
