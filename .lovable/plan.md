@@ -1,81 +1,50 @@
+# Production-Hardened Live Tracking System
 
+## Status: ✅ IMPLEMENTED
 
-# iOS Live Activity Widget Redesign
+## What Changed
 
-## Problems Visible in Screenshot
+### 1. Background Location Tracking (Seller)
+- **Package:** Added `@transistorsoft/capacitor-background-geolocation`
+- **File:** `src/hooks/useBackgroundLocationTracking.ts` — Full rewrite
+  - Native: Transistorsoft plugin with motion-aware tracking, `stopOnTerminate: false`, `preventSuspend: true`
+  - Web: Falls back to `navigator.geolocation.watchPosition`
+  - 20s health watchdog detects stale tracking and attempts recovery via `getCurrentPosition()`
+  - Auto-restart on app resume if native plugin was killed by OS
+  - Permission level tracking (`always` / `when_in_use` / `denied`)
 
-1. Three duplicate "Your Order is Ready" cards stacked on top of each other (dedup issue still manifesting on device)
-2. A fourth card shows "We're Preparing Your Order" with nested duplicate content inside it
-3. The purple gradient card looks dated and lacks information hierarchy
-4. The dark card is functional but visually flat
-5. No order short ID visible to help buyers distinguish orders
-6. Emoji-heavy titles feel unpolished ("Your Order is Ready! 🎉")
-7. No meaningful contextual info per status (e.g., "Pickup from [seller]" when ready, ETA countdown when in transit)
+### 2. Seller GPS Tracker UI
+- **File:** `src/components/delivery/SellerGPSTracker.tsx`
+  - "Keep screen open" warning only on web (native handles background natively)
+  - Permission upgrade banner when on `when_in_use` with link to Settings
+  - Tracking paused badge + alert when watchdog detects stale state
+  - Settings deep link via `capacitor-native-settings`
 
-## What Changes
+### 3. Delta-Based Live Activity APNs Push
+- **File:** `supabase/functions/update-delivery-location/index.ts`
+  - After updating `delivery_assignments`, queries `live_activity_tokens`
+  - Compares deltas: distance > 50m OR ETA change ≥ 1 min
+  - 15s throttle floor to stay within Apple's APNs budget
+  - Stale retry: pushes if last push was >60s ago regardless of deltas
+  - Stores `last_pushed_eta`, `last_pushed_distance` on `live_activity_tokens`
+  - Timing instrumentation: logs `db=Xms total=Xms la_push=Xms`
 
-### A. ContentState — add `order_short_id` and `seller_logo_url`
+### 4. APNs Success Tracking
+- **File:** `supabase/functions/update-live-activity-apns/index.ts`
+  - Updates `live_activity_tokens.updated_at` on successful (non-terminal) pushes
 
-Add two new fields to `LiveDeliveryAttributes.ContentState`:
-- `orderShortId: String?` — last 4-8 chars of order ID for buyer recognition (e.g., "#7838")
-- `sellerLogoUrl: String?` — seller logo URL for a branded feel (rendered if available)
+### 5. Database
+- **Migration:** Added `last_pushed_eta` (int) and `last_pushed_distance` (int) columns to `live_activity_tokens`
 
-Update `LiveActivityData` interface in `definitions.ts` and the mapper/APNs edge function to populate these.
+## iOS Build Requirements
+- `Info.plist`: `UIBackgroundModes` → `location`, `fetch`
+- `NSLocationAlwaysAndWhenInUseUsageDescription`
+- `NSLocationWhenInUseUsageDescription`
+- `NSMotionUsageDescription`
 
-### B. Widget Visual Redesign
-
-Replace the current 3-branch lock screen layout with a single, unified, status-adaptive card:
-
-**Layout structure (all statuses):**
-```text
-┌─────────────────────────────────────────────┐
-│  [SocivaIcon]  Seller Name        #7838     │
-│                                   2 items   │
-│                                             │
-│  Status Title (SF Symbol prefix)            │
-│  Contextual subtitle                        │
-│                                             │
-│  ═══════●🛵═══════════════  ETA 8 min       │
-└─────────────────────────────────────────────┘
-```
-
-**Design principles:**
-- Single dark card with subtle status-tinted accent (not full gradient)
-- SF Symbols instead of emojis for status icons (checkmark.circle.fill, fork.knife, bag.fill, bicycle, mappin.and.ellipse)
-- Accent color changes per phase: amber (accepted/preparing), blue (ready), green (in transit), emerald (delivered)
-- Clean typography: `.subheadline.bold` for title, `.caption` for subtitle
-- Progress bar accent matches status color
-- ETA displayed inline with progress bar when available
-- Order short ID as a subtle badge in top-right
-
-**Status-specific content:**
-- **accepted**: "Order Confirmed" / "Seller is reviewing your order"
-- **preparing**: "Being Prepared" / "Your order is being made"
-- **ready**: "Ready for Pickup" / "Waiting to be picked up from {seller}"
-- **picked_up/on_the_way/en_route**: "On the Way" / "{driver} · {distance} km away" + ETA badge
-- **arrived**: "At Your Location" / "{driver} has arrived"
-- **delivered/completed**: "Delivered" / full progress, green accent, auto-dismiss
-
-**Dynamic Island (compact):**
-- Leading: SocivaIcon
-- Trailing: ETA in green if available, else mini progress ring
-
-**Dynamic Island (expanded):**
-- Same clean layout as lock screen but condensed
-- No gradient backgrounds, just the standard Dynamic Island dark
-
-### C. Files to Change
-
-| File | Change |
-|------|--------|
-| `native/ios/LiveDeliveryAttributes.swift` | Add `orderShortId`, `sellerLogoUrl` to ContentState |
-| `native/ios/LiveDeliveryWidget.swift` | Full redesign of lock screen view, DI regions, helper functions |
-| `src/plugins/live-activity/definitions.ts` | Add `order_short_id`, `seller_logo_url` to LiveActivityData |
-| `src/services/liveActivityMapper.ts` | Populate new fields from order data |
-| `src/services/liveActivitySync.ts` | Pass `order_number` / short ID to mapper |
-| `supabase/functions/update-live-activity-apns/index.ts` | Include new fields in APNs content-state, fetch order number |
-
-### D. Scope Exclusion
-
-The duplicate card issue (3x "Ready" cards in screenshot) is a LiveActivityManager dedup problem, not a widget design issue. That is tracked separately and is addressed by the existing hydration dedup logic. This plan focuses solely on the visual and informational quality of the widget.
-
+## Latency Targets
+- Seller GPS → Edge Function: < 2s
+- Edge Function → DB: < 500ms
+- DB → Realtime → Buyer: < 1s
+- Edge Function → APNs → Dynamic Island: < 3s
+- **Total foreground: < 5s | Dynamic Island: < 8s**
