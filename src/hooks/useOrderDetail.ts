@@ -208,11 +208,24 @@ export function useOrderDetail(id: string | undefined) {
     return (step as any)?.seller_hint || null;
   };
 
-  // Derive isInTransit from status key — works for both cart_purchase (actor=delivery) and seller_delivery (actor=seller)
+  // Derive isInTransit from DB-backed flow: statuses between 'picked_up' and terminal are transit.
+  // For robustness, check if status actor is 'delivery' or if it matches known transit keys from flow.
   const isInTransit = useMemo(() => {
     if (!order) return false;
-    return ['picked_up', 'on_the_way', 'at_gate'].includes(order.status);
-  }, [order?.status]);
+    // Use flow data: a status is in-transit if it has actor='delivery' or is explicitly a delivery-phase step
+    const transitStep = flow.find(s => s.status_key === order.status);
+    if (transitStep?.actor === 'delivery') return true;
+    // Fallback: check against system_settings transit_statuses (loaded via trackingConfig)
+    // Since this is a React hook, we import the sync version
+    try {
+      const { getTrackingConfigSync } = require('@/services/trackingConfig');
+      const cfg = getTrackingConfigSync();
+      return cfg.transit_statuses.includes(order.status);
+    } catch {
+      // Ultimate fallback
+      return ['picked_up', 'on_the_way', 'at_gate'].includes(order.status);
+    }
+  }, [order?.status, flow]);
 
   return {
     order, setOrder, isLoading, isUpdating, hasReview, setHasReview,

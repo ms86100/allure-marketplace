@@ -17,8 +17,13 @@ interface DeliveryArrivalOverlayProps {
   status: string | null;
   onDismiss: () => void;
   deliveryCode?: string | null;
-  /** DB-backed proximity messages */
   proximityMessages?: ProximityMessages;
+  /** DB-backed transit statuses for determining visibility */
+  transitStatuses?: string[];
+  /** DB-backed distance threshold for overlay visibility */
+  overlayDistanceMeters?: number;
+  /** DB-backed doorstep distance threshold */
+  doorstepDistanceMeters?: number;
 }
 
 export function DeliveryArrivalOverlay({
@@ -30,17 +35,21 @@ export function DeliveryArrivalOverlay({
   onDismiss,
   deliveryCode,
   proximityMessages,
+  transitStatuses,
+  overlayDistanceMeters = 200,
+  doorstepDistanceMeters = 50,
 }: DeliveryArrivalOverlayProps) {
   const [dismissed, setDismissed] = useState(false);
 
-  // Show only when distance < 200m and in transit
-  const isImminent = distance !== null && distance < 200 &&
-    ['picked_up', 'on_the_way', 'at_gate'].includes(status || '');
+  const transitSet = new Set(transitStatuses ?? ['picked_up', 'on_the_way', 'at_gate']);
+
+  // Show only when distance < threshold and in transit
+  const isImminent = distance !== null && distance < overlayDistanceMeters &&
+    transitSet.has(status || '');
 
   const visible = isImminent && !dismissed;
 
   useEffect(() => {
-    // Reset dismissed when distance goes above threshold
     if (!isImminent) setDismissed(false);
   }, [isImminent]);
 
@@ -80,7 +89,7 @@ export function DeliveryArrivalOverlay({
                 <MapPin size={28} className="text-primary" />
               </motion.div>
               <h2 className="text-lg font-bold text-foreground">
-                {distance !== null && distance < 50
+                {distance !== null && distance < doorstepDistanceMeters
                   ? (proximityMessages?.at_doorstep_title || '🏠 At your doorstep!')
                   : (proximityMessages?.arriving_title || '🏃 Driver arriving now!')}
               </h2>
@@ -119,7 +128,6 @@ export function DeliveryArrivalOverlay({
                 </a>
               )}
 
-              {/* Gap A: Show OTP in arrival overlay */}
               {deliveryCode && (
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-center">
                   <p className="text-[10px] text-muted-foreground mb-0.5">Your Delivery OTP</p>
