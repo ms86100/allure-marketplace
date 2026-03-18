@@ -103,6 +103,7 @@ export function useLiveActivityOrchestrator(): void {
 
       let delivery: any = null;
       let sellerName: string | null = null;
+      let sellerLogoUrl: string | null = null;
       let itemCount: number | null = null;
       try {
         const sellerId = (payload.new as any)?.seller_id;
@@ -114,12 +115,13 @@ export function useLiveActivityOrchestrator(): void {
             .not('status', 'in', '("cancelled","failed")')
             .maybeSingle(),
           sellerId
-            ? supabase.from('seller_profiles').select('business_name').eq('id', sellerId).maybeSingle()
+            ? supabase.from('seller_profiles').select('business_name, logo_url').eq('id', sellerId).maybeSingle()
             : Promise.resolve({ data: null }),
           supabase.from('order_items').select('id', { count: 'exact', head: true }).eq('order_id', orderId),
         ]);
         delivery = deliveryRes.data;
         sellerName = (sellerRes.data as any)?.business_name ?? null;
+        sellerLogoUrl = (sellerRes.data as any)?.logo_url ?? null;
         itemCount = itemCountRes.count ?? null;
       } catch { /* best-effort */ }
 
@@ -129,6 +131,7 @@ export function useLiveActivityOrchestrator(): void {
         sellerName,
         itemCount,
         flowEntriesRef.current,
+        sellerLogoUrl,
       );
       await LiveActivityManager.push(activityData);
     };

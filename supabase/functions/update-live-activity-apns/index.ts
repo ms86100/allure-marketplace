@@ -24,13 +24,30 @@ interface LAUpdatePayload {
   seller_name?: string;
   seller_logo?: string;
   seller_logo_url?: string;
-  transaction_type?: string;
-  parent_group?: string;
 }
 
-const TERMINAL_STATUSES = new Set([
+/** Safety-net fallback — overridden by DB query below */
+const FALLBACK_TERMINAL = new Set([
   "delivered", "completed", "cancelled", "no_show", "failed",
 ]);
+
+async function loadTerminalStatuses(
+  supabase: ReturnType<typeof createClient>,
+): Promise<Set<string>> {
+  try {
+    const { data, error } = await supabase
+      .from("category_status_flows")
+      .select("status_key")
+      .eq("is_terminal", true);
+    if (error || !data || data.length === 0) return FALLBACK_TERMINAL;
+    const dbSet = new Set(data.map((r: any) => r.status_key));
+    // Union with fallbacks for safety
+    for (const s of FALLBACK_TERMINAL) dbSet.add(s);
+    return dbSet;
+  } catch {
+    return FALLBACK_TERMINAL;
+  }
+}
 
 function b64url(data: Uint8Array): string {
   return btoa(String.fromCharCode(...data))
@@ -87,14 +104,11 @@ interface StatusFlowEntry {
 
 async function getStatusFlowData(
   supabase: ReturnType<typeof createClient>,
-  transactionType: string,
-  parentGroup: string,
 ): Promise<Map<string, StatusFlowEntry>> {
   const { data, error } = await supabase
     .from("category_status_flows")
     .select("status_key, display_label, sort_order")
-    .eq("transaction_type", transactionType)
-    .eq("parent_group", parentGroup)
+    .in("transaction_type", ["cart_purchase", "seller_delivery"])
     .order("sort_order");
 
   const map = new Map<string, StatusFlowEntry>();
@@ -155,7 +169,7 @@ Deno.serve(async (req) => {
     }
 
     const payload: LAUpdatePayload = await req.json();
-    const { order_id, status, push_token, seller_name, seller_logo_url, transaction_type, parent_group } = payload;
+    const { order_id, status, push_token, seller_name, seller_logo_url } = payload;
 
     if (!order_id || !status || !push_token) {
       return new Response(
@@ -166,8 +180,8 @@ Deno.serve(async (req) => {
 
     console.log(`[LA-APNs] Updating LA for order=${order_id} status=${status} token=${push_token.substring(0, 16)}…`);
 
-    // Fetch delivery data + DB-backed status flow in parallel
-    const [deliveryRes, itemCountRes, flowMap] = await Promise.all([
+    // Fetch delivery data, DB-backed status flow, and terminal statuses in parallel
+    const [deliveryRes, itemCountRes, flowMap, terminalStatuses] = await Promise.all([
       supabase
         .from("delivery_assignments")
         .select("eta_minutes, distance_meters, rider_name, status")
@@ -177,11 +191,8 @@ Deno.serve(async (req) => {
         .from("order_items")
         .select("id", { count: "exact", head: true })
         .eq("order_id", order_id),
-      getStatusFlowData(
-        supabase,
-        transaction_type || "cart_purchase",
-        parent_group || "default",
-      ),
+      getStatusFlowData(supabase),
+      loadTerminalStatuses(supabase),
     ]);
 
     let etaMinutes: number | null = null;
@@ -221,7 +232,7 @@ Deno.serve(async (req) => {
     };
 
     // Build APNs payload for Live Activity update
-    const isTerminal = TERMINAL_STATUSES.has(status);
+    const isTerminal = terminalStatuses.has(status);
     const apnsPayload: Record<string, unknown> = {
       aps: {
         timestamp: Math.floor(Date.now() / 1000),

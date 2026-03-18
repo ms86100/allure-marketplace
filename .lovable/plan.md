@@ -1,110 +1,81 @@
 
 
-# Round 6: Production Readiness Audit
+# iOS Live Activity Widget Redesign
 
-## Current State Summary
+## Problems Visible in Screenshot
 
-Rounds 1-5 addressed the major architectural issues. The system now has DB-backed status flows, GPS filtering, OSRM road ETA, Live Activity dedup/lifecycle, deep link 404 fix, stale ETA suppression, cart race conditions, and DB-backed emoji configuration. This round identifies the remaining gaps.
+1. Three duplicate "Your Order is Ready" cards stacked on top of each other (dedup issue still manifesting on device)
+2. A fourth card shows "We're Preparing Your Order" with nested duplicate content inside it
+3. The purple gradient card looks dated and lacks information hierarchy
+4. The dark card is functional but visually flat
+5. No order short ID visible to help buyers distinguish orders
+6. Emoji-heavy titles feel unpolished ("Your Order is Ready! 🎉")
+7. No meaningful contextual info per status (e.g., "Pickup from [seller]" when ready, ETA countdown when in transit)
 
----
+## What Changes
 
-## Finding 1: APNs edge function has hardcoded TERMINAL_STATUSES (HIGH)
+### A. ContentState — add `order_short_id` and `seller_logo_url`
 
-**File:** `supabase/functions/update-live-activity-apns/index.ts` line 31-33
+Add two new fields to `LiveDeliveryAttributes.ContentState`:
+- `orderShortId: String?` — last 4-8 chars of order ID for buyer recognition (e.g., "#7838")
+- `sellerLogoUrl: String?` — seller logo URL for a branded feel (rendered if available)
 
-The edge function uses a hardcoded `TERMINAL_STATUSES` set: `delivered, completed, cancelled, no_show, failed`. Unlike the client-side `LiveActivityManager` (which loads from DB via `getTerminalStatuses()`), the server-side APNs function does not query `category_status_flows.is_terminal`. If a new terminal status is added to the DB, the edge function will not recognize it and will send `update` instead of `end`, causing the Live Activity to persist after delivery.
+Update `LiveActivityData` interface in `definitions.ts` and the mapper/APNs edge function to populate these.
 
-**Fix:** Query `category_status_flows` for `is_terminal = true` at the start of the function invocation. Union with the safety-net defaults. Use that set for the `isTerminal` check.
+### B. Widget Visual Redesign
 
----
+Replace the current 3-branch lock screen layout with a single, unified, status-adaptive card:
 
-## Finding 2: APNs edge function uses `parent_group` filter, client does not (HIGH)
+**Layout structure (all statuses):**
+```text
+┌─────────────────────────────────────────────┐
+│  [SocivaIcon]  Seller Name        #7838     │
+│                                   2 items   │
+│                                             │
+│  Status Title (SF Symbol prefix)            │
+│  Contextual subtitle                        │
+│                                             │
+│  ═══════●🛵═══════════════  ETA 8 min       │
+└─────────────────────────────────────────────┘
+```
 
-**File:** `supabase/functions/update-live-activity-apns/index.ts` lines 92-98
+**Design principles:**
+- Single dark card with subtle status-tinted accent (not full gradient)
+- SF Symbols instead of emojis for status icons (checkmark.circle.fill, fork.knife, bag.fill, bicycle, mappin.and.ellipse)
+- Accent color changes per phase: amber (accepted/preparing), blue (ready), green (in transit), emerald (delivered)
+- Clean typography: `.subheadline.bold` for title, `.caption` for subtitle
+- Progress bar accent matches status color
+- ETA displayed inline with progress bar when available
+- Order short ID as a subtle badge in top-right
 
-`getStatusFlowData()` queries with `.eq("parent_group", parentGroup)` defaulting to `"default"`. The client-side `liveActivitySync.ts` and `statusFlowCache.ts` use `.in('transaction_type', ['cart_purchase', 'seller_delivery'])` with NO `parent_group` filter. This means the APNs function may get a different (smaller) set of flow entries than the client, causing mismatched `progressPercent` and `progressStage` values between client-triggered and server-triggered updates.
+**Status-specific content:**
+- **accepted**: "Order Confirmed" / "Seller is reviewing your order"
+- **preparing**: "Being Prepared" / "Your order is being made"
+- **ready**: "Ready for Pickup" / "Waiting to be picked up from {seller}"
+- **picked_up/on_the_way/en_route**: "On the Way" / "{driver} · {distance} km away" + ETA badge
+- **arrived**: "At Your Location" / "{driver} has arrived"
+- **delivered/completed**: "Delivered" / full progress, green accent, auto-dismiss
 
-**Fix:** Align the edge function query with the client: use `.in("transaction_type", ["cart_purchase", "seller_delivery"])` and remove the `parent_group` filter. Remove `parent_group` from `LAUpdatePayload` interface.
+**Dynamic Island (compact):**
+- Leading: SocivaIcon
+- Trailing: ETA in green if available, else mini progress ring
 
----
+**Dynamic Island (expanded):**
+- Same clean layout as lock screen but condensed
+- No gradient backgrounds, just the standard Dynamic Island dark
 
-## Finding 3: `syncActiveOrders` does not pass `order_number` to mapper (MEDIUM)
+### C. Files to Change
 
-**File:** `src/services/liveActivitySync.ts` line 57
+| File | Change |
+|------|--------|
+| `native/ios/LiveDeliveryAttributes.swift` | Add `orderShortId`, `sellerLogoUrl` to ContentState |
+| `native/ios/LiveDeliveryWidget.swift` | Full redesign of lock screen view, DI regions, helper functions |
+| `src/plugins/live-activity/definitions.ts` | Add `order_short_id`, `seller_logo_url` to LiveActivityData |
+| `src/services/liveActivityMapper.ts` | Populate new fields from order data |
+| `src/services/liveActivitySync.ts` | Pass `order_number` / short ID to mapper |
+| `supabase/functions/update-live-activity-apns/index.ts` | Include new fields in APNs content-state, fetch order number |
 
-The orders query selects `id, status, seller_id` but not `order_number`. The `buildLiveActivityData` function accepts `order.order_number` for generating a readable short ID (e.g., `#1234`). Without it, all Live Activity cards fall back to the last 4 hex chars of the UUID, which is less recognizable for buyers.
+### D. Scope Exclusion
 
-**Fix:** Add `order_number` to the select query in `syncActiveOrders`.
-
----
-
-## Finding 4: Orchestrator `handleOrderUpdate` does not pass `order_number` (MEDIUM)
-
-**File:** `src/hooks/useLiveActivityOrchestrator.ts` line 127
-
-When processing realtime order updates, `buildLiveActivityData` is called with `{ id: orderId, status: newStatus }` -- no `order_number`. Same effect as Finding 3.
-
-**Fix:** Include `order_number` in the order payload from the realtime event (`payload.new`), or fetch it from the DB alongside other data.
-
----
-
-## Finding 5: Orchestrator `handleOrderUpdate` does not pass `sellerLogoUrl` (MEDIUM)
-
-**File:** `src/hooks/useLiveActivityOrchestrator.ts` lines 117-132
-
-When a realtime order update triggers, the code fetches `business_name` from `seller_profiles` but does not fetch `logo_url`. The `buildLiveActivityData` call omits the `sellerLogoUrl` parameter entirely. This means Live Activity updates triggered by realtime events will lose the seller logo that was present during initial sync.
-
-**Fix:** Add `logo_url` to the seller profile select, and pass it as the `sellerLogoUrl` argument.
-
----
-
-## Finding 6: Swift `OrderPhase.from()` has hardcoded status-to-phase mapping (LOW -- acceptable)
-
-**File:** `native/ios/LiveDeliveryWidget.swift` lines 57-67
-
-The `OrderPhase.from()` switch maps status strings to visual phases. This runs on-device in the widget extension and cannot make DB calls. The mapping covers all known statuses and has a safe default (`.confirmed`). This is an acceptable native-layer constraint -- the status keys themselves are DB-backed, and the widget simply maps them to visual representations.
-
-No action needed.
-
----
-
-## Finding 7: `LiveActivityManager` hardcoded fallback sets are defensive only (LOW -- acceptable)
-
-**File:** `src/services/LiveActivityManager.ts` lines 42-47
-
-The hardcoded `TERMINAL_STATUSES` and `START_STATUSES` are fallbacks used only if `loadStatusSets()` fails. They are immediately replaced by DB-backed values during hydration. This is correct defensive programming.
-
-No action needed.
-
----
-
-## Verified: All Previously Fixed Items
-
-| Area | Status | Evidence |
-|------|--------|----------|
-| GPS filtering (Kalman-lite) | Verified | `gps-filter.ts` + `useDeliveryTracking.ts` |
-| Smooth marker interpolation | Verified | CSS transitions in `OrderDetailPage` |
-| OSRM road ETA | Verified | `useOSRMRoute` hook |
-| Proximity states (DB-backed) | Verified | `proximity_thresholds` in system_settings |
-| Deep link 404 prevention | Verified | `KNOWN_ROUTES` validation in `useDeepLinks.ts` |
-| Live Activity dedup (hydration) | Verified | `_doHydrate()` in `LiveActivityManager` |
-| Native-layer dedup (start) | Verified | `getActiveActivities()` check before `startLiveActivity` |
-| Activity lifecycle termination | Verified | Terminal status check in `push()` |
-| Stale ETA suppression | Verified | `getSmartEta` returns null when stale |
-| Cart race conditions | Verified | Mutation barrier + reconciliation in `useCart` |
-| DB-backed active statuses (sync) | Verified | `getStartStatuses()` in `liveActivitySync.ts` |
-| DB-backed flow entries (orchestrator) | Verified | `seller_delivery` included in query |
-| DB-backed emoji config | Verified | `delivery_status_labels` in `DeliveryStatusCard` |
-| AddressPicker forwardRef | Verified | Wrapped in `React.forwardRef` |
-
----
-
-## Implementation Plan
-
-| Step | What | Severity | Files |
-|------|------|----------|-------|
-| 1 | Replace hardcoded `TERMINAL_STATUSES` in APNs edge function with DB query | High | `supabase/functions/update-live-activity-apns/index.ts` |
-| 2 | Align APNs flow query: use `.in()` for transaction_type, remove `parent_group` filter | High | `supabase/functions/update-live-activity-apns/index.ts` |
-| 3 | Add `order_number` to sync query and orchestrator handler | Medium | `src/services/liveActivitySync.ts`, `src/hooks/useLiveActivityOrchestrator.ts` |
-| 4 | Add `logo_url` to orchestrator's seller profile fetch and pass to mapper | Medium | `src/hooks/useLiveActivityOrchestrator.ts` |
+The duplicate card issue (3x "Ready" cards in screenshot) is a LiveActivityManager dedup problem, not a widget design issue. That is tracked separately and is addressed by the existing hydration dedup logic. This plan focuses solely on the visual and informational quality of the widget.
 
