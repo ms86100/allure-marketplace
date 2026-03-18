@@ -294,6 +294,46 @@ export function useLiveActivityOrchestrator(): void {
     };
   }, [userId, doSync]);
 
+  // ── Polling heartbeat: safety net for dead realtime connections ──
+  useEffect(() => {
+    if (!userId || !Capacitor.isNativePlatform()) return;
+
+    const POLL_INTERVAL_MS = 45_000; // 45 seconds
+    /** Last-known statuses to avoid redundant processing */
+    const lastKnownRef = new Map<string, string>();
+
+    const poll = async () => {
+      if (!mountedRef.current) return;
+      const terminalArr = [...terminalStatusesCache];
+      try {
+        const { data } = await supabase
+          .from('orders')
+          .select('id, status')
+          .eq('buyer_id', userId)
+          .not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`);
+
+        if (!data || data.length === 0) return;
+
+        let hasMismatch = false;
+        for (const order of data) {
+          if (lastKnownRef.get(order.id) !== order.status) {
+            hasMismatch = true;
+            lastKnownRef.set(order.id, order.status);
+          }
+        }
+
+        if (hasMismatch) {
+          console.log(TAG, 'Polling heartbeat detected status change — re-syncing');
+          await syncActiveOrders(userId);
+        }
+      } catch { /* best-effort */ }
+    };
+
+    const intervalId = setInterval(poll, POLL_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [userId]);
+
   // ── App resume re-hydration (one-shot sync) ──
   useEffect(() => {
     if (!userId || !Capacitor.isNativePlatform()) return;
