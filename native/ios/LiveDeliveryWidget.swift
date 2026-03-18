@@ -115,7 +115,7 @@ struct LiveDeliveryWidget: Widget {
         } dynamicIsland: { context in
             let phase = OrderPhase.from(context.state.workflowStatus)
 
-            DynamicIsland {
+            return DynamicIsland {
                 // ── Expanded ──
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 6) {
