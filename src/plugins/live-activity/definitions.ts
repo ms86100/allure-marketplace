@@ -41,4 +41,5 @@ export interface LiveActivityPlugin {
   endLiveActivity(opts: { activityId: string }): Promise<void>;
   getActiveActivities(): Promise<{ activities: ActiveActivityEntry[] }>;
   cleanupStaleActivities(opts: { validEntityIds: string[] }): Promise<void>;
+  addListener?(eventName: string, callback: (data: any) => void): any;
 }
