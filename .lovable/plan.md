@@ -1,81 +1,102 @@
 
 
-# iOS Live Activity Widget Redesign
+# Round 8: Production Readiness Audit
 
-## Problems Visible in Screenshot
+## Current State Assessment
 
-1. Three duplicate "Your Order is Ready" cards stacked on top of each other (dedup issue still manifesting on device)
-2. A fourth card shows "We're Preparing Your Order" with nested duplicate content inside it
-3. The purple gradient card looks dated and lacks information hierarchy
-4. The dark card is functional but visually flat
-5. No order short ID visible to help buyers distinguish orders
-6. Emoji-heavy titles feel unpolished ("Your Order is Ready! 🎉")
-7. No meaningful contextual info per status (e.g., "Pickup from [seller]" when ready, ETA countdown when in transit)
+After 7 rounds of hardening, the system is architecturally sound. All major subsystems are DB-backed:
 
-## What Changes
+- **Status lifecycle:** `category_status_flows` drives terminal/start sets via `statusFlowCache.ts`
+- **Tracking config:** 18 parameters loaded from `system_settings` via `trackingConfig.ts`
+- **Proximity thresholds:** DB-backed in both client (`LiveDeliveryTracker`) and server (`update-delivery-location`)
+- **Status labels/emojis:** DB-backed via `delivery_status_labels` in `system_settings`
+- **Live Activity progress/stages:** DB-backed via `category_status_flows` sort_order and display_label
+- **Terminal status detection (APNs):** DB query to `category_status_flows.is_terminal`
 
-### A. ContentState — add `order_short_id` and `seller_logo_url`
+All hardcoded values that remain are defensive safety-net fallbacks used only when DB queries fail. This is correct defensive programming.
 
-Add two new fields to `LiveDeliveryAttributes.ContentState`:
-- `orderShortId: String?` — last 4-8 chars of order ID for buyer recognition (e.g., "#7838")
-- `sellerLogoUrl: String?` — seller logo URL for a branded feel (rendered if available)
+---
 
-Update `LiveActivityData` interface in `definitions.ts` and the mapper/APNs edge function to populate these.
+## Finding 1: Delivery assignment exclusion filter is hardcoded (MEDIUM)
 
-### B. Widget Visual Redesign
+**Files:** `src/services/liveActivitySync.ts` line 82, `src/hooks/useLiveActivityOrchestrator.ts` line 115
 
-Replace the current 3-branch lock screen layout with a single, unified, status-adaptive card:
+Both files filter delivery assignments with `.not('status', 'in', '("cancelled","failed")')`. These two statuses are hardcoded inline rather than derived from `getTerminalStatuses()`. If a new terminal delivery status is added (e.g., `rejected`, `expired`), these filters will still return those assignments, potentially showing stale delivery data.
 
-**Layout structure (all statuses):**
-```text
-┌─────────────────────────────────────────────┐
-│  [SocivaIcon]  Seller Name        #7838     │
-│                                   2 items   │
-│                                             │
-│  Status Title (SF Symbol prefix)            │
-│  Contextual subtitle                        │
-│                                             │
-│  ═══════●🛵═══════════════  ETA 8 min       │
-└─────────────────────────────────────────────┘
-```
+**Fix:** Use the already-loaded terminal statuses set to build the exclusion filter dynamically.
 
-**Design principles:**
-- Single dark card with subtle status-tinted accent (not full gradient)
-- SF Symbols instead of emojis for status icons (checkmark.circle.fill, fork.knife, bag.fill, bicycle, mappin.and.ellipse)
-- Accent color changes per phase: amber (accepted/preparing), blue (ready), green (in transit), emerald (delivered)
-- Clean typography: `.subheadline.bold` for title, `.caption` for subtitle
-- Progress bar accent matches status color
-- ETA displayed inline with progress bar when available
-- Order short ID as a subtle badge in top-right
+---
 
-**Status-specific content:**
-- **accepted**: "Order Confirmed" / "Seller is reviewing your order"
-- **preparing**: "Being Prepared" / "Your order is being made"
-- **ready**: "Ready for Pickup" / "Waiting to be picked up from {seller}"
-- **picked_up/on_the_way/en_route**: "On the Way" / "{driver} · {distance} km away" + ETA badge
-- **arrived**: "At Your Location" / "{driver} has arrived"
-- **delivered/completed**: "Delivered" / full progress, green accent, auto-dismiss
+## Finding 2: `DEFAULT_ICON_MAP` and `DEFAULT_COLOR_MAP` in DeliveryStatusCard not DB-backed (LOW -- acceptable)
 
-**Dynamic Island (compact):**
-- Leading: SocivaIcon
-- Trailing: ETA in green if available, else mini progress ring
+**File:** `src/components/delivery/DeliveryStatusCard.tsx` lines 39-58
 
-**Dynamic Island (expanded):**
-- Same clean layout as lock screen but condensed
-- No gradient backgrounds, just the standard Dynamic Island dark
+These map delivery statuses to Lucide icon names and Tailwind color classes. They are visual presentation defaults used when `delivery_status_labels` DB config does not include `icon` or `color` keys. The DB config already supports overriding these via `icon` and `color` keys in the JSON. This is correct layering.
 
-### C. Files to Change
+No action needed.
 
-| File | Change |
+---
+
+## Finding 3: `KNOWN_ROUTES` in useDeepLinks is hardcoded (LOW -- acceptable)
+
+**File:** `src/hooks/useDeepLinks.ts` lines 9-12
+
+Frontend route segments are inherently code-level concerns. Adding a new route always requires a code change. This cannot be DB-backed because it must be available synchronously at deep link parse time before any DB query completes.
+
+No action needed.
+
+---
+
+## Finding 4: `DEFAULT_PROXIMITY` in LiveDeliveryTracker (LOW -- acceptable)
+
+**File:** `src/components/delivery/LiveDeliveryTracker.tsx` lines 40-47
+
+Defensive fallbacks used only when `proximity_thresholds` system_setting is absent. The DB value is confirmed present and active per network responses.
+
+No action needed.
+
+---
+
+## Finding 5: `DEFAULTS` in trackingConfig.ts (LOW -- acceptable)
+
+**File:** `src/services/trackingConfig.ts` lines 29-48
+
+Defensive fallbacks for all 18 tracking parameters. DB values take precedence. These exist solely to prevent crashes if system_settings query fails.
+
+No action needed.
+
+---
+
+## Verified: All Previously Fixed Items (Rounds 1-7)
+
+| Area | Status |
 |------|--------|
-| `native/ios/LiveDeliveryAttributes.swift` | Add `orderShortId`, `sellerLogoUrl` to ContentState |
-| `native/ios/LiveDeliveryWidget.swift` | Full redesign of lock screen view, DI regions, helper functions |
-| `src/plugins/live-activity/definitions.ts` | Add `order_short_id`, `seller_logo_url` to LiveActivityData |
-| `src/services/liveActivityMapper.ts` | Populate new fields from order data |
-| `src/services/liveActivitySync.ts` | Pass `order_number` / short ID to mapper |
-| `supabase/functions/update-live-activity-apns/index.ts` | Include new fields in APNs content-state, fetch order number |
+| GPS Kalman-lite filter | Verified in `gps-filter.ts` + `useDeliveryTracking.ts` |
+| Smooth marker interpolation | Verified via CSS transitions |
+| OSRM road ETA | Verified in `useOSRMRoute` |
+| Proximity states (DB-backed) | Verified in `system_settings` + edge function |
+| Deep link 404 prevention | Verified in `useDeepLinks.ts` |
+| Live Activity dedup (hydration) | Verified in `LiveActivityManager._doHydrate()` |
+| Native-layer dedup (start) | Verified via `getActiveActivities()` check |
+| Activity lifecycle termination | Verified via terminal status check in `push()` |
+| Stale ETA suppression | Verified in `getSmartEta` |
+| Cart race conditions | Verified via mutation barrier |
+| DB-backed active statuses (sync) | Verified: `getStartStatuses()` in `liveActivitySync.ts` |
+| DB-backed flow entries (orchestrator) | Verified: `seller_delivery` included |
+| DB-backed emoji config | Verified in `DeliveryStatusCard` |
+| APNs terminal statuses (DB query) | Verified in `loadTerminalStatuses()` |
+| APNs flow query aligned | Verified: `.in('transaction_type', ...)` |
+| Seller logo (correct column) | Verified: `profile_image_url` |
+| Proximity thresholds in edge function | Verified: `loadProximityThresholds()` |
+| Location stale threshold (DB-backed) | Verified: `getTrackingConfigSync().location_stale_threshold_ms` |
 
-### D. Scope Exclusion
+---
 
-The duplicate card issue (3x "Ready" cards in screenshot) is a LiveActivityManager dedup problem, not a widget design issue. That is tracked separately and is addressed by the existing hydration dedup logic. This plan focuses solely on the visual and informational quality of the widget.
+## Implementation Plan
+
+| Step | What | Severity | Files |
+|------|------|----------|-------|
+| 1 | Replace hardcoded `("cancelled","failed")` delivery assignment exclusion with DB-backed terminal statuses | Medium | `src/services/liveActivitySync.ts`, `src/hooks/useLiveActivityOrchestrator.ts` |
+
+This is the only remaining actionable finding. The system passes the acceptance criteria for production readiness.
 
