@@ -169,7 +169,7 @@ Deno.serve(async (req) => {
     }
 
     const payload: LAUpdatePayload = await req.json();
-    const { order_id, status, push_token, seller_name, seller_logo_url, transaction_type, parent_group } = payload;
+    const { order_id, status, push_token, seller_name, seller_logo_url } = payload;
 
     if (!order_id || !status || !push_token) {
       return new Response(
