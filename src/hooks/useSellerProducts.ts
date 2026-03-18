@@ -192,9 +192,9 @@ export function useSellerProducts() {
     if (!formData.name.trim() || !formData.category) { toast.error('Please fill in all required fields', { id: 'product-validation' }); return; }
     const price = parseFloat(formData.price);
     const actionNeedsPrice = !['contact_seller', 'request_quote', 'make_offer'].includes(formData.action_type);
-    if (actionNeedsPrice && (isNaN(price) || price <= 0)) { toast.error('Please enter a valid price'); return; }
-    if (formData.action_type === 'contact_seller' && !formData.contact_phone.trim()) { toast.error('Phone number is required for Contact Seller action'); return; }
-    if (formData.contact_phone.trim() && !/^[\d+\-\s()]{7,15}$/.test(formData.contact_phone.trim())) { toast.error('Please enter a valid phone number'); return; }
+    if (actionNeedsPrice && (isNaN(price) || price <= 0)) { toast.error('Please enter a valid price', { id: 'product-validation' }); return; }
+    if (formData.action_type === 'contact_seller' && !formData.contact_phone.trim()) { toast.error('Phone number is required for Contact Seller action', { id: 'product-validation' }); return; }
+    if (formData.contact_phone.trim() && !/^[\d+\-\s()]{7,15}$/.test(formData.contact_phone.trim())) { toast.error('Please enter a valid phone number', { id: 'product-validation' }); return; }
 
     setIsSaving(true);
     try {
