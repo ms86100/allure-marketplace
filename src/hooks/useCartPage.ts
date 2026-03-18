@@ -291,9 +291,9 @@ export function useCartPage() {
       clearCart(); await refresh(); hapticNotification('success');
       requestFullPermission().catch(() => {});
       supabase.functions.invoke('process-notification-queue').catch(() => {});
-      if (orderIds.length === 1) { toast.success('Order placed successfully!'); navigate(`/orders/${orderIds[0]}`); }
-      else { toast.success(`${orderIds.length} orders placed successfully!`); navigate('/orders'); }
-    } catch (error: any) { console.error('Error placing order:', error); toast.error(friendlyError(error)); }
+      if (orderIds.length === 1) { toast.success('Order placed successfully!', { id: 'order-placed' }); navigate(`/orders/${orderIds[0]}`); }
+      else { toast.success(`${orderIds.length} orders placed successfully!`, { id: 'order-placed' }); navigate('/orders'); }
+    } catch (error: any) { console.error('Error placing order:', error); toast.error(friendlyError(error), { id: 'checkout-error' }); }
     finally { setIsPlacingOrder(false); }
   };
 
