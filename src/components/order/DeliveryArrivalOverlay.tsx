@@ -3,6 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Phone, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+interface ProximityMessages {
+  at_doorstep_title?: string;
+  arriving_title?: string;
+  subtitle?: string;
+}
+
 interface DeliveryArrivalOverlayProps {
   distance: number | null;
   eta: number | null;
@@ -11,6 +17,8 @@ interface DeliveryArrivalOverlayProps {
   status: string | null;
   onDismiss: () => void;
   deliveryCode?: string | null;
+  /** DB-backed proximity messages */
+  proximityMessages?: ProximityMessages;
 }
 
 export function DeliveryArrivalOverlay({
