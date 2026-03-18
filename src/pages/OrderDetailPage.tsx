@@ -57,6 +57,7 @@ export default function OrderDetailPage() {
   const isDeliveryOrder = ['delivery', 'seller_delivery'].includes(fulfillmentType);
 
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
+  const trackingConfig = useTrackingConfig();
 
   // Gap A: Fetch delivery OTP for buyer display
 
@@ -136,7 +137,6 @@ export default function OrderDetailPage() {
   const isInTransit = o.isInTransit;
 
   // Gap G: Only show arrival overlay for BUYER when rider is close — uses DB-backed threshold
-  const trackingConfig = useTrackingConfig();
   const showArrivalOverlay = o.isBuyerView && deliveryAssignmentId && deliveryTracking.riderLocation && deliveryTracking.distance != null && deliveryTracking.distance < trackingConfig.arrival_overlay_distance_meters;
 
 
@@ -471,7 +471,7 @@ export default function OrderDetailPage() {
       {showArrivalOverlay && (
         <DeliveryArrivalOverlay
           distance={deliveryTracking.distance}
-          eta={deliveryTracking.eta}
+          eta={deliveryTracking.distance != null && deliveryTracking.distance < 500 ? Math.max(1, Math.ceil(deliveryTracking.distance / 1000 * 4)) : (roadEtaMinutes ?? deliveryTracking.eta)}
           riderName={deliveryTracking.riderName}
           riderPhone={deliveryTracking.riderPhone}
           status={deliveryTracking.status}
