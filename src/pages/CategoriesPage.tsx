@@ -329,6 +329,7 @@ export default function CategoriesPage() {
                               fallbackIcon={cat.icon}
                               fallbackUrl={cat.imageUrl}
                               alt={cat.displayName}
+                              color={cat.color}
                             />
 
                             {/* Gradient overlay */}
