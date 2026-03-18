@@ -227,7 +227,7 @@ export function useCartPage() {
 
     for (const group of sellerGroups) {
       const minOrder = (group.items[0]?.product?.seller as any)?.minimum_order_amount;
-      if (minOrder && group.subtotal < minOrder) { toast.error(`${group.sellerName} requires a minimum order of ${formatPrice(minOrder)}. Your current total is ${formatPrice(group.subtotal)}.`); return; }
+      if (minOrder && group.subtotal < minOrder) { toast.error(`${group.sellerName} requires a minimum order of ${formatPrice(minOrder)}. Your current total is ${formatPrice(group.subtotal)}.`, { id: 'checkout-min-order' }); return; }
     }
 
     setIsPlacingOrder(true);
