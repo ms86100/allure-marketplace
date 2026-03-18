@@ -93,7 +93,7 @@ export function useSellerSettings() {
 
   const handleCategoryChange = (category: ProductCategory, checked: boolean) => {
     const allowedCategories = primaryGroup ? groupedConfigs[primaryGroup]?.map(c => c.category) || [] : [];
-    if (!allowedCategories.includes(category as any) && checked) { toast.error(`This category is not available in your ${primaryGroup} group`); return; }
+    if (!allowedCategories.includes(category as any) && checked) { toast.error(`This category is not available in your ${primaryGroup} group`, { id: 'settings-category' }); return; }
     setFormData(prev => ({ ...prev, categories: checked ? [...prev.categories, category] : prev.categories.filter(c => c !== category) }));
   };
 
