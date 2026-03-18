@@ -230,7 +230,7 @@ export default function OrderDetailPage() {
             </>
           )}
           {/* Seller self-delivery GPS broadcasting */}
-          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by === 'seller' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
+          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
             <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart />
           )}
           {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}
@@ -298,7 +298,7 @@ export default function OrderDetailPage() {
             </div>
             <div className="border-t border-border pt-3 mt-3 space-y-1.5 text-sm">
               {(order as any).discount_amount > 0 && <div className="flex justify-between text-primary"><span>Discount</span><span>-{o.formatPrice((order as any).discount_amount)}</span></div>}
-              <div className="flex justify-between"><span className="text-muted-foreground">Delivery</span>{o.orderFulfillmentType === 'delivery' ? <span className={`font-medium ${(order as any).delivery_fee > 0 ? '' : 'text-primary'}`}>{(order as any).delivery_fee > 0 ? o.formatPrice((order as any).delivery_fee) : 'FREE'}</span> : <span className="text-muted-foreground">Self Pickup</span>}</div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Delivery</span>{isDeliveryOrder ? <span className={`font-medium ${(order as any).delivery_fee > 0 ? '' : 'text-primary'}`}>{(order as any).delivery_fee > 0 ? o.formatPrice((order as any).delivery_fee) : 'FREE'}</span> : <span className="text-muted-foreground">Self Pickup</span>}</div>
               <div className="flex justify-between font-bold pt-1 border-t border-border"><span>Total</span><span>{o.formatPrice(order.total_amount)}</span></div>
             </div>
           </div>

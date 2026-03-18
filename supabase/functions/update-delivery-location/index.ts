@@ -279,7 +279,7 @@ serve(async (req) => {
     if (
       assignment.last_location_at &&
       !assignment.stalled_notified &&
-      ['picked_up', 'at_gate'].includes(assignment.status)
+      ['picked_up', 'at_gate', 'on_the_way'].includes(assignment.status)
     ) {
       const lastAt = new Date(assignment.last_location_at).getTime();
       const staleDiffMs = Date.now() - lastAt;

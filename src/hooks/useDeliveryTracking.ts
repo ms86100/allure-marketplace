@@ -100,7 +100,7 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
         const d = payload.new as any;
         setState(prev => ({
           ...prev,
-          status: d.status,
+          status: d.status ?? prev.status,
           riderName: d.rider_name ?? prev.riderName,
           riderPhone: d.rider_phone ?? prev.riderPhone,
           riderPhotoUrl: d.rider_photo_url ?? prev.riderPhotoUrl,
