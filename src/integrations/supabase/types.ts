@@ -1644,7 +1644,7 @@ export type Database = {
           rider_name: string | null
           rider_phone: string | null
           rider_photo_url: string | null
-          society_id: string
+          society_id: string | null
           stalled_notified: boolean | null
           status: string
           updated_at: string
@@ -1681,7 +1681,7 @@ export type Database = {
           rider_name?: string | null
           rider_phone?: string | null
           rider_photo_url?: string | null
-          society_id: string
+          society_id?: string | null
           stalled_notified?: boolean | null
           status?: string
           updated_at?: string
@@ -1718,7 +1718,7 @@ export type Database = {
           rider_name?: string | null
           rider_phone?: string | null
           rider_photo_url?: string | null
-          society_id?: string
+          society_id?: string | null
           stalled_notified?: boolean | null
           status?: string
           updated_at?: string
