@@ -80,10 +80,12 @@ export function DeliveryArrivalOverlay({
                 <MapPin size={28} className="text-primary" />
               </motion.div>
               <h2 className="text-lg font-bold text-foreground">
-                {distance !== null && distance < 50 ? '🏠 At your doorstep!' : '🏃 Driver arriving now!'}
+                {distance !== null && distance < 50
+                  ? (proximityMessages?.at_doorstep_title || '🏠 At your doorstep!')
+                  : (proximityMessages?.arriving_title || '🏃 Driver arriving now!')}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Please get ready to receive your order
+                {proximityMessages?.subtitle || 'Please get ready to receive your order'}
               </p>
             </div>
 
