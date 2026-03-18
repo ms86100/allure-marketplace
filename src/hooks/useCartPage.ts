@@ -404,7 +404,7 @@ export function useCartPage() {
   const sessionAmount = activeSession?.amount || 0;
 
   return {
-    user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading,
+    user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading, hasHydrated,
     notes, setNotes, paymentMethod, setPaymentMethod,
     isPlacingOrder, showRazorpayCheckout, showUpiDeepLink, setShowUpiDeepLink, pendingOrderIds, paymentMode,
     appliedCoupon, setAppliedCoupon, showConfirmDialog, setShowConfirmDialog,
