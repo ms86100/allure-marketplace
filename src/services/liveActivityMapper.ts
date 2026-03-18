@@ -24,6 +24,9 @@ const STATUS_PROGRESS: Record<string, number> = {
   completed: 1.0,
 };
 
+/** Reasonable max distance (km) for progress interpolation heuristic */
+const MAX_DELIVERY_DISTANCE_KM = 10;
+
 /**
  * Maps order status + delivery info into a meaningful progress stage string.
  */
