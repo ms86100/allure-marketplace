@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MessageCircle, ChevronRight, Heart, ArrowRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { jitteredStaleTime } from '@/lib/query-utils';
+import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 interface RecentPost {
   id: string;
