@@ -1,75 +1,73 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Silent Push Optimization)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+## Fix Toast Notification Noise & Overlap
 
-## Silent Push Optimization: COMPLETE
+### Root Cause Analysis
 
-### What It Does
-Reduces push notification noise for mid-flow order statuses when Live Activity is already tracking the order on the lock screen. In-app notification history and badge counts are always preserved.
+There are **3 independent toast sources** that fire simultaneously for order status changes:
 
-### Notification Matrix
+1. **`useBuyerOrderAlerts.ts`** — Realtime Postgres listener on `orders` table. Fires a sonner toast for every status change (accepted, preparing, ready, etc.)
+2. **`usePushNotifications.ts`** — Foreground push notification listener. Shows a sonner toast when a push arrives while app is open
+3. **`useCartPage.ts`** — Direct toast calls during order placement flow (success, error, validation)
 
-| Status | Push? | Live Activity? | Rationale |
-|--------|-------|----------------|-----------|
-| `accepted` | ✅ Always | Yes | Critical — order confirmed |
-| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
-| `ready` | ✅ Always | Yes | Pickup moment — user must know |
-| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
-| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
-| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
-| `delivered` | ✅ Always | Yes | Critical endpoint |
-| `completed` | ✅ Always | No | Critical endpoint |
-| `cancelled` | ✅ Always | No | Critical — must alert |
-| All service/booking | ✅ Always | No | No Live Activity for these |
+When an order is placed or status changes, sources 1 + 2 fire nearly simultaneously, creating stacked/overlapping toasts. Source 3 adds more during checkout.
 
-### Implementation
+### Plan
 
-1. **DB column**: `category_status_flows.silent_push` (boolean, default false)
-2. **DB trigger**: `fn_enqueue_order_status_notification` includes `silent_push` in notification payload
-3. **Edge function**: `process-notification-queue` skips APNs/FCM delivery when `silent_push = true`, but still inserts `user_notifications` for in-app history
+#### 1. Deduplicate realtime alerts with push notifications
 
-## Phase I Live Activities — CI Pipeline Status
+**File: `src/hooks/useBuyerOrderAlerts.ts`**
 
-### Codemagic Build Pipeline: COMPLETE
+- Add `toast.dismiss()` before showing new toast to prevent stacking
+- Use unique toast IDs per order+status: `toast(msg.title, { id: \`order-\${orderId}-\${newStatus}\`, ... })`
+- This ensures if push notification already showed the same update, sonner deduplicates by ID
 
-Both `ios-release` and `release-all` workflows now include:
+**File: `src/hooks/usePushNotifications.ts`** (line ~344)
 
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+- Use the same ID pattern for order-related push toasts: extract `order_id` and `status` from notification data, use `{ id: \`order-\${orderId}-\${status}\` }`
+- Non-order notifications keep random IDs (no change)
 
-### Codemagic Requirements (User Action)
+#### 2. Suppress mid-flow realtime toasts during active checkout
 
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
+**File: `src/hooks/useBuyerOrderAlerts.ts`**
 
-### Runtime Call Chain (Verified)
+- Skip toast for status `pending` (just created, user already knows)
+- Skip toast if user is currently on the cart page (placing order) — check `window.location.hash.includes('/cart')`
 
-```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
-```
+#### 3. Limit visible toasts globally
 
-## Implementation Matrix
+**File: `src/components/ui/sonner.tsx`**
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+- Add `visibleToasts={1}` prop to the Sonner `<Toaster>` — only 1 toast visible at a time, newer replaces older
+- Add `gap={8}` for clean spacing if multiple allowed later
+
+#### 4. Add unique IDs to all cart/checkout toasts
+
+**File: `src/hooks/useCartPage.ts`**
+
+- Already partially done. Ensure ALL toast calls use unique IDs:
+  - `toast.success('Order placed...', { id: 'order-placed' })`
+  - `toast.error('...unavailable...', { id: 'checkout-validation' })`
+  - etc.
+
+#### 5. Smooth toast animations (already built-in)
+
+Sonner already has smooth enter/exit animations. Setting `visibleToasts={1}` with `position="bottom-center"` ensures clean, non-overlapping display. No custom animation code needed.
+
+### Files to Change
+
+| File | Change |
+|------|--------|
+| `src/components/ui/sonner.tsx` | Add `visibleToasts={1}` to limit stacking |
+| `src/hooks/useBuyerOrderAlerts.ts` | Add unique toast IDs per order+status, skip during checkout |
+| `src/hooks/usePushNotifications.ts` | Use matching toast IDs for order push notifications |
+| `src/hooks/useCartPage.ts` | Ensure all toasts have unique IDs |
+
+### What This Achieves
+
+- Only 1 toast visible at a time — no overlap with UI elements
+- Duplicate alerts from realtime + push are deduplicated by ID
+- Cart page doesn't show redundant "order created" alerts
+- Existing sonner animations provide polished transitions
+- No breaking changes to notification history or push delivery
+
