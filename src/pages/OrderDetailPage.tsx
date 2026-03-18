@@ -51,7 +51,7 @@ export default function OrderDetailPage() {
   // Live Activity is now handled globally by useLiveActivityOrchestrator
 
   useEffect(() => {
-    if (fulfillmentType === 'delivery' && orderId) {
+    if (isDeliveryOrder && orderId) {
       const fetchAssignment = () => {
         supabase
           .from('delivery_assignments')
