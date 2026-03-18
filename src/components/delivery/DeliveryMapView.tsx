@@ -10,6 +10,7 @@ interface DeliveryMapViewProps {
   destinationLng: number;
   riderName?: string | null;
   heading?: number | null;
+  onRoadEtaChange?: (eta: number | null) => void;
 }
 
 // Rider icon with rotation support
