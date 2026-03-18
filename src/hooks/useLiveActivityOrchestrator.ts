@@ -112,7 +112,7 @@ export function useLiveActivityOrchestrator(): void {
             .from('delivery_assignments')
             .select('eta_minutes, distance_meters, rider_name')
             .eq('order_id', orderId)
-            .not('status', 'in', '("cancelled","failed")')
+            .not('status', 'in', `(${[...terminalStatusesCache].map(s => `"${s}"`).join(',')})`)
             .maybeSingle(),
           sellerId
             ? supabase.from('seller_profiles').select('business_name, profile_image_url').eq('id', sellerId).maybeSingle()
