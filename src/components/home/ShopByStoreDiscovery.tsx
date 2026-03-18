@@ -15,6 +15,11 @@ import { Store, Star, MapPin, ChevronDown, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
+/** Replaces pure-numeric business names (e.g. phone numbers) with a fallback */
+function sanitizeSellerName(name: string): string {
+  return /^\d+$/.test(name.trim()) ? 'Local Seller' : name;
+}
+
 export function ShopByStoreDiscovery() {
   const { effectiveSociety, profile } = useAuth();
   const browseBeyond = profile?.browse_beyond_community ?? true;
@@ -170,7 +175,7 @@ function SocietyCard({ society }: { society: SocietyGroup }) {
               </div>
               <div className="px-1.5 pb-2 pt-1.5 text-center">
                 <p className="font-bold text-foreground line-clamp-2 leading-tight text-[9px]">
-                  {seller.business_name}
+                  {sanitizeSellerName(seller.business_name)}
                 </p>
                 {seller.rating > 0 && (
                   <div className="flex items-center justify-center gap-0.5 mt-0.5">
@@ -235,7 +240,7 @@ function CategorySellerRow({
               </div>
               <div className="px-1.5 pb-2 pt-1.5 text-center">
                 <p className={cn('font-bold text-foreground line-clamp-2 leading-tight', compact ? 'text-[9px]' : 'text-[11px]')}>
-                  {seller.business_name}
+                  {sanitizeSellerName(seller.business_name)}
                 </p>
                 {seller.rating > 0 && (
                   <div className="flex items-center justify-center gap-0.5 mt-0.5">

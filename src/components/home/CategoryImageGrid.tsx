@@ -52,19 +52,22 @@ function buildCategoryMeta(
 
 /* ── Image collage ──────────── */
 
-function ImageCollage({ images, fallbackIcon, fallbackUrl, alt }: {
+function ImageCollage({ images, fallbackIcon, fallbackUrl, alt, color }: {
   images: string[];
   fallbackIcon: string;
   fallbackUrl?: string | null;
   alt: string;
+  color?: string | null;
 }) {
   if (images.length === 0 && fallbackUrl) {
     return <img src={fallbackUrl} alt={alt} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />;
   }
   if (images.length === 0) {
     return (
-      <div className="absolute inset-0 bg-muted flex items-center justify-center">
-        <DynamicIcon name={fallbackIcon} size={32} className="text-muted-foreground" />
+      <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: color ? `${color}15` : undefined }}>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: color ? `${color}25` : undefined }}>
+          <DynamicIcon name={fallbackIcon} size={28} className="text-foreground/60" style={color ? { color } : undefined} />
+        </div>
       </div>
     );
   }
@@ -137,6 +140,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                   fallbackIcon={cat.icon}
                   fallbackUrl={cat.imageUrl}
                   alt={cat.displayName}
+                  color={cat.color}
                 />
                 {/* Gradient overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
