@@ -97,7 +97,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
       (deliveriesResult.data ?? []).map((d: any) => [d.order_id, d])
     );
     const sellerMap = new Map(
-      (sellersResult.data ?? []).map((s: any) => [s.id, { name: s.business_name, logo: s.logo_url }])
+      (sellersResult.data ?? []).map((s: any) => [s.id, { name: s.business_name, logo: s.profile_image_url }])
     );
     // Count items per order
     const itemCountMap = new Map<string, number>();
