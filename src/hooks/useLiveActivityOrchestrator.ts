@@ -143,14 +143,17 @@ export function useLiveActivityOrchestrator(): void {
       if (!row?.order_id) return;
 
       try {
-        const [orderRes, sellerRes] = await Promise.all([
+        const [orderRes, itemCountRes] = await Promise.all([
           supabase
             .from('orders')
             .select('id, status, buyer_id, seller_id')
             .eq('id', row.order_id)
             .eq('buyer_id', userId)
             .maybeSingle(),
-          Promise.resolve(null), // placeholder, resolved below
+          supabase
+            .from('order_items')
+            .select('id', { count: 'exact', head: true })
+            .eq('order_id', row.order_id),
         ]);
 
         const order = orderRes.data;
@@ -173,7 +176,7 @@ export function useLiveActivityOrchestrator(): void {
           distance_meters: row?.distance_meters,
           rider_name: row?.rider_name,
           vehicle_type: null,
-        }, sellerName);
+        }, sellerName, itemCountRes.count ?? null);
         await LiveActivityManager.push(data);
       } catch { /* best-effort */ }
     };

@@ -45,8 +45,8 @@ export async function syncActiveOrders(userId: string): Promise<number> {
     const orderIds = orders.map((o) => o.id);
     const sellerIds = [...new Set(orders.map((o) => o.seller_id).filter(Boolean))];
 
-    // Fetch deliveries and seller names in parallel
-    const [deliveriesResult, sellersResult] = await Promise.all([
+    // Fetch deliveries, seller names, and item counts in parallel
+    const [deliveriesResult, sellersResult, itemCountsResult] = await Promise.all([
       supabase
         .from('delivery_assignments')
         .select('order_id, eta_minutes, distance_meters, rider_name')
@@ -58,6 +58,10 @@ export async function syncActiveOrders(userId: string): Promise<number> {
             .select('id, business_name')
             .in('id', sellerIds)
         : Promise.resolve({ data: [] as any[] }),
+      supabase
+        .from('order_items')
+        .select('order_id')
+        .in('order_id', orderIds),
     ]);
 
     const deliveryMap = new Map(
@@ -66,11 +70,17 @@ export async function syncActiveOrders(userId: string): Promise<number> {
     const sellerMap = new Map(
       (sellersResult.data ?? []).map((s: any) => [s.id, s.business_name])
     );
+    // Count items per order
+    const itemCountMap = new Map<string, number>();
+    for (const item of (itemCountsResult.data ?? [])) {
+      itemCountMap.set(item.order_id, (itemCountMap.get(item.order_id) ?? 0) + 1);
+    }
 
     for (const order of orders) {
       const delivery = deliveryMap.get(order.id) ?? null;
       const sellerName = sellerMap.get(order.seller_id) ?? null;
-      const data = buildLiveActivityData(order, delivery, sellerName);
+      const itemCount = itemCountMap.get(order.id) ?? null;
+      const data = buildLiveActivityData(order, delivery, sellerName, itemCount);
       await LiveActivityManager.push(data);
     }
 

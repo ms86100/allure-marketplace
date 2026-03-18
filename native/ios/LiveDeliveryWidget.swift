@@ -2,7 +2,8 @@
  * LiveDeliveryWidget.swift
  *
  * Blinkit-style rich Live Activity widget with status-dependent
- * colored cards and animated progress bar with 🛵 scooter.
+ * colored cards, animated progress bar with 🛵 scooter,
+ * item counts, and deep-link tap support.
  */
 
 import SwiftUI
@@ -46,6 +47,19 @@ struct DeliveryProgressBar: View {
     }
 }
 
+// MARK: - Item Count Badge
+
+@available(iOS 16.1, *)
+struct ItemCountBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text("\(count) item\(count == 1 ? "" : "s")")
+            .font(.caption2)
+            .foregroundColor(.white.opacity(0.7))
+    }
+}
+
 // MARK: - Widget
 
 @available(iOS 16.1, *)
@@ -55,6 +69,7 @@ struct LiveDeliveryWidget: Widget {
         ActivityConfiguration(for: LiveDeliveryAttributes.self) { context in
             // ── Lock Screen Banner ──────────────────────────
             lockScreenView(context: context)
+                .widgetURL(URL(string: "sociva://orders/\(context.attributes.entityId)"))
 
         } dynamicIsland: { context in
             DynamicIsland {
@@ -74,6 +89,9 @@ struct LiveDeliveryWidget: Widget {
                                 .font(.caption)
                                 .fontWeight(.medium)
                                 .foregroundColor(.white)
+                            if let count = context.state.itemCount, count > 0 {
+                                ItemCountBadge(count: count)
+                            }
                         }
                     }
                 }
@@ -115,6 +133,10 @@ struct LiveDeliveryWidget: Widget {
                         .font(.caption)
                         .bold()
                         .foregroundColor(.green)
+                } else if let count = context.state.itemCount, count > 0 {
+                    Text("\(count) 📦")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.8))
                 } else {
                     // Mini progress indicator
                     Circle()
@@ -129,6 +151,7 @@ struct LiveDeliveryWidget: Widget {
                     .scaledToFit()
                     .clipShape(Circle())
             }
+            .widgetURL(URL(string: "sociva://orders/\(context.attributes.entityId)"))
         }
     }
 
@@ -151,6 +174,9 @@ struct LiveDeliveryWidget: Widget {
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.8))
                     Spacer()
+                    if let count = context.state.itemCount, count > 0 {
+                        ItemCountBadge(count: count)
+                    }
                 }
 
                 Text("Your Order is Ready! 🎉")
@@ -218,6 +244,9 @@ struct LiveDeliveryWidget: Widget {
                         Text(context.state.sellerName ?? "Sociva")
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.7))
+                        if let count = context.state.itemCount, count > 0 {
+                            ItemCountBadge(count: count)
+                        }
                     }
                     Spacer()
                     if let eta = context.state.etaMinutes {
