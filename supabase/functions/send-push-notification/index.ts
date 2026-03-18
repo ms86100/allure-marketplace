@@ -13,6 +13,8 @@ interface PushPayload {
   title: string;
   body: string;
   data?: Record<string, string>;
+  threadId?: string;
+  imageUrl?: string;
 }
 
 interface FirebaseServiceAccount {
@@ -86,7 +88,9 @@ async function sendApnsDirectNotification(
   p8Key: string,
   keyId: string,
   teamId: string,
-  bundleId: string
+  bundleId: string,
+  threadId?: string,
+  imageUrl?: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const cryptoKey = await importP8Key(p8Key);
@@ -97,22 +101,30 @@ async function sendApnsDirectNotification(
         alert: { title, body },
         sound: "default",
         badge: 1,
+        "mutable-content": imageUrl ? 1 : 0,
+        ...(threadId ? { "thread-id": threadId } : {}),
       },
       ...(data || {}),
+      ...(imageUrl ? { image_url: imageUrl } : {}),
     };
 
     const url = `https://api.push.apple.com/3/device/${apnsToken}`;
     console.log(`[APNs] Sending to production APNs, token prefix: ${apnsToken.substring(0, 16)}…`);
 
+    const apnsHeaders: Record<string, string> = {
+      Authorization: `bearer ${jwt}`,
+      "apns-topic": bundleId,
+      "apns-push-type": "alert",
+      "apns-priority": "10",
+      "Content-Type": "application/json",
+    };
+    if (threadId) {
+      apnsHeaders["apns-collapse-id"] = threadId.substring(0, 64);
+    }
+
     const apnsResponse = await fetch(url, {
       method: "POST",
-      headers: {
-        Authorization: `bearer ${jwt}`,
-        "apns-topic": bundleId,
-        "apns-push-type": "alert",
-        "apns-priority": "10",
-        "Content-Type": "application/json",
-      },
+      headers: apnsHeaders,
       body: JSON.stringify(apnsPayload),
     });
 
@@ -211,30 +223,47 @@ async function sendFCMNotification(
   deviceToken: string,
   title: string,
   body: string,
-  data?: Record<string, string>
+  data?: Record<string, string>,
+  threadId?: string,
+  imageUrl?: string,
 ): Promise<{ success: boolean; error?: string }> {
   const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
+
+  const androidNotification: Record<string, unknown> = { sound: "default" };
+  if (threadId) androidNotification.tag = threadId;
+  if (imageUrl) androidNotification.image = imageUrl;
+
+  const fcmNotification: Record<string, unknown> = { title, body };
+  if (imageUrl) fcmNotification.image = imageUrl;
+
+  const apnsAps: Record<string, unknown> = {
+    alert: { title, body },
+    sound: "default",
+    badge: 1,
+  };
+  if (imageUrl) apnsAps["mutable-content"] = 1;
+  if (threadId) apnsAps["thread-id"] = threadId;
+
+  const apnsHeaders: Record<string, string> = {
+    "apns-push-type": "alert",
+    "apns-priority": "10",
+  };
+  if (threadId) apnsHeaders["apns-collapse-id"] = threadId.substring(0, 64);
 
   const message: Record<string, unknown> = {
     message: {
       token: deviceToken,
-      notification: { title, body },
+      notification: fcmNotification,
       data: data || {},
       android: {
         priority: "high",
-        notification: { sound: "default" },
+        notification: androidNotification,
       },
       apns: {
-        headers: {
-          "apns-push-type": "alert",
-          "apns-priority": "10",
-        },
+        headers: apnsHeaders,
         payload: {
-          aps: {
-            alert: { title, body },
-            sound: "default",
-            badge: 1,
-          },
+          aps: apnsAps,
+          ...(imageUrl ? { image_url: imageUrl } : {}),
         },
       },
     },
@@ -319,7 +348,7 @@ Deno.serve(async (req) => {
     ]);
     const apnsConfigured = !!(apnsP8Key && apnsKeyId && apnsTeamId && apnsBundleId);
 
-    const { userId, title, body, data }: PushPayload = await req.json();
+    const { userId, title, body, data, threadId, imageUrl }: PushPayload = await req.json();
 
     if (!userId || !title || !body) {
       return new Response(
@@ -379,11 +408,13 @@ Deno.serve(async (req) => {
             apnsP8Key!,
             apnsKeyId!,
             apnsTeamId!,
-            apnsBundleId!
+            apnsBundleId!,
+            threadId,
+            imageUrl,
           );
 
           // If APNs fails and we have a real FCM token, fall back to FCM
-          if (!result.success && result.error !== "INVALID_TOKEN" && !isApnsOnlyToken) {
+           if (!result.success && result.error !== "INVALID_TOKEN" && !isApnsOnlyToken) {
             console.log(`[Push] APNs failed, falling back to FCM`);
             result = await sendFCMNotification(
               accessToken,
@@ -391,7 +422,9 @@ Deno.serve(async (req) => {
               tokenRecord.token,
               title,
               body,
-              data
+              data,
+              threadId,
+              imageUrl,
             );
           }
         } else if (isApnsOnlyToken) {
@@ -407,7 +440,9 @@ Deno.serve(async (req) => {
             tokenRecord.token,
             title,
             body,
-            data
+            data,
+            threadId,
+            imageUrl,
           );
         }
 

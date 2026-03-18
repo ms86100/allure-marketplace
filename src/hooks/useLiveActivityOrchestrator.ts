@@ -81,12 +81,13 @@ export function useLiveActivityOrchestrator(): void {
             return;
           }
 
-          // Fetch delivery data and seller name
+          // Fetch delivery data, seller name, and item count
           let delivery: any = null;
           let sellerName: string | null = null;
+          let itemCount: number | null = null;
           try {
             const sellerId = (payload.new as any)?.seller_id;
-            const [deliveryRes, sellerRes] = await Promise.all([
+            const [deliveryRes, sellerRes, itemCountRes] = await Promise.all([
               supabase
                 .from('delivery_assignments')
                 .select('eta_minutes, distance_meters, rider_name')
@@ -100,15 +101,21 @@ export function useLiveActivityOrchestrator(): void {
                     .eq('id', sellerId)
                     .maybeSingle()
                 : Promise.resolve({ data: null }),
+              supabase
+                .from('order_items')
+                .select('id', { count: 'exact', head: true })
+                .eq('order_id', orderId),
             ]);
             delivery = deliveryRes.data;
             sellerName = (sellerRes.data as any)?.business_name ?? null;
+            itemCount = itemCountRes.count ?? null;
           } catch { /* best-effort */ }
 
           const activityData = buildLiveActivityData(
             { id: orderId, status: newStatus },
             delivery,
             sellerName,
+            itemCount,
           );
           await LiveActivityManager.push(activityData);
         },
@@ -136,14 +143,17 @@ export function useLiveActivityOrchestrator(): void {
       if (!row?.order_id) return;
 
       try {
-        const [orderRes, sellerRes] = await Promise.all([
+        const [orderRes, itemCountRes] = await Promise.all([
           supabase
             .from('orders')
             .select('id, status, buyer_id, seller_id')
             .eq('id', row.order_id)
             .eq('buyer_id', userId)
             .maybeSingle(),
-          Promise.resolve(null), // placeholder, resolved below
+          supabase
+            .from('order_items')
+            .select('id', { count: 'exact', head: true })
+            .eq('order_id', row.order_id),
         ]);
 
         const order = orderRes.data;
@@ -166,7 +176,7 @@ export function useLiveActivityOrchestrator(): void {
           distance_meters: row?.distance_meters,
           rider_name: row?.rider_name,
           vehicle_type: null,
-        }, sellerName);
+        }, sellerName, itemCountRes.count ?? null);
         await LiveActivityManager.push(data);
       } catch { /* best-effort */ }
     };

@@ -109,12 +109,25 @@ Deno.serve(async (req) => {
             if (pushData.reference_path) pushData.reference_path = String(pushData.reference_path);
             else if (item.reference_path) pushData.reference_path = item.reference_path;
 
+            // Change 1: Deep-link routing — set route from reference_path
+            if (!pushData.route && item.reference_path) {
+              pushData.route = item.reference_path;
+            }
+
+            // Change 2: threadId for notification grouping (per order)
+            const threadId = item.payload?.orderId ? String(item.payload.orderId) : undefined;
+
+            // Change 3: image URL from payload (seller logo)
+            const imageUrl = item.payload?.image_url ? String(item.payload.image_url) : undefined;
+
             const { data: pushResult, error: pushError } = await supabase.functions.invoke("send-push-notification", {
               body: {
                 userId: item.user_id,
                 title: item.title,
                 body: item.body,
                 data: pushData,
+                threadId,
+                imageUrl,
               },
             });
 

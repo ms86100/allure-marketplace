@@ -1058,6 +1058,7 @@ export type Database = {
           is_terminal: boolean | null
           notification_action: string | null
           notification_body: string | null
+          notification_image_url: string | null
           notification_title: string | null
           notify_buyer: boolean | null
           notify_seller: boolean | null
@@ -1081,6 +1082,7 @@ export type Database = {
           is_terminal?: boolean | null
           notification_action?: string | null
           notification_body?: string | null
+          notification_image_url?: string | null
           notification_title?: string | null
           notify_buyer?: boolean | null
           notify_seller?: boolean | null
@@ -1104,6 +1106,7 @@ export type Database = {
           is_terminal?: boolean | null
           notification_action?: string | null
           notification_body?: string | null
+          notification_image_url?: string | null
           notification_title?: string | null
           notify_buyer?: boolean | null
           notify_seller?: boolean | null

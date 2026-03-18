@@ -36,7 +36,8 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             vehicleType: call.getString("vehicle_type"),
             progressStage: call.getString("progress_stage"),
             progressPercent: call.getDouble("progress_percent"),
-            sellerName: call.getString("seller_name")
+            sellerName: call.getString("seller_name"),
+            itemCount: call.getInt("item_count")
         )
     }
 

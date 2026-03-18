@@ -24,6 +24,9 @@ const STATUS_PROGRESS: Record<string, number> = {
   completed: 1.0,
 };
 
+/** Reasonable max distance (km) for progress interpolation heuristic */
+const MAX_DELIVERY_DISTANCE_KM = 10;
+
 /**
  * Maps order status + delivery info into a meaningful progress stage string.
  */
@@ -60,19 +63,33 @@ export function buildLiveActivityData(
     vehicle_type?: string | null;
   } | null,
   sellerName?: string | null,
+  itemCount?: number | null,
 ): LiveActivityData {
+  const distanceKm = delivery?.distance_meters != null
+    ? delivery.distance_meters / 1000
+    : null;
+
+  // Change 7: GPS-derived progress when distance is available during transit
+  let progressPercent = STATUS_PROGRESS[order.status] ?? null;
+  const isTransit = order.status === 'on_the_way' || order.status === 'en_route' || order.status === 'picked_up';
+  if (isTransit && distanceKm != null && distanceKm >= 0) {
+    // Interpolate: closer to 0 distance = closer to 1.0 progress
+    // Use 0.5–0.95 range to keep it between "picked up" and "delivered"
+    const ratio = Math.min(distanceKm / MAX_DELIVERY_DISTANCE_KM, 1);
+    progressPercent = Math.max(0.5, 0.95 - ratio * 0.45);
+  }
+
   return {
     entity_type: 'order',
     entity_id: order.id,
     workflow_status: order.status,
     eta_minutes: delivery?.eta_minutes ?? null,
-    driver_distance: delivery?.distance_meters != null
-      ? delivery.distance_meters / 1000
-      : null,
+    driver_distance: distanceKm,
     driver_name: delivery?.rider_name ?? null,
     vehicle_type: delivery?.vehicle_type ?? null,
     progress_stage: mapProgressStage(order.status, delivery),
-    progress_percent: STATUS_PROGRESS[order.status] ?? null,
+    progress_percent: progressPercent,
     seller_name: sellerName ?? null,
+    item_count: itemCount ?? null,
   };
 }

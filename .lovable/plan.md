@@ -1,120 +1,93 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Silent Push Optimization)
 
-# Blinkit Gap-Fill: End-to-End Implementation Plan
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-## What We're Filling
+## Silent Push Optimization: COMPLETE
 
-| Gap | Blinkit Behavior | Current State | Feasibility |
-|-----|-----------------|---------------|-------------|
-| 1. Push notification deep-link routing | Tap notification → opens order tracking | Partial — only routes if `data.route` is set, but trigger doesn't set it | Easy fix |
-| 2. iOS notification grouping (threadId) | Order notifications grouped per order | No grouping — each notification is standalone | Easy fix |
-| 3. Rich push (image) | Notification shows product/seller image | No image support, no Notification Service Extension | Medium — requires NSE in CI |
-| 4. Dynamic Island tap → order page | Tapping expanded DI opens order tracking | No `widgetURL` configured in SwiftUI | Easy fix (Swift) |
-| 5. Item count in Dynamic Island compact | Shows "3 items" or similar | Only shows ETA or progress circle | Easy fix (Swift + data) |
-| 6. APNs push-to-Live-Activity | Widget updates even when app is killed | App-driven only — stops when process dies | Hard — deferred (per memory) |
-| 7. GPS-derived progress | Progress bar reflects real distance | Hardcoded per-status values | Medium — needs distance data |
+### What It Does
+Reduces push notification noise for mid-flow order statuses when Live Activity is already tracking the order on the lock screen. In-app notification history and badge counts are always preserved.
 
-**Gap 6 (APNs push-to-Live-Activity) is explicitly deferred per project strategy.** The remaining 6 gaps are implementable now.
+### Notification Matrix
 
----
+| Status | Push? | Live Activity? | Rationale |
+|--------|-------|----------------|-----------|
+| `accepted` | ✅ Always | Yes | Critical — order confirmed |
+| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
+| `ready` | ✅ Always | Yes | Pickup moment — user must know |
+| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
+| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
+| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
+| `delivered` | ✅ Always | Yes | Critical endpoint |
+| `completed` | ✅ Always | No | Critical endpoint |
+| `cancelled` | ✅ Always | No | Critical — must alert |
+| All service/booking | ✅ Always | No | No Live Activity for these |
 
-## Change 1: Push Notification Deep-Link Routing
+### Implementation
 
-**Problem:** The DB trigger builds `reference_path: '/orders/' || NEW.id` and `payload.orderId`, but the push notification data doesn't include a `route` key. The tap handler in `usePushNotifications.ts` only navigates when `data.route` exists (line 362).
+1. **DB column**: `category_status_flows.silent_push` (boolean, default false)
+2. **DB trigger**: `fn_enqueue_order_status_notification` includes `silent_push` in notification payload
+3. **Edge function**: `process-notification-queue` skips APNs/FCM delivery when `silent_push = true`, but still inserts `user_notifications` for in-app history
 
-**Fix:**
-- **`supabase/functions/process-notification-queue/index.ts`** (lines 107-110): When building `pushData`, add `route` from `item.reference_path`:
-  ```
-  pushData.route = item.reference_path || '';
-  ```
-- This makes every notification tappable → navigates to the order detail page.
+## Phase I Live Activities — CI Pipeline Status
 
----
+### Codemagic Build Pipeline: COMPLETE
 
-## Change 2: iOS Notification Grouping (threadId)
+Both `ios-release` and `release-all` workflows now include:
 
-**Problem:** Multiple notifications for the same order appear as separate items on the lock screen instead of being grouped.
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
 
-**Fix:**
-- **`supabase/functions/send-push-notification/index.ts`**: Accept optional `threadId` in the payload. Pass it to APNs as `apns-collapse-id` header and `aps.thread-id`, and to FCM as `android.notification.tag` + `apns.payload.aps.thread-id`.
-- **`supabase/functions/process-notification-queue/index.ts`**: Set `threadId: item.payload?.orderId` when invoking send-push, so all notifications for the same order group together.
+### Codemagic Requirements (User Action)
 
----
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
 
-## Change 3: Rich Push Notifications (Image)
+### Runtime Call Chain (Verified)
 
-**Problem:** No notification images. Blinkit shows seller logos or product thumbnails.
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
+```
 
-**Approach:** This requires an iOS Notification Service Extension (NSE) to download and attach images before display. The NSE is a separate target in Xcode.
+## Implementation Matrix
 
-**Fix (3 parts):**
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
 
-a. **Data pipeline:** Add `notification_image_url` column to `category_status_flows` (nullable). The trigger `fn_enqueue_order_status_notification` includes seller logo URL in the payload. The edge function passes `imageUrl` to `send-push-notification`.
+## Reality-Check Audit Fixes (Round 4)
 
-b. **APNs payload:** In `send-push-notification`, set `mutable-content: 1` in `aps` and include `image_url` in the payload root. Set `apns-push-type: alert` (already set).
+### Fix 1: Live Activity Deduplication — COMPLETE
 
-c. **Native iOS NSE:** Create `native/ios/NotificationServiceExtension.swift` — a standard `UNNotificationServiceExtension` that downloads the image from `userInfo["image_url"]` and attaches it as `UNNotificationAttachment`. Add CI configuration to create the NSE target (similar to widget extension setup).
+| Layer | Fix |
+|-------|-----|
+| **Swift native** | `startLiveActivity` now checks for existing activity with same `entityId` before `Activity.request()`. If found, updates it and returns existing `activity.id` instead of creating a duplicate. |
+| **LiveActivityManager** | Added `hydrating` flag; `resetHydration()` is now a no-op while hydration is actively running, preventing the poll timer from racing with app-resume sync. |
+| **liveActivitySync** | Added `syncing` mutex flag to prevent concurrent `syncActiveOrders` calls from overlapping. |
+| **Orchestrator** | App-resume handler now pauses the poll timer before syncing, then resumes it after sync completes. |
 
-d. **FCM (Android):** Add `notification.image` field in the FCM payload — Android handles rich images natively without extra code.
+### Fix 2: Toast Conflict Prevention — COMPLETE
 
----
-
-## Change 4: Dynamic Island Tap → Order Page
-
-**Problem:** Tapping the Dynamic Island or lock screen widget does nothing (no `widgetURL`).
-
-**Fix:**
-- **`native/ios/LiveDeliveryAttributes.swift`**: No changes needed (entityId already available).
-- **`native/ios/LiveDeliveryWidget.swift`**: Wrap the lock screen view and expanded DI region with `.widgetURL(URL(string: "sociva://orders/\(context.attributes.entityId)"))` so tapping opens the app at the order tracking page.
-- The existing `useDeepLinks.ts` already handles `sociva://orders/{id}` → navigates to `/orders/{id}`.
-
----
-
-## Change 5: Item Count in Dynamic Island
-
-**Problem:** Compact trailing only shows ETA or a progress circle. Blinkit shows item count.
-
-**Fix:**
-- **`src/plugins/live-activity/definitions.ts`**: Add `item_count: number | null` to `LiveActivityData`.
-- **`native/ios/LiveDeliveryAttributes.swift`**: Add `itemCount: Int?` to `ContentState`.
-- **`native/ios/LiveActivityPlugin.swift`**: Read `call.getInt("item_count")` in `buildState`.
-- **`native/ios/LiveDeliveryWidget.swift`**: In `compactTrailing`, when no ETA is available, show item count (e.g., "3 items") instead of the progress circle. In `DynamicIslandExpandedRegion(.leading)`, show item count below seller name.
-- **`src/services/liveActivityMapper.ts`**: Accept `itemCount` parameter in `buildLiveActivityData`.
-- **`src/hooks/useLiveActivityOrchestrator.ts`** + **`src/services/liveActivitySync.ts`**: Fetch `order_items` count when building activity data. Use `supabase.from('order_items').select('id', { count: 'exact', head: true }).eq('order_id', orderId)`.
-
----
-
-## Change 7: Distance-Derived Progress
-
-**Problem:** Progress is hardcoded per status. When `distance_meters` is available, we should use it for more accurate progress.
-
-**Fix:**
-- **`src/services/liveActivityMapper.ts`**: When status is `on_the_way`/`picked_up`/`en_route` and `distance_meters` is available, compute progress as `max(0.5, 1 - (distance_km / initial_distance_km))`. Since we don't have `initial_distance`, use a heuristic: cap at a reasonable max (e.g., 10km) and interpolate. Fallback to hardcoded value when no distance data.
-
----
-
-## Implementation Order
-
-1. **Change 1** (deep-link routing) — edge function only, instant impact
-2. **Change 2** (threadId grouping) — edge function only
-3. **Change 4** (DI tap) — Swift only, no data changes
-4. **Change 5** (item count) — data pipeline + Swift + TS
-5. **Change 7** (distance progress) — TS mapper only
-6. **Change 3** (rich push images) — migration + edge fn + NSE + CI (most complex)
-
-## Files Modified
-
-| File | Changes |
-|------|---------|
-| `supabase/functions/process-notification-queue/index.ts` | Add `route` and `threadId` to push data |
-| `supabase/functions/send-push-notification/index.ts` | Accept `threadId`, `imageUrl`. Add `thread-id`, `mutable-content`, `image` to APNs/FCM payloads |
-| `native/ios/LiveDeliveryWidget.swift` | Add `.widgetURL()`, show item count in compact/expanded |
-| `native/ios/LiveDeliveryAttributes.swift` | Add `itemCount: Int?` to ContentState |
-| `native/ios/LiveActivityPlugin.swift` | Read `item_count` in `buildState` |
-| `native/ios/NotificationServiceExtension.swift` | New file — NSE for image attachment |
-| `src/plugins/live-activity/definitions.ts` | Add `item_count` field |
-| `src/services/liveActivityMapper.ts` | Accept item count, improve distance-based progress |
-| `src/hooks/useLiveActivityOrchestrator.ts` | Fetch item count alongside delivery data |
-| `src/services/liveActivitySync.ts` | Fetch item count in sync |
-| New migration | Add `notification_image_url` to `category_status_flows`, update trigger to include seller logo |
-
+| Layer | Fix |
+|-------|-----|
+| **useCartPage** | Added `upiCompletionRef` guard — only ONE of `handleUpiDeepLinkSuccess` / `handleUpiDeepLinkFailed` can execute per payment session. Both use the same toast ID `'upi-confirmed'` for dedup. Ref resets when a new UPI session starts. |
+| **UpiDeepLinkCheckout** | `handleSystemClose` now skips `onPaymentFailed` when `completionTriggeredRef.current` is true, preventing the sheet unmount from firing a conflicting handler after success. |
