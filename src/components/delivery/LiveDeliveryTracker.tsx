@@ -195,23 +195,15 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
         </div>
       )}
 
-      {isBuyerView ? (
-        <p className="text-xs text-muted-foreground">
-          {tracking.status === 'assigned' && `✅ ${tracking.riderName || 'A rider'} will pick up your order soon.`}
-          {tracking.status === 'picked_up' && '🚚 Your order has been picked up!'}
-          {tracking.status === 'on_the_way' && '🛵 Your order is on the way!'}
-          {tracking.status === 'at_gate' && '🏠 Delivery partner is at your society gate.'}
-          {tracking.status === 'delivered' && '🎉 Your order has been delivered!'}
-        </p>
-      ) : (
-        <p className="text-xs text-muted-foreground">
-          {tracking.status === 'assigned' && `🚴 ${tracking.riderName || 'Rider'} assigned.`}
-          {tracking.status === 'picked_up' && '📦 Pickup confirmed. Live delivery has started.'}
-          {tracking.status === 'on_the_way' && '🛵 You are on the way to the buyer.'}
-          {tracking.status === 'at_gate' && '🏠 You are at the buyer\'s gate.'}
-          {tracking.status === 'delivered' && '✅ Delivery completed.'}
-        </p>
-      )}
+      {tracking.status && (() => {
+        const hint = statusHints?.[tracking.status];
+        const message = isBuyerView
+          ? (hint?.buyer_hint || hint?.display_label || tracking.status)
+          : ((hint as any)?.seller_hint || hint?.display_label || tracking.status);
+        return message ? (
+          <p className="text-xs text-muted-foreground">{message}</p>
+        ) : null;
+      })()}
     </div>
   );
 }
