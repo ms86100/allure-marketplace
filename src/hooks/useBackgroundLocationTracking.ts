@@ -9,10 +9,19 @@ interface TrackingState {
   lastSentAt: number | null;
 }
 
-// Adaptive intervals based on movement
-const INTERVAL_MOVING_MS = 5_000;   // 5s when moving
-const INTERVAL_IDLE_MS = 15_000;    // 15s when stationary
-const SPEED_THRESHOLD_KMH = 5;     // Below this = stationary
+interface QueuedLocationPayload {
+  assignment_id: string;
+  latitude: number;
+  longitude: number;
+  speed_kmh: number | null;
+  heading: number | null;
+  accuracy_meters: number | null;
+}
+
+const INTERVAL_MOVING_MS = 5_000;
+const INTERVAL_IDLE_MS = 15_000;
+const SPEED_THRESHOLD_KMH = 5;
+const MAX_QUEUED_POINTS = 20;
 
 export function useBackgroundLocationTracking(assignmentId: string | null) {
   const [state, setState] = useState<TrackingState>({
@@ -25,50 +34,88 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
   const lastSentRef = useRef<number>(0);
   const lastSpeedRef = useRef<number>(0);
   const mountedRef = useRef(true);
+  const queueRef = useRef<QueuedLocationPayload[]>([]);
+  const flushingRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
-  /** Get current adaptive interval based on last known speed */
-  const getInterval = useCallback(() => {
-    return lastSpeedRef.current > SPEED_THRESHOLD_KMH
-      ? INTERVAL_MOVING_MS
-      : INTERVAL_IDLE_MS;
+  const postLocation = useCallback(async (payload: QueuedLocationPayload) => {
+    await supabase.functions.invoke('update-delivery-location', {
+      body: payload,
+    });
+  }, []);
+
+  const flushQueue = useCallback(async () => {
+    if (flushingRef.current || queueRef.current.length === 0) return;
+    flushingRef.current = true;
+
+    try {
+      while (queueRef.current.length > 0) {
+        const nextPayload = queueRef.current[0];
+        await postLocation(nextPayload);
+        queueRef.current.shift();
+        const now = Date.now();
+        lastSentRef.current = now;
+        if (mountedRef.current) {
+          setState((s) => ({ ...s, lastSentAt: now }));
+        }
+      }
+    } catch (error) {
+      console.error('[LocationTracking] Queue flush failed:', error);
+    } finally {
+      flushingRef.current = false;
+    }
+  }, [postLocation]);
+
+  const enqueueLocation = useCallback((payload: QueuedLocationPayload) => {
+    queueRef.current.push(payload);
+    if (queueRef.current.length > MAX_QUEUED_POINTS) {
+      queueRef.current = queueRef.current.slice(-MAX_QUEUED_POINTS);
+    }
   }, []);
 
   const sendLocation = useCallback(async (
-    lat: number, lng: number, speed: number | null, heading: number | null, accuracy: number | null
+    lat: number,
+    lng: number,
+    speed: number | null,
+    heading: number | null,
+    accuracy: number | null,
   ) => {
     if (!assignmentId) return;
 
-    const speedKmh = speed != null ? speed * 3.6 : 0; // m/s → km/h
+    const speedKmh = speed != null ? speed * 3.6 : 0;
     lastSpeedRef.current = speedKmh;
 
     const now = Date.now();
     const interval = speedKmh > SPEED_THRESHOLD_KMH ? INTERVAL_MOVING_MS : INTERVAL_IDLE_MS;
     if (now - lastSentRef.current < interval) return;
-    lastSentRef.current = now;
+
+    const payload: QueuedLocationPayload = {
+      assignment_id: assignmentId,
+      latitude: lat,
+      longitude: lng,
+      speed_kmh: speedKmh > 0 ? speedKmh : null,
+      heading,
+      accuracy_meters: accuracy,
+    };
 
     try {
-      await supabase.functions.invoke('update-delivery-location', {
-        body: {
-          assignment_id: assignmentId,
-          latitude: lat,
-          longitude: lng,
-          speed_kmh: speedKmh > 0 ? speedKmh : null,
-          heading,
-          accuracy_meters: accuracy,
-        },
-      });
+      await flushQueue();
+      await postLocation(payload);
+      lastSentRef.current = now;
       if (mountedRef.current) {
-        setState(s => ({ ...s, lastSentAt: now }));
+        setState((s) => ({ ...s, lastSentAt: now }));
       }
     } catch (err) {
-      console.error('[LocationTracking] Send failed:', err);
+      console.error('[LocationTracking] Send failed, queueing point:', err);
+      enqueueLocation(payload);
     }
-  }, [assignmentId]);
+  }, [assignmentId, enqueueLocation, flushQueue, postLocation]);
 
   const startTracking = useCallback(async () => {
     if (state.isTracking || !assignmentId) return;
@@ -78,7 +125,7 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
         const { Geolocation } = await import('@capacitor/geolocation');
         const perm = await Geolocation.requestPermissions();
         if (perm.location === 'denied') {
-          setState(s => ({ ...s, permissionDenied: true }));
+          setState((s) => ({ ...s, permissionDenied: true }));
           toast.error('Location permission denied. Tracking unavailable.');
           return;
         }
@@ -93,41 +140,43 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
               position.coords.heading,
               position.coords.accuracy,
             );
-          }
+          },
         );
         watchIdRef.current = id;
-        setState(s => ({ ...s, isTracking: true, permissionDenied: false }));
+        setState((s) => ({ ...s, isTracking: true, permissionDenied: false }));
       } catch (err) {
         console.error('[LocationTracking] Native watch failed:', err);
         toast.error('Could not start location tracking.');
       }
-    } else {
-      if (!navigator.geolocation) {
-        toast.error('Geolocation not supported in this browser.');
-        return;
-      }
-      const id = navigator.geolocation.watchPosition(
-        (pos) => {
-          sendLocation(
-            pos.coords.latitude,
-            pos.coords.longitude,
-            pos.coords.speed,
-            pos.coords.heading,
-            pos.coords.accuracy,
-          );
-        },
-        (err) => {
-          if (err.code === err.PERMISSION_DENIED) {
-            setState(s => ({ ...s, permissionDenied: true }));
-            toast.error('Location permission denied.');
-          }
-        },
-        { enableHighAccuracy: true }
-      );
-      watchIdRef.current = id;
-      setState(s => ({ ...s, isTracking: true, permissionDenied: false }));
+      return;
     }
-  }, [assignmentId, state.isTracking, sendLocation]);
+
+    if (!navigator.geolocation) {
+      toast.error('Geolocation not supported in this browser.');
+      return;
+    }
+
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        sendLocation(
+          pos.coords.latitude,
+          pos.coords.longitude,
+          pos.coords.speed,
+          pos.coords.heading,
+          pos.coords.accuracy,
+        );
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setState((s) => ({ ...s, permissionDenied: true }));
+          toast.error('Location permission denied.');
+        }
+      },
+      { enableHighAccuracy: true },
+    );
+    watchIdRef.current = id;
+    setState((s) => ({ ...s, isTracking: true, permissionDenied: false }));
+  }, [assignmentId, sendLocation, state.isTracking]);
 
   const stopTracking = useCallback(async () => {
     if (watchIdRef.current == null) return;
@@ -136,18 +185,31 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
       try {
         const { Geolocation } = await import('@capacitor/geolocation');
         await Geolocation.clearWatch({ id: watchIdRef.current as string });
-      } catch {}
+      } catch {
+        // noop
+      }
     } else {
       navigator.geolocation.clearWatch(watchIdRef.current as number);
     }
+
     watchIdRef.current = null;
     if (mountedRef.current) {
-      setState(s => ({ ...s, isTracking: false }));
+      setState((s) => ({ ...s, isTracking: false }));
     }
   }, []);
 
   useEffect(() => {
-    return () => { stopTracking(); };
+    const handleOnline = () => {
+      flushQueue();
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [flushQueue]);
+
+  useEffect(() => {
+    return () => {
+      stopTracking();
+    };
   }, [stopTracking]);
 
   return {

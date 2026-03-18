@@ -45,14 +45,12 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
     smoothedLng: null,
   });
 
-  // Staleness check every 30s
   useEffect(() => {
     const interval = setInterval(() => {
-      setState(prev => {
+      setState((prev) => {
         if (!prev.lastLocationAt) return prev;
         const stale = Date.now() - new Date(prev.lastLocationAt).getTime() > 2 * 60 * 1000;
-        if (stale !== prev.isLocationStale) return { ...prev, isLocationStale: stale };
-        return prev;
+        return stale !== prev.isLocationStale ? { ...prev, isLocationStale: stale } : prev;
       });
     }, 30_000);
     return () => clearInterval(interval);
@@ -60,54 +58,52 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
 
   useEffect(() => {
     if (!assignmentId) {
-      setState(prev => ({ ...prev, isLoading: false }));
+      setState((prev) => ({ ...prev, isLoading: false }));
       return;
     }
 
-    // Reset filter state for new assignment
     gpsFilterState.current = { lastAccepted: null, smoothedLat: null, smoothedLng: null };
 
-    // Fetch initial assignment data
     (async () => {
       const { data } = await supabase
         .from('delivery_assignments')
-        .select('id, status, rider_name, rider_phone, rider_photo_url, eta_minutes, distance_meters, last_location_lat, last_location_lng, last_location_at')
+        .select('id, status, rider_name, rider_phone, rider_photo_url, eta_minutes, distance_meters, last_location_lat, last_location_lng, last_location_at, proximity_status')
         .eq('id', assignmentId)
         .single();
 
-      if (data) {
-        const loc: RiderLocation | null = data.last_location_lat && data.last_location_lng ? {
-          latitude: data.last_location_lat,
-          longitude: data.last_location_lng,
-          speed_kmh: null,
-          heading: null,
-          recorded_at: data.last_location_at || new Date().toISOString(),
-        } : null;
-
-        // Seed the GPS filter with initial position
-        if (loc) {
-          const result = filterGPSPoint(loc, gpsFilterState.current);
-          gpsFilterState.current = result.newState;
-        }
-
-        setState(prev => ({
-          ...prev,
-          status: data.status,
-          riderName: data.rider_name,
-          riderPhone: data.rider_phone,
-          riderPhotoUrl: data.rider_photo_url,
-          eta: data.eta_minutes,
-          distance: data.distance_meters,
-          lastLocationAt: data.last_location_at,
-          riderLocation: loc,
-          isLoading: false,
-        }));
-      } else {
-        setState(prev => ({ ...prev, isLoading: false }));
+      if (!data) {
+        setState((prev) => ({ ...prev, isLoading: false }));
+        return;
       }
+
+      const loc: RiderLocation | null = data.last_location_lat && data.last_location_lng ? {
+        latitude: data.last_location_lat,
+        longitude: data.last_location_lng,
+        speed_kmh: null,
+        heading: null,
+        recorded_at: data.last_location_at || new Date().toISOString(),
+      } : null;
+
+      if (loc) {
+        const result = filterGPSPoint(loc, gpsFilterState.current);
+        gpsFilterState.current = result.newState;
+      }
+
+      setState((prev) => ({
+        ...prev,
+        status: data.status,
+        riderName: data.rider_name,
+        riderPhone: data.rider_phone,
+        riderPhotoUrl: data.rider_photo_url,
+        eta: data.eta_minutes,
+        distance: data.distance_meters,
+        lastLocationAt: data.last_location_at,
+        proximityStatus: data.proximity_status,
+        riderLocation: loc,
+        isLoading: false,
+      }));
     })();
 
-    // Subscribe to delivery_assignments changes
     const assignmentChannel = supabase
       .channel(`tracking-assignment-${assignmentId}`)
       .on('postgres_changes', {
@@ -117,28 +113,39 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
         filter: `id=eq.${assignmentId}`,
       }, (payload) => {
         const d = payload.new as any;
-        setState(prev => ({
-          ...prev,
-          status: d.status ?? prev.status,
-          riderName: d.rider_name ?? prev.riderName,
-          riderPhone: d.rider_phone ?? prev.riderPhone,
-          riderPhotoUrl: d.rider_photo_url ?? prev.riderPhotoUrl,
-          eta: d.eta_minutes ?? prev.eta,
-          distance: d.distance_meters ?? prev.distance,
-          lastLocationAt: d.last_location_at ?? prev.lastLocationAt,
-          proximityStatus: d.proximity_status ?? prev.proximityStatus,
-          riderLocation: d.last_location_lat && d.last_location_lng ? {
-            latitude: d.last_location_lat,
-            longitude: d.last_location_lng,
-            speed_kmh: prev.riderLocation?.speed_kmh ?? null,
-            heading: prev.riderLocation?.heading ?? null,
-            recorded_at: d.last_location_at || new Date().toISOString(),
-          } : prev.riderLocation,
-        }));
+        setState((prev) => {
+          const incomingRecordedAt = d.last_location_at || null;
+          const currentRecordedAt = prev.riderLocation?.recorded_at || prev.lastLocationAt || null;
+          const shouldReplaceLocation = Boolean(
+            d.last_location_lat &&
+            d.last_location_lng &&
+            (!currentRecordedAt || (incomingRecordedAt && new Date(incomingRecordedAt).getTime() > new Date(currentRecordedAt).getTime()))
+          );
+
+          return {
+            ...prev,
+            status: d.status ?? prev.status,
+            riderName: d.rider_name ?? prev.riderName,
+            riderPhone: d.rider_phone ?? prev.riderPhone,
+            riderPhotoUrl: d.rider_photo_url ?? prev.riderPhotoUrl,
+            eta: d.eta_minutes ?? prev.eta,
+            distance: d.distance_meters ?? prev.distance,
+            lastLocationAt: d.last_location_at ?? prev.lastLocationAt,
+            proximityStatus: d.proximity_status ?? prev.proximityStatus,
+            riderLocation: shouldReplaceLocation
+              ? {
+                  latitude: d.last_location_lat,
+                  longitude: d.last_location_lng,
+                  speed_kmh: prev.riderLocation?.speed_kmh ?? null,
+                  heading: prev.riderLocation?.heading ?? null,
+                  recorded_at: d.last_location_at || new Date().toISOString(),
+                }
+              : prev.riderLocation,
+          };
+        });
       })
       .subscribe();
 
-    // Subscribe to delivery_locations for live GPS updates with filtering
     const locationChannel = supabase
       .channel(`tracking-location-${assignmentId}`)
       .on('postgres_changes', {
@@ -156,11 +163,10 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
           recorded_at: loc.recorded_at,
         };
 
-        // Apply GPS noise filter
         const result = filterGPSPoint(rawPoint, gpsFilterState.current);
         gpsFilterState.current = result.newState;
 
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           riderLocation: {
             ...rawPoint,
@@ -168,6 +174,7 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
             longitude: result.filtered.longitude,
           },
           lastLocationAt: loc.recorded_at,
+          isLocationStale: false,
         }));
       })
       .subscribe();
