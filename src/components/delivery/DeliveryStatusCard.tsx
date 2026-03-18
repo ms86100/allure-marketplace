@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Truck, Phone, MapPin, Key, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
+import { Truck, Phone, MapPin, Key, CheckCircle, XCircle, Clock, Loader2, Package, Navigation, Home } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
 
