@@ -21,7 +21,8 @@ export function computeStoreStatus(
   if (!isAvailable) return { status: 'paused', nextOpenAt: null, minutesUntilOpen: null };
   if (!availabilityStart || !availabilityEnd) return { status: 'open', nextOpenAt: null, minutesUntilOpen: 0 };
 
-  const now = new Date();
+  // Use IST (UTC+5:30) to match DB function timezone
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
   const currentDay = DAY_ABBREVS[now.getDay()];
 
   if (operatingDays && operatingDays.length > 0 && !operatingDays.includes(currentDay)) {

@@ -97,9 +97,32 @@ export function ReorderLastOrder() {
       const productIds = lastOrder.items.map(i => i.product_id).filter(Boolean);
       const { data: available } = await supabase
         .from('products')
-        .select('id, price')
+        .select('id, price, seller_id')
         .in('id', productIds)
         .eq('is_available', true);
+
+      // Check seller availability before reordering
+      if (available && available.length > 0) {
+        const sellerIds = [...new Set(available.map(p => p.seller_id).filter(Boolean))];
+        if (sellerIds.length > 0) {
+          const { data: sellers } = await supabase
+            .from('seller_profiles')
+            .select('id, availability_start, availability_end, operating_days, is_available')
+            .in('id', sellerIds);
+          if (sellers) {
+            const { computeStoreStatus, formatStoreClosedMessage } = await import('@/lib/store-availability');
+            for (const seller of sellers) {
+              const status = computeStoreStatus(seller.availability_start, seller.availability_end, seller.operating_days, seller.is_available ?? true);
+              if (status.status !== 'open') {
+                const msg = formatStoreClosedMessage(status);
+                toast.error(msg || 'Store is currently closed. Please try later.');
+                setIsLoading(false);
+                return;
+              }
+            }
+          }
+        }
+      }
 
       if (!available?.length) {
         toast.error(ml.label('label_reorder_unavailable'));
