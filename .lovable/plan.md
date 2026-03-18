@@ -1,115 +1,81 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phases 1–3)
 
-All 9 original phases plus Blinkit parity Phases 1–3 are fully implemented.
+# iOS Live Activity Widget Redesign
 
-## Blinkit Gap-Fill Status
+## Problems Visible in Screenshot
 
-### Phase 1: APNs Push-to-Live-Activity — COMPLETE
+1. Three duplicate "Your Order is Ready" cards stacked on top of each other (dedup issue still manifesting on device)
+2. A fourth card shows "We're Preparing Your Order" with nested duplicate content inside it
+3. The purple gradient card looks dated and lacks information hierarchy
+4. The dark card is functional but visually flat
+5. No order short ID visible to help buyers distinguish orders
+6. Emoji-heavy titles feel unpolished ("Your Order is Ready! 🎉")
+7. No meaningful contextual info per status (e.g., "Pickup from [seller]" when ready, ETA countdown when in transit)
 
-Live Activities now update even when the app process is killed by iOS, matching Blinkit's reliability.
+## What Changes
 
-#### Architecture
+### A. ContentState — add `order_short_id` and `seller_logo_url`
 
+Add two new fields to `LiveDeliveryAttributes.ContentState`:
+- `orderShortId: String?` — last 4-8 chars of order ID for buyer recognition (e.g., "#7838")
+- `sellerLogoUrl: String?` — seller logo URL for a branded feel (rendered if available)
+
+Update `LiveActivityData` interface in `definitions.ts` and the mapper/APNs edge function to populate these.
+
+### B. Widget Visual Redesign
+
+Replace the current 3-branch lock screen layout with a single, unified, status-adaptive card:
+
+**Layout structure (all statuses):**
+```text
+┌─────────────────────────────────────────────┐
+│  [SocivaIcon]  Seller Name        #7838     │
+│                                   2 items   │
+│                                             │
+│  Status Title (SF Symbol prefix)            │
+│  Contextual subtitle                        │
+│                                             │
+│  ═══════●🛵═══════════════  ETA 8 min       │
+└─────────────────────────────────────────────┘
 ```
-Order status change → DB trigger → net.http_post → update-live-activity-apns edge function
-  → APNs push (apns-push-type: liveactivity) → iOS widget receives content-state update
-  → Lock screen / Dynamic Island re-renders
-```
 
-#### Implementation Details
+**Design principles:**
+- Single dark card with subtle status-tinted accent (not full gradient)
+- SF Symbols instead of emojis for status icons (checkmark.circle.fill, fork.knife, bag.fill, bicycle, mappin.and.ellipse)
+- Accent color changes per phase: amber (accepted/preparing), blue (ready), green (in transit), emerald (delivered)
+- Clean typography: `.subheadline.bold` for title, `.caption` for subtitle
+- Progress bar accent matches status color
+- ETA displayed inline with progress bar when available
+- Order short ID as a subtle badge in top-right
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB table** | `live_activity_tokens` (user_id, order_id, push_token, platform) with RLS |
-| **Swift plugin** | `LiveActivityPlugin.swift` — requests activity with `pushType: .token`, observes `Activity.pushTokenUpdates`, emits `liveActivityPushToken` event to JS |
-| **LiveActivityManager.ts** | Listens for `liveActivityPushToken` events, upserts token to `live_activity_tokens` table, cleans up on activity end |
-| **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
-| **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
+**Status-specific content:**
+- **accepted**: "Order Confirmed" / "Seller is reviewing your order"
+- **preparing**: "Being Prepared" / "Your order is being made"
+- **ready**: "Ready for Pickup" / "Waiting to be picked up from {seller}"
+- **picked_up/on_the_way/en_route**: "On the Way" / "{driver} · {distance} km away" + ETA badge
+- **arrived**: "At Your Location" / "{driver} has arrived"
+- **delivered/completed**: "Delivered" / full progress, green accent, auto-dismiss
 
-### Phase 2: System Reliability — COMPLETE
+**Dynamic Island (compact):**
+- Leading: SocivaIcon
+- Trailing: ETA in green if available, else mini progress ring
 
-#### 2A. Idempotency Guard on Push Processing
+**Dynamic Island (expanded):**
+- Same clean layout as lock screen but condensed
+- No gradient backgrounds, just the standard Dynamic Island dark
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB trigger** | `fn_enqueue_order_status_notification` now checks for duplicate entries (same `reference_path` + `payload->>'status'` within 30 seconds) before inserting into `notification_queue`. Skips with `RAISE NOTICE`. |
-| **DB index** | `idx_notification_queue_dedup` on `notification_queue(reference_path, created_at DESC)` for fast dedup lookups |
+### C. Files to Change
 
-#### 2B. Realtime Channel Auto-Reconnect
+| File | Change |
+|------|--------|
+| `native/ios/LiveDeliveryAttributes.swift` | Add `orderShortId`, `sellerLogoUrl` to ContentState |
+| `native/ios/LiveDeliveryWidget.swift` | Full redesign of lock screen view, DI regions, helper functions |
+| `src/plugins/live-activity/definitions.ts` | Add `order_short_id`, `seller_logo_url` to LiveActivityData |
+| `src/services/liveActivityMapper.ts` | Populate new fields from order data |
+| `src/services/liveActivitySync.ts` | Pass `order_number` / short ID to mapper |
+| `supabase/functions/update-live-activity-apns/index.ts` | Include new fields in APNs content-state, fetch order number |
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`useLiveActivityOrchestrator.ts`** | Both order and delivery channels now detect `CHANNEL_ERROR` / `TIMED_OUT`, remove the dead channel, and re-subscribe after 3s delay. Max 3 reconnects per session. On successful reconnect (`SUBSCRIBED`), retry counter resets. Each reconnect triggers a one-shot `syncActiveOrders` to fill any gap. Unique channel names with `Date.now()` suffix prevent Supabase channel name conflicts. |
+### D. Scope Exclusion
 
-### Phase 3: Seller Self-Delivery GPS + Buyer Live Map — COMPLETE
+The duplicate card issue (3x "Ready" cards in screenshot) is a LiveActivityManager dedup problem, not a widget design issue. That is tracked separately and is addressed by the existing hydration dedup logic. This plan focuses solely on the visual and informational quality of the widget.
 
-#### 3A. Seller GPS Broadcasting for Self-Delivery
-
-| Component | What Was Done |
-|-----------|---------------|
-| **`SellerGPSTracker.tsx`** | New component — shown to sellers on OrderDetailPage when `delivery_handled_by === 'seller'` and order status is `picked_up` or `on_the_way`. Uses existing `useBackgroundLocationTracking` hook. Shows Start/Stop controls, live badge, and last-sent timestamp. |
-| **`OrderDetailPage.tsx`** | Integrated `SellerGPSTracker` in the seller action area, gated by `delivery_handled_by === 'seller'` + transit statuses |
-
-#### 3B. Buyer Live Map
-
-| Component | What Was Done |
-|-----------|---------------|
-| **`DeliveryMapView.tsx`** | New component using Leaflet + OpenStreetMap (no API key). Shows rider position (🛵 marker) and destination (📍 marker). Auto-fits bounds on mount, pans when rider moves out of view. |
-| **`OrderDetailPage.tsx`** | Integrated `DeliveryMapView` above `LiveDeliveryTracker` for buyer view when rider has GPS data and order has delivery coordinates (`delivery_lat`/`delivery_lng`). Falls back to text-only tracker when no GPS data available. |
-
-### Previously Completed Blinkit Gaps
-
-| Feature | Status |
-|---------|--------|
-| Push deep-link routing | ✅ Done |
-| Notification grouping (threadId) | ✅ Done |
-| Rich push images (NSE) | ✅ Done |
-| Dynamic Island tap → order page | ✅ Done |
-| Item count in DI | ✅ Done |
-| GPS-derived progress | ✅ Done |
-
-### Phase 4: Live Map / Rider GPS — DEFERRED
-
-Requires dedicated rider-side GPS broadcasting infrastructure (separate product workstream). Seller self-delivery GPS (Phase 3A) covers the immediate need.
-
-### Product Thumbnails in Widget — DEFERRED
-
-Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
-
-## Silent Push Optimization: COMPLETE
-
-### Notification Matrix
-
-| Status | Push? | Live Activity? | Rationale |
-|--------|-------|----------------|-----------|
-| `accepted` | ✅ Always | Yes | Critical — order confirmed |
-| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
-| `ready` | ✅ Always | Yes | Pickup moment — user must know |
-| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
-| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
-| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
-| `delivered` | ✅ Always | Yes | Critical endpoint |
-| `completed` | ✅ Always | No | Critical endpoint |
-| `cancelled` | ✅ Always | No | Critical — must alert |
-| All service/booking | ✅ Always | No | No Live Activity for these |
-
-## Implementation Matrix
-
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
-| BG-1 | APNs Push-to-Live-Activity | Implemented |
-| BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
-| BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |
-| BG-4 | Buyer Delivery Confirmation (Gap 8) | Implemented |
-| BG-5 | ETA at Acceptance Time (Gap 11) | Implemented |
