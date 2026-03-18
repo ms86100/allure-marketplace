@@ -190,7 +190,7 @@ export function useLiveActivityOrchestrator(): void {
     };
   }, [userId, doSync]);
 
-  // ── App resume re-hydration ──
+  // ── App resume re-hydration (pauses poll to avoid race) ──
   useEffect(() => {
     if (!userId || !Capacitor.isNativePlatform()) return;
 
@@ -201,9 +201,21 @@ export function useLiveActivityOrchestrator(): void {
         const { App } = await import('@capacitor/app');
         const listener = await App.addListener('appStateChange', async ({ isActive }) => {
           if (!isActive || !mountedRef.current) return;
-          console.log(TAG, 'App resumed — re-hydrating');
+          console.log(TAG, 'App resumed — re-hydrating (poll paused)');
+
+          // Pause poll timer to prevent racing with resume sync
+          if (pollTimerRef.current) {
+            clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
+
           LiveActivityManager.resetHydration();
           await doSync();
+
+          // Resume poll timer after sync completes
+          if (mountedRef.current) {
+            pollTimerRef.current = setInterval(doSync, POLL_INTERVAL_MS);
+          }
         });
         cleanup = () => listener.remove();
       } catch (e) {

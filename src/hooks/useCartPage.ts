@@ -355,9 +355,14 @@ export function useCartPage() {
     toast.error('Payment was not completed. Your order has been cancelled. You can try again.', { id: 'razorpay-failed' });
   };
 
+  // ── UPI completion guard: only ONE of success/failed can execute per session ──
+  const upiCompletionRef = useRef(false);
+
   const handleUpiDeepLinkSuccess = async () => {
+    if (upiCompletionRef.current) return;
+    upiCompletionRef.current = true;
     setShowUpiDeepLink(false);
-    toast.success('Payment submitted! Seller will verify shortly.', { id: 'upi-success' });
+    toast.success('Payment submitted! Seller will verify shortly.', { id: 'upi-confirmed' });
     // Clear cart and payment session ONLY after payment confirmation submitted
     clearCart(); await refresh();
     clearPaymentSession();
@@ -366,13 +371,15 @@ export function useCartPage() {
   };
 
   const handleUpiDeepLinkFailed = async () => {
+    if (upiCompletionRef.current) return;
+    upiCompletionRef.current = true;
     setShowUpiDeepLink(false);
     if (!user?.id) { toast.error('Session expired.', { id: 'checkout-session' }); setPendingOrderIds([]); clearPaymentSession(); return; }
     if (pendingOrderIds.length > 0) {
       // Check if payment was actually completed before cancelling
       const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
       if (recheckOrder?.payment_status === 'paid' || recheckOrder?.payment_status === 'buyer_confirmed') {
-        toast.success('Payment was already confirmed! Your order is active.', { id: 'upi-already-confirmed' });
+        toast.success('Payment was already confirmed! Your order is active.', { id: 'upi-confirmed' });
         clearCart(); await refresh();
         clearPaymentSession();
         navigate(`/orders/${pendingOrderIds[0]}`);

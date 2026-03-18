@@ -63,5 +63,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
   } catch (e) {
     console.error(TAG, 'syncActiveOrders failed:', e);
     return 0;
+  } finally {
+    syncing = false;
   }
 }
