@@ -109,7 +109,7 @@ export function SocietyLeaderboard() {
             <div className="w-7 h-7 rounded-lg bg-warning/20 flex items-center justify-center">
               <Trophy size={14} className="text-warning" />
             </div>
-            <h3 className="font-bold text-sm text-foreground">Top Sellers in Your Society</h3>
+            <h3 className="font-bold text-sm text-foreground">{ml.label('label_section_leaderboard_sellers')}</h3>
           </div>
 
           {/* Podium: top 3 with center elevated */}
