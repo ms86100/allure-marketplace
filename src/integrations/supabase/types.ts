@@ -2962,6 +2962,8 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          last_pushed_distance: number | null
+          last_pushed_eta: number | null
           order_id: string
           platform: string
           push_token: string
@@ -2971,6 +2973,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          last_pushed_distance?: number | null
+          last_pushed_eta?: number | null
           order_id: string
           platform?: string
           push_token: string
@@ -2980,6 +2984,8 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          last_pushed_distance?: number | null
+          last_pushed_eta?: number | null
           order_id?: string
           platform?: string
           push_token?: string
