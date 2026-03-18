@@ -20,6 +20,11 @@ import { useMarketplaceConfig } from '@/hooks/useMarketplaceConfig';
 import { useBadgeConfig } from '@/hooks/useBadgeConfig';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
+/* ── Gradient Divider ── */
+function SectionDivider() {
+  return <div className="my-5 mx-4 h-px bg-gradient-to-r from-transparent via-border to-transparent" />;
+}
+
 export function MarketplaceSection() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
@@ -101,10 +106,15 @@ export function MarketplaceSection() {
 
   return (
     <div className="pb-2">
+      {/* ── Hero: Featured Banners ── */}
+      <FeaturedBanners />
+
+      {/* ── Icon-forward Category Tabs ── */}
       <div className="pt-3 pb-4">
         <ParentGroupTabs activeGroup={activeGroup} onGroupChange={setActiveGroup} activeParentGroups={activeParentGroupSet} />
       </div>
 
+      {/* ── Category Image Grids ── */}
       {activeParentGroups.slice(0, 4).map((group) => (
         <CategoryImageGrid
           key={group.value}
@@ -114,36 +124,46 @@ export function MarketplaceSection() {
         />
       ))}
 
-      <FeaturedBanners />
-
+      {/* ── Discovery Rows ── */}
       {!activeGroup && popularNearYou.length > (discoveryMinProducts || 3) && (
-        <DiscoveryRow
-          title={browsingLocation?.label ? `${ml.label('label_discovery_popular')} · ${browsingLocation.label}` : ml.label('label_discovery_popular')}
-          icon={<Flame size={14} className="text-destructive" />}
-          products={popularNearYou}
-          onProductTap={handleProductTap}
-          onNavigate={navigate}
-          categoryConfigs={categoryConfigs}
-          marketplaceConfig={mc}
-          badgeConfigs={badgeConfigs}
-          socialProofMap={socialProofMap}
-        />
+        <>
+          <SectionDivider />
+          <div className="bg-secondary/20 py-4 -mx-0 rounded-none">
+            <DiscoveryRow
+              title={browsingLocation?.label ? `${ml.label('label_discovery_popular')} · ${browsingLocation.label}` : ml.label('label_discovery_popular')}
+              icon={<Flame size={14} className="text-destructive" />}
+              products={popularNearYou}
+              onProductTap={handleProductTap}
+              onNavigate={navigate}
+              categoryConfigs={categoryConfigs}
+              marketplaceConfig={mc}
+              badgeConfigs={badgeConfigs}
+              socialProofMap={socialProofMap}
+            />
+          </div>
+        </>
       )}
 
       {!activeGroup && newThisWeek.length > 0 && (
-        <DiscoveryRow
-          title={ml.label('label_discovery_new')}
-          icon={<Sparkles size={14} className="text-primary" />}
-          products={newThisWeek}
-          onProductTap={handleProductTap}
-          onNavigate={navigate}
-          categoryConfigs={categoryConfigs}
-          marketplaceConfig={mc}
-          badgeConfigs={badgeConfigs}
-          socialProofMap={socialProofMap}
-        />
+        <>
+          <SectionDivider />
+          <DiscoveryRow
+            title={ml.label('label_discovery_new')}
+            icon={<Sparkles size={14} className="text-primary" />}
+            products={newThisWeek}
+            onProductTap={handleProductTap}
+            onNavigate={navigate}
+            categoryConfigs={categoryConfigs}
+            marketplaceConfig={mc}
+            badgeConfigs={badgeConfigs}
+            socialProofMap={socialProofMap}
+          />
+        </>
       )}
 
+      <SectionDivider />
+
+      {/* ── Product Listings ── */}
       <ProductListings
         categories={filteredCategories}
         isLoading={loadingLocal}
@@ -155,7 +175,10 @@ export function MarketplaceSection() {
         socialProofMap={socialProofMap}
       />
 
-      <ShopByStoreDiscovery />
+      {/* ── Store Discovery ── */}
+      <div className="bg-primary/[0.03] py-4 mt-2">
+        <ShopByStoreDiscovery />
+      </div>
 
       <ProductDetailSheet
         product={selectedProduct}
@@ -202,7 +225,7 @@ function DiscoveryRow({
   socialProofMap?: Map<string, number>;
 }) {
   return (
-    <div className="mt-5">
+    <div>
       <div className="flex items-center gap-1.5 px-4 mb-3">
         {icon}
         <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{title}</h3>

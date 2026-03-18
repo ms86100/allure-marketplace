@@ -108,7 +108,9 @@ export default function HomePage() {
         <ForYouSection />
 
         {/* ═══ LEADERBOARD & COMMUNITY ═══ */}
-        <SocietyLeaderboard />
+        <div className="bg-secondary/30 py-4 mt-2">
+          <SocietyLeaderboard />
+        </div>
         <CommunityTeaser />
       </div>
     </AppLayout>

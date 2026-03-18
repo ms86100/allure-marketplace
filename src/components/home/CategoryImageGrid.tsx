@@ -64,9 +64,15 @@ function ImageCollage({ images, fallbackIcon, fallbackUrl, alt, color }: {
   }
   if (images.length === 0) {
     return (
-      <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: color ? `${color}15` : undefined }}>
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: color ? `${color}25` : undefined }}>
-          <DynamicIcon name={fallbackIcon} size={28} className="text-foreground/60" style={color ? { color } : undefined} />
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ backgroundColor: color ? `${color}20` : 'hsl(var(--secondary))' }}
+      >
+        <div
+          className="w-16 h-16 rounded-2xl flex items-center justify-center"
+          style={{ backgroundColor: color ? `${color}30` : undefined }}
+        >
+          <DynamicIcon name={fallbackIcon} size={36} className="text-foreground/60" style={color ? { color } : undefined} />
         </div>
       </div>
     );
@@ -143,7 +149,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                   color={cat.color}
                 />
                 {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/5" />
 
                 {/* Count badge — top right */}
                 {meta.count > 0 && (
@@ -166,6 +172,9 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                   </span>
                 </div>
               </div>
+
+              {/* Accent bar */}
+              <div className="h-[2px]" style={{ backgroundColor: cat.color || 'hsl(var(--primary))' }} />
 
               {/* Metadata row */}
               <div className="flex items-center gap-2.5 px-3 py-2.5 text-[10px] text-muted-foreground">

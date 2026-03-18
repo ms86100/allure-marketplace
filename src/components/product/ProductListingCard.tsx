@@ -116,12 +116,24 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
   const activityLabel = useMemo(() => { if (!(product as any).last_active_at) return ''; return formatSellerActivity((product as any).last_active_at, ml); }, [(product as any).last_active_at, ml]);
   const onTimeBadgeMinOrders = ml.threshold('on_time_badge_min_orders');
 
+  // Tinted placeholder background from category color
+  const placeholderBg = catConfig?.color ? `${catConfig.color}15` : undefined;
+
   return (
     <div ref={cardRef} onClick={handleCardClick} className={cn('bg-card rounded-xl cursor-pointer flex flex-col h-full relative', 'border border-border', 'transition-all duration-200 ease-out', 'active:scale-[0.98] hover:scale-[1.02]', isOutOfStock && 'opacity-50 grayscale-[40%]', isStoreClosed && !isOutOfStock && 'opacity-60 grayscale-[30%]', className)}>
       <div className="relative">
         <div className="relative aspect-[4/3] rounded-t-xl overflow-hidden product-image-bg">
-          <img src={product.image_url || undefined} alt={product.name} className={cn("w-full h-full", product.image_url ? "object-contain p-2" : "hidden")} loading="lazy" />
-          {!product.image_url && (<div className="w-full h-full flex items-center justify-center bg-muted"><span className="text-3xl">{placeholderEmoji}</span></div>)}
+          {product.image_url ? (
+            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: placeholderBg || 'hsl(var(--muted))' }}>
+              <span className="text-3xl">{placeholderEmoji}</span>
+            </div>
+          )}
+          {/* Bottom gradient for button contrast */}
+          {product.image_url && (
+            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/15 to-transparent pointer-events-none" />
+          )}
           {isOutOfStock && (<div className="absolute inset-0 bg-background/60 flex items-center justify-center"><span className="text-[8px] font-bold text-muted-foreground bg-muted/90 px-1.5 py-0.5 rounded-full uppercase tracking-wider">{mc.labels.outOfStock}</span></div>)}
           {isStoreClosed && !isOutOfStock && (<div className="absolute inset-0 bg-background/40 flex items-center justify-center"><span className="text-[8px] font-bold text-muted-foreground bg-muted/90 px-1.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1"><Clock size={8} />{storeClosedMessage}</span></div>)}
           {badges.length > 0 && (<div className="absolute top-1.5 left-1.5 flex flex-col gap-0.5">{badges.map((b, i) => (<Badge key={i} className={cn('text-[7px] leading-none px-1.5 py-0.5 font-bold shadow-sm rounded border-0', b.color)}>{b.label}</Badge>))}</div>)}
