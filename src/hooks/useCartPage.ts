@@ -239,7 +239,7 @@ export function useCartPage() {
       if (freshError) throw freshError;
 
       const unavailable = items.filter(item => { const fresh = freshProducts?.find(p => p.id === item.product_id); return !fresh || !fresh.is_available || fresh.approval_status !== 'approved'; });
-      if (unavailable.length > 0) { toast.error(`Some items are no longer available: ${unavailable.map(i => i.product?.name || 'Unknown').join(', ')}. Please remove them and try again.`); await refresh(); setIsPlacingOrder(false); return; }
+      if (unavailable.length > 0) { toast.error(`Some items are no longer available: ${unavailable.map(i => i.product?.name || 'Unknown').join(', ')}. Please remove them and try again.`, { id: 'checkout-unavailable' }); await refresh(); setIsPlacingOrder(false); return; }
 
       const closedSellers: string[] = [];
       for (const group of sellerGroups) {
