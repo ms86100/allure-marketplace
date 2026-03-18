@@ -29,6 +29,7 @@ export function AutoHighlightStrip() {
   const { effectiveSocietyId } = useAuth();
   const navigate = useNavigate();
   const { formatPrice } = useCurrency();
+  const ml = useMarketplaceLabels();
 
   const { data: highlights = [], isLoading } = useQuery({
     queryKey: ['auto-highlights', effectiveSocietyId],
