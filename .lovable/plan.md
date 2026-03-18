@@ -1,92 +1,115 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phases 1–3)
 
-# Round 5 Production Readiness Audit — Verified Findings
+All 9 original phases plus Blinkit parity Phases 1–3 are fully implemented.
 
-Every gap from Rounds 3 and 4 has been verified against the live database and current codebase. Here is what remains.
+## Blinkit Gap-Fill Status
 
----
+### Phase 1: APNs Push-to-Live-Activity — COMPLETE
 
-## Status of Previous Fixes (All Confirmed Working)
+Live Activities now update even when the app process is killed by iOS, matching Blinkit's reliability.
 
-- **OTP trigger:** `trg_generate_delivery_code` exists, generates 4-digit numeric codes. Confirmed `delivery_code = 9823` in live data.
-- **OTP gate trigger:** `trg_enforce_delivery_otp` exists — blocks direct `delivered` updates.
-- **RPCs:** `buyer_confirm_delivery`, `buyer_cancel_order`, `verify_delivery_otp_and_complete` all exist.
-- **BuyerDeliveryConfirmation** uses `supabase.rpc('buyer_confirm_delivery')` — correct.
-- **OrderCancellation** loads reasons from `system_settings` with fallback defaults — correct.
-- **Proximity thresholds** stored in `system_settings` and loaded by `LiveDeliveryTracker` — correct.
-- **Duplicate subscription fix:** `LiveDeliveryTracker` accepts `trackingState` prop, `OrderDetailPage` passes it — correct.
-- **GPS filter applied in assignment channel** (useDeliveryTracking line 135) — correct.
-- **OSRM road ETA** wired through `onRoadEtaChange` into `LiveDeliveryTracker` — correct.
-- **Arrival overlay gated to buyer** (line 136 of OrderDetailPage) — correct.
-- **Delivery code realtime subscription** (lines 106-117 of OrderDetailPage) — correct.
-- **Needs attention banner** for buyer (lines 175-189) — correct.
-- **Stalled monitor** flags `needs_attention` instead of cancelling, uses `stalled_notified` column — correct.
-- **Deep link fix** with hostname+pathname reconstruction and KNOWN_ROUTES fallback — correct.
-- **Live Activity dedup** in hydration and native-layer check in push() — correct.
-- **Orchestrator active order ID filtering** for delivery channel — correct.
-- **GPS jitter threshold** lowered to 1m — correct.
-- **OSRM timeout + retry + route caching** — correct.
-- **Heading icon churn** fixed with 10-degree threshold — correct.
-- **Live Activity mapper** uses DB-backed `category_status_flows` for labels and progress — correct.
-- **APNs edge function** queries `category_status_flows` at runtime — correct.
+#### Architecture
 
----
+```
+Order status change → DB trigger → net.http_post → update-live-activity-apns edge function
+  → APNs push (apns-push-type: liveactivity) → iOS widget receives content-state update
+  → Lock screen / Dynamic Island re-renders
+```
 
-## Remaining Gaps
+#### Implementation Details
 
-### Gap 1: LiveDeliveryTracker Status Messages Are Hardcoded (HIGH)
+| Component | What Was Done |
+|-----------|---------------|
+| **DB table** | `live_activity_tokens` (user_id, order_id, push_token, platform) with RLS |
+| **Swift plugin** | `LiveActivityPlugin.swift` — requests activity with `pushType: .token`, observes `Activity.pushTokenUpdates`, emits `liveActivityPushToken` event to JS |
+| **LiveActivityManager.ts** | Listens for `liveActivityPushToken` events, upserts token to `live_activity_tokens` table, cleans up on activity end |
+| **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
+| **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
 
-**Issue:** Lines 190-205 of `LiveDeliveryTracker.tsx` contain hardcoded status-to-text mappings like `'picked_up' -> '🚚 Your order has been picked up!'` and `'on_the_way' -> '🛵 Your order is on the way!'`. These are separate from the proximity messages (which ARE DB-backed). The `category_status_flows` table already has `buyer_hint` and `display_label` columns that should be used.
+### Phase 2: System Reliability — COMPLETE
 
-The user explicitly mandated "no hardcoding, everything DB-backed."
+#### 2A. Idempotency Guard on Push Processing
 
-**Fix:** Fetch `buyer_hint` and `display_label` for the delivery assignment status from `category_status_flows` (the order status flow, not the delivery assignment status flow). Pass these labels into `LiveDeliveryTracker` or have it look up the text from a prop. Use `buyer_hint` for buyer view and construct seller messages from `display_label`.
+| Component | What Was Done |
+|-----------|---------------|
+| **DB trigger** | `fn_enqueue_order_status_notification` now checks for duplicate entries (same `reference_path` + `payload->>'status'` within 30 seconds) before inserting into `notification_queue`. Skips with `RAISE NOTICE`. |
+| **DB index** | `idx_notification_queue_dedup` on `notification_queue(reference_path, created_at DESC)` for fast dedup lookups |
 
-### Gap 2: LiveActivityManager START_STATUSES and TERMINAL_STATUSES Are Hardcoded (MEDIUM)
+#### 2B. Realtime Channel Auto-Reconnect
 
-**Issue:** `LiveActivityManager.ts` lines 41-58 hardcode which statuses are terminal and which should start an activity. If an admin adds a new status via the Workflow Manager (e.g., `quality_check`), the Live Activity system won't know about it.
+| Component | What Was Done |
+|-----------|---------------|
+| **`useLiveActivityOrchestrator.ts`** | Both order and delivery channels now detect `CHANNEL_ERROR` / `TIMED_OUT`, remove the dead channel, and re-subscribe after 3s delay. Max 3 reconnects per session. On successful reconnect (`SUBSCRIBED`), retry counter resets. Each reconnect triggers a one-shot `syncActiveOrders` to fill any gap. Unique channel names with `Date.now()` suffix prevent Supabase channel name conflicts. |
 
-**Fix:** Load the status flow entries at hydration time and derive terminal/start sets from `sort_order` and status keys. Statuses with the highest sort_orders (beyond `delivered`) are terminal; statuses between `accepted` and `delivered` are start statuses.
+### Phase 3: Seller Self-Delivery GPS + Buyer Live Map — COMPLETE
 
-### Gap 3: `useLiveActivityOrchestrator` TERMINAL_STATUSES Duplicated and Hardcoded (MEDIUM)
+#### 3A. Seller GPS Broadcasting for Self-Delivery
 
-**Issue:** The orchestrator has its own copy of `TERMINAL_STATUSES` at line 12. Same problem as Gap 2.
+| Component | What Was Done |
+|-----------|---------------|
+| **`SellerGPSTracker.tsx`** | New component — shown to sellers on OrderDetailPage when `delivery_handled_by === 'seller'` and order status is `picked_up` or `on_the_way`. Uses existing `useBackgroundLocationTracking` hook. Shows Start/Stop controls, live badge, and last-sent timestamp. |
+| **`OrderDetailPage.tsx`** | Integrated `SellerGPSTracker` in the seller action area, gated by `delivery_handled_by === 'seller'` + transit statuses |
 
-**Fix:** Share a single source of truth with `LiveActivityManager`, or both derive from DB flow entries.
+#### 3B. Buyer Live Map
 
-### Gap 4: `monitor-stalled-deliveries` Notification Messages Are Hardcoded (MEDIUM)
+| Component | What Was Done |
+|-----------|---------------|
+| **`DeliveryMapView.tsx`** | New component using Leaflet + OpenStreetMap (no API key). Shows rider position (🛵 marker) and destination (📍 marker). Auto-fits bounds on mount, pans when rider moves out of view. |
+| **`OrderDetailPage.tsx`** | Integrated `DeliveryMapView` above `LiveDeliveryTracker` for buyer view when rider has GPS data and order has delivery coordinates (`delivery_lat`/`delivery_lng`). Falls back to text-only tracker when no GPS data available. |
 
-**Issue:** Lines 58-72 of the edge function hardcode notification titles and bodies like "Delivery update paused" and "GPS tracking paused for over 10 minutes." Per the user's requirement, these should come from `system_settings`.
+### Previously Completed Blinkit Gaps
 
-**Fix:** Add system_settings keys like `stalled_delivery_buyer_title`, `stalled_delivery_buyer_body`, `stalled_delivery_seller_title`, `stalled_delivery_seller_body`. Fetch them in the edge function with fallback defaults.
+| Feature | Status |
+|---------|--------|
+| Push deep-link routing | ✅ Done |
+| Notification grouping (threadId) | ✅ Done |
+| Rich push images (NSE) | ✅ Done |
+| Dynamic Island tap → order page | ✅ Done |
+| Item count in DI | ✅ Done |
+| GPS-derived progress | ✅ Done |
 
-### Gap 5: `DeliveryArrivalOverlay` Messages Are Hardcoded (MEDIUM)
+### Phase 4: Live Map / Rider GPS — DEFERRED
 
-**Issue:** The arrival overlay component likely has hardcoded text for proximity stages. Should use the DB-backed proximity config.
+Requires dedicated rider-side GPS broadcasting infrastructure (separate product workstream). Seller self-delivery GPS (Phase 3A) covers the immediate need.
 
-**Fix:** Pass the proximity config into the overlay component.
+### Product Thumbnails in Widget — DEFERRED
 
----
+Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
 
-## Summary
+## Silent Push Optimization: COMPLETE
 
-| # | Gap | Severity | Type |
-|---|-----|----------|------|
-| 1 | LiveDeliveryTracker status messages hardcoded | High | Frontend |
-| 2 | LiveActivityManager status sets hardcoded | Medium | Frontend |
-| 3 | Orchestrator TERMINAL_STATUSES duplicated | Medium | Frontend |
-| 4 | Stalled delivery notification text hardcoded | Medium | Edge Function |
-| 5 | DeliveryArrivalOverlay messages hardcoded | Medium | Frontend |
+### Notification Matrix
 
-All Critical and High issues from Rounds 3 and 4 are resolved and verified. The remaining items are all about the "no hardcoding" requirement — moving the last hardcoded strings to the database.
+| Status | Push? | Live Activity? | Rationale |
+|--------|-------|----------------|-----------|
+| `accepted` | ✅ Always | Yes | Critical — order confirmed |
+| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
+| `ready` | ✅ Always | Yes | Pickup moment — user must know |
+| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
+| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
+| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
+| `delivered` | ✅ Always | Yes | Critical endpoint |
+| `completed` | ✅ Always | No | Critical endpoint |
+| `cancelled` | ✅ Always | No | Critical — must alert |
+| All service/booking | ✅ Always | No | No Live Activity for these |
 
-## Implementation Plan
+## Implementation Matrix
 
-| Step | What | Files |
-|------|------|-------|
-| 1 | Replace hardcoded status messages in LiveDeliveryTracker with DB-backed buyer_hint/display_label from category_status_flows | `LiveDeliveryTracker.tsx` |
-| 2 | Derive START/TERMINAL status sets from category_status_flows in LiveActivityManager | `LiveActivityManager.ts`, `liveActivitySync.ts` |
-| 3 | Remove duplicated TERMINAL_STATUSES from orchestrator, use shared source | `useLiveActivityOrchestrator.ts` |
-| 4 | Move stalled delivery notification text to system_settings | Migration (data insert) + `monitor-stalled-deliveries/index.ts` |
-| 5 | Pass proximity config into DeliveryArrivalOverlay | `DeliveryArrivalOverlay.tsx`, `OrderDetailPage.tsx` |
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+| BG-1 | APNs Push-to-Live-Activity | Implemented |
+| BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
+| BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |
+| BG-4 | Buyer Delivery Confirmation (Gap 8) | Implemented |
+| BG-5 | ETA at Acceptance Time (Gap 11) | Implemented |

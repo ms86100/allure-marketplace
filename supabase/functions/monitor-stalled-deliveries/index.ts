@@ -16,6 +16,26 @@ serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
+    // Fetch DB-backed notification text from system_settings
+    const { data: settingsRows } = await supabase
+      .from('system_settings')
+      .select('key, value')
+      .in('key', [
+        'stalled_buyer_title', 'stalled_buyer_body_soft', 'stalled_buyer_body_hard',
+        'stalled_seller_title', 'stalled_seller_body_soft', 'stalled_seller_body_hard',
+      ]);
+    const settings: Record<string, string> = {};
+    for (const row of settingsRows || []) {
+      if (row.key && row.value) settings[row.key] = row.value;
+    }
+
+    const buyerTitle = settings['stalled_buyer_title'] || '⚠️ Delivery update paused';
+    const buyerBodySoft = settings['stalled_buyer_body_soft'] || 'Live tracking is temporarily paused. The delivery is still in progress.';
+    const buyerBodyHard = settings['stalled_buyer_body_hard'] || 'Location updates have stopped for a while. You can contact the seller or report an issue.';
+    const sellerTitle = settings['stalled_seller_title'] || '🚨 Tracking paused';
+    const sellerBodySoft = settings['stalled_seller_body_soft'] || 'Location updates stopped for 10+ min. Please keep the app open while delivering.';
+    const sellerBodyHard = settings['stalled_seller_body_hard'] || 'Location updates stopped for 30+ min. Please update delivery status or open the app.';
+
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
@@ -57,10 +77,8 @@ serve(async (req) => {
         if (order.buyer_id) {
           await supabase.from('notification_queue').insert({
             user_id: order.buyer_id,
-            title: '⚠️ Delivery update paused',
-            body: isHardStall
-              ? 'Location updates have stopped for a while. You can contact the seller or report an issue.'
-              : 'Live tracking is temporarily paused. The delivery is still in progress.',
+            title: buyerTitle,
+            body: isHardStall ? buyerBodyHard : buyerBodySoft,
             type: 'delivery_issue',
             reference_path: `/orders/${order.id}`,
             payload: {
@@ -82,10 +100,8 @@ serve(async (req) => {
         if (seller?.user_id) {
           await supabase.from('notification_queue').insert({
             user_id: seller.user_id,
-            title: '🚨 Tracking paused',
-            body: isHardStall
-              ? 'Location updates stopped for 30+ min. Please update delivery status or open the app.'
-              : 'Location updates stopped for 10+ min. Please keep the app open while delivering.',
+            title: sellerTitle,
+            body: isHardStall ? sellerBodyHard : sellerBodySoft,
             type: 'delivery_issue',
             reference_path: `/orders/${order.id}`,
             payload: {

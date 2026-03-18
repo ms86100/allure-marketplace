@@ -4,6 +4,12 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
 
+interface StatusHint {
+  buyer_hint?: string | null;
+  seller_hint?: string | null;
+  display_label?: string | null;
+}
+
 interface LiveDeliveryTrackerProps {
   assignmentId: string;
   isBuyerView: boolean;
@@ -11,6 +17,8 @@ interface LiveDeliveryTrackerProps {
   trackingState?: DeliveryTrackingState;
   /** Gap F: Road-based ETA from OSRM, more accurate than Haversine */
   roadEtaMinutes?: number | null;
+  /** Gap 1 R5: DB-backed status hints keyed by status_key */
+  statusHints?: Record<string, StatusHint>;
 }
 
 interface ProximityThreshold {
@@ -101,7 +109,7 @@ function getLastSeenText(lastLocationAt: string | null): string | null {
   return null;
 }
 
-export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, roadEtaMinutes }: LiveDeliveryTrackerProps) {
+export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, roadEtaMinutes, statusHints }: LiveDeliveryTrackerProps) {
   const ownTracking = useDeliveryTracking(trackingState ? null : assignmentId);
   const tracking = trackingState || ownTracking;
 
@@ -187,23 +195,15 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
         </div>
       )}
 
-      {isBuyerView ? (
-        <p className="text-xs text-muted-foreground">
-          {tracking.status === 'assigned' && `✅ ${tracking.riderName || 'A rider'} will pick up your order soon.`}
-          {tracking.status === 'picked_up' && '🚚 Your order has been picked up!'}
-          {tracking.status === 'on_the_way' && '🛵 Your order is on the way!'}
-          {tracking.status === 'at_gate' && '🏠 Delivery partner is at your society gate.'}
-          {tracking.status === 'delivered' && '🎉 Your order has been delivered!'}
-        </p>
-      ) : (
-        <p className="text-xs text-muted-foreground">
-          {tracking.status === 'assigned' && `🚴 ${tracking.riderName || 'Rider'} assigned.`}
-          {tracking.status === 'picked_up' && '📦 Pickup confirmed. Live delivery has started.'}
-          {tracking.status === 'on_the_way' && '🛵 You are on the way to the buyer.'}
-          {tracking.status === 'at_gate' && '🏠 You are at the buyer\'s gate.'}
-          {tracking.status === 'delivered' && '✅ Delivery completed.'}
-        </p>
-      )}
+      {tracking.status && (() => {
+        const hint = statusHints?.[tracking.status];
+        const message = isBuyerView
+          ? (hint?.buyer_hint || hint?.display_label || tracking.status)
+          : ((hint as any)?.seller_hint || hint?.display_label || tracking.status);
+        return message ? (
+          <p className="text-xs text-muted-foreground">{message}</p>
+        ) : null;
+      })()}
     </div>
   );
 }

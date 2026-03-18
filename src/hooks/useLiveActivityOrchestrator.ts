@@ -5,11 +5,13 @@ import { LiveActivityManager } from '@/services/LiveActivityManager';
 import { buildLiveActivityData, type StatusFlowEntry } from '@/services/liveActivityMapper';
 import { syncActiveOrders } from '@/services/liveActivitySync';
 import { runLiveActivityDiagnostics } from '@/services/liveActivityDiagnostics';
+import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statusFlowCache';
 import { Capacitor } from '@capacitor/core';
 
 const TAG = '[LiveActivityOrchestrator]';
 
-const TERMINAL_STATUSES = new Set([
+/** DB-backed terminal statuses — loaded once at init */
+let terminalStatusesCache: Set<string> = new Set([
   'delivered', 'completed', 'cancelled', 'no_show', 'failed',
 ]);
 
@@ -67,6 +69,7 @@ export function useLiveActivityOrchestrator(): void {
     });
 
     fetchFlowEntries();
+    getTerminalStatuses().then(s => { terminalStatusesCache = s; }).catch(() => {});
     doSync();
 
     return () => {
@@ -89,7 +92,7 @@ export function useLiveActivityOrchestrator(): void {
 
       console.log(TAG, `Order ${orderId} status → ${newStatus}`);
 
-      if (TERMINAL_STATUSES.has(newStatus)) {
+      if (terminalStatusesCache.has(newStatus)) {
         activeOrderIdsRef.current.delete(orderId);
         await LiveActivityManager.end(orderId);
         return;
@@ -299,8 +302,10 @@ export function useLiveActivityOrchestrator(): void {
           if (!isActive || !mountedRef.current) return;
           console.log(TAG, 'App resumed — re-hydrating');
 
+          invalidateStatusFlowCache();
           LiveActivityManager.resetHydration();
           await fetchFlowEntries();
+          getTerminalStatuses().then(s => { terminalStatusesCache = s; }).catch(() => {});
           await doSync();
         });
         cleanup = () => listener.remove();

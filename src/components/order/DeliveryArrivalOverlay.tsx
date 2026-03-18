@@ -3,6 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Phone, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+interface ProximityMessages {
+  at_doorstep_title?: string;
+  arriving_title?: string;
+  subtitle?: string;
+}
+
 interface DeliveryArrivalOverlayProps {
   distance: number | null;
   eta: number | null;
@@ -11,6 +17,8 @@ interface DeliveryArrivalOverlayProps {
   status: string | null;
   onDismiss: () => void;
   deliveryCode?: string | null;
+  /** DB-backed proximity messages */
+  proximityMessages?: ProximityMessages;
 }
 
 export function DeliveryArrivalOverlay({
@@ -21,6 +29,7 @@ export function DeliveryArrivalOverlay({
   status,
   onDismiss,
   deliveryCode,
+  proximityMessages,
 }: DeliveryArrivalOverlayProps) {
   const [dismissed, setDismissed] = useState(false);
 
@@ -71,10 +80,12 @@ export function DeliveryArrivalOverlay({
                 <MapPin size={28} className="text-primary" />
               </motion.div>
               <h2 className="text-lg font-bold text-foreground">
-                {distance !== null && distance < 50 ? '🏠 At your doorstep!' : '🏃 Driver arriving now!'}
+                {distance !== null && distance < 50
+                  ? (proximityMessages?.at_doorstep_title || '🏠 At your doorstep!')
+                  : (proximityMessages?.arriving_title || '🏃 Driver arriving now!')}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Please get ready to receive your order
+                {proximityMessages?.subtitle || 'Please get ready to receive your order'}
               </p>
             </div>
 

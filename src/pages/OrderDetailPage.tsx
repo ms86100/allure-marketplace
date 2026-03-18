@@ -16,6 +16,7 @@ import { DeliveryETABanner } from '@/components/order/DeliveryETABanner';
 import { SellerGPSTracker } from '@/components/delivery/SellerGPSTracker';
 import { UpdateBuyerLocationButton } from '@/components/delivery/UpdateBuyerLocationButton';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
+import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
 import { DeliveryCompletionOtpDialog } from '@/components/delivery/DeliveryCompletionOtpDialog';
 import { DeliveryFeedbackForm } from '@/components/delivery/DeliveryFeedbackForm';
 
@@ -47,6 +48,7 @@ export default function OrderDetailPage() {
   const [buyerOtp, setBuyerOtp] = useState<string | null>(null);
   const [roadEtaMinutes, setRoadEtaMinutes] = useState<number | null>(null);
   const { data: serviceBooking } = useServiceBookingForOrder(o.order?.id);
+  const { getSetting } = useSystemSettingsRaw(['proximity_thresholds']);
 
   const order = o.order;
   const orderId = order?.id;
@@ -303,7 +305,13 @@ export default function OrderDetailPage() {
                   </Suspense>
                 ) : null;
               })()}
-              <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} trackingState={deliveryTracking} roadEtaMinutes={roadEtaMinutes} />
+              <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} trackingState={deliveryTracking} roadEtaMinutes={roadEtaMinutes} statusHints={(() => {
+                const hints: Record<string, { buyer_hint?: string | null; seller_hint?: string | null; display_label?: string | null }> = {};
+                for (const step of o.flow) {
+                  hints[step.status_key] = { buyer_hint: step.buyer_hint, seller_hint: (step as any).seller_hint, display_label: step.display_label };
+                }
+                return hints;
+              })()} />
               {/* Gap A: Show delivery OTP to buyer */}
               {o.isBuyerView && buyerOtp && isInTransit && (
                 <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 text-center">
@@ -467,6 +475,20 @@ export default function OrderDetailPage() {
           status={deliveryTracking.status}
           onDismiss={() => {}}
           deliveryCode={buyerOtp}
+          proximityMessages={(() => {
+            try {
+              const raw = getSetting('proximity_thresholds');
+              if (raw) {
+                const cfg = JSON.parse(raw);
+                return {
+                  at_doorstep_title: cfg.at_doorstep?.buyer_message,
+                  arriving_title: cfg.arriving?.buyer_message,
+                  subtitle: undefined,
+                };
+              }
+            } catch { /* use defaults */ }
+            return undefined;
+          })()}
         />
       )}
     </AppLayout>
