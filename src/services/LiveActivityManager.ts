@@ -273,8 +273,11 @@ class _LiveActivityManager {
       console.log(TAG, `END entity=${entityId} activityId=${entry.activityId}`);
       await LiveActivity.endLiveActivity({ activityId: entry.activityId });
       console.log(TAG, `END SUCCESS entity=${entityId}`);
+      addOpsEntry({ timestamp: Date.now(), action: 'end', entityId, success: true, activityId: entry.activityId });
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       recordLAError('END', entityId, e);
+      addOpsEntry({ timestamp: Date.now(), action: 'end', entityId, success: false, error: msg });
     }
   }
 
