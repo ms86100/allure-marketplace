@@ -131,9 +131,18 @@ export function useCartPage() {
     else setFulfillmentType('self_pickup');
   }, [sellerGroups.length, firstSeller]);
 
+  // Clear coupon when seller composition changes (multi-vendor or different seller)
+  const currentSellerId = sellerGroups.length === 1 ? sellerGroups[0].sellerId : null;
   useEffect(() => {
     if (sellerGroups.length > 1 && appliedCoupon) setAppliedCoupon(null);
   }, [sellerGroups.length]);
+  useEffect(() => {
+    // If single-seller cart switches to a different seller, clear stale coupon
+    if (appliedCoupon && currentSellerId && appliedCoupon.id) {
+      // CouponInput already remounts via key, but parent state needs clearing too
+      setAppliedCoupon(null);
+    }
+  }, [currentSellerId]);
 
   // Auto-select default delivery address
   useEffect(() => {
