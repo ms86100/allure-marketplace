@@ -15,6 +15,7 @@ import { X, AlertTriangle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
 
 interface OrderCancellationProps {
   orderId: string;
@@ -24,7 +25,7 @@ interface OrderCancellationProps {
   canCancel?: boolean;
 }
 
-const CANCELLATION_REASONS = [
+const DEFAULT_REASONS = [
   { value: 'changed_mind', label: 'Changed my mind' },
   { value: 'ordered_wrong', label: 'Ordered wrong items' },
   { value: 'taking_too_long', label: 'Taking too long to accept' },
@@ -40,6 +41,17 @@ export function OrderCancellation({ orderId, orderStatus, onCancelled, canCancel
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
 
+  // Load cancellation reasons from DB
+  const { getSetting } = useSystemSettingsRaw(['cancellation_reasons']);
+  const rawReasons = getSetting('cancellation_reasons');
+  let reasons = DEFAULT_REASONS;
+  try {
+    if (rawReasons) {
+      const parsed = JSON.parse(rawReasons);
+      if (Array.isArray(parsed) && parsed.length > 0) reasons = parsed;
+    }
+  } catch { /* use defaults */ }
+
   // Use workflow-driven eligibility if provided, otherwise fall back to legacy check
   const isEligible = canCancel !== undefined ? canCancel : ['placed', 'accepted'].includes(orderStatus);
 
@@ -53,7 +65,7 @@ export function OrderCancellation({ orderId, orderStatus, onCancelled, canCancel
       return;
     }
 
-    const finalReason = reason === 'other' ? otherReason : CANCELLATION_REASONS.find(r => r.value === reason)?.label;
+    const finalReason = reason === 'other' ? otherReason : reasons.find(r => r.value === reason)?.label;
 
     if (reason === 'other' && !otherReason.trim()) {
       toast.error('Please enter your reason');
@@ -104,7 +116,7 @@ export function OrderCancellation({ orderId, orderStatus, onCancelled, canCancel
 
         <div className="space-y-4 mt-4">
           <RadioGroup value={reason} onValueChange={setReason}>
-            {CANCELLATION_REASONS.map(({ value, label }) => (
+            {reasons.map(({ value, label }) => (
               <div key={value} className="flex items-center space-x-2">
                 <RadioGroupItem value={value} id={value} />
                 <Label htmlFor={value} className="cursor-pointer">{label}</Label>

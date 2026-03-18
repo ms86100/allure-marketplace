@@ -27,7 +27,7 @@ import { SellerPaymentConfirmation } from '@/components/payment/SellerPaymentCon
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
 import { isTerminalStatus } from '@/hooks/useCategoryStatusFlow';
-import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck, Loader2 } from 'lucide-react';
+import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck, Loader2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { getString, setString } from '@/lib/persistent-kv';
@@ -88,18 +88,35 @@ export default function OrderDetailPage() {
     }
   }, [orderId, isDeliveryOrder]);
 
-  // Gap A: Fetch delivery OTP for buyer
+  // Gap A: Fetch delivery OTP for buyer + Gap 9: Subscribe to realtime updates
   useEffect(() => {
-    if (deliveryAssignmentId && isDeliveryOrder) {
-      supabase
-        .from('delivery_assignments')
-        .select('delivery_code')
-        .eq('id', deliveryAssignmentId)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data?.delivery_code) setBuyerOtp(data.delivery_code);
-        });
-    }
+    if (!deliveryAssignmentId || !isDeliveryOrder) return;
+
+    // Initial fetch
+    supabase
+      .from('delivery_assignments')
+      .select('delivery_code')
+      .eq('id', deliveryAssignmentId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.delivery_code) setBuyerOtp(data.delivery_code);
+      });
+
+    // Realtime subscription for delivery_code changes
+    const otpChannel = supabase
+      .channel(`otp-watch-${deliveryAssignmentId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'delivery_assignments',
+        filter: `id=eq.${deliveryAssignmentId}`,
+      }, (payload) => {
+        const code = (payload.new as any)?.delivery_code;
+        if (code) setBuyerOtp(code);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(otpChannel); };
   }, [isDeliveryOrder, deliveryAssignmentId]);
 
   if (o.isLoading) return <AppLayout showHeader={false}><div className="p-4 space-y-3"><Skeleton className="h-8 w-32" /><Skeleton className="h-28 w-full rounded-xl" /><Skeleton className="h-40 w-full rounded-xl" /></div></AppLayout>;
@@ -153,6 +170,24 @@ export default function OrderDetailPage() {
           )}
 
           {o.isUrgentOrder && order.auto_cancel_at && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} />}
+
+          {/* Gap 8: Needs attention banner for buyer */}
+          {o.isBuyerView && (order as any).needs_attention && (
+            <div className="bg-warning/10 border border-warning/20 rounded-xl p-3 flex items-start gap-2.5">
+              <AlertTriangle className="text-warning shrink-0 mt-0.5" size={16} />
+              <div>
+                <p className="text-sm font-semibold text-warning">Attention Needed</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {(order as any).needs_attention_reason || 'There may be a delay with your order. Contact the seller if needed.'}
+                </p>
+                {sellerProfile?.phone && (
+                  <a href={`tel:${sellerProfile.phone}`} className="inline-flex items-center gap-1 text-xs font-medium text-primary mt-1.5">
+                    <Phone size={12} /> Contact Seller
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
 
           {order.status === 'cancelled' && order.rejection_reason && o.isBuyerView && (
             <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 flex items-start gap-2.5">

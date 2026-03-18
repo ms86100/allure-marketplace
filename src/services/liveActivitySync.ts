@@ -4,7 +4,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { LiveActivityManager } from '@/services/LiveActivityManager';
-import { buildLiveActivityData } from '@/services/liveActivityMapper';
+import { buildLiveActivityData, type StatusFlowEntry } from '@/services/liveActivityMapper';
 
 const TAG = '[LA-Sync]';
 
@@ -15,6 +15,31 @@ const ACTIVE_STATUSES = [
 
 /** Prevents concurrent syncActiveOrders calls from racing */
 let syncing = false;
+
+/** Cached status flow entries to avoid re-fetching on every sync */
+let cachedFlowEntries: StatusFlowEntry[] | null = null;
+let cacheExpiry = 0;
+
+async function getStatusFlowEntries(): Promise<StatusFlowEntry[]> {
+  if (cachedFlowEntries && Date.now() < cacheExpiry) {
+    return cachedFlowEntries;
+  }
+  const { data, error } = await supabase
+    .from('category_status_flows')
+    .select('status_key, display_label, sort_order, buyer_hint')
+    .eq('transaction_type', 'cart_purchase')
+    .eq('parent_group', 'default')
+    .order('sort_order');
+
+  if (error || !data) {
+    console.warn(TAG, 'Failed to fetch status flows, using empty:', error?.message);
+    return cachedFlowEntries ?? [];
+  }
+
+  cachedFlowEntries = data as StatusFlowEntry[];
+  cacheExpiry = Date.now() + 10 * 60 * 1000; // Cache for 10 minutes
+  return cachedFlowEntries;
+}
 
 export async function syncActiveOrders(userId: string): Promise<number> {
   if (syncing) {
@@ -45,8 +70,8 @@ export async function syncActiveOrders(userId: string): Promise<number> {
     const orderIds = orders.map((o) => o.id);
     const sellerIds = [...new Set(orders.map((o) => o.seller_id).filter(Boolean))];
 
-    // Fetch deliveries, seller names, and item counts in parallel
-    const [deliveriesResult, sellersResult, itemCountsResult] = await Promise.all([
+    // Fetch deliveries, seller names, item counts, and status flows in parallel
+    const [deliveriesResult, sellersResult, itemCountsResult, flowEntries] = await Promise.all([
       supabase
         .from('delivery_assignments')
         .select('order_id, eta_minutes, distance_meters, rider_name')
@@ -62,6 +87,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
         .from('order_items')
         .select('order_id')
         .in('order_id', orderIds),
+      getStatusFlowEntries(),
     ]);
 
     const deliveryMap = new Map(
@@ -81,7 +107,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
       const delivery = deliveryMap.get(order.id) ?? null;
       const sellerName = sellerMap.get(order.seller_id) ?? null;
       const itemCount = itemCountMap.get(order.id) ?? null;
-      const data = buildLiveActivityData(order, delivery, sellerName, itemCount);
+      const data = buildLiveActivityData(order, delivery, sellerName, itemCount, flowEntries);
       try {
         await LiveActivityManager.push(data);
       } catch (e) {

@@ -13,7 +13,7 @@ interface DeliveryMapViewProps {
   onRoadEtaChange?: (eta: number | null) => void;
 }
 
-// Rider icon with rotation support
+// Gap 7: Cache icon instances, only recreate when heading changes >10°
 function createRiderIcon(heading: number | null): L.DivIcon {
   const rotation = heading != null ? heading : 0;
   return L.divIcon({
@@ -63,6 +63,7 @@ function AnimatedRiderMarker({ lat, lng, heading, name }: {
   const markerRef = useRef<L.Marker>(null);
   const prevPos = useRef<[number, number]>([lat, lng]);
   const animFrameRef = useRef<number>(0);
+  const lastHeadingRef = useRef<number | null>(heading);
 
   useEffect(() => {
     const marker = markerRef.current;
@@ -73,12 +74,11 @@ function AnimatedRiderMarker({ lat, lng, heading, name }: {
     const endLat = lat;
     const endLng = lng;
 
-    // Skip animation if distance is tiny
     const dLat = Math.abs(endLat - startLat);
     const dLng = Math.abs(endLng - startLng);
     if (dLat < 0.000001 && dLng < 0.000001) return;
 
-    const duration = 2000; // 2s smooth animation
+    const duration = 2000;
     const startTime = performance.now();
 
     cancelAnimationFrame(animFrameRef.current);
@@ -86,7 +86,6 @@ function AnimatedRiderMarker({ lat, lng, heading, name }: {
     const animate = (now: number) => {
       const elapsed = now - startTime;
       const t = Math.min(elapsed / duration, 1);
-      // Ease-out cubic for natural deceleration
       const ease = 1 - Math.pow(1 - t, 3);
 
       const currentLat = startLat + (endLat - startLat) * ease;
@@ -106,12 +105,19 @@ function AnimatedRiderMarker({ lat, lng, heading, name }: {
     return () => cancelAnimationFrame(animFrameRef.current);
   }, [lat, lng]);
 
-  // Update icon when heading changes
+  // Gap 7: Only update icon when heading changes by >10°
   useEffect(() => {
     const marker = markerRef.current;
-    if (marker) {
-      marker.setIcon(createRiderIcon(heading));
-    }
+    if (!marker) return;
+
+    const prev = lastHeadingRef.current;
+    const curr = heading;
+
+    if (prev === null && curr === null) return;
+    if (prev !== null && curr !== null && Math.abs(curr - prev) < 10) return;
+
+    lastHeadingRef.current = curr;
+    marker.setIcon(createRiderIcon(curr));
   }, [heading]);
 
   return (
@@ -125,7 +131,7 @@ function AnimatedRiderMarker({ lat, lng, heading, name }: {
   );
 }
 
-/** Gap 4: OSRM road route hook — now also extracts road duration for accurate ETA */
+/** OSRM road route hook with timeout, retry, and route caching */
 function useOSRMRoute(
   riderLat: number, riderLng: number,
   destLat: number, destLng: number
@@ -135,8 +141,10 @@ function useOSRMRoute(
   const [roadDistanceMeters, setRoadDistanceMeters] = useState<number | null>(null);
   const lastFetchPos = useRef<[number, number] | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  /** Gap 6: Cache last successful route */
+  const lastSuccessfulRoute = useRef<[number, number][]>([]);
 
-  const fetchRoute = useCallback(async () => {
+  const fetchRoute = useCallback(async (retryCount = 0) => {
     // Only re-fetch if rider moved > 80m from last fetch point
     if (lastFetchPos.current) {
       const [prevLat, prevLng] = lastFetchPos.current;
@@ -149,10 +157,15 @@ function useOSRMRoute(
     const controller = new AbortController();
     abortRef.current = controller;
 
+    // Gap 6: 5-second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     try {
       const url = `https://router.project-osrm.org/route/v1/driving/${riderLng},${riderLat};${destLng},${destLat}?overview=full&geometries=geojson`;
       const res = await fetch(url, { signal: controller.signal });
-      if (!res.ok) return;
+      clearTimeout(timeoutId);
+
+      if (!res.ok) throw new Error(`OSRM ${res.status}`);
       const data = await res.json();
       const route = data.routes?.[0];
       if (route?.geometry?.coordinates) {
@@ -160,8 +173,8 @@ function useOSRMRoute(
           (c: [number, number]) => [c[1], c[0]]
         );
         setRouteCoords(coords);
+        lastSuccessfulRoute.current = coords;
         lastFetchPos.current = [riderLat, riderLng];
-        // Extract road-based ETA and distance from OSRM
         if (route.duration != null) {
           setRoadEtaMinutes(Math.max(1, Math.ceil(route.duration / 60)));
         }
@@ -170,8 +183,22 @@ function useOSRMRoute(
         }
       }
     } catch (e) {
-      if ((e as Error).name !== 'AbortError') {
-        console.warn('[OSRM] Route fetch failed, falling back to straight line');
+      clearTimeout(timeoutId);
+      if ((e as Error).name === 'AbortError') {
+        // Gap 6: Retry once on timeout
+        if (retryCount < 1) {
+          setTimeout(() => fetchRoute(retryCount + 1), 1000);
+        } else {
+          // Use cached route if available
+          if (lastSuccessfulRoute.current.length > 0) {
+            setRouteCoords(lastSuccessfulRoute.current);
+          }
+        }
+      } else {
+        console.warn('[OSRM] Route fetch failed, using cached/straight line');
+        if (lastSuccessfulRoute.current.length > 0) {
+          setRouteCoords(lastSuccessfulRoute.current);
+        }
       }
     }
   }, [riderLat, riderLng, destLat, destLng]);
@@ -195,12 +222,10 @@ export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinatio
 
   const { routeCoords, roadEtaMinutes } = useOSRMRoute(riderLat, riderLng, destinationLat, destinationLng);
 
-  // Gap F: Propagate OSRM ETA to parent
   useEffect(() => {
     onRoadEtaChange?.(roadEtaMinutes);
   }, [roadEtaMinutes, onRoadEtaChange]);
 
-  // Fallback straight line if OSRM hasn't loaded yet
   const polylinePositions = routeCoords.length > 0
     ? routeCoords
     : [[riderLat, riderLng] as [number, number], [destinationLat, destinationLng] as [number, number]];
@@ -211,7 +236,6 @@ export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinatio
 
   return (
     <div className="rounded-xl overflow-hidden border border-border h-[200px] relative">
-      {/* Gap 4: OSRM road-based ETA badge on map */}
       {roadEtaMinutes && (
         <div className="absolute top-2 right-2 z-[500] bg-background/90 backdrop-blur-sm border border-border rounded-lg px-2.5 py-1 shadow-sm">
           <p className="text-xs font-bold text-primary">{roadEtaMinutes > 3 ? `${roadEtaMinutes - 1}–${roadEtaMinutes + 1}` : roadEtaMinutes} min</p>

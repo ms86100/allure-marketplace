@@ -2,6 +2,7 @@ import { useDeliveryTracking, type DeliveryTrackingState } from '@/hooks/useDeli
 import { Phone, Truck, Navigation, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
 
 interface LiveDeliveryTrackerProps {
   assignmentId: string;
@@ -11,6 +12,33 @@ interface LiveDeliveryTrackerProps {
   /** Gap F: Road-based ETA from OSRM, more accurate than Haversine */
   roadEtaMinutes?: number | null;
 }
+
+interface ProximityThreshold {
+  max_meters?: number;
+  buyer_message?: string;
+  seller_message?: string;
+  buyer_prefix?: string;
+  seller_prefix?: string;
+  suffix?: string;
+}
+
+interface ProximityConfig {
+  at_doorstep: ProximityThreshold;
+  arriving: ProximityThreshold;
+  nearby: ProximityThreshold;
+  eta_2min: ProximityThreshold;
+  eta_5min: ProximityThreshold;
+  default: ProximityThreshold;
+}
+
+const DEFAULT_PROXIMITY: ProximityConfig = {
+  at_doorstep: { max_meters: 50, buyer_message: '🏠 At your doorstep!', seller_message: '🏠 You are at the doorstep.' },
+  arriving: { max_meters: 200, buyer_message: '🏃 Almost there!', seller_message: '🏃 You are almost there.' },
+  nearby: { max_meters: 500, buyer_message: '📍 Arriving soon!', seller_message: '📍 Buyer is nearby on your route.' },
+  eta_2min: { buyer_message: '⏱️ Arriving in about 2 minutes', seller_message: '⏱️ Around 2 minutes away' },
+  eta_5min: { buyer_prefix: '⏱️ Arriving in about', seller_prefix: '⏱️ Around', suffix: 'minutes' },
+  default: { buyer_message: '🛵 On the way to you', seller_message: '🛵 Delivery in progress' },
+};
 
 function formatDistance(meters: number | null): string {
   if (!meters) return '';
@@ -23,7 +51,6 @@ function computeDistanceEta(distanceMeters: number): number {
 }
 
 function getSmartEta(distance: number | null, dbEta: number | null, roadEta?: number | null): number | null {
-  // Gap F: Prefer OSRM road-based ETA when available
   if (roadEta != null && roadEta > 0) return roadEta;
   if (distance !== null && distance < 500) {
     return computeDistanceEta(distance);
@@ -34,20 +61,35 @@ function getSmartEta(distance: number | null, dbEta: number | null, roadEta?: nu
   return dbEta;
 }
 
-function getProximityMessage(distance: number | null, eta: number | null, proximityStatus: string | null, isBuyerView: boolean): string {
-  if (proximityStatus === 'at_doorstep') return isBuyerView ? '🏠 At your doorstep!' : '🏠 You are at the doorstep.';
-  if (proximityStatus === 'arriving') return isBuyerView ? '🏃 Almost there!' : '🏃 You are almost there.';
-  if (proximityStatus === 'nearby') return isBuyerView ? '📍 Arriving soon!' : '📍 Buyer is nearby on your route.';
+function getProximityMessage(
+  distance: number | null,
+  eta: number | null,
+  proximityStatus: string | null,
+  isBuyerView: boolean,
+  config: ProximityConfig,
+): string {
+  const msg = (key: keyof ProximityConfig) =>
+    isBuyerView ? config[key].buyer_message : config[key].seller_message;
+
+  if (proximityStatus === 'at_doorstep') return msg('at_doorstep');
+  if (proximityStatus === 'arriving') return msg('arriving');
+  if (proximityStatus === 'nearby') return msg('nearby');
 
   const smartEta = getSmartEta(distance, eta);
-  if (distance !== null && distance < 50) return isBuyerView ? '🏠 At your doorstep!' : '🏠 You are at the doorstep.';
-  if (distance !== null && distance < 200) return isBuyerView ? '🏃 Almost there!' : '🏃 You are almost there.';
-  if (distance !== null && distance < 500) return isBuyerView ? '📍 Arriving soon!' : `📍 About ${formatDistance(distance)}`;
-  if (smartEta !== null && smartEta <= 2) return isBuyerView ? '⏱️ Arriving in about 2 minutes' : '⏱️ Around 2 minutes away';
-  if (smartEta !== null && smartEta <= 5) return isBuyerView ? `⏱️ Arriving in about ${smartEta} minutes` : `⏱️ Around ${smartEta} minutes away`;
+
+  if (distance !== null && distance < (config.at_doorstep.max_meters ?? 50)) return msg('at_doorstep');
+  if (distance !== null && distance < (config.arriving.max_meters ?? 200)) return msg('arriving');
+  if (distance !== null && distance < (config.nearby.max_meters ?? 500)) return msg('nearby');
+
+  if (smartEta !== null && smartEta <= 2) return msg('eta_2min');
+  if (smartEta !== null && smartEta <= 5) {
+    const c = config.eta_5min;
+    const prefix = isBuyerView ? (c.buyer_prefix || '⏱️ Arriving in about') : (c.seller_prefix || '⏱️ Around');
+    return `${prefix} ${smartEta} ${c.suffix || 'minutes'}`;
+  }
   if (smartEta !== null) return `🕐 ETA: ${smartEta} minutes`;
   if (distance !== null) return `📏 ${formatDistance(distance)}`;
-  return isBuyerView ? '🛵 On the way to you' : '🛵 Delivery in progress';
+  return msg('default');
 }
 
 function getLastSeenText(lastLocationAt: string | null): string | null {
@@ -60,9 +102,16 @@ function getLastSeenText(lastLocationAt: string | null): string | null {
 }
 
 export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, roadEtaMinutes }: LiveDeliveryTrackerProps) {
-  // Gap D: Use passed-in tracking state if available, otherwise create own subscription
   const ownTracking = useDeliveryTracking(trackingState ? null : assignmentId);
   const tracking = trackingState || ownTracking;
+
+  // Load proximity config from DB
+  const { getSetting } = useSystemSettingsRaw(['proximity_thresholds']);
+  const rawProximity = getSetting('proximity_thresholds');
+  let proximityConfig = DEFAULT_PROXIMITY;
+  try {
+    if (rawProximity) proximityConfig = { ...DEFAULT_PROXIMITY, ...JSON.parse(rawProximity) };
+  } catch { /* use defaults */ }
 
   if (tracking.isLoading) {
     return (
@@ -99,7 +148,7 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
       {isInTransit && (
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-center">
           <p className="text-sm font-semibold text-primary">
-            {getProximityMessage(tracking.distance, tracking.eta, tracking.proximityStatus, isBuyerView)}
+            {getProximityMessage(tracking.distance, tracking.eta, tracking.proximityStatus, isBuyerView, proximityConfig)}
           </p>
           {tracking.distance !== null && tracking.distance > 500 && (
             <p className="text-xs text-muted-foreground mt-1">{formatDistance(tracking.distance)}</p>

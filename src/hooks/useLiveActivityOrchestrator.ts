@@ -2,7 +2,7 @@ import { useEffect, useRef, useContext, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { IdentityContext } from '@/contexts/auth/contexts';
 import { LiveActivityManager } from '@/services/LiveActivityManager';
-import { buildLiveActivityData } from '@/services/liveActivityMapper';
+import { buildLiveActivityData, type StatusFlowEntry } from '@/services/liveActivityMapper';
 import { syncActiveOrders } from '@/services/liveActivitySync';
 import { runLiveActivityDiagnostics } from '@/services/liveActivityDiagnostics';
 import { Capacitor } from '@capacitor/core';
@@ -19,20 +19,41 @@ const RECONNECT_DELAY_MS = 3000;
 /**
  * Global hook that drives Live Activity from order status changes.
  * Mounted once at the app shell level.
- *
- * Hardened with:
- * - Channel subscription status monitoring with auto-reconnect
- * - INSERT + UPDATE on delivery_assignments
- * - One-shot syncActiveOrders on mount/resume (no polling)
- * - Runtime diagnostics on first mount
  */
 export function useLiveActivityOrchestrator(): void {
   const identity = useContext(IdentityContext);
   const userId = identity?.user?.id ?? null;
   const mountedRef = useRef(false);
+  /** In-memory set of the buyer's active order IDs for filtering delivery events */
+  const activeOrderIdsRef = useRef<Set<string>>(new Set());
+  /** Cached status flow entries */
+  const flowEntriesRef = useRef<StatusFlowEntry[]>([]);
+
+  const fetchFlowEntries = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from('category_status_flows')
+        .select('status_key, display_label, sort_order, buyer_hint')
+        .eq('transaction_type', 'cart_purchase')
+        .eq('parent_group', 'default')
+        .order('sort_order');
+      if (data) flowEntriesRef.current = data as StatusFlowEntry[];
+    } catch { /* best-effort */ }
+  }, []);
 
   const doSync = useCallback(async () => {
     if (!userId || !mountedRef.current) return;
+    // Refresh active order IDs for delivery channel filtering
+    try {
+      const { data } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('buyer_id', userId)
+        .not('status', 'in', '("delivered","completed","cancelled","no_show","failed")');
+      if (data) {
+        activeOrderIdsRef.current = new Set(data.map(o => o.id));
+      }
+    } catch { /* best-effort */ }
     await syncActiveOrders(userId);
   }, [userId]);
 
@@ -45,12 +66,13 @@ export function useLiveActivityOrchestrator(): void {
       console.log(TAG, 'Diagnostics:', JSON.stringify(diag));
     });
 
+    fetchFlowEntries();
     doSync();
 
     return () => {
       mountedRef.current = false;
     };
-  }, [userId, doSync]);
+  }, [userId, doSync, fetchFlowEntries]);
 
   // ── Realtime: order status changes (with auto-reconnect) ──
   useEffect(() => {
@@ -68,9 +90,13 @@ export function useLiveActivityOrchestrator(): void {
       console.log(TAG, `Order ${orderId} status → ${newStatus}`);
 
       if (TERMINAL_STATUSES.has(newStatus)) {
+        activeOrderIdsRef.current.delete(orderId);
         await LiveActivityManager.end(orderId);
         return;
       }
+
+      // Track active order
+      activeOrderIdsRef.current.add(orderId);
 
       let delivery: any = null;
       let sellerName: string | null = null;
@@ -99,6 +125,7 @@ export function useLiveActivityOrchestrator(): void {
         delivery,
         sellerName,
         itemCount,
+        flowEntriesRef.current,
       );
       await LiveActivityManager.push(activityData);
     };
@@ -121,7 +148,7 @@ export function useLiveActivityOrchestrator(): void {
         .subscribe((status) => {
           console.log(TAG, `Order channel status: ${status}`);
           if (status === 'SUBSCRIBED') {
-            retryCount = 0; // Reset on success
+            retryCount = 0;
           }
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             console.warn(TAG, `Order channel degraded (${status}), attempting reconnect...`);
@@ -139,7 +166,6 @@ export function useLiveActivityOrchestrator(): void {
         return;
       }
       retryCount++;
-      // Remove old channel
       if (channelRef) {
         supabase.removeChannel(channelRef);
         channelRef = null;
@@ -147,7 +173,6 @@ export function useLiveActivityOrchestrator(): void {
       retryTimer = setTimeout(() => {
         if (!mountedRef.current) return;
         subscribe();
-        // Re-sync on reconnect to fill any gap
         doSync();
       }, RECONNECT_DELAY_MS);
     };
@@ -160,7 +185,7 @@ export function useLiveActivityOrchestrator(): void {
     };
   }, [userId, doSync]);
 
-  // ── Realtime: delivery assignment INSERT + UPDATE (with auto-reconnect) ──
+  // ── Realtime: delivery assignment INSERT + UPDATE (with order ID filtering) ──
   useEffect(() => {
     if (!userId || !Capacitor.isNativePlatform()) return;
 
@@ -171,6 +196,9 @@ export function useLiveActivityOrchestrator(): void {
     const handleDeliveryChange = async (payload: any) => {
       const row = payload.new as any;
       if (!row?.order_id) return;
+
+      // Gap 5: Filter — only process events for this buyer's active orders
+      if (!activeOrderIdsRef.current.has(row.order_id)) return;
 
       try {
         const [orderRes, itemCountRes] = await Promise.all([
@@ -206,7 +234,7 @@ export function useLiveActivityOrchestrator(): void {
           distance_meters: row?.distance_meters,
           rider_name: row?.rider_name,
           vehicle_type: null,
-        }, sellerName, itemCountRes.count ?? null);
+        }, sellerName, itemCountRes.count ?? null, flowEntriesRef.current);
         await LiveActivityManager.push(data);
       } catch { /* best-effort */ }
     };
@@ -272,6 +300,7 @@ export function useLiveActivityOrchestrator(): void {
           console.log(TAG, 'App resumed — re-hydrating');
 
           LiveActivityManager.resetHydration();
+          await fetchFlowEntries();
           await doSync();
         });
         cleanup = () => listener.remove();
@@ -281,5 +310,5 @@ export function useLiveActivityOrchestrator(): void {
     })();
 
     return () => cleanup?.();
-  }, [userId, doSync]);
+  }, [userId, doSync, fetchFlowEntries]);
 }
