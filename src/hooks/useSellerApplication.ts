@@ -254,7 +254,7 @@ export function useSellerApplication() {
       }
     } catch (error: any) {
       console.error('Error saving draft:', error);
-      toast.error(friendlyError(error));
+      toast.error(friendlyError(error), { id: 'seller-app-draft-error' });
       return null;
     } finally { setIsLoading(false); }
   };
