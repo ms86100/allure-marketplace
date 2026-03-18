@@ -44,12 +44,12 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
     const channel = supabase
       .channel(`delivery-${orderId}`)
       .on('postgres_changes', {
-        event: '*',
+        event: 'UPDATE',
         schema: 'public',
         table: 'delivery_assignments',
         filter: `order_id=eq.${orderId}`,
       }, (payload) => {
-        if (payload.new) {
+        if (payload.new && (payload.new as any).id) {
           setAssignment(payload.new as DeliveryAssignment);
         }
       })
