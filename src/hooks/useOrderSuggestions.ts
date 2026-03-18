@@ -40,30 +40,29 @@ export function useOrderSuggestions() {
         .limit(3);
 
       if (error) throw error;
+      if (!data || data.length === 0) return [];
 
-      // Enrich with product and seller data
-      const suggestions: OrderSuggestion[] = [];
-      for (const s of (data || []) as any[]) {
-        const { data: product } = await supabase
-          .from('products')
-          .select('name, image_urls, price')
-          .eq('id', s.product_id)
-          .single();
+      // Batch fetch products and sellers
+      const productIds = [...new Set((data as any[]).map(s => s.product_id).filter(Boolean))];
+      const sellerIds = [...new Set((data as any[]).map(s => s.seller_id).filter(Boolean))];
 
-        const { data: seller } = await supabase
-          .from('seller_profiles')
-          .select('business_name')
-          .eq('id', s.seller_id)
-          .single();
+      const [productsRes, sellersRes] = await Promise.all([
+        productIds.length > 0
+          ? supabase.from('products').select('id, name, image_urls, price').in('id', productIds)
+          : { data: [] },
+        sellerIds.length > 0
+          ? supabase.from('seller_profiles').select('id, business_name').in('id', sellerIds)
+          : { data: [] },
+      ]);
 
-        suggestions.push({
-          ...s,
-          product: product || undefined,
-          seller: seller || undefined,
-        });
-      }
+      const productMap = new Map((productsRes.data || []).map((p: any) => [p.id, p]));
+      const sellerMap = new Map((sellersRes.data || []).map((s: any) => [s.id, s]));
 
-      return suggestions;
+      return (data as any[]).map(s => ({
+        ...s,
+        product: productMap.get(s.product_id) || undefined,
+        seller: sellerMap.get(s.seller_id) || undefined,
+      })) as OrderSuggestion[];
     },
     enabled: !!user?.id,
     staleTime: 5 * 60_000,

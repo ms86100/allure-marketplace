@@ -133,11 +133,18 @@ export function ReorderLastOrder() {
       const availableSet = new Set(available.map(p => p.id));
       const unavailableCount = productIds.length - availableSet.size;
 
-      await supabase.from('cart_items').delete().eq('user_id', user.id);
       const inserts = lastOrder.items
         .filter(i => availableSet.has(i.product_id))
         .map(i => ({ user_id: user.id, product_id: i.product_id, quantity: i.quantity }));
 
+      if (inserts.length === 0) {
+        toast.error(ml.label('label_reorder_unavailable'));
+        setIsLoading(false);
+        return;
+      }
+
+      // Only delete cart AFTER confirming we have items to insert
+      await supabase.from('cart_items').delete().eq('user_id', user.id);
       const { error } = await supabase.from('cart_items').insert(inserts);
       if (error) throw error;
 

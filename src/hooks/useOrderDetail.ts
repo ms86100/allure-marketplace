@@ -143,11 +143,17 @@ export function useOrderDetail(id: string | undefined) {
     try {
       const updateData: any = { status: newStatus, auto_cancel_at: null };
       if (rejectionReason) updateData.rejection_reason = rejectionReason;
-      let query = supabase.from('orders').update(updateData).eq('id', order.id).eq('status', order.status as any);
+      let query = supabase.from('orders').update(updateData).eq('id', order.id).eq('status', order.status as any).select();
       if (isSellerView) query = query.eq('seller_id', seller?.id);
       else query = query.eq('buyer_id', user.id);
-      const { error } = await query;
+      const { data: updatedRows, error } = await query;
       if (error) throw error;
+      if (!updatedRows || updatedRows.length === 0) {
+        // Concurrent update detected — refetch real state
+        fetchOrder();
+        toast.error('Order status has changed. Refreshing...', { id: `order-${order.id}-conflict` });
+        return;
+      }
       setOrder({ ...order, ...updateData });
       toast.success(`Order ${getOrderStatus(newStatus).label.toLowerCase()}`, { id: `order-${order.id}-update` });
       supabase.functions.invoke('process-notification-queue').catch(() => {});
