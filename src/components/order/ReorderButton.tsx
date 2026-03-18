@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/hooks/useCart';
 import { OrderItem } from '@/types/database';
 import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface ReorderButtonProps {
@@ -27,9 +27,10 @@ export function ReorderButton({
 }: ReorderButtonProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const { replaceCart } = useCart();
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
   const handleReorder = async (e?: React.MouseEvent) => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     if (!user) {
@@ -66,7 +67,7 @@ export function ReorderButton({
         .filter(item => item.product_id)
         .map(item => item.product_id);
 
-      // ORDER-01 FIX: Also check approval_status to prevent reordering suspended/rejected products
+      // Check product availability and approval status
       const { data: availableProducts } = await supabase
         .from('products')
         .select('id, price, seller_id')
@@ -80,18 +81,12 @@ export function ReorderButton({
         return;
       }
 
-      await supabase
-        .from('cart_items')
-        .delete()
-        .eq('user_id', user.id);
-
       const cartInserts = orderItems
         .filter(item => 
           item.product_id && 
           availableProducts.some(p => p.id === item.product_id)
         )
         .map(item => ({
-          user_id: user.id,
           product_id: item.product_id!,
           quantity: item.quantity,
         }));
@@ -102,11 +97,8 @@ export function ReorderButton({
         return;
       }
 
-      const { error } = await supabase
-        .from('cart_items')
-        .insert(cartInserts);
-
-      if (error) throw error;
+      // Use the cart provider's replaceCart — seeds cache before navigation
+      await replaceCart(cartInserts);
 
       const unavailableCount = orderItems.length - cartInserts.length;
       if (unavailableCount > 0) {
@@ -114,8 +106,6 @@ export function ReorderButton({
       }
 
       toast.success('Items added to cart!');
-      queryClient.invalidateQueries({ queryKey: ['cart-items'] });
-      queryClient.invalidateQueries({ queryKey: ['cart-count'] });
       navigate('/cart');
     } catch (error) {
       console.error('Error reordering:', error);

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/hooks/useCart';
 import { RefreshCw, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
-import { useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface LastOrder {
@@ -21,13 +21,12 @@ interface LastOrder {
 export function ReorderLastOrder() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const { replaceCart } = useCart();
   const { formatPrice } = useCurrency();
   const ml = useMarketplaceLabels();
   const [lastOrder, setLastOrder] = useState<LastOrder | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [hasExistingCart, setHasExistingCart] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -67,7 +66,7 @@ export function ReorderLastOrder() {
     setIsLoading(true);
     
     try {
-      // Check if cart has existing items and ask for confirmation
+      // Check if cart has existing items
       const { data: existingCart } = await supabase
         .from('cart_items')
         .select('id')
@@ -75,7 +74,6 @@ export function ReorderLastOrder() {
         .limit(1);
 
       if (existingCart && existingCart.length > 0) {
-        setHasExistingCart(true);
         setShowConfirm(true);
         setIsLoading(false);
         return;
@@ -91,7 +89,6 @@ export function ReorderLastOrder() {
   const executeReorder = async () => {
     if (!user || !lastOrder) return;
     setShowConfirm(false);
-
     setIsLoading(true);
     try {
       const productIds = lastOrder.items.map(i => i.product_id).filter(Boolean);
@@ -135,7 +132,7 @@ export function ReorderLastOrder() {
 
       const inserts = lastOrder.items
         .filter(i => availableSet.has(i.product_id))
-        .map(i => ({ user_id: user.id, product_id: i.product_id, quantity: i.quantity }));
+        .map(i => ({ product_id: i.product_id, quantity: i.quantity }));
 
       if (inserts.length === 0) {
         toast.error(ml.label('label_reorder_unavailable'));
@@ -143,17 +140,13 @@ export function ReorderLastOrder() {
         return;
       }
 
-      // Only delete cart AFTER confirming we have items to insert
-      await supabase.from('cart_items').delete().eq('user_id', user.id);
-      const { error } = await supabase.from('cart_items').insert(inserts);
-      if (error) throw error;
+      // Use the cart provider's replaceCart — seeds cache before navigation
+      await replaceCart(inserts);
 
       if (unavailableCount > 0) {
         toast.info(`${unavailableCount} item(s) were unavailable and skipped`);
       }
       toast.success(ml.label('label_reorder_success'));
-      queryClient.invalidateQueries({ queryKey: ['cart-items'] });
-      queryClient.invalidateQueries({ queryKey: ['cart-count'] });
       navigate('/cart');
     } catch {
       toast.error('Failed to reorder');
