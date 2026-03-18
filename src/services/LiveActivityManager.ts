@@ -4,6 +4,7 @@ import type { LiveActivityData } from '@/plugins/live-activity/definitions';
 import { getString, setString, removeKey } from '@/lib/persistent-kv';
 import { recordLAError } from '@/services/liveActivityDiagnostics';
 import { supabase } from '@/integrations/supabase/client';
+import { getTerminalStatuses, getStartStatuses } from '@/services/statusFlowCache';
 
 const TAG = '[LiveActivity]';
 const OPS_LOG_KEY = 'live_activity_ops_log';
@@ -37,25 +38,24 @@ export function getOperationLog(): OperationLogEntry[] {
   return [...operationLog];
 }
 
-/** Terminal workflow statuses that should end any live activity */
-const TERMINAL_STATUSES = new Set([
-  'delivered',
-  'completed',
-  'cancelled',
-  'no_show',
-  'failed',
+/** DB-backed terminal and start status sets — loaded at hydration time */
+let TERMINAL_STATUSES = new Set([
+  'delivered', 'completed', 'cancelled', 'no_show', 'failed',
 ]);
+let START_STATUSES = new Set([
+  'accepted', 'picked_up', 'confirmed', 'preparing', 'en_route', 'on_the_way', 'ready',
+]);
+let statusSetsLoaded = false;
 
-/** Statuses that should start a live activity if one is not already active */
-const START_STATUSES = new Set([
-  'accepted',
-  'picked_up',
-  'confirmed',
-  'preparing',
-  'en_route',
-  'on_the_way',
-  'ready',
-]);
+async function loadStatusSets(): Promise<void> {
+  if (statusSetsLoaded) return;
+  try {
+    const [terminal, start] = await Promise.all([getTerminalStatuses(), getStartStatuses()]);
+    TERMINAL_STATUSES = terminal;
+    START_STATUSES = start;
+    statusSetsLoaded = true;
+  } catch { /* keep defaults */ }
+}
 
 const THROTTLE_MS = 5_000;
 const STORAGE_KEY = 'live_activity_map';
