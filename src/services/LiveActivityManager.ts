@@ -210,7 +210,7 @@ class _LiveActivityManager {
         this.persistMap();
         this.enforceMaxActive();
       } catch (e) {
-        console.error(TAG, `START FAILED entity=${entity_id}:`, e);
+        recordLAError('START', entity_id, e);
       }
       return;
     }
