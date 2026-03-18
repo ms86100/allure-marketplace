@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { LiveActivityManager } from '@/services/LiveActivityManager';
-import type { LiveActivityData } from '@/plugins/live-activity/definitions';
+import { buildLiveActivityData } from '@/services/liveActivityMapper';
 
 interface UseLiveActivityOptions {
   /** Entity type: "order" | "booking" */
@@ -19,6 +19,8 @@ interface UseLiveActivityOptions {
   vehicleType: string | null;
   /** Human-readable progress stage */
   progressStage: string | null;
+  /** Seller / business name */
+  sellerName: string | null;
 }
 
 /**
@@ -27,41 +29,25 @@ interface UseLiveActivityOptions {
  *
  * Mount in OrderDetailPage — it reacts to delivery tracking
  * and order status changes automatically.
+ *
+ * NOTE: This hook only pushes updates. The orchestrator
+ * (useLiveActivityOrchestrator) owns the full lifecycle
+ * including start and end — never end activities here.
  */
 export function useLiveActivity(opts: UseLiveActivityOptions): void {
-  const { entityType, entityId, status, eta, distance, driverName, vehicleType, progressStage } = opts;
-
-  // Track previous entityId to clean up on unmount or entity change
-  const prevEntityId = useRef<string | undefined>(undefined);
+  const { entityType, entityId, status, eta, distance, driverName, vehicleType, progressStage, sellerName } = opts;
 
   useEffect(() => {
     if (!entityId || !status) return;
 
-    const data: LiveActivityData = {
-      entity_type: entityType,
-      entity_id: entityId,
-      workflow_status: status,
+    const order = { id: entityId, status, seller_id: null };
+    const delivery = {
       eta_minutes: eta,
-      driver_distance: distance,
-      driver_name: driverName,
-      vehicle_type: vehicleType,
-      progress_stage: progressStage,
-      progress_percent: null,
-      seller_name: null,
+      distance_meters: distance ? distance * 1000 : null,
+      rider_name: driverName,
     };
 
+    const data = buildLiveActivityData(order, delivery, sellerName);
     LiveActivityManager.push(data);
-  }, [entityType, entityId, status, eta, distance, driverName, vehicleType, progressStage]);
-
-  // Cleanup on unmount or entity change
-  useEffect(() => {
-    const prev = prevEntityId.current;
-    prevEntityId.current = entityId;
-
-    return () => {
-      if (prev) {
-        LiveActivityManager.end(prev);
-      }
-    };
-  }, [entityId]);
+  }, [entityType, entityId, status, eta, distance, driverName, vehicleType, progressStage, sellerName]);
 }
