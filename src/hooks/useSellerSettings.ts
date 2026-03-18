@@ -110,7 +110,7 @@ export function useSellerSettings() {
       if (error) throw error;
       toast.success(newAvailability ? 'Store is now open!' : 'Store paused temporarily', { id: 'settings-availability' });
       if ((sellerProfile as any).society_id) logAudit(newAvailability ? 'store_resumed' : 'store_paused', 'seller_profile', sellerProfile.id, (sellerProfile as any).society_id);
-    } catch { setFormData(prev => ({ ...prev, is_available: !newAvailability })); toast.error('Failed to update store status'); }
+    } catch { setFormData(prev => ({ ...prev, is_available: !newAvailability })); toast.error('Failed to update store status', { id: 'settings-availability-error' }); }
   };
 
   const handleSave = async () => {
