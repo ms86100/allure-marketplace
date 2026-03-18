@@ -1,115 +1,95 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phases 1–3)
 
-All 9 original phases plus Blinkit parity Phases 1–3 are fully implemented.
+# Round 5: Production Readiness Audit
 
-## Blinkit Gap-Fill Status
+## Summary of Current State
 
-### Phase 1: APNs Push-to-Live-Activity — COMPLETE
+Rounds 1-4 resolved the major architectural issues: GPS filtering, OSRM road ETA, Live Activity dedup/lifecycle, deep link 404 fix, stale ETA suppression, null location staleness, status flow cache alignment, and cart race conditions. The system is architecturally sound. This round identifies the remaining hardcoded values and residual gaps.
 
-Live Activities now update even when the app process is killed by iOS, matching Blinkit's reliability.
+---
 
-#### Architecture
+## Finding 1: `ACTIVE_STATUSES` in liveActivitySync.ts is hardcoded (HIGH)
 
-```
-Order status change → DB trigger → net.http_post → update-live-activity-apns edge function
-  → APNs push (apns-push-type: liveactivity) → iOS widget receives content-state update
-  → Lock screen / Dynamic Island re-renders
-```
+**File:** `src/services/liveActivitySync.ts` lines 11-14
 
-#### Implementation Details
+The `syncActiveOrders` function uses a hardcoded list `['accepted', 'preparing', 'ready', 'picked_up', 'on_the_way', 'arrived', 'confirmed']` to query active orders. This must come from the DB-backed `statusFlowCache.getStartStatuses()` which already exists and returns the correct set from `category_status_flows`.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB table** | `live_activity_tokens` (user_id, order_id, push_token, platform) with RLS |
-| **Swift plugin** | `LiveActivityPlugin.swift` — requests activity with `pushType: .token`, observes `Activity.pushTokenUpdates`, emits `liveActivityPushToken` event to JS |
-| **LiveActivityManager.ts** | Listens for `liveActivityPushToken` events, upserts token to `live_activity_tokens` table, cleans up on activity end |
-| **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
-| **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
+**Fix:** Replace the hardcoded array with the result of `getStartStatuses()` from `statusFlowCache.ts`. Since `syncActiveOrders` is async, call it at the top and convert the Set to an array for the `.in()` query.
 
-### Phase 2: System Reliability — COMPLETE
+---
 
-#### 2A. Idempotency Guard on Push Processing
+## Finding 2: Orchestrator queries `cart_purchase` + `default` only (HIGH)
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB trigger** | `fn_enqueue_order_status_notification` now checks for duplicate entries (same `reference_path` + `payload->>'status'` within 30 seconds) before inserting into `notification_queue`. Skips with `RAISE NOTICE`. |
-| **DB index** | `idx_notification_queue_dedup` on `notification_queue(reference_path, created_at DESC)` for fast dedup lookups |
+**File:** `src/hooks/useLiveActivityOrchestrator.ts` lines 36-43
 
-#### 2B. Realtime Channel Auto-Reconnect
+`fetchFlowEntries()` queries `transaction_type = 'cart_purchase'` and `parent_group = 'default'`. Delivery orders use `seller_delivery` and `food_beverages`. This means the orchestrator's flow entries (used for `buildLiveActivityData`) may be incomplete for delivery orders, causing missing `display_label` and incorrect `progress_percent`.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`useLiveActivityOrchestrator.ts`** | Both order and delivery channels now detect `CHANNEL_ERROR` / `TIMED_OUT`, remove the dead channel, and re-subscribe after 3s delay. Max 3 reconnects per session. On successful reconnect (`SUBSCRIBED`), retry counter resets. Each reconnect triggers a one-shot `syncActiveOrders` to fill any gap. Unique channel names with `Date.now()` suffix prevent Supabase channel name conflicts. |
+**Fix:** Align with `statusFlowCache.ts` by querying `.in('transaction_type', ['cart_purchase', 'seller_delivery'])` and removing the `parent_group` filter (or including both `default` and `food_beverages`).
 
-### Phase 3: Seller Self-Delivery GPS + Buyer Live Map — COMPLETE
+---
 
-#### 3A. Seller GPS Broadcasting for Self-Delivery
+## Finding 3: `DeliveryStatusCard` has hardcoded emoji prefixes (MEDIUM)
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`SellerGPSTracker.tsx`** | New component — shown to sellers on OrderDetailPage when `delivery_handled_by === 'seller'` and order status is `picked_up` or `on_the_way`. Uses existing `useBackgroundLocationTracking` hook. Shows Start/Stop controls, live badge, and last-sent timestamp. |
-| **`OrderDetailPage.tsx`** | Integrated `SellerGPSTracker` in the seller action area, gated by `delivery_handled_by === 'seller'` + transit statuses |
+**File:** `src/components/delivery/DeliveryStatusCard.tsx` lines 145-150
 
-#### 3B. Buyer Live Map
+The `displayBuyerMsg` and `displaySellerMsg` computations use hardcoded emoji prefixes (`⏳`, `🚚`, `🏠`, `🎉`, `📦`, `❌`, `✅`) per status. These should come from the `delivery_status_labels` DB setting, which already supports per-status configuration.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`DeliveryMapView.tsx`** | New component using Leaflet + OpenStreetMap (no API key). Shows rider position (🛵 marker) and destination (📍 marker). Auto-fits bounds on mount, pans when rider moves out of view. |
-| **`OrderDetailPage.tsx`** | Integrated `DeliveryMapView` above `LiveDeliveryTracker` for buyer view when rider has GPS data and order has delivery coordinates (`delivery_lat`/`delivery_lng`). Falls back to text-only tracker when no GPS data available. |
+**Fix:** Extend the `delivery_status_labels` JSON to include an `emoji` key per status. Parse it in the component and use it instead of the inline conditional chain. Fallback to current emojis if DB value is missing.
 
-### Previously Completed Blinkit Gaps
+---
 
-| Feature | Status |
-|---------|--------|
-| Push deep-link routing | ✅ Done |
-| Notification grouping (threadId) | ✅ Done |
-| Rich push images (NSE) | ✅ Done |
-| Dynamic Island tap → order page | ✅ Done |
-| Item count in DI | ✅ Done |
-| GPS-derived progress | ✅ Done |
+## Finding 4: `DEFAULT_PROXIMITY` fallback in LiveDeliveryTracker (LOW — acceptable)
 
-### Phase 4: Live Map / Rider GPS — DEFERRED
+**File:** `src/components/delivery/LiveDeliveryTracker.tsx` lines 40-47
 
-Requires dedicated rider-side GPS broadcasting infrastructure (separate product workstream). Seller self-delivery GPS (Phase 3A) covers the immediate need.
+These are defensive fallbacks only used when the DB `proximity_thresholds` setting is missing. The DB value is confirmed present and active (visible in network response). No action needed.
 
-### Product Thumbnails in Widget — DEFERRED
+---
 
-Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
+## Finding 5: `DEFAULT_LABELS` fallback in DeliveryStatusCard (LOW — acceptable)
 
-## Silent Push Optimization: COMPLETE
+**File:** `src/components/delivery/DeliveryStatusCard.tsx` lines 59-68
 
-### Notification Matrix
+Same pattern — defensive fallbacks for when `delivery_status_labels` is unavailable. DB value is confirmed active. No action needed.
 
-| Status | Push? | Live Activity? | Rationale |
-|--------|-------|----------------|-----------|
-| `accepted` | ✅ Always | Yes | Critical — order confirmed |
-| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
-| `ready` | ✅ Always | Yes | Pickup moment — user must know |
-| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
-| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
-| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
-| `delivered` | ✅ Always | Yes | Critical endpoint |
-| `completed` | ✅ Always | No | Critical endpoint |
-| `cancelled` | ✅ Always | No | Critical — must alert |
-| All service/booking | ✅ Always | No | No Live Activity for these |
+---
 
-## Implementation Matrix
+## Finding 6: Deep link `KNOWN_ROUTES` is hardcoded (LOW)
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
-| BG-1 | APNs Push-to-Live-Activity | Implemented |
-| BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
-| BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |
-| BG-4 | Buyer Delivery Confirmation (Gap 8) | Implemented |
-| BG-5 | ETA at Acceptance Time (Gap 11) | Implemented |
+**File:** `src/hooks/useDeepLinks.ts` lines 9-12
+
+The set of valid route segments is hardcoded. This is acceptable because these are frontend route definitions, not business logic. Adding a new route requires a code change anyway. No action needed.
+
+---
+
+## Finding 7: `AddressPicker` ref warning in console (LOW)
+
+The console shows a warning: "Function components cannot be given refs." This is in `AddressPicker` rendered on CartPage. Not a crash, but should be wrapped with `React.forwardRef` for correctness.
+
+**Fix:** Wrap `AddressPicker` component with `React.forwardRef`.
+
+---
+
+## Live Tracking & Live Activity Verification
+
+All previously identified critical issues are confirmed resolved in code:
+
+- **Map smoothness:** Kalman-lite filter + CSS transition interpolation + heading rotation (useDeliveryTracking + OrderDetailPage)
+- **Proximity:** DB-backed thresholds with at_doorstep/arriving/nearby states (system_settings `proximity_thresholds`)
+- **Dynamic Island 404:** Deep link interceptor with KNOWN_ROUTES fallback (useDeepLinks)
+- **Activity lifecycle:** Terminal status ends activity, dedup on hydration, 1:1 order-to-activity mapping (LiveActivityManager)
+- **Stale ETA:** Suppressed when `isLocationStale` or `lastLocationAt` is null (LiveDeliveryTracker `getSmartEta`)
+- **Null location staleness:** Treated as stale when order is active (useDeliveryTracking interval check)
+- **Status flow alignment:** `statusFlowCache` queries both `cart_purchase` and `seller_delivery`
+
+---
+
+## Implementation Plan
+
+| Step | What | Severity | Files |
+|------|------|----------|-------|
+| 1 | Replace hardcoded `ACTIVE_STATUSES` with DB-backed `getStartStatuses()` | High | `liveActivitySync.ts` |
+| 2 | Fix orchestrator flow query to include `seller_delivery` | High | `useLiveActivityOrchestrator.ts` |
+| 3 | Move emoji prefixes in DeliveryStatusCard to DB-backed config | Medium | `DeliveryStatusCard.tsx`, DB migration |
+| 4 | Fix AddressPicker forwardRef warning | Low | `AddressPicker.tsx` |
+
