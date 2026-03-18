@@ -36,7 +36,9 @@ export function SocietyTrustStrip() {
     staleTime: 5 * 60_000,
   });
 
-  if (!effectiveSociety || isLoading) {
+  if (!effectiveSociety || !isApproved || !effectiveSocietyId) return null;
+
+  if (isLoading) {
     return (
       <div className="mx-4 mt-3">
         <Skeleton className="h-14 w-full rounded-2xl" />
