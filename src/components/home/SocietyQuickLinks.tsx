@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   Users, Car, IndianRupee, MessageCircle, Wrench, ShieldAlert, ChevronRight, Building2,
 } from 'lucide-react';
+import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 interface QuickLink {
   icon: typeof Users;
