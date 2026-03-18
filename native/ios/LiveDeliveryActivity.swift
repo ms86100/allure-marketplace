@@ -23,6 +23,8 @@ struct LiveDeliveryAttributes: ActivityAttributes {
         var progressPercent: Double?
         var sellerName: String?
         var itemCount: Int?
+        var orderShortId: String?
+        var sellerLogoUrl: String?
     }
 
     /// Fixed data set at start

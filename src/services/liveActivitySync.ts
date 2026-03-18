@@ -83,7 +83,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
       sellerIds.length > 0
         ? supabase
             .from('seller_profiles')
-            .select('id, business_name')
+            .select('id, business_name, logo_url')
             .in('id', sellerIds)
         : Promise.resolve({ data: [] as any[] }),
       supabase
@@ -97,7 +97,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
       (deliveriesResult.data ?? []).map((d: any) => [d.order_id, d])
     );
     const sellerMap = new Map(
-      (sellersResult.data ?? []).map((s: any) => [s.id, s.business_name])
+      (sellersResult.data ?? []).map((s: any) => [s.id, { name: s.business_name, logo: s.logo_url }])
     );
     // Count items per order
     const itemCountMap = new Map<string, number>();
@@ -108,9 +108,11 @@ export async function syncActiveOrders(userId: string): Promise<number> {
     // Serialize push() calls to prevent hydration race conditions
     for (const order of orders) {
       const delivery = deliveryMap.get(order.id) ?? null;
-      const sellerName = sellerMap.get(order.seller_id) ?? null;
+      const sellerInfo = sellerMap.get(order.seller_id) as { name: string; logo: string | null } | null;
+      const sellerName = sellerInfo?.name ?? null;
+      const sellerLogo = sellerInfo?.logo ?? null;
       const itemCount = itemCountMap.get(order.id) ?? null;
-      const data = buildLiveActivityData(order, delivery, sellerName, itemCount, flowEntries);
+      const data = buildLiveActivityData(order, delivery, sellerName, itemCount, flowEntries, sellerLogo);
       try {
         await LiveActivityManager.push(data);
       } catch (e) {

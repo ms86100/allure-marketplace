@@ -92,6 +92,8 @@ export async function runLiveActivityDiagnostics(dryRun = true): Promise<Diagnos
         progress_percent: 0.4,
         seller_name: null,
         item_count: null,
+        order_short_id: '#TEST',
+        seller_logo_url: null,
       };
       const { activityId } = await LiveActivity.startLiveActivity(testData);
       result.checks.startTestResult = 'success';

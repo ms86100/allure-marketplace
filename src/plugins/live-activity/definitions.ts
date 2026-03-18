@@ -28,6 +28,10 @@ export interface LiveActivityData {
   seller_name: string | null;
   /** Number of items in the order */
   item_count: number | null;
+  /** Short order identifier for buyer recognition, e.g. "#7838" */
+  order_short_id: string | null;
+  /** Seller logo URL for branded display */
+  seller_logo_url: string | null;
 }
 
 export interface ActiveActivityEntry {
