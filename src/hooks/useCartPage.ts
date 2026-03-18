@@ -320,8 +320,12 @@ export function useCartPage() {
     setShowRazorpayCheckout(false);
     if (!user?.id) { toast.error('Session expired. Please sign in again.', { id: 'checkout-session' }); setPendingOrderIds([]); clearPaymentSession(); return; }
     if (pendingOrderIds.length > 0) {
-      const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
-      if (recheckOrder?.payment_status === 'paid') { toast.success('Payment verified! Your order is confirmed.', { id: 'razorpay-verified' }); clearCart(); await refresh(); clearPaymentSession(); navigate(`/orders/${pendingOrderIds[0]}`); setPendingOrderIds([]); return; }
+      // Poll multiple times before cancelling — webhook may be delayed
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
+        if (recheckOrder?.payment_status === 'paid') { toast.success('Payment verified! Your order is confirmed.', { id: 'razorpay-verified' }); clearCart(); await refresh(); clearPaymentSession(); navigate(`/orders/${pendingOrderIds[0]}`); setPendingOrderIds([]); return; }
+        if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
+      }
       try { await supabase.from('orders').update({ status: 'cancelled' } as any).in('id', pendingOrderIds).eq('payment_status', 'pending').eq('buyer_id', user.id); } catch (err) { console.error('Failed to cancel unpaid orders:', err); }
     }
     setPendingOrderIds([]);

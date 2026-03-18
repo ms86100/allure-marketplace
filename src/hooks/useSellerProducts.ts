@@ -281,7 +281,7 @@ export function useSellerProducts() {
       const { error } = await supabase.from('products').update({ is_available: !product.is_available }).eq('id', product.id);
       if (error) throw error;
       if (sellerProfile) fetchData(sellerProfile.id);
-    } catch (error) { console.error('Error updating availability:', error); toast.error('Failed to update'); }
+    } catch (error) { console.error('Error updating availability:', error); toast.error('Failed to update', { id: 'product-toggle-error' }); }
   };
 
   const isCurrentCategoryService = useMemo(() => isServiceCategory(formData.category, configs), [formData.category, configs]);

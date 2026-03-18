@@ -333,7 +333,7 @@ export function useSellerApplication() {
       setSubmissionComplete(true);
     } catch (error: any) {
       console.error('Error submitting application:', error);
-      toast.error(friendlyError(error));
+      toast.error(friendlyError(error), { id: 'seller-app-submit-error' });
     } finally { setIsLoading(false); }
   };
 

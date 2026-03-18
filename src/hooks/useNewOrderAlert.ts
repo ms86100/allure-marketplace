@@ -215,9 +215,22 @@ export function useNewOrderAlert(sellerId: string | null) {
 
     pollTimerRef.current = setTimeout(poll, 0);
 
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        pausedByVisibility = true;
+        if (pollTimerRef.current) { clearTimeout(pollTimerRef.current); pollTimerRef.current = null; }
+      } else {
+        pausedByVisibility = false;
+        pollDelayRef.current = MIN_POLL_MS;
+        if (!pollTimerRef.current) pollTimerRef.current = setTimeout(poll, 0);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
       cancelled = true;
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [sellerId, handleNewOrder]);
 
