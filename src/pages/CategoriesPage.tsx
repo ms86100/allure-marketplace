@@ -112,6 +112,7 @@ export default function CategoriesPage() {
   const { groups, isLoading: groupsLoading } = useParentGroups();
   const { data: productCategories = [], isLoading: productsLoading } = useProductsByCategory();
   const { formatPrice } = useCurrency();
+  const ml = useMarketplaceLabels();
 
   const browseBeyond = profile?.browse_beyond_community ?? true;
   const searchRadius = profile?.search_radius_km ?? 10;
