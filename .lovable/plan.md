@@ -1,86 +1,49 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-## Root Cause: Capacitor 8 does not auto-discover app-local Swift plugins
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-The CI logs confirm the files are copied and added to Compile Sources. The build succeeds. The plugin class is correctly structured. **The problem is not file inclusion -- it is plugin discovery.**
+## Phase I Live Activities — CI Pipeline Status
 
-### Why auto-discovery fails
+### Codemagic Build Pipeline: COMPLETE
 
-This project uses **Capacitor 8** (line 68 of `codemagic.yaml`: "Capacitor 8 requires iOS 16.0 minimum"). Starting from Capacitor 6+, plugin discovery changed: plugins are enumerated from **CocoaPods/SPM package metadata**, not by ObjC runtime class scanning. App-local Swift files compiled directly into the App target are **invisible** to this mechanism even though they compile successfully.
+Both `ios-release` and `release-all` workflows now include:
 
-The CocoaPods plugin list (line 79-91) includes `CapacitorApp`, `CapacitorCamera`, etc. -- but `LiveActivityPlugin` is not a pod. It's a loose Swift file. Capacitor 8 simply never looks for it.
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
 
-### The fix: Explicit bridge registration
+### Codemagic Requirements (User Action)
 
-Register the plugin instance after the Capacitor bridge loads. This is the correct Capacitor 6+ pattern for app-local plugins.
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
 
-### Changes
+### Runtime Call Chain (Verified)
 
-#### 1. `codemagic.yaml` -- Patch AppDelegate step (line 123)
-
-Update the existing AppDelegate template to include a `viewDidLoad` hook or use the Capacitor notification to register the plugin after the bridge initializes:
-
-```swift
-import UIKit
-import Capacitor
-import FirebaseCore
-
-@UIApplicationMain
-class AppDelegate: UIResponder, UIApplicationDelegate {
-    var window: UIWindow?
-
-    func application(_ application: UIApplication,
-                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        FirebaseApp.configure()
-        
-        // Register app-local plugins after bridge loads
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(registerLocalPlugins(_:)),
-            name: NSNotification.Name.capacitorDidLoad,  // or equivalent
-            object: nil
-        )
-        
-        return true
-    }
-    
-    @objc func registerLocalPlugins(_ notification: Notification) {
-        guard let bridge = notification.object as? CAPBridge else { return }
-        bridge.registerPluginInstance(LiveActivityPlugin())
-    }
-    
-    // ... existing URL handling, APNs forwarding stays the same
-}
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
 ```
 
-**Alternative (simpler, no notification):** If `CAPBridgeViewController` is the root, subclass it:
+## Implementation Matrix
 
-```swift
-class SocivaBridgeViewController: CAPBridgeViewController {
-    override open func capacitorDidLoad() {
-        bridge?.registerPluginInstance(LiveActivityPlugin())
-    }
-}
-```
-
-Then point `Main.storyboard` to this subclass. Both approaches achieve the same result -- I will verify which one Capacitor 8 supports and implement accordingly.
-
-#### 2. No changes to `LiveActivityPlugin.swift`
-
-The plugin source is correct as-is.
-
-#### 3. No ObjC shim needed
-
-This is pure Swift registration through Capacitor's supported API.
-
-### Why this is different from the previously rejected ObjC shim
-
-The ObjC `.m` shim was a Capacitor 4-era workaround using `CAP_PLUGIN` macros. This fix uses Capacitor's own `registerPluginInstance()` API -- the documented mechanism for app-local plugins in Capacitor 6+.
-
-### Expected result
-
-After one more Codemagic build with this change:
-- `✅ LiveActivityPlugin loaded` appears in device logs
-- `/la-debug` shows Plugin Available: yes
-- Start Test returns an activityId or a real ActivityKit error
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
