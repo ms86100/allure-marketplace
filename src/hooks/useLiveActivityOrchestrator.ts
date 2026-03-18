@@ -83,21 +83,34 @@ export function useLiveActivityOrchestrator(): void {
             return;
           }
 
-          // Fetch delivery data if available
+          // Fetch delivery data and seller name
           let delivery: any = null;
+          let sellerName: string | null = null;
           try {
-            const { data } = await supabase
-              .from('delivery_assignments')
-              .select('eta_minutes, distance_meters, rider_name')
-              .eq('order_id', orderId)
-              .not('status', 'in', '("cancelled","failed")')
-              .maybeSingle();
-            delivery = data;
+            const sellerId = (payload.new as any)?.seller_id;
+            const [deliveryRes, sellerRes] = await Promise.all([
+              supabase
+                .from('delivery_assignments')
+                .select('eta_minutes, distance_meters, rider_name')
+                .eq('order_id', orderId)
+                .not('status', 'in', '("cancelled","failed")')
+                .maybeSingle(),
+              sellerId
+                ? supabase
+                    .from('seller_profiles')
+                    .select('business_name')
+                    .eq('id', sellerId)
+                    .maybeSingle()
+                : Promise.resolve({ data: null }),
+            ]);
+            delivery = deliveryRes.data;
+            sellerName = (sellerRes.data as any)?.business_name ?? null;
           } catch { /* best-effort */ }
 
           const activityData = buildLiveActivityData(
             { id: orderId, status: newStatus },
             delivery,
+            sellerName,
           );
           await LiveActivityManager.push(activityData);
         },

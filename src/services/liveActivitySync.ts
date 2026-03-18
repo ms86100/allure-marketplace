@@ -26,7 +26,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
     console.log(TAG, 'Syncing active buyer orders for', userId);
     const { data: orders, error } = await supabase
       .from('orders')
-      .select('id, status')
+      .select('id, status, seller_id')
       .eq('buyer_id', userId)
       .in('status', ACTIVE_STATUSES);
 
@@ -43,19 +43,34 @@ export async function syncActiveOrders(userId: string): Promise<number> {
     console.log(TAG, `Found ${orders.length} active order(s)`);
 
     const orderIds = orders.map((o) => o.id);
-    const { data: deliveries } = await supabase
-      .from('delivery_assignments')
-      .select('order_id, eta_minutes, distance_meters, rider_name')
-      .in('order_id', orderIds)
-      .not('status', 'in', '("cancelled","failed")');
+    const sellerIds = [...new Set(orders.map((o) => o.seller_id).filter(Boolean))];
+
+    // Fetch deliveries and seller names in parallel
+    const [deliveriesResult, sellersResult] = await Promise.all([
+      supabase
+        .from('delivery_assignments')
+        .select('order_id, eta_minutes, distance_meters, rider_name')
+        .in('order_id', orderIds)
+        .not('status', 'in', '("cancelled","failed")'),
+      sellerIds.length > 0
+        ? supabase
+            .from('seller_profiles')
+            .select('id, business_name')
+            .in('id', sellerIds)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
 
     const deliveryMap = new Map(
-      (deliveries ?? []).map((d: any) => [d.order_id, d])
+      (deliveriesResult.data ?? []).map((d: any) => [d.order_id, d])
+    );
+    const sellerMap = new Map(
+      (sellersResult.data ?? []).map((s: any) => [s.id, s.business_name])
     );
 
     for (const order of orders) {
       const delivery = deliveryMap.get(order.id) ?? null;
-      const data = buildLiveActivityData(order, delivery);
+      const sellerName = sellerMap.get(order.seller_id) ?? null;
+      const data = buildLiveActivityData(order, delivery, sellerName);
       await LiveActivityManager.push(data);
     }
 
