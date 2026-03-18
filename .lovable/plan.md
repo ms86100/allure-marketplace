@@ -1,81 +1,92 @@
 
 
-# iOS Live Activity Widget Redesign
+# Round 1: Production Readiness Audit -- Live Activity + Tracking + Notifications
 
-## Problems Visible in Screenshot
+## System Assessment
 
-1. Three duplicate "Your Order is Ready" cards stacked on top of each other (dedup issue still manifesting on device)
-2. A fourth card shows "We're Preparing Your Order" with nested duplicate content inside it
-3. The purple gradient card looks dated and lacks information hierarchy
-4. The dark card is functional but visually flat
-5. No order short ID visible to help buyers distinguish orders
-6. Emoji-heavy titles feel unpolished ("Your Order is Ready! 🎉")
-7. No meaningful contextual info per status (e.g., "Pickup from [seller]" when ready, ETA countdown when in transit)
+After thorough code review across all layers (client hooks, LiveActivityManager, edge functions, DB triggers, native Swift), the architecture is sound and production-grade. The system already implements:
 
-## What Changes
+- Triple-layer dedup (client map, native query, hydration cleanup)
+- DB-backed terminal/start status sets via `category_status_flows`
+- APNs server-side push for killed-app updates with `event: "end"` on terminal statuses
+- 30-second duplicate notification guard in the DB trigger
+- Kalman-lite GPS filtering with smooth marker interpolation
+- OSRM road-snapped routing and ETA
+- DB-backed proximity thresholds
+- Auto-reconnect with retry on realtime channel failures
+- App resume re-hydration with cache invalidation
 
-### A. ContentState — add `order_short_id` and `seller_logo_url`
+## Findings
 
-Add two new fields to `LiveDeliveryAttributes.ContentState`:
-- `orderShortId: String?` — last 4-8 chars of order ID for buyer recognition (e.g., "#7838")
-- `sellerLogoUrl: String?` — seller logo URL for a branded feel (rendered if available)
+### Finding 1: DB trigger has hardcoded terminal statuses (MEDIUM)
 
-Update `LiveActivityData` interface in `definitions.ts` and the mapper/APNs edge function to populate these.
+**File:** `fn_enqueue_order_status_notification` (latest migration)
 
-### B. Widget Visual Redesign
+**Line 209:** `IF NEW.status IN ('delivered', 'completed', 'cancelled', 'no_show', 'failed') THEN DELETE FROM public.live_activity_tokens...`
 
-Replace the current 3-branch lock screen layout with a single, unified, status-adaptive card:
+This hardcodes terminal statuses for token cleanup instead of querying `category_status_flows.is_terminal`. If a new terminal status is added to the DB (e.g., `rejected`, `expired`), tokens will not be cleaned up and Live Activities will persist.
 
-**Layout structure (all statuses):**
-```text
-┌─────────────────────────────────────────────┐
-│  [SocivaIcon]  Seller Name        #7838     │
-│                                   2 items   │
-│                                             │
-│  Status Title (SF Symbol prefix)            │
-│  Contextual subtitle                        │
-│                                             │
-│  ═══════●🛵═══════════════  ETA 8 min       │
-└─────────────────────────────────────────────┘
+**Fix:** Replace the hardcoded IN clause with a subquery:
+```sql
+IF EXISTS (
+  SELECT 1 FROM public.category_status_flows
+  WHERE status_key = NEW.status AND is_terminal = true
+) THEN
+  DELETE FROM public.live_activity_tokens WHERE order_id = NEW.id;
+END IF;
 ```
 
-**Design principles:**
-- Single dark card with subtle status-tinted accent (not full gradient)
-- SF Symbols instead of emojis for status icons (checkmark.circle.fill, fork.knife, bag.fill, bicycle, mappin.and.ellipse)
-- Accent color changes per phase: amber (accepted/preparing), blue (ready), green (in transit), emerald (delivered)
-- Clean typography: `.subheadline.bold` for title, `.caption` for subtitle
-- Progress bar accent matches status color
-- ETA displayed inline with progress bar when available
-- Order short ID as a subtle badge in top-right
+### Finding 2: DB trigger passes `seller_logo` instead of `seller_logo_url` to APNs function (MEDIUM)
 
-**Status-specific content:**
-- **accepted**: "Order Confirmed" / "Seller is reviewing your order"
-- **preparing**: "Being Prepared" / "Your order is being made"
-- **ready**: "Ready for Pickup" / "Waiting to be picked up from {seller}"
-- **picked_up/on_the_way/en_route**: "On the Way" / "{driver} · {distance} km away" + ETA badge
-- **arrived**: "At Your Location" / "{driver} has arrived"
-- **delivered/completed**: "Delivered" / full progress, green accent, auto-dismiss
+**File:** Same trigger, line 204: `'seller_logo', COALESCE(v_seller_logo, '')`
 
-**Dynamic Island (compact):**
-- Leading: SocivaIcon
-- Trailing: ETA in green if available, else mini progress ring
+The edge function `update-live-activity-apns` destructures `seller_logo_url` from the payload (line 172), but the trigger sends `seller_logo`. Additionally, line 77 queries `sp.logo_url` which may not exist (the correct column is `profile_image_url` per previous rounds).
 
-**Dynamic Island (expanded):**
-- Same clean layout as lock screen but condensed
-- No gradient backgrounds, just the standard Dynamic Island dark
+**Fix:** Update the trigger to:
+1. Query `sp.profile_image_url` instead of `sp.logo_url`
+2. Send `seller_logo_url` key instead of `seller_logo`
 
-### C. Files to Change
+### Finding 3: No polling fallback for realtime subscriptions (MEDIUM)
 
-| File | Change |
+The orchestrator relies solely on Supabase Realtime with a max of 3 reconnect retries. If all retries fail, the system silently stops receiving updates. The `lovable-stack-overflow` context suggests adding a polling fallback.
+
+However, the current system partially mitigates this: app resume triggers a full `syncActiveOrders()` which reconciles state. The risk window is only during sustained foreground usage with a dead realtime connection.
+
+**Fix:** Add a lightweight polling heartbeat (every 30-60s) that checks the latest order status and compares against the last-known status, triggering an update only on mismatch. This is a safety net, not a replacement for realtime.
+
+### Finding 4: `sync_order_to_delivery_assignment` hardcodes statuses (LOW)
+
+**Line 23:** `IF NEW.status IN ('on_the_way', 'delivered') THEN` -- only syncs these two statuses. If new delivery-relevant statuses are added, they won't propagate to delivery_assignments.
+
+**Fix:** Query `category_status_flows` for statuses with a delivery-relevant flag, or expand the hardcoded set to include all transit/terminal statuses.
+
+## Verified (No Action Needed)
+
+| Area | Status |
 |------|--------|
-| `native/ios/LiveDeliveryAttributes.swift` | Add `orderShortId`, `sellerLogoUrl` to ContentState |
-| `native/ios/LiveDeliveryWidget.swift` | Full redesign of lock screen view, DI regions, helper functions |
-| `src/plugins/live-activity/definitions.ts` | Add `order_short_id`, `seller_logo_url` to LiveActivityData |
-| `src/services/liveActivityMapper.ts` | Populate new fields from order data |
-| `src/services/liveActivitySync.ts` | Pass `order_number` / short ID to mapper |
-| `supabase/functions/update-live-activity-apns/index.ts` | Include new fields in APNs content-state, fetch order number |
+| Live Activity 1:1 per order | Verified: `active` Map keyed by entity_id |
+| Dedup on start | Verified: `starting` Set + `getActiveActivities()` native check |
+| Dedup on hydration | Verified: groups by entityId, ends all but last |
+| Terminal → end | Verified: `push()` checks `TERMINAL_STATUSES.has()` → calls `end()` |
+| APNs end event | Verified: `event: "end"` + `dismissal-date` in 5s |
+| Deep link 404 prevention | Verified: `KNOWN_ROUTES` validation + fallback to `/orders` |
+| Notification dedup (30s guard) | Verified in DB trigger |
+| Silent push for mid-flow | Verified: `silent_push` from `category_status_flows` |
+| GPS Kalman filter | Verified in `gps-filter.ts` |
+| Smooth marker animation | Verified: `AnimatedRiderMarker` with cubic ease |
+| OSRM road ETA | Verified in `useOSRMRoute` |
+| Proximity thresholds (DB) | Verified in `system_settings` |
+| Stale location warning | Verified: configurable threshold |
+| App resume reconciliation | Verified: `resetHydration()` + `doSync()` |
+| Realtime auto-reconnect | Verified: 3 retries with 3s delay |
 
-### D. Scope Exclusion
+## Implementation Plan
 
-The duplicate card issue (3x "Ready" cards in screenshot) is a LiveActivityManager dedup problem, not a widget design issue. That is tracked separately and is addressed by the existing hydration dedup logic. This plan focuses solely on the visual and informational quality of the widget.
+| Step | What | Severity | Scope |
+|------|------|----------|-------|
+| 1 | Fix DB trigger: dynamic terminal status check for token cleanup | Medium | SQL migration |
+| 2 | Fix DB trigger: correct seller logo column + payload key | Medium | SQL migration |
+| 3 | Add lightweight polling fallback to orchestrator | Medium | `useLiveActivityOrchestrator.ts` |
+
+Steps 1 and 2 can be combined into a single migration that replaces `fn_enqueue_order_status_notification`.
 
