@@ -17,13 +17,12 @@ export function UpdateBuyerLocationButton({ orderId }: Props) {
     try {
       const pos = await getCurrentPosition();
 
-      const { error } = await supabase
-        .from('orders')
-        .update({
-          delivery_lat: pos.latitude,
-          delivery_lng: pos.longitude,
-        })
-        .eq('id', orderId);
+      // Gap 8: Use RPC instead of direct update to prevent column tampering
+      const { error } = await supabase.rpc('update_buyer_delivery_location', {
+        _order_id: orderId,
+        _delivery_lat: pos.latitude,
+        _delivery_lng: pos.longitude,
+      });
 
       if (error) throw error;
 

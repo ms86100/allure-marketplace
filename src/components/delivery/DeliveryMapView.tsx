@@ -124,12 +124,14 @@ function AnimatedRiderMarker({ lat, lng, heading, name }: {
   );
 }
 
-/** OSRM road route hook */
+/** Gap 4: OSRM road route hook — now also extracts road duration for accurate ETA */
 function useOSRMRoute(
   riderLat: number, riderLng: number,
   destLat: number, destLng: number
 ) {
   const [routeCoords, setRouteCoords] = useState<[number, number][]>([]);
+  const [roadEtaMinutes, setRoadEtaMinutes] = useState<number | null>(null);
+  const [roadDistanceMeters, setRoadDistanceMeters] = useState<number | null>(null);
   const lastFetchPos = useRef<[number, number] | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -139,7 +141,6 @@ function useOSRMRoute(
       const [prevLat, prevLng] = lastFetchPos.current;
       const dLat = Math.abs(riderLat - prevLat);
       const dLng = Math.abs(riderLng - prevLng);
-      // Rough check: ~0.001 deg ≈ 111m
       if (dLat < 0.0007 && dLng < 0.0007) return;
     }
 
@@ -152,12 +153,20 @@ function useOSRMRoute(
       const res = await fetch(url, { signal: controller.signal });
       if (!res.ok) return;
       const data = await res.json();
-      if (data.routes?.[0]?.geometry?.coordinates) {
-        const coords: [number, number][] = data.routes[0].geometry.coordinates.map(
-          (c: [number, number]) => [c[1], c[0]] // GeoJSON is [lng,lat], Leaflet wants [lat,lng]
+      const route = data.routes?.[0];
+      if (route?.geometry?.coordinates) {
+        const coords: [number, number][] = route.geometry.coordinates.map(
+          (c: [number, number]) => [c[1], c[0]]
         );
         setRouteCoords(coords);
         lastFetchPos.current = [riderLat, riderLng];
+        // Extract road-based ETA and distance from OSRM
+        if (route.duration != null) {
+          setRoadEtaMinutes(Math.max(1, Math.ceil(route.duration / 60)));
+        }
+        if (route.distance != null) {
+          setRoadDistanceMeters(Math.round(route.distance));
+        }
       }
     } catch (e) {
       if ((e as Error).name !== 'AbortError') {
@@ -174,7 +183,7 @@ function useOSRMRoute(
     return () => abortRef.current?.abort();
   }, []);
 
-  return routeCoords;
+  return { routeCoords, roadEtaMinutes, roadDistanceMeters };
 }
 
 export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinationLng, riderName, heading }: DeliveryMapViewProps) {
@@ -183,7 +192,7 @@ export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinatio
     (riderLng + destinationLng) / 2,
   ];
 
-  const routeCoords = useOSRMRoute(riderLat, riderLng, destinationLat, destinationLng);
+  const { routeCoords, roadEtaMinutes } = useOSRMRoute(riderLat, riderLng, destinationLat, destinationLng);
 
   // Fallback straight line if OSRM hasn't loaded yet
   const polylinePositions = routeCoords.length > 0
@@ -196,6 +205,13 @@ export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinatio
 
   return (
     <div className="rounded-xl overflow-hidden border border-border h-[200px] relative">
+      {/* Gap 4: OSRM road-based ETA badge on map */}
+      {roadEtaMinutes && (
+        <div className="absolute top-2 right-2 z-[500] bg-background/90 backdrop-blur-sm border border-border rounded-lg px-2.5 py-1 shadow-sm">
+          <p className="text-xs font-bold text-primary">{roadEtaMinutes > 3 ? `${roadEtaMinutes - 1}–${roadEtaMinutes + 1}` : roadEtaMinutes} min</p>
+          <p className="text-[9px] text-muted-foreground">via road</p>
+        </div>
+      )}
       <MapContainer
         center={center}
         zoom={14}

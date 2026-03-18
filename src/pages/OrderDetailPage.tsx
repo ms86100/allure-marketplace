@@ -16,6 +16,8 @@ import { DeliveryETABanner } from '@/components/order/DeliveryETABanner';
 import { SellerGPSTracker } from '@/components/delivery/SellerGPSTracker';
 import { UpdateBuyerLocationButton } from '@/components/delivery/UpdateBuyerLocationButton';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
+import { DeliveryCompletionOtpDialog } from '@/components/delivery/DeliveryCompletionOtpDialog';
+import { DeliveryFeedbackForm } from '@/components/delivery/DeliveryFeedbackForm';
 
 import { OrderItemCard } from '@/components/order/OrderItemCard';
 import { AppointmentDetailsCard } from '@/components/order/AppointmentDetailsCard';
@@ -25,7 +27,7 @@ import { SellerPaymentConfirmation } from '@/components/payment/SellerPaymentCon
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
 import { isTerminalStatus } from '@/hooks/useCategoryStatusFlow';
-import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck } from 'lucide-react';
+import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { getString, setString } from '@/lib/persistent-kv';
@@ -40,6 +42,8 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const o = useOrderDetail(id);
   const [deliveryAssignmentId, setDeliveryAssignmentId] = useState<string | null>(null);
+  const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
+  const [hasDeliveryFeedback, setHasDeliveryFeedback] = useState(false);
   const { data: serviceBooking } = useServiceBookingForOrder(o.order?.id);
 
   const order = o.order;
@@ -117,6 +121,20 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="px-4 pt-3 space-y-3">
+          {/* Gap 11: Order placed celebration banner — shown for newly placed orders */}
+          {o.isBuyerView && order.status === 'placed' && (Date.now() - new Date(order.created_at).getTime() < 60000) && (
+            <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
+              <span className="text-3xl">🎉</span>
+              <p className="text-sm font-bold text-primary mt-1.5">Order Placed Successfully!</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Your order is being reviewed by the seller</p>
+              {(order as any).estimated_delivery_at && (
+                <p className="text-xs font-medium text-primary mt-1">
+                  Estimated delivery: {format(new Date((order as any).estimated_delivery_at), 'h:mm a')}
+                </p>
+              )}
+            </div>
+          )}
+
           {o.isUrgentOrder && order.auto_cancel_at && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} />}
 
           {order.status === 'cancelled' && order.rejection_reason && o.isBuyerView && (
@@ -215,19 +233,23 @@ export default function OrderDetailPage() {
           {/* Live Delivery Tracking or Static Card */}
           {isDeliveryOrder && isInTransit && deliveryAssignmentId && (
             <>
-              {/* Map view — show for both buyer and seller when rider has GPS data */}
-              {deliveryTracking.riderLocation && (order as any).delivery_lat && (order as any).delivery_lng && (
-                <Suspense fallback={<Skeleton className="h-48 w-full rounded-xl" />}>
-                  <DeliveryMapView
-                    riderLat={deliveryTracking.riderLocation.latitude}
-                    riderLng={deliveryTracking.riderLocation.longitude}
-                    destinationLat={(order as any).delivery_lat}
-                    destinationLng={(order as any).delivery_lng}
-                    riderName={deliveryTracking.riderName}
-                    heading={deliveryTracking.riderLocation.heading}
-                  />
-                </Suspense>
-              )}
+              {/* Gap 10: Map view — fallback to buyer profile coords if delivery_lat/lng missing */}
+              {deliveryTracking.riderLocation && (() => {
+                const destLat = (order as any).delivery_lat || (buyer as any)?.latitude || null;
+                const destLng = (order as any).delivery_lng || (buyer as any)?.longitude || null;
+                return destLat && destLng ? (
+                  <Suspense fallback={<Skeleton className="h-48 w-full rounded-xl" />}>
+                    <DeliveryMapView
+                      riderLat={deliveryTracking.riderLocation.latitude}
+                      riderLng={deliveryTracking.riderLocation.longitude}
+                      destinationLat={destLat}
+                      destinationLng={destLng}
+                      riderName={deliveryTracking.riderName}
+                      heading={deliveryTracking.riderLocation.heading}
+                    />
+                  </Suspense>
+                ) : null;
+              })()}
               <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} />
               {o.isBuyerView && (
                 <div className="flex justify-end">
@@ -236,9 +258,19 @@ export default function OrderDetailPage() {
               )}
             </>
           )}
+          {/* Gap 3: Fallback when delivery is in transit but assignment hasn't been created yet */}
+          {isDeliveryOrder && isInTransit && !deliveryAssignmentId && (
+            <div className="bg-card border border-border rounded-xl p-4">
+              <div className="flex items-center gap-3 justify-center text-muted-foreground">
+                <Loader2 size={16} className="animate-spin" />
+                <p className="text-sm">Setting up live tracking...</p>
+              </div>
+            </div>
+          )}
           {/* Seller self-delivery GPS broadcasting */}
+          {/* Gap 1: Pass deliveryStatus so GPS auto-stops on terminal states */}
           {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
-            <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart />
+            <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart deliveryStatus={order.status} />
           )}
           {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}
 
@@ -260,6 +292,20 @@ export default function OrderDetailPage() {
             <div className="bg-warning/10 border border-warning/20 rounded-xl p-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5"><Star className="text-warning" size={18} /><div><p className="text-sm font-semibold">Rate this order</p><p className="text-[11px] text-muted-foreground">Help others with your review</p></div></div>
               <ReviewForm orderId={order.id} sellerId={order.seller_id} sellerName={seller?.business_name || 'Seller'} onSuccess={() => o.setHasReview(true)} />
+            </div>
+          )}
+
+          {/* Gap 12: Delivery-specific rating — separate from product review */}
+          {o.isBuyerView && isDeliveryOrder && (order.status === 'completed' || order.status === 'delivered') && !hasDeliveryFeedback && (
+            <div className="bg-accent/5 border border-accent/20 rounded-xl p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-lg">🚚</span>
+                <div>
+                  <p className="text-sm font-semibold">Rate the delivery</p>
+                  <p className="text-[11px] text-muted-foreground">Punctuality, handling & experience</p>
+                </div>
+              </div>
+              <DeliveryFeedbackForm orderId={order.id} sellerId={order.seller_id} onSuccess={() => setHasDeliveryFeedback(true)} />
             </div>
           )}
 
@@ -315,6 +361,7 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Seller Action Bar */}
+      {/* Gap 2: Seller Action Bar — intercept "delivered" to require OTP for delivery orders */}
       {o.isSellerView && !isTerminalStatus(o.flow, order.status) && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
           <div className="px-4 py-3 flex gap-3">
@@ -322,7 +369,14 @@ export default function OrderDetailPage() {
             {o.orderFulfillmentType === 'delivery' && order.status === 'ready' && (order as any).delivery_handled_by === 'platform' ? (
               <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground"><Truck size={16} className="text-primary" /><span>Awaiting delivery pickup</span></div>
             ) : o.nextStatus ? (
-              <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.nextStatus!)} disabled={o.isUpdating}>{o.isUpdating ? 'Updating...' : `Mark ${o.getOrderStatus(o.nextStatus).label}`}<ChevronRight size={14} className="ml-1" /></Button>
+              o.nextStatus === 'delivered' && isDeliveryOrder && deliveryAssignmentId ? (
+                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
+                  {o.isUpdating ? 'Updating...' : 'Verify & Deliver'}
+                  <ChevronRight size={14} className="ml-1" />
+                </Button>
+              ) : (
+                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.nextStatus!)} disabled={o.isUpdating}>{o.isUpdating ? 'Updating...' : `Mark ${o.getOrderStatus(o.nextStatus).label}`}<ChevronRight size={14} className="ml-1" /></Button>
+              )
             ) : null}
           </div>
         </div>
@@ -330,6 +384,17 @@ export default function OrderDetailPage() {
 
       <OrderRejectionDialog open={o.isRejectionDialogOpen} onOpenChange={o.setIsRejectionDialogOpen} onReject={o.handleReject} orderNumber={order.id} />
       {o.chatRecipientId && <OrderChat orderId={order.id} otherUserId={o.chatRecipientId} otherUserName={o.chatRecipientName || 'User'} isOpen={o.isChatOpen} onClose={() => { o.setIsChatOpen(false); o.fetchUnreadCount(); }} disabled={!o.canChat} />}
+
+      {/* Gap 2: OTP verification dialog for seller self-delivery */}
+      <DeliveryCompletionOtpDialog
+        orderId={order.id}
+        open={isOtpDialogOpen}
+        onOpenChange={setIsOtpDialogOpen}
+        onVerified={() => {
+          o.setOrder({ ...order, status: 'delivered' } as any);
+          window.location.reload();
+        }}
+      />
 
       {/* DeliveryArrivalOverlay — only when rider GPS exists and is close (Gap 9) */}
       {showArrivalOverlay && (
