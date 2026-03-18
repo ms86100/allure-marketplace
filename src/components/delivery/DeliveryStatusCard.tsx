@@ -25,6 +25,7 @@ const DELIVERY_STATUS_CONFIG: Record<string, { label: string; color: string; ico
   pending: { label: 'Assigning Rider', color: 'bg-warning/15 text-warning', icon: Clock },
   assigned: { label: 'Rider Assigned', color: 'bg-info/15 text-info', icon: Truck },
   picked_up: { label: 'Out for Delivery', color: 'bg-primary/15 text-primary', icon: Truck },
+  on_the_way: { label: 'On The Way', color: 'bg-primary/15 text-primary', icon: Truck },
   at_gate: { label: 'At Your Gate', color: 'bg-info/15 text-info', icon: MapPin },
   delivered: { label: 'Delivered', color: 'bg-success/15 text-success', icon: CheckCircle },
   failed: { label: 'Delivery Failed', color: 'bg-destructive/15 text-destructive', icon: XCircle },
