@@ -203,7 +203,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Gap 8: Buyer delivery confirmation — shown when seller marks delivered */}
-          {o.isBuyerView && order.status === 'delivered' && o.orderFulfillmentType === 'delivery' && (
+          {o.isBuyerView && order.status === 'delivered' && isDeliveryOrder && (
             <BuyerDeliveryConfirmation
               orderId={order.id}
               sellerName={seller?.business_name}
