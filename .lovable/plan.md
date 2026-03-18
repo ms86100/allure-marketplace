@@ -1,75 +1,56 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Silent Push Optimization)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+## Round 2 Audit — All 11 Issues: Implementation Evidence
 
-## Silent Push Optimization: COMPLETE
+Every item from the Round 2 plan is already live in the codebase. Here is file-level proof for each:
 
-### What It Does
-Reduces push notification noise for mid-flow order statuses when Live Activity is already tracking the order on the lock screen. In-app notification history and badge counts are always preserved.
+---
 
-### Notification Matrix
+### Issue 1: SmartSuggestionBanner Store Availability Check — DONE
+**File:** `src/components/home/SmartSuggestionBanner.tsx` L22-38
+**Evidence:** `handleReorder` fetches seller availability fields (`availability_start`, `availability_end`, `operating_days`, `is_available`) and calls `computeStoreStatus`. If store is not open, shows `toast.error` and returns early before invoking `quick-reorder`.
 
-| Status | Push? | Live Activity? | Rationale |
-|--------|-------|----------------|-----------|
-| `accepted` | ✅ Always | Yes | Critical — order confirmed |
-| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
-| `ready` | ✅ Always | Yes | Pickup moment — user must know |
-| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
-| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
-| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
-| `delivered` | ✅ Always | Yes | Critical endpoint |
-| `completed` | ✅ Always | No | Critical endpoint |
-| `cancelled` | ✅ Always | No | Critical — must alert |
-| All service/booking | ✅ Always | No | No Live Activity for these |
+### Issue 2: Toast System Migrated to Sonner — DONE
+**File:** `src/components/home/SmartSuggestionBanner.tsx` L7
+**Evidence:** `import { toast } from 'sonner';` — no `useToast` import exists. All toast calls use `toast.error(...)` and `toast.success(...)`.
 
-### Implementation
+### Issue 3: N+1 Query Batched — DONE
+**File:** `src/hooks/useOrderSuggestions.ts` L46-65
+**Evidence:** Collects all `productIds` and `sellerIds` into Sets, then uses `Promise.all` with `.in('id', productIds)` and `.in('id', sellerIds)` batch queries. Maps results into suggestion objects.
 
-1. **DB column**: `category_status_flows.silent_push` (boolean, default false)
-2. **DB trigger**: `fn_enqueue_order_status_notification` includes `silent_push` in notification payload
-3. **Edge function**: `process-notification-queue` skips APNs/FCM delivery when `silent_push = true`, but still inserts `user_notifications` for in-app history
+### Issue 4: updateOrderStatus Checks Affected Rows — DONE
+**File:** `src/hooks/useOrderDetail.ts` L146-156
+**Evidence:** Query uses `.select()` after `.update()`. L151-155 checks `if (!updatedRows || updatedRows.length === 0)` — if no rows affected, calls `fetchOrder()` to refetch real state and shows `toast.error('Order status has changed. Refreshing...')`.
 
-## Phase I Live Activities — CI Pipeline Status
+### Issue 5: COD Duplicate Guard Removed — DONE
+**File:** `src/hooks/useCartPage.ts` L294-306
+**Evidence:** The COD flow at L294-306 goes directly to `createOrdersForAllSellers('pending')` without any duplicate-order pre-check query. The overly broad guard has been removed.
 
-### Codemagic Build Pipeline: COMPLETE
+### Issue 6: Time Comparison Uses Numeric Minutes — DONE
+**File:** `src/components/home/UpcomingAppointmentBanner.tsx` L59-63
+**Evidence:** Uses `timeToMinutes(b.start_time || '00:00') < nowMinutes` where `nowMinutes = now.getHours() * 60 + now.getMinutes()`. No string comparison. Handles non-zero-padded DB values correctly.
 
-Both `ios-release` and `release-all` workflows now include:
+### Issue 7: Notification Dismiss Persisted — DONE
+**File:** `src/components/notifications/HomeNotificationBanner.tsx` L22-25
+**Evidence:** `handleDismiss` calls both `setDismissed(notification.id)` for immediate UI and `markRead.mutate(notification.id)` to persist via the `useMarkNotificationRead` hook. Banner won't reappear after navigation.
 
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+### Issue 8: Geolocation Permission Check — DONE
+**File:** `src/hooks/useArrivalDetection.ts` L74-86
+**Evidence:** On web, calls `navigator.permissions.query({ name: 'geolocation' })` first. Only starts `watchPosition` if `result.state === 'granted'`. Comment on L84: "If 'prompt' or 'denied', don't trigger the popup".
 
-### Codemagic Requirements (User Action)
+### Issue 9: Admin Product Approval Scoped by created_at — DONE
+**File:** `src/hooks/useSellerApplicationReview.ts` L186-191
+**Evidence:** `approvalCutoff = new Date().toISOString()`. Query uses `.lte('created_at', approvalCutoff)` to only approve products that existed before the approval moment. Logs count: `Auto-approved ${productCount} products`.
 
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
+### Issue 10: togglePauseShop Mutex — DONE
+**File:** `src/hooks/useSellerSettings.ts` L104-117
+**Evidence:** `togglePauseRef = useRef(false)`. L106: `if (togglePauseRef.current) return;` blocks concurrent calls. Set to `true` on entry, reset to `false` in `finally` block.
 
-### Runtime Call Chain (Verified)
+### Issue 11: Cart Delete After Item Confirmation — DONE
+**File:** `src/components/home/ReorderLastOrder.tsx` L127-148
+**Evidence:** L127-131 checks `if (!available?.length)` and returns early with toast. L136-143 builds `inserts` array and checks `if (inserts.length === 0)` before any deletion. L147: cart delete only runs after confirming insertable items exist. Comment on L146: "Only delete cart AFTER confirming we have items to insert".
 
-```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
-```
+---
 
-## Implementation Matrix
+**Conclusion:** All 11 Round 2 audit items are fully implemented. No outstanding gaps remain.
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
