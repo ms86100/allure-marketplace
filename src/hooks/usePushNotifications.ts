@@ -310,10 +310,25 @@ export function usePushNotificationsInternal() {
         });
         hapticNotification('success');
 
-        // Play the custom alert sound for seller order/inquiry notifications
+        // Play a short alert beep via Web Audio API (no media session / no playback controls)
         try {
-          const audio = new Audio('/sounds/new-order-alert.mp3');
-          audio.play().catch(() => {});
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const now = ctx.currentTime;
+          for (let i = 0; i < 3; i++) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = i % 2 === 0 ? 880 : 660;
+            osc.type = 'sine';
+            const t = now + i * 0.15;
+            gain.gain.setValueAtTime(0.18, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+            osc.start(t);
+            osc.stop(t + 0.15);
+          }
+          // Auto-close context after sound finishes
+          setTimeout(() => ctx.close().catch(() => {}), 600);
         } catch {}
 
         toast(notification?.title ?? 'New Notification', {
