@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { filterGPSPoint, type FilterState } from '@/lib/gps-filter';
+import { getTrackingConfig, getTrackingConfigSync } from '@/services/trackingConfig';
 
 interface RiderLocation {
   latitude: number;
@@ -45,11 +46,17 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
     smoothedLng: null,
   });
 
+  // Pre-load config
+  useEffect(() => {
+    getTrackingConfig().catch(() => {});
+  }, []);
+
   useEffect(() => {
     const interval = setInterval(() => {
       setState((prev) => {
         if (!prev.lastLocationAt) return prev;
-        const stale = Date.now() - new Date(prev.lastLocationAt).getTime() > 2 * 60 * 1000;
+        const threshold = getTrackingConfigSync().location_stale_threshold_ms;
+        const stale = Date.now() - new Date(prev.lastLocationAt).getTime() > threshold;
         return stale !== prev.isLocationStale ? { ...prev, isLocationStale: stale } : prev;
       });
     }, 30_000);
@@ -122,7 +129,6 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
             (!currentRecordedAt || (incomingRecordedAt && new Date(incomingRecordedAt).getTime() > new Date(currentRecordedAt).getTime()))
           );
 
-          // Gap E: Apply GPS filter to assignment location too (same as location channel)
           let filteredLocation = prev.riderLocation;
           if (shouldReplaceLocation) {
             const rawPoint: RiderLocation = {

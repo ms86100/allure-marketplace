@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getTrackingConfig, type TrackingConfig } from '@/services/trackingConfig';
 
 interface TrackingState {
   isTracking: boolean;
@@ -18,11 +19,6 @@ interface QueuedLocationPayload {
   accuracy_meters: number | null;
 }
 
-const INTERVAL_MOVING_MS = 5_000;
-const INTERVAL_IDLE_MS = 15_000;
-const SPEED_THRESHOLD_KMH = 5;
-const MAX_QUEUED_POINTS = 20;
-
 export function useBackgroundLocationTracking(assignmentId: string | null) {
   const [state, setState] = useState<TrackingState>({
     isTracking: false,
@@ -36,9 +32,12 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
   const mountedRef = useRef(true);
   const queueRef = useRef<QueuedLocationPayload[]>([]);
   const flushingRef = useRef(false);
+  const configRef = useRef<TrackingConfig | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
+    // Pre-load config
+    getTrackingConfig().then(c => { configRef.current = c; });
     return () => {
       mountedRef.current = false;
     };
@@ -55,6 +54,10 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
     flushingRef.current = true;
 
     try {
+      const maxQueued = configRef.current?.location_max_queued_points ?? 20;
+      if (queueRef.current.length > maxQueued) {
+        queueRef.current = queueRef.current.slice(-maxQueued);
+      }
       while (queueRef.current.length > 0) {
         const nextPayload = queueRef.current[0];
         await postLocation(nextPayload);
@@ -73,9 +76,10 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
   }, [postLocation]);
 
   const enqueueLocation = useCallback((payload: QueuedLocationPayload) => {
+    const maxQueued = configRef.current?.location_max_queued_points ?? 20;
     queueRef.current.push(payload);
-    if (queueRef.current.length > MAX_QUEUED_POINTS) {
-      queueRef.current = queueRef.current.slice(-MAX_QUEUED_POINTS);
+    if (queueRef.current.length > maxQueued) {
+      queueRef.current = queueRef.current.slice(-maxQueued);
     }
   }, []);
 
@@ -88,11 +92,15 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
   ) => {
     if (!assignmentId) return;
 
+    const cfg = configRef.current;
     const speedKmh = speed != null ? speed * 3.6 : 0;
     lastSpeedRef.current = speedKmh;
 
     const now = Date.now();
-    const interval = speedKmh > SPEED_THRESHOLD_KMH ? INTERVAL_MOVING_MS : INTERVAL_IDLE_MS;
+    const speedThreshold = cfg?.location_speed_threshold_kmh ?? 5;
+    const interval = speedKmh > speedThreshold
+      ? (cfg?.location_interval_moving_ms ?? 5000)
+      : (cfg?.location_interval_idle_ms ?? 15000);
     if (now - lastSentRef.current < interval) return;
 
     const payload: QueuedLocationPayload = {
