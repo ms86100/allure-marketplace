@@ -133,7 +133,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       availability = computeStoreStatus(sellerSnapshot.availability_start, sellerSnapshot.availability_end, sellerSnapshot.operating_days, sellerSnapshot.is_available ?? true);
     }
 
-    if (availability.status !== 'open') { const msg = formatStoreClosedMessage(availability); toast.error(msg || 'This store is currently closed. Please try again later.'); return; }
+    if (availability.status !== 'open') { const msg = formatStoreClosedMessage(availability); toast.error(msg || 'This store is currently closed. Please try again later.', { id: 'cart-store-closed' }); return; }
 
     setOptimistic(prev => {
       const existing = prev.find(item => item.product_id === product.id);
