@@ -1,38 +1,49 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-## Bug: Store Incorrectly Marked as Closed
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-### Root Cause
-**Timezone mismatch between client and server.**
+## Phase I Live Activities — CI Pipeline Status
 
-- The database function `compute_store_status` uses `now()` which returns **UTC time**
-- Store 7838 has hours 09:00 - 21:00, intended as **IST (UTC+5:30)**
-- When it's 10 AM IST, the server sees **4:30 AM UTC** — outside the 09:00-21:00 window
-- The client-side check uses `new Date()` (local browser time) so the UI initially shows "open"
-- But when `addItem` inserts into `cart_items`, the DB trigger `validate_cart_item_store_availability_trigger` calls the server-side function, which returns "closed" and raises `STORE_CLOSED:closed`
-- This causes the optimistic update to roll back, explaining the "added then reset" behavior
+### Codemagic Build Pipeline: COMPLETE
 
-### Why both reported symptoms happen
-1. **Homepage Add**: Optimistic toast "Added to cart" fires, then DB rejects → rollback + "Store closed" error toast
-2. **Product detail Add to Cart**: Same flow — optimistic UI shows quantity stepper, DB rejects → resets to "Add to Cart ₹10"
+Both `ios-release` and `release-all` workflows now include:
 
-### Fix
-**Make the DB function timezone-aware.** Convert `now()` to IST (Asia/Kolkata) before comparing against store hours.
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
 
-#### Database migration
-Update the `compute_store_status` function to use:
-```sql
-v_now timestamp := (now() AT TIME ZONE 'Asia/Kolkata');
-v_current_time time := v_now::time;
-v_current_day text := to_char(v_now, 'Dy');
+### Codemagic Requirements (User Action)
+
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
+
+### Runtime Call Chain (Verified)
+
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
 ```
 
-This single change fixes both the trigger validation and any other server-side callers of this function.
+## Implementation Matrix
 
-#### Long-term consideration
-Hardcoding `Asia/Kolkata` works since this is an India-only marketplace. If multi-timezone support is needed later, store a `timezone` column on `seller_profiles` and pass it into the function.
-
-### Files to modify
-- **Database migration only** — one `CREATE OR REPLACE FUNCTION` statement
-- No client-side code changes needed (client already uses local time correctly)
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |

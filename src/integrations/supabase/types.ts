@@ -8402,7 +8402,7 @@ export type Database = {
       }
       compute_store_status: {
         Args: {
-          p_available: boolean
+          p_available?: boolean
           p_days: string[]
           p_end: string
           p_start: string
