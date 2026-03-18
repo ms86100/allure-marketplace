@@ -151,7 +151,12 @@ export function UpiDeepLinkCheckout({
     setScreenshotPreview(null);
   };
 
+  const confirmSubmittedRef = useRef(false);
+
   const handleSubmitConfirmation = async () => {
+    // Idempotency guard: prevent double-submission on app-switch
+    if (confirmSubmittedRef.current) return;
+    confirmSubmittedRef.current = true;
     setIsSubmitting(true);
     try {
       let screenshotUrl: string | null = null;
