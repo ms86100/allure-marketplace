@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Users, Tag, Star, ChevronRight } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
+import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 interface CategoryImageGridProps {
   parentGroup: string;
