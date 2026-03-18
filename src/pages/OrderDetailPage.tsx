@@ -88,18 +88,35 @@ export default function OrderDetailPage() {
     }
   }, [orderId, isDeliveryOrder]);
 
-  // Gap A: Fetch delivery OTP for buyer
+  // Gap A: Fetch delivery OTP for buyer + Gap 9: Subscribe to realtime updates
   useEffect(() => {
-    if (deliveryAssignmentId && isDeliveryOrder) {
-      supabase
-        .from('delivery_assignments')
-        .select('delivery_code')
-        .eq('id', deliveryAssignmentId)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data?.delivery_code) setBuyerOtp(data.delivery_code);
-        });
-    }
+    if (!deliveryAssignmentId || !isDeliveryOrder) return;
+
+    // Initial fetch
+    supabase
+      .from('delivery_assignments')
+      .select('delivery_code')
+      .eq('id', deliveryAssignmentId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.delivery_code) setBuyerOtp(data.delivery_code);
+      });
+
+    // Realtime subscription for delivery_code changes
+    const otpChannel = supabase
+      .channel(`otp-watch-${deliveryAssignmentId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'delivery_assignments',
+        filter: `id=eq.${deliveryAssignmentId}`,
+      }, (payload) => {
+        const code = (payload.new as any)?.delivery_code;
+        if (code) setBuyerOtp(code);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(otpChannel); };
   }, [isDeliveryOrder, deliveryAssignmentId]);
 
   if (o.isLoading) return <AppLayout showHeader={false}><div className="p-4 space-y-3"><Skeleton className="h-8 w-32" /><Skeleton className="h-28 w-full rounded-xl" /><Skeleton className="h-40 w-full rounded-xl" /></div></AppLayout>;
