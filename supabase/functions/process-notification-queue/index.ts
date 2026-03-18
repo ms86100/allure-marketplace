@@ -59,7 +59,6 @@ Deno.serve(async (req) => {
     console.log(`Processing ${pending.length} queued notifications`);
 
     let processed = 0;
-    let retried = 0;
     let deadLettered = 0;
 
     for (const item of pending) {
