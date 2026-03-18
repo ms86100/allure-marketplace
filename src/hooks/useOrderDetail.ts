@@ -23,7 +23,7 @@ function resolveTransactionType(
   if (fulfillmentType === 'self_pickup') return 'self_fulfillment';
   // Seller-handled delivery → seller_delivery (includes delivery tracking statuses)
   if (fulfillmentType === 'seller_delivery') return 'seller_delivery';
-  if (fulfillmentType === 'delivery' && COALESCE(deliveryHandledBy, 'seller') === 'seller') return 'seller_delivery';
+  if (fulfillmentType === 'delivery' && (deliveryHandledBy || 'seller') === 'seller') return 'seller_delivery';
   if (fulfillmentType === 'delivery' && !deliveryHandledBy) return 'seller_delivery';
   // Platform-handled delivery
   if (fulfillmentType === 'delivery' && deliveryHandledBy === 'platform') return 'cart_purchase';

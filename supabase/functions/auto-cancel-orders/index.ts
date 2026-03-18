@@ -56,14 +56,46 @@ app.post("/", async (c) => {
 
     if (!expiredOrders || expiredOrders.length === 0) {
       console.log("No expired orders to cancel");
-      return c.json({ message: "No expired orders", cancelled: 0 }, 200, corsHeaders);
+    } else {
+      console.log(`Found ${expiredOrders.length} expired orders to cancel`);
     }
 
-    console.log(`Found ${expiredOrders.length} expired orders to cancel`);
+    // --- Auto-complete delivered orders past auto_complete_at ---
+    const { data: deliveredExpired, error: deliveredErr } = await supabase
+      .from("orders")
+      .select("id, buyer_id, seller_id")
+      .eq("status", "delivered")
+      .not("auto_complete_at", "is", null)
+      .lt("auto_complete_at", now);
 
-    // C9: Cancel all expired orders in parallel with Promise.allSettled
-    const results = await Promise.allSettled(
-      expiredOrders.map(async (order) => {
+    if (deliveredErr) {
+      console.error("Error fetching delivered orders for auto-complete:", deliveredErr);
+    }
+
+    const autoCompleteResults = await Promise.allSettled(
+      (deliveredExpired || []).map(async (order) => {
+        const { error: completeError } = await supabase
+          .from("orders")
+          .update({
+            status: "completed",
+            auto_complete_at: null,
+            updated_at: now,
+          })
+          .eq("id", order.id)
+          .eq("status", "delivered");
+
+        if (completeError) {
+          console.error(`Error auto-completing order ${order.id}:`, completeError);
+          throw { id: order.id, error: completeError.message };
+        }
+        console.log(`Order ${order.id} auto-completed`);
+        return { id: order.id, success: true };
+      })
+    );
+
+    // --- Cancel expired orders ---
+    const cancelResults = await Promise.allSettled(
+      (expiredOrders || []).map(async (order) => {
         const { error: updateError } = await supabase
           .from("orders")
           .update({
@@ -83,16 +115,19 @@ app.post("/", async (c) => {
       })
     );
 
-    const mapped = results.map((r) =>
-      r.status === 'fulfilled' ? r.value : { id: (r.reason as any)?.id, success: false, error: (r.reason as any)?.error }
-    );
+    const mapResult = (r: PromiseSettledResult<any>) =>
+      r.status === 'fulfilled' ? r.value : { id: (r.reason as any)?.id, success: false, error: (r.reason as any)?.error };
 
-    const successCount = mapped.filter((r) => r.success).length;
+    const cancelledCount = cancelResults.filter(r => r.status === 'fulfilled').length;
+    const completedCount = autoCompleteResults.filter(r => r.status === 'fulfilled').length;
+
     return c.json(
       {
-        message: `Processed ${expiredOrders.length} orders`,
-        cancelled: successCount,
-        results: mapped,
+        message: `Cancelled ${cancelledCount}, auto-completed ${completedCount}`,
+        cancelled: cancelledCount,
+        auto_completed: completedCount,
+        cancel_results: cancelResults.map(mapResult),
+        complete_results: autoCompleteResults.map(mapResult),
       },
       200,
       corsHeaders
