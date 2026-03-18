@@ -65,6 +65,8 @@ Deno.serve(async (req) => {
 
     for (const item of pending) {
       try {
+        const silentPush = item.payload?.silent_push === true;
+
         // C5: Insert into user_notifications with queue_item_id to deduplicate on retry
         const { error: insertError } = await supabase
           .from("user_notifications")
