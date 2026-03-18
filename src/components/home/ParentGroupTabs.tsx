@@ -76,7 +76,7 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
             {/* Label */}
             <span
               className={cn(
-                'text-[10px] font-bold leading-tight text-center max-w-[60px] truncate',
+                'text-[10px] font-bold leading-tight text-center w-16 line-clamp-2',
                 isActive ? 'text-primary' : 'text-muted-foreground'
               )}
             >
