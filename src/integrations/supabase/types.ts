@@ -1065,6 +1065,7 @@ export type Database = {
           seller_hint: string | null
           seller_notification_body: string | null
           seller_notification_title: string | null
+          silent_push: boolean | null
           sort_order: number
           status_key: string
           transaction_type: string
@@ -1087,6 +1088,7 @@ export type Database = {
           seller_hint?: string | null
           seller_notification_body?: string | null
           seller_notification_title?: string | null
+          silent_push?: boolean | null
           sort_order: number
           status_key: string
           transaction_type: string
@@ -1109,6 +1111,7 @@ export type Database = {
           seller_hint?: string | null
           seller_notification_body?: string | null
           seller_notification_title?: string | null
+          silent_push?: boolean | null
           sort_order?: number
           status_key?: string
           transaction_type?: string
