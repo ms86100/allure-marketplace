@@ -1,115 +1,64 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phases 1–3)
 
-All 9 original phases plus Blinkit parity Phases 1–3 are fully implemented.
+# Investigation Results and Fix Plan
 
-## Blinkit Gap-Fill Status
+## Issues Found
 
-### Phase 1: APNs Push-to-Live-Activity — COMPLETE
+### Issue 1: Duplicate Lock Screen Cards (Live Activity)
+The screenshot shows 3x "Your Order is Ready" and 1x "We're Preparing Your Order" as **iOS Live Activity cards** (not push notifications). The trigger fix from earlier only addressed the `notification_queue` duplicates — the Live Activity APNs updates have a **separate duplication path**:
 
-Live Activities now update even when the app process is killed by iOS, matching Blinkit's reliability.
+- **Path A**: The DB trigger `fn_enqueue_order_status_notification` calls `update-live-activity-apns` edge function via `pg_net` on every status change
+- **Path B**: The `useLiveActivityOrchestrator` hook detects the same status change via Supabase Realtime and calls `LiveActivityManager.push()` which invokes `startLiveActivity` / `updateLiveActivity` on the native bridge
 
-#### Architecture
+Both paths fire for the same status change, causing duplicate APNs updates to the iOS widget system. Each update can create a stacked card on the lock screen.
 
-```
-Order status change → DB trigger → net.http_post → update-live-activity-apns edge function
-  → APNs push (apns-push-type: liveactivity) → iOS widget receives content-state update
-  → Lock screen / Dynamic Island re-renders
-```
+**Fix**: Remove the `pg_net` call to `update-live-activity-apns` from the DB trigger. Let the client-side `LiveActivityOrchestrator` (which has proper dedup, throttling, and concurrency guards) be the **sole driver** of Live Activity updates. The DB trigger should only handle push notification queue entries.
 
-#### Implementation Details
+### Issue 2: Wrong Notification Content ("Your Order is Ready" always)
+The "Your Order is Ready" text comes from the **Live Activity widget** on iOS, not from push notifications. When the seller rapidly transitions through statuses (accepted → preparing → ready), the Live Activity gets multiple APNs updates. The native iOS widget displays the **last received status** but stacks previous cards. The `progress_stage` field in `buildLiveActivityData` correctly maps each status, so the issue is the duplicate cards showing stale states alongside the current one.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB table** | `live_activity_tokens` (user_id, order_id, push_token, platform) with RLS |
-| **Swift plugin** | `LiveActivityPlugin.swift` — requests activity with `pushType: .token`, observes `Activity.pushTokenUpdates`, emits `liveActivityPushToken` event to JS |
-| **LiveActivityManager.ts** | Listens for `liveActivityPushToken` events, upserts token to `live_activity_tokens` table, cleans up on activity end |
-| **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
-| **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
+This is resolved by fixing Issue 1 (removing the duplicate APNs path).
 
-### Phase 2: System Reliability — COMPLETE
+### Issue 3: ETA Shows 13-17 Minutes at 50m Distance
+The `delivery_assignments` row for this order has `eta_minutes: 15, distance_meters: 50`. The 15-minute ETA was set by the **manual database insert** done earlier to recover the missing assignment. The trigger `trg_create_seller_delivery_assignment` would have calculated `GREATEST(2, round(50 * 1.3 / 1000 / 15 * 60))` = 2 minutes.
 
-#### 2A. Idempotency Guard on Push Processing
+The `LiveDeliveryTracker` displays `{eta - 2}–{eta + 2} min` = 13-17 min using the raw DB value.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB trigger** | `fn_enqueue_order_status_notification` now checks for duplicate entries (same `reference_path` + `payload->>'status'` within 30 seconds) before inserting into `notification_queue`. Skips with `RAISE NOTICE`. |
-| **DB index** | `idx_notification_queue_dedup` on `notification_queue(reference_path, created_at DESC)` for fast dedup lookups |
+**Fix (two parts)**:
+1. **DB**: Update the existing assignment's `eta_minutes` to a correct value based on actual distance
+2. **Frontend**: In `LiveDeliveryTracker`, when distance is available and small (< 500m), override the DB ETA with a distance-derived estimate: `max(1, ceil(distance_m / 1000 * 4))` minutes (assuming ~15 km/h). This prevents stale/wrong ETAs from being displayed
 
-#### 2B. Realtime Channel Auto-Reconnect
+### Issue 4: DeliveryArrivalOverlay Clipped/Broken Layout
+The overlay uses `fixed inset-0 z-50 flex items-end` which puts it behind the bottom tab bar. On mobile, the bottom tab bar overlaps the overlay content.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`useLiveActivityOrchestrator.ts`** | Both order and delivery channels now detect `CHANNEL_ERROR` / `TIMED_OUT`, remove the dead channel, and re-subscribe after 3s delay. Max 3 reconnects per session. On successful reconnect (`SUBSCRIBED`), retry counter resets. Each reconnect triggers a one-shot `syncActiveOrders` to fill any gap. Unique channel names with `Date.now()` suffix prevent Supabase channel name conflicts. |
+**Fix**: Add `pb-20` (bottom padding) to the overlay container to account for the tab bar, and ensure the overlay's z-index is above the tab bar.
 
-### Phase 3: Seller Self-Delivery GPS + Buyer Live Map — COMPLETE
+### Issue 5: Seller Has No Live Tracking UI
+Currently, the seller only sees `SellerGPSTracker` (a simple "broadcasting" panel). The user wants the seller to see the **same map and tracking card** as the buyer.
 
-#### 3A. Seller GPS Broadcasting for Self-Delivery
+**Fix**: Show `DeliveryMapView` and `LiveDeliveryTracker` for the seller view as well (remove the `isBuyerView` guard on the map), while keeping the GPS broadcasting panel.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`SellerGPSTracker.tsx`** | New component — shown to sellers on OrderDetailPage when `delivery_handled_by === 'seller'` and order status is `picked_up` or `on_the_way`. Uses existing `useBackgroundLocationTracking` hook. Shows Start/Stop controls, live badge, and last-sent timestamp. |
-| **`OrderDetailPage.tsx`** | Integrated `SellerGPSTracker` in the seller action area, gated by `delivery_handled_by === 'seller'` + transit statuses |
+---
 
-#### 3B. Buyer Live Map
+## Implementation Plan
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`DeliveryMapView.tsx`** | New component using Leaflet + OpenStreetMap (no API key). Shows rider position (🛵 marker) and destination (📍 marker). Auto-fits bounds on mount, pans when rider moves out of view. |
-| **`OrderDetailPage.tsx`** | Integrated `DeliveryMapView` above `LiveDeliveryTracker` for buyer view when rider has GPS data and order has delivery coordinates (`delivery_lat`/`delivery_lng`). Falls back to text-only tracker when no GPS data available. |
+### 1. DB Migration: Remove Live Activity APNs from notification trigger
+Remove the `pg_net` call to `update-live-activity-apns` from `fn_enqueue_order_status_notification`. The client-side orchestrator handles this. Also fix the active order's ETA.
 
-### Previously Completed Blinkit Gaps
+### 2. Frontend: Distance-based ETA override in LiveDeliveryTracker
+In `LiveDeliveryTracker`, when `distance < 500m` and `eta > 2`, compute a smarter ETA from distance instead of using the stale DB value.
 
-| Feature | Status |
-|---------|--------|
-| Push deep-link routing | ✅ Done |
-| Notification grouping (threadId) | ✅ Done |
-| Rich push images (NSE) | ✅ Done |
-| Dynamic Island tap → order page | ✅ Done |
-| Item count in DI | ✅ Done |
-| GPS-derived progress | ✅ Done |
+### 3. Frontend: Fix DeliveryArrivalOverlay bottom clipping
+Add padding to account for the tab bar and increase z-index.
 
-### Phase 4: Live Map / Rider GPS — DEFERRED
+### 4. Frontend: Show map and tracking to seller
+In `OrderDetailPage.tsx`, render `DeliveryMapView` for both buyer and seller views when in transit. The seller's GPS location (from `SellerGPSTracker`) feeds into `delivery_assignments`, so the same tracker works for both views.
 
-Requires dedicated rider-side GPS broadcasting infrastructure (separate product workstream). Seller self-delivery GPS (Phase 3A) covers the immediate need.
+| # | Change | Type |
+|---|--------|------|
+| 1 | Remove `pg_net` Live Activity APNs call from `fn_enqueue_order_status_notification` | DB Migration |
+| 2 | Fix active order's ETA to match actual distance | DB Migration |
+| 3 | Distance-based ETA override in `LiveDeliveryTracker` | Frontend |
+| 4 | Fix `DeliveryArrivalOverlay` bottom padding + z-index | Frontend |
+| 5 | Show map + tracking card for seller view | Frontend |
 
-### Product Thumbnails in Widget — DEFERRED
-
-Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
-
-## Silent Push Optimization: COMPLETE
-
-### Notification Matrix
-
-| Status | Push? | Live Activity? | Rationale |
-|--------|-------|----------------|-----------|
-| `accepted` | ✅ Always | Yes | Critical — order confirmed |
-| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
-| `ready` | ✅ Always | Yes | Pickup moment — user must know |
-| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
-| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
-| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
-| `delivered` | ✅ Always | Yes | Critical endpoint |
-| `completed` | ✅ Always | No | Critical endpoint |
-| `cancelled` | ✅ Always | No | Critical — must alert |
-| All service/booking | ✅ Always | No | No Live Activity for these |
-
-## Implementation Matrix
-
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
-| BG-1 | APNs Push-to-Live-Activity | Implemented |
-| BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
-| BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |
-| BG-4 | Buyer Delivery Confirmation (Gap 8) | Implemented |
-| BG-5 | ETA at Acceptance Time (Gap 11) | Implemented |
