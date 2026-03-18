@@ -39,6 +39,7 @@ export function SocietyLeaderboard() {
   const { effectiveSocietyId } = useAuth();
   const navigate = useNavigate();
   const { formatPrice } = useCurrency();
+  const ml = useMarketplaceLabels();
   const [topSellers, setTopSellers] = useState<TopSeller[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [loading, setLoading] = useState(true);
