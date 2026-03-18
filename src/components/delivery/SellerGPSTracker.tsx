@@ -87,9 +87,9 @@ export function SellerGPSTracker({ assignmentId, autoStart = true, deliveryStatu
     try {
       const { NativeSettings, IOSSettings, AndroidSettings } = await import('capacitor-native-settings');
       if (Capacitor.getPlatform() === 'ios') {
-        await NativeSettings.openIOS({ optionIOS: IOSSettings.App });
+        await NativeSettings.open({ optionIOS: IOSSettings.App, optionAndroid: AndroidSettings.ApplicationDetails });
       } else {
-        await NativeSettings.openAndroid({ optionAndroid: AndroidSettings.ApplicationDetails });
+        await NativeSettings.open({ optionIOS: IOSSettings.App, optionAndroid: AndroidSettings.ApplicationDetails });
       }
     } catch {
       // Plugin not available

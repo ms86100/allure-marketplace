@@ -54,6 +54,7 @@
         "@radix-ui/react-tooltip": "^1.2.7",
         "@supabase/supabase-js": "^2.93.3",
         "@tanstack/react-query": "^5.83.0",
+        "@transistorsoft/capacitor-background-geolocation": "^8.0.1",
         "@types/google.maps": "^3.58.1",
         "@types/leaflet": "^1.9.21",
         "@types/swagger-ui-react": "^5.18.0",
@@ -936,6 +937,10 @@
     "@testing-library/react": ["@testing-library/react@16.3.2", "", { "dependencies": { "@babel/runtime": "^7.12.5" }, "peerDependencies": { "@types/react": "^18.0.0 || ^19.0.0", "@types/react-dom": "^18.0.0 || ^19.0.0", "react": "^18.0.0 || ^19.0.0", "react-dom": "^18.0.0 || ^19.0.0" } }, "sha512-XU5/SytQM+ykqMnAnvB2umaJNIOsLF3PVv//1Ew4CTcpz0/BRyy/af40qqrt7SjKpDdT1saBMc42CUok5gaw+g=="],
 
     "@tootallnate/once": ["@tootallnate/once@2.0.0", "", {}, "sha512-XCuKFP5PS55gnMVu3dty8KPatLqUoy/ZYzDzAGCQ8JNFCkLXzmI7vNHCR+XpbZaMWQK/vQubr7PkYq8g470J/A=="],
+
+    "@transistorsoft/capacitor-background-fetch": ["@transistorsoft/capacitor-background-fetch@8.0.0", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-EndUSiZkuzfn5+oa9MAtmv4quVIVAjR8uUNwvGWLCr4S1FDssMj52vH1xty9XY5Wv70/k7O7ywym81iJ9JjyBg=="],
+
+    "@transistorsoft/capacitor-background-geolocation": ["@transistorsoft/capacitor-background-geolocation@8.0.1", "", { "dependencies": { "@transistorsoft/capacitor-background-fetch": "^8.0.0" }, "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-BSrXZanGuyDqfuQjQ3C+t9/Eb9pYOKLHEgiJZGLRMUKSZTtN9jcmiSqMD0owOnwjCNRe8cAM5R+wm8Enx8cBfw=="],
 
     "@tree-sitter-grammars/tree-sitter-yaml": ["@tree-sitter-grammars/tree-sitter-yaml@0.7.1", "", { "dependencies": { "node-addon-api": "^8.3.1", "node-gyp-build": "^4.8.4" }, "peerDependencies": { "tree-sitter": "^0.22.4" } }, "sha512-AynBwkIoQCTgjDR33bDUp9Mqq+YTco0is3n5hRApMqG9of/6A4eQsfC1/uSEeHSUyMQSYawcAWamsexnVpIP4Q=="],
 
