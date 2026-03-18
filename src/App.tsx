@@ -78,6 +78,7 @@ const HelpPage = lazyWithRetry(() => import("./pages/HelpPage"));
 const NotificationsPage = lazyWithRetry(() => import("./pages/NotificationsPage"));
 const CommunityRulesPage = lazyWithRetry(() => import("./pages/CommunityRulesPage"));
 const PushDebugPage = lazyWithRetry(() => import("./pages/PushDebugPage"));
+const LiveActivityDebugPage = lazyWithRetry(() => import("./pages/LiveActivityDebugPage"));
 const BulletinPage = lazyWithRetry(() => import("./pages/BulletinPage"));
 const MySubscriptionsPage = lazyWithRetry(() => import("./pages/MySubscriptionsPage"));
 const TrustDirectoryPage = lazyWithRetry(() => import("./pages/TrustDirectoryPage"));
@@ -389,6 +390,7 @@ function AppRoutes() {
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
          <Route path="/community-rules" element={<CommunityRulesPage />} />
         <Route path="/push-debug" element={<ProtectedRoute><PushDebugPage /></ProtectedRoute>} />
+        <Route path="/la-debug" element={<ProtectedRoute><LiveActivityDebugPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

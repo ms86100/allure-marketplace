@@ -1,57 +1,49 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-## Live Activity: Full Reliability & Debug Implementation
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-### What exists today
-- Global orchestrator in `App.tsx` with realtime listeners, polling fallback (15s), delivery INSERT+UPDATE, app resume hydration
-- `LiveActivityManager` with start/update/end, throttling, persistence, hydration
-- `liveActivityDiagnostics.ts` with `runLiveActivityDiagnostics()` and `recordLAError()`
-- `liveActivitySync.ts` with `syncActiveOrders()`
-- Push Debug page at `/push-debug` accessible from Profile
+## Phase I Live Activities — CI Pipeline Status
 
-### What's missing
-1. No visible debug UI for Live Activity — all diagnostics are console-only
-2. `LiveActivityManager` errors are recorded but never surfaced to UI
-3. No way to manually test start/update/end on-device
-4. No structured operation log (only `recentErrors` array for failures, no success tracking)
+### Codemagic Build Pipeline: COMPLETE
 
-### Implementation Plan
+Both `ios-release` and `release-all` workflows now include:
 
-#### 1. Create `LiveActivityDebugPage.tsx`
-A dedicated debug screen (similar pattern to `PushDebugPage`) at `/la-debug` with:
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
 
-**Device & Capability section:**
-- Platform, OS info from Capacitor
-- `isNativePlatform()` result
-- Plugin availability (call `getActiveActivities` and show success/fail)
+### Codemagic Requirements (User Action)
 
-**Native State section:**
-- List of currently active native activities (from `getActiveActivities()`)
-- Current `live_activity_map` persisted data
-- Recent errors from `getRecentLAErrors()`
-- Last diagnostics result from `getLastDiagnostics()`
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
 
-**Test Actions (buttons):**
-- "Run Diagnostics" — calls `runLiveActivityDiagnostics(true)`
-- "Start Test Activity" — calls `runLiveActivityDiagnostics(false)` (which does a real start/end cycle)
-- "Sync Active Orders" — calls `syncActiveOrders(userId)` and shows count
-- "End All Activities" — calls `LiveActivityManager.endAll()`
+### Runtime Call Chain (Verified)
 
-**Operation Log section:**
-- Scrollable list showing every start/update/end attempt with success/failure, error message, timestamp
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
+```
 
-#### 2. Add structured operation log to `LiveActivityManager`
-- Add an in-memory array `operationLog` (capped at 50 entries) tracking every `push`/`end` call with: `{ timestamp, action, entityId, status, success, error?, activityId? }`
-- Persist to `live_activity_ops_log` key
-- Export `getOperationLog()` for the debug page
+## Implementation Matrix
 
-#### 3. Add route and navigation
-- Register `/la-debug` route in `App.tsx`
-- Add "Live Activity Debug" menu item in `ProfilePage.tsx` next to "Push Debug"
-
-#### 4. Files to create/modify
-- **Create**: `src/pages/LiveActivityDebugPage.tsx`
-- **Edit**: `src/services/LiveActivityManager.ts` — add operation log
-- **Edit**: `src/App.tsx` — add route
-- **Edit**: `src/pages/ProfilePage.tsx` — add menu link
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |

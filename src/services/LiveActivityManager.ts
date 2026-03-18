@@ -5,6 +5,36 @@ import { getString, setString, removeKey } from '@/lib/persistent-kv';
 import { recordLAError } from '@/services/liveActivityDiagnostics';
 
 const TAG = '[LiveActivity]';
+const OPS_LOG_KEY = 'live_activity_ops_log';
+const MAX_OPS_LOG = 50;
+
+export interface OperationLogEntry {
+  timestamp: number;
+  action: 'start' | 'update' | 'end' | 'end_all';
+  entityId: string;
+  status?: string;
+  success: boolean;
+  error?: string;
+  activityId?: string;
+}
+
+/** In-memory operation log, persisted to KV */
+const operationLog: OperationLogEntry[] = (() => {
+  try {
+    const raw = getString(OPS_LOG_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+})();
+
+function addOpsEntry(entry: OperationLogEntry) {
+  operationLog.push(entry);
+  if (operationLog.length > MAX_OPS_LOG) operationLog.splice(0, operationLog.length - MAX_OPS_LOG);
+  try { setString(OPS_LOG_KEY, JSON.stringify(operationLog)); } catch { /* best-effort */ }
+}
+
+export function getOperationLog(): OperationLogEntry[] {
+  return [...operationLog];
+}
 
 /** Terminal workflow statuses that should end any live activity */
 const TERMINAL_STATUSES = new Set([
@@ -209,8 +239,11 @@ class _LiveActivityManager {
         });
         this.persistMap();
         this.enforceMaxActive();
+        addOpsEntry({ timestamp: Date.now(), action: 'start', entityId: entity_id, status: workflow_status, success: true, activityId });
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
         recordLAError('START', entity_id, e);
+        addOpsEntry({ timestamp: Date.now(), action: 'start', entityId: entity_id, status: workflow_status, success: false, error: msg });
       }
       return;
     }
@@ -240,8 +273,11 @@ class _LiveActivityManager {
       console.log(TAG, `END entity=${entityId} activityId=${entry.activityId}`);
       await LiveActivity.endLiveActivity({ activityId: entry.activityId });
       console.log(TAG, `END SUCCESS entity=${entityId}`);
+      addOpsEntry({ timestamp: Date.now(), action: 'end', entityId, success: true, activityId: entry.activityId });
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       recordLAError('END', entityId, e);
+      addOpsEntry({ timestamp: Date.now(), action: 'end', entityId, success: false, error: msg });
     }
   }
 
@@ -281,8 +317,11 @@ class _LiveActivityManager {
       console.log(TAG, `UPDATE EXEC entity=${data.entity_id} status=${data.workflow_status}`);
       await LiveActivity.updateLiveActivity(data);
       console.log(TAG, `UPDATE SUCCESS entity=${data.entity_id}`);
+      addOpsEntry({ timestamp: Date.now(), action: 'update', entityId: data.entity_id, status: data.workflow_status, success: true });
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       recordLAError('UPDATE', data.entity_id, e);
+      addOpsEntry({ timestamp: Date.now(), action: 'update', entityId: data.entity_id, status: data.workflow_status, success: false, error: msg });
     }
   }
 }
