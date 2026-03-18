@@ -11,6 +11,8 @@ import { OrderRejectionDialog } from '@/components/order/OrderRejectionDialog';
 import { DeliveryStatusCard } from '@/components/delivery/DeliveryStatusCard';
 import { LiveDeliveryTracker } from '@/components/delivery/LiveDeliveryTracker';
 import { DeliveryArrivalOverlay } from '@/components/order/DeliveryArrivalOverlay';
+import { BuyerDeliveryConfirmation } from '@/components/order/BuyerDeliveryConfirmation';
+import { DeliveryETABanner } from '@/components/order/DeliveryETABanner';
 import { SellerGPSTracker } from '@/components/delivery/SellerGPSTracker';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
 
@@ -190,6 +192,20 @@ export default function OrderDetailPage() {
               amount={order.total_amount}
               utrRef={(order as any).upi_transaction_ref}
               buyerName={buyer?.name}
+              onConfirmed={() => window.location.reload()}
+            />
+          )}
+
+          {/* Gap 11: ETA banner for buyer — shown from acceptance until delivery */}
+          {o.isBuyerView && o.orderFulfillmentType === 'delivery' && (order as any).estimated_delivery_at && !['delivered', 'completed', 'cancelled'].includes(order.status) && (
+            <DeliveryETABanner estimatedDeliveryAt={(order as any).estimated_delivery_at} />
+          )}
+
+          {/* Gap 8: Buyer delivery confirmation — shown when seller marks delivered */}
+          {o.isBuyerView && order.status === 'delivered' && o.orderFulfillmentType === 'delivery' && (
+            <BuyerDeliveryConfirmation
+              orderId={order.id}
+              sellerName={seller?.business_name}
               onConfirmed={() => window.location.reload()}
             />
           )}

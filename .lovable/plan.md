@@ -111,3 +111,5 @@ Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widge
 | BG-1 | APNs Push-to-Live-Activity | Implemented |
 | BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
 | BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |
+| BG-4 | Buyer Delivery Confirmation (Gap 8) | Implemented |
+| BG-5 | ETA at Acceptance Time (Gap 11) | Implemented |
