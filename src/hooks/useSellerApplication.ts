@@ -287,14 +287,14 @@ export function useSellerApplication() {
 
   const handleSubmit = async () => {
     if (!user || !draftSellerId) return;
-    if (draftProducts.length === 0) { toast.error('Please add at least one product'); return; }
-    if (!acceptedDeclaration) { toast.error('Please accept the seller declaration'); return; }
-    if (formData.operating_days.length === 0) { toast.error('Please select at least one operating day'); return; }
-    if (formData.accepts_upi && !formData.upi_id.trim()) { toast.error('Please enter your UPI ID or disable UPI payments'); return; }
+    if (draftProducts.length === 0) { toast.error('Please add at least one product', { id: 'seller-app-validation' }); return; }
+    if (!acceptedDeclaration) { toast.error('Please accept the seller declaration', { id: 'seller-app-validation' }); return; }
+    if (formData.operating_days.length === 0) { toast.error('Please select at least one operating day', { id: 'seller-app-validation' }); return; }
+    if (formData.accepts_upi && !formData.upi_id.trim()) { toast.error('Please enter your UPI ID or disable UPI payments', { id: 'seller-app-validation' }); return; }
     // Check location: must have direct coords OR society with coords
     if (!formData.latitude) {
       if (!profile?.society_id) {
-        toast.error('Please set your store location before submitting');
+        toast.error('Please set your store location before submitting', { id: 'seller-app-validation' });
         setIsLoading(false);
         return;
       }
