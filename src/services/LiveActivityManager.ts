@@ -3,6 +3,7 @@ import { LiveActivity } from '@/plugins/live-activity';
 import type { LiveActivityData } from '@/plugins/live-activity/definitions';
 import { getString, setString, removeKey } from '@/lib/persistent-kv';
 import { recordLAError } from '@/services/liveActivityDiagnostics';
+import { supabase } from '@/integrations/supabase/client';
 
 const TAG = '[LiveActivity]';
 const OPS_LOG_KEY = 'live_activity_ops_log';
@@ -74,36 +75,70 @@ interface PersistedMap {
 
 /**
  * Singleton manager that coordinates lock-screen live activities.
- *
- * Safety guarantees:
- * - Only one activity per entity at a time (dedup by entity_id)
- * - Updates throttled to max 1 per 5 seconds
- * - Graceful degradation on web (no-op plugin)
- * - Auto-cleanup on terminal status
- * - Reconciles with native state on first push (prevents duplicates after app restart)
- * - Persistent activity map survives app restarts
- * - Stale activities cleaned up before new ones are created
- * - Map capped at MAX_ACTIVE entries
- * - Promise-based hydration lock prevents race conditions
  */
 class _LiveActivityManager {
   private active = new Map<string, ActiveEntry>();
-
-  /** Promise-based hydration lock — all concurrent callers await the same promise */
   private hydrationPromise: Promise<void> | null = null;
-
-  /** True while hydration is actively running (prevents reset during hydration) */
   private hydrating = false;
-
-  /** In-flight start lock — prevents concurrent startLiveActivity calls for the same entity */
   private starting = new Set<string>();
-
-  /** Set during hydration — if native plugin is unavailable, skip all starts */
   private canStart = true;
 
-  /** True only on native iOS / Android */
+  /** Tracks which entityIds have had their push token saved */
+  private tokenSaved = new Set<string>();
+
+  /** Listener cleanup */
+  private tokenListenerSetup = false;
+
   private get isSupported(): boolean {
     return Capacitor.isNativePlatform();
+  }
+
+  // ── Push Token Listener ──────────────────────────────────
+
+  private setupTokenListener(): void {
+    if (this.tokenListenerSetup || !this.isSupported) return;
+    this.tokenListenerSetup = true;
+
+    try {
+      LiveActivity.addListener?.('liveActivityPushToken', async (event: { entityId: string; pushToken: string }) => {
+        const { entityId, pushToken } = event;
+        console.log(TAG, `PUSH TOKEN received for entity=${entityId} token=${pushToken.substring(0, 16)}…`);
+
+        // Only save once per entity per session
+        if (this.tokenSaved.has(entityId)) {
+          console.log(TAG, `PUSH TOKEN already saved for ${entityId}, skipping`);
+          return;
+        }
+
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            console.warn(TAG, 'PUSH TOKEN — no authenticated user, skipping save');
+            return;
+          }
+
+          const { error } = await supabase
+            .from('live_activity_tokens')
+            .upsert({
+              user_id: user.id,
+              order_id: entityId,
+              push_token: pushToken,
+              platform: 'ios',
+            }, { onConflict: 'order_id,platform' });
+
+          if (error) {
+            console.error(TAG, `PUSH TOKEN save failed: ${error.message}`);
+          } else {
+            this.tokenSaved.add(entityId);
+            console.log(TAG, `PUSH TOKEN saved for entity=${entityId}`);
+          }
+        } catch (e) {
+          console.error(TAG, 'PUSH TOKEN save exception:', e);
+        }
+      });
+    } catch (e) {
+      console.warn(TAG, 'Failed to setup token listener (web?):', e);
+    }
   }
 
   // ── Persistence ──────────────────────────────────────────
@@ -135,12 +170,6 @@ class _LiveActivityManager {
 
   // ── Hydration & Cleanup ──────────────────────────────────
 
-  /**
-   * Promise-based hydration lock.
-   * First caller creates the promise; all concurrent callers await the same one.
-   * This prevents the race where concurrent push() calls see an empty active map
-   * and each creates a new native activity.
-   */
   private async hydrate(): Promise<void> {
     if (!this.hydrationPromise) {
       this.hydrationPromise = this._doHydrate();
@@ -151,6 +180,9 @@ class _LiveActivityManager {
   private async _doHydrate(): Promise<void> {
     this.hydrating = true;
     console.log(TAG, 'HYDRATE START — reconciling persisted + native state');
+
+    // Setup push token listener on first hydration
+    this.setupTokenListener();
 
     try {
       const persisted = this.loadPersistedMap();
@@ -205,7 +237,6 @@ class _LiveActivityManager {
       const msg = e instanceof Error ? e.message : String(e);
       console.warn(TAG, 'HYDRATE FAILED:', msg);
 
-      // If native plugin is not available / permission denied, disable starts
       if (msg.includes('not implemented') || msg.includes('not enabled') || msg.includes('not available')) {
         this.canStart = false;
         console.warn(TAG, 'HYDRATE — native Live Activities not available, disabling starts');
@@ -245,7 +276,6 @@ class _LiveActivityManager {
       return;
     }
 
-    // Await hydration — all concurrent callers block here until hydration completes
     await this.hydrate();
 
     if (!this.canStart) {
@@ -266,7 +296,6 @@ class _LiveActivityManager {
 
     // No active entry and status qualifies → start
     if (!existing && START_STATUSES.has(workflow_status)) {
-      // In-flight start lock — prevent concurrent starts for same entity
       if (this.starting.has(entity_id)) {
         console.log(TAG, `SKIP — start already in-flight for ${entity_id}`);
         return;
@@ -287,7 +316,6 @@ class _LiveActivityManager {
         addOpsEntry({ timestamp: Date.now(), action: 'start', entityId: entity_id, status: workflow_status, success: true, activityId });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        // If permission denied, disable future starts
         if (msg.includes('not authorized') || msg.includes('not allowed') || msg.includes('denied')) {
           this.canStart = false;
           console.warn(TAG, 'Permission denied — disabling future starts');
@@ -319,7 +347,11 @@ class _LiveActivityManager {
 
     if (entry.pendingTimer) clearTimeout(entry.pendingTimer);
     this.active.delete(entityId);
+    this.tokenSaved.delete(entityId);
     this.persistMap();
+
+    // Clean up token from backend (best-effort)
+    this.deleteTokenFromBackend(entityId);
 
     try {
       console.log(TAG, `END entity=${entityId} activityId=${entry.activityId}`);
@@ -353,6 +385,24 @@ class _LiveActivityManager {
   /** Check if a Live Activity is currently tracking the given entity */
   isTracking(entityId: string): boolean {
     return this.active.has(entityId);
+  }
+
+  // ── Token Cleanup ────────────────────────────────────────
+
+  private async deleteTokenFromBackend(entityId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('live_activity_tokens')
+        .delete()
+        .eq('order_id', entityId);
+      if (error) {
+        console.warn(TAG, `Failed to delete LA token for ${entityId}: ${error.message}`);
+      } else {
+        console.log(TAG, `Deleted LA token for ${entityId}`);
+      }
+    } catch (e) {
+      console.warn(TAG, 'Token cleanup exception:', e);
+    }
   }
 
   // ── internal ──────────────────────────────────────────────
