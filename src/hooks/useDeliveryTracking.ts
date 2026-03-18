@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { filterGPSPoint, type FilterState } from '@/lib/gps-filter';
 import { getTrackingConfig, getTrackingConfigSync } from '@/services/trackingConfig';
@@ -25,6 +25,34 @@ export interface DeliveryTrackingState {
   proximityStatus: string | null;
 }
 
+/** Polling intervals in ms */
+const POLL_TRANSIT_MS = 10_000;
+const POLL_IDLE_MS = 30_000;
+const POLL_DEGRADED_MS = 5_000;
+
+/**
+ * Fetches assignment data and returns parsed state fields.
+ */
+async function fetchAssignment(assignmentId: string) {
+  const { data } = await supabase
+    .from('delivery_assignments')
+    .select('id, status, rider_name, rider_phone, rider_photo_url, eta_minutes, distance_meters, last_location_lat, last_location_lng, last_location_at, proximity_status')
+    .eq('id', assignmentId)
+    .single();
+  return data;
+}
+
+function buildLocationFromData(data: any): RiderLocation | null {
+  if (!data.last_location_lat || !data.last_location_lng) return null;
+  return {
+    latitude: data.last_location_lat,
+    longitude: data.last_location_lng,
+    speed_kmh: null,
+    heading: null,
+    recorded_at: data.last_location_at || new Date().toISOString(),
+  };
+}
+
 export function useDeliveryTracking(assignmentId: string | null | undefined): DeliveryTrackingState {
   const [state, setState] = useState<DeliveryTrackingState>({
     riderLocation: null,
@@ -46,15 +74,20 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
     smoothedLng: null,
   });
 
+  // Track last realtime event time to skip redundant polls
+  const lastRealtimeAt = useRef<number>(0);
+  // Track channel health
+  const channelDegraded = useRef(false);
+
   // Pre-load config
   useEffect(() => {
     getTrackingConfig().catch(() => {});
   }, []);
 
+  // Staleness checker
   useEffect(() => {
     const interval = setInterval(() => {
       setState((prev) => {
-        // If lastLocationAt is null and we have a status (order exists), treat as stale
         if (!prev.lastLocationAt) {
           return prev.status && !prev.isLocationStale ? { ...prev, isLocationStale: true } : prev;
         }
@@ -66,6 +99,42 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
     return () => clearInterval(interval);
   }, []);
 
+  /**
+   * Apply fetched data to state, only if newer than current.
+   * Returns true if state was updated.
+   */
+  const applyFetchedData = useCallback((data: any) => {
+    const loc = buildLocationFromData(data);
+    if (loc) {
+      const result = filterGPSPoint(loc, gpsFilterState.current);
+      gpsFilterState.current = result.newState;
+      loc.latitude = result.filtered.latitude;
+      loc.longitude = result.filtered.longitude;
+    }
+
+    setState((prev) => {
+      // Only update location if incoming is newer
+      const incomingAt = data.last_location_at;
+      const currentAt = prev.lastLocationAt;
+      const isNewer = !currentAt || (incomingAt && new Date(incomingAt).getTime() > new Date(currentAt).getTime());
+
+      return {
+        ...prev,
+        status: data.status ?? prev.status,
+        riderName: data.rider_name ?? prev.riderName,
+        riderPhone: data.rider_phone ?? prev.riderPhone,
+        riderPhotoUrl: data.rider_photo_url ?? prev.riderPhotoUrl,
+        eta: data.eta_minutes ?? prev.eta,
+        distance: data.distance_meters ?? prev.distance,
+        lastLocationAt: isNewer ? (data.last_location_at ?? prev.lastLocationAt) : prev.lastLocationAt,
+        proximityStatus: data.proximity_status ?? prev.proximityStatus,
+        riderLocation: isNewer && loc ? loc : prev.riderLocation,
+        isLoading: false,
+        isLocationStale: isNewer ? false : prev.isLocationStale,
+      };
+    });
+  }, []);
+
   useEffect(() => {
     if (!assignmentId) {
       setState((prev) => ({ ...prev, isLoading: false }));
@@ -73,47 +142,67 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
     }
 
     gpsFilterState.current = { lastAccepted: null, smoothedLat: null, smoothedLng: null };
+    channelDegraded.current = false;
+    lastRealtimeAt.current = 0;
 
+    // ─── Initial fetch ───
     (async () => {
-      const { data } = await supabase
-        .from('delivery_assignments')
-        .select('id, status, rider_name, rider_phone, rider_photo_url, eta_minutes, distance_meters, last_location_lat, last_location_lng, last_location_at, proximity_status')
-        .eq('id', assignmentId)
-        .single();
-
+      const data = await fetchAssignment(assignmentId);
       if (!data) {
         setState((prev) => ({ ...prev, isLoading: false }));
         return;
       }
-
-      const loc: RiderLocation | null = data.last_location_lat && data.last_location_lng ? {
-        latitude: data.last_location_lat,
-        longitude: data.last_location_lng,
-        speed_kmh: null,
-        heading: null,
-        recorded_at: data.last_location_at || new Date().toISOString(),
-      } : null;
-
-      if (loc) {
-        const result = filterGPSPoint(loc, gpsFilterState.current);
-        gpsFilterState.current = result.newState;
-      }
-
-      setState((prev) => ({
-        ...prev,
-        status: data.status,
-        riderName: data.rider_name,
-        riderPhone: data.rider_phone,
-        riderPhotoUrl: data.rider_photo_url,
-        eta: data.eta_minutes,
-        distance: data.distance_meters,
-        lastLocationAt: data.last_location_at,
-        proximityStatus: data.proximity_status,
-        riderLocation: loc,
-        isLoading: false,
-      }));
+      applyFetchedData(data);
     })();
 
+    // ─── Adaptive polling fallback ───
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const schedulePoll = () => {
+      if (pollTimer) clearTimeout(pollTimer);
+
+      const getInterval = () => {
+        if (channelDegraded.current) return POLL_DEGRADED_MS;
+        // Check current status from state ref
+        const transitStatuses = new Set(getTrackingConfigSync().transit_statuses);
+        // We read from the DOM-less closure, so we need a way to get current status
+        // We'll use a simple approach: always poll at transit rate, it's only 10s
+        return POLL_TRANSIT_MS;
+      };
+
+      pollTimer = setTimeout(async () => {
+        // Skip poll if we received a realtime event very recently
+        if (Date.now() - lastRealtimeAt.current < 3_000) {
+          schedulePoll();
+          return;
+        }
+
+        try {
+          const data = await fetchAssignment(assignmentId);
+          if (data) applyFetchedData(data);
+        } catch (err) {
+          console.warn('[DeliveryTracking] Poll failed:', err);
+        }
+        schedulePoll();
+      }, getInterval());
+    };
+
+    schedulePoll();
+
+    // ─── Visibility change: immediate poll on foreground resume ───
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        // Immediate poll when app comes to foreground
+        fetchAssignment(assignmentId).then((data) => {
+          if (data) applyFetchedData(data);
+        }).catch(() => {});
+        // Reset poll timer
+        schedulePoll();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // ─── Realtime channels ───
     const assignmentChannel = supabase
       .channel(`tracking-assignment-${assignmentId}`)
       .on('postgres_changes', {
@@ -122,6 +211,8 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
         table: 'delivery_assignments',
         filter: `id=eq.${assignmentId}`,
       }, (payload) => {
+        lastRealtimeAt.current = Date.now();
+        channelDegraded.current = false;
         const d = payload.new as any;
         setState((prev) => {
           const incomingRecordedAt = d.last_location_at || null;
@@ -164,7 +255,15 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
           };
         });
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[DeliveryTracking] Assignment channel degraded:', status);
+          channelDegraded.current = true;
+          schedulePoll(); // Accelerate polling
+        } else if (status === 'SUBSCRIBED') {
+          channelDegraded.current = false;
+        }
+      });
 
     const locationChannel = supabase
       .channel(`tracking-location-${assignmentId}`)
@@ -174,6 +273,8 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
         table: 'delivery_locations',
         filter: `assignment_id=eq.${assignmentId}`,
       }, (payload) => {
+        lastRealtimeAt.current = Date.now();
+        channelDegraded.current = false;
         const loc = payload.new as any;
         const rawPoint: RiderLocation = {
           latitude: loc.latitude,
@@ -197,13 +298,23 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
           isLocationStale: false,
         }));
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[DeliveryTracking] Location channel degraded:', status);
+          channelDegraded.current = true;
+          schedulePoll();
+        } else if (status === 'SUBSCRIBED') {
+          channelDegraded.current = false;
+        }
+      });
 
     return () => {
+      if (pollTimer) clearTimeout(pollTimer);
+      document.removeEventListener('visibilitychange', handleVisibility);
       supabase.removeChannel(assignmentChannel);
       supabase.removeChannel(locationChannel);
     };
-  }, [assignmentId]);
+  }, [assignmentId, applyFetchedData]);
 
   return state;
 }
