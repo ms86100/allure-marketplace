@@ -72,10 +72,10 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 const CART_QUERY_KEY = ['cart-items'] as const;
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, isSessionRestored } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: items = [], isLoading } = useQuery({
+  const { data: items = [], isLoading, isFetched } = useQuery({
     queryKey: [...CART_QUERY_KEY, user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -87,7 +87,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const items = (data as any as (CartItem & { product: Product })[]) || [];
       return items.filter(item => item.product != null && item.product.is_available !== false);
     },
-    enabled: !!user,
+    enabled: isSessionRestored && !!user,
     staleTime: 5 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnMount: 'always',
