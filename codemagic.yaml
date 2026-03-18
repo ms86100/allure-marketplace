@@ -632,8 +632,11 @@ workflows:
           BUILD_NUMBER=$(date +%s)
           echo "Setting build number to $BUILD_NUMBER"
           agvtool new-version -all $BUILD_NUMBER
-          # Also set build number on widget extension
+          # Sync widget extension version with main app
+          MARKETING_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" App/Info.plist 2>/dev/null || echo "1.0.0")
+          echo "Syncing widget extension: version=$MARKETING_VERSION build=$BUILD_NUMBER"
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" LiveDeliveryWidgetExtension/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MARKETING_VERSION" LiveDeliveryWidgetExtension/Info.plist
 
       - name: Verify push entitlement exists
         script: |
