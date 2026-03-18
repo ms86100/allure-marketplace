@@ -13,7 +13,15 @@ const ACTIVE_STATUSES = [
   'on_the_way', 'confirmed',
 ] as const;
 
+/** Prevents concurrent syncActiveOrders calls from racing */
+let syncing = false;
+
 export async function syncActiveOrders(userId: string): Promise<number> {
+  if (syncing) {
+    console.log(TAG, 'SKIP — sync already in progress');
+    return 0;
+  }
+  syncing = true;
   try {
     console.log(TAG, 'Syncing active buyer orders for', userId);
     const { data: orders, error } = await supabase
