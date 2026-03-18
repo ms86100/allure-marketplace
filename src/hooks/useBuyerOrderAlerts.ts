@@ -11,6 +11,9 @@ import { useQueryClient } from '@tanstack/react-query';
  * if AuthProvider hasn't mounted yet (HMR / startup race).
  */
 
+// Transit statuses where "View" action is suppressed to avoid overlapping bottom nav
+const TRANSIT_STATUSES = new Set(['picked_up', 'on_the_way', 'at_gate', 'nearby', 'arriving']);
+
 const STATUS_MESSAGES: Record<string, { icon: string; title: string; description: string; haptic: 'success' | 'warning' | 'error' }> = {
   accepted: { icon: '✅', title: 'Order Accepted!', description: 'The seller has accepted your order.', haptic: 'success' },
   preparing: { icon: '👨‍🍳', title: 'Being Prepared', description: 'Your order is being prepared now.', haptic: 'success' },
@@ -64,17 +67,22 @@ export function useBuyerOrderAlerts() {
           // Use unique ID per order+status to deduplicate with push notifications
           const toastId = `order-${orderId}-${newStatus}`;
 
+          const isTransit = TRANSIT_STATUSES.has(newStatus);
+
           toast(msg.title, {
             id: toastId,
             description: msg.description,
             icon: msg.icon,
-            duration: 6000,
-            action: {
-              label: 'View',
-              onClick: () => {
-                window.location.hash = `#/orders/${orderId}`;
+            duration: isTransit ? 3000 : 6000,
+            // Suppress "View" action for transit statuses to prevent overlap with bottom nav
+            ...(isTransit ? {} : {
+              action: {
+                label: 'View',
+                onClick: () => {
+                  window.location.hash = `#/orders/${orderId}`;
+                },
               },
-            },
+            }),
           });
 
           queryClient.invalidateQueries({ queryKey: ['orders'] });

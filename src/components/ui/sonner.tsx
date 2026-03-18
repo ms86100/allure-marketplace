@@ -14,6 +14,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       visibleToasts={1}
       gap={8}
       closeButton
+      offset={80}
       toastOptions={{
         classNames: {
           toast:
