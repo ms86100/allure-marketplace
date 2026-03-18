@@ -93,8 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ts: Date.now(),
     });
     prevIdentityDepsRef.current = { userId: user?.id ?? null, hasSession: !!session, isLoading };
-    return { user, session, isLoading, signOut, refreshProfile };
-  }, [user, session, isLoading, signOut, refreshProfile]);
+    return { user, session, isLoading, isSessionRestored, signOut, refreshProfile };
+  }, [user, session, isLoading, isSessionRestored, signOut, refreshProfile]);
 
   const roleValue = useMemo<RoleContextType>(() => ({
     profile, roles, isApproved, isAdmin, isSocietyAdmin,
