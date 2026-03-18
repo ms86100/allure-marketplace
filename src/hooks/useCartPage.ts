@@ -24,6 +24,8 @@ interface PaymentSession {
   paymentMethod: string;
   amount: number;
   createdAt: number;
+  sellerUpiId?: string;
+  sellerName?: string;
 }
 
 function savePaymentSession(session: PaymentSession) {
