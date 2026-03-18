@@ -14,6 +14,7 @@ import { DeliveryArrivalOverlay } from '@/components/order/DeliveryArrivalOverla
 import { BuyerDeliveryConfirmation } from '@/components/order/BuyerDeliveryConfirmation';
 import { DeliveryETABanner } from '@/components/order/DeliveryETABanner';
 import { SellerGPSTracker } from '@/components/delivery/SellerGPSTracker';
+import { UpdateBuyerLocationButton } from '@/components/delivery/UpdateBuyerLocationButton';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
 
 import { OrderItemCard } from '@/components/order/OrderItemCard';
@@ -228,6 +229,11 @@ export default function OrderDetailPage() {
                 </Suspense>
               )}
               <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} />
+              {o.isBuyerView && (
+                <div className="flex justify-end">
+                  <UpdateBuyerLocationButton orderId={order.id} />
+                </div>
+              )}
             </>
           )}
           {/* Seller self-delivery GPS broadcasting */}
