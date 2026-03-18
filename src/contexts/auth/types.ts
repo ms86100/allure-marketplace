@@ -10,6 +10,8 @@ export interface AuthContextType {
   sellerProfiles: SellerProfile[];
   currentSellerId: string | null;
   isLoading: boolean;
+  /** True once initial session restoration from storage has completed */
+  isSessionRestored: boolean;
   isApproved: boolean;
   isSeller: boolean;
   hasSellerProfile: boolean;
@@ -38,6 +40,8 @@ export interface AuthState {
   sellerProfiles: SellerProfile[];
   currentSellerId: string | null;
   isLoading: boolean;
+  /** True once initial session restoration from storage has completed (regardless of outcome) */
+  isSessionRestored: boolean;
   isSecurityOfficer: boolean;
   isWorker: boolean;
   societyAdminRole: SocietyAdmin | null;
@@ -55,6 +59,7 @@ export const initialAuthState: AuthState = {
   sellerProfiles: [],
   currentSellerId: null,
   isLoading: true,
+  isSessionRestored: false,
   isSecurityOfficer: false,
   isWorker: false,
   societyAdminRole: null,

@@ -23,7 +23,7 @@ export default function CartPage() {
   const ml = useMarketplaceLabels();
   const navigate = useNavigate();
 
-  if (c.isLoading) {
+  if (c.isLoading || !c.hasHydrated) {
     return (
       <AppLayout showHeader={false} showCart={false}>
         <div className="p-4 safe-top">

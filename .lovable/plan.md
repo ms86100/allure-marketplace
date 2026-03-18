@@ -1,163 +1,115 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
-Implementation plan to fix the cart-empty bug permanently
+## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phases 1–3)
 
-What is actually broken
+All 9 original phases plus Blinkit parity Phases 1–3 are fully implemented.
 
-The issue is real and there are multiple contributing causes in the current code:
+## Blinkit Gap-Fill Status
 
-1. Auth/session readiness race
-- `useCart` and `useCartCount` only wait for `!!user`.
-- `AuthProvider` flips `isLoading` to false as soon as auth emits, before the app has a reliable “session restored and ready” state for downstream queries.
-- This makes cart queries vulnerable during fast navigation, resume, or sign-in restoration.
+### Phase 1: APNs Push-to-Live-Activity — COMPLETE
 
-2. False empty-cart rendering
-- `CartPage` shows the empty state whenever `items.length === 0`.
-- It does not distinguish between:
-  - truly empty cart
-  - stale cached empty array
-  - background refetch after an add/reorder
-  - auth restoration still in progress
-- So users can see “Your cart is empty” even while the backend cart row exists.
+Live Activities now update even when the app process is killed by iOS, matching Blinkit's reliability.
 
-3. Split cart write paths
-- `useCart.addItem()` updates cart cache optimistically.
-- `ReorderButton` and `ReorderLastOrder` bypass the cart provider, write directly to the database, then immediately navigate to `/cart`.
-- That creates inconsistent state between:
-  - cart badge/count
-  - cart items cache
-  - cart page UI
+#### Architecture
 
-Why sign out / sign in makes it appear
-- A fresh auth bootstrap causes the cart query to run again cleanly, so the backend data finally hydrates into the UI.
+```
+Order status change → DB trigger → net.http_post → update-live-activity-apns edge function
+  → APNs push (apns-push-type: liveactivity) → iOS widget receives content-state update
+  → Lock screen / Dynamic Island re-renders
+```
 
-Proposed permanent fix
+#### Implementation Details
 
-1. Add a real auth-ready signal
-Files:
-- `src/contexts/auth/types.ts`
-- `src/contexts/auth/useAuthState.ts`
-- `src/contexts/auth/AuthProvider.tsx`
-- optionally new `src/hooks/useAuthReady.ts`
+| Component | What Was Done |
+|-----------|---------------|
+| **DB table** | `live_activity_tokens` (user_id, order_id, push_token, platform) with RLS |
+| **Swift plugin** | `LiveActivityPlugin.swift` — requests activity with `pushType: .token`, observes `Activity.pushTokenUpdates`, emits `liveActivityPushToken` event to JS |
+| **LiveActivityManager.ts** | Listens for `liveActivityPushToken` events, upserts token to `live_activity_tokens` table, cleans up on activity end |
+| **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
+| **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
 
-Plan:
-- Introduce a dedicated auth bootstrap/session-ready flag separate from profile loading.
-- Mark auth as ready only after initial session restoration completes.
-- Expose this through auth context so data hooks can depend on it.
-- Keep route protection behavior intact, but stop data hooks from querying too early.
+### Phase 2: System Reliability — COMPLETE
 
-2. Gate all cart reads on auth readiness
-Files:
-- `src/hooks/useCart.tsx`
-- `src/hooks/useCartCount.ts`
+#### 2A. Idempotency Guard on Push Processing
 
-Plan:
-- Change cart queries from `enabled: !!user` to `enabled: authReady && !!user`.
-- Track both:
-  - initial cart hydration status
-  - background refetch status
-- Expose a stronger cart state from the provider, for example:
-  - `isBootstrapping`
-  - `isRefreshing`
-  - `hasHydrated`
+| Component | What Was Done |
+|-----------|---------------|
+| **DB trigger** | `fn_enqueue_order_status_notification` now checks for duplicate entries (same `reference_path` + `payload->>'status'` within 30 seconds) before inserting into `notification_queue`. Skips with `RAISE NOTICE`. |
+| **DB index** | `idx_notification_queue_dedup` on `notification_queue(reference_path, created_at DESC)` for fast dedup lookups |
 
-3. Stop showing a false empty state
-Files:
-- `src/pages/CartPage.tsx`
-- `src/hooks/useCartPage.ts`
+#### 2B. Realtime Channel Auto-Reconnect
 
-Plan:
-- Render loading/sync UI until the first authenticated cart fetch completes.
-- Only show “Your cart is empty” after:
-  - auth is ready
-  - cart query has hydrated at least once
-  - no refetch is currently resolving a recent mutation
-- This removes the bad trust-breaking flash.
+| Component | What Was Done |
+|-----------|---------------|
+| **`useLiveActivityOrchestrator.ts`** | Both order and delivery channels now detect `CHANNEL_ERROR` / `TIMED_OUT`, remove the dead channel, and re-subscribe after 3s delay. Max 3 reconnects per session. On successful reconnect (`SUBSCRIBED`), retry counter resets. Each reconnect triggers a one-shot `syncActiveOrders` to fill any gap. Unique channel names with `Date.now()` suffix prevent Supabase channel name conflicts. |
 
-4. Unify cart mutations behind the cart provider
-Files:
-- `src/hooks/useCart.tsx`
-- `src/components/order/ReorderButton.tsx`
-- `src/components/home/ReorderLastOrder.tsx`
+### Phase 3: Seller Self-Delivery GPS + Buyer Live Map — COMPLETE
 
-Plan:
-- Add a provider-level batch/replace API such as `replaceCart(items)` or `setCartFromProducts(...)`.
-- Move reorder flows to use the shared cart layer instead of direct DB writes plus blind invalidation.
-- Update cache optimistically before navigating to `/cart`.
-- Await the provider mutation lifecycle before navigation so the cart page opens with correct data already present.
+#### 3A. Seller GPS Broadcasting for Self-Delivery
 
-5. Make navigation to `/cart` resilient after mutations
-Files:
-- `src/components/order/ReorderButton.tsx`
-- `src/components/home/ReorderLastOrder.tsx`
-- possibly product/home CTA callers if needed
+| Component | What Was Done |
+|-----------|---------------|
+| **`SellerGPSTracker.tsx`** | New component — shown to sellers on OrderDetailPage when `delivery_handled_by === 'seller'` and order status is `picked_up` or `on_the_way`. Uses existing `useBackgroundLocationTracking` hook. Shows Start/Stop controls, live badge, and last-sent timestamp. |
+| **`OrderDetailPage.tsx`** | Integrated `SellerGPSTracker` in the seller action area, gated by `delivery_handled_by === 'seller'` + transit statuses |
 
-Plan:
-- After successful add/reorder, wait for cart cache reconciliation or explicitly seed the cart query before navigating.
-- Do not rely only on `invalidateQueries()` and hope the next screen finishes refetch in time.
+#### 3B. Buyer Live Map
 
-6. Add cache hygiene on auth transitions
-Files:
-- `src/hooks/useCart.tsx`
-- `src/contexts/auth/useAuthState.ts`
-- possibly app-level query handling
+| Component | What Was Done |
+|-----------|---------------|
+| **`DeliveryMapView.tsx`** | New component using Leaflet + OpenStreetMap (no API key). Shows rider position (🛵 marker) and destination (📍 marker). Auto-fits bounds on mount, pans when rider moves out of view. |
+| **`OrderDetailPage.tsx`** | Integrated `DeliveryMapView` above `LiveDeliveryTracker` for buyer view when rider has GPS data and order has delivery coordinates (`delivery_lat`/`delivery_lng`). Falls back to text-only tracker when no GPS data available. |
 
-Plan:
-- On sign-out: clear cart item/count caches for the old user immediately.
-- On sign-in/session restore: trigger a single authoritative cart refresh for the current user.
-- Prevent undefined-user cache states from leaking into the signed-in experience.
+### Previously Completed Blinkit Gaps
 
-7. Add regression coverage for the real failure path
-Files:
-- existing test area for hooks/pages if present
+| Feature | Status |
+|---------|--------|
+| Push deep-link routing | ✅ Done |
+| Notification grouping (threadId) | ✅ Done |
+| Rich push images (NSE) | ✅ Done |
+| Dynamic Island tap → order page | ✅ Done |
+| Item count in DI | ✅ Done |
+| GPS-derived progress | ✅ Done |
 
-Plan:
-- Add tests for:
-  - add from home page then open cart immediately
-  - reorder then open cart immediately
-  - app start with delayed session restore
-  - sign-out/sign-in cycle with existing backend cart
-  - stale empty cache followed by background refetch
-- Acceptance: cart badge and cart page must always agree.
+### Phase 4: Live Map / Rider GPS — DEFERRED
 
-Implementation order
+Requires dedicated rider-side GPS broadcasting infrastructure (separate product workstream). Seller self-delivery GPS (Phase 3A) covers the immediate need.
 
-1. Add auth-ready/session-restored state
-2. Update `useCart` and `useCartCount` to use it
-3. Fix cart page empty-state logic
-4. Refactor reorder flows into shared cart mutation APIs
-5. Add auth-transition cache cleanup
-6. Run regression verification on fast navigation flows
+### Product Thumbnails in Widget — DEFERRED
 
-Technical notes
-- This should be frontend/query-state work only; no database migration is required for the core fix.
-- The most important architectural change is making the backend cart the source of truth while keeping the React Query cache consistent across all cart entry points.
-- The current direct mutation pattern in reorder flows is the biggest consistency risk and should be removed.
+Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
 
-Validation checklist after implementation
+## Silent Push Optimization: COMPLETE
 
-1. Add from home page, immediately open cart
-- item must appear on first render
+### Notification Matrix
 
-2. Reorder from home/order history, immediately open cart
-- replaced items must appear without refresh
+| Status | Push? | Live Activity? | Rationale |
+|--------|-------|----------------|-----------|
+| `accepted` | ✅ Always | Yes | Critical — order confirmed |
+| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
+| `ready` | ✅ Always | Yes | Pickup moment — user must know |
+| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
+| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
+| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
+| `delivered` | ✅ Always | Yes | Critical endpoint |
+| `completed` | ✅ Always | No | Critical endpoint |
+| `cancelled` | ✅ Always | No | Critical — must alert |
+| All service/booking | ✅ Always | No | No Live Activity for these |
 
-3. Refresh app on `/cart`
-- existing backend cart must load correctly without needing sign-out/sign-in
+## Implementation Matrix
 
-4. Sign out and sign back in
-- old cart cache must not leak
-- current user cart must appear reliably
-
-5. Slow network / delayed session restore
-- cart page must show loading/syncing, never false empty state
-
-6. Cart badge vs cart page
-- both must always match
-
-Definition of done
-
-This is fixed only if:
-- cart never depends on a lucky re-login to appear
-- all cart entry points use the same mutation/cache path
-- `/cart` never shows a false empty state while authenticated cart data is still hydrating
-- badge count and cart contents remain consistent across navigation, refresh, and session restore
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+| BG-1 | APNs Push-to-Live-Activity | Implemented |
+| BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
+| BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |
+| BG-4 | Buyer Delivery Confirmation (Gap 8) | Implemented |
+| BG-5 | ETA at Acceptance Time (Gap 11) | Implemented |

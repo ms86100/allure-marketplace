@@ -54,7 +54,7 @@ export function useCartPage() {
   const navigate = useNavigate();
   const { user, profile, society } = useAuth();
   const { requestFullPermission } = usePushNotifications();
-  const { items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, refresh, addItem, isLoading } = useCart();
+  const { items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, refresh, addItem, isLoading, hasHydrated } = useCart();
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
@@ -404,7 +404,7 @@ export function useCartPage() {
   const sessionAmount = activeSession?.amount || 0;
 
   return {
-    user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading,
+    user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading, hasHydrated,
     notes, setNotes, paymentMethod, setPaymentMethod,
     isPlacingOrder, showRazorpayCheckout, showUpiDeepLink, setShowUpiDeepLink, pendingOrderIds, paymentMode,
     appliedCoupon, setAppliedCoupon, showConfirmDialog, setShowConfirmDialog,

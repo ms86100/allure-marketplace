@@ -23,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user, session, profile, society, roles, sellerProfiles,
     currentSellerId, isLoading, societyAdminRole, managedBuilderIds,
     viewAsSocietyId, viewAsSociety, isSecurityOfficer, isWorker,
+    isSessionRestored,
   } = state;
 
   const isApproved = profile?.verification_status === 'approved';
@@ -92,8 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ts: Date.now(),
     });
     prevIdentityDepsRef.current = { userId: user?.id ?? null, hasSession: !!session, isLoading };
-    return { user, session, isLoading, signOut, refreshProfile };
-  }, [user, session, isLoading, signOut, refreshProfile]);
+    return { user, session, isLoading, isSessionRestored, signOut, refreshProfile };
+  }, [user, session, isLoading, isSessionRestored, signOut, refreshProfile]);
 
   const roleValue = useMemo<RoleContextType>(() => ({
     profile, roles, isApproved, isAdmin, isSocietyAdmin,
@@ -115,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const legacyValue = useMemo<AuthContextType>(() => ({
     user, session, profile, society, roles, sellerProfiles,
-    currentSellerId, isLoading, isApproved, isSeller, hasSellerProfile, isAdmin,
+    currentSellerId, isLoading, isSessionRestored, isApproved, isSeller, hasSellerProfile, isAdmin,
     isSocietyAdmin, isBuilderMember, isSecurityOfficer, isWorker,
     societyAdminRole, managedBuilderIds,
     signOut, refreshProfile,
@@ -124,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     effectiveSocietyId, effectiveSociety,
   }), [
     user, session, profile, society, roles, sellerProfiles,
-    currentSellerId, isLoading, isApproved, isSeller, hasSellerProfile, isAdmin,
+    currentSellerId, isLoading, isSessionRestored, isApproved, isSeller, hasSellerProfile, isAdmin,
     isSocietyAdmin, isBuilderMember, isSecurityOfficer, isWorker,
     societyAdminRole, managedBuilderIds,
     signOut, refreshProfile, setCurrentSellerId,

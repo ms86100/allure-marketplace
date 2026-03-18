@@ -8,6 +8,8 @@ export interface IdentityContextType {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
+  /** True once initial session restoration from storage has completed */
+  isSessionRestored: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }

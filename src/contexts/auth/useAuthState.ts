@@ -126,7 +126,7 @@ export function useAuthState() {
   }, [setPartial]);
 
   const clearAuthState = useCallback(() => {
-    setState({ ...initialAuthState, isLoading: false });
+    setState({ ...initialAuthState, isLoading: false, isSessionRestored: true });
   }, []);
 
   // Track whether user explicitly called signOut
@@ -175,7 +175,7 @@ export function useAuthState() {
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setPartial({ session, user: session?.user ?? null, isLoading: false });
+      setPartial({ session, user: session?.user ?? null, isLoading: false, isSessionRestored: true });
       if (session?.user && profileFetchedFor.current !== session.user.id) {
         profileFetchedFor.current = session.user.id;
         fetchProfile(session.user.id);
