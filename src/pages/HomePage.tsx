@@ -4,16 +4,15 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { OnboardingWalkthrough, useOnboarding } from '@/components/onboarding/OnboardingWalkthrough';
 
 import { MarketplaceSection } from '@/components/home/MarketplaceSection';
-import { ReorderLastOrder } from '@/components/home/ReorderLastOrder';
-import { BuyAgainRow } from '@/components/home/BuyAgainRow';
 import { SocietyQuickLinks } from '@/components/home/SocietyQuickLinks';
 
 import { HomeSearchSuggestions } from '@/components/home/HomeSearchSuggestions';
 import { CommunityTeaser } from '@/components/home/CommunityTeaser';
-import { UpcomingAppointmentBanner } from '@/components/home/UpcomingAppointmentBanner';
 import { HomeNotificationBanner } from '@/components/notifications/HomeNotificationBanner';
-import { SmartSuggestionBanner } from '@/components/home/SmartSuggestionBanner';
-import { ArrivalSuggestionCard } from '@/components/home/ArrivalSuggestionCard';
+import { ActiveOrderStrip } from '@/components/home/ActiveOrderStrip';
+import { ForYouSection } from '@/components/home/ForYouSection';
+import { SocietyTrustStrip } from '@/components/home/SocietyTrustStrip';
+import { SocietyLeaderboard } from '@/components/home/SocietyLeaderboard';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { motion } from 'framer-motion';
@@ -87,28 +86,29 @@ export default function HomePage() {
           );
         })()}
 
+        {/* ═══ ACTIVE ORDER TRACKING ═══ */}
+        <ActiveOrderStrip />
+
         {/* ═══ RICH NOTIFICATION BANNER ═══ */}
         <HomeNotificationBanner />
 
-        {/* ═══ SMART SUGGESTIONS ═══ */}
-        <ArrivalSuggestionCard />
-        <SmartSuggestionBanner />
+        {/* ═══ SOCIETY TRUST STRIP ═══ */}
+        <SocietyTrustStrip />
 
         {/* ═══ DISCOVER ═══ */}
         <HomeSearchSuggestions />
-        <div className="px-4 mt-3">
-          <UpcomingAppointmentBanner />
-        </div>
 
-        {/* ═══ YOUR ORDERS ═══ */}
-        <ReorderLastOrder />
-        <BuyAgainRow />
+        {/* ═══ MARKETPLACE (CORE VALUE — HIGH PRIORITY) ═══ */}
+        <MarketplaceSection />
 
-        {/* ═══ COMMUNITY ═══ */}
+        {/* ═══ SOCIETY QUICK LINKS ═══ */}
         <SocietyQuickLinks />
 
-        {/* ═══ MARKETPLACE & COMMUNITY ═══ */}
-        <MarketplaceSection />
+        {/* ═══ PERSONALIZED SECTIONS (conditional) ═══ */}
+        <ForYouSection />
+
+        {/* ═══ LEADERBOARD & COMMUNITY ═══ */}
+        <SocietyLeaderboard />
         <CommunityTeaser />
       </div>
     </AppLayout>
