@@ -44,13 +44,14 @@ export function useLiveActivityOrchestrator(): void {
 
   const doSync = useCallback(async () => {
     if (!userId || !mountedRef.current) return;
-    // Refresh active order IDs for delivery channel filtering
+    // Use DB-backed terminal statuses for filtering active orders
+    const terminalArr = [...terminalStatusesCache];
     try {
       const { data } = await supabase
         .from('orders')
         .select('id')
         .eq('buyer_id', userId)
-        .not('status', 'in', '("delivered","completed","cancelled","no_show","failed")');
+        .not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`);
       if (data) {
         activeOrderIdsRef.current = new Set(data.map(o => o.id));
       }
