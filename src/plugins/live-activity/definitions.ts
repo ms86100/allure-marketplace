@@ -26,6 +26,8 @@ export interface LiveActivityData {
   progress_percent: number | null;
   /** Seller / business display name */
   seller_name: string | null;
+  /** Number of items in the order */
+  item_count: number | null;
 }
 
 export interface ActiveActivityEntry {

@@ -13,6 +13,8 @@ interface PushPayload {
   title: string;
   body: string;
   data?: Record<string, string>;
+  threadId?: string;
+  imageUrl?: string;
 }
 
 interface FirebaseServiceAccount {
