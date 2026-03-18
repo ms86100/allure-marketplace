@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { hapticNotification } from '@/lib/haptics';
 import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
+import { LiveActivityManager } from '@/services/LiveActivityManager';
 
 /**
  * BUILD FINGERPRINT — bump on every push-related update.
