@@ -131,9 +131,18 @@ export function useCartPage() {
     else setFulfillmentType('self_pickup');
   }, [sellerGroups.length, firstSeller]);
 
+  // Clear coupon when seller composition changes (multi-vendor or different seller)
+  const currentSellerId = sellerGroups.length === 1 ? sellerGroups[0].sellerId : null;
   useEffect(() => {
     if (sellerGroups.length > 1 && appliedCoupon) setAppliedCoupon(null);
   }, [sellerGroups.length]);
+  useEffect(() => {
+    // If single-seller cart switches to a different seller, clear stale coupon
+    if (appliedCoupon && currentSellerId && appliedCoupon.id) {
+      // CouponInput already remounts via key, but parent state needs clearing too
+      setAppliedCoupon(null);
+    }
+  }, [currentSellerId]);
 
   // Auto-select default delivery address
   useEffect(() => {
@@ -283,7 +292,22 @@ export function useCartPage() {
     }
 
     // COD flow — order is confirmed immediately
+    // Guard: check for existing pending unpaid orders to prevent duplicates
     setOrderStep('creating');
+    try {
+      const { data: existingPending } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('buyer_id', user.id)
+        .eq('payment_status', 'pending')
+        .in('status', ['pending', 'accepted', 'confirmed'] as any[])
+        .limit(1);
+      if (existingPending && existingPending.length > 0) {
+        toast.error('You have an unpaid order pending. Please complete or cancel it first.', { id: 'checkout-pending-exists' });
+        setIsPlacingOrder(false);
+        return;
+      }
+    } catch {}
     try {
       const orderIds = await createOrdersForAllSellers('pending');
       if (orderIds.length === 0) throw new Error('Failed to create orders');
