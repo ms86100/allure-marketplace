@@ -44,23 +44,34 @@ export function useBuyerOrderAlerts() {
         (payload) => {
           const newStatus = (payload.new as any)?.status;
           const oldStatus = (payload.old as any)?.status;
+          const orderId = (payload.new as any)?.id;
 
           // C4: If old status is undefined (REPLICA IDENTITY not FULL), skip to avoid spam toasts
           if (!newStatus || oldStatus === undefined || newStatus === oldStatus) return;
+
+          // Skip 'pending' status — user just created the order, they already know
+          if (newStatus === 'pending') return;
+
+          // Suppress during active checkout on cart page
+          if (window.location.hash.includes('/cart')) return;
 
           const msg = STATUS_MESSAGES[newStatus];
           if (!msg) return;
 
           hapticNotification(msg.haptic);
 
+          // Use unique ID per order+status to deduplicate with push notifications
+          const toastId = `order-${orderId}-${newStatus}`;
+
           toast(msg.title, {
+            id: toastId,
             description: msg.description,
             icon: msg.icon,
             duration: 6000,
             action: {
               label: 'View',
               onClick: () => {
-                window.location.hash = `#/orders/${(payload.new as any).id}`;
+                window.location.hash = `#/orders/${orderId}`;
               },
             },
           });

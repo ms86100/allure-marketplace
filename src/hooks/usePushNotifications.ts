@@ -341,9 +341,15 @@ export function usePushNotificationsInternal() {
           setTimeout(() => ctx.close().catch(() => {}), 600);
         } catch {}
 
-        toast(notification?.title ?? 'New Notification', {
+        // Build a unique toast ID for order-related notifications to deduplicate with realtime alerts
+        const toastOptions: Record<string, any> = {
           description: notification?.body,
-        });
+        };
+        if (orderId && data?.status) {
+          toastOptions.id = `order-${orderId}-${data.status}`;
+        }
+
+        toast(notification?.title ?? 'New Notification', toastOptions);
       });
       cleanupListeners.push(() => fgListener.remove());
 

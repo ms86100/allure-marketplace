@@ -342,7 +342,7 @@ export function useCartPage() {
 
   const handleUpiDeepLinkFailed = async () => {
     setShowUpiDeepLink(false);
-    if (!user?.id) { toast.error('Session expired.'); setPendingOrderIds([]); clearPaymentSession(); return; }
+    if (!user?.id) { toast.error('Session expired.', { id: 'checkout-session' }); setPendingOrderIds([]); clearPaymentSession(); return; }
     if (pendingOrderIds.length > 0) {
       // Check if payment was actually completed before cancelling
       const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
