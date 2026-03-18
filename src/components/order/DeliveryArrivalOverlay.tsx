@@ -20,6 +20,7 @@ export function DeliveryArrivalOverlay({
   riderPhone,
   status,
   onDismiss,
+  deliveryCode,
 }: DeliveryArrivalOverlayProps) {
   const [dismissed, setDismissed] = useState(false);
 
