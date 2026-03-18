@@ -219,19 +219,23 @@ export default function OrderDetailPage() {
           {/* Live Delivery Tracking or Static Card */}
           {isDeliveryOrder && isInTransit && deliveryAssignmentId && (
             <>
-              {/* Map view — show for both buyer and seller when rider has GPS data */}
-              {deliveryTracking.riderLocation && (order as any).delivery_lat && (order as any).delivery_lng && (
-                <Suspense fallback={<Skeleton className="h-48 w-full rounded-xl" />}>
-                  <DeliveryMapView
-                    riderLat={deliveryTracking.riderLocation.latitude}
-                    riderLng={deliveryTracking.riderLocation.longitude}
-                    destinationLat={(order as any).delivery_lat}
-                    destinationLng={(order as any).delivery_lng}
-                    riderName={deliveryTracking.riderName}
-                    heading={deliveryTracking.riderLocation.heading}
-                  />
-                </Suspense>
-              )}
+              {/* Gap 10: Map view — fallback to buyer profile coords if delivery_lat/lng missing */}
+              {deliveryTracking.riderLocation && (() => {
+                const destLat = (order as any).delivery_lat || (buyer as any)?.latitude || null;
+                const destLng = (order as any).delivery_lng || (buyer as any)?.longitude || null;
+                return destLat && destLng ? (
+                  <Suspense fallback={<Skeleton className="h-48 w-full rounded-xl" />}>
+                    <DeliveryMapView
+                      riderLat={deliveryTracking.riderLocation.latitude}
+                      riderLng={deliveryTracking.riderLocation.longitude}
+                      destinationLat={destLat}
+                      destinationLng={destLng}
+                      riderName={deliveryTracking.riderName}
+                      heading={deliveryTracking.riderLocation.heading}
+                    />
+                  </Suspense>
+                ) : null;
+              })()}
               <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} />
               {o.isBuyerView && (
                 <div className="flex justify-end">
@@ -239,6 +243,15 @@ export default function OrderDetailPage() {
                 </div>
               )}
             </>
+          )}
+          {/* Gap 3: Fallback when delivery is in transit but assignment hasn't been created yet */}
+          {isDeliveryOrder && isInTransit && !deliveryAssignmentId && (
+            <div className="bg-card border border-border rounded-xl p-4">
+              <div className="flex items-center gap-3 justify-center text-muted-foreground">
+                <Loader2 size={16} className="animate-spin" />
+                <p className="text-sm">Setting up live tracking...</p>
+              </div>
+            </div>
           )}
           {/* Seller self-delivery GPS broadcasting */}
           {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
