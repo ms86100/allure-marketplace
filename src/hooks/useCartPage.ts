@@ -327,7 +327,7 @@ export function useCartPage() {
     setPendingOrderIds([]);
     clearPaymentSession();
     // Do NOT clear cart on payment failure — user can retry
-    toast.error('Payment was not completed. Your order has been cancelled. You can try again.');
+    toast.error('Payment was not completed. Your order has been cancelled. You can try again.', { id: 'razorpay-failed' });
   };
 
   const handleUpiDeepLinkSuccess = async () => {
