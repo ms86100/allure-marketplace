@@ -1764,6 +1764,51 @@ export type Database = {
           },
         ]
       }
+      delivery_feedback: {
+        Row: {
+          buyer_id: string
+          comment: string | null
+          created_at: string
+          id: string
+          order_id: string
+          rating: number
+          seller_id: string
+        }
+        Insert: {
+          buyer_id: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          order_id: string
+          rating: number
+          seller_id: string
+        }
+        Update: {
+          buyer_id?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          order_id?: string
+          rating?: number
+          seller_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_feedback_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_feedback_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_audit_trail"
+            referencedColumns: ["order_id"]
+          },
+        ]
+      }
       delivery_locations: {
         Row: {
           accuracy_meters: number | null
@@ -8382,6 +8427,124 @@ export type Database = {
           _start_time: string
         }
         Returns: Json
+      }
+      buyer_cancel_order: {
+        Args: {
+          _expected_status?: Database["public"]["Enums"]["order_status"]
+          _order_id: string
+          _reason?: string
+        }
+        Returns: {
+          auto_cancel_at: string | null
+          auto_complete_at: string | null
+          buyer_id: string | null
+          buyer_society_id: string | null
+          coupon_id: string | null
+          created_at: string | null
+          delivery_address: string | null
+          delivery_address_id: string | null
+          delivery_fee: number
+          delivery_handled_by: string | null
+          delivery_lat: number | null
+          delivery_lng: number | null
+          deposit_paid: boolean | null
+          deposit_refunded: boolean | null
+          discount_amount: number | null
+          distance_km: number | null
+          estimated_delivery_at: string | null
+          fulfillment_type: string
+          id: string
+          idempotency_key: string | null
+          is_cross_society: boolean
+          notes: string | null
+          order_type: string | null
+          payment_confirmed_at: string | null
+          payment_confirmed_by_seller: boolean | null
+          payment_screenshot_url: string | null
+          payment_status: string | null
+          payment_type: string | null
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          ready_at: string | null
+          rejection_reason: string | null
+          rental_end_date: string | null
+          rental_start_date: string | null
+          scheduled_date: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
+          seller_id: string | null
+          seller_society_id: string | null
+          society_id: string | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          total_amount: number
+          updated_at: string | null
+          upi_transaction_ref: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      buyer_cancel_pending_orders: {
+        Args: { _order_ids: string[] }
+        Returns: number
+      }
+      buyer_mark_order_completed: {
+        Args: { _order_id: string }
+        Returns: {
+          auto_cancel_at: string | null
+          auto_complete_at: string | null
+          buyer_id: string | null
+          buyer_society_id: string | null
+          coupon_id: string | null
+          created_at: string | null
+          delivery_address: string | null
+          delivery_address_id: string | null
+          delivery_fee: number
+          delivery_handled_by: string | null
+          delivery_lat: number | null
+          delivery_lng: number | null
+          deposit_paid: boolean | null
+          deposit_refunded: boolean | null
+          discount_amount: number | null
+          distance_km: number | null
+          estimated_delivery_at: string | null
+          fulfillment_type: string
+          id: string
+          idempotency_key: string | null
+          is_cross_society: boolean
+          notes: string | null
+          order_type: string | null
+          payment_confirmed_at: string | null
+          payment_confirmed_by_seller: boolean | null
+          payment_screenshot_url: string | null
+          payment_status: string | null
+          payment_type: string | null
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          ready_at: string | null
+          rejection_reason: string | null
+          rental_end_date: string | null
+          rental_start_date: string | null
+          scheduled_date: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
+          seller_id: string | null
+          seller_society_id: string | null
+          society_id: string | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          total_amount: number
+          updated_at: string | null
+          upi_transaction_ref: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       calculate_society_trust_score: {
         Args: { _society_id: string }
