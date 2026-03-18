@@ -171,7 +171,7 @@ export function useOrderDetail(id: string | undefined) {
   const chatRecipientId = isSellerView ? order?.buyer_id : seller?.user_id;
   const chatRecipientName = isSellerView ? (order as any)?.buyer?.name : seller?.business_name;
 
-  const copyOrderId = () => { if (!order) return; navigator.clipboard.writeText(order.id.slice(0, 8)); toast.success('Order ID copied'); };
+  const copyOrderId = () => { if (!order) return; navigator.clipboard.writeText(order.id.slice(0, 8)); toast.success('Order ID copied', { id: 'order-id-copied' }); };
 
   // Display statuses derived entirely from DB flow
   const displayStatuses = useMemo(() => {
