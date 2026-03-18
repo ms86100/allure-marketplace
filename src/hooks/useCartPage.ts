@@ -388,7 +388,12 @@ export function useCartPage() {
   };
 
   // Compute whether we have an active payment session (for rendering payment UI even if cart is empty)
-  const hasActivePaymentSession = pendingOrderIds.length > 0 || !!loadPaymentSession();
+  const activeSession = loadPaymentSession();
+  const hasActivePaymentSession = pendingOrderIds.length > 0 || !!activeSession;
+  // Fallback seller details from session for app-resume when cart is empty
+  const sessionSellerUpiId = activeSession?.sellerUpiId || '';
+  const sessionSellerName = activeSession?.sellerName || 'Seller';
+  const sessionAmount = activeSession?.amount || 0;
 
   return {
     user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading,
