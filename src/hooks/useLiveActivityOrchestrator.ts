@@ -203,7 +203,7 @@ export function useLiveActivityOrchestrator(): void {
 
   // Polling fallback removed — pure realtime. App-resume one-shot sync remains below.
 
-  // ── App resume re-hydration (pauses poll to avoid race) ──
+  // ── App resume re-hydration (one-shot sync) ──
   useEffect(() => {
     if (!userId || !Capacitor.isNativePlatform()) return;
 
@@ -214,21 +214,10 @@ export function useLiveActivityOrchestrator(): void {
         const { App } = await import('@capacitor/app');
         const listener = await App.addListener('appStateChange', async ({ isActive }) => {
           if (!isActive || !mountedRef.current) return;
-          console.log(TAG, 'App resumed — re-hydrating (poll paused)');
-
-          // Pause poll timer to prevent racing with resume sync
-          if (pollTimerRef.current) {
-            clearInterval(pollTimerRef.current);
-            pollTimerRef.current = null;
-          }
+          console.log(TAG, 'App resumed — re-hydrating');
 
           LiveActivityManager.resetHydration();
           await doSync();
-
-          // Resume poll timer after sync completes
-          if (mountedRef.current) {
-            pollTimerRef.current = setInterval(doSync, POLL_INTERVAL_MS);
-          }
         });
         cleanup = () => listener.remove();
       } catch (e) {
