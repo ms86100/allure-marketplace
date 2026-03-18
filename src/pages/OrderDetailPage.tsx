@@ -14,6 +14,7 @@ import { DeliveryArrivalOverlay } from '@/components/order/DeliveryArrivalOverla
 import { BuyerDeliveryConfirmation } from '@/components/order/BuyerDeliveryConfirmation';
 import { DeliveryETABanner } from '@/components/order/DeliveryETABanner';
 import { SellerGPSTracker } from '@/components/delivery/SellerGPSTracker';
+import { UpdateBuyerLocationButton } from '@/components/delivery/UpdateBuyerLocationButton';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
 
 import { OrderItemCard } from '@/components/order/OrderItemCard';
