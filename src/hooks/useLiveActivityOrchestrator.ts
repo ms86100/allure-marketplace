@@ -302,8 +302,10 @@ export function useLiveActivityOrchestrator(): void {
           if (!isActive || !mountedRef.current) return;
           console.log(TAG, 'App resumed — re-hydrating');
 
+          invalidateStatusFlowCache();
           LiveActivityManager.resetHydration();
           await fetchFlowEntries();
+          getTerminalStatuses().then(s => { terminalStatusesCache = s; }).catch(() => {});
           await doSync();
         });
         cleanup = () => listener.remove();
