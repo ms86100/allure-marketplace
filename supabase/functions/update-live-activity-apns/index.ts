@@ -24,8 +24,6 @@ interface LAUpdatePayload {
   seller_name?: string;
   seller_logo?: string;
   seller_logo_url?: string;
-  transaction_type?: string;
-  parent_group?: string;
 }
 
 /** Safety-net fallback — overridden by DB query below */
