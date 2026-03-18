@@ -1,115 +1,75 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phases 1–3)
 
-All 9 original phases plus Blinkit parity Phases 1–3 are fully implemented.
+# Round 4 Production Readiness Audit
 
-## Blinkit Gap-Fill Status
+## Verified Working (Rounds 1-3)
 
-### Phase 1: APNs Push-to-Live-Activity — COMPLETE
+All previously identified Critical and High issues are confirmed resolved:
+- OTP triggers, RPCs, and delivery gate enforcement
+- GPS filtering, OSRM road ETA, smooth marker interpolation
+- Live Activity dedup, deep link 404 fix, lifecycle termination
+- Stalled delivery monitor with DB-backed thresholds and notification text
+- Status flow cache for dynamic START/TERMINAL sets
+- Proximity thresholds and UI strings from system_settings
+- LiveDeliveryTracker status hints from category_status_flows
+- Hooks error fixed (useTrackingConfig moved above early returns at line 60)
+- Auth readiness gate for cart queries
 
-Live Activities now update even when the app process is killed by iOS, matching Blinkit's reliability.
+## Current Findings
 
-#### Architecture
+### Finding 1: Stale ETA persists for orders with no active GPS (CRITICAL)
 
-```
-Order status change → DB trigger → net.http_post → update-live-activity-apns edge function
-  → APNs push (apns-push-type: liveactivity) → iOS widget receives content-state update
-  → Lock screen / Dynamic Island re-renders
-```
+**Issue:** The delivery assignment for order `0ca43884` shows `distance_meters: 50, eta_minutes: 15, last_location_at: null`. The ETA of 15 minutes was written by the `update-delivery-location` edge function during an earlier GPS update, but since GPS stopped (last_location_at is null/cleared), the stale ETA persists in the DB indefinitely.
 
-#### Implementation Details
+**Why it matters:** Buyer sees "15 min ETA" when the rider is 50m away (or GPS is stale). This is misleading and destroys trust.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB table** | `live_activity_tokens` (user_id, order_id, push_token, platform) with RLS |
-| **Swift plugin** | `LiveActivityPlugin.swift` — requests activity with `pushType: .token`, observes `Activity.pushTokenUpdates`, emits `liveActivityPushToken` event to JS |
-| **LiveActivityManager.ts** | Listens for `liveActivityPushToken` events, upserts token to `live_activity_tokens` table, cleans up on activity end |
-| **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
-| **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
+**Root cause:** The `getSmartEta` function in `LiveDeliveryTracker.tsx` correctly prefers road ETA and distance-based ETA for <500m, but the ETA badge at line 150 also calls `getSmartEta` and displays the stale DB ETA when OSRM returns no route (both points are essentially the same location, OSRM returned distance=5m, duration=0.8s). The OSRM road ETA would be ~0 min, but `roadEtaMinutes` may not propagate correctly when OSRM returns near-zero values.
 
-### Phase 2: System Reliability — COMPLETE
+Additionally, the proximity message logic correctly shows "At your doorstep" for 50m, but the badge still shows the stale "14-16 min" range because `getSmartEta(50, 15, roadEta)` falls through to the distance-based calculation of `max(1, ceil(50/1000*4)) = 1` only when `roadEta` is null.
 
-#### 2A. Idempotency Guard on Push Processing
+**Fix:**
+1. In `LiveDeliveryTracker.tsx`, the ETA badge should suppress display when `isLocationStale` is true or `lastLocationAt` is null
+2. In `useDeliveryTracking.ts`, mark location as stale when `last_location_at` is null (currently only checks age threshold, but null means never reported or cleared)
+3. In `getSmartEta`, when distance < proximity doorstep threshold, always return 1 regardless of DB ETA
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB trigger** | `fn_enqueue_order_status_notification` now checks for duplicate entries (same `reference_path` + `payload->>'status'` within 30 seconds) before inserting into `notification_queue`. Skips with `RAISE NOTICE`. |
-| **DB index** | `idx_notification_queue_dedup` on `notification_queue(reference_path, created_at DESC)` for fast dedup lookups |
+### Finding 2: `last_location_at: null` not treated as stale (HIGH)
 
-#### 2B. Realtime Channel Auto-Reconnect
+**Issue:** `useDeliveryTracking` line 63-69 checks staleness by comparing `Date.now() - lastLocationAt`. When `lastLocationAt` is null, it returns early and never sets `isLocationStale = true`. So if GPS was never recorded (or was cleared), the system does not warn the buyer.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`useLiveActivityOrchestrator.ts`** | Both order and delivery channels now detect `CHANNEL_ERROR` / `TIMED_OUT`, remove the dead channel, and re-subscribe after 3s delay. Max 3 reconnects per session. On successful reconnect (`SUBSCRIBED`), retry counter resets. Each reconnect triggers a one-shot `syncActiveOrders` to fill any gap. Unique channel names with `Date.now()` suffix prevent Supabase channel name conflicts. |
+**Root cause:** The staleness check at line 65 (`if (!prev.lastLocationAt) return prev`) skips the check entirely for null values.
 
-### Phase 3: Seller Self-Delivery GPS + Buyer Live Map — COMPLETE
+**Fix:** When `lastLocationAt` is null and the order is in transit, treat it as stale. This ensures the warning appears.
 
-#### 3A. Seller GPS Broadcasting for Self-Delivery
+### Finding 3: DeliveryStatusCard ICON_MAP and COLOR_MAP are hardcoded (MEDIUM)
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`SellerGPSTracker.tsx`** | New component — shown to sellers on OrderDetailPage when `delivery_handled_by === 'seller'` and order status is `picked_up` or `on_the_way`. Uses existing `useBackgroundLocationTracking` hook. Shows Start/Stop controls, live badge, and last-sent timestamp. |
-| **`OrderDetailPage.tsx`** | Integrated `SellerGPSTracker` in the seller action area, gated by `delivery_handled_by === 'seller'` + transit statuses |
+**Issue:** Lines 31-50 of `DeliveryStatusCard.tsx` hardcode `ICON_MAP` and `COLOR_MAP`. While labels are DB-backed via `delivery_status_labels`, the visual presentation (icons, colors) is still hardcoded.
 
-#### 3B. Buyer Live Map
+**Root cause:** The previous rounds only migrated labels/messages to DB, not the icon/color assignments.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`DeliveryMapView.tsx`** | New component using Leaflet + OpenStreetMap (no API key). Shows rider position (🛵 marker) and destination (📍 marker). Auto-fits bounds on mount, pans when rider moves out of view. |
-| **`OrderDetailPage.tsx`** | Integrated `DeliveryMapView` above `LiveDeliveryTracker` for buyer view when rider has GPS data and order has delivery coordinates (`delivery_lat`/`delivery_lng`). Falls back to text-only tracker when no GPS data available. |
+**Fix:** Extend the `delivery_status_labels` system_settings JSON to include `icon` and `color` keys per status. Parse them in the component with fallback to current hardcoded defaults.
 
-### Previously Completed Blinkit Gaps
+### Finding 4: `DEFAULT_PROXIMITY` in LiveDeliveryTracker is a hardcoded fallback (LOW)
 
-| Feature | Status |
-|---------|--------|
-| Push deep-link routing | ✅ Done |
-| Notification grouping (threadId) | ✅ Done |
-| Rich push images (NSE) | ✅ Done |
-| Dynamic Island tap → order page | ✅ Done |
-| Item count in DI | ✅ Done |
-| GPS-derived progress | ✅ Done |
+**Issue:** Lines 40-47 contain hardcoded fallback proximity messages. These are only used if the DB value is missing or unparseable.
 
-### Phase 4: Live Map / Rider GPS — DEFERRED
+**Severity:** Low — this is acceptable defensive coding. The DB value is confirmed present and working. No action needed.
 
-Requires dedicated rider-side GPS broadcasting infrastructure (separate product workstream). Seller self-delivery GPS (Phase 3A) covers the immediate need.
+### Finding 5: `statusFlowCache.ts` queries `cart_purchase` transaction type but delivery orders use `seller_delivery` (MEDIUM)
 
-### Product Thumbnails in Widget — DEFERRED
+**Issue:** The status flow cache (used by LiveActivityManager) queries `transaction_type = 'cart_purchase'` and `parent_group = 'default'`. But the network request for the actual order detail page queries `parent_group = 'food_beverages'` and `transaction_type = 'seller_delivery'`, which returns the full delivery flow (placed through cancelled). The `cart_purchase` type returns a different, shorter flow.
 
-Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
+**Root cause:** The Live Activity system's status sets may not match the actual order's flow, causing incorrect terminal/start classification for delivery orders.
 
-## Silent Push Optimization: COMPLETE
+**Fix:** The status flow cache should consider both transaction types, or the Live Activity system should resolve the correct flow based on the order's fulfillment type and seller category.
 
-### Notification Matrix
+---
 
-| Status | Push? | Live Activity? | Rationale |
-|--------|-------|----------------|-----------|
-| `accepted` | ✅ Always | Yes | Critical — order confirmed |
-| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
-| `ready` | ✅ Always | Yes | Pickup moment — user must know |
-| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
-| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
-| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
-| `delivered` | ✅ Always | Yes | Critical endpoint |
-| `completed` | ✅ Always | No | Critical endpoint |
-| `cancelled` | ✅ Always | No | Critical — must alert |
-| All service/booking | ✅ Always | No | No Live Activity for these |
+## Implementation Plan
 
-## Implementation Matrix
+| Step | What | Severity | Files |
+|------|------|----------|-------|
+| 1 | Fix stale ETA display: suppress badge when location is null/stale, cap ETA to distance-based value for <500m | Critical | `LiveDeliveryTracker.tsx` |
+| 2 | Treat `last_location_at: null` as stale when in transit | High | `useDeliveryTracking.ts` |
+| 3 | Fix statusFlowCache to include `seller_delivery` flows | Medium | `statusFlowCache.ts` |
+| 4 | Extend DeliveryStatusCard to support DB-backed icons/colors | Medium | `DeliveryStatusCard.tsx`, DB migration for extended JSON |
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
-| BG-1 | APNs Push-to-Live-Activity | Implemented |
-| BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
-| BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |
-| BG-4 | Buyer Delivery Confirmation (Gap 8) | Implemented |
-| BG-5 | ETA at Acceptance Time (Gap 11) | Implemented |
