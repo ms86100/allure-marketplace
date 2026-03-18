@@ -14,13 +14,30 @@ function formatDistance(meters: number | null): string {
   return `${(meters / 1000).toFixed(1)} km away`;
 }
 
+/** Compute a distance-based ETA (minutes) assuming ~15 km/h average speed */
+function computeDistanceEta(distanceMeters: number): number {
+  return Math.max(1, Math.ceil(distanceMeters / 1000 * 4));
+}
+
+/** Get the best ETA: prefer distance-based when close, otherwise use DB value */
+function getSmartEta(distance: number | null, dbEta: number | null): number | null {
+  if (distance !== null && distance < 500) {
+    return computeDistanceEta(distance);
+  }
+  if (distance !== null && dbEta !== null && dbEta > computeDistanceEta(distance)) {
+    return computeDistanceEta(distance);
+  }
+  return dbEta;
+}
+
 function getProximityMessage(distance: number | null, eta: number | null): string {
+  const smartEta = getSmartEta(distance, eta);
   if (distance !== null && distance < 50) return '🏠 At your doorstep!';
   if (distance !== null && distance < 200) return '🏃 Almost there!';
   if (distance !== null && distance < 500) return '📍 Arriving soon!';
-  if (eta !== null && eta <= 2) return '⏱️ Arriving in about 2 minutes';
-  if (eta !== null && eta <= 5) return `⏱️ Arriving in about ${eta} minutes`;
-  if (eta !== null) return `🕐 ETA: ${eta} minutes`;
+  if (smartEta !== null && smartEta <= 2) return '⏱️ Arriving in about 2 minutes';
+  if (smartEta !== null && smartEta <= 5) return `⏱️ Arriving in about ${smartEta} minutes`;
+  if (smartEta !== null) return `🕐 ETA: ${smartEta} minutes`;
   if (distance !== null) return `📏 ${formatDistance(distance)}`;
   return '🛵 On the way to you';
 }
