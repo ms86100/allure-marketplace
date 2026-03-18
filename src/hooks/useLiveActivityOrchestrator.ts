@@ -138,14 +138,28 @@ export function useLiveActivityOrchestrator(): void {
       if (!row?.order_id) return;
 
       try {
-        const { data: order } = await supabase
-          .from('orders')
-          .select('id, status, buyer_id')
-          .eq('id', row.order_id)
-          .eq('buyer_id', userId)
-          .maybeSingle();
+        const [orderRes, sellerRes] = await Promise.all([
+          supabase
+            .from('orders')
+            .select('id, status, buyer_id, seller_id')
+            .eq('id', row.order_id)
+            .eq('buyer_id', userId)
+            .maybeSingle(),
+          Promise.resolve(null), // placeholder, resolved below
+        ]);
 
+        const order = orderRes.data;
         if (!order) return;
+
+        let sellerName: string | null = null;
+        if (order.seller_id) {
+          const { data: seller } = await supabase
+            .from('seller_profiles')
+            .select('business_name')
+            .eq('id', order.seller_id)
+            .maybeSingle();
+          sellerName = seller?.business_name ?? null;
+        }
 
         console.log(TAG, `Delivery ${payload.eventType} for order ${order.id}: eta=${row.eta_minutes}, distance=${row.distance_meters}`);
 
@@ -154,7 +168,7 @@ export function useLiveActivityOrchestrator(): void {
           distance_meters: row?.distance_meters,
           rider_name: row?.rider_name,
           vehicle_type: null,
-        });
+        }, sellerName);
         await LiveActivityManager.push(data);
       } catch { /* best-effort */ }
     };
