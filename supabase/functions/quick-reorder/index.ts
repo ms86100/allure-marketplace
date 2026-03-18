@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
     const { data: rpcResult, error: createErr } = await userClient
       .rpc("create_multi_vendor_orders", {
         _buyer_id: user.id,
-        _seller_groups: JSON.stringify(sellerGroups),
+        _seller_groups: sellerGroups,
         _payment_method: "cod",
         _payment_status: "pending",
         _fulfillment_type: originalOrder.fulfillment_type || "self_pickup",
