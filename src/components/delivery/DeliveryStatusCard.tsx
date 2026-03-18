@@ -28,6 +28,8 @@ interface StatusLabelConfig {
   seller_msg?: string;
   icon?: string;
   color?: string;
+  buyer_emoji?: string;
+  seller_emoji?: string;
 }
 
 const LUCIDE_ICON_MAP: Record<string, any> = {
