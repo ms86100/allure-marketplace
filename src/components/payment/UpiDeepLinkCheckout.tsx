@@ -216,11 +216,9 @@ export function UpiDeepLinkCheckout({
 
       completeFlow();
     } catch (err) {
+      confirmSubmittedRef.current = false; // Allow retry on failure
       console.error('Failed to submit payment confirmation:', err);
       toast.error('Failed to submit payment confirmation', { id: 'upi-submit-err' });
-    } catch (err) {
-      confirmSubmittedRef.current = false; // Allow retry on failure
-      throw err;
     } finally {
       setIsSubmitting(false);
     }
