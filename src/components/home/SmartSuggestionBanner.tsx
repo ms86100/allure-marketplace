@@ -13,6 +13,7 @@ export function SmartSuggestionBanner() {
   const dismissMutation = useDismissSuggestion();
   const actMutation = useMarkSuggestionActed();
   const navigate = useNavigate();
+  const { formatPrice } = useCurrency();
   const [reorderingId, setReorderingId] = useState<string | null>(null);
   const isReorderingRef = useRef(false); // Global mutex across all suggestions
 
