@@ -224,7 +224,7 @@ export function useSellerApplication() {
 
   const saveDraft = async (): Promise<string | null> => {
     if (!user) return null;
-    if (!formData.business_name.trim()) { toast.error('Please enter a business name'); return null; }
+    if (!formData.business_name.trim()) { toast.error('Please enter a business name', { id: 'seller-app-validation' }); return null; }
     setIsLoading(true);
     try {
       const draftPayload = {
@@ -254,7 +254,7 @@ export function useSellerApplication() {
       }
     } catch (error: any) {
       console.error('Error saving draft:', error);
-      toast.error(friendlyError(error));
+      toast.error(friendlyError(error), { id: 'seller-app-draft-error' });
       return null;
     } finally { setIsLoading(false); }
   };
@@ -281,27 +281,27 @@ export function useSellerApplication() {
   const handleSaveDraftAndExit = async () => {
     if (step >= 3) await saveDraft();
     localStorage.removeItem('seller_onboarding_step');
-    toast.success('Draft saved! You can resume later.');
+    toast.success('Draft saved! You can resume later.', { id: 'seller-app-draft-saved' });
     navigate('/profile');
   };
 
   const handleSubmit = async () => {
     if (!user || !draftSellerId) return;
-    if (draftProducts.length === 0) { toast.error('Please add at least one product'); return; }
-    if (!acceptedDeclaration) { toast.error('Please accept the seller declaration'); return; }
-    if (formData.operating_days.length === 0) { toast.error('Please select at least one operating day'); return; }
-    if (formData.accepts_upi && !formData.upi_id.trim()) { toast.error('Please enter your UPI ID or disable UPI payments'); return; }
+    if (draftProducts.length === 0) { toast.error('Please add at least one product', { id: 'seller-app-validation' }); return; }
+    if (!acceptedDeclaration) { toast.error('Please accept the seller declaration', { id: 'seller-app-validation' }); return; }
+    if (formData.operating_days.length === 0) { toast.error('Please select at least one operating day', { id: 'seller-app-validation' }); return; }
+    if (formData.accepts_upi && !formData.upi_id.trim()) { toast.error('Please enter your UPI ID or disable UPI payments', { id: 'seller-app-validation' }); return; }
     // Check location: must have direct coords OR society with coords
     if (!formData.latitude) {
       if (!profile?.society_id) {
-        toast.error('Please set your store location before submitting');
+        toast.error('Please set your store location before submitting', { id: 'seller-app-validation' });
         setIsLoading(false);
         return;
       }
       // Verify society actually has coordinates
       const { data: society } = await supabase.from('societies').select('latitude, longitude').eq('id', profile.society_id).single();
       if (!society?.latitude || !society?.longitude) {
-        toast.error('Your society has no location set. Please set your store location manually.');
+        toast.error('Your society has no location set. Please set your store location manually.', { id: 'seller-app-validation' });
         setIsLoading(false);
         return;
       }
@@ -327,13 +327,13 @@ export function useSellerApplication() {
       await refreshProfile();
       localStorage.setItem('seller_onboarding_completed', 'true');
     localStorage.removeItem('seller_onboarding_step');
-    toast.success('Application submitted! Awaiting admin approval.');
+    toast.success('Application submitted! Awaiting admin approval.', { id: 'seller-app-submitted' });
     // Notify admins about the new store application
       notifyAdminsNewStoreApplication(formData.business_name.trim(), user.id).catch(console.error);
       setSubmissionComplete(true);
     } catch (error: any) {
       console.error('Error submitting application:', error);
-      toast.error(friendlyError(error));
+      toast.error(friendlyError(error), { id: 'seller-app-submit-error' });
     } finally { setIsLoading(false); }
   };
 

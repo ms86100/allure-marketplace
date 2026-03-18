@@ -189,12 +189,12 @@ export function useSellerProducts() {
 
   const handleSave = async () => {
     if (!sellerProfile || !user) return;
-    if (!formData.name.trim() || !formData.category) { toast.error('Please fill in all required fields'); return; }
+    if (!formData.name.trim() || !formData.category) { toast.error('Please fill in all required fields', { id: 'product-validation' }); return; }
     const price = parseFloat(formData.price);
     const actionNeedsPrice = !['contact_seller', 'request_quote', 'make_offer'].includes(formData.action_type);
-    if (actionNeedsPrice && (isNaN(price) || price <= 0)) { toast.error('Please enter a valid price'); return; }
-    if (formData.action_type === 'contact_seller' && !formData.contact_phone.trim()) { toast.error('Phone number is required for Contact Seller action'); return; }
-    if (formData.contact_phone.trim() && !/^[\d+\-\s()]{7,15}$/.test(formData.contact_phone.trim())) { toast.error('Please enter a valid phone number'); return; }
+    if (actionNeedsPrice && (isNaN(price) || price <= 0)) { toast.error('Please enter a valid price', { id: 'product-validation' }); return; }
+    if (formData.action_type === 'contact_seller' && !formData.contact_phone.trim()) { toast.error('Phone number is required for Contact Seller action', { id: 'product-validation' }); return; }
+    if (formData.contact_phone.trim() && !/^[\d+\-\s()]{7,15}$/.test(formData.contact_phone.trim())) { toast.error('Please enter a valid phone number', { id: 'product-validation' }); return; }
 
     setIsSaving(true);
     try {
@@ -237,12 +237,12 @@ export function useSellerProducts() {
         const { error } = await supabase.from('products').update(productData as any).eq('id', editingProduct.id);
         if (error) throw error;
         savedProductId = editingProduct.id;
-        toast.success('Product updated');
+        toast.success('Product updated', { id: 'product-saved' });
       } else {
         const { data: inserted, error } = await supabase.from('products').insert(productData as any).select('id').single();
         if (error) throw error;
         savedProductId = inserted.id;
-        toast.success('Product added');
+        toast.success('Product added', { id: 'product-saved' });
       }
 
       const isService = isServiceCategory(formData.category, configs);
@@ -253,11 +253,11 @@ export function useSellerProducts() {
           max_bookings_per_slot: parseInt(serviceFields.max_bookings_per_slot) || 1, cancellation_notice_hours: parseInt(serviceFields.cancellation_notice_hours) || 24,
           rescheduling_notice_hours: parseInt(serviceFields.rescheduling_notice_hours) || 12,
         }, { onConflict: 'product_id' });
-        if (slError) { console.error('Service listing upsert failed:', slError); toast.error('Product saved but service settings failed. Please try editing again.'); }
+        if (slError) { console.error('Service listing upsert failed:', slError); toast.error('Product saved but service settings failed. Please try editing again.', { id: 'product-service-error' }); }
       }
       setIsDialogOpen(false); resetForm();
       if (sellerProfile) fetchData(sellerProfile.id);
-    } catch (error: any) { console.error('Error saving product:', error); toast.error(friendlyError(error)); }
+    } catch (error: any) { console.error('Error saving product:', error); toast.error(friendlyError(error), { id: 'product-save-error' }); }
     finally { setIsSaving(false); }
   };
 
@@ -265,23 +265,23 @@ export function useSellerProducts() {
     if (!deleteTarget) return;
     try {
       const { data: activeBookings } = await supabase.from('service_bookings').select('id').eq('product_id', deleteTarget.id).not('status', 'in', '(cancelled,completed,no_show)').limit(1);
-      if (activeBookings && activeBookings.length > 0) { toast.error('Cannot delete: this product has active bookings. Cancel or complete them first.'); setDeleteTarget(null); return; }
+      if (activeBookings && activeBookings.length > 0) { toast.error('Cannot delete: this product has active bookings. Cancel or complete them first.', { id: 'product-delete-blocked' }); setDeleteTarget(null); return; }
       const { error } = await supabase.from('products').delete().eq('id', deleteTarget.id);
       if (error) throw error;
-      toast.success('Product deleted');
+      toast.success('Product deleted', { id: 'product-deleted' });
       if (sellerProfile) fetchData(sellerProfile.id);
-    } catch (error) { console.error('Error deleting product:', error); toast.error(friendlyError(error)); }
+    } catch (error) { console.error('Error deleting product:', error); toast.error(friendlyError(error), { id: 'product-delete-error' }); }
     finally { setDeleteTarget(null); }
   };
 
   const toggleAvailability = async (product: Product) => {
     const status = (product as any).approval_status || 'draft';
-    if (status !== 'approved') { toast.error('Submit for review first — only approved products can be toggled.'); return; }
+    if (status !== 'approved') { toast.error('Submit for review first — only approved products can be toggled.', { id: 'product-toggle-blocked' }); return; }
     try {
       const { error } = await supabase.from('products').update({ is_available: !product.is_available }).eq('id', product.id);
       if (error) throw error;
       if (sellerProfile) fetchData(sellerProfile.id);
-    } catch (error) { console.error('Error updating availability:', error); toast.error('Failed to update'); }
+    } catch (error) { console.error('Error updating availability:', error); toast.error('Failed to update', { id: 'product-toggle-error' }); }
   };
 
   const isCurrentCategoryService = useMemo(() => isServiceCategory(formData.category, configs), [formData.category, configs]);

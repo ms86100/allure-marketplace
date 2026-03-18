@@ -143,24 +143,24 @@ export function useOrderDetail(id: string | undefined) {
     try {
       const updateData: any = { status: newStatus, auto_cancel_at: null };
       if (rejectionReason) updateData.rejection_reason = rejectionReason;
-      let query = supabase.from('orders').update(updateData).eq('id', order.id);
+      let query = supabase.from('orders').update(updateData).eq('id', order.id).eq('status', order.status as any);
       if (isSellerView) query = query.eq('seller_id', seller?.id);
       else query = query.eq('buyer_id', user.id);
       const { error } = await query;
       if (error) throw error;
       setOrder({ ...order, ...updateData });
-      toast.success(`Order ${getOrderStatus(newStatus).label.toLowerCase()}`);
+      toast.success(`Order ${getOrderStatus(newStatus).label.toLowerCase()}`, { id: `order-${order.id}-update` });
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus, rejection_reason: rejectionReason });
     } catch (error: any) {
       console.error('Error updating order:', error, JSON.stringify(error));
       const errMsg = error?.message || error?.details || '';
-      toast.error(errMsg.includes('Invalid status transition') ? 'Invalid status transition — you cannot skip steps' : `Failed to update order: ${errMsg || 'Unknown error'}`);
+      toast.error(errMsg.includes('Invalid status transition') ? 'Invalid status transition — you cannot skip steps' : `Failed to update order: ${errMsg || 'Unknown error'}`, { id: `order-${order.id}-error` });
     } finally { setIsUpdating(false); }
   };
 
   const handleReject = async (reason: string) => { await updateOrderStatus('cancelled', reason); };
-  const handleTimeout = () => { fetchOrder(); toast.error('Order was auto-cancelled due to timeout'); };
+  const handleTimeout = () => { fetchOrder(); toast.error('Order was auto-cancelled due to timeout', { id: `order-${id}-timeout` }); };
 
   const isBuyerView = order ? order.buyer_id === user?.id : false;
   const nextStatus = getNextStatus();
@@ -171,7 +171,7 @@ export function useOrderDetail(id: string | undefined) {
   const chatRecipientId = isSellerView ? order?.buyer_id : seller?.user_id;
   const chatRecipientName = isSellerView ? (order as any)?.buyer?.name : seller?.business_name;
 
-  const copyOrderId = () => { if (!order) return; navigator.clipboard.writeText(order.id.slice(0, 8)); toast.success('Order ID copied'); };
+  const copyOrderId = () => { if (!order) return; navigator.clipboard.writeText(order.id.slice(0, 8)); toast.success('Order ID copied', { id: 'order-id-copied' }); };
 
   // Display statuses derived entirely from DB flow
   const displayStatuses = useMemo(() => {

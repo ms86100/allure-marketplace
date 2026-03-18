@@ -173,14 +173,15 @@ export function useNewOrderAlert(sellerId: string | null) {
     return () => { supabase.removeChannel(channel); };
   }, [sellerId, handleNewOrder]);
 
-  // ── Polling fallback — never stops, always keeps a safety net ──
+  // ── Polling fallback — pauses when tab hidden, resumes on visible ──
   useEffect(() => {
     if (!sellerId) return;
 
     let cancelled = false;
+    let pausedByVisibility = false;
 
     const poll = async () => {
-      if (cancelled) return;
+      if (cancelled || pausedByVisibility) return;
       try {
         let query = supabase
           .from('orders')
@@ -214,9 +215,22 @@ export function useNewOrderAlert(sellerId: string | null) {
 
     pollTimerRef.current = setTimeout(poll, 0);
 
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        pausedByVisibility = true;
+        if (pollTimerRef.current) { clearTimeout(pollTimerRef.current); pollTimerRef.current = null; }
+      } else {
+        pausedByVisibility = false;
+        pollDelayRef.current = MIN_POLL_MS;
+        if (!pollTimerRef.current) pollTimerRef.current = setTimeout(poll, 0);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
       cancelled = true;
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [sellerId, handleNewOrder]);
 

@@ -119,22 +119,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
     ), [items]);
 
   const addItem = useCallback(async (product: Product, quantity = 1, silent = false) => {
-    if (!user) { toast.error('Please sign in to add items to cart'); return; }
+    if (!user) { toast.error('Please sign in to add items to cart', { id: 'cart-sign-in' }); return; }
 
     const pActionType = (product as any).action_type;
-    if (pActionType && !['add_to_cart', 'buy_now'].includes(pActionType)) { toast.error('This item cannot be added to cart'); return; }
-
+    if (pActionType && !['add_to_cart', 'buy_now'].includes(pActionType)) { toast.error('This item cannot be added to cart', { id: 'cart-not-allowed' }); return; }
     const inlineAvailability = getInlineSellerAvailability(product);
     let availability = computeStoreStatus(inlineAvailability.availabilityStart, inlineAvailability.availabilityEnd, inlineAvailability.operatingDays, inlineAvailability.isAvailable);
 
     if (!inlineAvailability.hasInlineAvailability) {
-      if (!product.seller_id) { toast.error('Unable to verify store availability right now. Please try again.'); return; }
+      if (!product.seller_id) { toast.error('Unable to verify store availability right now. Please try again.', { id: 'cart-availability' }); return; }
       const { data: sellerSnapshot, error: sellerError } = await supabase.from('seller_profiles').select('availability_start, availability_end, operating_days, is_available').eq('id', product.seller_id).maybeSingle();
-      if (sellerError || !sellerSnapshot) { toast.error('Unable to verify store availability right now. Please try again.'); return; }
+      if (sellerError || !sellerSnapshot) { toast.error('Unable to verify store availability right now. Please try again.', { id: 'cart-availability' }); return; }
       availability = computeStoreStatus(sellerSnapshot.availability_start, sellerSnapshot.availability_end, sellerSnapshot.operating_days, sellerSnapshot.is_available ?? true);
     }
 
-    if (availability.status !== 'open') { const msg = formatStoreClosedMessage(availability); toast.error(msg || 'This store is currently closed. Please try again later.'); return; }
+    if (availability.status !== 'open') { const msg = formatStoreClosedMessage(availability); toast.error(msg || 'This store is currently closed. Please try again later.', { id: 'cart-store-closed' }); return; }
 
     setOptimistic(prev => {
       const existing = prev.find(item => item.product_id === product.id);
@@ -152,14 +151,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.from('cart_items').insert({ user_id: user.id, product_id: product.id, quantity });
         if (error) throw error;
       }
-      if (!silent) toast.success('Added to cart');
+      if (!silent) toast.success('Added to cart', { id: 'cart-add' });
       queryClient.setQueryData(['cart-count', user?.id], (old: number | undefined) => (old || 0) + quantity);
       invalidate();
     } catch (error) {
       queryClient.setQueryData(['cart-count', user?.id], prevCount);
       invalidate();
       const availabilityError = parseStoreAvailabilityError(error);
-      if (availabilityError) toast.error(availabilityError);
+      if (availabilityError) toast.error(availabilityError, { id: 'cart-availability-error' });
       else handleApiError(error, 'Failed to add item');
     }
   }, [user, setOptimistic, invalidate, queryClient]);
@@ -199,7 +198,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData([...CART_QUERY_KEY, user?.id], prev);
       if (qtyDelta !== 0) queryClient.setQueryData(['cart-count', user?.id], (old: number | undefined) => Math.max(0, (old || 0) - qtyDelta));
       const availabilityError = parseStoreAvailabilityError(error);
-      if (availabilityError) toast.error(availabilityError);
+      if (availabilityError) toast.error(availabilityError, { id: 'cart-qty-availability' });
       else handleApiError(error, 'Failed to update quantity');
     }
   }, [user, setOptimistic, removeItem, queryClient]);

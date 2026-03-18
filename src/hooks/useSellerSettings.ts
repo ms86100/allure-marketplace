@@ -93,7 +93,7 @@ export function useSellerSettings() {
 
   const handleCategoryChange = (category: ProductCategory, checked: boolean) => {
     const allowedCategories = primaryGroup ? groupedConfigs[primaryGroup]?.map(c => c.category) || [] : [];
-    if (!allowedCategories.includes(category as any) && checked) { toast.error(`This category is not available in your ${primaryGroup} group`); return; }
+    if (!allowedCategories.includes(category as any) && checked) { toast.error(`This category is not available in your ${primaryGroup} group`, { id: 'settings-category' }); return; }
     setFormData(prev => ({ ...prev, categories: checked ? [...prev.categories, category] : prev.categories.filter(c => c !== category) }));
   };
 
@@ -108,16 +108,16 @@ export function useSellerSettings() {
     try {
       const { error } = await supabase.from('seller_profiles').update({ is_available: newAvailability }).eq('id', sellerProfile.id);
       if (error) throw error;
-      toast.success(newAvailability ? 'Store is now open!' : 'Store paused temporarily');
+      toast.success(newAvailability ? 'Store is now open!' : 'Store paused temporarily', { id: 'settings-availability' });
       if ((sellerProfile as any).society_id) logAudit(newAvailability ? 'store_resumed' : 'store_paused', 'seller_profile', sellerProfile.id, (sellerProfile as any).society_id);
-    } catch { setFormData(prev => ({ ...prev, is_available: !newAvailability })); toast.error('Failed to update store status'); }
+    } catch { setFormData(prev => ({ ...prev, is_available: !newAvailability })); toast.error('Failed to update store status', { id: 'settings-availability-error' }); }
   };
 
   const handleSave = async () => {
     if (!sellerProfile) return;
-    if (!formData.business_name.trim()) { toast.error('Please enter a business name'); return; }
-    if (formData.categories.length === 0) { toast.error('Please select at least one category'); return; }
-    if (formData.accepts_upi && !formData.upi_id.trim()) { toast.error('Please enter your UPI ID'); return; }
+    if (!formData.business_name.trim()) { toast.error('Please enter a business name', { id: 'settings-validation' }); return; }
+    if (formData.categories.length === 0) { toast.error('Please select at least one category', { id: 'settings-validation' }); return; }
+    if (formData.accepts_upi && !formData.upi_id.trim()) { toast.error('Please enter your UPI ID', { id: 'settings-validation' }); return; }
 
     setIsSaving(true);
     try {
@@ -140,9 +140,9 @@ export function useSellerSettings() {
         daily_order_limit: (dailyLimit !== null && !isNaN(dailyLimit) && dailyLimit > 0) ? dailyLimit : null,
       } as any).eq('id', sellerProfile.id);
       if (error) throw error;
-      toast.success('Settings saved successfully');
+      toast.success('Settings saved successfully', { id: 'settings-saved' });
       if ((sellerProfile as any).society_id) logAudit('seller_settings_updated', 'seller_profile', sellerProfile.id, (sellerProfile as any).society_id, { business_name: formData.business_name, categories: formData.categories });
-    } catch (error: any) { console.error('Error saving:', error); toast.error(friendlyError(error)); }
+    } catch (error: any) { console.error('Error saving:', error); toast.error(friendlyError(error), { id: 'settings-save-error' }); }
     finally { setIsSaving(false); }
   };
 
