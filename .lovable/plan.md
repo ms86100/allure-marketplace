@@ -1,49 +1,63 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+## Deterministic Plugin Registration — No Storyboard Patching
 
-## Phase I Live Activities — CI Pipeline Status
+### Problem
+The current approach patches `Main.storyboard` XML via `sed` to swap `CAPBridgeViewController` → `SocivaBridgeViewController`. This is fragile: attribute order, whitespace, or Capacitor version changes can silently break it.
 
-### Codemagic Build Pipeline: COMPLETE
+### Solution: Programmatic Root VC Override in AppDelegate
 
-Both `ios-release` and `release-all` workflows now include:
+Instead of patching the storyboard, **set the root view controller in code** inside `AppDelegate.didFinishLaunchingWithOptions`. This is 100% deterministic — it doesn't matter what the storyboard says.
 
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
-
-### Codemagic Requirements (User Action)
-
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
-
-### Runtime Call Chain (Verified)
-
-```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
+```swift
+func application(_ application: UIApplication,
+                 didFinishLaunchingWithOptions launchOptions: ...) -> Bool {
+    FirebaseApp.configure()
+    
+    // Deterministic: always use our custom bridge VC, bypassing storyboard class
+    let vc = SocivaBridgeViewController()
+    window?.rootViewController = vc
+    window?.makeKeyAndVisible()
+    
+    // Runtime assertion
+    print("✅ rootViewController = \(type(of: window?.rootViewController))")
+    
+    return true
+}
 ```
 
-## Implementation Matrix
+`SocivaBridgeViewController` remains unchanged — it subclasses `CAPBridgeViewController` and calls `bridge?.registerPluginInstance(LiveActivityPlugin())` in `capacitorDidLoad()`.
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+### Changes to `codemagic.yaml` (both `ios-release` and `release-all`)
+
+**1. Update AppDelegate generation** (lines 123-173 / 856-903):
+Add 3 lines to `didFinishLaunchingWithOptions` after `FirebaseApp.configure()`:
+```swift
+let vc = SocivaBridgeViewController()
+window?.rootViewController = vc
+window?.makeKeyAndVisible()
+```
+
+**2. Remove ALL storyboard `sed` patching** (lines 210-237 / 936-960):
+Delete the entire storyboard patch block — primary sed, fallback sed, verification grep. None of it is needed anymore since the storyboard's `customClass` is irrelevant when AppDelegate overrides the root VC.
+
+**3. Keep** the `SocivaBridgeViewController.swift` generation and xcodeproj target addition (it still needs to compile).
+
+**4. Add runtime validation step** — keep the existing `grep -q "registerPluginInstance"` check on the Swift file, and add:
+```bash
+grep -q "SocivaBridgeViewController()" ios/App/App/AppDelegate.swift && \
+  echo "✅ Programmatic VC override in AppDelegate" || \
+  { echo "❌ FATAL: Missing programmatic VC override"; exit 1; }
+```
+
+### Why This Is Deterministic
+- No XML parsing or string matching
+- No dependency on storyboard structure
+- AppDelegate always creates and sets `SocivaBridgeViewController` as root
+- `capacitorDidLoad()` always fires → plugin always registers
+- Build fails explicitly if the code is missing (grep assertion)
+
+### Expected Result
+- Device logs: `rootViewController = Optional(SocivaBridgeViewController)` + `✅ LiveActivityPlugin registered`
+- `/la-debug`: Plugin Available ✅, getActivities Works ✅
+
