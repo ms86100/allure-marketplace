@@ -232,7 +232,7 @@ Deno.serve(async (req) => {
     };
 
     // Build APNs payload for Live Activity update
-    const isTerminal = TERMINAL_STATUSES.has(status);
+    const isTerminal = terminalStatuses.has(status);
     const apnsPayload: Record<string, unknown> = {
       aps: {
         timestamp: Math.floor(Date.now() / 1000),

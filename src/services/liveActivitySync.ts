@@ -54,7 +54,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
 
     const { data: orders, error } = await supabase
       .from('orders')
-      .select('id, status, seller_id')
+      .select('id, status, seller_id, order_number')
       .eq('buyer_id', userId)
       .in('status', activeStatuses as any);
 
