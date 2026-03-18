@@ -18,13 +18,15 @@ export function BuyerDeliveryConfirmation({ orderId, sellerName, onConfirmed }: 
   const handleConfirm = async () => {
     setConfirming(true);
     try {
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('orders')
         .update({ status: 'completed' as any })
         .eq('id', orderId)
-        .eq('status', 'delivered' as any);
+        .eq('status', 'delivered' as any)
+        .select('id');
 
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error('Order was already completed or status changed.');
       setConfirmed(true);
       toast.success('Delivery confirmed! Thank you.', { id: `delivery-confirm-${orderId}` });
       // Fire notification processing

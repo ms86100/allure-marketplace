@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -82,6 +82,10 @@ export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinatio
         <Marker position={[destinationLat, destinationLng]} icon={destinationIcon}>
           <Popup>Delivery Address</Popup>
         </Marker>
+        <Polyline
+          positions={[[riderLat, riderLng], [destinationLat, destinationLng]]}
+          pathOptions={{ color: 'hsl(var(--primary))', weight: 3, dashArray: '8, 8', opacity: 0.7 }}
+        />
       </MapContainer>
     </div>
   );

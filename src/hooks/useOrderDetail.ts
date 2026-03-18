@@ -20,12 +20,14 @@ function resolveTransactionType(
     return 'request_service';
   }
   if (orderType === 'booking') return 'service_booking';
-  if (fulfillmentType && ['self_pickup', 'seller_delivery'].includes(fulfillmentType)) return 'self_fulfillment';
-  // Delivery orders where seller handles delivery → self_fulfillment (no delivery partner steps)
-  if (fulfillmentType === 'delivery' && deliveryHandledBy === 'seller') return 'self_fulfillment';
-  // Delivery but no handler specified → default to self_fulfillment (platform delivery not live)
-  if (fulfillmentType === 'delivery' && !deliveryHandledBy) return 'self_fulfillment';
-  return 'cart_purchase';
+  if (fulfillmentType === 'self_pickup') return 'self_fulfillment';
+  // Seller-handled delivery → seller_delivery (includes delivery tracking statuses)
+  if (fulfillmentType === 'seller_delivery') return 'seller_delivery';
+  if (fulfillmentType === 'delivery' && (deliveryHandledBy || 'seller') === 'seller') return 'seller_delivery';
+  if (fulfillmentType === 'delivery' && !deliveryHandledBy) return 'seller_delivery';
+  // Platform-handled delivery
+  if (fulfillmentType === 'delivery' && deliveryHandledBy === 'platform') return 'cart_purchase';
+  return 'self_fulfillment';
 }
 
 export function useOrderDetail(id: string | undefined) {
