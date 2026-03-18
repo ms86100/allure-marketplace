@@ -189,7 +189,7 @@ export function useSellerProducts() {
 
   const handleSave = async () => {
     if (!sellerProfile || !user) return;
-    if (!formData.name.trim() || !formData.category) { toast.error('Please fill in all required fields'); return; }
+    if (!formData.name.trim() || !formData.category) { toast.error('Please fill in all required fields', { id: 'product-validation' }); return; }
     const price = parseFloat(formData.price);
     const actionNeedsPrice = !['contact_seller', 'request_quote', 'make_offer'].includes(formData.action_type);
     if (actionNeedsPrice && (isNaN(price) || price <= 0)) { toast.error('Please enter a valid price'); return; }
