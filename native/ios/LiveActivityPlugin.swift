@@ -40,7 +40,9 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             progressStage: call.getString("progress_stage"),
             progressPercent: call.getDouble("progress_percent"),
             sellerName: call.getString("seller_name"),
-            itemCount: call.getInt("item_count")
+            itemCount: call.getInt("item_count"),
+            orderShortId: call.getString("order_short_id"),
+            sellerLogoUrl: call.getString("seller_logo_url")
         )
     }
 
@@ -61,7 +63,6 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 if activity.attributes.entityId == entityId {
                     Task {
                         await activity.update(.init(state: state, staleDate: nil))
-                        // Observe push token for existing activity too
                         self.observePushToken(for: activity, entityId: entityId)
                         call.resolve(["activityId": activity.id])
                     }
@@ -80,7 +81,6 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                     content: .init(state: state, staleDate: nil),
                     pushType: .token
                 )
-                // Observe push token updates
                 self.observePushToken(for: activity, entityId: entityId)
                 call.resolve(["activityId": activity.id])
             } catch {
@@ -95,7 +95,6 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @available(iOS 16.2, *)
     private func observePushToken(for activity: Activity<LiveDeliveryAttributes>, entityId: String) {
-        // Cancel any existing observation for this entity
         tokenTasks[entityId]?.cancel()
 
         let task = Task { [weak self] in
@@ -104,7 +103,6 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 let token = tokenData.map { String(format: "%02x", $0) }.joined()
                 print("📲 LiveActivity push token for \(entityId): \(token.prefix(16))…")
 
-                // Emit event to JS layer
                 self?.notifyListeners("liveActivityPushToken", data: [
                     "entityId": entityId,
                     "pushToken": token,
@@ -129,7 +127,7 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                         return
                     }
                 }
-                call.resolve() // no-op if not found
+                call.resolve()
             }
         } else {
             call.reject("iOS 16.2+ required for Live Activities")
@@ -145,7 +143,6 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             Task {
                 for activity in Activity<LiveDeliveryAttributes>.activities {
                     if activity.id == activityId {
-                        // Cancel token observation
                         let entityId = activity.attributes.entityId
                         self.tokenTasks[entityId]?.cancel()
                         self.tokenTasks.removeValue(forKey: entityId)

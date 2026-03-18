@@ -1,62 +1,104 @@
 /**
  * LiveDeliveryWidget.swift
  *
- * Blinkit-style rich Live Activity widget with status-dependent
- * colored cards, animated progress bar with 🛵 scooter,
- * item counts, and deep-link tap support.
+ * Unified, status-adaptive Live Activity widget for Sociva.
+ * Single dark card with status-tinted accents, SF Symbols,
+ * clean typography, and contextual information.
  */
 
 import SwiftUI
 import WidgetKit
 import ActivityKit
 
-// MARK: - Reusable Progress Bar
+// MARK: - Status Phase
 
 @available(iOS 16.1, *)
-struct DeliveryProgressBar: View {
-    let progress: Double // 0.0–1.0
+enum OrderPhase {
+    case confirmed
+    case preparing
+    case ready
+    case transit
+    case arrived
+    case delivered
+
+    var accentColor: Color {
+        switch self {
+        case .confirmed:  return .orange
+        case .preparing:  return Color(red: 0.95, green: 0.65, blue: 0.15) // amber
+        case .ready:      return Color(red: 0.25, green: 0.55, blue: 0.95) // blue
+        case .transit:    return Color(red: 0.2, green: 0.78, blue: 0.45)  // green
+        case .arrived:    return Color(red: 0.2, green: 0.78, blue: 0.45)
+        case .delivered:  return Color(red: 0.15, green: 0.75, blue: 0.5)  // emerald
+        }
+    }
+
+    var sfSymbol: String {
+        switch self {
+        case .confirmed:  return "checkmark.circle.fill"
+        case .preparing:  return "fork.knife"
+        case .ready:      return "bag.fill"
+        case .transit:    return "bicycle"
+        case .arrived:    return "mappin.and.ellipse"
+        case .delivered:  return "checkmark.seal.fill"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .confirmed:  return "Order Confirmed"
+        case .preparing:  return "Being Prepared"
+        case .ready:      return "Ready for Pickup"
+        case .transit:    return "On the Way"
+        case .arrived:    return "At Your Location"
+        case .delivered:  return "Delivered"
+        }
+    }
+
+    static func from(_ status: String) -> OrderPhase {
+        switch status {
+        case "accepted", "confirmed":               return .confirmed
+        case "preparing":                            return .preparing
+        case "ready":                                return .ready
+        case "picked_up", "on_the_way", "en_route":  return .transit
+        case "arrived":                              return .arrived
+        case "delivered", "completed":               return .delivered
+        default:                                     return .confirmed
+        }
+    }
+}
+
+// MARK: - Accent Progress Bar
+
+@available(iOS 16.1, *)
+struct AccentProgressBar: View {
+    let progress: Double
+    let accentColor: Color
     let showScooter: Bool
 
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width
-            let clampedProgress = min(max(progress, 0), 1)
+            let p = min(max(progress, 0), 1)
 
             ZStack(alignment: .leading) {
-                // Background track
                 Capsule()
-                    .fill(Color.green.opacity(0.2))
-                    .frame(height: 6)
+                    .fill(accentColor.opacity(0.15))
+                    .frame(height: 5)
 
-                // Filled track
                 Capsule()
-                    .fill(Color.green)
-                    .frame(width: w * clampedProgress, height: 6)
-                    .animation(.easeInOut(duration: 0.5), value: clampedProgress)
+                    .fill(accentColor)
+                    .frame(width: w * p, height: 5)
+                    .animation(.easeInOut(duration: 0.6), value: p)
 
-                // Scooter emoji at progress point
                 if showScooter {
                     Text("🛵")
-                        .font(.system(size: 16))
-                        .offset(x: max(0, w * clampedProgress - 10), y: -2)
-                        .animation(.easeInOut(duration: 0.5), value: clampedProgress)
+                        .font(.system(size: 14))
+                        .offset(x: max(0, w * p - 9), y: -3)
+                        .animation(.easeInOut(duration: 0.6), value: p)
                 }
             }
         }
-        .frame(height: 20)
-    }
-}
-
-// MARK: - Item Count Badge
-
-@available(iOS 16.1, *)
-struct ItemCountBadge: View {
-    let count: Int
-
-    var body: some View {
-        Text("\(count) item\(count == 1 ? "" : "s")")
-            .font(.caption2)
-            .foregroundColor(.white.opacity(0.7))
+        .frame(height: 18)
     }
 }
 
@@ -67,30 +109,33 @@ struct ItemCountBadge: View {
 struct LiveDeliveryWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: LiveDeliveryAttributes.self) { context in
-            // ── Lock Screen Banner ──────────────────────────
             lockScreenView(context: context)
                 .widgetURL(URL(string: "sociva://orders/\(context.attributes.entityId)"))
 
         } dynamicIsland: { context in
+            let phase = OrderPhase.from(context.state.workflowStatus)
+
             DynamicIsland {
-                // ── Expanded Regions ────────────────────────
+                // ── Expanded ──
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 6) {
                         Image("SocivaIcon")
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 24, height: 24)
+                            .frame(width: 22, height: 22)
                             .clipShape(Circle())
                         VStack(alignment: .leading, spacing: 1) {
                             Text(context.state.sellerName ?? "Sociva")
                                 .font(.caption2)
-                                .foregroundColor(.white.opacity(0.7))
-                            Text(statusSubtitle(context.state.workflowStatus))
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white)
-                            if let count = context.state.itemCount, count > 0 {
-                                ItemCountBadge(count: count)
+                                .foregroundColor(.white.opacity(0.6))
+                            HStack(spacing: 4) {
+                                Image(systemName: phase.sfSymbol)
+                                    .font(.caption2)
+                                    .foregroundColor(phase.accentColor)
+                                Text(phase.title)
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
                             }
                         }
                     }
@@ -98,28 +143,28 @@ struct LiveDeliveryWidget: Widget {
                 DynamicIslandExpandedRegion(.trailing) {
                     if let eta = context.state.etaMinutes {
                         VStack(alignment: .trailing, spacing: 1) {
-                            Text("Arriving in")
-                                .font(.caption2)
-                                .foregroundColor(.white.opacity(0.6))
-                            Text("\(eta) mins")
-                                .font(.headline)
+                            Text("\(eta)")
+                                .font(.title3)
                                 .fontWeight(.bold)
-                                .foregroundColor(.white)
+                                .foregroundColor(phase.accentColor)
+                            Text("min")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.5))
                         }
-                    } else {
-                        Text(statusTitle(context.state.workflowStatus))
+                    } else if let shortId = context.state.orderShortId {
+                        Text(shortId)
                             .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
+                            .foregroundColor(.white.opacity(0.5))
                     }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    DeliveryProgressBar(
+                    AccentProgressBar(
                         progress: context.state.progressPercent ?? 0,
-                        showScooter: isDeliveryStatus(context.state.workflowStatus)
+                        accentColor: phase.accentColor,
+                        showScooter: phase == .transit
                     )
                     .padding(.horizontal, 4)
-                    .padding(.top, 4)
+                    .padding(.top, 2)
                 }
             } compactLeading: {
                 Image("SocivaIcon")
@@ -132,16 +177,11 @@ struct LiveDeliveryWidget: Widget {
                     Text("\(eta)m")
                         .font(.caption)
                         .bold()
-                        .foregroundColor(.green)
-                } else if let count = context.state.itemCount, count > 0 {
-                    Text("\(count) 📦")
-                        .font(.caption2)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(phase.accentColor)
                 } else {
-                    // Mini progress indicator
                     Circle()
                         .trim(from: 0, to: context.state.progressPercent ?? 0.1)
-                        .stroke(Color.green, lineWidth: 2)
+                        .stroke(phase.accentColor, lineWidth: 2)
                         .frame(width: 14, height: 14)
                         .rotationEffect(.degrees(-90))
                 }
@@ -155,176 +195,117 @@ struct LiveDeliveryWidget: Widget {
         }
     }
 
-    // MARK: - Lock Screen View (status-dependent cards)
+    // MARK: - Unified Lock Screen View
 
     @ViewBuilder
     private func lockScreenView(context: ActivityViewContext<LiveDeliveryAttributes>) -> some View {
-        let status = context.state.workflowStatus
+        let phase = OrderPhase.from(context.state.workflowStatus)
 
-        if status == "ready" {
-            // ── Ready: Purple-blue gradient ──
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image("SocivaIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 28, height: 28)
-                        .clipShape(Circle())
-                    Text(context.state.sellerName ?? "Sociva")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.8))
-                    Spacer()
-                    if let count = context.state.itemCount, count > 0 {
-                        ItemCountBadge(count: count)
-                    }
-                }
+        VStack(alignment: .leading, spacing: 10) {
+            // ── Row 1: Brand + Order ID ──
+            HStack {
+                Image("SocivaIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
+                    .clipShape(Circle())
 
-                Text("Your Order is Ready! 🎉")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
+                Text(context.state.sellerName ?? "Sociva")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white.opacity(0.85))
 
-                if let stage = context.state.progressStage, !stage.isEmpty {
-                    Text(stage)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.8))
-                }
+                Spacer()
 
-                DeliveryProgressBar(progress: context.state.progressPercent ?? 0.85, showScooter: false)
-            }
-            .padding()
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 0.45, green: 0.25, blue: 0.85),
-                        Color(red: 0.30, green: 0.45, blue: 0.95)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-
-        } else if status == "delivered" || status == "completed" {
-            // ── Delivered: Green card ──
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image("SocivaIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 28, height: 28)
-                        .clipShape(Circle())
-                    Text(context.state.sellerName ?? "Sociva")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.8))
-                    Spacer()
-                    Text("✅")
-                        .font(.title2)
-                }
-
-                Text("Order Delivered!")
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-
-                DeliveryProgressBar(progress: 1.0, showScooter: false)
-            }
-            .padding()
-            .background(Color.green.opacity(0.85))
-
-        } else {
-            // ── Default: Dark gray card (accepted, preparing, en_route, etc.) ──
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image("SocivaIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 28, height: 28)
-                        .clipShape(Circle())
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(context.state.sellerName ?? "Sociva")
+                VStack(alignment: .trailing, spacing: 1) {
+                    if let shortId = context.state.orderShortId {
+                        Text(shortId)
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
-                        if let count = context.state.itemCount, count > 0 {
-                            ItemCountBadge(count: count)
-                        }
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white.opacity(0.5))
                     }
-                    Spacer()
-                    if let eta = context.state.etaMinutes {
-                        VStack(alignment: .trailing, spacing: 1) {
-                            Text("ETA")
-                                .font(.caption2)
-                                .foregroundColor(.orange.opacity(0.8))
-                            Text("\(eta) min")
-                                .font(.headline)
-                                .bold()
-                                .foregroundColor(.orange)
-                        }
+                    if let count = context.state.itemCount, count > 0 {
+                        Text("\(count) item\(count == 1 ? "" : "s")")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.4))
                     }
                 }
+            }
 
-                Text(statusTitle(status))
-                    .font(.title3)
+            // ── Row 2: Status Title with SF Symbol ──
+            HStack(spacing: 6) {
+                Image(systemName: phase.sfSymbol)
+                    .font(.subheadline)
+                    .foregroundColor(phase.accentColor)
+
+                Text(phase.title)
+                    .font(.subheadline)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
-
-                if let stage = context.state.progressStage,
-                   !stage.isEmpty,
-                   stage.lowercased() != status.lowercased() {
-                    Text(stage)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.8))
-                }
-
-                HStack(spacing: 12) {
-                    if let name = context.state.driverName {
-                        Label(name, systemImage: "person.fill")
-                            .font(.caption2)
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                    if let dist = context.state.driverDistance {
-                        Label(String(format: "%.1f km", dist), systemImage: "location.fill")
-                            .font(.caption2)
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                }
-
-                DeliveryProgressBar(
-                    progress: context.state.progressPercent ?? 0,
-                    showScooter: isDeliveryStatus(status)
-                )
             }
-            .padding()
-            .background(Color(white: 0.12))
+
+            // ── Row 3: Contextual Subtitle ──
+            Text(contextualSubtitle(state: context.state, phase: phase))
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.6))
+                .lineLimit(1)
+
+            // ── Row 4: Progress + ETA ──
+            HStack(spacing: 8) {
+                AccentProgressBar(
+                    progress: context.state.progressPercent ?? 0,
+                    accentColor: phase.accentColor,
+                    showScooter: phase == .transit
+                )
+
+                if let eta = context.state.etaMinutes {
+                    Text("ETA \(eta) min")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(phase.accentColor)
+                        .fixedSize()
+                }
+            }
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            ZStack {
+                Color(white: 0.1)
+                // Subtle accent glow at top-left
+                phase.accentColor
+                    .opacity(0.08)
+                    .blur(radius: 40)
+                    .offset(x: -60, y: -30)
+            }
+        )
     }
 
-    // MARK: - Helpers
+    // MARK: - Contextual Subtitle
 
-    private func statusTitle(_ status: String) -> String {
-        switch status {
-        case "accepted":   return "Order Accepted ✓"
-        case "confirmed":  return "Booking Confirmed ✓"
-        case "preparing":  return "We're Preparing Your Order"
-        case "picked_up":  return "Order Picked Up"
-        case "en_route":   return "Order is On the Way 🛵"
-        case "on_the_way": return "Order is On the Way 🛵"
-        case "ready":      return "Your Order is Ready!"
-        default:           return "Order Update"
+    private func contextualSubtitle(state: LiveDeliveryAttributes.ContentState, phase: OrderPhase) -> String {
+        switch phase {
+        case .confirmed:
+            return "Seller is reviewing your order"
+        case .preparing:
+            return state.progressStage ?? "Your order is being made"
+        case .ready:
+            if let seller = state.sellerName {
+                return "Waiting to be picked up from \(seller)"
+            }
+            return "Your order is ready for pickup"
+        case .transit:
+            var parts: [String] = []
+            if let name = state.driverName { parts.append(name) }
+            if let dist = state.driverDistance { parts.append(String(format: "%.1f km away", dist)) }
+            return parts.isEmpty ? "Your order is on the way" : parts.joined(separator: " · ")
+        case .arrived:
+            if let name = state.driverName {
+                return "\(name) has arrived"
+            }
+            return "Your delivery has arrived"
+        case .delivered:
+            return "Thank you for your order"
         }
-    }
-
-    private func statusSubtitle(_ status: String) -> String {
-        switch status {
-        case "accepted", "confirmed": return "Order confirmed"
-        case "preparing":  return "Preparing your order"
-        case "ready":      return "Ready for pickup"
-        case "picked_up":  return "Picked up"
-        case "en_route", "on_the_way": return "Order is on the way"
-        default:           return "Order update"
-        }
-    }
-
-    private func isDeliveryStatus(_ status: String) -> Bool {
-        return status == "picked_up" || status == "en_route" || status == "on_the_way"
     }
 }

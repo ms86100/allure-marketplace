@@ -59,6 +59,17 @@ function mapProgressStage(
 }
 
 /**
+ * Derives a short order ID from the full UUID, e.g. "#7838".
+ */
+function deriveOrderShortId(orderId: string, orderNumber?: string | null): string {
+  if (orderNumber) return `#${orderNumber}`;
+  // Last 4 hex chars of UUID
+  const clean = orderId.replace(/-/g, '');
+  const last4 = clean.slice(-4).toUpperCase();
+  return `#${last4}`;
+}
+
+/**
  * Builds a LiveActivityData payload from an order row, optional
  * delivery assignment data, and DB-backed status flow entries.
  */
@@ -66,6 +77,7 @@ export function buildLiveActivityData(
   order: {
     id: string;
     status: string;
+    order_number?: string | null;
   },
   delivery?: {
     eta_minutes?: number | null;
@@ -76,6 +88,7 @@ export function buildLiveActivityData(
   sellerName?: string | null,
   itemCount?: number | null,
   statusFlowEntries?: StatusFlowEntry[],
+  sellerLogoUrl?: string | null,
 ): LiveActivityData {
   const config = getTrackingConfigSync();
   const distanceKm = delivery?.distance_meters != null
@@ -113,5 +126,7 @@ export function buildLiveActivityData(
     progress_percent: progressPercent,
     seller_name: sellerName ?? null,
     item_count: itemCount ?? null,
+    order_short_id: deriveOrderShortId(order.id, order.order_number),
+    seller_logo_url: sellerLogoUrl ?? null,
   };
 }

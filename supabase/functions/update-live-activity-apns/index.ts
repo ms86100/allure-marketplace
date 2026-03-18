@@ -23,6 +23,7 @@ interface LAUpdatePayload {
   push_token: string;
   seller_name?: string;
   seller_logo?: string;
+  seller_logo_url?: string;
   transaction_type?: string;
   parent_group?: string;
 }
@@ -154,7 +155,7 @@ Deno.serve(async (req) => {
     }
 
     const payload: LAUpdatePayload = await req.json();
-    const { order_id, status, push_token, seller_name, transaction_type, parent_group } = payload;
+    const { order_id, status, push_token, seller_name, seller_logo_url, transaction_type, parent_group } = payload;
 
     if (!order_id || !status || !push_token) {
       return new Response(
@@ -202,6 +203,9 @@ Deno.serve(async (req) => {
     const flowEntry = flowMap.get(status);
     const progressStage = flowEntry?.display_label ?? null;
 
+    // Derive short order ID from UUID
+    const orderShortId = `#${order_id.replace(/-/g, "").slice(-4).toUpperCase()}`;
+
     const contentState: Record<string, unknown> = {
       workflowStatus: status,
       etaMinutes,
@@ -212,6 +216,8 @@ Deno.serve(async (req) => {
       progressPercent,
       sellerName: seller_name || null,
       itemCount,
+      orderShortId,
+      sellerLogoUrl: seller_logo_url || null,
     };
 
     // Build APNs payload for Live Activity update
