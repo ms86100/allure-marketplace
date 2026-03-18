@@ -300,7 +300,7 @@ export function useCartPage() {
         .select('id')
         .eq('buyer_id', user.id)
         .eq('payment_status', 'pending')
-        .in('status', ['pending', 'accepted', 'confirmed'])
+        .in('status', ['pending', 'accepted', 'confirmed'] as any[])
         .limit(1);
       if (existingPending && existingPending.length > 0) {
         toast.error('You have an unpaid order pending. Please complete or cancel it first.', { id: 'checkout-pending-exists' });
