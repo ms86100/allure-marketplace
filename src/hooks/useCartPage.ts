@@ -206,7 +206,7 @@ export function useCartPage() {
 
       const stillPending = existingOrders?.filter(o => o.status !== 'cancelled' && o.payment_status !== 'paid' && o.payment_status !== 'buyer_confirmed');
       if (stillPending && stillPending.length > 0) {
-        toast.error('You have a pending payment. Please complete or cancel it first.');
+        toast.error('You have a pending payment. Please complete or cancel it first.', { id: 'checkout-pending' });
         // Re-open the UPI payment sheet
         setPendingOrderIds(stillPending.map(o => o.id));
         if (paymentMethod === 'upi' && paymentMode.isUpiDeepLink) {
