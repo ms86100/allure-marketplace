@@ -1,49 +1,48 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
+Problem summary:
+The screenshots show the JavaScript side is running inside a native iOS shell (`Platform: ios`, `Native: Yes`), but Capacitor still cannot see the native `LiveActivity` bridge at runtime. Since the plugin source now looks correct in the repo, the most likely issue is not the JS code anymore — it is that the installed iPhone app binary does not actually contain the updated native plugin.
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+Why this is still happening:
+1. `native/ios/LiveActivityPlugin.swift` is now correctly structured:
+   - `@objc(LiveActivityPlugin)` present
+   - `CAPBridgedPlugin` metadata present
+   - no class-level `@available` guard
+2. But this project does not have a checked-in `ios/` app folder locally right now, so the real iOS project is generated during the mobile build pipeline.
+3. That means pressing normal web build/publish is not enough. The fix only takes effect after a fresh native iOS build is produced and installed.
+4. If the installed app came from an older binary, or the CI step that copies `native/ios/LiveActivityPlugin.swift` into the actual iOS target did not run correctly, Capacitor will still report exactly what your screenshots show: `"LiveActivity" plugin is not implemented on ios`.
 
-## Phase I Live Activities — CI Pipeline Status
+Most likely root cause:
+The app on your phone is still an older native build, or the build pipeline produced an IPA without the plugin file being compiled into the App target.
 
-### Codemagic Build Pipeline: COMPLETE
+Plan to fix and verify:
+1. Verify build source
+   - Confirm the app on the phone was installed from a brand-new iOS native build, not just after a web publish/update.
+   - If it was not rebuilt as a native iOS binary, rebuild it first.
 
-Both `ios-release` and `release-all` workflows now include:
+2. Verify CI/build logs
+   - Check the iOS build log for these exact steps succeeding:
+     - `=== Copying Live Activity Swift files ===`
+     - `=== Live Activity plugin files added to App target ===`
+   - If either step is missing or fails, the plugin never enters the final app.
 
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+3. Force a truly fresh install
+   - Create a new iOS build
+   - Uninstall the existing app from the iPhone
+   - Install the new build
+   - This removes the chance that you are testing an older cached binary
 
-### Codemagic Requirements (User Action)
+4. Runtime confirmation
+   - On the fresh build, the native log should print:
+     `✅ LiveActivityPlugin loaded — Capacitor bridge registered`
+   - Then `/la-debug` should change to:
+     - Plugin Available: yes
+     - getActivities Works: yes
+     - Start Test: success or a real ActivityKit-specific error
+   - If it still says “plugin not implemented”, the plugin is still not inside the compiled app target
 
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
+5. If it still fails after a fresh native build
+   - Next implementation step should be to harden build verification by surfacing a native build marker/version in the debug page so we can prove which binary is installed
+   - Also add CI log assertions around the plugin copy/target-membership step so a broken mobile build fails earlier instead of shipping silently
 
-### Runtime Call Chain (Verified)
-
-```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
-```
-
-## Implementation Matrix
-
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+Technical conclusion:
+The current evidence points to a deployment/build inclusion problem, not a Live Activity logic problem. The repo code for the plugin now looks correct; the installed iPhone app likely does not contain that updated native code yet.
