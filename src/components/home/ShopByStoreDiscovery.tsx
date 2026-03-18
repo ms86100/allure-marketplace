@@ -15,6 +15,11 @@ import { Store, Star, MapPin, ChevronDown, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
+/** Replaces pure-numeric business names (e.g. phone numbers) with a fallback */
+function sanitizeSellerName(name: string): string {
+  return /^\d+$/.test(name.trim()) ? 'Local Seller' : name;
+}
+
 export function ShopByStoreDiscovery() {
   const { effectiveSociety, profile } = useAuth();
   const browseBeyond = profile?.browse_beyond_community ?? true;
