@@ -277,6 +277,12 @@ Deno.serve(async (req) => {
           .delete()
           .eq("order_id", order_id);
         console.log(`[LA-APNs] Cleaned up token for terminal order ${order_id}`);
+      } else {
+        // Track successful push timestamp for delta-based throttling
+        await supabase
+          .from("live_activity_tokens")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("order_id", order_id);
       }
 
       return new Response(
