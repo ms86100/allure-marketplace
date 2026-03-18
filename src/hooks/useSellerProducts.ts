@@ -270,7 +270,7 @@ export function useSellerProducts() {
       if (error) throw error;
       toast.success('Product deleted', { id: 'product-deleted' });
       if (sellerProfile) fetchData(sellerProfile.id);
-    } catch (error) { console.error('Error deleting product:', error); toast.error(friendlyError(error)); }
+    } catch (error) { console.error('Error deleting product:', error); toast.error(friendlyError(error), { id: 'product-delete-error' }); }
     finally { setDeleteTarget(null); }
   };
 
