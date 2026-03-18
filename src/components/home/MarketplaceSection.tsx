@@ -8,6 +8,7 @@ import { useSocialProof } from '@/hooks/queries/useSocialProof';
 import { ParentGroupTabs } from '@/components/home/ParentGroupTabs';
 import { CategoryImageGrid } from '@/components/home/CategoryImageGrid';
 import { FeaturedBanners } from '@/components/home/FeaturedBanners';
+import { AutoHighlightStrip } from '@/components/home/AutoHighlightStrip';
 import { ShopByStoreDiscovery } from '@/components/home/ShopByStoreDiscovery';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
@@ -19,6 +20,9 @@ import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useMarketplaceConfig } from '@/hooks/useMarketplaceConfig';
 import { useBadgeConfig } from '@/hooks/useBadgeConfig';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 
 /* ── Gradient Divider ── */
 function SectionDivider() {
@@ -27,7 +31,7 @@ function SectionDivider() {
 
 export function MarketplaceSection() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, effectiveSocietyId } = useAuth();
   const ml = useMarketplaceLabels();
   const { browsingLocation } = useBrowsingLocation();
 
@@ -40,6 +44,25 @@ export function MarketplaceSection() {
 
   const { data: localCategories = [], isLoading: loadingLocal } = useProductsByCategory(80);
   const { parentGroupInfos } = useParentGroups();
+
+  // Check if featured banners exist to decide whether to show auto-highlights
+  const { data: bannerCount = 0 } = useQuery({
+    queryKey: ['featured-banner-count', effectiveSocietyId],
+    queryFn: async () => {
+      let query = supabase
+        .from('featured_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true);
+      if (effectiveSocietyId) {
+        query = query.or(`society_id.eq.${effectiveSocietyId},society_id.is.null`);
+      } else {
+        query = query.is('society_id', null);
+      }
+      const { count } = await query;
+      return count || 0;
+    },
+    staleTime: 60_000,
+  });
 
   const allProducts = useMemo(() => localCategories.flatMap(c => c.products), [localCategories]);
   const allProductIds = useMemo(() => allProducts.map(p => p.id), [allProducts]);
@@ -106,8 +129,12 @@ export function MarketplaceSection() {
 
   return (
     <div className="pb-2">
-      {/* ── Hero: Featured Banners ── */}
-      <FeaturedBanners />
+      {/* ── Hero: Featured Banners OR Auto-Highlights ── */}
+      {bannerCount > 0 ? (
+        <FeaturedBanners />
+      ) : (
+        <AutoHighlightStrip />
+      )}
 
       {/* ── Icon-forward Category Tabs ── */}
       <div className="pt-3 pb-4">
@@ -128,10 +155,11 @@ export function MarketplaceSection() {
       {!activeGroup && popularNearYou.length > (discoveryMinProducts || 3) && (
         <>
           <SectionDivider />
-          <div className="bg-secondary/20 py-4 -mx-0 rounded-none">
+          <div className="bg-secondary/20 py-4 rounded-none">
             <DiscoveryRow
               title={browsingLocation?.label ? `${ml.label('label_discovery_popular')} · ${browsingLocation.label}` : ml.label('label_discovery_popular')}
               icon={<Flame size={14} className="text-destructive" />}
+              accentClass="bg-destructive/10 text-destructive"
               products={popularNearYou}
               onProductTap={handleProductTap}
               onNavigate={navigate}
@@ -150,6 +178,7 @@ export function MarketplaceSection() {
           <DiscoveryRow
             title={ml.label('label_discovery_new')}
             icon={<Sparkles size={14} className="text-primary" />}
+            accentClass="bg-primary/10 text-primary"
             products={newThisWeek}
             onProductTap={handleProductTap}
             onNavigate={navigate}
@@ -176,7 +205,10 @@ export function MarketplaceSection() {
       />
 
       {/* ── Store Discovery ── */}
-      <div className="bg-primary/[0.03] py-4 mt-2">
+      <div className="bg-secondary/30 py-5 mt-3">
+        <div className="flex items-center gap-1.5 px-4 mb-1">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Meet your neighbors who sell</span>
+        </div>
         <ShopByStoreDiscovery />
       </div>
 
@@ -210,12 +242,13 @@ export function MarketplaceSection() {
   );
 }
 
-// ── Discovery Row ──
+// ── Discovery Row with accent header ──
 function DiscoveryRow({
-  title, icon, products, onProductTap, onNavigate, categoryConfigs, marketplaceConfig, badgeConfigs, socialProofMap,
+  title, icon, accentClass, products, onProductTap, onNavigate, categoryConfigs, marketplaceConfig, badgeConfigs, socialProofMap,
 }: {
   title: string;
   icon: React.ReactNode;
+  accentClass?: string;
   products: ProductWithSeller[];
   onProductTap?: (p: ProductWithSeller) => void;
   onNavigate?: (path: string) => void;
@@ -224,15 +257,35 @@ function DiscoveryRow({
   badgeConfigs?: any[];
   socialProofMap?: Map<string, number>;
 }) {
+  // Find the hero product (bestseller or highest orders)
+  const heroIdx = useMemo(() => {
+    const bsIdx = products.findIndex(p => p.is_bestseller);
+    if (bsIdx >= 0) return bsIdx;
+    if (products.length > 0) {
+      let maxIdx = 0;
+      let maxCount = (products[0] as any).completed_order_count || 0;
+      for (let i = 1; i < products.length; i++) {
+        const c = (products[i] as any).completed_order_count || 0;
+        if (c > maxCount) { maxCount = c; maxIdx = i; }
+      }
+      return maxCount > 0 ? maxIdx : -1;
+    }
+    return -1;
+  }, [products]);
+
   return (
     <div>
-      <div className="flex items-center gap-1.5 px-4 mb-3">
-        {icon}
+      <div className="flex items-center gap-2 px-4 mb-3">
+        {accentClass && (
+          <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold', accentClass)}>
+            {icon}
+          </span>
+        )}
         <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{title}</h3>
       </div>
       <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1 snap-x snap-mandatory">
-        {products.map(product => (
-          <div key={product.id} className="w-[155px] shrink-0 snap-start">
+        {products.map((product, i) => (
+          <div key={product.id} className={cn('shrink-0 snap-start', i === heroIdx ? 'w-[220px]' : 'w-[155px]')}>
             <ProductListingCard
               product={product}
               onTap={onProductTap}
@@ -323,37 +376,50 @@ function ProductListings({
 
   return (
     <div className="space-y-8 mt-5">
-      {categories.map(cat => (
-        <div key={cat.category}>
-          <div className="flex items-center justify-between px-4 mb-3">
-            <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
-              <DynamicIcon name={cat.icon} size={16} className="shrink-0" />
-              {cat.displayName}
-            </h3>
-            <Link
-              to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-              className="text-[11px] font-bold text-primary flex items-center gap-0.5"
-            >
-              see all <ChevronRight size={12} />
-            </Link>
+      {categories.map((cat, catIdx) => {
+        // Get category color for accent dot
+        const catConfig = categoryConfigs?.find((c: any) => c.category === cat.category);
+        const catColor = catConfig?.color || null;
+
+        return (
+          <div key={cat.category}>
+            <div className="flex items-center justify-between px-4 mb-3">
+              <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
+                {catColor && (
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: catColor }} />
+                )}
+                <DynamicIcon name={cat.icon} size={16} className="shrink-0" />
+                {cat.displayName}
+              </h3>
+              <Link
+                to={`/category/${cat.parentGroup}?sub=${cat.category}`}
+                className="text-[11px] font-bold text-primary flex items-center gap-0.5"
+              >
+                see all <ChevronRight size={12} />
+              </Link>
+            </div>
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1 snap-x snap-mandatory">
+              {cat.products.slice(0, 8).map((product, i) => {
+                // First bestseller in each category row gets hero treatment
+                const isHero = i === 0 && product.is_bestseller;
+                return (
+                  <div key={product.id} className={cn('shrink-0 snap-start', isHero ? 'w-[220px]' : 'w-[155px]')}>
+                    <ProductListingCard
+                      product={product}
+                      onTap={onProductTap}
+                      onNavigate={onNavigate}
+                      categoryConfigs={categoryConfigs}
+                      marketplaceConfig={marketplaceConfig}
+                      badgeConfigs={badgeConfigs}
+                      socialProofCount={socialProofMap?.get(product.id)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1 snap-x snap-mandatory">
-            {cat.products.slice(0, 8).map(product => (
-              <div key={product.id} className="w-[155px] shrink-0 snap-start">
-                <ProductListingCard
-                  product={product}
-                  onTap={onProductTap}
-                  onNavigate={onNavigate}
-                  categoryConfigs={categoryConfigs}
-                  marketplaceConfig={marketplaceConfig}
-                  badgeConfigs={badgeConfigs}
-                  socialProofCount={socialProofMap?.get(product.id)}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

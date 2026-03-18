@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Trophy, Star, ShoppingBag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCurrency } from '@/hooks/useCurrency';
+import { cn } from '@/lib/utils';
 
 interface TopSeller {
   id: string;
@@ -24,6 +23,15 @@ interface TopProduct {
   seller_name: string;
   seller_id: string;
   price: number;
+}
+
+/** Deterministic hue from seller ID */
+function hashToHue(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash) % 360;
 }
 
 export function SocietyLeaderboard() {
@@ -91,47 +99,114 @@ export function SocietyLeaderboard() {
   const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
 
   return (
-    <div className="space-y-4 px-4">
+    <div className="space-y-5 px-4">
+      {/* ── Top Sellers — Podium Style ── */}
       {topSellers.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Trophy size={16} className="text-primary" />
-            <h3 className="font-bold text-sm">Top Sellers in Your Society</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-warning/20 flex items-center justify-center">
+              <Trophy size={14} className="text-warning" />
+            </div>
+            <h3 className="font-bold text-sm text-foreground">Top Sellers in Your Society</h3>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            {topSellers.map((s, i) => (
-              <Card key={s.id} className="shrink-0 w-28 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/seller/${s.id}`)}>
-                <CardContent className="p-3 text-center space-y-1">
-                  <span className="text-lg">{medals[i]}</span>
-                  {s.profile_image_url ? (
-                    <img src={s.profile_image_url} alt="" className="w-10 h-10 rounded-full mx-auto object-cover" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full mx-auto bg-muted flex items-center justify-center">
-                      <ShoppingBag size={16} className="text-muted-foreground" />
+
+          {/* Podium: top 3 with center elevated */}
+          {topSellers.length >= 3 ? (
+            <div className="flex items-end justify-center gap-2 mb-3">
+              {[topSellers[1], topSellers[0], topSellers[2]].map((s, visualIdx) => {
+                const isCenter = visualIdx === 1;
+                const rank = isCenter ? 0 : visualIdx === 0 ? 1 : 2;
+                const hue = hashToHue(s.id);
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => navigate(`/seller/${s.id}`)}
+                    className={cn(
+                      'flex flex-col items-center cursor-pointer transition-all hover:scale-[1.03] active:scale-[0.97]',
+                      isCenter ? 'w-28' : 'w-24',
+                    )}
+                  >
+                    <span className="text-lg mb-1">{medals[rank]}</span>
+                    <div className={cn(
+                      'rounded-full overflow-hidden border-2 mb-1.5',
+                      isCenter ? 'w-16 h-16 border-warning' : 'w-12 h-12 border-border',
+                    )}>
+                      {s.profile_image_url ? (
+                        <img src={s.profile_image_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div
+                          className="w-full h-full flex items-center justify-center font-bold text-white"
+                          style={{ backgroundColor: `hsl(${hue}, 55%, 50%)`, fontSize: isCenter ? '18px' : '14px' }}
+                        >
+                          {s.business_name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                     </div>
-                  )}
-                  <p className="text-[11px] font-semibold truncate">{s.business_name}</p>
-                  <div className="flex items-center justify-center gap-0.5">
-                    <Star size={10} className="text-primary fill-primary" />
-                    <span className="text-[10px] font-medium">{s.rating.toFixed(1)}</span>
+                    <p className={cn('font-semibold text-foreground truncate text-center w-full', isCenter ? 'text-[12px]' : 'text-[10px]')}>
+                      {s.business_name}
+                    </p>
+                    <div className="flex items-center gap-0.5 mt-0.5">
+                      <Star size={9} className="text-warning fill-warning" />
+                      <span className="text-[9px] font-medium text-muted-foreground">{s.rating.toFixed(1)}</span>
+                    </div>
+                    <p className="text-[8px] text-muted-foreground">{s.completed_order_count} orders</p>
                   </div>
-                  <p className="text-[9px] text-muted-foreground">{s.completed_order_count} orders</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {/* Remaining sellers (or all if < 3) as horizontal scroll */}
+          {(topSellers.length < 3 ? topSellers : topSellers.slice(3)).length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {(topSellers.length < 3 ? topSellers : topSellers.slice(3)).map((s, i) => {
+                const rank = topSellers.length < 3 ? i : i + 3;
+                const hue = hashToHue(s.id);
+                return (
+                  <div
+                    key={s.id}
+                    className="shrink-0 w-28 rounded-2xl bg-card border border-border overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => navigate(`/seller/${s.id}`)}
+                  >
+                    <div className="p-3 text-center space-y-1">
+                      <span className="text-lg">{medals[rank]}</span>
+                      {s.profile_image_url ? (
+                        <img src={s.profile_image_url} alt="" className="w-10 h-10 rounded-full mx-auto object-cover" />
+                      ) : (
+                        <div
+                          className="w-10 h-10 rounded-full mx-auto flex items-center justify-center font-bold text-white"
+                          style={{ backgroundColor: `hsl(${hue}, 55%, 50%)` }}
+                        >
+                          {s.business_name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <p className="text-[11px] font-semibold truncate">{s.business_name}</p>
+                      <div className="flex items-center justify-center gap-0.5">
+                        <Star size={10} className="text-warning fill-warning" />
+                        <span className="text-[10px] font-medium">{s.rating.toFixed(1)}</span>
+                      </div>
+                      <p className="text-[9px] text-muted-foreground">{s.completed_order_count} orders</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
+      {/* ── Most Ordered Products ── */}
       {topProducts.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-2.5">
-            <ShoppingBag size={16} className="text-primary" />
-            <h3 className="font-bold text-sm">Most Ordered Products</h3>
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+              <ShoppingBag size={14} className="text-primary" />
+            </div>
+            <h3 className="font-bold text-sm text-foreground">Most Ordered Products</h3>
           </div>
           <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
             {topProducts.map((p, i) => (
-              <div key={p.product_id} className="shrink-0 w-[130px] rounded-2xl bg-card border border-border overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/seller/${p.seller_id}`)}>
+              <div key={p.product_id} className="shrink-0 w-[155px] rounded-2xl bg-card border border-border overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/seller/${p.seller_id}`)}>
                 <div className="relative aspect-square bg-muted">
                   {p.image_url ? (
                     <img src={p.image_url} alt="" className="w-full h-full object-cover" />
