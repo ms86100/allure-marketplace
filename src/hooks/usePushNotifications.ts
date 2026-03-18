@@ -309,6 +309,15 @@ export function usePushNotificationsInternal() {
           title: notification?.title,
           body: notification?.body,
         });
+
+        // Suppress duplicate alert if Live Activity is already tracking this order
+        const data = notification?.data as Record<string, string> | undefined;
+        const orderId = data?.order_id ?? data?.entity_id;
+        if (orderId && LiveActivityManager.isTracking(orderId)) {
+          pushLog('info', 'FOREGROUND_SUPPRESSED_LA_ACTIVE', { orderId });
+          return;
+        }
+
         hapticNotification('success');
 
         // Play a short alert beep via Web Audio API (no media session / no playback controls)

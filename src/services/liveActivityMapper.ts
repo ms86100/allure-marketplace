@@ -2,13 +2,13 @@ import type { LiveActivityData } from '@/plugins/live-activity/definitions';
 
 /** Human-readable progress descriptions shown as the subtitle on the lock screen widget */
 const PROGRESS_DESCRIPTIONS: Record<string, string> = {
-  accepted: 'Your order has been accepted',
-  confirmed: 'Your booking is confirmed',
-  preparing: 'Your order is being prepared',
-  ready: 'Ready for pickup',
-  picked_up: 'Order picked up by rider',
-  en_route: 'On the way to you',
-  on_the_way: 'On the way to you',
+  accepted: 'Order Accepted',
+  confirmed: 'Booking Confirmed',
+  preparing: 'Order Being Prepared',
+  ready: 'Order Ready',
+  picked_up: 'Order Picked Up',
+  en_route: 'Order On The Way',
+  on_the_way: 'Order On The Way',
 };
 
 /**
