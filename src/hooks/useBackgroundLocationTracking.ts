@@ -9,7 +9,10 @@ interface TrackingState {
   lastSentAt: number | null;
 }
 
-const SEND_INTERVAL_MS = 10_000; // Throttle: send at most every 10s
+// Adaptive intervals based on movement
+const INTERVAL_MOVING_MS = 5_000;   // 5s when moving
+const INTERVAL_IDLE_MS = 15_000;    // 15s when stationary
+const SPEED_THRESHOLD_KMH = 5;     // Below this = stationary
 
 export function useBackgroundLocationTracking(assignmentId: string | null) {
   const [state, setState] = useState<TrackingState>({
@@ -20,6 +23,7 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
 
   const watchIdRef = useRef<string | number | null>(null);
   const lastSentRef = useRef<number>(0);
+  const lastSpeedRef = useRef<number>(0);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -27,12 +31,24 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
     return () => { mountedRef.current = false; };
   }, []);
 
+  /** Get current adaptive interval based on last known speed */
+  const getInterval = useCallback(() => {
+    return lastSpeedRef.current > SPEED_THRESHOLD_KMH
+      ? INTERVAL_MOVING_MS
+      : INTERVAL_IDLE_MS;
+  }, []);
+
   const sendLocation = useCallback(async (
     lat: number, lng: number, speed: number | null, heading: number | null, accuracy: number | null
   ) => {
     if (!assignmentId) return;
+
+    const speedKmh = speed != null ? speed * 3.6 : 0; // m/s → km/h
+    lastSpeedRef.current = speedKmh;
+
     const now = Date.now();
-    if (now - lastSentRef.current < SEND_INTERVAL_MS) return;
+    const interval = speedKmh > SPEED_THRESHOLD_KMH ? INTERVAL_MOVING_MS : INTERVAL_IDLE_MS;
+    if (now - lastSentRef.current < interval) return;
     lastSentRef.current = now;
 
     try {
@@ -41,7 +57,7 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
           assignment_id: assignmentId,
           latitude: lat,
           longitude: lng,
-          speed_kmh: speed != null ? speed * 3.6 : null, // m/s → km/h
+          speed_kmh: speedKmh > 0 ? speedKmh : null,
           heading,
           accuracy_meters: accuracy,
         },
@@ -86,7 +102,6 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
         toast.error('Could not start location tracking.');
       }
     } else {
-      // Web fallback
       if (!navigator.geolocation) {
         toast.error('Geolocation not supported in this browser.');
         return;
@@ -131,7 +146,6 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
     }
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => { stopTracking(); };
   }, [stopTracking]);
