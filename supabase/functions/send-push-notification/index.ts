@@ -436,7 +436,9 @@ Deno.serve(async (req) => {
             tokenRecord.token,
             title,
             body,
-            data
+            data,
+            threadId,
+            imageUrl,
           );
         }
 
