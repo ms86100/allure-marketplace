@@ -44,6 +44,8 @@ export default function OrderDetailPage() {
   const [deliveryAssignmentId, setDeliveryAssignmentId] = useState<string | null>(null);
   const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
   const [hasDeliveryFeedback, setHasDeliveryFeedback] = useState(false);
+  const [buyerOtp, setBuyerOtp] = useState<string | null>(null);
+  const [roadEtaMinutes, setRoadEtaMinutes] = useState<number | null>(null);
   const { data: serviceBooking } = useServiceBookingForOrder(o.order?.id);
 
   const order = o.order;
@@ -53,7 +55,7 @@ export default function OrderDetailPage() {
 
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
 
-  // Live Activity is now handled globally by useLiveActivityOrchestrator
+  // Gap A: Fetch delivery OTP for buyer display
 
   useEffect(() => {
     if (isDeliveryOrder && orderId) {
@@ -86,6 +88,20 @@ export default function OrderDetailPage() {
     }
   }, [orderId, isDeliveryOrder]);
 
+  // Gap A: Fetch delivery OTP for buyer
+  useEffect(() => {
+    if (deliveryAssignmentId && isDeliveryOrder) {
+      supabase
+        .from('delivery_assignments')
+        .select('delivery_code')
+        .eq('id', deliveryAssignmentId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.delivery_code) setBuyerOtp(data.delivery_code);
+        });
+    }
+  }, [isDeliveryOrder, deliveryAssignmentId]);
+
   if (o.isLoading) return <AppLayout showHeader={false}><div className="p-4 space-y-3"><Skeleton className="h-8 w-32" /><Skeleton className="h-28 w-full rounded-xl" /><Skeleton className="h-40 w-full rounded-xl" /></div></AppLayout>;
   if (!order) return <AppLayout showHeader={false}><div className="p-4 text-center py-16"><p className="text-sm text-muted-foreground">Order not found</p><Link to="/orders"><Button size="sm" className="mt-4">View Orders</Button></Link></div></AppLayout>;
 
@@ -99,8 +115,9 @@ export default function OrderDetailPage() {
   const displayStatuses = o.displayStatuses;
   const isInTransit = o.isInTransit;
 
-  // Gap 9: Only show arrival overlay when we have actual GPS data and rider is close
-  const showArrivalOverlay = deliveryAssignmentId && deliveryTracking.riderLocation && deliveryTracking.distance != null && deliveryTracking.distance < 200;
+  // Gap G: Only show arrival overlay for BUYER when rider is close
+  const showArrivalOverlay = o.isBuyerView && deliveryAssignmentId && deliveryTracking.riderLocation && deliveryTracking.distance != null && deliveryTracking.distance < 200;
+
 
   return (
     <AppLayout showHeader={false} showNav={(!o.isSellerView || isTerminalStatus(o.flow, order.status)) && !o.isChatOpen}>
@@ -246,11 +263,20 @@ export default function OrderDetailPage() {
                       destinationLng={destLng}
                       riderName={deliveryTracking.riderName}
                       heading={deliveryTracking.riderLocation.heading}
+                      onRoadEtaChange={setRoadEtaMinutes}
                     />
                   </Suspense>
                 ) : null;
               })()}
-              <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} />
+              <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} trackingState={deliveryTracking} roadEtaMinutes={roadEtaMinutes} />
+              {/* Gap A: Show delivery OTP to buyer */}
+              {o.isBuyerView && buyerOtp && isInTransit && (
+                <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Your Delivery OTP</p>
+                  <p className="text-3xl font-bold tracking-[0.3em] text-primary">{buyerOtp}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">Share this code with the delivery partner</p>
+                </div>
+              )}
               {o.isBuyerView && (
                 <div className="flex justify-end">
                   <UpdateBuyerLocationButton orderId={order.id} />
@@ -405,6 +431,7 @@ export default function OrderDetailPage() {
           riderPhone={deliveryTracking.riderPhone}
           status={deliveryTracking.status}
           onDismiss={() => {}}
+          deliveryCode={buyerOtp}
         />
       )}
     </AppLayout>

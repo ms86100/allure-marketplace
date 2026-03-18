@@ -1,4 +1,4 @@
-import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
+import { useDeliveryTracking, type DeliveryTrackingState } from '@/hooks/useDeliveryTracking';
 import { Phone, Truck, Navigation, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -6,6 +6,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 interface LiveDeliveryTrackerProps {
   assignmentId: string;
   isBuyerView: boolean;
+  /** Gap D: Accept pre-existing tracking state to avoid duplicate subscriptions */
+  trackingState?: DeliveryTrackingState;
+  /** Gap F: Road-based ETA from OSRM, more accurate than Haversine */
+  roadEtaMinutes?: number | null;
 }
 
 function formatDistance(meters: number | null): string {
@@ -18,7 +22,9 @@ function computeDistanceEta(distanceMeters: number): number {
   return Math.max(1, Math.ceil(distanceMeters / 1000 * 4));
 }
 
-function getSmartEta(distance: number | null, dbEta: number | null): number | null {
+function getSmartEta(distance: number | null, dbEta: number | null, roadEta?: number | null): number | null {
+  // Gap F: Prefer OSRM road-based ETA when available
+  if (roadEta != null && roadEta > 0) return roadEta;
   if (distance !== null && distance < 500) {
     return computeDistanceEta(distance);
   }
@@ -53,8 +59,10 @@ function getLastSeenText(lastLocationAt: string | null): string | null {
   return null;
 }
 
-export function LiveDeliveryTracker({ assignmentId, isBuyerView }: LiveDeliveryTrackerProps) {
-  const tracking = useDeliveryTracking(assignmentId);
+export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, roadEtaMinutes }: LiveDeliveryTrackerProps) {
+  // Gap D: Use passed-in tracking state if available, otherwise create own subscription
+  const ownTracking = useDeliveryTracking(trackingState ? null : assignmentId);
+  const tracking = trackingState || ownTracking;
 
   if (tracking.isLoading) {
     return (
@@ -78,7 +86,7 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView }: LiveDeliveryT
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Live Tracking</p>
         </div>
         {(() => {
-          const smartEta = getSmartEta(tracking.distance, tracking.eta);
+          const smartEta = getSmartEta(tracking.distance, tracking.eta, roadEtaMinutes);
           return smartEta && isInTransit ? (
             <Badge variant="secondary" className="bg-primary/10 text-primary">
               <Clock size={10} className="mr-1" />

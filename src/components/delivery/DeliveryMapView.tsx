@@ -10,6 +10,7 @@ interface DeliveryMapViewProps {
   destinationLng: number;
   riderName?: string | null;
   heading?: number | null;
+  onRoadEtaChange?: (eta: number | null) => void;
 }
 
 // Rider icon with rotation support
@@ -186,13 +187,18 @@ function useOSRMRoute(
   return { routeCoords, roadEtaMinutes, roadDistanceMeters };
 }
 
-export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinationLng, riderName, heading }: DeliveryMapViewProps) {
+export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinationLng, riderName, heading, onRoadEtaChange }: DeliveryMapViewProps) {
   const center: [number, number] = [
     (riderLat + destinationLat) / 2,
     (riderLng + destinationLng) / 2,
   ];
 
   const { routeCoords, roadEtaMinutes } = useOSRMRoute(riderLat, riderLng, destinationLat, destinationLng);
+
+  // Gap F: Propagate OSRM ETA to parent
+  useEffect(() => {
+    onRoadEtaChange?.(roadEtaMinutes);
+  }, [roadEtaMinutes, onRoadEtaChange]);
 
   // Fallback straight line if OSRM hasn't loaded yet
   const polylinePositions = routeCoords.length > 0

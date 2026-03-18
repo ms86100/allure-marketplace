@@ -10,6 +10,7 @@ interface DeliveryArrivalOverlayProps {
   riderPhone: string | null;
   status: string | null;
   onDismiss: () => void;
+  deliveryCode?: string | null;
 }
 
 export function DeliveryArrivalOverlay({
@@ -19,6 +20,7 @@ export function DeliveryArrivalOverlay({
   riderPhone,
   status,
   onDismiss,
+  deliveryCode,
 }: DeliveryArrivalOverlayProps) {
   const [dismissed, setDismissed] = useState(false);
 
@@ -104,6 +106,14 @@ export function DeliveryArrivalOverlay({
                     Call Delivery Partner
                   </Button>
                 </a>
+              )}
+
+              {/* Gap A: Show OTP in arrival overlay */}
+              {deliveryCode && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-center">
+                  <p className="text-[10px] text-muted-foreground mb-0.5">Your Delivery OTP</p>
+                  <p className="text-2xl font-bold tracking-[0.3em] text-primary">{deliveryCode}</p>
+                </div>
               )}
             </div>
           </motion.div>

@@ -62,14 +62,10 @@ export function OrderCancellation({ orderId, orderStatus, onCancelled, canCancel
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ 
-          status: 'cancelled',
-          rejection_reason: `Cancelled by buyer: ${finalReason}`,
-        })
-        .eq('id', orderId)
-        .eq('buyer_id', user?.id);
+      const { error } = await supabase.rpc('buyer_cancel_order', {
+        _order_id: orderId,
+        _reason: `Cancelled by buyer: ${finalReason}`,
+      });
 
       if (error) throw error;
 
