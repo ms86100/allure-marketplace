@@ -229,6 +229,11 @@ export default function OrderDetailPage() {
                 </Suspense>
               )}
               <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} />
+              {o.isBuyerView && (
+                <div className="flex justify-end">
+                  <UpdateBuyerLocationButton orderId={order.id} />
+                </div>
+              )}
             </>
           )}
           {/* Seller self-delivery GPS broadcasting */}
