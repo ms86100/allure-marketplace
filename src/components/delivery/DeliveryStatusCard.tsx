@@ -131,8 +131,9 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
   if (!assignment) return null;
 
   const statusConfig = labelsConfig[assignment.status] || labelsConfig.pending || DEFAULT_LABELS.pending;
-  const StatusIcon = ICON_MAP[assignment.status] || Clock;
-  const colorClass = COLOR_MAP[assignment.status] || COLOR_MAP.pending;
+  const iconName = statusConfig.icon || DEFAULT_ICON_MAP[assignment.status] || 'Clock';
+  const StatusIcon = LUCIDE_ICON_MAP[iconName] || Clock;
+  const colorClass = statusConfig.color || DEFAULT_COLOR_MAP[assignment.status] || DEFAULT_COLOR_MAP.pending;
 
   const deliverySteps = Object.keys(labelsConfig).filter(k => !['failed', 'cancelled'].includes(k));
   const currentStepIndex = deliverySteps.indexOf(assignment.status);

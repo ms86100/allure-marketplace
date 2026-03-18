@@ -20,8 +20,7 @@ export async function getStatusFlowEntries(): Promise<FlowEntry[]> {
   const { data, error } = await supabase
     .from('category_status_flows')
     .select('status_key, sort_order, is_terminal')
-    .eq('transaction_type', 'cart_purchase')
-    .eq('parent_group', 'default')
+    .in('transaction_type', ['cart_purchase', 'seller_delivery'])
     .order('sort_order');
 
   if (error || !data) return cached ?? [];
