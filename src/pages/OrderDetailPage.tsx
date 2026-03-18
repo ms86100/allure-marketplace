@@ -42,6 +42,8 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const o = useOrderDetail(id);
   const [deliveryAssignmentId, setDeliveryAssignmentId] = useState<string | null>(null);
+  const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
+  const [hasDeliveryFeedback, setHasDeliveryFeedback] = useState(false);
   const { data: serviceBooking } = useServiceBookingForOrder(o.order?.id);
 
   const order = o.order;
