@@ -160,7 +160,7 @@ export function useOrderDetail(id: string | undefined) {
   };
 
   const handleReject = async (reason: string) => { await updateOrderStatus('cancelled', reason); };
-  const handleTimeout = () => { fetchOrder(); toast.error('Order was auto-cancelled due to timeout'); };
+  const handleTimeout = () => { fetchOrder(); toast.error('Order was auto-cancelled due to timeout', { id: `order-${id}-timeout` }); };
 
   const isBuyerView = order ? order.buyer_id === user?.id : false;
   const nextStatus = getNextStatus();
