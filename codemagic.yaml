@@ -135,6 +135,13 @@ workflows:
               func application(_ application: UIApplication,
                                didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
                   FirebaseApp.configure()
+
+                  // Deterministic: always use our custom bridge VC, bypassing storyboard class
+                  let vc = SocivaBridgeViewController()
+                  window?.rootViewController = vc
+                  window?.makeKeyAndVisible()
+                  print("✅ rootViewController = \(type(of: window?.rootViewController))")
+
                   return true
               }
 
@@ -207,38 +214,10 @@ workflows:
           puts "=== SocivaBridgeViewController.swift added to App target ==="
           RUBY
 
-          # Patch Main.storyboard to use SocivaBridgeViewController instead of CAPBridgeViewController
-          STORYBOARD="ios/App/App/Base.lproj/Main.storyboard"
-          if [ -f "$STORYBOARD" ]; then
-            echo "=== Storyboard BEFORE patch ==="
-            grep -n 'customClass' "$STORYBOARD" || echo "(no customClass attributes found)"
-            # Primary: patch both customClass and customModule together
-            sed -i '' 's/customClass="CAPBridgeViewController" customModule="Capacitor"/customClass="SocivaBridgeViewController" customModule="App"/g' "$STORYBOARD"
-            # Fallback: if attributes are in different order or customModule is absent
-            if ! grep -q 'SocivaBridgeViewController' "$STORYBOARD"; then
-              sed -i '' 's/customClass="CAPBridgeViewController"/customClass="SocivaBridgeViewController"/g' "$STORYBOARD"
-              sed -i '' '/SocivaBridgeViewController/s/customModule="Capacitor"/customModule="App"/g' "$STORYBOARD"
-            fi
-            echo "=== Storyboard AFTER patch ==="
-            grep -n 'customClass\|customModule' "$STORYBOARD" || echo "(no customClass/customModule found)"
-            # Mandatory verification
-            grep -q 'SocivaBridgeViewController' "$STORYBOARD" && echo "✅ Storyboard patched" || { echo "❌ FATAL: Storyboard patch failed"; cat "$STORYBOARD"; exit 1; }
-            grep -q 'customModule="App"' "$STORYBOARD" && echo "✅ customModule=App confirmed" || echo "⚠️ customModule=App not found (may need manual check)"
-          else
-            echo "⚠️ Main.storyboard not found at $STORYBOARD — checking alternate paths"
-            find ios/App -name "Main.storyboard" -print
-            for SB in $(find ios/App -name "Main.storyboard"); do
-              sed -i '' 's/customClass="CAPBridgeViewController" customModule="Capacitor"/customClass="SocivaBridgeViewController" customModule="App"/g' "$SB"
-              if ! grep -q 'SocivaBridgeViewController' "$SB"; then
-                sed -i '' 's/customClass="CAPBridgeViewController"/customClass="SocivaBridgeViewController"/g' "$SB"
-                sed -i '' '/SocivaBridgeViewController/s/customModule="Capacitor"/customModule="App"/g' "$SB"
-              fi
-            done
-          fi
-
-          # Verification
+          # Verification — no storyboard patching needed, AppDelegate sets root VC programmatically
           echo "=== Build verification ==="
-          grep -q "registerPluginInstance" ios/App/App/SocivaBridgeViewController.swift && echo "✅ Plugin registration in BridgeVC" || echo "❌ MISSING BridgeVC registration"
+          grep -q "registerPluginInstance" ios/App/App/SocivaBridgeViewController.swift && echo "✅ Plugin registration in BridgeVC" || { echo "❌ FATAL: Missing plugin registration"; exit 1; }
+          grep -q "SocivaBridgeViewController()" ios/App/App/AppDelegate.swift && echo "✅ Programmatic VC override in AppDelegate" || { echo "❌ FATAL: Missing programmatic VC override"; exit 1; }
 
       - name: Add Push Notification & Live Activity Entitlements
         script: |
