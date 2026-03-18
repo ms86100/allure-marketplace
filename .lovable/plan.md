@@ -1,66 +1,115 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phases 1–3)
 
-# Fix: Duplicate Push Notifications on Buyer Lock Screen
+All 9 original phases plus Blinkit parity Phases 1–3 are fully implemented.
 
-## Root Cause — Proven with Database Evidence
+## Blinkit Gap-Fill Status
 
-There are **TWO separate trigger functions** that fire on order INSERT, both inserting into `notification_queue`:
+### Phase 1: APNs Push-to-Live-Activity — COMPLETE
 
-1. **`fn_enqueue_new_order_notification`** — fires on `AFTER INSERT ON orders` (trigger: `trg_enqueue_new_order_notification`)
-2. **`fn_enqueue_order_status_notification`** — fires on `AFTER UPDATE ON orders` but ALSO matches INSERT events because other BEFORE INSERT triggers (like `trg_set_order_society_id`, `trg_update_updated_at_orders`) cause the row to be "updated" during the same transaction
+Live Activities now update even when the app process is killed by iOS, matching Blinkit's reliability.
 
-**Database proof:** Every single order in the last 48 hours has exactly **2 copies** of the `placed` notification with the **exact same `created_at` timestamp**. For example:
-- Order `0ca43884...`: 2 copies at `2026-03-18 11:46:32`
-- Order `d9b5c141...`: 2 copies at `2026-03-18 09:42:44`
-- This pattern is consistent for ALL recent orders
+#### Architecture
 
-The 30-second idempotency check in `fn_enqueue_order_status_notification` does NOT catch these because both trigger functions run in the **same transaction** — the duplicate doesn't exist yet when the second one checks.
-
-Additionally, looking at the screenshot: the buyer is getting "Your Order is Ready" and "We're Preparing Your Order" notifications stacked — these are status-change notifications that come from `fn_enqueue_order_status_notification`. The seller couldn't accept orders previously (now fixed with the `p.latitude` fix), so when the seller finally processed multiple orders at once, the buyer received a flood of backlogged notifications.
-
-## Fix Plan
-
-### 1. Database Migration — Drop the duplicate INSERT trigger
-
-The `fn_enqueue_new_order_notification` trigger is redundant. The `fn_enqueue_order_status_notification` already handles the `placed` status (via the CASE statement). We need to:
-
-- **Drop** `trg_enqueue_new_order_notification` trigger from `orders` table
-- **Drop** the `fn_enqueue_new_order_notification` function
-
-This eliminates the double-insert at the source.
-
-### 2. Database Migration — Strengthen idempotency guard
-
-Update `fn_enqueue_order_status_notification` to use a **UNIQUE constraint** approach instead of the time-window check. Add the idempotency check using `ON CONFLICT DO NOTHING` on `(reference_path, payload->>'status')` within a short window, or simply use a stronger dedup:
-
-```sql
--- Before inserting, use INSERT ... ON CONFLICT to prevent any remaining edge cases
--- Add a partial unique index for deduplication
-CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_queue_order_status_dedup
-ON public.notification_queue (reference_path, (payload->>'status'))
-WHERE reference_path IS NOT NULL 
-  AND reference_path LIKE '/orders/%'
-  AND created_at > now() - interval '60 seconds';
+```
+Order status change → DB trigger → net.http_post → update-live-activity-apns edge function
+  → APNs push (apns-push-type: liveactivity) → iOS widget receives content-state update
+  → Lock screen / Dynamic Island re-renders
 ```
 
-Since partial unique indexes with `now()` won't work (not immutable), the better approach is:
-- Keep the 30-second SELECT check but also add `ON CONFLICT DO NOTHING` on the insert itself using a deterministic idempotency key column
+#### Implementation Details
 
-Actually, the simplest permanent fix is:
-- Drop the duplicate trigger (fix 1 above)
-- The existing 30-second idempotency SELECT guard in `fn_enqueue_order_status_notification` handles retries/edge cases
+| Component | What Was Done |
+|-----------|---------------|
+| **DB table** | `live_activity_tokens` (user_id, order_id, push_token, platform) with RLS |
+| **Swift plugin** | `LiveActivityPlugin.swift` — requests activity with `pushType: .token`, observes `Activity.pushTokenUpdates`, emits `liveActivityPushToken` event to JS |
+| **LiveActivityManager.ts** | Listens for `liveActivityPushToken` events, upserts token to `live_activity_tokens` table, cleans up on activity end |
+| **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
+| **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
 
-### 3. Clean up existing duplicate notifications
+### Phase 2: System Reliability — COMPLETE
 
-Run a one-time cleanup to remove duplicate `notification_queue` entries that have already been created.
+#### 2A. Idempotency Guard on Push Processing
 
-## Summary
+| Component | What Was Done |
+|-----------|---------------|
+| **DB trigger** | `fn_enqueue_order_status_notification` now checks for duplicate entries (same `reference_path` + `payload->>'status'` within 30 seconds) before inserting into `notification_queue`. Skips with `RAISE NOTICE`. |
+| **DB index** | `idx_notification_queue_dedup` on `notification_queue(reference_path, created_at DESC)` for fast dedup lookups |
 
-| Change | Type | Purpose |
-|--------|------|---------|
-| Drop `trg_enqueue_new_order_notification` trigger | DB Migration | Eliminates the root cause of double notifications |
-| Drop `fn_enqueue_new_order_notification` function | DB Migration | Cleanup orphaned function |
-| Clean existing duplicates | DB Migration | Remove already-queued duplicates |
+#### 2B. Realtime Channel Auto-Reconnect
 
-No frontend changes needed. This is purely a database-level fix.
+| Component | What Was Done |
+|-----------|---------------|
+| **`useLiveActivityOrchestrator.ts`** | Both order and delivery channels now detect `CHANNEL_ERROR` / `TIMED_OUT`, remove the dead channel, and re-subscribe after 3s delay. Max 3 reconnects per session. On successful reconnect (`SUBSCRIBED`), retry counter resets. Each reconnect triggers a one-shot `syncActiveOrders` to fill any gap. Unique channel names with `Date.now()` suffix prevent Supabase channel name conflicts. |
 
+### Phase 3: Seller Self-Delivery GPS + Buyer Live Map — COMPLETE
+
+#### 3A. Seller GPS Broadcasting for Self-Delivery
+
+| Component | What Was Done |
+|-----------|---------------|
+| **`SellerGPSTracker.tsx`** | New component — shown to sellers on OrderDetailPage when `delivery_handled_by === 'seller'` and order status is `picked_up` or `on_the_way`. Uses existing `useBackgroundLocationTracking` hook. Shows Start/Stop controls, live badge, and last-sent timestamp. |
+| **`OrderDetailPage.tsx`** | Integrated `SellerGPSTracker` in the seller action area, gated by `delivery_handled_by === 'seller'` + transit statuses |
+
+#### 3B. Buyer Live Map
+
+| Component | What Was Done |
+|-----------|---------------|
+| **`DeliveryMapView.tsx`** | New component using Leaflet + OpenStreetMap (no API key). Shows rider position (🛵 marker) and destination (📍 marker). Auto-fits bounds on mount, pans when rider moves out of view. |
+| **`OrderDetailPage.tsx`** | Integrated `DeliveryMapView` above `LiveDeliveryTracker` for buyer view when rider has GPS data and order has delivery coordinates (`delivery_lat`/`delivery_lng`). Falls back to text-only tracker when no GPS data available. |
+
+### Previously Completed Blinkit Gaps
+
+| Feature | Status |
+|---------|--------|
+| Push deep-link routing | ✅ Done |
+| Notification grouping (threadId) | ✅ Done |
+| Rich push images (NSE) | ✅ Done |
+| Dynamic Island tap → order page | ✅ Done |
+| Item count in DI | ✅ Done |
+| GPS-derived progress | ✅ Done |
+
+### Phase 4: Live Map / Rider GPS — DEFERRED
+
+Requires dedicated rider-side GPS broadcasting infrastructure (separate product workstream). Seller self-delivery GPS (Phase 3A) covers the immediate need.
+
+### Product Thumbnails in Widget — DEFERRED
+
+Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
+
+## Silent Push Optimization: COMPLETE
+
+### Notification Matrix
+
+| Status | Push? | Live Activity? | Rationale |
+|--------|-------|----------------|-----------|
+| `accepted` | ✅ Always | Yes | Critical — order confirmed |
+| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
+| `ready` | ✅ Always | Yes | Pickup moment — user must know |
+| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
+| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
+| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
+| `delivered` | ✅ Always | Yes | Critical endpoint |
+| `completed` | ✅ Always | No | Critical endpoint |
+| `cancelled` | ✅ Always | No | Critical — must alert |
+| All service/booking | ✅ Always | No | No Live Activity for these |
+
+## Implementation Matrix
+
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+| BG-1 | APNs Push-to-Live-Activity | Implemented |
+| BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
+| BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |
+| BG-4 | Buyer Delivery Confirmation (Gap 8) | Implemented |
+| BG-5 | ETA at Acceptance Time (Gap 11) | Implemented |
