@@ -57,8 +57,10 @@ function getLastSeenText(lastLocationAt: string | null): string | null {
   return null;
 }
 
-export function LiveDeliveryTracker({ assignmentId, isBuyerView }: LiveDeliveryTrackerProps) {
-  const tracking = useDeliveryTracking(assignmentId);
+export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, roadEtaMinutes }: LiveDeliveryTrackerProps) {
+  // Gap D: Use passed-in tracking state if available, otherwise create own subscription
+  const ownTracking = useDeliveryTracking(trackingState ? null : assignmentId);
+  const tracking = trackingState || ownTracking;
 
   if (tracking.isLoading) {
     return (
