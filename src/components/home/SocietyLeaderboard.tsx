@@ -98,7 +98,7 @@ export function SocietyLeaderboard() {
 
   if (topSellers.length === 0 && topProducts.length === 0) return null;
 
-  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+  const rankColors = ['hsl(45, 93%, 47%)', 'hsl(0, 0%, 66%)', 'hsl(30, 67%, 50%)', 'hsl(var(--muted-foreground))', 'hsl(var(--muted-foreground))'];
 
   return (
     <div className="space-y-5 px-4">
