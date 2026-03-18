@@ -10,6 +10,7 @@ interface DeliveryArrivalOverlayProps {
   riderPhone: string | null;
   status: string | null;
   onDismiss: () => void;
+  deliveryCode?: string | null;
 }
 
 export function DeliveryArrivalOverlay({
