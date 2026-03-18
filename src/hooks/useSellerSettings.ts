@@ -140,7 +140,7 @@ export function useSellerSettings() {
         daily_order_limit: (dailyLimit !== null && !isNaN(dailyLimit) && dailyLimit > 0) ? dailyLimit : null,
       } as any).eq('id', sellerProfile.id);
       if (error) throw error;
-      toast.success('Settings saved successfully');
+      toast.success('Settings saved successfully', { id: 'settings-saved' });
       if ((sellerProfile as any).society_id) logAudit('seller_settings_updated', 'seller_profile', sellerProfile.id, (sellerProfile as any).society_id, { business_name: formData.business_name, categories: formData.categories });
     } catch (error: any) { console.error('Error saving:', error); toast.error(friendlyError(error)); }
     finally { setIsSaving(false); }
