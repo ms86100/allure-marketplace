@@ -237,12 +237,12 @@ export function useSellerProducts() {
         const { error } = await supabase.from('products').update(productData as any).eq('id', editingProduct.id);
         if (error) throw error;
         savedProductId = editingProduct.id;
-        toast.success('Product updated');
+        toast.success('Product updated', { id: 'product-saved' });
       } else {
         const { data: inserted, error } = await supabase.from('products').insert(productData as any).select('id').single();
         if (error) throw error;
         savedProductId = inserted.id;
-        toast.success('Product added');
+        toast.success('Product added', { id: 'product-saved' });
       }
 
       const isService = isServiceCategory(formData.category, configs);
