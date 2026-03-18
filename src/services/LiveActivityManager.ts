@@ -282,7 +282,7 @@ class _LiveActivityManager {
       await LiveActivity.updateLiveActivity(data);
       console.log(TAG, `UPDATE SUCCESS entity=${data.entity_id}`);
     } catch (e) {
-      console.error(TAG, `UPDATE FAILED entity=${data.entity_id}:`, e);
+      recordLAError('UPDATE', data.entity_id, e);
     }
   }
 }
