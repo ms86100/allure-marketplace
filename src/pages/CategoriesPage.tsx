@@ -56,7 +56,7 @@ function buildCategoryMeta(
   return map;
 }
 
-/* ── Collage component (inline) ──────────────────────────── */
+/* ── Collage component ──────────────────────────── */
 
 function ImageCollage({ images, fallbackIcon, fallbackUrl, alt, color }: {
   images: string[];
@@ -120,10 +120,8 @@ export default function CategoriesPage() {
   const [activeGroup, setActiveGroup] = useState<string>('all');
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // Build enriched metadata map
   const metaMap = useMemo(() => buildCategoryMeta(productCategories), [productCategories]);
 
-  // Compute active categories
   const activeCategorySet = (() => {
     const s = new Set(productCategories.map(c => c.category));
     if (browseBeyond && nearbyBands.length > 0) {
@@ -321,9 +319,10 @@ export default function CategoriesPage() {
                 </div>
 
                 {/* Category Cards Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {group.categories.map((cat, catIdx) => {
                     const meta = metaMap[cat.category] || { count: 0, sellerCount: 0, minPrice: null, collageImages: [], hasBestseller: false };
+                    const catColor = cat.color || null;
                     return (
                       <motion.div
                         key={cat.category}
@@ -334,7 +333,14 @@ export default function CategoriesPage() {
                         <Link
                           to={`/category/${cat.parentGroup}?sub=${cat.category}`}
                           className="block rounded-2xl overflow-hidden shadow-sm active:scale-[0.97] transition-all duration-200 group bg-card border border-border hover:shadow-md"
-                          style={{ borderLeftWidth: '3px', borderLeftColor: cat.color || 'hsl(var(--primary))' }}
+                          style={{ borderLeftWidth: '4px', borderLeftColor: catColor || 'hsl(var(--primary))' }}
+                          onMouseEnter={(e) => {
+                            if (catColor) (e.currentTarget as HTMLElement).style.borderColor = `${catColor}60`;
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLElement).style.borderColor = '';
+                            (e.currentTarget as HTMLElement).style.borderLeftColor = catColor || 'hsl(var(--primary))';
+                          }}
                         >
                           {/* Image area */}
                           <div className="relative aspect-[3/2] overflow-hidden">
@@ -345,25 +351,20 @@ export default function CategoriesPage() {
                               alt={cat.displayName}
                               color={cat.color}
                             />
-
-                            {/* Gradient overlay */}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
 
-                            {/* Count badge — top right */}
                             {meta.count > 0 && (
                               <div className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground text-[9px] font-bold shadow-sm">
                                 {meta.count} items
                               </div>
                             )}
 
-                            {/* Bestseller star — top left */}
                             {meta.hasBestseller && (
                               <div className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-warning/90 flex items-center justify-center shadow-sm">
                                 <Star size={12} className="text-primary-foreground fill-primary-foreground" />
                               </div>
                             )}
 
-                            {/* Category name overlay */}
                             <div className="absolute bottom-0 left-0 right-0 p-2.5">
                               <span className="text-sm font-bold text-primary-foreground leading-tight line-clamp-2 drop-shadow-lg">
                                 {cat.displayName}
@@ -373,6 +374,7 @@ export default function CategoriesPage() {
 
                           {/* Metadata row */}
                           <div className="flex items-center gap-2 px-2.5 py-2 text-[10px] text-muted-foreground">
+                            <DynamicIcon name={cat.icon} size={10} className="shrink-0 text-muted-foreground/60" />
                             {meta.sellerCount > 0 && (
                               <span className="inline-flex items-center gap-0.5">
                                 <Users size={10} className="shrink-0" />

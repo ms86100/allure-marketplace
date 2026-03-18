@@ -120,7 +120,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
     <div className="mb-6 px-4">
       {/* Section header */}
       <div className="flex items-center justify-between mb-3">
-      <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{title}</h3>
+        <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{title}</h3>
         <Link
           to={`/category/${parentGroup}`}
           className="text-[11px] font-bold text-primary flex items-center gap-0.5 ml-4"
@@ -129,15 +129,28 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
         </Link>
       </div>
 
-        {/* Responsive card grid — auto-fit so columns match actual items */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {categories.slice(0, 6).map((cat) => {
+      {/* Responsive card grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {categories.slice(0, 8).map((cat) => {
           const meta = metaMap[cat.category] || { count: 0, sellerCount: 0, minPrice: null, collageImages: [], hasBestseller: false };
+          const catColor = cat.color || null;
           return (
             <Link
               key={cat.category}
               to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-              className="block rounded-2xl overflow-hidden active:scale-[0.97] transition-all duration-200 group bg-card border border-border hover:border-primary/20 hover:shadow-md"
+              className={cn(
+                'block rounded-2xl overflow-hidden active:scale-[0.97] transition-all duration-200 group bg-card border border-border',
+                'hover:shadow-md',
+              )}
+              style={{
+                ['--cat-color' as any]: catColor || 'hsl(var(--primary))',
+              }}
+              onMouseEnter={(e) => {
+                if (catColor) (e.currentTarget as HTMLElement).style.borderColor = `${catColor}40`;
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.borderColor = '';
+              }}
             >
               {/* Image area */}
               <div className="relative aspect-[3/2] overflow-hidden">
@@ -174,7 +187,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
               </div>
 
               {/* Accent bar */}
-              <div className="h-[2px]" style={{ backgroundColor: cat.color || 'hsl(var(--primary))' }} />
+              <div className="h-[2px]" style={{ backgroundColor: catColor || 'hsl(var(--primary))' }} />
 
               {/* Metadata row */}
               <div className="flex items-center gap-2.5 px-3 py-2.5 text-[10px] text-muted-foreground">
@@ -190,14 +203,17 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                     <span className="font-medium">From {formatPrice(meta.minPrice)}</span>
                   </span>
                 )}
-                {meta.sellerCount === 0 && meta.minPrice === null && (
+                {meta.sellerCount === 0 && meta.minPrice === null && meta.count > 0 && (
                   <span className="text-muted-foreground/60 font-medium">Explore →</span>
+                )}
+                {meta.sellerCount === 0 && meta.count === 0 && (
+                  <span className="text-muted-foreground/50 font-medium italic">Sellers setting up</span>
                 )}
               </div>
             </Link>
           );
         })}
-        </div>
+      </div>
     </div>
   );
 }
