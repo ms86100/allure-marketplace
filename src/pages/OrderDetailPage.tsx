@@ -431,6 +431,7 @@ export default function OrderDetailPage() {
           riderPhone={deliveryTracking.riderPhone}
           status={deliveryTracking.status}
           onDismiss={() => {}}
+          deliveryCode={buyerOtp}
         />
       )}
     </AppLayout>
