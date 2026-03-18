@@ -5,12 +5,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MAX_RETRIES = 3;
+const PUSH_MAX_ATTEMPTS = 3;
+const PUSH_RETRY_DELAYS_MS = [2000, 5000]; // delays between attempt 1→2, 2→3
 
-// Exponential backoff: 30s, 2min, 8min
-function getNextRetryAt(retryCount: number): string {
-  const delayMs = Math.pow(4, retryCount) * 30000;
-  return new Date(Date.now() + delayMs).toISOString();
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 Deno.serve(async (req) => {
