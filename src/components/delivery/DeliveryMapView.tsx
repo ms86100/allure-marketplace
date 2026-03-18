@@ -205,6 +205,13 @@ export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinatio
 
   return (
     <div className="rounded-xl overflow-hidden border border-border h-[200px] relative">
+      {/* Gap 4: OSRM road-based ETA badge on map */}
+      {roadEtaMinutes && (
+        <div className="absolute top-2 right-2 z-[500] bg-background/90 backdrop-blur-sm border border-border rounded-lg px-2.5 py-1 shadow-sm">
+          <p className="text-xs font-bold text-primary">{roadEtaMinutes > 3 ? `${roadEtaMinutes - 1}–${roadEtaMinutes + 1}` : roadEtaMinutes} min</p>
+          <p className="text-[9px] text-muted-foreground">via road</p>
+        </div>
+      )}
       <MapContainer
         center={center}
         zoom={14}
