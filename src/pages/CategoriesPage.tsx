@@ -280,9 +280,9 @@ export default function CategoriesPage() {
               transition={{ delay: 0.2, duration: 0.4 }}
               className="space-y-3"
             >
-              <h2 className="text-lg font-bold text-foreground">Stay tuned — we're growing!</h2>
+              <h2 className="text-lg font-bold text-foreground">{ml.label('label_empty_categories_title')}</h2>
               <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-                New sellers are joining your community. Products will be available here very soon.
+                {ml.label('label_empty_categories_desc')}
               </p>
             </motion.div>
             <motion.div
