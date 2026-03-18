@@ -30,7 +30,6 @@ export function useLiveActivityOrchestrator(): void {
   const identity = useContext(IdentityContext);
   const userId = identity?.user?.id ?? null;
   const mountedRef = useRef(false);
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const doSync = useCallback(async () => {
     if (!userId || !mountedRef.current) return;
