@@ -109,7 +109,7 @@ function getLastSeenText(lastLocationAt: string | null): string | null {
   return null;
 }
 
-export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, roadEtaMinutes }: LiveDeliveryTrackerProps) {
+export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, roadEtaMinutes, statusHints }: LiveDeliveryTrackerProps) {
   const ownTracking = useDeliveryTracking(trackingState ? null : assignmentId);
   const tracking = trackingState || ownTracking;
 
