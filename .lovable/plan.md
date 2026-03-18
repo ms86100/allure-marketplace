@@ -1,115 +1,99 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phases 1–3)
 
-All 9 original phases plus Blinkit parity Phases 1–3 are fully implemented.
+# Live Delivery Tracking: Gap Analysis and Improvement Plan
 
-## Blinkit Gap-Fill Status
+## Research Findings: How Zomato/Swiggy/Blinkit Work
 
-### Phase 1: APNs Push-to-Live-Activity — COMPLETE
+Based on technical research, these platforms use a **5-layer architecture**:
 
-Live Activities now update even when the app process is killed by iOS, matching Blinkit's reliability.
+1. **Rider app sends GPS every 5-10 seconds** (adaptive: faster when moving, slower when idle)
+2. **Backend processes updates**: road-snapping, GPS noise filtering, anomaly detection (teleport jumps)
+3. **Real-time push to buyer** via WebSocket/Kafka (not polling)
+4. **Client-side interpolation**: smooth marker animation between GPS points using speed + heading to predict intermediate positions
+5. **Proximity-based status transitions**: automatic status changes at distance thresholds (500m, 200m, 50m) -- not manual seller action
 
-#### Architecture
+Key insight: The "smooth movement" users see is an **illusion** -- the app receives discrete GPS points every 5-10s and **interpolates** the marker between them using heading and speed.
 
-```
-Order status change → DB trigger → net.http_post → update-live-activity-apns edge function
-  → APNs push (apns-push-type: liveactivity) → iOS widget receives content-state update
-  → Lock screen / Dynamic Island re-renders
-```
+## Current System vs Industry Standard
 
-#### Implementation Details
+| Aspect | Our System | Zomato/Swiggy |
+|--------|-----------|---------------|
+| GPS capture interval | 10s throttle | 5-10s adaptive |
+| Transport to buyer | Supabase Realtime (Postgres changes) | WebSocket/Kafka |
+| Map marker animation | Instant jump to new position | Smooth interpolation between points |
+| Road snapping | None -- raw GPS on straight line | Google Roads API / Mapbox Map Matching |
+| Route display | Dashed straight line | Actual road route polyline |
+| ETA calculation | Haversine + speed formula | Road-distance + traffic + ML model |
+| Proximity auto-status | Manual seller action | Automatic geofence triggers |
+| GPS noise filtering | Accuracy > 100m skip | Kalman filter + road snap |
+| Buyer location update | Fixed at order time | Can update dynamically |
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB table** | `live_activity_tokens` (user_id, order_id, push_token, platform) with RLS |
-| **Swift plugin** | `LiveActivityPlugin.swift` — requests activity with `pushType: .token`, observes `Activity.pushTokenUpdates`, emits `liveActivityPushToken` event to JS |
-| **LiveActivityManager.ts** | Listens for `liveActivityPushToken` events, upserts token to `live_activity_tokens` table, cleans up on activity end |
-| **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
-| **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
+## What We Can Realistically Implement
 
-### Phase 2: System Reliability — COMPLETE
+Given our stack (Supabase Realtime, Leaflet maps, edge functions), here are the high-impact improvements ranked by feasibility:
 
-#### 2A. Idempotency Guard on Push Processing
+### 1. Smooth Marker Interpolation (High Impact, No Backend Change)
+Animate the rider marker between GPS points using CSS transitions or Leaflet's `slideTo`. When a new GPS point arrives, smoothly move the marker over ~2 seconds instead of jumping.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **DB trigger** | `fn_enqueue_order_status_notification` now checks for duplicate entries (same `reference_path` + `payload->>'status'` within 30 seconds) before inserting into `notification_queue`. Skips with `RAISE NOTICE`. |
-| **DB index** | `idx_notification_queue_dedup` on `notification_queue(reference_path, created_at DESC)` for fast dedup lookups |
+### 2. GPS Noise Filtering with Kalman Filter (High Impact, Frontend)
+Add a simple Kalman filter in the `useDeliveryTracking` hook to smooth out GPS jitter. Reject points that represent impossible speed (>120 km/h teleport detection).
 
-#### 2B. Realtime Channel Auto-Reconnect
+### 3. Road-Snapped Route via OSRM (Medium Impact, Free API)
+Replace the straight dashed line with an actual road route using the free OSRM API (`router.project-osrm.org`). This also gives us road-based distance and ETA instead of Haversine.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`useLiveActivityOrchestrator.ts`** | Both order and delivery channels now detect `CHANNEL_ERROR` / `TIMED_OUT`, remove the dead channel, and re-subscribe after 3s delay. Max 3 reconnects per session. On successful reconnect (`SUBSCRIBED`), retry counter resets. Each reconnect triggers a one-shot `syncActiveOrders` to fill any gap. Unique channel names with `Date.now()` suffix prevent Supabase channel name conflicts. |
+### 4. Automatic Proximity Status Transitions (High Impact, Backend)
+In the `update-delivery-location` edge function, automatically transition assignment status based on distance: `on_the_way` -> when distance < 200m, show "arriving" state; when < 50m, show "at doorstep". Currently these require manual seller action.
 
-### Phase 3: Seller Self-Delivery GPS + Buyer Live Map — COMPLETE
+### 5. Dynamic Buyer Location (Medium Impact, Frontend + Backend)
+Allow buyer to update their delivery location while order is in transit. Store latest buyer coords and recalculate distance/ETA against updated position.
 
-#### 3A. Seller GPS Broadcasting for Self-Delivery
+### 6. Adaptive GPS Interval (Low Effort, Frontend)
+Reduce the throttle from 10s to 5s when moving (speed > 5 km/h), increase to 15s when stationary to save battery.
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`SellerGPSTracker.tsx`** | New component — shown to sellers on OrderDetailPage when `delivery_handled_by === 'seller'` and order status is `picked_up` or `on_the_way`. Uses existing `useBackgroundLocationTracking` hook. Shows Start/Stop controls, live badge, and last-sent timestamp. |
-| **`OrderDetailPage.tsx`** | Integrated `SellerGPSTracker` in the seller action area, gated by `delivery_handled_by === 'seller'` + transit statuses |
+---
 
-#### 3B. Buyer Live Map
+## Implementation Plan
 
-| Component | What Was Done |
-|-----------|---------------|
-| **`DeliveryMapView.tsx`** | New component using Leaflet + OpenStreetMap (no API key). Shows rider position (🛵 marker) and destination (📍 marker). Auto-fits bounds on mount, pans when rider moves out of view. |
-| **`OrderDetailPage.tsx`** | Integrated `DeliveryMapView` above `LiveDeliveryTracker` for buyer view when rider has GPS data and order has delivery coordinates (`delivery_lat`/`delivery_lng`). Falls back to text-only tracker when no GPS data available. |
+### Step 1: Smooth Map Marker Animation
+- In `DeliveryMapView.tsx`, use Leaflet marker's `setLatLng()` with CSS transition on the marker element
+- Store previous position, animate over 2s to new position when GPS updates arrive
+- Rotate the rider icon based on `heading` from GPS data
 
-### Previously Completed Blinkit Gaps
+### Step 2: GPS Noise Filter (Kalman-lite)
+- Add a `filterGPSPoint()` utility that rejects points where implied speed > 120 km/h (teleport)
+- Apply exponential smoothing: `smoothed = 0.7 * new + 0.3 * previous`
+- Integrate into `useDeliveryTracking` before updating state
 
-| Feature | Status |
-|---------|--------|
-| Push deep-link routing | ✅ Done |
-| Notification grouping (threadId) | ✅ Done |
-| Rich push images (NSE) | ✅ Done |
-| Dynamic Island tap → order page | ✅ Done |
-| Item count in DI | ✅ Done |
-| GPS-derived progress | ✅ Done |
+### Step 3: OSRM Road Route
+- In `DeliveryMapView.tsx`, fetch route geometry from `https://router.project-osrm.org/route/v1/driving/{lng1},{lat1};{lng2},{lat2}?overview=full&geometries=geojson`
+- Render the actual road polyline instead of a straight dashed line
+- Use OSRM's returned `duration` and `distance` for more accurate ETA display
+- Cache route and only re-fetch when rider moves > 100m from last fetch point
 
-### Phase 4: Live Map / Rider GPS — DEFERRED
+### Step 4: Auto Proximity Status in Edge Function
+- In `update-delivery-location/index.ts`, add automatic status progression:
+  - When `distance < 200m` and status is `on_the_way` -> update status hint to `arriving`
+  - When `distance < 50m` -> update hint to `at_doorstep`
+- Add a `proximity_status` column to `delivery_assignments` (separate from workflow status)
+- Frontend reads this for display without changing the manual workflow
 
-Requires dedicated rider-side GPS broadcasting infrastructure (separate product workstream). Seller self-delivery GPS (Phase 3A) covers the immediate need.
+### Step 5: Adaptive Send Interval
+- In `useBackgroundLocationTracking.ts`, make `SEND_INTERVAL_MS` dynamic:
+  - Moving (speed > 5 km/h): 5 seconds
+  - Stationary: 15 seconds
+  - Track last known speed to decide interval
 
-### Product Thumbnails in Widget — DEFERRED
+### Step 6: Dynamic Buyer Location
+- Add a "Update my location" button on buyer's tracking screen
+- Save updated coords to `delivery_assignments.delivery_lat/lng` (or the order)
+- Edge function recalculates distance/ETA against latest buyer position
 
-Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
+| # | Change | Type | Files |
+|---|--------|------|-------|
+| 1 | Smooth marker animation with heading rotation | Frontend | `DeliveryMapView.tsx` |
+| 2 | GPS noise filter (teleport rejection + smoothing) | Frontend | New `lib/gps-filter.ts`, `useDeliveryTracking.ts` |
+| 3 | OSRM road route polyline + road-based ETA | Frontend | `DeliveryMapView.tsx`, `LiveDeliveryTracker.tsx` |
+| 4 | Proximity status column + auto-update in edge function | Backend + DB | `update-delivery-location/index.ts`, migration |
+| 5 | Adaptive GPS send interval | Frontend | `useBackgroundLocationTracking.ts` |
+| 6 | Dynamic buyer location update | Frontend + Backend | `OrderDetailPage.tsx`, edge function |
 
-## Silent Push Optimization: COMPLETE
-
-### Notification Matrix
-
-| Status | Push? | Live Activity? | Rationale |
-|--------|-------|----------------|-----------|
-| `accepted` | ✅ Always | Yes | Critical — order confirmed |
-| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
-| `ready` | ✅ Always | Yes | Pickup moment — user must know |
-| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
-| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
-| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
-| `delivered` | ✅ Always | Yes | Critical endpoint |
-| `completed` | ✅ Always | No | Critical endpoint |
-| `cancelled` | ✅ Always | No | Critical — must alert |
-| All service/booking | ✅ Always | No | No Live Activity for these |
-
-## Implementation Matrix
-
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
-| BG-1 | APNs Push-to-Live-Activity | Implemented |
-| BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
-| BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |
-| BG-4 | Buyer Delivery Confirmation (Gap 8) | Implemented |
-| BG-5 | ETA at Acceptance Time (Gap 11) | Implemented |
