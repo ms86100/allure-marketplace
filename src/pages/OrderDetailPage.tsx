@@ -104,20 +104,6 @@ export default function OrderDetailPage() {
   // Gap G: Only show arrival overlay for BUYER when rider is close
   const showArrivalOverlay = o.isBuyerView && deliveryAssignmentId && deliveryTracking.riderLocation && deliveryTracking.distance != null && deliveryTracking.distance < 200;
 
-  // Gap A: Fetch delivery OTP for buyer display
-  const [buyerOtp, setBuyerOtp] = useState<string | null>(null);
-  useEffect(() => {
-    if (o.isBuyerView && isDeliveryOrder && deliveryAssignmentId) {
-      supabase
-        .from('delivery_assignments')
-        .select('delivery_code')
-        .eq('id', deliveryAssignmentId)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data?.delivery_code) setBuyerOtp(data.delivery_code);
-        });
-    }
-  }, [o.isBuyerView, isDeliveryOrder, deliveryAssignmentId]);
 
   return (
     <AppLayout showHeader={false} showNav={(!o.isSellerView || isTerminalStatus(o.flow, order.status)) && !o.isChatOpen}>
