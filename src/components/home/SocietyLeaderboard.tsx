@@ -128,7 +128,7 @@ export function SocietyLeaderboard() {
                       isCenter ? 'w-28' : 'w-24',
                     )}
                   >
-                    <span className="text-lg mb-1">{medals[rank]}</span>
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white mb-1" style={{ backgroundColor: rankColors[rank] }}>{rank + 1}</span>
                     <div className={cn(
                       'rounded-full overflow-hidden border-2 mb-1.5',
                       isCenter ? 'w-16 h-16 border-warning' : 'w-12 h-12 border-border',
