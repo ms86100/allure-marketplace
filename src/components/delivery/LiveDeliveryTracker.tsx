@@ -83,7 +83,7 @@ function getProximityMessage(
   if (proximityStatus === 'arriving') return msg('arriving');
   if (proximityStatus === 'nearby') return msg('nearby');
 
-  const smartEta = getSmartEta(distance, eta);
+  const smartEta = getSmartEta(distance, eta, null, false);
 
   if (distance !== null && distance < (config.at_doorstep.max_meters ?? 50)) return msg('at_doorstep');
   if (distance !== null && distance < (config.arriving.max_meters ?? 200)) return msg('arriving');
