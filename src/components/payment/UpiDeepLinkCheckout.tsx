@@ -151,7 +151,12 @@ export function UpiDeepLinkCheckout({
     setScreenshotPreview(null);
   };
 
+  const confirmSubmittedRef = useRef(false);
+
   const handleSubmitConfirmation = async () => {
+    // Idempotency guard: prevent double-submission on app-switch
+    if (confirmSubmittedRef.current) return;
+    confirmSubmittedRef.current = true;
     setIsSubmitting(true);
     try {
       let screenshotUrl: string | null = null;
@@ -211,6 +216,7 @@ export function UpiDeepLinkCheckout({
 
       completeFlow();
     } catch (err) {
+      confirmSubmittedRef.current = false; // Allow retry on failure
       console.error('Failed to submit payment confirmation:', err);
       toast.error('Failed to submit payment confirmation', { id: 'upi-submit-err' });
     } finally {

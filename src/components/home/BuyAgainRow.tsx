@@ -98,7 +98,7 @@ export function BuyAgainRow() {
 
   const isInCart = (productId: string) => items.some(i => i.product_id === productId);
 
-  const handleQuickAdd = (product: BuyAgainProduct) => {
+  const handleQuickAdd = async (product: BuyAgainProduct) => {
     if (isInCart(product.id)) return;
     if (!product.seller_id) {
       console.error('[BuyAgain] Missing seller_id for product:', product.id);
@@ -106,7 +106,8 @@ export function BuyAgainRow() {
       return;
     }
     impact('medium');
-    addItem({
+    // addItem already checks store availability via seller_id lookup
+    await addItem({
       id: product.id,
       seller_id: product.seller_id,
       name: product.name,
@@ -122,7 +123,6 @@ export function BuyAgainRow() {
       created_at: '',
       updated_at: '',
     });
-    toast.success(`${product.name} added to cart`);
   };
 
   return (
