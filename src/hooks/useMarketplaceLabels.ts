@@ -28,6 +28,23 @@ const LABEL_KEYS = [
   'label_analytics_intelligence_title', 'label_analytics_active_buyers',
   'label_analytics_views', 'label_analytics_conversion',
   'label_analytics_fee_format', 'label_analytics_fee_desc',
+  // Section headers
+  'label_section_leaderboard_sellers', 'label_section_leaderboard_products',
+  'label_section_store_discovery', 'label_section_highlights',
+  'label_section_search_popular', 'label_section_community', 'label_section_society_links',
+  // Empty states
+  'label_empty_marketplace_title', 'label_empty_marketplace_desc',
+  'label_empty_categories_title', 'label_empty_categories_desc',
+  'label_empty_categories_hint',
+  // Metadata
+  'label_seller_count_singular', 'label_seller_count_plural',
+  'label_item_count', 'label_explore_cta', 'label_sellers_setting_up', 'label_nearby',
+  // Page titles
+  'label_categories_page_title', 'label_categories_page_subtitle',
+  // Highlight types
+  'label_highlight_bestseller', 'label_highlight_top_rated', 'label_highlight_deal',
+  // Community
+  'label_community_first_post', 'label_community_first_post_desc',
   // Thresholds
   'on_time_badge_min_orders', 'stable_price_days', 'new_this_week_days',
   'discovery_min_products', 'discovery_max_items', 'price_history_max_points',
