@@ -171,6 +171,24 @@ export default function OrderDetailPage() {
 
           {o.isUrgentOrder && order.auto_cancel_at && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} />}
 
+          {/* Gap 8: Needs attention banner for buyer */}
+          {o.isBuyerView && (order as any).needs_attention && (
+            <div className="bg-warning/10 border border-warning/20 rounded-xl p-3 flex items-start gap-2.5">
+              <AlertTriangle className="text-warning shrink-0 mt-0.5" size={16} />
+              <div>
+                <p className="text-sm font-semibold text-warning">Attention Needed</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {(order as any).needs_attention_reason || 'There may be a delay with your order. Contact the seller if needed.'}
+                </p>
+                {sellerProfile?.phone && (
+                  <a href={`tel:${sellerProfile.phone}`} className="inline-flex items-center gap-1 text-xs font-medium text-primary mt-1.5">
+                    <Phone size={12} /> Contact Seller
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
           {order.status === 'cancelled' && order.rejection_reason && o.isBuyerView && (
             <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 flex items-start gap-2.5">
               <XCircle className="text-destructive shrink-0 mt-0.5" size={16} />
