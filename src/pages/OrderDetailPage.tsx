@@ -295,6 +295,20 @@ export default function OrderDetailPage() {
             </div>
           )}
 
+          {/* Gap 12: Delivery-specific rating — separate from product review */}
+          {o.isBuyerView && isDeliveryOrder && (order.status === 'completed' || order.status === 'delivered') && !hasDeliveryFeedback && (
+            <div className="bg-accent/5 border border-accent/20 rounded-xl p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="text-lg">🚚</span>
+                <div>
+                  <p className="text-sm font-semibold">Rate the delivery</p>
+                  <p className="text-[11px] text-muted-foreground">Punctuality, handling & experience</p>
+                </div>
+              </div>
+              <DeliveryFeedbackForm orderId={order.id} sellerId={order.seller_id} onSuccess={() => setHasDeliveryFeedback(true)} />
+            </div>
+          )}
+
           {/* Seller/Buyer Info */}
           <div className="bg-card border border-border rounded-xl p-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{o.isSellerView ? 'Customer' : 'Seller'}</p>
