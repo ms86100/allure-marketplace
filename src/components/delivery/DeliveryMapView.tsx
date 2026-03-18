@@ -192,7 +192,7 @@ export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinatio
     (riderLng + destinationLng) / 2,
   ];
 
-  const routeCoords = useOSRMRoute(riderLat, riderLng, destinationLat, destinationLng);
+  const { routeCoords, roadEtaMinutes } = useOSRMRoute(riderLat, riderLng, destinationLat, destinationLng);
 
   // Fallback straight line if OSRM hasn't loaded yet
   const polylinePositions = routeCoords.length > 0
