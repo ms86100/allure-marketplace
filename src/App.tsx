@@ -320,16 +320,12 @@ function AppRoutes() {
   // Consume pending deep link after auth hydration completes
   useEffect(() => {
     if (!user) return;
-    // Small delay to let ProtectedRoute render with the authenticated user
     const timer = setTimeout(() => {
-      try {
-        const { consumePendingDeepLink } = require('@/hooks/useDeepLinks');
-        const pendingPath = consumePendingDeepLink();
-        if (pendingPath) {
-          console.log('[AppRoutes] Navigating to deferred deep link:', pendingPath);
-          deferredNavigate(pendingPath, { replace: true });
-        }
-      } catch { /* ignore */ }
+      const pendingPath = consumePendingDeepLink();
+      if (pendingPath) {
+        console.log('[AppRoutes] Navigating to deferred deep link:', pendingPath);
+        deferredNavigate(pendingPath, { replace: true });
+      }
     }, 100);
     return () => clearTimeout(timer);
   }, [user, deferredNavigate]);
