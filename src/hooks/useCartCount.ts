@@ -3,10 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 /**
- * B2: Lightweight hook that returns total quantity of items in cart.
- * Components that only need the badge count (e.g. BottomNav) use this
- * instead of the full useCart() to avoid re-renders on cart content changes.
- * Uses SUM(quantity) to stay consistent with useCart's itemCount.
+ * Lightweight hook that returns total quantity of items in cart.
+ * The cart-count cache is also seeded by useCart after every mutation,
+ * so this hook and useCart always share the same source of truth.
+ * The queryFn here serves as a fallback/initial fetch for components
+ * that mount before CartProvider (e.g. BottomNav).
  */
 export function useCartCount() {
   const { user, isSessionRestored } = useAuth();
@@ -15,7 +16,6 @@ export function useCartCount() {
     queryKey: ['cart-count', user?.id],
     queryFn: async () => {
       if (!user) return 0;
-      // C6: Filter out unavailable products to stay consistent with useCart
       const { data, error } = await supabase
         .from('cart_items')
         .select('quantity, product:products!inner(is_available)')
@@ -25,7 +25,7 @@ export function useCartCount() {
       return (data || []).reduce((sum, row) => sum + (row.quantity || 0), 0);
     },
     enabled: isSessionRestored && !!user,
-    staleTime: 30 * 1000, // 30s — lightweight polling-friendly
+    staleTime: 30 * 1000,
   });
 
   return itemCount;

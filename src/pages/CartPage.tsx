@@ -23,21 +23,25 @@ export default function CartPage() {
   const ml = useMarketplaceLabels();
   const navigate = useNavigate();
 
-  if (c.isLoading || !c.hasHydrated) {
-    return (
-      <AppLayout showHeader={false} showCart={false}>
-        <div className="p-4 safe-top">
-          <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted mb-6"><ArrowLeft size={18} /></button>
-          <div className="text-center py-16">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center animate-pulse"><span className="text-4xl">🛒</span></div>
-            <p className="text-sm text-muted-foreground">Loading your cart…</p>
+  // Show loading if cart hasn't hydrated yet OR if mutations are still in-flight
+  if (c.isLoading || !c.hasHydrated || c.pendingMutations > 0) {
+    // If we already have items, render them normally (don't flash loading)
+    if (c.items.length === 0) {
+      return (
+        <AppLayout showHeader={false} showCart={false}>
+          <div className="p-4 safe-top">
+            <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted mb-6"><ArrowLeft size={18} /></button>
+            <div className="text-center py-16">
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center animate-pulse"><span className="text-4xl">🛒</span></div>
+              <p className="text-sm text-muted-foreground">Loading your cart…</p>
+            </div>
           </div>
-        </div>
-      </AppLayout>
-    );
+        </AppLayout>
+      );
+    }
   }
 
-  if (c.items.length === 0 && !c.hasActivePaymentSession) {
+  if (c.items.length === 0 && !c.hasActivePaymentSession && c.pendingMutations === 0) {
     return (
       <AppLayout showHeader={false} showCart={false}>
         <div className="p-4 safe-top">
