@@ -1,48 +1,86 @@
 
-Problem summary:
-The screenshots show the JavaScript side is running inside a native iOS shell (`Platform: ios`, `Native: Yes`), but Capacitor still cannot see the native `LiveActivity` bridge at runtime. Since the plugin source now looks correct in the repo, the most likely issue is not the JS code anymore — it is that the installed iPhone app binary does not actually contain the updated native plugin.
 
-Why this is still happening:
-1. `native/ios/LiveActivityPlugin.swift` is now correctly structured:
-   - `@objc(LiveActivityPlugin)` present
-   - `CAPBridgedPlugin` metadata present
-   - no class-level `@available` guard
-2. But this project does not have a checked-in `ios/` app folder locally right now, so the real iOS project is generated during the mobile build pipeline.
-3. That means pressing normal web build/publish is not enough. The fix only takes effect after a fresh native iOS build is produced and installed.
-4. If the installed app came from an older binary, or the CI step that copies `native/ios/LiveActivityPlugin.swift` into the actual iOS target did not run correctly, Capacitor will still report exactly what your screenshots show: `"LiveActivity" plugin is not implemented on ios`.
+## Root Cause: Capacitor 8 does not auto-discover app-local Swift plugins
 
-Most likely root cause:
-The app on your phone is still an older native build, or the build pipeline produced an IPA without the plugin file being compiled into the App target.
+The CI logs confirm the files are copied and added to Compile Sources. The build succeeds. The plugin class is correctly structured. **The problem is not file inclusion -- it is plugin discovery.**
 
-Plan to fix and verify:
-1. Verify build source
-   - Confirm the app on the phone was installed from a brand-new iOS native build, not just after a web publish/update.
-   - If it was not rebuilt as a native iOS binary, rebuild it first.
+### Why auto-discovery fails
 
-2. Verify CI/build logs
-   - Check the iOS build log for these exact steps succeeding:
-     - `=== Copying Live Activity Swift files ===`
-     - `=== Live Activity plugin files added to App target ===`
-   - If either step is missing or fails, the plugin never enters the final app.
+This project uses **Capacitor 8** (line 68 of `codemagic.yaml`: "Capacitor 8 requires iOS 16.0 minimum"). Starting from Capacitor 6+, plugin discovery changed: plugins are enumerated from **CocoaPods/SPM package metadata**, not by ObjC runtime class scanning. App-local Swift files compiled directly into the App target are **invisible** to this mechanism even though they compile successfully.
 
-3. Force a truly fresh install
-   - Create a new iOS build
-   - Uninstall the existing app from the iPhone
-   - Install the new build
-   - This removes the chance that you are testing an older cached binary
+The CocoaPods plugin list (line 79-91) includes `CapacitorApp`, `CapacitorCamera`, etc. -- but `LiveActivityPlugin` is not a pod. It's a loose Swift file. Capacitor 8 simply never looks for it.
 
-4. Runtime confirmation
-   - On the fresh build, the native log should print:
-     `✅ LiveActivityPlugin loaded — Capacitor bridge registered`
-   - Then `/la-debug` should change to:
-     - Plugin Available: yes
-     - getActivities Works: yes
-     - Start Test: success or a real ActivityKit-specific error
-   - If it still says “plugin not implemented”, the plugin is still not inside the compiled app target
+### The fix: Explicit bridge registration
 
-5. If it still fails after a fresh native build
-   - Next implementation step should be to harden build verification by surfacing a native build marker/version in the debug page so we can prove which binary is installed
-   - Also add CI log assertions around the plugin copy/target-membership step so a broken mobile build fails earlier instead of shipping silently
+Register the plugin instance after the Capacitor bridge loads. This is the correct Capacitor 6+ pattern for app-local plugins.
 
-Technical conclusion:
-The current evidence points to a deployment/build inclusion problem, not a Live Activity logic problem. The repo code for the plugin now looks correct; the installed iPhone app likely does not contain that updated native code yet.
+### Changes
+
+#### 1. `codemagic.yaml` -- Patch AppDelegate step (line 123)
+
+Update the existing AppDelegate template to include a `viewDidLoad` hook or use the Capacitor notification to register the plugin after the bridge initializes:
+
+```swift
+import UIKit
+import Capacitor
+import FirebaseCore
+
+@UIApplicationMain
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    var window: UIWindow?
+
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        FirebaseApp.configure()
+        
+        // Register app-local plugins after bridge loads
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(registerLocalPlugins(_:)),
+            name: NSNotification.Name.capacitorDidLoad,  // or equivalent
+            object: nil
+        )
+        
+        return true
+    }
+    
+    @objc func registerLocalPlugins(_ notification: Notification) {
+        guard let bridge = notification.object as? CAPBridge else { return }
+        bridge.registerPluginInstance(LiveActivityPlugin())
+    }
+    
+    // ... existing URL handling, APNs forwarding stays the same
+}
+```
+
+**Alternative (simpler, no notification):** If `CAPBridgeViewController` is the root, subclass it:
+
+```swift
+class SocivaBridgeViewController: CAPBridgeViewController {
+    override open func capacitorDidLoad() {
+        bridge?.registerPluginInstance(LiveActivityPlugin())
+    }
+}
+```
+
+Then point `Main.storyboard` to this subclass. Both approaches achieve the same result -- I will verify which one Capacitor 8 supports and implement accordingly.
+
+#### 2. No changes to `LiveActivityPlugin.swift`
+
+The plugin source is correct as-is.
+
+#### 3. No ObjC shim needed
+
+This is pure Swift registration through Capacitor's supported API.
+
+### Why this is different from the previously rejected ObjC shim
+
+The ObjC `.m` shim was a Capacitor 4-era workaround using `CAP_PLUGIN` macros. This fix uses Capacitor's own `registerPluginInstance()` API -- the documented mechanism for app-local plugins in Capacitor 6+.
+
+### Expected result
+
+After one more Codemagic build with this change:
+- `✅ LiveActivityPlugin loaded` appears in device logs
+- `/la-debug` shows Plugin Available: yes
+- Start Test returns an activityId or a real ActivityKit error
+
