@@ -69,6 +69,7 @@ export function useLiveActivityOrchestrator(): void {
     });
 
     fetchFlowEntries();
+    getTerminalStatuses().then(s => { terminalStatusesCache = s; }).catch(() => {});
     doSync();
 
     return () => {
