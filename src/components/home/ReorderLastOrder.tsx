@@ -46,7 +46,7 @@ export function ReorderLastOrder() {
         if (data && data.order_items?.length > 0) {
           setLastOrder({
             id: data.id,
-            seller_name: (data.seller as any)?.business_name || 'Seller',
+            seller_name: (data.seller as any)?.business_name || '',
             item_count: data.order_items.length,
             total_amount: data.total_amount,
             created_at: data.created_at,

@@ -7,6 +7,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { Star, Flame, Tag, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 /**
  * Auto-generated highlight strip that shows when no FeaturedBanners are configured.
@@ -28,6 +29,7 @@ export function AutoHighlightStrip() {
   const { effectiveSocietyId } = useAuth();
   const navigate = useNavigate();
   const { formatPrice } = useCurrency();
+  const ml = useMarketplaceLabels();
 
   const { data: highlights = [], isLoading } = useQuery({
     queryKey: ['auto-highlights', effectiveSocietyId],
@@ -121,7 +123,7 @@ export function AutoHighlightStrip() {
     <div className="my-4">
       <div className="flex items-center gap-1.5 px-4 mb-2.5">
         <TrendingUp size={13} className="text-primary" />
-        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Highlights</span>
+        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{ml.label('label_section_highlights')}</span>
       </div>
       <div className="flex gap-2.5 overflow-x-auto scrollbar-hide px-4 pb-1 snap-x snap-mandatory">
         {highlights.map((card, i) => (
@@ -160,7 +162,7 @@ export function AutoHighlightStrip() {
               <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-background/80 backdrop-blur-sm rounded-full px-2 py-0.5">
                 {card.icon}
                 <span className="text-[8px] font-bold text-foreground uppercase tracking-wide">
-                  {card.type === 'bestseller' ? 'Bestseller' : card.type === 'top_seller' ? 'Top Rated' : 'Deal'}
+                  {card.type === 'bestseller' ? ml.label('label_highlight_bestseller') : card.type === 'top_seller' ? ml.label('label_highlight_top_rated') : ml.label('label_highlight_deal')}
                 </span>
               </div>
             </div>

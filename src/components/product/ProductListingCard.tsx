@@ -109,7 +109,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
   const locationLabel = useMemo(() => {
     const socName = product.society_name ?? (product as any).society_name;
     if (socName) return distanceLabel ? `${socName} · ${distanceLabel}` : socName;
-    if (distanceLabel) return `Nearby · ${distanceLabel}`;
+    if (distanceLabel) return `${ml.label('label_nearby')} · ${distanceLabel}`;
     return null;
   }, [product.society_name, (product as any).society_name, distanceLabel]);
 

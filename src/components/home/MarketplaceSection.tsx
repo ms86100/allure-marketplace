@@ -114,7 +114,7 @@ export function MarketplaceSection() {
       contact_phone: product.contact_phone,
       specifications: product.specifications || null,
       seller_id: product.seller_id,
-      seller_name: product.seller_name || 'Seller',
+      seller_name: product.seller_name || '',
       seller_rating: product.seller_rating || 0,
       seller_reviews: product.seller_reviews || 0,
       society_name: (product as any).society_name || null,
@@ -207,7 +207,7 @@ export function MarketplaceSection() {
       {/* ── Store Discovery ── */}
       <div className="bg-secondary/30 py-5 mt-3">
         <div className="flex items-center gap-1.5 px-4 mb-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Meet your neighbors who sell</span>
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{ml.label('label_section_store_discovery')}</span>
         </div>
         <ShopByStoreDiscovery />
       </div>
@@ -227,7 +227,7 @@ export function MarketplaceSection() {
             category: sp.category,
             description: sp.description || null,
             seller_id: sp.seller_id,
-            seller_name: sp.seller?.business_name || 'Seller',
+            seller_name: sp.seller?.business_name || '',
             seller_rating: 0,
             seller_reviews: 0,
             action_type: sp.action_type,
@@ -315,6 +315,7 @@ function ProductListings({
   badgeConfigs?: any[];
   socialProofMap?: Map<string, number>;
 }) {
+  const ml = useMarketplaceLabels();
   if (isLoading) {
     return (
       <div className="px-4 space-y-5 mt-4">
@@ -355,9 +356,9 @@ function ProductListings({
           transition={{ delay: 0.2, duration: 0.4 }}
           className="space-y-3"
         >
-          <h2 className="text-lg font-extrabold text-foreground tracking-tight">Your marketplace is getting ready!</h2>
+          <h2 className="text-lg font-extrabold text-foreground tracking-tight">{ml.label('label_empty_marketplace_title')}</h2>
           <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-            Sellers from your community are setting up shop. Products, services & more — all coming your way.
+            {ml.label('label_empty_marketplace_desc')}
           </p>
         </motion.div>
 
@@ -368,7 +369,7 @@ function ProductListings({
           className="mt-6 flex items-center gap-2 text-xs text-muted-foreground bg-card border border-border rounded-full px-4 py-2"
         >
           <Clock size={14} />
-          <span>New listings appear here automatically</span>
+          <span>{ml.label('label_empty_marketplace_hint')}</span>
         </motion.div>
       </div>
     );

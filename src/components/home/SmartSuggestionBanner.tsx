@@ -6,12 +6,14 @@ import { useOrderSuggestions, useDismissSuggestion, useMarkSuggestionActed } fro
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useState, useRef } from 'react';
+import { useCurrency } from '@/hooks/useCurrency';
 
 export function SmartSuggestionBanner() {
   const { data: suggestions, isLoading } = useOrderSuggestions();
   const dismissMutation = useDismissSuggestion();
   const actMutation = useMarkSuggestionActed();
   const navigate = useNavigate();
+  const { formatPrice } = useCurrency();
   const [reorderingId, setReorderingId] = useState<string | null>(null);
   const isReorderingRef = useRef(false); // Global mutex across all suggestions
 
@@ -102,8 +104,8 @@ export function SmartSuggestionBanner() {
               {suggestion.product?.name || 'Product'}
             </p>
             <p className="text-xs text-muted-foreground truncate">
-              {suggestion.seller?.business_name || 'Seller'}
-              {suggestion.product?.price ? ` · ₹${suggestion.product.price}` : ''}
+              {suggestion.seller?.business_name || ''}
+              {suggestion.product?.price ? ` · ${formatPrice(suggestion.product.price)}` : ''}
             </p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">

@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Users, Tag, Star, ChevronRight } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
+import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 interface CategoryImageGridProps {
   parentGroup: string;
@@ -93,6 +94,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
   const { groupedConfigs, isLoading } = useCategoryConfigs();
   const { data: productCategories = [], isLoading: productsLoading } = useProductsByCategory();
   const { formatPrice } = useCurrency();
+  const ml = useMarketplaceLabels();
 
   const allCategories = groupedConfigs[parentGroup] || [];
   const categories = activeCategories
@@ -167,7 +169,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                 {/* Count badge — top right */}
                 {meta.count > 0 && (
                   <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground text-[9px] font-bold shadow-sm">
-                    {meta.count} items
+                    {meta.count} {ml.label('label_item_count')}
                   </div>
                 )}
 
@@ -194,7 +196,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                 {meta.sellerCount > 0 && (
                   <span className="inline-flex items-center gap-1">
                     <Users size={10} className="shrink-0 text-primary/70" />
-                    <span className="font-medium">{meta.sellerCount} {meta.sellerCount === 1 ? 'seller' : 'sellers'}</span>
+                    <span className="font-medium">{meta.sellerCount} {meta.sellerCount === 1 ? ml.label('label_seller_count_singular') : ml.label('label_seller_count_plural')}</span>
                   </span>
                 )}
                 {meta.minPrice !== null && (
@@ -204,10 +206,10 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                   </span>
                 )}
                 {meta.sellerCount === 0 && meta.minPrice === null && meta.count > 0 && (
-                  <span className="text-muted-foreground/60 font-medium">Explore →</span>
+                  <span className="text-muted-foreground/60 font-medium">{ml.label('label_explore_cta')}</span>
                 )}
                 {meta.sellerCount === 0 && meta.count === 0 && (
-                  <span className="text-muted-foreground/50 font-medium italic">Sellers setting up</span>
+                  <span className="text-muted-foreground/50 font-medium italic">{ml.label('label_sellers_setting_up')}</span>
                 )}
               </div>
             </Link>

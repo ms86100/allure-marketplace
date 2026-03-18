@@ -13,6 +13,7 @@ import { Store, Sparkles, Clock, Star, Users, Tag } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { cn } from '@/lib/utils';
 import { useSearchPlaceholder } from '@/hooks/useSearchPlaceholder';
+import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 /* ── Helpers ─────────────────────────────────────────────── */
 
@@ -111,6 +112,7 @@ export default function CategoriesPage() {
   const { groups, isLoading: groupsLoading } = useParentGroups();
   const { data: productCategories = [], isLoading: productsLoading } = useProductsByCategory();
   const { formatPrice } = useCurrency();
+  const ml = useMarketplaceLabels();
 
   const browseBeyond = profile?.browse_beyond_community ?? true;
   const searchRadius = profile?.search_radius_km ?? 10;
@@ -186,8 +188,8 @@ export default function CategoriesPage() {
       {/* Header */}
       <div className="sticky top-0 z-40 safe-top bg-background/95 backdrop-blur-sm">
         <div className="px-4 pt-3 pb-1">
-          <h1 className="text-lg font-bold text-foreground">Explore Categories</h1>
-          <p className="text-xs text-muted-foreground mb-1">Find what you love</p>
+          <h1 className="text-lg font-bold text-foreground">{ml.label('label_categories_page_title')}</h1>
+          <p className="text-xs text-muted-foreground mb-1">{ml.label('label_categories_page_subtitle')}</p>
           <div className="h-[2px] rounded-full bg-gradient-to-r from-primary via-primary/50 to-transparent" />
         </div>
 
@@ -278,9 +280,9 @@ export default function CategoriesPage() {
               transition={{ delay: 0.2, duration: 0.4 }}
               className="space-y-3"
             >
-              <h2 className="text-lg font-bold text-foreground">Stay tuned — we're growing!</h2>
+              <h2 className="text-lg font-bold text-foreground">{ml.label('label_empty_categories_title')}</h2>
               <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-                New sellers are joining your community. Products will be available here very soon.
+                {ml.label('label_empty_categories_desc')}
               </p>
             </motion.div>
             <motion.div
@@ -290,7 +292,7 @@ export default function CategoriesPage() {
               className="mt-6 flex items-center gap-2 text-xs text-muted-foreground bg-muted rounded-full px-4 py-2"
             >
               <Clock size={14} />
-              <span>Check back soon for new listings</span>
+              <span>{ml.label('label_empty_categories_hint')}</span>
             </motion.div>
           </div>
         ) : (
@@ -355,7 +357,7 @@ export default function CategoriesPage() {
 
                             {meta.count > 0 && (
                               <div className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground text-[9px] font-bold shadow-sm">
-                                {meta.count} items
+                                {meta.count} {ml.label('label_item_count')}
                               </div>
                             )}
 
@@ -378,7 +380,7 @@ export default function CategoriesPage() {
                             {meta.sellerCount > 0 && (
                               <span className="inline-flex items-center gap-0.5">
                                 <Users size={10} className="shrink-0" />
-                                {meta.sellerCount} {meta.sellerCount === 1 ? 'seller' : 'sellers'}
+                                {meta.sellerCount} {meta.sellerCount === 1 ? ml.label('label_seller_count_singular') : ml.label('label_seller_count_plural')}
                               </span>
                             )}
                             {meta.minPrice !== null && (
@@ -388,7 +390,7 @@ export default function CategoriesPage() {
                               </span>
                             )}
                             {meta.sellerCount === 0 && meta.minPrice === null && (
-                              <span className="text-muted-foreground/60">Explore →</span>
+                              <span className="text-muted-foreground/60">{ml.label('label_explore_cta')}</span>
                             )}
                           </div>
                         </Link>

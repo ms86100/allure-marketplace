@@ -6,6 +6,7 @@ import { Trophy, Star, ShoppingBag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCurrency } from '@/hooks/useCurrency';
 import { cn } from '@/lib/utils';
+import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 interface TopSeller {
   id: string;
@@ -38,6 +39,7 @@ export function SocietyLeaderboard() {
   const { effectiveSocietyId } = useAuth();
   const navigate = useNavigate();
   const { formatPrice } = useCurrency();
+  const ml = useMarketplaceLabels();
   const [topSellers, setTopSellers] = useState<TopSeller[]>([]);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +98,7 @@ export function SocietyLeaderboard() {
 
   if (topSellers.length === 0 && topProducts.length === 0) return null;
 
-  const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+  const rankColors = ['hsl(45, 93%, 47%)', 'hsl(0, 0%, 66%)', 'hsl(30, 67%, 50%)', 'hsl(var(--muted-foreground))', 'hsl(var(--muted-foreground))'];
 
   return (
     <div className="space-y-5 px-4">
@@ -107,7 +109,7 @@ export function SocietyLeaderboard() {
             <div className="w-7 h-7 rounded-lg bg-warning/20 flex items-center justify-center">
               <Trophy size={14} className="text-warning" />
             </div>
-            <h3 className="font-bold text-sm text-foreground">Top Sellers in Your Society</h3>
+            <h3 className="font-bold text-sm text-foreground">{ml.label('label_section_leaderboard_sellers')}</h3>
           </div>
 
           {/* Podium: top 3 with center elevated */}
@@ -126,7 +128,7 @@ export function SocietyLeaderboard() {
                       isCenter ? 'w-28' : 'w-24',
                     )}
                   >
-                    <span className="text-lg mb-1">{medals[rank]}</span>
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white mb-1" style={{ backgroundColor: rankColors[rank] }}>{rank + 1}</span>
                     <div className={cn(
                       'rounded-full overflow-hidden border-2 mb-1.5',
                       isCenter ? 'w-16 h-16 border-warning' : 'w-12 h-12 border-border',
@@ -169,7 +171,7 @@ export function SocietyLeaderboard() {
                     onClick={() => navigate(`/seller/${s.id}`)}
                   >
                     <div className="p-3 text-center space-y-1">
-                      <span className="text-lg">{medals[rank]}</span>
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white mx-auto" style={{ backgroundColor: rankColors[rank] }}>{rank + 1}</span>
                       {s.profile_image_url ? (
                         <img src={s.profile_image_url} alt="" className="w-10 h-10 rounded-full mx-auto object-cover" />
                       ) : (
@@ -202,7 +204,7 @@ export function SocietyLeaderboard() {
             <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
               <ShoppingBag size={14} className="text-primary" />
             </div>
-            <h3 className="font-bold text-sm text-foreground">Most Ordered Products</h3>
+            <h3 className="font-bold text-sm text-foreground">{ml.label('label_section_leaderboard_products')}</h3>
           </div>
           <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
             {topProducts.map((p, i) => (
@@ -215,7 +217,7 @@ export function SocietyLeaderboard() {
                       <ShoppingBag size={24} className="text-muted-foreground/40" />
                     </div>
                   )}
-                  <span className="absolute top-1.5 left-1.5 text-sm leading-none bg-background/80 backdrop-blur-sm rounded-lg px-1.5 py-1">{medals[i]}</span>
+                  <span className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-background/80 backdrop-blur-sm" style={{ backgroundColor: rankColors[i] }}>{i + 1}</span>
                   <span className="absolute bottom-1.5 right-1.5 text-[9px] font-bold text-primary-foreground bg-primary/90 backdrop-blur-sm rounded-full px-2 py-0.5">{p.order_count}× ordered</span>
                 </div>
                 <div className="p-2.5">

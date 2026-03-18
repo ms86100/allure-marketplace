@@ -2,10 +2,12 @@ import { useNavigate } from 'react-router-dom';
 import { useCommunitySearchSuggestions } from '@/hooks/queries/useCommunitySearchSuggestions';
 import { TrendingUp, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 export function HomeSearchSuggestions() {
   const navigate = useNavigate();
   const { data: suggestions = [] } = useCommunitySearchSuggestions();
+  const ml = useMarketplaceLabels();
 
   if (suggestions.length === 0) return null;
 
@@ -14,7 +16,7 @@ export function HomeSearchSuggestions() {
       <div className="flex items-center gap-1.5 mb-2">
         <Sparkles size={12} className="text-primary" />
         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-          Popular in your society
+          {ml.label('label_section_search_popular')}
         </span>
       </div>
       <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">

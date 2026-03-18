@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MessageCircle, ChevronRight, Heart, ArrowRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { jitteredStaleTime } from '@/lib/query-utils';
+import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 interface RecentPost {
   id: string;
@@ -16,6 +17,7 @@ interface RecentPost {
 
 export function CommunityTeaser() {
   const { effectiveSocietyId } = useAuth();
+  const ml = useMarketplaceLabels();
 
   const { data } = useQuery({
     queryKey: ['community-teaser', effectiveSocietyId],
@@ -55,14 +57,14 @@ export function CommunityTeaser() {
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
             <MessageCircle size={15} className="text-primary" />
-            Community
+            {ml.label('label_section_community')}
           </h3>
         </div>
         <Link to="/community">
           <div className="bg-primary/5 border border-primary/10 rounded-2xl px-4 py-6 text-center active:scale-[0.98] transition-transform">
             <MessageCircle size={28} className="text-primary mx-auto mb-2 opacity-60" />
-            <p className="text-sm font-semibold text-foreground">Be the first to post!</p>
-            <p className="text-[11px] text-muted-foreground mt-1">Share updates, ask questions, or help a neighbor</p>
+            <p className="text-sm font-semibold text-foreground">{ml.label('label_community_first_post')}</p>
+            <p className="text-[11px] text-muted-foreground mt-1">{ml.label('label_community_first_post_desc')}</p>
           </div>
         </Link>
       </div>
@@ -74,7 +76,7 @@ export function CommunityTeaser() {
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
           <MessageCircle size={15} className="text-primary" />
-          Community
+            {ml.label('label_section_community')}
         </h3>
         <Link to="/community" className="text-[11px] font-bold text-primary flex items-center gap-0.5">
           View all <ChevronRight size={12} />
