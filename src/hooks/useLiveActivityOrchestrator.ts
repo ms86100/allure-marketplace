@@ -92,7 +92,7 @@ export function useLiveActivityOrchestrator(): void {
 
       console.log(TAG, `Order ${orderId} status → ${newStatus}`);
 
-      if (TERMINAL_STATUSES.has(newStatus)) {
+      if (terminalStatusesCache.has(newStatus)) {
         activeOrderIdsRef.current.delete(orderId);
         await LiveActivityManager.end(orderId);
         return;
