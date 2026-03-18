@@ -87,6 +87,8 @@ Deno.serve(async (req) => {
           } else {
             throw new Error(`DB insert failed: ${insertError.message}`);
           }
+        }
+
         // Silent push: in-app notification saved above, skip device push delivery
         if (silentPush) {
           console.log(`[Queue][${item.id}] Silent push — skipping device delivery (Live Activity handles it)`);
