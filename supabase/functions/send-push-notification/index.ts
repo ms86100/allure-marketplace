@@ -408,7 +408,9 @@ Deno.serve(async (req) => {
             apnsP8Key!,
             apnsKeyId!,
             apnsTeamId!,
-            apnsBundleId!
+            apnsBundleId!,
+            threadId,
+            imageUrl,
           );
 
           // If APNs fails and we have a real FCM token, fall back to FCM
