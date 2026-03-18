@@ -29,6 +29,7 @@ export function DeliveryArrivalOverlay({
   status,
   onDismiss,
   deliveryCode,
+  proximityMessages,
 }: DeliveryArrivalOverlayProps) {
   const [dismissed, setDismissed] = useState(false);
 
