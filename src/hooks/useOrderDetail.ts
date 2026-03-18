@@ -155,7 +155,7 @@ export function useOrderDetail(id: string | undefined) {
     } catch (error: any) {
       console.error('Error updating order:', error, JSON.stringify(error));
       const errMsg = error?.message || error?.details || '';
-      toast.error(errMsg.includes('Invalid status transition') ? 'Invalid status transition — you cannot skip steps' : `Failed to update order: ${errMsg || 'Unknown error'}`);
+      toast.error(errMsg.includes('Invalid status transition') ? 'Invalid status transition — you cannot skip steps' : `Failed to update order: ${errMsg || 'Unknown error'}`, { id: `order-${order.id}-error` });
     } finally { setIsUpdating(false); }
   };
 
