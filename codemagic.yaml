@@ -868,36 +868,7 @@ workflows:
               func application(_ application: UIApplication,
                                didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
                   FirebaseApp.configure()
-
-                  // Register app-local plugins after Capacitor bridge loads
-                  NotificationCenter.default.addObserver(
-                      self,
-                      selector: #selector(capacitorBridgeDidLoad(_:)),
-                      name: NSNotification.Name("CAPBridgeViewControllerDidLoad"),
-                      object: nil
-                  )
-                  print("📡 AppDelegate: registered observer for CAPBridgeViewControllerDidLoad")
-
                   return true
-              }
-
-              @objc func capacitorBridgeDidLoad(_ notification: Notification) {
-                  print("📡 capacitorBridgeDidLoad fired — notification.object type: \(type(of: notification.object))")
-                  if let bridge = notification.object as? CAPBridge {
-                      bridge.registerPluginInstance(LiveActivityPlugin())
-                      print("✅ LiveActivityPlugin REGISTERED via AppDelegate notification (CAPBridge)")
-                  } else if let vc = notification.object as? CAPBridgeViewController {
-                      vc.bridge?.registerPluginInstance(LiveActivityPlugin())
-                      print("✅ LiveActivityPlugin REGISTERED via AppDelegate notification (CAPBridgeViewController)")
-                  } else {
-                      print("⚠️ capacitorBridgeDidLoad: unexpected object type — trying alternative registration")
-                      if let rootVC = UIApplication.shared.windows.first?.rootViewController as? CAPBridgeViewController {
-                          rootVC.bridge?.registerPluginInstance(LiveActivityPlugin())
-                          print("✅ LiveActivityPlugin REGISTERED via rootViewController fallback")
-                      } else {
-                          print("❌ LiveActivityPlugin registration FAILED — no bridge found")
-                      }
-                  }
               }
 
               func application(_ app: UIApplication, open url: URL,
