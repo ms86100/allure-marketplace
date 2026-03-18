@@ -187,7 +187,7 @@ function useOSRMRoute(
   return { routeCoords, roadEtaMinutes, roadDistanceMeters };
 }
 
-export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinationLng, riderName, heading }: DeliveryMapViewProps) {
+export function DeliveryMapView({ riderLat, riderLng, destinationLat, destinationLng, riderName, heading, onRoadEtaChange }: DeliveryMapViewProps) {
   const center: [number, number] = [
     (riderLat + destinationLat) / 2,
     (riderLng + destinationLng) / 2,
