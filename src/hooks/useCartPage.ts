@@ -305,8 +305,8 @@ export function useCartPage() {
     if (targetOrderId) {
       let confirmed = false;
       for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1500)); const { data } = await supabase.from('orders').select('payment_status').eq('id', targetOrderId).single(); if (data?.payment_status === 'paid') { confirmed = true; break; } }
-      if (!confirmed) toast.info('Payment is being verified. Your order will update shortly.');
-      else toast.success('Payment successful! Order placed.');
+      if (!confirmed) toast.info('Payment is being verified. Your order will update shortly.', { id: 'razorpay-verifying' });
+      else toast.success('Payment successful! Order placed.', { id: 'razorpay-success' });
     }
     supabase.functions.invoke('process-notification-queue').catch(() => {});
     // Clear cart and payment session ONLY after payment success
