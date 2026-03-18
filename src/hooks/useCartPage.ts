@@ -24,6 +24,8 @@ interface PaymentSession {
   paymentMethod: string;
   amount: number;
   createdAt: number;
+  sellerUpiId?: string;
+  sellerName?: string;
 }
 
 function savePaymentSession(session: PaymentSession) {
@@ -274,11 +276,14 @@ export function useCartPage() {
         if (orderIds.length === 0) throw new Error('Failed to create orders');
         setPendingOrderIds(orderIds);
         // CRITICAL: Persist payment session so it survives app-switch
+        const sellerForSession = sellerGroups[0]?.items[0]?.product?.seller as any;
         savePaymentSession({
           orderIds,
           paymentMethod: 'upi',
           amount: finalAmount,
           createdAt: Date.now(),
+          sellerUpiId: sellerForSession?.upi_id || undefined,
+          sellerName: sellerGroups[0]?.sellerName || undefined,
         });
         // Do NOT clear cart — cart stays until payment is confirmed
         if (paymentMode.isUpiDeepLink) {
@@ -383,7 +388,12 @@ export function useCartPage() {
   };
 
   // Compute whether we have an active payment session (for rendering payment UI even if cart is empty)
-  const hasActivePaymentSession = pendingOrderIds.length > 0 || !!loadPaymentSession();
+  const activeSession = loadPaymentSession();
+  const hasActivePaymentSession = pendingOrderIds.length > 0 || !!activeSession;
+  // Fallback seller details from session for app-resume when cart is empty
+  const sessionSellerUpiId = activeSession?.sellerUpiId || '';
+  const sessionSellerName = activeSession?.sellerName || 'Seller';
+  const sessionAmount = activeSession?.amount || 0;
 
   return {
     user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading,
@@ -399,7 +409,7 @@ export function useCartPage() {
     selectedDeliveryAddress, setSelectedDeliveryAddress, addresses, addressesLoading,
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed,
     handleUpiDeepLinkSuccess, handleUpiDeepLinkFailed,
-    hasActivePaymentSession,
+    hasActivePaymentSession, sessionSellerUpiId, sessionSellerName, sessionAmount,
     cancelPlacingOrder: () => setIsPlacingOrder(false),
   };
 }

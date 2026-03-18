@@ -292,7 +292,7 @@ export default function CartPage() {
       {/* CRITICAL: Render UPI sheet whenever pendingOrderIds exist — independent of cart state.
           This prevents the sheet from unmounting when cart items refetch as empty during app-switch. */}
       {c.pendingOrderIds.length > 0 && (
-        <UpiDeepLinkCheckout isOpen={c.showUpiDeepLink} onClose={() => c.setShowUpiDeepLink(false)} orderId={c.pendingOrderIds[0]} amount={c.finalAmount} sellerUpiId={(c.sellerGroups[0]?.items[0]?.product?.seller as any)?.upi_id || ''} sellerName={c.sellerGroups[0]?.sellerName || 'Seller'} onPaymentConfirmed={c.handleUpiDeepLinkSuccess} onPaymentFailed={c.handleUpiDeepLinkFailed} />
+        <UpiDeepLinkCheckout isOpen={c.showUpiDeepLink} onClose={() => c.setShowUpiDeepLink(false)} orderId={c.pendingOrderIds[0]} amount={(c.sellerGroups.length > 0 ? c.finalAmount : c.sessionAmount) || c.finalAmount} sellerUpiId={(c.sellerGroups[0]?.items[0]?.product?.seller as any)?.upi_id || c.sessionSellerUpiId} sellerName={c.sellerGroups[0]?.sellerName || c.sessionSellerName} onPaymentConfirmed={c.handleUpiDeepLinkSuccess} onPaymentFailed={c.handleUpiDeepLinkFailed} />
       )}
     </AppLayout>
   );

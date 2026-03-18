@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -66,10 +66,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get order items
+    // Get order items with seller_id from products
     const { data: items, error: itemsErr } = await supabase
       .from("order_items")
-      .select("product_id, quantity, unit_price")
+      .select("product_id, quantity, unit_price, products(id, price, approval_status, is_available, seller_id)")
       .eq("order_id", order_id);
 
     if (itemsErr || !items || items.length === 0) {
@@ -79,48 +79,61 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify all products are still available and approved
-    const productIds = items.map(i => i.product_id);
-    const { data: products } = await supabase
-      .from("products")
-      .select("id, price, status, is_available")
-      .in("id", productIds);
+    // Filter to available + approved products and group by seller
+    const sellerGroupsMap = new Map<string, { product_id: string; quantity: number; unit_price: number }[]>();
+    let totalAmount = 0;
 
-    const availableProducts = (products || []).filter(p => p.is_available && p.status === 'approved');
-    if (availableProducts.length === 0) {
+    for (const item of items) {
+      const product = (item as any).products;
+      if (!product || !product.is_available || product.approval_status !== 'approved') continue;
+
+      const sellerId = product.seller_id as string;
+      if (!sellerId) continue;
+
+      const cartItem = {
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: product.price, // Use current price
+      };
+
+      if (!sellerGroupsMap.has(sellerId)) {
+        sellerGroupsMap.set(sellerId, []);
+      }
+      sellerGroupsMap.get(sellerId)!.push(cartItem);
+      totalAmount += cartItem.unit_price * cartItem.quantity;
+    }
+
+    if (sellerGroupsMap.size === 0) {
       return new Response(JSON.stringify({ error: "No items are currently available for reorder" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Build cart items for the reorder
-    const cartItems = items
-      .filter(i => availableProducts.some(p => p.id === i.product_id))
-      .map(i => {
-        const currentProduct = availableProducts.find(p => p.id === i.product_id)!;
-        return {
-          product_id: i.product_id,
-          quantity: i.quantity,
-          unit_price: currentProduct.price, // Use current price
-        };
-      });
+    // Build _seller_groups JSON in the format the RPC expects
+    const sellerGroups = Array.from(sellerGroupsMap.entries()).map(([sellerId, groupItems]) => ({
+      seller_id: sellerId,
+      items: groupItems.map(i => ({
+        product_id: i.product_id,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+      })),
+    }));
 
-    const totalAmount = cartItems.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0);
+    // Use the authenticated user's client so auth.uid() matches _buyer_id inside the RPC
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
-    // Create new order using the RPC
-    const { data: newOrders, error: createErr } = await supabase
+    const { data: rpcResult, error: createErr } = await userClient
       .rpc("create_multi_vendor_orders", {
-        p_buyer_id: user.id,
-        p_society_id: originalOrder.society_id,
-        p_items: cartItems.map(i => ({
-          product_id: i.product_id,
-          quantity: i.quantity,
-          unit_price: i.unit_price,
-        })),
-        p_fulfillment_type: originalOrder.fulfillment_type || 'self_pickup',
-        p_delivery_fee: 0,
-        p_discount_amount: 0,
+        _buyer_id: user.id,
+        _seller_groups: JSON.stringify(sellerGroups),
+        _payment_method: "cod",
+        _payment_status: "pending",
+        _fulfillment_type: originalOrder.fulfillment_type || "self_pickup",
+        _delivery_fee: 0,
+        _coupon_discount: 0,
       });
 
     if (createErr) {
@@ -131,10 +144,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    // The RPC returns a JSON object with success/order_ids
+    const result = typeof rpcResult === 'string' ? JSON.parse(rpcResult) : rpcResult;
+
+    if (result && result.success === false) {
+      return new Response(JSON.stringify({ error: result.error, details: result }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(JSON.stringify({
       success: true,
-      orders: newOrders,
-      items_reordered: cartItems.length,
+      orders: result?.order_ids || [],
+      items_reordered: sellerGroups.reduce((sum, g) => sum + g.items.length, 0),
       total_amount: totalAmount,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

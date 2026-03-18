@@ -8,11 +8,17 @@ interface ArrivalState {
   distanceMeters: number | null;
 }
 
+interface SocietyGeo {
+  lat: number;
+  lng: number;
+  radius: number;
+}
+
 export function useArrivalDetection(): ArrivalState {
   const { user, profile } = useAuth();
   const [state, setState] = useState<ArrivalState>({ isNearHome: false, distanceMeters: null });
+  const [society, setSociety] = useState<SocietyGeo | null>(null);
   const watchIdRef = useRef<number | null>(null);
-  const societyRef = useRef<{ lat: number; lng: number; radius: number } | null>(null);
 
   const getDistance = useCallback((lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371000;
@@ -23,6 +29,7 @@ export function useArrivalDetection(): ArrivalState {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }, []);
 
+  // Fetch society geo data
   useEffect(() => {
     if (!user || !profile?.society_id) return;
 
@@ -34,21 +41,21 @@ export function useArrivalDetection(): ArrivalState {
         .single();
 
       if (data?.latitude && data?.longitude) {
-        societyRef.current = {
+        setSociety({
           lat: data.latitude,
           lng: data.longitude,
           radius: data.geofence_radius_meters || 500,
-        };
+        });
       }
     })();
   }, [user, profile?.society_id]);
 
+  // Start geolocation watch when society data is available
   useEffect(() => {
-    if (!societyRef.current) return;
+    if (!society) return;
     if (typeof navigator === 'undefined' || !navigator.geolocation) return;
 
     const checkPosition = (pos: GeolocationPosition) => {
-      const society = societyRef.current;
       if (!society) return;
 
       const dist = getDistance(pos.coords.latitude, pos.coords.longitude, society.lat, society.lng);
@@ -81,7 +88,6 @@ export function useArrivalDetection(): ArrivalState {
               { enableHighAccuracy: false, maximumAge: 60000, timeout: 10000 }
             );
           }
-          // If 'prompt' or 'denied', don't trigger the popup
         }).catch(() => {});
       }
     }
@@ -95,9 +101,10 @@ export function useArrivalDetection(): ArrivalState {
         } else {
           navigator.geolocation.clearWatch(watchIdRef.current);
         }
+        watchIdRef.current = null;
       }
     };
-  }, [getDistance, societyRef.current?.lat]);
+  }, [getDistance, society]);
 
   return state;
 }
