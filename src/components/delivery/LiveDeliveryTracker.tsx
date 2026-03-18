@@ -56,7 +56,9 @@ function computeDistanceEta(distanceMeters: number): number {
   return Math.max(1, Math.ceil(distanceMeters / 1000 * 4));
 }
 
-function getSmartEta(distance: number | null, dbEta: number | null, roadEta?: number | null): number | null {
+function getSmartEta(distance: number | null, dbEta: number | null, roadEta?: number | null, isLocationStale?: boolean): number | null {
+  // If location data is stale, don't trust any ETA
+  if (isLocationStale) return null;
   if (roadEta != null && roadEta > 0) return roadEta;
   if (distance !== null && distance < 500) {
     return computeDistanceEta(distance);
@@ -81,7 +83,7 @@ function getProximityMessage(
   if (proximityStatus === 'arriving') return msg('arriving');
   if (proximityStatus === 'nearby') return msg('nearby');
 
-  const smartEta = getSmartEta(distance, eta);
+  const smartEta = getSmartEta(distance, eta, null, false);
 
   if (distance !== null && distance < (config.at_doorstep.max_meters ?? 50)) return msg('at_doorstep');
   if (distance !== null && distance < (config.arriving.max_meters ?? 200)) return msg('arriving');
@@ -146,8 +148,9 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
           <Navigation size={16} className="text-primary" />
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{liveTrackingTitle}</p>
         </div>
-        {(() => {
-          const smartEta = getSmartEta(tracking.distance, tracking.eta, roadEtaMinutes);
+      {(() => {
+          const isStale = tracking.isLocationStale || !tracking.lastLocationAt;
+          const smartEta = getSmartEta(tracking.distance, tracking.eta, roadEtaMinutes, isStale);
           return smartEta && isInTransit ? (
             <Badge variant="secondary" className="bg-primary/10 text-primary">
               <Clock size={10} className="mr-1" />

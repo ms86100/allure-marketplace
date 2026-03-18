@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Truck, Phone, MapPin, Key, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
+import { Truck, Phone, MapPin, Key, CheckCircle, XCircle, Clock, Loader2, Package, Navigation, Home } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
 
@@ -26,20 +26,26 @@ interface StatusLabelConfig {
   label: string;
   buyer_msg?: string;
   seller_msg?: string;
+  icon?: string;
+  color?: string;
 }
 
-const ICON_MAP: Record<string, any> = {
-  pending: Clock,
-  assigned: Truck,
-  picked_up: Truck,
-  on_the_way: Truck,
-  at_gate: MapPin,
-  delivered: CheckCircle,
-  failed: XCircle,
-  cancelled: XCircle,
+const LUCIDE_ICON_MAP: Record<string, any> = {
+  Clock, Truck, MapPin, CheckCircle, XCircle, Package, Navigation, Home, Loader2, Key, Phone,
 };
 
-const COLOR_MAP: Record<string, string> = {
+const DEFAULT_ICON_MAP: Record<string, string> = {
+  pending: 'Clock',
+  assigned: 'Truck',
+  picked_up: 'Truck',
+  on_the_way: 'Navigation',
+  at_gate: 'MapPin',
+  delivered: 'CheckCircle',
+  failed: 'XCircle',
+  cancelled: 'XCircle',
+};
+
+const DEFAULT_COLOR_MAP: Record<string, string> = {
   pending: 'bg-warning/15 text-warning',
   assigned: 'bg-info/15 text-info',
   picked_up: 'bg-primary/15 text-primary',
@@ -125,8 +131,9 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
   if (!assignment) return null;
 
   const statusConfig = labelsConfig[assignment.status] || labelsConfig.pending || DEFAULT_LABELS.pending;
-  const StatusIcon = ICON_MAP[assignment.status] || Clock;
-  const colorClass = COLOR_MAP[assignment.status] || COLOR_MAP.pending;
+  const iconName = statusConfig.icon || DEFAULT_ICON_MAP[assignment.status] || 'Clock';
+  const StatusIcon = LUCIDE_ICON_MAP[iconName] || Clock;
+  const colorClass = statusConfig.color || DEFAULT_COLOR_MAP[assignment.status] || DEFAULT_COLOR_MAP.pending;
 
   const deliverySteps = Object.keys(labelsConfig).filter(k => !['failed', 'cancelled'].includes(k));
   const currentStepIndex = deliverySteps.indexOf(assignment.status);

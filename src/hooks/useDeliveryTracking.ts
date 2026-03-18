@@ -54,7 +54,10 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
   useEffect(() => {
     const interval = setInterval(() => {
       setState((prev) => {
-        if (!prev.lastLocationAt) return prev;
+        // If lastLocationAt is null and we have a status (order exists), treat as stale
+        if (!prev.lastLocationAt) {
+          return prev.status && !prev.isLocationStale ? { ...prev, isLocationStale: true } : prev;
+        }
         const threshold = getTrackingConfigSync().location_stale_threshold_ms;
         const stale = Date.now() - new Date(prev.lastLocationAt).getTime() > threshold;
         return stale !== prev.isLocationStale ? { ...prev, isLocationStale: stale } : prev;
