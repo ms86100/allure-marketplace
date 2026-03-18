@@ -7,6 +7,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { Star, Flame, Tag, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 /**
  * Auto-generated highlight strip that shows when no FeaturedBanners are configured.
