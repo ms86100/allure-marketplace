@@ -7,6 +7,7 @@ import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 export function HomeSearchSuggestions() {
   const navigate = useNavigate();
   const { data: suggestions = [] } = useCommunitySearchSuggestions();
+  const ml = useMarketplaceLabels();
 
   if (suggestions.length === 0) return null;
 
