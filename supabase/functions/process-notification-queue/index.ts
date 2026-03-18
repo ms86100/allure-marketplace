@@ -5,12 +5,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MAX_RETRIES = 3;
+const PUSH_MAX_ATTEMPTS = 3;
+const PUSH_RETRY_DELAYS_MS = [2000, 5000]; // delays between attempt 1→2, 2→3
 
-// Exponential backoff: 30s, 2min, 8min
-function getNextRetryAt(retryCount: number): string {
-  const delayMs = Math.pow(4, retryCount) * 30000;
-  return new Date(Date.now() + delayMs).toISOString();
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 Deno.serve(async (req) => {
@@ -60,7 +59,6 @@ Deno.serve(async (req) => {
     console.log(`Processing ${pending.length} queued notifications`);
 
     let processed = 0;
-    let retried = 0;
     let deadLettered = 0;
 
     for (const item of pending) {
@@ -100,89 +98,88 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Try to send push notification and verify delivery
-        let pushFailed = false;
-        let pushErrorMsg = "";
-        try {
-          const pushData = { ...(item.payload || {}) };
-          if (pushData.action) pushData.action = String(pushData.action);
-          if (pushData.reference_path) pushData.reference_path = String(pushData.reference_path);
-          else if (item.reference_path) pushData.reference_path = item.reference_path;
+        // Inline push retry: attempt up to 3 times with 2s/5s delays
+        let pushDelivered = false;
+        let lastPushError = "";
 
-          const { data: pushResult, error: pushError } = await supabase.functions.invoke("send-push-notification", {
-            body: {
-              userId: item.user_id,
-              title: item.title,
-              body: item.body,
-              data: pushData,
-            },
-          });
+        for (let attempt = 1; attempt <= PUSH_MAX_ATTEMPTS; attempt++) {
+          try {
+            const pushData = { ...(item.payload || {}) };
+            if (pushData.action) pushData.action = String(pushData.action);
+            if (pushData.reference_path) pushData.reference_path = String(pushData.reference_path);
+            else if (item.reference_path) pushData.reference_path = item.reference_path;
 
-          if (pushError) {
-            pushFailed = true;
-            pushErrorMsg = `Push invoke error: ${pushError.message || String(pushError)}`;
-            console.warn(`[Queue][${item.id}] ${pushErrorMsg}`);
-          } else if (pushResult?.sent === 0) {
-            pushFailed = true;
-            pushErrorMsg = `Push sent=0, failed=${pushResult?.failed ?? '?'}: ${JSON.stringify(pushResult?.results ?? [])}`;
-            console.warn(`[Queue][${item.id}] ${pushErrorMsg}`);
-          } else {
-            console.log(`[Queue][${item.id}] Push delivered: sent=${pushResult?.sent}`);
+            const { data: pushResult, error: pushError } = await supabase.functions.invoke("send-push-notification", {
+              body: {
+                userId: item.user_id,
+                title: item.title,
+                body: item.body,
+                data: pushData,
+              },
+            });
+
+            if (pushError) {
+              lastPushError = `Push invoke error: ${pushError.message || String(pushError)}`;
+              console.warn(`[Queue][${item.id}] Attempt ${attempt}/${PUSH_MAX_ATTEMPTS}: ${lastPushError}`);
+            } else if (pushResult?.sent === 0) {
+              lastPushError = `Push sent=0, failed=${pushResult?.failed ?? '?'}: ${JSON.stringify(pushResult?.results ?? [])}`;
+              console.warn(`[Queue][${item.id}] Attempt ${attempt}/${PUSH_MAX_ATTEMPTS}: ${lastPushError}`);
+            } else {
+              console.log(`[Queue][${item.id}] Push delivered on attempt ${attempt}: sent=${pushResult?.sent}`);
+              pushDelivered = true;
+              break;
+            }
+          } catch (pushErr: any) {
+            lastPushError = `Push exception: ${pushErr?.message || String(pushErr)}`;
+            console.warn(`[Queue][${item.id}] Attempt ${attempt}/${PUSH_MAX_ATTEMPTS}: ${lastPushError}`);
           }
-        } catch (pushErr: any) {
-          pushFailed = true;
-          pushErrorMsg = `Push exception: ${pushErr?.message || String(pushErr)}`;
-          console.warn(`[Queue][${item.id}] ${pushErrorMsg}`);
+
+          // Wait before next attempt (no delay after final attempt)
+          if (attempt < PUSH_MAX_ATTEMPTS) {
+            const delay = PUSH_RETRY_DELAYS_MS[attempt - 1] || 5000;
+            console.log(`[Queue][${item.id}] Waiting ${delay}ms before retry...`);
+            await sleep(delay);
+          }
         }
 
-        if (pushFailed) {
-          // Push delivery failed — treat as retryable error (in-app notification already saved)
-          throw new Error(pushErrorMsg);
-        }
-
-        // Mark as processed only when push actually delivered
-        await supabase
-          .from("notification_queue")
-          .update({ status: "processed", processed_at: new Date().toISOString() })
-          .eq("id", item.id);
-
-        processed++;
-      } catch (err: any) {
-        const currentRetry = (item.retry_count || 0) + 1;
-        const errorMsg = err?.message || String(err);
-
-        if (currentRetry >= MAX_RETRIES) {
-          // Dead-letter: max retries exceeded
+        if (pushDelivered) {
+          await supabase
+            .from("notification_queue")
+            .update({ status: "processed", processed_at: new Date().toISOString() })
+            .eq("id", item.id);
+          processed++;
+        } else {
+          // Dead-letter: all inline attempts exhausted
           await supabase
             .from("notification_queue")
             .update({
               status: "failed",
               processed_at: new Date().toISOString(),
-              retry_count: currentRetry,
-              last_error: errorMsg,
+              retry_count: PUSH_MAX_ATTEMPTS,
+              last_error: lastPushError,
             })
             .eq("id", item.id);
           deadLettered++;
-          console.error(`Dead-lettered notification ${item.id} after ${MAX_RETRIES} retries: ${errorMsg}`);
-        } else {
-          // Schedule retry with exponential backoff
-          await supabase
-            .from("notification_queue")
-            .update({
-              status: "retrying",
-              retry_count: currentRetry,
-              last_error: errorMsg,
-              next_retry_at: getNextRetryAt(currentRetry),
-            })
-            .eq("id", item.id);
-          retried++;
-          console.warn(`Scheduled retry ${currentRetry}/${MAX_RETRIES} for ${item.id}: ${errorMsg}`);
+          console.error(`[Queue][${item.id}] Dead-lettered after ${PUSH_MAX_ATTEMPTS} inline attempts: ${lastPushError}`);
         }
+      } catch (err: any) {
+        // Non-push failure (e.g. DB insert error) — dead-letter immediately
+        const errorMsg = err?.message || String(err);
+        await supabase
+          .from("notification_queue")
+          .update({
+            status: "failed",
+            processed_at: new Date().toISOString(),
+            last_error: errorMsg,
+          })
+          .eq("id", item.id);
+        deadLettered++;
+        console.error(`[Queue][${item.id}] Fatal error, dead-lettered: ${errorMsg}`);
       }
     }
 
     return new Response(
-      JSON.stringify({ processed, retried, dead_lettered: deadLettered, total: pending.length }),
+      JSON.stringify({ processed, dead_lettered: deadLettered, total: pending.length }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
