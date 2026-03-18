@@ -126,7 +126,7 @@ export function useAuthState() {
   }, [setPartial]);
 
   const clearAuthState = useCallback(() => {
-    setState({ ...initialAuthState, isLoading: false });
+    setState({ ...initialAuthState, isLoading: false, isSessionRestored: true });
   }, []);
 
   // Track whether user explicitly called signOut
