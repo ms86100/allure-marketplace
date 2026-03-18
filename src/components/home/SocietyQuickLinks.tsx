@@ -25,6 +25,7 @@ const quickLinks: QuickLink[] = [
 export function SocietyQuickLinks() {
   const { effectiveSociety } = useAuth();
   const { isFeatureEnabled } = useEffectiveFeatures();
+  const ml = useMarketplaceLabels();
 
   if (!effectiveSociety) return null;
 
