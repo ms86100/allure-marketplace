@@ -36,7 +36,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { GlobalHapticListener } from "@/components/haptics/GlobalHapticListener";
 import { initializeMedianBridge } from "@/lib/median";
-import { useDeepLinks } from "@/hooks/useDeepLinks";
+import { useDeepLinks, consumePendingDeepLink } from "@/hooks/useDeepLinks";
 import { useSecurityOfficer } from "@/hooks/useSecurityOfficer";
 import { useAppLifecycle } from "@/hooks/useAppLifecycle";
 import { useBuyerOrderAlerts } from "@/hooks/useBuyerOrderAlerts";
