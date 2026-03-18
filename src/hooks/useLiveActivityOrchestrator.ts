@@ -202,20 +202,7 @@ export function useLiveActivityOrchestrator(): void {
     };
   }, [userId]);
 
-  // ── Polling fallback ──
-  useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
-
-    console.log(TAG, 'Starting polling fallback every', POLL_INTERVAL_MS, 'ms');
-    pollTimerRef.current = setInterval(doSync, POLL_INTERVAL_MS);
-
-    return () => {
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
-        pollTimerRef.current = null;
-      }
-    };
-  }, [userId, doSync]);
+  // Polling fallback removed — pure realtime. App-resume one-shot sync remains below.
 
   // ── App resume re-hydration (pauses poll to avoid race) ──
   useEffect(() => {
