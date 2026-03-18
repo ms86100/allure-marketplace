@@ -1,5 +1,5 @@
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
-import { Phone, Truck, Navigation, Clock, MapPin } from 'lucide-react';
+import { Phone, Truck, Navigation, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -14,12 +14,10 @@ function formatDistance(meters: number | null): string {
   return `${(meters / 1000).toFixed(1)} km away`;
 }
 
-/** Compute a distance-based ETA (minutes) assuming ~15 km/h average speed */
 function computeDistanceEta(distanceMeters: number): number {
   return Math.max(1, Math.ceil(distanceMeters / 1000 * 4));
 }
 
-/** Get the best ETA: prefer distance-based when close, otherwise use DB value */
 function getSmartEta(distance: number | null, dbEta: number | null): number | null {
   if (distance !== null && distance < 500) {
     return computeDistanceEta(distance);
@@ -30,21 +28,20 @@ function getSmartEta(distance: number | null, dbEta: number | null): number | nu
   return dbEta;
 }
 
-function getProximityMessage(distance: number | null, eta: number | null, proximityStatus: string | null): string {
-  // Use proximity_status from backend when available
-  if (proximityStatus === 'at_doorstep') return '🏠 At your doorstep!';
-  if (proximityStatus === 'arriving') return '🏃 Almost there!';
-  if (proximityStatus === 'nearby') return '📍 Arriving soon!';
+function getProximityMessage(distance: number | null, eta: number | null, proximityStatus: string | null, isBuyerView: boolean): string {
+  if (proximityStatus === 'at_doorstep') return isBuyerView ? '🏠 At your doorstep!' : '🏠 You are at the doorstep.';
+  if (proximityStatus === 'arriving') return isBuyerView ? '🏃 Almost there!' : '🏃 You are almost there.';
+  if (proximityStatus === 'nearby') return isBuyerView ? '📍 Arriving soon!' : '📍 Buyer is nearby on your route.';
 
   const smartEta = getSmartEta(distance, eta);
-  if (distance !== null && distance < 50) return '🏠 At your doorstep!';
-  if (distance !== null && distance < 200) return '🏃 Almost there!';
-  if (distance !== null && distance < 500) return '📍 Arriving soon!';
-  if (smartEta !== null && smartEta <= 2) return '⏱️ Arriving in about 2 minutes';
-  if (smartEta !== null && smartEta <= 5) return `⏱️ Arriving in about ${smartEta} minutes`;
+  if (distance !== null && distance < 50) return isBuyerView ? '🏠 At your doorstep!' : '🏠 You are at the doorstep.';
+  if (distance !== null && distance < 200) return isBuyerView ? '🏃 Almost there!' : '🏃 You are almost there.';
+  if (distance !== null && distance < 500) return isBuyerView ? '📍 Arriving soon!' : `📍 About ${formatDistance(distance)}`;
+  if (smartEta !== null && smartEta <= 2) return isBuyerView ? '⏱️ Arriving in about 2 minutes' : '⏱️ Around 2 minutes away';
+  if (smartEta !== null && smartEta <= 5) return isBuyerView ? `⏱️ Arriving in about ${smartEta} minutes` : `⏱️ Around ${smartEta} minutes away`;
   if (smartEta !== null) return `🕐 ETA: ${smartEta} minutes`;
   if (distance !== null) return `📏 ${formatDistance(distance)}`;
-  return '🛵 On the way to you';
+  return isBuyerView ? '🛵 On the way to you' : '🛵 Delivery in progress';
 }
 
 function getLastSeenText(lastLocationAt: string | null): string | null {
@@ -75,7 +72,6 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView }: LiveDeliveryT
 
   return (
     <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Navigation size={16} className="text-primary" />
@@ -92,19 +88,16 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView }: LiveDeliveryT
         })()}
       </div>
 
-      {/* Proximity / ETA message */}
-      {isBuyerView && isInTransit && (
+      {isInTransit && (
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-center">
           <p className="text-sm font-semibold text-primary">
-            {getProximityMessage(tracking.distance, tracking.eta, tracking.proximityStatus)}
+            {getProximityMessage(tracking.distance, tracking.eta, tracking.proximityStatus, isBuyerView)}
           </p>
           {tracking.distance !== null && tracking.distance > 500 && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {formatDistance(tracking.distance)}
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">{formatDistance(tracking.distance)}</p>
           )}
           {tracking.isLocationStale && (
-            <p className="text-[10px] text-destructive mt-1">⚠️ Location may be outdated — rider GPS not updating</p>
+            <p className="text-[10px] text-destructive mt-1">⚠️ Location may be outdated — GPS is not updating</p>
           )}
           {!tracking.isLocationStale && lastSeen && (
             <p className="text-[10px] text-muted-foreground mt-1">⚠️ {lastSeen}</p>
@@ -112,13 +105,12 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView }: LiveDeliveryT
         </div>
       )}
 
-      {/* Rider info */}
       {tracking.riderName && (
         <div className="flex items-center justify-between bg-muted/50 rounded-lg p-2.5">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
               {tracking.riderPhotoUrl ? (
-                <img src={tracking.riderPhotoUrl} alt="" className="w-full h-full object-cover" />
+                <img src={tracking.riderPhotoUrl} alt="Delivery partner" className="w-full h-full object-cover" />
               ) : (
                 <Truck size={16} className="text-primary" />
               )}
@@ -138,8 +130,7 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView }: LiveDeliveryT
         </div>
       )}
 
-      {/* Status messages */}
-      {isBuyerView && (
+      {isBuyerView ? (
         <p className="text-xs text-muted-foreground">
           {tracking.status === 'assigned' && `✅ ${tracking.riderName || 'A rider'} will pick up your order soon.`}
           {tracking.status === 'picked_up' && '🚚 Your order has been picked up!'}
@@ -147,13 +138,12 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView }: LiveDeliveryT
           {tracking.status === 'at_gate' && '🏠 Delivery partner is at your society gate.'}
           {tracking.status === 'delivered' && '🎉 Your order has been delivered!'}
         </p>
-      )}
-      {!isBuyerView && (
+      ) : (
         <p className="text-xs text-muted-foreground">
           {tracking.status === 'assigned' && `🚴 ${tracking.riderName || 'Rider'} assigned.`}
-          {tracking.status === 'picked_up' && '📦 Rider has picked up the order.'}
-          {tracking.status === 'on_the_way' && '🛵 Rider is on the way to delivery.'}
-          {tracking.status === 'at_gate' && '🏠 Rider is at the buyer\'s gate.'}
+          {tracking.status === 'picked_up' && '📦 Pickup confirmed. Live delivery has started.'}
+          {tracking.status === 'on_the_way' && '🛵 You are on the way to the buyer.'}
+          {tracking.status === 'at_gate' && '🏠 You are at the buyer\'s gate.'}
           {tracking.status === 'delivered' && '✅ Delivery completed.'}
         </p>
       )}
