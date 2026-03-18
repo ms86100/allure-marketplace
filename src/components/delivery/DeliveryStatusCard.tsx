@@ -26,20 +26,26 @@ interface StatusLabelConfig {
   label: string;
   buyer_msg?: string;
   seller_msg?: string;
+  icon?: string;
+  color?: string;
 }
 
-const ICON_MAP: Record<string, any> = {
-  pending: Clock,
-  assigned: Truck,
-  picked_up: Truck,
-  on_the_way: Truck,
-  at_gate: MapPin,
-  delivered: CheckCircle,
-  failed: XCircle,
-  cancelled: XCircle,
+const LUCIDE_ICON_MAP: Record<string, any> = {
+  Clock, Truck, MapPin, CheckCircle, XCircle, Package, Navigation, Home, Loader2, Key, Phone,
 };
 
-const COLOR_MAP: Record<string, string> = {
+const DEFAULT_ICON_MAP: Record<string, string> = {
+  pending: 'Clock',
+  assigned: 'Truck',
+  picked_up: 'Truck',
+  on_the_way: 'Navigation',
+  at_gate: 'MapPin',
+  delivered: 'CheckCircle',
+  failed: 'XCircle',
+  cancelled: 'XCircle',
+};
+
+const DEFAULT_COLOR_MAP: Record<string, string> = {
   pending: 'bg-warning/15 text-warning',
   assigned: 'bg-info/15 text-info',
   picked_up: 'bg-primary/15 text-primary',
