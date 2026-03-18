@@ -149,7 +149,7 @@ export function useOrderDetail(id: string | undefined) {
       const { error } = await query;
       if (error) throw error;
       setOrder({ ...order, ...updateData });
-      toast.success(`Order ${getOrderStatus(newStatus).label.toLowerCase()}`);
+      toast.success(`Order ${getOrderStatus(newStatus).label.toLowerCase()}`, { id: `order-${order.id}-update` });
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus, rejection_reason: rejectionReason });
     } catch (error: any) {
