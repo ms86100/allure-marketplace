@@ -44,6 +44,7 @@ export default function OrderDetailPage() {
   const order = o.order;
   const orderId = order?.id;
   const fulfillmentType = o.orderFulfillmentType;
+  const isDeliveryOrder = ['delivery', 'seller_delivery'].includes(fulfillmentType);
 
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
 
