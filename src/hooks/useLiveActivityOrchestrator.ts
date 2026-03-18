@@ -115,7 +115,7 @@ export function useLiveActivityOrchestrator(): void {
             .not('status', 'in', '("cancelled","failed")')
             .maybeSingle(),
           sellerId
-            ? supabase.from('seller_profiles').select('business_name, logo_url').eq('id', sellerId).maybeSingle()
+            ? supabase.from('seller_profiles').select('business_name, profile_image_url').eq('id', sellerId).maybeSingle()
             : Promise.resolve({ data: null }),
           supabase.from('order_items').select('id', { count: 'exact', head: true }).eq('order_id', orderId),
         ]);
