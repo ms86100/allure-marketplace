@@ -1,8 +1,8 @@
 # Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phase 1)
+## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phases 1–3)
 
-All 9 original phases plus Blinkit parity Phase 1 (APNs Push-to-Live-Activity) are fully implemented.
+All 9 original phases plus Blinkit parity Phases 1–3 are fully implemented.
 
 ## Blinkit Gap-Fill Status
 
@@ -28,25 +28,36 @@ Order status change → DB trigger → net.http_post → update-live-activity-ap
 | **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
 | **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
 
-#### APNs Push Format
+### Phase 2: System Reliability — COMPLETE
 
-```json
-{
-  "aps": {
-    "timestamp": 1710764400,
-    "event": "update",
-    "content-state": {
-      "workflowStatus": "on_the_way",
-      "etaMinutes": 5,
-      "driverDistance": 1.2,
-      "driverName": "Ravi",
-      "progressPercent": 0.7,
-      "sellerName": "Fresh Bakes",
-      "itemCount": 3
-    }
-  }
-}
-```
+#### 2A. Idempotency Guard on Push Processing
+
+| Component | What Was Done |
+|-----------|---------------|
+| **DB trigger** | `fn_enqueue_order_status_notification` now checks for duplicate entries (same `reference_path` + `payload->>'status'` within 30 seconds) before inserting into `notification_queue`. Skips with `RAISE NOTICE`. |
+| **DB index** | `idx_notification_queue_dedup` on `notification_queue(reference_path, created_at DESC)` for fast dedup lookups |
+
+#### 2B. Realtime Channel Auto-Reconnect
+
+| Component | What Was Done |
+|-----------|---------------|
+| **`useLiveActivityOrchestrator.ts`** | Both order and delivery channels now detect `CHANNEL_ERROR` / `TIMED_OUT`, remove the dead channel, and re-subscribe after 3s delay. Max 3 reconnects per session. On successful reconnect (`SUBSCRIBED`), retry counter resets. Each reconnect triggers a one-shot `syncActiveOrders` to fill any gap. Unique channel names with `Date.now()` suffix prevent Supabase channel name conflicts. |
+
+### Phase 3: Seller Self-Delivery GPS + Buyer Live Map — COMPLETE
+
+#### 3A. Seller GPS Broadcasting for Self-Delivery
+
+| Component | What Was Done |
+|-----------|---------------|
+| **`SellerGPSTracker.tsx`** | New component — shown to sellers on OrderDetailPage when `delivery_handled_by === 'seller'` and order status is `picked_up` or `on_the_way`. Uses existing `useBackgroundLocationTracking` hook. Shows Start/Stop controls, live badge, and last-sent timestamp. |
+| **`OrderDetailPage.tsx`** | Integrated `SellerGPSTracker` in the seller action area, gated by `delivery_handled_by === 'seller'` + transit statuses |
+
+#### 3B. Buyer Live Map
+
+| Component | What Was Done |
+|-----------|---------------|
+| **`DeliveryMapView.tsx`** | New component using Leaflet + OpenStreetMap (no API key). Shows rider position (🛵 marker) and destination (📍 marker). Auto-fits bounds on mount, pans when rider moves out of view. |
+| **`OrderDetailPage.tsx`** | Integrated `DeliveryMapView` above `LiveDeliveryTracker` for buyer view when rider has GPS data and order has delivery coordinates (`delivery_lat`/`delivery_lng`). Falls back to text-only tracker when no GPS data available. |
 
 ### Previously Completed Blinkit Gaps
 
@@ -59,18 +70,15 @@ Order status change → DB trigger → net.http_post → update-live-activity-ap
 | Item count in DI | ✅ Done |
 | GPS-derived progress | ✅ Done |
 
-### Phase 2: Live Map / Rider GPS — DEFERRED
+### Phase 4: Live Map / Rider GPS — DEFERRED
 
-Requires rider-side GPS broadcasting infrastructure (separate product workstream).
+Requires dedicated rider-side GPS broadcasting infrastructure (separate product workstream). Seller self-delivery GPS (Phase 3A) covers the immediate need.
 
 ### Product Thumbnails in Widget — DEFERRED
 
 Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
 
 ## Silent Push Optimization: COMPLETE
-
-### What It Does
-Reduces push notification noise for mid-flow order statuses when Live Activity is already tracking the order on the lock screen. In-app notification history and badge counts are always preserved.
 
 ### Notification Matrix
 
@@ -87,42 +95,6 @@ Reduces push notification noise for mid-flow order statuses when Live Activity i
 | `cancelled` | ✅ Always | No | Critical — must alert |
 | All service/booking | ✅ Always | No | No Live Activity for these |
 
-### Implementation
-
-1. **DB column**: `category_status_flows.silent_push` (boolean, default false)
-2. **DB trigger**: `fn_enqueue_order_status_notification` includes `silent_push` in notification payload
-3. **Edge function**: `process-notification-queue` skips APNs/FCM delivery when `silent_push = true`, but still inserts `user_notifications` for in-app history
-
-## Phase I Live Activities — CI Pipeline Status
-
-### Codemagic Build Pipeline: COMPLETE
-
-Both `ios-release` and `release-all` workflows now include:
-
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
-
-### Codemagic Requirements (User Action)
-
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
-
-### Runtime Call Chain (Verified)
-
-```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
-```
-
 ## Implementation Matrix
 
 | Phase | Feature | Status |
@@ -136,21 +108,6 @@ Order status change → useLiveActivity hook → LiveActivityManager.push()
 | G | Smart Delay Detection | Implemented |
 | H | Notification Payload Standardization | Implemented |
 | I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
-
-## Reality-Check Audit Fixes (Round 4)
-
-### Fix 1: Live Activity Deduplication — COMPLETE
-
-| Layer | Fix |
-|-------|-----|
-| **Swift native** | `startLiveActivity` now checks for existing activity with same `entityId` before `Activity.request()`. If found, updates it and returns existing `activity.id` instead of creating a duplicate. |
-| **LiveActivityManager** | Added `hydrating` flag; `resetHydration()` is now a no-op while hydration is actively running, preventing the poll timer from racing with app-resume sync. |
-| **liveActivitySync** | Added `syncing` mutex flag to prevent concurrent `syncActiveOrders` calls from overlapping. |
-| **Orchestrator** | App-resume handler now pauses the poll timer before syncing, then resumes it after sync completes. |
-
-### Fix 2: Toast Conflict Prevention — COMPLETE
-
-| Layer | Fix |
-|-------|-----|
-| **useCartPage** | Added `upiCompletionRef` guard — only ONE of `handleUpiDeepLinkSuccess` / `handleUpiDeepLinkFailed` can execute per payment session. Both use the same toast ID `'upi-confirmed'` for dedup. Ref resets when a new UPI session starts. |
-| **UpiDeepLinkCheckout** | `handleSystemClose` now skips `onPaymentFailed` when `completionTriggeredRef.current` is true, preventing the sheet unmount from firing a conflicting handler after success. |
+| BG-1 | APNs Push-to-Live-Activity | Implemented |
+| BG-2 | System Reliability (Idempotency + Reconnect) | Implemented |
+| BG-3 | Seller Self-Delivery GPS + Buyer Live Map | Implemented |
