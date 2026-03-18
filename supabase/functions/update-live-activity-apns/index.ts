@@ -104,14 +104,11 @@ interface StatusFlowEntry {
 
 async function getStatusFlowData(
   supabase: ReturnType<typeof createClient>,
-  transactionType: string,
-  parentGroup: string,
 ): Promise<Map<string, StatusFlowEntry>> {
   const { data, error } = await supabase
     .from("category_status_flows")
     .select("status_key, display_label, sort_order")
-    .eq("transaction_type", transactionType)
-    .eq("parent_group", parentGroup)
+    .in("transaction_type", ["cart_purchase", "seller_delivery"])
     .order("sort_order");
 
   const map = new Map<string, StatusFlowEntry>();
