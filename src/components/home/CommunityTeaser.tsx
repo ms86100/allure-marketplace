@@ -17,6 +17,7 @@ interface RecentPost {
 
 export function CommunityTeaser() {
   const { effectiveSocietyId } = useAuth();
+  const ml = useMarketplaceLabels();
 
   const { data } = useQuery({
     queryKey: ['community-teaser', effectiveSocietyId],
