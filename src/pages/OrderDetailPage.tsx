@@ -263,11 +263,12 @@ export default function OrderDetailPage() {
                       destinationLng={destLng}
                       riderName={deliveryTracking.riderName}
                       heading={deliveryTracking.riderLocation.heading}
+                      onRoadEtaChange={setRoadEtaMinutes}
                     />
                   </Suspense>
                 ) : null;
               })()}
-              <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} trackingState={deliveryTracking} />
+              <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} trackingState={deliveryTracking} roadEtaMinutes={roadEtaMinutes} />
               {/* Gap A: Show delivery OTP to buyer */}
               {o.isBuyerView && buyerOtp && isInTransit && (
                 <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 text-center">
