@@ -36,8 +36,7 @@ export function useLiveActivityOrchestrator(): void {
       const { data } = await supabase
         .from('category_status_flows')
         .select('status_key, display_label, sort_order, buyer_hint')
-        .eq('transaction_type', 'cart_purchase')
-        .eq('parent_group', 'default')
+        .in('transaction_type', ['cart_purchase', 'seller_delivery'])
         .order('sort_order');
       if (data) flowEntriesRef.current = data as StatusFlowEntry[];
     } catch { /* best-effort */ }
