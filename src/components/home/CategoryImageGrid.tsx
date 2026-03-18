@@ -94,6 +94,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
   const { groupedConfigs, isLoading } = useCategoryConfigs();
   const { data: productCategories = [], isLoading: productsLoading } = useProductsByCategory();
   const { formatPrice } = useCurrency();
+  const ml = useMarketplaceLabels();
 
   const allCategories = groupedConfigs[parentGroup] || [];
   const categories = activeCategories
