@@ -38,6 +38,8 @@ export interface AuthState {
   sellerProfiles: SellerProfile[];
   currentSellerId: string | null;
   isLoading: boolean;
+  /** True once initial session restoration from storage has completed (regardless of outcome) */
+  isSessionRestored: boolean;
   isSecurityOfficer: boolean;
   isWorker: boolean;
   societyAdminRole: SocietyAdmin | null;
