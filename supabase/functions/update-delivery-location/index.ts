@@ -74,14 +74,15 @@ serve(async (req) => {
     const authClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user: authUser }, error: authError } = await authClient.auth.getUser();
-    if (authError || !authUser) {
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: authError } = await authClient.auth.getClaims(token);
+    if (authError || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const callerId = authUser.id;
+    const callerId = claimsData.claims.sub as string;
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
