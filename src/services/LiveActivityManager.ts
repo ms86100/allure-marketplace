@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { LiveActivity } from '@/plugins/live-activity';
 import type { LiveActivityData } from '@/plugins/live-activity/definitions';
 import { getString, setString, removeKey } from '@/lib/persistent-kv';
+import { recordLAError } from '@/services/liveActivityDiagnostics';
 
 const TAG = '[LiveActivity]';
 
