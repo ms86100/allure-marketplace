@@ -72,8 +72,14 @@ function ImageCollage({ images, fallbackIcon, fallbackUrl, alt, color }: {
   }
   if (images.length === 0) {
     return (
-      <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: color ? `${color}15` : undefined }}>
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: color ? `${color}25` : undefined }}>
+      <div
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ backgroundColor: color ? `${color}20` : 'hsl(var(--secondary))' }}
+      >
+        <div
+          className="w-14 h-14 rounded-2xl flex items-center justify-center"
+          style={{ backgroundColor: color ? `${color}30` : undefined }}
+        >
           <DynamicIcon name={fallbackIcon} size={28} className="text-foreground/60" style={color ? { color } : undefined} />
         </div>
       </div>
@@ -180,7 +186,7 @@ export default function CategoriesPage() {
   return (
     <AppLayout showHeader={false}>
       {/* Header */}
-      <div className="sticky top-0 z-40 safe-top bg-background">
+      <div className="sticky top-0 z-40 safe-top bg-background/95 backdrop-blur-sm">
         <div className="px-4 pt-3 pb-1">
           <h1 className="text-lg font-bold text-foreground">Explore Categories</h1>
           <p className="text-xs text-muted-foreground mb-1">Find what you love</p>
@@ -219,12 +225,13 @@ export default function CategoriesPage() {
               key={g.slug}
               onClick={() => handlePillClick(g.slug)}
               className={cn(
-                'px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all border snap-start min-w-[auto]',
+                'px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all border snap-start min-w-[auto] flex items-center gap-1',
                 activeGroup === g.slug
                   ? 'bg-primary text-primary-foreground border-primary scale-105'
                   : 'bg-card text-muted-foreground border-border active:scale-[0.97]'
               )}
             >
+              <DynamicIcon name={g.icon || 'Package'} size={12} />
               {g.name}
             </button>
           ))}
@@ -289,7 +296,7 @@ export default function CategoriesPage() {
             </motion.div>
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-6">
             {filteredGroups.map((group, groupIdx) => (
               <motion.div
                 key={group.slug}
@@ -299,15 +306,21 @@ export default function CategoriesPage() {
                 transition={{ delay: groupIdx * 0.08, duration: 0.35 }}
               >
                 {/* Section Header */}
-                <div className="flex items-center gap-2 mb-2 px-1">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-bold">
-                    <DynamicIcon name={group.icon || 'Package'} size={12} /> {group.name}
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <span
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold"
+                    style={{
+                      backgroundColor: group.color ? `${group.color}15` : 'hsl(var(--primary) / 0.1)',
+                      color: group.color || 'hsl(var(--primary))',
+                    }}
+                  >
+                    <DynamicIcon name={group.icon || 'Package'} size={13} /> {group.name}
                   </span>
                   <span className="text-[10px] text-muted-foreground">({group.categories.length})</span>
                   <div className="flex-1 h-px bg-border" />
                 </div>
 
-                {/* Category Cards Grid — 2 cols mobile, 3 cols md+ */}
+                {/* Category Cards Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {group.categories.map((cat, catIdx) => {
                     const meta = metaMap[cat.category] || { count: 0, sellerCount: 0, minPrice: null, collageImages: [], hasBestseller: false };
@@ -320,7 +333,8 @@ export default function CategoriesPage() {
                       >
                         <Link
                           to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-                          className="block rounded-2xl overflow-hidden shadow-sm active:scale-[0.97] transition-transform group bg-card border border-border"
+                          className="block rounded-2xl overflow-hidden shadow-sm active:scale-[0.97] transition-all duration-200 group bg-card border border-border hover:shadow-md"
+                          style={{ borderLeftWidth: '3px', borderLeftColor: cat.color || 'hsl(var(--primary))' }}
                         >
                           {/* Image area */}
                           <div className="relative aspect-[3/2] overflow-hidden">
@@ -333,7 +347,7 @@ export default function CategoriesPage() {
                             />
 
                             {/* Gradient overlay */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-foreground/65 via-foreground/15 to-transparent" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
 
                             {/* Count badge — top right */}
                             {meta.count > 0 && (
@@ -351,7 +365,7 @@ export default function CategoriesPage() {
 
                             {/* Category name overlay */}
                             <div className="absolute bottom-0 left-0 right-0 p-2.5">
-                              <span className="text-sm font-bold text-primary-foreground leading-tight line-clamp-2 drop-shadow-md">
+                              <span className="text-sm font-bold text-primary-foreground leading-tight line-clamp-2 drop-shadow-lg">
                                 {cat.displayName}
                               </span>
                             </div>

@@ -22,22 +22,26 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
 
   if (isLoading) {
     return (
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-1">
+      <div className="flex gap-4 overflow-x-auto scrollbar-hide px-4 py-1 justify-start">
         {[1, 2, 3, 4, 5].map(i => (
-          <Skeleton key={i} className="w-24 h-9 rounded-full shrink-0" />
+          <div key={i} className="flex flex-col items-center gap-1.5 shrink-0">
+            <Skeleton className="w-12 h-12 rounded-full" />
+            <Skeleton className="w-10 h-3 rounded" />
+          </div>
         ))}
       </div>
     );
   }
 
   const tabs: ParentGroupInfo[] = filteredGroups.length > 1
-    ? [{ value: '__all__', label: 'All', icon: '🏠', color: '', description: '', layoutType: 'ecommerce' }, ...filteredGroups]
+    ? [{ value: '__all__', label: 'All', icon: 'LayoutGrid', color: '', description: '', layoutType: 'ecommerce' }, ...filteredGroups]
     : filteredGroups;
 
   return (
-    <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-1">
+    <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 py-1">
       {tabs.map((tab) => {
         const isActive = tab.value === '__all__' ? activeGroup === null : activeGroup === tab.value;
+        const tintColor = tab.color || undefined;
         return (
           <button
             key={tab.value}
@@ -45,15 +49,39 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
               hapticSelection();
               onGroupChange(tab.value === '__all__' ? null : tab.value);
             }}
-            className={cn(
-              'shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full transition-all duration-200 text-[12px] font-bold whitespace-nowrap',
-              isActive
-                ? 'bg-primary text-primary-foreground shadow-cta'
-                : 'bg-card text-foreground border border-border hover:border-primary/30 active:scale-95'
-            )}
+            className="shrink-0 flex flex-col items-center gap-1.5 transition-all duration-200 group"
           >
-            <DynamicIcon name={tab.icon} size={14} className="shrink-0" />
-            <span>{tab.label}</span>
+            {/* Icon circle */}
+            <div
+              className={cn(
+                'w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200',
+                isActive
+                  ? 'ring-2 ring-primary ring-offset-2 ring-offset-background shadow-md'
+                  : 'hover:scale-105 active:scale-95'
+              )}
+              style={{
+                backgroundColor: tintColor ? `${tintColor}20` : 'hsl(var(--secondary))',
+              }}
+            >
+              <DynamicIcon
+                name={tab.icon}
+                size={24}
+                className={cn(
+                  'transition-colors duration-200',
+                  isActive ? 'text-primary' : 'text-foreground/70'
+                )}
+                style={tintColor && !isActive ? { color: tintColor } : undefined}
+              />
+            </div>
+            {/* Label */}
+            <span
+              className={cn(
+                'text-[10px] font-bold leading-tight text-center max-w-[60px] truncate',
+                isActive ? 'text-primary' : 'text-muted-foreground'
+              )}
+            >
+              {tab.label}
+            </span>
           </button>
         );
       })}

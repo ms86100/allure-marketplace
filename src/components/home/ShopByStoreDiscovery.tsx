@@ -13,11 +13,52 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Store, Star, MapPin, ChevronDown, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 /** Replaces pure-numeric business names (e.g. phone numbers) with a fallback */
 function sanitizeSellerName(name: string): string {
   return /^\d+$/.test(name.trim()) ? 'Local Seller' : name;
+}
+
+/** Deterministic hue from a string (seller ID) for colored avatars */
+function hashToHue(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash) % 360;
+}
+
+function SellerAvatar({ name, id, imageUrl, size = 'md' }: {
+  name: string; id: string; imageUrl: string | null; size?: 'sm' | 'md';
+}) {
+  const dims = size === 'sm' ? 'w-9 h-9' : 'w-12 h-12';
+  const sanitized = sanitizeSellerName(name);
+  const initial = sanitized.charAt(0).toUpperCase();
+  const hue = useMemo(() => hashToHue(id), [id]);
+
+  if (imageUrl) {
+    return (
+      <img
+        src={imageUrl}
+        alt={sanitized}
+        className={cn('rounded-xl object-cover', dims)}
+        loading="lazy"
+      />
+    );
+  }
+
+  return (
+    <div
+      className={cn('rounded-xl flex items-center justify-center font-bold text-white', dims)}
+      style={{
+        backgroundColor: `hsl(${hue}, 55%, 50%)`,
+        fontSize: size === 'sm' ? '12px' : '16px',
+      }}
+    >
+      {initial}
+    </div>
+  );
 }
 
 export function ShopByStoreDiscovery() {
@@ -33,7 +74,7 @@ export function ShopByStoreDiscovery() {
   if (!loadingLocal && !loadingNearby && !hasLocal && !hasNearby) return null;
 
   return (
-    <div className="mt-5 space-y-5">
+    <div className="space-y-5">
       {/* ━━━ In Your Society ━━━ */}
       {(loadingLocal || hasLocal) && (
         <section>
@@ -130,7 +171,6 @@ function formatDistance(km: number): string {
 // ── Society Card inside a distance band ──
 function SocietyCard({ society }: { society: SocietyGroup }) {
   const navigate = useNavigate();
-  // Flatten all sellers across groups into one horizontal list
   const allSellers = Object.entries(society.sellersByGroup).flatMap(([group, sellers]) =>
     sellers.map(s => ({
       id: s.seller_id,
@@ -154,27 +194,16 @@ function SocietyCard({ society }: { society: SocietyGroup }) {
               key={seller.id}
               onClick={() => navigate(`/seller/${seller.id}`)}
               className={cn(
-                'shrink-0 w-20 rounded-2xl overflow-hidden cursor-pointer',
+                'shrink-0 w-24 rounded-2xl overflow-hidden cursor-pointer',
                 'bg-card border border-border',
                 'transition-all duration-200 hover:scale-[1.02] active:scale-[0.97]',
               )}
             >
-              <div className="flex items-center justify-center bg-muted h-12 p-1.5">
-                {seller.profile_image_url ? (
-                  <img
-                    src={seller.profile_image_url}
-                    alt={seller.business_name}
-                    className="rounded-xl object-cover w-9 h-9"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="rounded-xl bg-muted flex items-center justify-center w-9 h-9">
-                    <Store className="text-muted-foreground" size={16} />
-                  </div>
-                )}
+              <div className="flex items-center justify-center h-16 p-2">
+                <SellerAvatar name={seller.business_name} id={seller.id} imageUrl={seller.profile_image_url} size="md" />
               </div>
               <div className="px-1.5 pb-2 pt-1.5 text-center">
-                <p className="font-bold text-foreground line-clamp-2 leading-tight text-[9px]">
+                <p className="font-bold text-foreground line-clamp-2 leading-tight text-[10px]">
                   {sanitizeSellerName(seller.business_name)}
                 </p>
                 {seller.rating > 0 && (
@@ -221,22 +250,16 @@ function CategorySellerRow({
                 'shrink-0 rounded-2xl overflow-hidden cursor-pointer',
                 'bg-card border border-border',
                 'transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.97]',
-                compact ? 'w-20' : 'w-24'
+                compact ? 'w-20' : 'w-28'
               )}
             >
-              <div className={cn('flex items-center justify-center bg-muted', compact ? 'h-12 p-1.5' : 'h-16 p-2')}>
-                {seller.profile_image_url ? (
-                  <img
-                    src={seller.profile_image_url}
-                    alt={seller.business_name}
-                    className={cn('rounded-xl object-cover', compact ? 'w-9 h-9' : 'w-12 h-12')}
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className={cn('rounded-xl bg-muted flex items-center justify-center', compact ? 'w-9 h-9' : 'w-12 h-12')}>
-                    <Store className="text-muted-foreground" size={compact ? 16 : 22} />
-                  </div>
-                )}
+              <div className={cn('flex items-center justify-center', compact ? 'h-12 p-1.5' : 'h-20 p-2')}>
+                <SellerAvatar
+                  name={seller.business_name}
+                  id={seller.id}
+                  imageUrl={seller.profile_image_url}
+                  size={compact ? 'sm' : 'md'}
+                />
               </div>
               <div className="px-1.5 pb-2 pt-1.5 text-center">
                 <p className={cn('font-bold text-foreground line-clamp-2 leading-tight', compact ? 'text-[9px]' : 'text-[11px]')}>
@@ -265,7 +288,7 @@ function LocalSkeleton() {
         <div key={i}>
           <Skeleton className="h-4 w-16 mb-2 rounded-full" />
           <div className="flex gap-2.5">
-            {[1, 2, 3].map(j => <Skeleton key={j} className="w-24 h-28 rounded-2xl shrink-0" />)}
+            {[1, 2, 3].map(j => <Skeleton key={j} className="w-28 h-32 rounded-2xl shrink-0" />)}
           </div>
         </div>
       ))}
