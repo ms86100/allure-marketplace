@@ -1,71 +1,75 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Silent Push Optimization)
 
-## Reduce Push Noise: Silent Push for Mid-Flow Statuses
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-### Approach
+## Silent Push Optimization: COMPLETE
 
-Add a `silent_push` boolean column to `category_status_flows`. The DB trigger already reads from this table — it will pass the flag through the notification payload. The `process-notification-queue` edge function will check this flag and skip calling `send-push-notification` for silent items (while still inserting into `user_notifications` for in-app history).
+### What It Does
+Reduces push notification noise for mid-flow order statuses when Live Activity is already tracking the order on the lock screen. In-app notification history and badge counts are always preserved.
 
-### Adjusted Matrix (per your feedback)
+### Notification Matrix
 
-| Status | `silent_push` | Rationale |
-|--------|--------------|-----------|
-| `accepted` | false | Critical — order confirmed |
-| `preparing` | **true** | Mid-flow, Live Activity handles it |
-| `ready` | **false** | Pickup moment — keep push (your Condition 1) |
-| `picked_up` | **true** | Mid-flow tracking |
-| `on_the_way` | **true** | Mid-flow tracking |
-| `arrived` | **true** | Live Activity shows this on lock screen |
-| `delivered` | false | Critical endpoint |
-| `completed` | false | Critical endpoint |
-| `cancelled` | false | Critical — must alert |
-| `no_show` | false | Critical |
-| All service/booking statuses | false | No Live Activity for these |
+| Status | Push? | Live Activity? | Rationale |
+|--------|-------|----------------|-----------|
+| `accepted` | ✅ Always | Yes | Critical — order confirmed |
+| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
+| `ready` | ✅ Always | Yes | Pickup moment — user must know |
+| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
+| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
+| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
+| `delivered` | ✅ Always | Yes | Critical endpoint |
+| `completed` | ✅ Always | No | Critical endpoint |
+| `cancelled` | ✅ Always | No | Critical — must alert |
+| All service/booking | ✅ Always | No | No Live Activity for these |
 
-Key decision: **`ready` stays as a full push** per your recommendation that it's a pickup-critical moment.
+### Implementation
 
-### Changes
+1. **DB column**: `category_status_flows.silent_push` (boolean, default false)
+2. **DB trigger**: `fn_enqueue_order_status_notification` includes `silent_push` in notification payload
+3. **Edge function**: `process-notification-queue` skips APNs/FCM delivery when `silent_push = true`, but still inserts `user_notifications` for in-app history
 
-**1. Database migration** — Add column + backfill:
-```sql
-ALTER TABLE category_status_flows 
-  ADD COLUMN IF NOT EXISTS silent_push boolean DEFAULT false;
+## Phase I Live Activities — CI Pipeline Status
 
-UPDATE category_status_flows 
-  SET silent_push = true 
-  WHERE status_key IN ('preparing', 'picked_up', 'on_the_way', 'arrived');
+### Codemagic Build Pipeline: COMPLETE
+
+Both `ios-release` and `release-all` workflows now include:
+
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+
+### Codemagic Requirements (User Action)
+
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
+
+### Runtime Call Chain (Verified)
+
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
 ```
 
-**2. DB trigger `fn_enqueue_order_status_notification`** — Include `silent_push` in the payload:
-```sql
--- Add to v_payload when silent_push is true
-v_payload := v_payload || jsonb_build_object('silent_push', v_silent_push);
-```
+## Implementation Matrix
 
-**3. `process-notification-queue/index.ts`** — Skip push delivery for silent items:
-```typescript
-const silentPush = item.payload?.silent_push === true;
-
-// Always insert in-app notification (unchanged)
-// ...
-
-if (silentPush) {
-  // Mark processed without sending push — in-app record already saved
-  await supabase.from("notification_queue")
-    .update({ status: "processed", processed_at: new Date().toISOString() })
-    .eq("id", item.id);
-  processed++;
-  continue;
-}
-
-// Existing push delivery logic continues for non-silent items
-```
-
-**4. No client-side changes** — The existing `isTracking` foreground suppression remains as a secondary safety net. Badge counts and in-app notification center continue to update for all notifications (silent or not) since `user_notifications` insert is unaffected.
-
-### Safety Guarantees (Conditions Met)
-
-- **Condition 1 (Don't over-silence)**: `ready` keeps full push. Only truly mid-flow statuses are silenced.
-- **Condition 2 (Visibility fallback)**: In-app notification history + badge count always update regardless of `silent_push` flag. User can always check notification center.
-- **Fallback answer**: If phone is in pocket and Live Activity is not visible, user will still see `ready` and `delivered` push banners — the two moments that matter most.
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |

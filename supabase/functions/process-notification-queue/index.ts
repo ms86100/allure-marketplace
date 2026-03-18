@@ -65,6 +65,8 @@ Deno.serve(async (req) => {
 
     for (const item of pending) {
       try {
+        const silentPush = item.payload?.silent_push === true;
+
         // C5: Insert into user_notifications with queue_item_id to deduplicate on retry
         const { error: insertError } = await supabase
           .from("user_notifications")
@@ -85,6 +87,17 @@ Deno.serve(async (req) => {
           } else {
             throw new Error(`DB insert failed: ${insertError.message}`);
           }
+        }
+
+        // Silent push: in-app notification saved above, skip device push delivery
+        if (silentPush) {
+          console.log(`[Queue][${item.id}] Silent push — skipping device delivery (Live Activity handles it)`);
+          await supabase
+            .from("notification_queue")
+            .update({ status: "processed", processed_at: new Date().toISOString() })
+            .eq("id", item.id);
+          processed++;
+          continue;
         }
 
         // Try to send push notification and verify delivery
