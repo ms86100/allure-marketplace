@@ -277,7 +277,7 @@ export function useCartPage() {
         } else {
           setShowRazorpayCheckout(true);
         }
-      } catch (error: any) { console.error('Error creating orders:', error); toast.error(friendlyError(error)); }
+      } catch (error: any) { console.error('Error creating orders:', error); toast.error(friendlyError(error), { id: 'checkout-create-error' }); }
       finally { setIsPlacingOrder(false); }
       return;
     }
