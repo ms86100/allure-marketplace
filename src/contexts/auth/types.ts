@@ -10,6 +10,8 @@ export interface AuthContextType {
   sellerProfiles: SellerProfile[];
   currentSellerId: string | null;
   isLoading: boolean;
+  /** True once initial session restoration from storage has completed */
+  isSessionRestored: boolean;
   isApproved: boolean;
   isSeller: boolean;
   hasSellerProfile: boolean;

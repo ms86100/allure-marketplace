@@ -60,7 +60,10 @@ interface CartContextType {
   totalAmount: number;
   sellerGroups: SellerGroup[];
   isLoading: boolean;
+  /** True once the first successful cart fetch has completed for the current user */
+  hasHydrated: boolean;
   addItem: (product: Product, quantity?: number, silent?: boolean) => Promise<void>;
+  replaceCart: (inserts: { product_id: string; quantity: number }[]) => Promise<void>;
   updateQuantity: (productId: string, quantity: number) => Promise<void>;
   removeItem: (productId: string) => Promise<void>;
   clearCart: () => Promise<void>;

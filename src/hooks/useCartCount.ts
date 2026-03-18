@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
  * Uses SUM(quantity) to stay consistent with useCart's itemCount.
  */
 export function useCartCount() {
-  const { user } = useAuth();
+  const { user, isSessionRestored } = useAuth();
 
   const { data: itemCount = 0 } = useQuery({
     queryKey: ['cart-count', user?.id],
@@ -24,7 +24,7 @@ export function useCartCount() {
       if (error) return 0;
       return (data || []).reduce((sum, row) => sum + (row.quantity || 0), 0);
     },
-    enabled: !!user,
+    enabled: isSessionRestored && !!user,
     staleTime: 30 * 1000, // 30s — lightweight polling-friendly
   });
 
