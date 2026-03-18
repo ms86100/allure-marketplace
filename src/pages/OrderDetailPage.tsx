@@ -223,6 +223,7 @@ export default function OrderDetailPage() {
                     destinationLat={(order as any).delivery_lat}
                     destinationLng={(order as any).delivery_lng}
                     riderName={deliveryTracking.riderName}
+                    heading={deliveryTracking.riderLocation.heading}
                   />
                 </Suspense>
               )}
