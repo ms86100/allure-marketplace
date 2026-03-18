@@ -355,9 +355,9 @@ function ProductListings({
           transition={{ delay: 0.2, duration: 0.4 }}
           className="space-y-3"
         >
-          <h2 className="text-lg font-extrabold text-foreground tracking-tight">Your marketplace is getting ready!</h2>
+          <h2 className="text-lg font-extrabold text-foreground tracking-tight">{ml.label('label_empty_marketplace_title')}</h2>
           <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-            Sellers from your community are setting up shop. Products, services & more — all coming your way.
+            {ml.label('label_empty_marketplace_desc')}
           </p>
         </motion.div>
 
