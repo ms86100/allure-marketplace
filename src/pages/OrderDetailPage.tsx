@@ -471,7 +471,7 @@ export default function OrderDetailPage() {
       {showArrivalOverlay && (
         <DeliveryArrivalOverlay
           distance={deliveryTracking.distance}
-          eta={deliveryTracking.eta}
+          eta={deliveryTracking.distance != null && deliveryTracking.distance < 500 ? Math.max(1, Math.ceil(deliveryTracking.distance / 1000 * 4)) : (roadEtaMinutes ?? deliveryTracking.eta)}
           riderName={deliveryTracking.riderName}
           riderPhone={deliveryTracking.riderPhone}
           status={deliveryTracking.status}
