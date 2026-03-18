@@ -10,7 +10,7 @@ interface RiderLocation {
   recorded_at: string;
 }
 
-interface DeliveryTrackingState {
+export interface DeliveryTrackingState {
   riderLocation: RiderLocation | null;
   eta: number | null;
   distance: number | null;
