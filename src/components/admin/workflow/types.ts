@@ -35,6 +35,7 @@ export const ACTORS = ['buyer', 'seller', 'delivery', 'system', 'admin'];
 
 export const TRANSACTION_TYPES = [
   { value: 'cart_purchase', label: 'Cart Purchase' },
+  { value: 'seller_delivery', label: 'Seller Delivery' },
   { value: 'self_fulfillment', label: 'Self Fulfillment' },
   { value: 'service_booking', label: 'Service Booking' },
   { value: 'request_service', label: 'Request Service' },
