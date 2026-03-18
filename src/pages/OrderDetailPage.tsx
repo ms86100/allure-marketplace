@@ -385,6 +385,17 @@ export default function OrderDetailPage() {
       <OrderRejectionDialog open={o.isRejectionDialogOpen} onOpenChange={o.setIsRejectionDialogOpen} onReject={o.handleReject} orderNumber={order.id} />
       {o.chatRecipientId && <OrderChat orderId={order.id} otherUserId={o.chatRecipientId} otherUserName={o.chatRecipientName || 'User'} isOpen={o.isChatOpen} onClose={() => { o.setIsChatOpen(false); o.fetchUnreadCount(); }} disabled={!o.canChat} />}
 
+      {/* Gap 2: OTP verification dialog for seller self-delivery */}
+      <DeliveryCompletionOtpDialog
+        orderId={order.id}
+        open={isOtpDialogOpen}
+        onOpenChange={setIsOtpDialogOpen}
+        onVerified={() => {
+          o.setOrder({ ...order, status: 'delivered' } as any);
+          window.location.reload();
+        }}
+      />
+
       {/* DeliveryArrivalOverlay — only when rider GPS exists and is close (Gap 9) */}
       {showArrivalOverlay && (
         <DeliveryArrivalOverlay
