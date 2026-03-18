@@ -230,7 +230,7 @@ export default function OrderDetailPage() {
             </>
           )}
           {/* Seller self-delivery GPS broadcasting */}
-          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by === 'seller' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
+          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
             <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart />
           )}
           {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}
