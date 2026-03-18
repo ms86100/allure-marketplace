@@ -136,7 +136,7 @@ export function SellerGPSTracker({ assignmentId, autoStart = true, deliveryStatu
 
       {/* Permission upgrade banner (native: WhenInUse → Always) */}
       {isNative && isTracking && permissionLevel === 'when_in_use' && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5 space-y-2">
+        <div className="bg-warning/10 border border-warning/20 rounded-lg p-2.5 space-y-2">
           <p className="text-xs text-foreground">For uninterrupted delivery tracking, enable "Always" location access.</p>
           <Button variant="outline" size="sm" onClick={openNativeSettings} className="h-7 text-xs gap-1.5">
             <Settings size={12} />
