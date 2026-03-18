@@ -327,7 +327,7 @@ export function useSellerApplication() {
       await refreshProfile();
       localStorage.setItem('seller_onboarding_completed', 'true');
     localStorage.removeItem('seller_onboarding_step');
-    toast.success('Application submitted! Awaiting admin approval.');
+    toast.success('Application submitted! Awaiting admin approval.', { id: 'seller-app-submitted' });
     // Notify admins about the new store application
       notifyAdminsNewStoreApplication(formData.business_name.trim(), user.id).catch(console.error);
       setSubmissionComplete(true);
