@@ -1,93 +1,111 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Silent Push Optimization)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+# Honest Assessment: What's Already Done vs What's Truly Missing
 
-## Silent Push Optimization: COMPLETE
+## Already Implemented (Confirmed in Code)
 
-### What It Does
-Reduces push notification noise for mid-flow order statuses when Live Activity is already tracking the order on the lock screen. In-app notification history and badge counts are always preserved.
+All 6 gaps from the previous plan are **fully implemented**:
 
-### Notification Matrix
+| Feature | Status | Evidence |
+|---------|--------|----------|
+| Push deep-link routing | Done | `pushData.route = item.reference_path` in `process-notification-queue` line 113-115 |
+| Notification grouping (threadId) | Done | `threadId` passed to APNs (`thread-id`, `apns-collapse-id`) and FCM (`tag`) in `send-push-notification` |
+| Rich push images | Done | NSE created, `mutable-content: 1` set, `image_url` from seller logo in trigger, payload wired end-to-end |
+| Dynamic Island tap → order page | Done | `.widgetURL(URL(string: "sociva://orders/\(context.attributes.entityId)"))` on both lock screen and DI |
+| Item count in DI | Done | `itemCount` in ContentState, fetched from `order_items`, shown in compact trailing and lock screen |
+| GPS-derived progress | Done | Distance-based interpolation in `liveActivityMapper.ts` lines 75-80 |
 
-| Status | Push? | Live Activity? | Rationale |
-|--------|-------|----------------|-----------|
-| `accepted` | ✅ Always | Yes | Critical — order confirmed |
-| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
-| `ready` | ✅ Always | Yes | Pickup moment — user must know |
-| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
-| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
-| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
-| `delivered` | ✅ Always | Yes | Critical endpoint |
-| `completed` | ✅ Always | No | Critical endpoint |
-| `cancelled` | ✅ Always | No | Critical — must alert |
-| All service/booking | ✅ Always | No | No Live Activity for these |
+Your assessment text may have been written before these changes were applied. The code now has all of these.
 
-### Implementation
+---
 
-1. **DB column**: `category_status_flows.silent_push` (boolean, default false)
-2. **DB trigger**: `fn_enqueue_order_status_notification` includes `silent_push` in notification payload
-3. **Edge function**: `process-notification-queue` skips APNs/FCM delivery when `silent_push = true`, but still inserts `user_notifications` for in-app history
+## What's Genuinely Still Missing
 
-## Phase I Live Activities — CI Pipeline Status
+### Gap 1: APNs Push-to-Live-Activity (Critical)
 
-### Codemagic Build Pipeline: COMPLETE
+**What it means:** When iOS kills your app process (memory pressure, user swipe-kill), Live Activity updates stop completely. Blinkit's activities keep updating because their server sends APNs pushes directly to the Live Activity widget token.
 
-Both `ios-release` and `release-all` workflows now include:
+**What's needed:**
+- When starting a Live Activity, capture the `pushToken` from ActivityKit
+- Send that token to your backend
+- Create an edge function that sends APNs pushes with `apns-push-type: liveactivity` and the activity's push token
+- The DB trigger (or a new one) sends Live Activity update pushes on each status change
 
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+**Scope:** New DB table for LA push tokens, new edge function, Swift changes to capture push token, trigger updates. This is an architecture change.
 
-### Codemagic Requirements (User Action)
+### Gap 2: Live Map / Real-Time Rider GPS (Large Feature)
 
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
+**What it means:** Blinkit shows a real-time map with the rider's moving GPS dot. Your system shows static distance text only.
 
-### Runtime Call Chain (Verified)
+**What's needed:**
+- Rider/delivery partner app that broadcasts GPS coordinates (separate app or feature)
+- Real-time GPS storage (e.g., `rider_locations` table with Realtime enabled)
+- Buyer-side map component (MapKit JS or Google Maps) on the order tracking page
+- Note: Apple does NOT allow MapKit in Live Activity widgets. The map would only appear in the in-app order tracking screen, not on the lock screen.
 
-```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
-```
+**Scope:** This requires a rider-side app/feature that doesn't exist yet. This is a separate product workstream.
 
-## Implementation Matrix
+### Gap 3: Product Thumbnails in Lock Screen Widget (Apple Limitation)
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+**What it means:** Blinkit sometimes shows product images in the lock screen card.
 
-## Reality-Check Audit Fixes (Round 4)
+**Reality:** Live Activity widgets can display images, but they must be bundled in the app or loaded from a URL. Apple limits the total Activity payload to 4KB, so images must be small or loaded asynchronously. The NSE approach won't help here — this is about the widget itself.
 
-### Fix 1: Live Activity Deduplication — COMPLETE
+**What's needed:** Pass a small product thumbnail URL in the ContentState, download it in the widget using `AsyncImage`, and display it. However, SwiftUI `AsyncImage` is unreliable in widgets. The practical approach is to pass a small base64-encoded thumbnail or rely on the seller logo already available.
 
-| Layer | Fix |
-|-------|-----|
-| **Swift native** | `startLiveActivity` now checks for existing activity with same `entityId` before `Activity.request()`. If found, updates it and returns existing `activity.id` instead of creating a duplicate. |
-| **LiveActivityManager** | Added `hydrating` flag; `resetHydration()` is now a no-op while hydration is actively running, preventing the poll timer from racing with app-resume sync. |
-| **liveActivitySync** | Added `syncing` mutex flag to prevent concurrent `syncActiveOrders` calls from overlapping. |
-| **Orchestrator** | App-resume handler now pauses the poll timer before syncing, then resumes it after sync completes. |
+---
 
-### Fix 2: Toast Conflict Prevention — COMPLETE
+## Implementation Plan — 2 Phases
 
-| Layer | Fix |
-|-------|-----|
-| **useCartPage** | Added `upiCompletionRef` guard — only ONE of `handleUpiDeepLinkSuccess` / `handleUpiDeepLinkFailed` can execute per payment session. Both use the same toast ID `'upi-confirmed'` for dedup. Ref resets when a new UPI session starts. |
-| **UpiDeepLinkCheckout** | `handleSystemClose` now skips `onPaymentFailed` when `completionTriggeredRef.current` is true, preventing the sheet unmount from firing a conflicting handler after success. |
+### Phase 1: APNs Push-to-Live-Activity (Server-Side Widget Updates)
+
+This is the single most impactful gap. Without it, Live Activities are unreliable.
+
+| # | Change | File(s) |
+|---|--------|---------|
+| 1 | Capture push token from `Activity.pushTokenUpdates` stream after starting activity | `LiveActivityPlugin.swift` — add async token observation, call back to JS |
+| 2 | Send push token to backend when received | `LiveActivityManager.ts` — after `startLiveActivity`, listen for token callback, save to DB |
+| 3 | New DB table `live_activity_tokens` (user_id, order_id, push_token, created_at) | New migration |
+| 4 | New edge function `update-live-activity-apns` — sends APNs push with `content-state` payload to the activity push token | New edge function |
+| 5 | Update the order status trigger to also invoke `update-live-activity-apns` when a Live Activity token exists for the order | Update `fn_enqueue_order_status_notification` or new trigger |
+| 6 | Clean up tokens when activity ends | `LiveActivityPlugin.swift` — on `endLiveActivity`, `LiveActivityManager.ts` — delete from DB |
+
+**Actor mapping:**
+- Buyer app (iOS): Captures and sends push token
+- Backend trigger: Sends APNs push on status change
+- Lock screen widget: Receives update even when app is killed
+
+### Phase 2: In-App Live Map with Rider GPS (Requires Rider Infrastructure)
+
+This phase requires a rider/delivery partner capability. If riders already exist in the system:
+
+| # | Change | File(s) |
+|---|--------|---------|
+| 1 | New DB table `rider_locations` (rider_id, order_id, lat, lng, updated_at) with Realtime enabled | New migration |
+| 2 | Rider-side location broadcasting (if rider app exists) | Rider app or seller dashboard integration |
+| 3 | Buyer-side map component on order tracking page showing rider position | New React component using Google Maps or Mapbox |
+| 4 | Realtime subscription to `rider_locations` for the active order | Order tracking page hook |
+
+**Actor mapping:**
+- Rider/delivery partner: Broadcasts GPS
+- Buyer in-app (order tracking screen): Shows live map
+- Lock screen widget: Cannot show map (Apple limitation) — continues showing distance text
+
+**Note:** Phase 2 is blocked if there is no rider-side app or GPS broadcasting mechanism. The `delivery_assignments.distance_meters` field suggests some distance tracking exists, but real-time GPS streaming is a separate system.
+
+### What About Product Thumbnails in Widget?
+
+This is low-impact and technically fragile (4KB payload limit, unreliable `AsyncImage` in widgets). Recommend deferring. The seller logo via rich push notifications (already implemented) provides similar visual identity for push notifications. The lock screen widget already shows the seller name and branded Sociva icon.
+
+---
+
+## Summary
+
+| Gap | Phase | Blocked? | Impact |
+|-----|-------|----------|--------|
+| APNs Push-to-Live-Activity | Phase 1 | No | Critical — activities die when app is killed |
+| Live map with rider GPS | Phase 2 | Yes — needs rider GPS infrastructure | High — Blinkit's signature feature |
+| Product thumbnails in widget | Deferred | No | Low — Apple limitations make it fragile |
+
+**Recommendation:** Implement Phase 1 now. Phase 2 depends on whether rider GPS broadcasting exists or needs to be built from scratch.
+
