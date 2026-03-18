@@ -1,93 +1,102 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Silent Push Optimization)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+# Blinkit-Style Rich Live Activity + Dynamic Island
 
-## Silent Push Optimization: COMPLETE
+## Reference (from screenshot)
+The Dynamic Island expanded view shows:
+- Dark background with app icon + brand
+- Status subtitle: "Order is on the way"
+- Bold ETA: "Arriving in 9 mins"
+- Animated green progress bar with a delivery scooter emoji at the progress point
+- Rich, visual, branded feel
 
-### What It Does
-Reduces push notification noise for mid-flow order statuses when Live Activity is already tracking the order on the lock screen. In-app notification history and badge counts are always preserved.
+## Changes Required
 
-### Notification Matrix
+### 1. Data Model — Add `progressPercent` field
 
-| Status | Push? | Live Activity? | Rationale |
-|--------|-------|----------------|-----------|
-| `accepted` | ✅ Always | Yes | Critical — order confirmed |
-| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
-| `ready` | ✅ Always | Yes | Pickup moment — user must know |
-| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
-| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
-| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
-| `delivered` | ✅ Always | Yes | Critical endpoint |
-| `completed` | ✅ Always | No | Critical endpoint |
-| `cancelled` | ✅ Always | No | Critical — must alert |
-| All service/booking | ✅ Always | No | No Live Activity for these |
+**`LiveDeliveryActivity.swift`** — Add to ContentState:
+- `progressPercent: Double?` (0.0–1.0)
+- `sellerName: String?`
 
-### Implementation
+**`definitions.ts`** — Add matching fields:
+- `progress_percent: number | null`
+- `seller_name: string | null`
 
-1. **DB column**: `category_status_flows.silent_push` (boolean, default false)
-2. **DB trigger**: `fn_enqueue_order_status_notification` includes `silent_push` in notification payload
-3. **Edge function**: `process-notification-queue` skips APNs/FCM delivery when `silent_push = true`, but still inserts `user_notifications` for in-app history
+### 2. Swift Widget — Complete Redesign
 
-## Phase I Live Activities — CI Pipeline Status
+**Lock Screen Banner** — Status-dependent colored cards:
 
-### Codemagic Build Pipeline: COMPLETE
+| Status | Background | Content |
+|--------|-----------|---------|
+| `accepted`, `confirmed` | Dark gray | App icon + seller name, "Order Confirmed", order info |
+| `preparing` | Dark gray | "We're Preparing Your Order", animated progress bar (green, ~50%) |
+| `ready` | Purple-blue gradient | "Your Order is Ready for Pickup!", seller name |
+| `picked_up`, `en_route`, `on_the_way` | Dark gray | "Order is on the way", bold "Arriving in X mins", green progress bar with 🛵 scooter at progress point |
+| `delivered`, `completed` | Green | "Order Delivered!" |
 
-Both `ios-release` and `release-all` workflows now include:
+**Dynamic Island Expanded** (the screenshot reference):
+- **Leading:** App icon + "Order is on the way" (or status text)
+- **Trailing:** Bold "Arriving in X mins" or ETA
+- **Bottom:** Full-width green progress bar with 🛵 emoji positioned at progress percentage
+- Smooth SwiftUI animation on progress changes
 
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+**Dynamic Island Compact:**
+- Leading: Sociva icon
+- Trailing: ETA countdown ("9m") or a mini progress indicator
 
-### Codemagic Requirements (User Action)
+**Minimal:** Sociva icon (unchanged)
 
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
+### 3. Progress Bar Component (SwiftUI)
 
-### Runtime Call Chain (Verified)
+Custom `DeliveryProgressBar` view:
+- `GeometryReader` for width calculation
+- Green rounded capsule background (dim) + foreground fill
+- 🛵 emoji (`Text("🛵")`) positioned at `progressPercent * totalWidth`
+- `.animation(.easeInOut(duration: 0.5))` for smooth transitions
 
+### 4. Status-to-Progress Mapping
+
+In `liveActivityMapper.ts`:
 ```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
+accepted    → 0.10
+confirmed   → 0.10  
+preparing   → 0.40
+ready       → 0.75
+picked_up   → 0.55
+on_the_way  → 0.70
+en_route    → 0.80
+delivered   → 1.00
 ```
 
-## Implementation Matrix
+### 5. Data Pipeline Updates
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+**`liveActivityMapper.ts`** — Add `progress_percent` and `seller_name` to output.
 
-## Reality-Check Audit Fixes (Round 4)
+**`liveActivitySync.ts`** — Join seller name:
+```sql
+.select('id, status, buyer_id, seller_id, seller:seller_profiles!orders_seller_id_fkey(business_name)')
+```
 
-### Fix 1: Live Activity Deduplication — COMPLETE
+**`useLiveActivityOrchestrator.ts`** — Pass seller name in realtime callbacks.
 
-| Layer | Fix |
-|-------|-----|
-| **Swift native** | `startLiveActivity` now checks for existing activity with same `entityId` before `Activity.request()`. If found, updates it and returns existing `activity.id` instead of creating a duplicate. |
-| **LiveActivityManager** | Added `hydrating` flag; `resetHydration()` is now a no-op while hydration is actively running, preventing the poll timer from racing with app-resume sync. |
-| **liveActivitySync** | Added `syncing` mutex flag to prevent concurrent `syncActiveOrders` calls from overlapping. |
-| **Orchestrator** | App-resume handler now pauses the poll timer before syncing, then resumes it after sync completes. |
+### 6. Native Plugin Updates
 
-### Fix 2: Toast Conflict Prevention — COMPLETE
+**`LiveActivityPlugin.swift`** — Read new fields:
+- `call.getDouble("progress_percent")`
+- `call.getString("seller_name")`
 
-| Layer | Fix |
-|-------|-----|
-| **useCartPage** | Added `upiCompletionRef` guard — only ONE of `handleUpiDeepLinkSuccess` / `handleUpiDeepLinkFailed` can execute per payment session. Both use the same toast ID `'upi-confirmed'` for dedup. Ref resets when a new UPI session starts. |
-| **UpiDeepLinkCheckout** | `handleSystemClose` now skips `onPaymentFailed` when `completionTriggeredRef.current` is true, preventing the sheet unmount from firing a conflicting handler after success. |
+Pass them into `ContentState`.
+
+## Files to Change
+
+| File | Change |
+|------|--------|
+| `native/ios/LiveDeliveryActivity.swift` | Add `progressPercent`, `sellerName` to ContentState |
+| `native/ios/LiveDeliveryWidget.swift` | Full redesign: status-dependent cards, progress bar with 🛵, rich Dynamic Island |
+| `native/ios/LiveActivityPlugin.swift` | Read `progress_percent`, `seller_name` from bridge |
+| `src/plugins/live-activity/definitions.ts` | Add `progress_percent`, `seller_name` fields |
+| `src/services/liveActivityMapper.ts` | Add progress mapping + seller_name passthrough |
+| `src/services/liveActivitySync.ts` | Join seller business_name in query |
+| `src/hooks/useLiveActivityOrchestrator.ts` | Pass seller_name in realtime payloads |
+| `src/hooks/useLiveActivity.ts` | Add new fields to hook options |
+
