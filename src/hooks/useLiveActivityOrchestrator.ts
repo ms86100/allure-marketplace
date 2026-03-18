@@ -105,7 +105,8 @@ export function useLiveActivityOrchestrator(): void {
       let sellerName: string | null = null;
       let itemCount: number | null = null;
       try {
-        const sellerId = (payload.new as any)?.seller_id;
+      const sellerId = (payload.new as any)?.seller_id;
+        const orderNumber = (payload.new as any)?.order_number as string | null;
         const [deliveryRes, sellerRes, itemCountRes] = await Promise.all([
           supabase
             .from('delivery_assignments')
@@ -114,7 +115,7 @@ export function useLiveActivityOrchestrator(): void {
             .not('status', 'in', '("cancelled","failed")')
             .maybeSingle(),
           sellerId
-            ? supabase.from('seller_profiles').select('business_name').eq('id', sellerId).maybeSingle()
+            ? supabase.from('seller_profiles').select('business_name, logo_url').eq('id', sellerId).maybeSingle()
             : Promise.resolve({ data: null }),
           supabase.from('order_items').select('id', { count: 'exact', head: true }).eq('order_id', orderId),
         ]);
