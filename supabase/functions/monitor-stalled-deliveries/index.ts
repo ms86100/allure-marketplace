@@ -77,10 +77,8 @@ serve(async (req) => {
         if (order.buyer_id) {
           await supabase.from('notification_queue').insert({
             user_id: order.buyer_id,
-            title: '⚠️ Delivery update paused',
-            body: isHardStall
-              ? 'Location updates have stopped for a while. You can contact the seller or report an issue.'
-              : 'Live tracking is temporarily paused. The delivery is still in progress.',
+            title: buyerTitle,
+            body: isHardStall ? buyerBodyHard : buyerBodySoft,
             type: 'delivery_issue',
             reference_path: `/orders/${order.id}`,
             payload: {
@@ -102,10 +100,8 @@ serve(async (req) => {
         if (seller?.user_id) {
           await supabase.from('notification_queue').insert({
             user_id: seller.user_id,
-            title: '🚨 Tracking paused',
-            body: isHardStall
-              ? 'Location updates stopped for 30+ min. Please update delivery status or open the app.'
-              : 'Location updates stopped for 10+ min. Please keep the app open while delivering.',
+            title: sellerTitle,
+            body: isHardStall ? sellerBodyHard : sellerBodySoft,
             type: 'delivery_issue',
             reference_path: `/orders/${order.id}`,
             payload: {
