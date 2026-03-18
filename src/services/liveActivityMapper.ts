@@ -1,55 +1,66 @@
 import type { LiveActivityData } from '@/plugins/live-activity/definitions';
 
-/** Human-readable progress descriptions shown as the subtitle on the lock screen widget */
-const PROGRESS_DESCRIPTIONS: Record<string, string> = {
-  accepted: 'Order Accepted',
-  confirmed: 'Booking Confirmed',
-  preparing: 'Order Being Prepared',
-  ready: 'Order Ready',
-  picked_up: 'Order Picked Up',
-  en_route: 'Order On The Way',
-  on_the_way: 'Order On The Way',
-};
-
-/** Maps order status to a 0.0–1.0 progress value for the animated bar */
-const STATUS_PROGRESS: Record<string, number> = {
-  accepted: 0.10,
-  confirmed: 0.10,
-  preparing: 0.40,
-  ready: 0.75,
-  picked_up: 0.55,
-  on_the_way: 0.70,
-  en_route: 0.80,
-  delivered: 1.0,
-  completed: 1.0,
-};
+/** Status flow entry from category_status_flows table */
+export interface StatusFlowEntry {
+  status_key: string;
+  display_label: string;
+  sort_order: number;
+  buyer_hint?: string | null;
+}
 
 /** Reasonable max distance (km) for progress interpolation heuristic */
 const MAX_DELIVERY_DISTANCE_KM = 10;
 
 /**
+ * Derives progress_percent from sort_order within the status flow.
+ * Maps sort_order range [min..max] to [0.05..1.0].
+ */
+function deriveProgressPercent(
+  statusKey: string,
+  flowMap: Map<string, StatusFlowEntry>,
+): number | null {
+  const entry = flowMap.get(statusKey);
+  if (!entry) return null;
+
+  const sortOrders = Array.from(flowMap.values()).map(e => e.sort_order);
+  const minSort = Math.min(...sortOrders);
+  const maxSort = Math.max(...sortOrders);
+  if (maxSort === minSort) return 0.5;
+
+  return 0.05 + ((entry.sort_order - minSort) / (maxSort - minSort)) * 0.95;
+}
+
+/**
  * Maps order status + delivery info into a meaningful progress stage string.
+ * Uses DB-backed display_label when available.
  */
 function mapProgressStage(
   status: string,
+  flowMap: Map<string, StatusFlowEntry>,
   delivery?: {
     eta_minutes?: number | null;
     rider_name?: string | null;
   } | null,
 ): string | null {
-  if ((status === 'en_route' || status === 'on_the_way' || status === 'picked_up') && delivery) {
+  const TRANSIT_STATUSES = new Set(['en_route', 'on_the_way', 'picked_up']);
+
+  if (TRANSIT_STATUSES.has(status) && delivery) {
     const parts: string[] = [];
     if (delivery.rider_name) parts.push(delivery.rider_name);
     if (delivery.eta_minutes != null) parts.push(`ETA ${delivery.eta_minutes} min`);
     if (parts.length > 0) return parts.join(' · ');
   }
 
-  return PROGRESS_DESCRIPTIONS[status] ?? null;
+  // Use DB-backed label
+  const entry = flowMap.get(status);
+  if (entry?.display_label) return entry.display_label;
+
+  return null;
 }
 
 /**
- * Builds a LiveActivityData payload from an order row and optional
- * delivery assignment data.
+ * Builds a LiveActivityData payload from an order row, optional
+ * delivery assignment data, and DB-backed status flow entries.
  */
 export function buildLiveActivityData(
   order: {
@@ -64,17 +75,26 @@ export function buildLiveActivityData(
   } | null,
   sellerName?: string | null,
   itemCount?: number | null,
+  statusFlowEntries?: StatusFlowEntry[],
 ): LiveActivityData {
   const distanceKm = delivery?.distance_meters != null
     ? delivery.distance_meters / 1000
     : null;
 
-  // Change 7: GPS-derived progress when distance is available during transit
-  let progressPercent = STATUS_PROGRESS[order.status] ?? null;
+  // Build flow map from DB entries
+  const flowMap = new Map<string, StatusFlowEntry>();
+  if (statusFlowEntries) {
+    for (const entry of statusFlowEntries) {
+      flowMap.set(entry.status_key, entry);
+    }
+  }
+
+  // Derive progress from DB sort_order
+  let progressPercent = deriveProgressPercent(order.status, flowMap);
+
+  // GPS-derived progress when distance is available during transit
   const isTransit = order.status === 'on_the_way' || order.status === 'en_route' || order.status === 'picked_up';
   if (isTransit && distanceKm != null && distanceKm >= 0) {
-    // Interpolate: closer to 0 distance = closer to 1.0 progress
-    // Use 0.5–0.95 range to keep it between "picked up" and "delivered"
     const ratio = Math.min(distanceKm / MAX_DELIVERY_DISTANCE_KM, 1);
     progressPercent = Math.max(0.5, 0.95 - ratio * 0.45);
   }
@@ -87,7 +107,7 @@ export function buildLiveActivityData(
     driver_distance: distanceKm,
     driver_name: delivery?.rider_name ?? null,
     vehicle_type: delivery?.vehicle_type ?? null,
-    progress_stage: mapProgressStage(order.status, delivery),
+    progress_stage: mapProgressStage(order.status, flowMap, delivery),
     progress_percent: progressPercent,
     seller_name: sellerName ?? null,
     item_count: itemCount ?? null,
