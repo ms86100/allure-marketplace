@@ -939,17 +939,29 @@ workflows:
           if [ -f "$STORYBOARD" ]; then
             echo "=== Storyboard BEFORE patch ==="
             grep -n 'customClass' "$STORYBOARD" || echo "(no customClass attributes found)"
-            sed -i '' 's/customClass="CAPBridgeViewController"/customClass="SocivaBridgeViewController"/g' "$STORYBOARD"
+            sed -i '' 's/customClass="CAPBridgeViewController" customModule="Capacitor"/customClass="SocivaBridgeViewController" customModule="App"/g' "$STORYBOARD"
+            if ! grep -q 'SocivaBridgeViewController' "$STORYBOARD"; then
+              sed -i '' 's/customClass="CAPBridgeViewController"/customClass="SocivaBridgeViewController"/g' "$STORYBOARD"
+              sed -i '' '/SocivaBridgeViewController/s/customModule="Capacitor"/customModule="App"/g' "$STORYBOARD"
+            fi
             echo "=== Storyboard AFTER patch ==="
-            grep -n 'customClass' "$STORYBOARD" || echo "(no customClass attributes found)"
+            grep -n 'customClass\|customModule' "$STORYBOARD" || echo "(no customClass/customModule found)"
+            grep -q 'SocivaBridgeViewController' "$STORYBOARD" && echo "✅ Storyboard patched" || { echo "❌ FATAL: Storyboard patch failed"; cat "$STORYBOARD"; exit 1; }
+            grep -q 'customModule="App"' "$STORYBOARD" && echo "✅ customModule=App confirmed" || echo "⚠️ customModule=App not found"
           else
             echo "⚠️ Main.storyboard not found — searching..."
-            find ios/App -name "Main.storyboard" -print -exec cat {} \;
+            find ios/App -name "Main.storyboard" -print
+            for SB in $(find ios/App -name "Main.storyboard"); do
+              sed -i '' 's/customClass="CAPBridgeViewController" customModule="Capacitor"/customClass="SocivaBridgeViewController" customModule="App"/g' "$SB"
+              if ! grep -q 'SocivaBridgeViewController' "$SB"; then
+                sed -i '' 's/customClass="CAPBridgeViewController"/customClass="SocivaBridgeViewController"/g' "$SB"
+                sed -i '' '/SocivaBridgeViewController/s/customModule="Capacitor"/customModule="App"/g' "$SB"
+              fi
+            done
           fi
 
           # Verification
           echo "=== Build verification ==="
-          grep -q "registerPluginInstance" ios/App/App/AppDelegate.swift && echo "✅ Plugin registration in AppDelegate" || echo "❌ MISSING"
           grep -q "registerPluginInstance" ios/App/App/SocivaBridgeViewController.swift && echo "✅ Plugin registration in BridgeVC" || echo "❌ MISSING"
 
       - name: Add Push Notification & Live Activity Entitlements
