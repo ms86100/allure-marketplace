@@ -332,7 +332,7 @@ export function useCartPage() {
 
   const handleUpiDeepLinkSuccess = async () => {
     setShowUpiDeepLink(false);
-    toast.success('Payment submitted! Seller will verify shortly.');
+    toast.success('Payment submitted! Seller will verify shortly.', { id: 'upi-success' });
     // Clear cart and payment session ONLY after payment confirmation submitted
     clearCart(); await refresh();
     clearPaymentSession();
