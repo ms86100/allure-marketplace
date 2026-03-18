@@ -21,6 +21,9 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "cleanupStaleActivities", returnType: CAPPluginReturnPromise),
     ]
 
+    /// Active push-token observation tasks keyed by entityId
+    private var tokenTasks: [String: Task<Void, Never>] = [:]
+
     override public func load() {
         print("✅ LiveActivityPlugin loaded — Capacitor bridge registered")
     }
@@ -58,6 +61,8 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 if activity.attributes.entityId == entityId {
                     Task {
                         await activity.update(.init(state: state, staleDate: nil))
+                        // Observe push token for existing activity too
+                        self.observePushToken(for: activity, entityId: entityId)
                         call.resolve(["activityId": activity.id])
                     }
                     return
@@ -73,8 +78,10 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                 let activity = try Activity.request(
                     attributes: attributes,
                     content: .init(state: state, staleDate: nil),
-                    pushType: nil
+                    pushType: .token
                 )
+                // Observe push token updates
+                self.observePushToken(for: activity, entityId: entityId)
                 call.resolve(["activityId": activity.id])
             } catch {
                 call.reject("Failed to start live activity: \(error.localizedDescription)")
@@ -82,6 +89,29 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         } else {
             call.reject("iOS 16.2+ required for Live Activities")
         }
+    }
+
+    // MARK: - Push Token Observation
+
+    @available(iOS 16.2, *)
+    private func observePushToken(for activity: Activity<LiveDeliveryAttributes>, entityId: String) {
+        // Cancel any existing observation for this entity
+        tokenTasks[entityId]?.cancel()
+
+        let task = Task { [weak self] in
+            for await tokenData in activity.pushTokenUpdates {
+                guard !Task.isCancelled else { break }
+                let token = tokenData.map { String(format: "%02x", $0) }.joined()
+                print("📲 LiveActivity push token for \(entityId): \(token.prefix(16))…")
+
+                // Emit event to JS layer
+                self?.notifyListeners("liveActivityPushToken", data: [
+                    "entityId": entityId,
+                    "pushToken": token,
+                ])
+            }
+        }
+        tokenTasks[entityId] = task
     }
 
     // MARK: - Update
@@ -115,6 +145,11 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             Task {
                 for activity in Activity<LiveDeliveryAttributes>.activities {
                     if activity.id == activityId {
+                        // Cancel token observation
+                        let entityId = activity.attributes.entityId
+                        self.tokenTasks[entityId]?.cancel()
+                        self.tokenTasks.removeValue(forKey: entityId)
+
                         await activity.end(
                             .init(state: activity.content.state, staleDate: nil),
                             dismissalPolicy: .immediate
@@ -154,6 +189,10 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             Task {
                 for activity in Activity<LiveDeliveryAttributes>.activities {
                     if !validIds.contains(activity.attributes.entityId) {
+                        let entityId = activity.attributes.entityId
+                        self.tokenTasks[entityId]?.cancel()
+                        self.tokenTasks.removeValue(forKey: entityId)
+
                         await activity.end(
                             .init(state: activity.content.state, staleDate: nil),
                             dismissalPolicy: .immediate
