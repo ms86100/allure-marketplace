@@ -57,6 +57,7 @@ export default function OrderDetailPage() {
   const isDeliveryOrder = ['delivery', 'seller_delivery'].includes(fulfillmentType);
 
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
+  const trackingConfig = useTrackingConfig();
 
   // Gap A: Fetch delivery OTP for buyer display
 
