@@ -1,75 +1,38 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Silent Push Optimization)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+## Round 3: Post-Fix Verification Audit — All Issues Verified
 
-## Silent Push Optimization: COMPLETE
+### Verification Results
 
-### What It Does
-Reduces push notification noise for mid-flow order statuses when Live Activity is already tracking the order on the lock screen. In-app notification history and badge counts are always preserved.
+| # | Issue | Status | Evidence |
+|---|-------|--------|----------|
+| 1 | `quick-reorder` RPC params (`_` prefix) | **FIXED** | L129-137: `_buyer_id`, `_seller_groups`, `_payment_method`, `_payment_status`, `_fulfillment_type`, `_delivery_fee`, `_coupon_discount` |
+| 2 | `quick-reorder` `_seller_groups` not stringified | **FIXED** | L131: `_seller_groups: sellerGroups` — raw object, no `JSON.stringify` |
+| 3 | `quick-reorder` uses `approval_status` | **FIXED** | L72: `.select("...approval_status...")`, L88: `product.approval_status !== 'approved'` |
+| 4 | SmartSuggestionBanner error toast | **FIXED** | L58: `toast.info('Could not reorder...')`, L71: same. No `toast.success` on error path |
+| 5 | SmartSuggestionBanner global mutex | **FIXED** | L16: `isReorderingRef = useRef(false)`, L22-23: early return + set true, L74-75: reset in finally |
+| 6 | Store availability check before reorder | **FIXED** | L28-41: fetches seller, calls `computeStoreStatus`, blocks with `toast.error` if not open |
+| 7 | `useArrivalDetection` ref → state | **FIXED** | L20: `useState<SocietyGeo>`, L44: `setSociety(...)`, L107: dependency `[getDistance, society]` — effect re-runs when society loads |
+| 8 | Order status concurrency (affected rows) | **FIXED** | L146: `.eq('status', order.status)` for optimistic locking, L151: checks `updatedRows.length === 0`, refetches + shows conflict toast |
+| 9 | Payment session persistence (UPI) | **FIXED** | L27-28: `sellerUpiId`/`sellerName` in `PaymentSession`, L285-286: saved during order creation, L295 in CartPage: `c.sessionSellerUpiId` fallback |
+| 10 | `useCart` rapid-tap mutex | **FIXED** | `addItemLocksRef` Set-based per-product mutex in `useCart.tsx` L123-174 |
+| 11 | Cart optimistic rollback | **FIXED** | `addItem` catch restores prev + invalidates, `updateQuantity` catch restores prev + reverses count delta |
 
-### Notification Matrix
+### Remaining Low-Priority Items (Not Bugs)
 
-| Status | Push? | Live Activity? | Rationale |
-|--------|-------|----------------|-----------|
-| `accepted` | ✅ Always | Yes | Critical — order confirmed |
-| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
-| `ready` | ✅ Always | Yes | Pickup moment — user must know |
-| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
-| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
-| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
-| `delivered` | ✅ Always | Yes | Critical endpoint |
-| `completed` | ✅ Always | No | Critical endpoint |
-| `cancelled` | ✅ Always | No | Critical — must alert |
-| All service/booking | ✅ Always | No | No Live Activity for these |
+1. **`ReorderLastOrder` always deletes cart before insert (L147)** — This is intentional: it atomically replaces cart contents after user confirmation dialog. The delete runs unconditionally, which is a harmless no-op if cart is empty. Not a bug.
 
-### Implementation
+2. **`BuyAgainRow` incomplete product object** — Falls through to DB seller fetch in `addItem`. Works correctly via fallback. Type inconsistency only.
 
-1. **DB column**: `category_status_flows.silent_push` (boolean, default false)
-2. **DB trigger**: `fn_enqueue_order_status_notification` includes `silent_push` in notification payload
-3. **Edge function**: `process-notification-queue` skips APNs/FCM delivery when `silent_push = true`, but still inserts `user_notifications` for in-app history
+3. **Geolocation on web only watches if permission is `granted`** — L84: `if (result.state === 'granted')`. This means first-time users who haven't granted permission won't get arrival detection. This is by design to avoid unsolicited permission prompts on a marketplace app. Not a bug.
 
-## Phase I Live Activities — CI Pipeline Status
+### Production Risk Assessment
 
-### Codemagic Build Pipeline: COMPLETE
+All critical and high-severity issues from Rounds 1-2 are verified fixed. The system is production-ready for the identified flows.
 
-Both `ios-release` and `release-all` workflows now include:
+**If this system had 10,000 daily users, the first failure would be:** `sessionStorage` payment recovery failing in incognito/private browsing mode — some browsers clear `sessionStorage` on tab close, meaning UPI app-switch recovery won't restore. This is an inherent browser limitation, not a code bug. A fallback to `localStorage` with encryption could mitigate it but introduces its own tradeoffs.
 
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+### Verdict
 
-### Codemagic Requirements (User Action)
+No implementation changes needed. All previously flagged issues are verified fixed in code.
 
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
-
-### Runtime Call Chain (Verified)
-
-```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
-```
-
-## Implementation Matrix
-
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
