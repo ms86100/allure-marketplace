@@ -162,7 +162,7 @@ export function useCartPage() {
       const fresh = freshPrices?.find(p => p.id === item.product_id);
       return fresh && Math.abs(fresh.price - (item.product?.price || 0)) > 0.01;
     });
-    if (priceMismatch) { toast.error('Some item prices have changed. Refreshing your cart...'); await refresh(); throw new Error('Price mismatch detected'); }
+    if (priceMismatch) { toast.error('Some item prices have changed. Refreshing your cart...', { id: 'checkout-price-mismatch' }); await refresh(); throw new Error('Price mismatch detected'); }
 
     const deliveryAddressText = fulfillmentType === 'delivery' && selectedDeliveryAddress
       ? [selectedDeliveryAddress.flat_number && `Flat ${selectedDeliveryAddress.flat_number}`, selectedDeliveryAddress.block && `Block ${selectedDeliveryAddress.block}`, selectedDeliveryAddress.building_name, selectedDeliveryAddress.landmark].filter(Boolean).join(', ')
