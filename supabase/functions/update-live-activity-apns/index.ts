@@ -14,7 +14,7 @@ const corsHeaders = {
  * Sends an APNs push with `apns-push-type: liveactivity` to update
  * a Live Activity widget on iOS even when the app process is killed.
  *
- * Called by the DB trigger on order status changes when a push token exists.
+ * Gap 2: Now queries category_status_flows for DB-backed labels and progress.
  */
 
 interface LAUpdatePayload {
@@ -23,32 +23,9 @@ interface LAUpdatePayload {
   push_token: string;
   seller_name?: string;
   seller_logo?: string;
+  transaction_type?: string;
+  parent_group?: string;
 }
-
-/** Status → progress percent mapping (mirrors liveActivityMapper.ts) */
-const STATUS_PROGRESS: Record<string, number> = {
-  accepted: 0.10,
-  confirmed: 0.10,
-  preparing: 0.40,
-  ready: 0.75,
-  picked_up: 0.55,
-  on_the_way: 0.70,
-  en_route: 0.80,
-  delivered: 1.0,
-  completed: 1.0,
-};
-
-const PROGRESS_DESCRIPTIONS: Record<string, string> = {
-  accepted: "Order Accepted",
-  confirmed: "Booking Confirmed",
-  preparing: "Order Being Prepared",
-  ready: "Order Ready",
-  picked_up: "Order Picked Up",
-  en_route: "Order On The Way",
-  on_the_way: "Order On The Way",
-  delivered: "Delivered",
-  completed: "Completed",
-};
 
 const TERMINAL_STATUSES = new Set([
   "delivered", "completed", "cancelled", "no_show", "failed",
@@ -100,6 +77,47 @@ async function createApnsJwt(
   return `${signingInput}.${b64url(new Uint8Array(signature))}`;
 }
 
+/** Cached status flow data to avoid re-querying within the same function invocation */
+interface StatusFlowEntry {
+  status_key: string;
+  display_label: string;
+  sort_order: number;
+}
+
+async function getStatusFlowData(
+  supabase: ReturnType<typeof createClient>,
+  transactionType: string,
+  parentGroup: string,
+): Promise<Map<string, StatusFlowEntry>> {
+  const { data, error } = await supabase
+    .from("category_status_flows")
+    .select("status_key, display_label, sort_order")
+    .eq("transaction_type", transactionType)
+    .eq("parent_group", parentGroup)
+    .order("sort_order");
+
+  const map = new Map<string, StatusFlowEntry>();
+  if (!error && data) {
+    for (const entry of data) {
+      map.set(entry.status_key, entry as StatusFlowEntry);
+    }
+  }
+  return map;
+}
+
+function deriveProgressPercent(
+  statusKey: string,
+  flowMap: Map<string, StatusFlowEntry>,
+): number | null {
+  const entry = flowMap.get(statusKey);
+  if (!entry) return null;
+  const sortOrders = Array.from(flowMap.values()).map((e) => e.sort_order);
+  const minSort = Math.min(...sortOrders);
+  const maxSort = Math.max(...sortOrders);
+  if (maxSort === minSort) return 0.5;
+  return 0.05 + ((entry.sort_order - minSort) / (maxSort - minSort)) * 0.95;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -136,7 +154,7 @@ Deno.serve(async (req) => {
     }
 
     const payload: LAUpdatePayload = await req.json();
-    const { order_id, status, push_token, seller_name, seller_logo } = payload;
+    const { order_id, status, push_token, seller_name, transaction_type, parent_group } = payload;
 
     if (!order_id || !status || !push_token) {
       return new Response(
@@ -147,35 +165,42 @@ Deno.serve(async (req) => {
 
     console.log(`[LA-APNs] Updating LA for order=${order_id} status=${status} token=${push_token.substring(0, 16)}…`);
 
-    // Fetch delivery data for ETA/distance
+    // Fetch delivery data + DB-backed status flow in parallel
+    const [deliveryRes, itemCountRes, flowMap] = await Promise.all([
+      supabase
+        .from("delivery_assignments")
+        .select("eta_minutes, distance_meters, rider_name, status")
+        .eq("order_id", order_id)
+        .maybeSingle(),
+      supabase
+        .from("order_items")
+        .select("id", { count: "exact", head: true })
+        .eq("order_id", order_id),
+      getStatusFlowData(
+        supabase,
+        transaction_type || "cart_purchase",
+        parent_group || "default",
+      ),
+    ]);
+
     let etaMinutes: number | null = null;
     let driverDistance: number | null = null;
     let driverName: string | null = null;
-    let vehicleType: string | null = null;
-    let itemCount: number | null = null;
+    const vehicleType: string | null = null;
 
-    const { data: delivery } = await supabase
-      .from("delivery_assignments")
-      .select("eta_minutes, distance_meters, rider_name, status")
-      .eq("order_id", order_id)
-      .maybeSingle();
-
+    const delivery = deliveryRes.data;
     if (delivery) {
       etaMinutes = delivery.eta_minutes ?? null;
       driverDistance = delivery.distance_meters ? delivery.distance_meters / 1000 : null;
       driverName = delivery.rider_name ?? null;
     }
 
-    // Get item count
-    const { count } = await supabase
-      .from("order_items")
-      .select("id", { count: "exact", head: true })
-      .eq("order_id", order_id);
-    itemCount = count ?? null;
+    const itemCount = itemCountRes.count ?? null;
 
-    // Build content-state matching LiveDeliveryAttributes.ContentState
-    const progressPercent = STATUS_PROGRESS[status] ?? null;
-    const progressStage = PROGRESS_DESCRIPTIONS[status] ?? null;
+    // DB-backed progress and labels
+    const progressPercent = deriveProgressPercent(status, flowMap);
+    const flowEntry = flowMap.get(status);
+    const progressStage = flowEntry?.display_label ?? null;
 
     const contentState: Record<string, unknown> = {
       workflowStatus: status,
@@ -204,7 +229,6 @@ Deno.serve(async (req) => {
     const cryptoKey = await importP8Key(apnsP8Key);
     const jwt = await createApnsJwt(cryptoKey, apnsKeyId, apnsTeamId);
 
-    // APNs topic for Live Activity must be: bundleId + ".push-type.liveactivity"
     const laTopic = `${apnsBundleId}.push-type.liveactivity`;
 
     const apnsResponse = await fetch(
@@ -230,7 +254,6 @@ Deno.serve(async (req) => {
       const apnsId = apnsResponse.headers.get("apns-id");
       console.log(`[LA-APNs] ✅ Live Activity updated (apns-id: ${apnsId})`);
 
-      // If terminal, clean up the token
       if (isTerminal) {
         await supabase
           .from("live_activity_tokens")
@@ -246,7 +269,6 @@ Deno.serve(async (req) => {
     }
 
     if (statusCode === 410) {
-      // Token expired / activity ended — clean up
       await supabase
         .from("live_activity_tokens")
         .delete()
