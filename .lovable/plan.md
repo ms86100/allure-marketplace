@@ -1,49 +1,30 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+## Fix: Explicit UIWindow Creation in AppDelegate
 
-## Phase I Live Activities — CI Pipeline Status
+### Problem
+Lines 141-142 (and 853-854) use `window?.rootViewController = vc` — but `self.window` is `nil` at this point, so the optional chaining silently no-ops. iOS falls back to storyboard's `CAPBridgeViewController`, plugin never registers.
 
-### Codemagic Build Pipeline: COMPLETE
+### Fix
 
-Both `ios-release` and `release-all` workflows now include:
+Replace the window assignment block in **two locations**:
 
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
-
-### Codemagic Requirements (User Action)
-
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
-
-### Runtime Call Chain (Verified)
-
-```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
+**Location 1 — `ios-release` workflow (lines 139-143):**
+```swift
+// Deterministic: create window + use custom bridge VC
+let vc = SocivaBridgeViewController()
+let win = UIWindow(frame: UIScreen.main.bounds)
+win.rootViewController = vc
+win.makeKeyAndVisible()
+self.window = win
+print("✅ rootViewController = \(type(of: self.window?.rootViewController))")
 ```
 
-## Implementation Matrix
+**Location 2 — `release-all` workflow (lines 851-855):**
+Identical change.
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+### What this does
+- Explicitly creates a `UIWindow` instead of relying on storyboard to populate `self.window`
+- Guarantees `SocivaBridgeViewController` is root → `capacitorDidLoad()` fires → `LiveActivityPlugin` registers
+- No other files change
+
