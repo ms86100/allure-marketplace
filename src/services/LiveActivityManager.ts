@@ -210,6 +210,8 @@ class _LiveActivityManager {
         this.canStart = false;
         console.warn(TAG, 'HYDRATE — native Live Activities not available, disabling starts');
       }
+    } finally {
+      this.hydrating = false;
     }
   }
 
