@@ -318,7 +318,7 @@ export function useCartPage() {
 
   const handleRazorpayFailed = async () => {
     setShowRazorpayCheckout(false);
-    if (!user?.id) { toast.error('Session expired. Please sign in again.'); setPendingOrderIds([]); clearPaymentSession(); return; }
+    if (!user?.id) { toast.error('Session expired. Please sign in again.', { id: 'checkout-session' }); setPendingOrderIds([]); clearPaymentSession(); return; }
     if (pendingOrderIds.length > 0) {
       const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
       if (recheckOrder?.payment_status === 'paid') { toast.success('Payment verified! Your order is confirmed.'); clearCart(); await refresh(); clearPaymentSession(); navigate(`/orders/${pendingOrderIds[0]}`); setPendingOrderIds([]); return; }
