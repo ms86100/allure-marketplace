@@ -23,6 +23,8 @@ function resolveTransactionType(
   if (fulfillmentType && ['self_pickup', 'seller_delivery'].includes(fulfillmentType)) return 'self_fulfillment';
   // Delivery orders where seller handles delivery → self_fulfillment (no delivery partner steps)
   if (fulfillmentType === 'delivery' && deliveryHandledBy === 'seller') return 'self_fulfillment';
+  // Delivery but no handler specified → default to self_fulfillment (platform delivery not live)
+  if (fulfillmentType === 'delivery' && !deliveryHandledBy) return 'self_fulfillment';
   return 'cart_purchase';
 }
 

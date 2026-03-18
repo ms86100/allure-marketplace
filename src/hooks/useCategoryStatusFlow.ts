@@ -90,6 +90,11 @@ function resolveTransactionType(
   if (fulfillmentType === 'delivery' && deliveryHandledBy === 'seller') {
     return 'self_fulfillment';
   }
+  // Delivery but no handler specified → default to self_fulfillment
+  // (platform delivery not live yet; prevents deadlock)
+  if (fulfillmentType === 'delivery' && !deliveryHandledBy) {
+    return 'self_fulfillment';
+  }
   return 'cart_purchase';
 }
 
