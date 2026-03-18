@@ -221,30 +221,47 @@ async function sendFCMNotification(
   deviceToken: string,
   title: string,
   body: string,
-  data?: Record<string, string>
+  data?: Record<string, string>,
+  threadId?: string,
+  imageUrl?: string,
 ): Promise<{ success: boolean; error?: string }> {
   const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
+
+  const androidNotification: Record<string, unknown> = { sound: "default" };
+  if (threadId) androidNotification.tag = threadId;
+  if (imageUrl) androidNotification.image = imageUrl;
+
+  const fcmNotification: Record<string, unknown> = { title, body };
+  if (imageUrl) fcmNotification.image = imageUrl;
+
+  const apnsAps: Record<string, unknown> = {
+    alert: { title, body },
+    sound: "default",
+    badge: 1,
+  };
+  if (imageUrl) apnsAps["mutable-content"] = 1;
+  if (threadId) apnsAps["thread-id"] = threadId;
+
+  const apnsHeaders: Record<string, string> = {
+    "apns-push-type": "alert",
+    "apns-priority": "10",
+  };
+  if (threadId) apnsHeaders["apns-collapse-id"] = threadId.substring(0, 64);
 
   const message: Record<string, unknown> = {
     message: {
       token: deviceToken,
-      notification: { title, body },
+      notification: fcmNotification,
       data: data || {},
       android: {
         priority: "high",
-        notification: { sound: "default" },
+        notification: androidNotification,
       },
       apns: {
-        headers: {
-          "apns-push-type": "alert",
-          "apns-priority": "10",
-        },
+        headers: apnsHeaders,
         payload: {
-          aps: {
-            alert: { title, body },
-            sound: "default",
-            badge: 1,
-          },
+          aps: apnsAps,
+          ...(imageUrl ? { image_url: imageUrl } : {}),
         },
       },
     },
