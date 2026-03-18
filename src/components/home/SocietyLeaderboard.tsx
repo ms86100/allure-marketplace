@@ -6,6 +6,7 @@ import { Trophy, Star, ShoppingBag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCurrency } from '@/hooks/useCurrency';
 import { cn } from '@/lib/utils';
+import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
 interface TopSeller {
   id: string;
