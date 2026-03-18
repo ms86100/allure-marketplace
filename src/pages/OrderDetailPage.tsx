@@ -234,7 +234,7 @@ export default function OrderDetailPage() {
             <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart />
           )}
           )}
-          {o.orderFulfillmentType === 'delivery' && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}
+          {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}
 
           {o.canReorder && (
             <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 flex items-center justify-between">
