@@ -112,6 +112,7 @@ export default function ProfilePage() {
     ...(isAdmin ? [{ icon: Shield, label: 'Admin Panel', to: '/admin' }] : []),
     ...(isAdmin ? [{ icon: FileText, label: 'Platform Docs', to: '/docs' }] : []),
     { icon: Bug, label: 'Push Debug', to: '/push-debug' },
+    { icon: Activity, label: 'Live Activity Debug', to: '/la-debug' },
     { icon: FileText, label: 'Privacy Policy', to: '/privacy-policy' },
     { icon: FileText, label: 'Terms & Conditions', to: '/terms' },
     { icon: FileText, label: 'Community Rules', to: '/community-rules' },

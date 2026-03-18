@@ -390,6 +390,7 @@ function AppRoutes() {
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
          <Route path="/community-rules" element={<CommunityRulesPage />} />
         <Route path="/push-debug" element={<ProtectedRoute><PushDebugPage /></ProtectedRoute>} />
+        <Route path="/la-debug" element={<ProtectedRoute><LiveActivityDebugPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

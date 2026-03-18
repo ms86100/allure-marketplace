@@ -317,8 +317,11 @@ class _LiveActivityManager {
       console.log(TAG, `UPDATE EXEC entity=${data.entity_id} status=${data.workflow_status}`);
       await LiveActivity.updateLiveActivity(data);
       console.log(TAG, `UPDATE SUCCESS entity=${data.entity_id}`);
+      addOpsEntry({ timestamp: Date.now(), action: 'update', entityId: data.entity_id, status: data.workflow_status, success: true });
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       recordLAError('UPDATE', data.entity_id, e);
+      addOpsEntry({ timestamp: Date.now(), action: 'update', entityId: data.entity_id, status: data.workflow_status, success: false, error: msg });
     }
   }
 }
