@@ -56,7 +56,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
       .from('orders')
       .select('id, status, seller_id')
       .eq('buyer_id', userId)
-      .in('status', activeStatuses);
+      .in('status', activeStatuses as any);
 
     if (error) {
       console.error(TAG, 'Failed to fetch active orders:', error.message);
