@@ -15,8 +15,8 @@ interface LiveDeliveryTrackerProps {
 
 interface ProximityThreshold {
   max_meters?: number;
-  buyer_message: string;
-  seller_message: string;
+  buyer_message?: string;
+  seller_message?: string;
   buyer_prefix?: string;
   seller_prefix?: string;
   suffix?: string;
