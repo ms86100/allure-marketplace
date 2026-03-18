@@ -3384,6 +3384,7 @@ export type Database = {
           deposit_refunded: boolean | null
           discount_amount: number | null
           distance_km: number | null
+          estimated_delivery_at: string | null
           fulfillment_type: string
           id: string
           idempotency_key: string | null
@@ -3428,6 +3429,7 @@ export type Database = {
           deposit_refunded?: boolean | null
           discount_amount?: number | null
           distance_km?: number | null
+          estimated_delivery_at?: string | null
           fulfillment_type?: string
           id?: string
           idempotency_key?: string | null
@@ -3472,6 +3474,7 @@ export type Database = {
           deposit_refunded?: boolean | null
           discount_amount?: number | null
           distance_km?: number | null
+          estimated_delivery_at?: string | null
           fulfillment_type?: string
           id?: string
           idempotency_key?: string | null
