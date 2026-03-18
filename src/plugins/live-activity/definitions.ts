@@ -22,6 +22,10 @@ export interface LiveActivityData {
   vehicle_type: string | null;
   /** Human-readable progress stage, e.g. "Preparing → Picked Up → On the way" */
   progress_stage: string | null;
+  /** 0.0–1.0 progress percentage for the animated bar */
+  progress_percent: number | null;
+  /** Seller / business display name */
+  seller_name: string | null;
 }
 
 export interface ActiveActivityEntry {
@@ -30,32 +34,9 @@ export interface ActiveActivityEntry {
 }
 
 export interface LiveActivityPlugin {
-  /**
-   * Start a new lock-screen live activity.
-   * Returns a platform-specific activity identifier used for future updates.
-   */
   startLiveActivity(data: LiveActivityData): Promise<{ activityId: string }>;
-
-  /**
-   * Push an update to the currently-active live activity.
-   * If no activity is active for `entity_id`, this is a no-op.
-   */
   updateLiveActivity(data: LiveActivityData): Promise<void>;
-
-  /**
-   * End (dismiss) the live activity for a given entity.
-   */
   endLiveActivity(opts: { activityId: string }): Promise<void>;
-
-  /**
-   * Query all currently-running native activities.
-   * Used to reconcile in-memory state after app restart / cold launch.
-   */
   getActiveActivities(): Promise<{ activities: ActiveActivityEntry[] }>;
-
-  /**
-   * End all native activities whose entityId is NOT in the provided list.
-   * Called during hydration to remove orphaned / stale activities.
-   */
   cleanupStaleActivities(opts: { validEntityIds: string[] }): Promise<void>;
 }
