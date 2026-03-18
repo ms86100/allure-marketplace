@@ -1,56 +1,49 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-## Add In-Flight Start Lock to LiveActivityManager
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-### Problem
-The hydration race fix is in place (promise-based lock — good). But there's still a gap: after hydration completes, if `syncActiveOrders` fires 5 `push()` calls for the same order simultaneously, all 5 see `this.active` is empty (the first `startLiveActivity` hasn't resolved yet), and all 5 call `startLiveActivity` — creating duplicates.
+## Phase I Live Activities — CI Pipeline Status
 
-### Fix
-Add a `starting` Set that tracks entity IDs currently mid-start. This is a ~10-line change in `LiveActivityManager.ts`.
+### Codemagic Build Pipeline: COMPLETE
 
-**In the class definition (line 90):**
-```ts
-private starting = new Set<string>();
+Both `ios-release` and `release-all` workflows now include:
+
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+
+### Codemagic Requirements (User Action)
+
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
+
+### Runtime Call Chain (Verified)
+
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
 ```
 
-**In `push()` at line 259, wrap the start block:**
-```ts
-if (!existing && START_STATUSES.has(workflow_status)) {
-  // In-flight start lock — prevent concurrent starts for same entity
-  if (this.starting.has(entity_id)) {
-    console.log(TAG, `SKIP — start already in-flight for ${entity_id}`);
-    return;
-  }
-  this.starting.add(entity_id);
-  try {
-    // ... existing startLiveActivity logic ...
-  } catch (e) {
-    // ... existing error handling ...
-  } finally {
-    this.starting.delete(entity_id);
-  }
-  return;
-}
-```
+## Implementation Matrix
 
-Also add permission error detection in the start catch block:
-```ts
-catch (e) {
-  const msg = e instanceof Error ? e.message : String(e);
-  // If permission denied, disable future starts
-  if (msg.includes('not authorized') || msg.includes('not allowed') || msg.includes('denied')) {
-    this.canStart = false;
-    console.warn(TAG, 'Permission denied — disabling future starts');
-  }
-  // ... existing error logging ...
-}
-```
-
-### Files Changed
-
-| File | Change |
-|------|--------|
-| `src/services/LiveActivityManager.ts` | Add `starting` Set + in-flight guard in `push()` + permission error catch |
-
-Single file, ~15 lines net addition.
-
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |

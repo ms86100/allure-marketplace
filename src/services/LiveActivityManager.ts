@@ -92,6 +92,9 @@ class _LiveActivityManager {
   /** Promise-based hydration lock — all concurrent callers await the same promise */
   private hydrationPromise: Promise<void> | null = null;
 
+  /** In-flight start lock — prevents concurrent startLiveActivity calls for the same entity */
+  private starting = new Set<string>();
+
   /** Set during hydration — if native plugin is unavailable, skip all starts */
   private canStart = true;
 
@@ -257,6 +260,12 @@ class _LiveActivityManager {
 
     // No active entry and status qualifies → start
     if (!existing && START_STATUSES.has(workflow_status)) {
+      // In-flight start lock — prevent concurrent starts for same entity
+      if (this.starting.has(entity_id)) {
+        console.log(TAG, `SKIP — start already in-flight for ${entity_id}`);
+        return;
+      }
+      this.starting.add(entity_id);
       try {
         console.log(TAG, `START entity=${entity_id} status=${workflow_status}`);
         const { activityId } = await LiveActivity.startLiveActivity(data);
@@ -272,8 +281,15 @@ class _LiveActivityManager {
         addOpsEntry({ timestamp: Date.now(), action: 'start', entityId: entity_id, status: workflow_status, success: true, activityId });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        // If permission denied, disable future starts
+        if (msg.includes('not authorized') || msg.includes('not allowed') || msg.includes('denied')) {
+          this.canStart = false;
+          console.warn(TAG, 'Permission denied — disabling future starts');
+        }
         recordLAError('START', entity_id, e);
         addOpsEntry({ timestamp: Date.now(), action: 'start', entityId: entity_id, status: workflow_status, success: false, error: msg });
+      } finally {
+        this.starting.delete(entity_id);
       }
       return;
     }
