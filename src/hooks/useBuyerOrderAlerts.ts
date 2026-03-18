@@ -47,8 +47,8 @@ export function useBuyerOrderAlerts() {
           const oldStatus = (payload.old as any)?.status;
           const orderId = (payload.new as any)?.id;
 
-          // C4: If old status is undefined (REPLICA IDENTITY not FULL), skip to avoid spam toasts
-          if (!newStatus || oldStatus === undefined || newStatus === oldStatus) return;
+          // Only skip if no new status (toast ID dedup handles duplicates)
+          if (!newStatus) return;
 
           // Skip 'pending' status — user just created the order, they already know
           if (newStatus === 'pending') return;

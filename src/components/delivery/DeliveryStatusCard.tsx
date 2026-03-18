@@ -90,7 +90,7 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
   const config = DELIVERY_STATUS_CONFIG[assignment.status] || DELIVERY_STATUS_CONFIG.pending;
   const StatusIcon = config.icon;
 
-  const deliverySteps = ['pending', 'assigned', 'picked_up', 'at_gate', 'delivered'];
+  const deliverySteps = ['pending', 'assigned', 'picked_up', 'on_the_way', 'at_gate', 'delivered'];
   const currentStepIndex = deliverySteps.indexOf(assignment.status);
 
   return (
