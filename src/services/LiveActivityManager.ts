@@ -149,6 +149,7 @@ class _LiveActivityManager {
   }
 
   private async _doHydrate(): Promise<void> {
+    this.hydrating = true;
     console.log(TAG, 'HYDRATE START — reconciling persisted + native state');
 
     try {
