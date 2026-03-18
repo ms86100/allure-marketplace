@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, useMemo, ReactNode } from 'react';
+import { createContext, useContext, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -88,9 +88,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return items.filter(item => item.product != null && item.product.is_available !== false);
     },
     enabled: !!user,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const setOptimistic = useCallback((updater: (prev: (CartItem & { product: Product })[]) => (CartItem & { product: Product })[]) => {
@@ -118,48 +119,59 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }, {})
     ), [items]);
 
+  // Per-product mutex to prevent race conditions on rapid taps
+  const addItemLocksRef = useRef<Set<string>>(new Set());
+
   const addItem = useCallback(async (product: Product, quantity = 1, silent = false) => {
     if (!user) { toast.error('Please sign in to add items to cart', { id: 'cart-sign-in' }); return; }
 
-    const pActionType = (product as any).action_type;
-    if (pActionType && !['add_to_cart', 'buy_now'].includes(pActionType)) { toast.error('This item cannot be added to cart', { id: 'cart-not-allowed' }); return; }
-    const inlineAvailability = getInlineSellerAvailability(product);
-    let availability = computeStoreStatus(inlineAvailability.availabilityStart, inlineAvailability.availabilityEnd, inlineAvailability.operatingDays, inlineAvailability.isAvailable);
+    // Per-product mutex: skip if already in-flight for this product
+    if (addItemLocksRef.current.has(product.id)) return;
+    addItemLocksRef.current.add(product.id);
 
-    if (!inlineAvailability.hasInlineAvailability) {
-      if (!product.seller_id) { toast.error('Unable to verify store availability right now. Please try again.', { id: 'cart-availability' }); return; }
-      const { data: sellerSnapshot, error: sellerError } = await supabase.from('seller_profiles').select('availability_start, availability_end, operating_days, is_available').eq('id', product.seller_id).maybeSingle();
-      if (sellerError || !sellerSnapshot) { toast.error('Unable to verify store availability right now. Please try again.', { id: 'cart-availability' }); return; }
-      availability = computeStoreStatus(sellerSnapshot.availability_start, sellerSnapshot.availability_end, sellerSnapshot.operating_days, sellerSnapshot.is_available ?? true);
-    }
-
-    if (availability.status !== 'open') { const msg = formatStoreClosedMessage(availability); toast.error(msg || 'This store is currently closed. Please try again later.', { id: 'cart-store-closed' }); return; }
-
-    setOptimistic(prev => {
-      const existing = prev.find(item => item.product_id === product.id);
-      if (existing) return prev.map(item => item.product_id === product.id ? { ...item, quantity: Math.min(item.quantity + quantity, 99) } : item);
-      return [...prev, { id: `temp-${crypto.randomUUID()}`, user_id: user.id, product_id: product.id, quantity, created_at: new Date().toISOString(), product, society_id: null } as CartItem & { product: Product }];
-    });
-
-    const prevCount = queryClient.getQueryData(['cart-count', user?.id]);
     try {
-      const { data: existing } = await supabase.from('cart_items').select('quantity').eq('user_id', user.id).eq('product_id', product.id).maybeSingle();
-      if (existing) {
-        const { error } = await supabase.from('cart_items').update({ quantity: Math.min(existing.quantity + quantity, 99) }).eq('user_id', user.id).eq('product_id', product.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('cart_items').insert({ user_id: user.id, product_id: product.id, quantity });
-        if (error) throw error;
+      const pActionType = (product as any).action_type;
+      if (pActionType && !['add_to_cart', 'buy_now'].includes(pActionType)) { toast.error('This item cannot be added to cart', { id: 'cart-not-allowed' }); return; }
+      const inlineAvailability = getInlineSellerAvailability(product);
+      let availability = computeStoreStatus(inlineAvailability.availabilityStart, inlineAvailability.availabilityEnd, inlineAvailability.operatingDays, inlineAvailability.isAvailable);
+
+      if (!inlineAvailability.hasInlineAvailability) {
+        if (!product.seller_id) { toast.error('Unable to verify store availability right now. Please try again.', { id: 'cart-availability' }); return; }
+        const { data: sellerSnapshot, error: sellerError } = await supabase.from('seller_profiles').select('availability_start, availability_end, operating_days, is_available').eq('id', product.seller_id).maybeSingle();
+        if (sellerError || !sellerSnapshot) { toast.error('Unable to verify store availability right now. Please try again.', { id: 'cart-availability' }); return; }
+        availability = computeStoreStatus(sellerSnapshot.availability_start, sellerSnapshot.availability_end, sellerSnapshot.operating_days, sellerSnapshot.is_available ?? true);
       }
-      if (!silent) toast.success('Added to cart', { id: 'cart-add' });
-      queryClient.setQueryData(['cart-count', user?.id], (old: number | undefined) => (old || 0) + quantity);
-      invalidate();
-    } catch (error) {
-      queryClient.setQueryData(['cart-count', user?.id], prevCount);
-      invalidate();
-      const availabilityError = parseStoreAvailabilityError(error);
-      if (availabilityError) toast.error(availabilityError, { id: 'cart-availability-error' });
-      else handleApiError(error, 'Failed to add item');
+
+      if (availability.status !== 'open') { const msg = formatStoreClosedMessage(availability); toast.error(msg || 'This store is currently closed. Please try again later.', { id: 'cart-store-closed' }); return; }
+
+      setOptimistic(prev => {
+        const existing = prev.find(item => item.product_id === product.id);
+        if (existing) return prev.map(item => item.product_id === product.id ? { ...item, quantity: Math.min(item.quantity + quantity, 99) } : item);
+        return [...prev, { id: `temp-${crypto.randomUUID()}`, user_id: user.id, product_id: product.id, quantity, created_at: new Date().toISOString(), product, society_id: null } as CartItem & { product: Product }];
+      });
+
+      const prevCount = queryClient.getQueryData(['cart-count', user?.id]);
+      try {
+        const { data: existing } = await supabase.from('cart_items').select('quantity').eq('user_id', user.id).eq('product_id', product.id).maybeSingle();
+        if (existing) {
+          const { error } = await supabase.from('cart_items').update({ quantity: Math.min(existing.quantity + quantity, 99) }).eq('user_id', user.id).eq('product_id', product.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('cart_items').insert({ user_id: user.id, product_id: product.id, quantity });
+          if (error) throw error;
+        }
+        if (!silent) toast.success('Added to cart', { id: 'cart-add' });
+        queryClient.setQueryData(['cart-count', user?.id], (old: number | undefined) => (old || 0) + quantity);
+        invalidate();
+      } catch (error) {
+        queryClient.setQueryData(['cart-count', user?.id], prevCount);
+        invalidate();
+        const availabilityError = parseStoreAvailabilityError(error);
+        if (availabilityError) toast.error(availabilityError, { id: 'cart-availability-error' });
+        else handleApiError(error, 'Failed to add item');
+      }
+    } finally {
+      addItemLocksRef.current.delete(product.id);
     }
   }, [user, setOptimistic, invalidate, queryClient]);
 
