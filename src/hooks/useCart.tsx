@@ -151,7 +151,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.from('cart_items').insert({ user_id: user.id, product_id: product.id, quantity });
         if (error) throw error;
       }
-      if (!silent) toast.success('Added to cart');
+      if (!silent) toast.success('Added to cart', { id: 'cart-add' });
       queryClient.setQueryData(['cart-count', user?.id], (old: number | undefined) => (old || 0) + quantity);
       invalidate();
     } catch (error) {
