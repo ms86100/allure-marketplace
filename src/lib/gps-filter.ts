@@ -19,7 +19,7 @@ interface FilterState {
 
 const MAX_SPEED_KMH = 120; // Reject teleports above this speed
 const SMOOTHING_FACTOR = 0.7; // Weight for new point (0.3 for previous)
-const MIN_MOVEMENT_METERS = 3; // Ignore micro-jitter below this
+const MIN_MOVEMENT_METERS = 1; // Lowered from 3m — 3m was too aggressive for slow-moving riders
 
 /** Haversine distance in meters */
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {

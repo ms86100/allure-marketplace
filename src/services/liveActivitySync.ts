@@ -76,12 +76,17 @@ export async function syncActiveOrders(userId: string): Promise<number> {
       itemCountMap.set(item.order_id, (itemCountMap.get(item.order_id) ?? 0) + 1);
     }
 
+    // Serialize push() calls to prevent hydration race conditions
     for (const order of orders) {
       const delivery = deliveryMap.get(order.id) ?? null;
       const sellerName = sellerMap.get(order.seller_id) ?? null;
       const itemCount = itemCountMap.get(order.id) ?? null;
       const data = buildLiveActivityData(order, delivery, sellerName, itemCount);
-      await LiveActivityManager.push(data);
+      try {
+        await LiveActivityManager.push(data);
+      } catch (e) {
+        console.error(TAG, `push() failed for order ${order.id}:`, e);
+      }
     }
 
     return orders.length;
