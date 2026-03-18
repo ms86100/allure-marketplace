@@ -169,7 +169,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                 {/* Count badge — top right */}
                 {meta.count > 0 && (
                   <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground text-[9px] font-bold shadow-sm">
-                    {meta.count} items
+                    {meta.count} {ml.label('label_item_count')}
                   </div>
                 )}
 
