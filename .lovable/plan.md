@@ -73,3 +73,21 @@ Order status change → useLiveActivity hook → LiveActivityManager.push()
 | G | Smart Delay Detection | Implemented |
 | H | Notification Payload Standardization | Implemented |
 | I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+
+## Reality-Check Audit Fixes (Round 4)
+
+### Fix 1: Live Activity Deduplication — COMPLETE
+
+| Layer | Fix |
+|-------|-----|
+| **Swift native** | `startLiveActivity` now checks for existing activity with same `entityId` before `Activity.request()`. If found, updates it and returns existing `activity.id` instead of creating a duplicate. |
+| **LiveActivityManager** | Added `hydrating` flag; `resetHydration()` is now a no-op while hydration is actively running, preventing the poll timer from racing with app-resume sync. |
+| **liveActivitySync** | Added `syncing` mutex flag to prevent concurrent `syncActiveOrders` calls from overlapping. |
+| **Orchestrator** | App-resume handler now pauses the poll timer before syncing, then resumes it after sync completes. |
+
+### Fix 2: Toast Conflict Prevention — COMPLETE
+
+| Layer | Fix |
+|-------|-----|
+| **useCartPage** | Added `upiCompletionRef` guard — only ONE of `handleUpiDeepLinkSuccess` / `handleUpiDeepLinkFailed` can execute per payment session. Both use the same toast ID `'upi-confirmed'` for dedup. Ref resets when a new UPI session starts. |
+| **UpiDeepLinkCheckout** | `handleSystemClose` now skips `onPaymentFailed` when `completionTriggeredRef.current` is true, preventing the sheet unmount from firing a conflicting handler after success. |
