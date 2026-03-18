@@ -182,9 +182,13 @@ export function useSellerApplicationReview() {
         if (roleErr && !roleErr.message?.includes('duplicate')) {
           console.error('[Admin] Failed to add seller role:', roleErr);
         }
-        // Approve all pending/draft products
-        const { error: prodErr } = await supabase.from('products').update({ approval_status: 'approved' } as any).eq('seller_id', seller.id).in('approval_status', ['pending', 'draft']);
+        // Approve only products that existed before this approval moment
+        const approvalCutoff = new Date().toISOString();
+        const { data: productsToApprove } = await supabase.from('products').select('id').eq('seller_id', seller.id).in('approval_status', ['pending', 'draft']).lte('created_at', approvalCutoff);
+        const productCount = productsToApprove?.length || 0;
+        const { error: prodErr } = await supabase.from('products').update({ approval_status: 'approved' } as any).eq('seller_id', seller.id).in('approval_status', ['pending', 'draft']).lte('created_at', approvalCutoff);
         if (prodErr) console.error('[Admin] Failed to approve products:', prodErr);
+        else if (productCount > 0) console.log(`[Admin] Auto-approved ${productCount} products for seller ${seller.id}`);
         // Approve all pending licenses
         const { error: licErr } = await supabase.from('seller_licenses').update({ status: 'approved', reviewed_at: new Date().toISOString() } as any).eq('seller_id', seller.id).eq('status', 'pending');
         if (licErr) console.error('[Admin] Failed to approve licenses:', licErr);
