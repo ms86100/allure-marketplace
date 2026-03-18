@@ -17,90 +17,92 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
     const { data: stalledAssignments, error } = await supabase
       .from('delivery_assignments')
-      .select('id, order_id, rider_name, rider_phone, last_location_at, status, failed_reason, failure_owner, orders:orders!delivery_assignments_order_id_fkey(id, buyer_id, seller_id, status)')
+      .select('id, order_id, rider_name, rider_phone, last_location_at, status, stalled_notified, orders:orders!delivery_assignments_order_id_fkey(id, buyer_id, seller_id, status, needs_attention)')
       .in('status', ['picked_up', 'on_the_way', 'at_gate'])
       .not('last_location_at', 'is', null)
       .lt('last_location_at', tenMinutesAgo);
 
     if (error) throw error;
 
-    let escalated = 0;
+    let flagged = 0;
 
     for (const assignment of stalledAssignments || []) {
       const order = Array.isArray((assignment as any).orders) ? (assignment as any).orders[0] : (assignment as any).orders;
       if (!order || order.status === 'cancelled') continue;
 
-      const failedReason = 'Tracking paused for over 10 minutes during active delivery';
+      const isHardStall = assignment.last_location_at && new Date(assignment.last_location_at).toISOString() < thirtyMinutesAgo;
 
-      const { error: orderUpdateError } = await supabase
-        .from('orders')
-        .update({
-          status: 'cancelled',
-          rejection_reason: failedReason,
-        } as any)
-        .eq('id', order.id)
-        .in('status', ['picked_up', 'on_the_way', 'at_gate']);
-
-      if (orderUpdateError) continue;
-
-      await supabase
-        .from('delivery_assignments')
-        .update({
-          status: 'failed',
-          failed_reason: failedReason,
-          failure_owner: 'system',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', assignment.id)
-        .in('status', ['picked_up', 'on_the_way', 'at_gate']);
-
-      if (order.buyer_id) {
-        await supabase.from('notification_queue').insert({
-          user_id: order.buyer_id,
-          title: '⚠️ Delivery issue detected',
-          body: 'We could not keep live tracking active, so this delivery has been flagged for attention.',
-          type: 'delivery_issue',
-          reference_path: `/orders/${order.id}`,
-          payload: {
-            type: 'delivery_issue',
-            entity_type: 'order',
-            entity_id: order.id,
-            workflow_status: 'failed',
-            action: 'View Order',
-          },
-        });
+      // Gap C: For 10-min stalls — flag needs_attention, don't cancel
+      if (!order.needs_attention) {
+        await supabase
+          .from('orders')
+          .update({
+            needs_attention: true,
+            needs_attention_reason: 'GPS tracking paused for over 10 minutes during active delivery',
+          } as any)
+          .eq('id', order.id);
       }
 
-      const { data: seller } = await supabase
-        .from('seller_profiles')
-        .select('user_id')
-        .eq('id', order.seller_id)
-        .maybeSingle();
+      // Notify only once
+      if (!assignment.stalled_notified) {
+        await supabase
+          .from('delivery_assignments')
+          .update({ stalled_notified: true, updated_at: new Date().toISOString() })
+          .eq('id', assignment.id);
 
-      if (seller?.user_id) {
-        await supabase.from('notification_queue').insert({
-          user_id: seller.user_id,
-          title: '🚨 Delivery tracking lost',
-          body: 'This order was auto-flagged because location updates stopped for too long.',
-          type: 'delivery_issue',
-          reference_path: `/orders/${order.id}`,
-          payload: {
+        if (order.buyer_id) {
+          await supabase.from('notification_queue').insert({
+            user_id: order.buyer_id,
+            title: '⚠️ Delivery update paused',
+            body: isHardStall
+              ? 'Location updates have stopped for a while. You can contact the seller or report an issue.'
+              : 'Live tracking is temporarily paused. The delivery is still in progress.',
             type: 'delivery_issue',
-            entity_type: 'order',
-            entity_id: order.id,
-            workflow_status: 'failed',
-            action: 'Open Order',
-          },
-        });
-      }
+            reference_path: `/orders/${order.id}`,
+            payload: {
+              type: 'delivery_issue',
+              entity_type: 'order',
+              entity_id: order.id,
+              workflow_status: 'needs_attention',
+              action: 'View Order',
+            },
+          });
+        }
 
-      escalated += 1;
+        const { data: seller } = await supabase
+          .from('seller_profiles')
+          .select('user_id')
+          .eq('id', order.seller_id)
+          .maybeSingle();
+
+        if (seller?.user_id) {
+          await supabase.from('notification_queue').insert({
+            user_id: seller.user_id,
+            title: '🚨 Tracking paused',
+            body: isHardStall
+              ? 'Location updates stopped for 30+ min. Please update delivery status or open the app.'
+              : 'Location updates stopped for 10+ min. Please keep the app open while delivering.',
+            type: 'delivery_issue',
+            reference_path: `/orders/${order.id}`,
+            payload: {
+              type: 'delivery_issue',
+              entity_type: 'order',
+              entity_id: order.id,
+              workflow_status: 'needs_attention',
+              action: 'Open Order',
+            },
+          });
+        }
+
+        flagged += 1;
+      }
     }
 
-    return new Response(JSON.stringify({ success: true, escalated }), {
+    return new Response(JSON.stringify({ success: true, flagged }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
