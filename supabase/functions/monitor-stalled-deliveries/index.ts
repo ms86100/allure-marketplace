@@ -35,11 +35,11 @@ serve(async (req) => {
     const buyerBodySoft = settings['stalled_buyer_body_soft'] || 'Live tracking is temporarily paused. The delivery is still in progress.';
     const buyerBodyHard = settings['stalled_buyer_body_hard'] || 'Location updates have stopped for a while. You can contact the seller or report an issue.';
     const sellerTitle = settings['stalled_seller_title'] || '🚨 Tracking paused';
-    const sellerBodySoft = settings['stalled_seller_body_soft'] || 'Location updates stopped for 10+ min. Please keep the app open while delivering.';
-    const sellerBodyHard = settings['stalled_seller_body_hard'] || 'Location updates stopped for 30+ min. Please update delivery status or open the app.';
+    const sellerBodySoft = settings['stalled_seller_body_soft'] || 'Location updates paused. Please keep the app open while delivering.';
+    const sellerBodyHard = settings['stalled_seller_body_hard'] || 'Location updates stopped for 3+ min. Please update delivery status or open the app.';
 
-    const softMinutes = parseInt(settings['stalled_soft_threshold_minutes'] || '10', 10);
-    const hardMinutes = parseInt(settings['stalled_hard_threshold_minutes'] || '30', 10);
+    const softMinutes = parseFloat(settings['stalled_soft_threshold_minutes'] || '1.5');
+    const hardMinutes = parseFloat(settings['stalled_hard_threshold_minutes'] || '3');
 
     let transitStatuses: string[];
     try {
