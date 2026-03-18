@@ -317,12 +317,14 @@ workflows:
             echo "=== gate_bell.mp3 linked to Xcode project ==="
           fi
 
-      - name: Copy Live Activity native plugin files
+      - name: Copy Live Activity native plugin files + Privacy Manifest
         script: |
           echo "=== Copying Live Activity Swift files ==="
           cp native/ios/LiveActivityPlugin.swift ios/App/App/
           cp native/ios/LiveDeliveryActivity.swift ios/App/App/
-          echo "=== Adding Swift files to App target ==="
+          # Copy Privacy Manifest (required since May 2024)
+          cp native/ios/PrivacyInfo.xcprivacy ios/App/App/PrivacyInfo.xcprivacy
+          echo "=== Adding Swift files + PrivacyInfo to App target ==="
           cd ios/App
           ruby - << 'RUBY'
           require 'xcodeproj'
@@ -338,8 +340,14 @@ workflows:
             end
           end
 
+          # Add PrivacyInfo.xcprivacy to resources
+          privacy_ref = group.files.find { |f| f.path == 'PrivacyInfo.xcprivacy' } || group.new_file('PrivacyInfo.xcprivacy')
+          unless target.resources_build_phase.files_references.any? { |f| f.path == 'PrivacyInfo.xcprivacy' }
+            target.resources_build_phase.add_file_reference(privacy_ref, true)
+          end
+
           project.save
-          puts "=== Live Activity plugin files added to App target ==="
+          puts "=== Live Activity plugin files + PrivacyInfo added to App target ==="
           RUBY
 
       - name: Create Live Activity Widget Extension
