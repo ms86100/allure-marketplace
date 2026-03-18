@@ -254,8 +254,9 @@ export default function OrderDetailPage() {
             </div>
           )}
           {/* Seller self-delivery GPS broadcasting */}
+          {/* Gap 1: Pass deliveryStatus so GPS auto-stops on terminal states */}
           {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
-            <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart />
+            <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart deliveryStatus={order.status} />
           )}
           {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}
 
