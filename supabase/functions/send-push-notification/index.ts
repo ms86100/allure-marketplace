@@ -99,8 +99,11 @@ async function sendApnsDirectNotification(
         alert: { title, body },
         sound: "default",
         badge: 1,
+        "mutable-content": imageUrl ? 1 : 0,
+        ...(threadId ? { "thread-id": threadId } : {}),
       },
       ...(data || {}),
+      ...(imageUrl ? { image_url: imageUrl } : {}),
     };
 
     const url = `https://api.push.apple.com/3/device/${apnsToken}`;
