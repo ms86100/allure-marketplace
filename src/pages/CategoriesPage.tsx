@@ -380,7 +380,7 @@ export default function CategoriesPage() {
                             {meta.sellerCount > 0 && (
                               <span className="inline-flex items-center gap-0.5">
                                 <Users size={10} className="shrink-0" />
-                                {meta.sellerCount} {meta.sellerCount === 1 ? 'seller' : 'sellers'}
+                                {meta.sellerCount} {meta.sellerCount === 1 ? ml.label('label_seller_count_singular') : ml.label('label_seller_count_plural')}
                               </span>
                             )}
                             {meta.minPrice !== null && (
