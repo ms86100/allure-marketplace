@@ -475,6 +475,20 @@ export default function OrderDetailPage() {
           status={deliveryTracking.status}
           onDismiss={() => {}}
           deliveryCode={buyerOtp}
+          proximityMessages={(() => {
+            try {
+              const raw = getSetting('proximity_thresholds');
+              if (raw) {
+                const cfg = JSON.parse(raw);
+                return {
+                  at_doorstep_title: cfg.at_doorstep?.buyer_message,
+                  arriving_title: cfg.arriving?.buyer_message,
+                  subtitle: undefined,
+                };
+              }
+            } catch { /* use defaults */ }
+            return undefined;
+          })()}
         />
       )}
     </AppLayout>
