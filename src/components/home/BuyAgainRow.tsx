@@ -42,7 +42,7 @@ export function BuyAgainRow() {
           price: r.price,
           image_url: r.image_url,
           seller_id: r.seller_id || '',
-          seller_name: r.seller_name || 'Seller',
+          seller_name: r.seller_name || '',
           order_count: Number(r.order_count) || 0,
         }));
       }
