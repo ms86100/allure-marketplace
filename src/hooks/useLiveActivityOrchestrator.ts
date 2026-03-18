@@ -103,10 +103,10 @@ export function useLiveActivityOrchestrator(): void {
 
       let delivery: any = null;
       let sellerName: string | null = null;
+      let sellerLogoUrl: string | null = null;
       let itemCount: number | null = null;
       try {
-      const sellerId = (payload.new as any)?.seller_id;
-        const orderNumber = (payload.new as any)?.order_number as string | null;
+        const sellerId = (payload.new as any)?.seller_id;
         const [deliveryRes, sellerRes, itemCountRes] = await Promise.all([
           supabase
             .from('delivery_assignments')
@@ -121,6 +121,7 @@ export function useLiveActivityOrchestrator(): void {
         ]);
         delivery = deliveryRes.data;
         sellerName = (sellerRes.data as any)?.business_name ?? null;
+        sellerLogoUrl = (sellerRes.data as any)?.logo_url ?? null;
         itemCount = itemCountRes.count ?? null;
       } catch { /* best-effort */ }
 
@@ -130,6 +131,7 @@ export function useLiveActivityOrchestrator(): void {
         sellerName,
         itemCount,
         flowEntriesRef.current,
+        sellerLogoUrl,
       );
       await LiveActivityManager.push(activityData);
     };
