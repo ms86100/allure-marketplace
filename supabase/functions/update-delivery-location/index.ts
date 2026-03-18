@@ -230,9 +230,12 @@ serve(async (req) => {
     let proximity: string = 'en_route';
     let skipEtaUpdate = false;
 
+    // Load DB-backed proximity thresholds
+    const proximityThresholds = await loadProximityThresholds(supabase);
+
     if (destLat && destLng) {
       distanceMeters = Math.round(haversineDistance(latitude, longitude, destLat, destLng));
-      proximity = getProximity(distanceMeters);
+      proximity = getProximity(distanceMeters, proximityThresholds);
 
       let historicalAvgMin: number | null = null;
       if ((speed_kmh == null || speed_kmh < 2) && sellerId) {

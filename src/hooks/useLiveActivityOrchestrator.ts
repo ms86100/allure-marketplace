@@ -224,13 +224,15 @@ export function useLiveActivityOrchestrator(): void {
         if (!order) return;
 
         let sellerName: string | null = null;
+        let sellerLogoUrl: string | null = null;
         if (order.seller_id) {
           const { data: seller } = await supabase
             .from('seller_profiles')
-            .select('business_name')
+            .select('business_name, logo_url')
             .eq('id', order.seller_id)
             .maybeSingle();
           sellerName = seller?.business_name ?? null;
+          sellerLogoUrl = seller?.logo_url ?? null;
         }
 
         console.log(TAG, `Delivery ${payload.eventType} for order ${order.id}: eta=${row.eta_minutes}, distance=${row.distance_meters}`);
@@ -240,7 +242,7 @@ export function useLiveActivityOrchestrator(): void {
           distance_meters: row?.distance_meters,
           rider_name: row?.rider_name,
           vehicle_type: null,
-        }, sellerName, itemCountRes.count ?? null, flowEntriesRef.current);
+        }, sellerName, itemCountRes.count ?? null, flowEntriesRef.current, sellerLogoUrl);
         await LiveActivityManager.push(data);
       } catch { /* best-effort */ }
     };
