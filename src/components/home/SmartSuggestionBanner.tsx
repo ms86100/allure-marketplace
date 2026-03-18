@@ -4,7 +4,7 @@ import { ShoppingBag, X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useOrderSuggestions, useDismissSuggestion, useMarkSuggestionActed } from '@/hooks/useOrderSuggestions';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useState } from 'react';
 
 export function SmartSuggestionBanner() {
@@ -12,7 +12,6 @@ export function SmartSuggestionBanner() {
   const dismissMutation = useDismissSuggestion();
   const actMutation = useMarkSuggestionActed();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [reorderingId, setReorderingId] = useState<string | null>(null);
 
   if (isLoading || !suggestions || suggestions.length === 0) return null;
@@ -20,6 +19,24 @@ export function SmartSuggestionBanner() {
   const handleReorder = async (suggestion: typeof suggestions[0]) => {
     setReorderingId(suggestion.id);
     try {
+      // Check store availability before reordering
+      const { data: seller } = await supabase
+        .from('seller_profiles')
+        .select('id, availability_start, availability_end, operating_days, is_available')
+        .eq('id', suggestion.seller_id)
+        .single();
+
+      if (seller) {
+        const { computeStoreStatus, formatStoreClosedMessage } = await import('@/lib/store-availability');
+        const status = computeStoreStatus(seller.availability_start, seller.availability_end, seller.operating_days, seller.is_available ?? true);
+        if (status.status !== 'open') {
+          const msg = formatStoreClosedMessage(status);
+          toast.error(msg || 'Store is currently closed. Please try later.');
+          setReorderingId(null);
+          return;
+        }
+      }
+
       // Find the most recent order with this product from this seller
       const { data: recentOrders } = await supabase
         .from('order_items')
@@ -34,12 +51,11 @@ export function SmartSuggestionBanner() {
         });
 
         if (error || data?.error) {
-          // Fall back to navigating to product
           navigate(`/product/${suggestion.product_id}`);
-          toast({ title: 'Added to cart', description: 'Review your cart to complete the order.' });
+          toast.success('Added to cart. Review your cart to complete the order.');
         } else {
           actMutation.mutate(suggestion.id);
-          toast({ title: '✅ Order placed!', description: `Your order has been created successfully.` });
+          toast.success('Order placed successfully!');
           if (data?.orders?.[0]) {
             navigate(`/orders/${data.orders[0]}`);
           }
@@ -68,7 +84,6 @@ export function SmartSuggestionBanner() {
           transition={{ delay: i * 0.1 }}
           className="bg-card border border-border rounded-xl p-3 flex items-center gap-3"
         >
-          {/* Product image */}
           <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
             {suggestion.product?.image_urls?.[0] ? (
               <img src={suggestion.product.image_urls[0]} alt="" className="w-full h-full object-cover" />
@@ -76,8 +91,6 @@ export function SmartSuggestionBanner() {
               <ShoppingBag size={20} className="text-muted-foreground" />
             )}
           </div>
-
-          {/* Info */}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">
               {suggestion.product?.name || 'Product'}
@@ -87,8 +100,6 @@ export function SmartSuggestionBanner() {
               {suggestion.product?.price ? ` · ₹${suggestion.product.price}` : ''}
             </p>
           </div>
-
-          {/* Actions */}
           <div className="flex items-center gap-1.5 shrink-0">
             <Button
               size="sm"

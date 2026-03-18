@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile, ProductCategory, DAYS_OF_WEEK } from '@/types/database';
@@ -101,8 +101,10 @@ export function useSellerSettings() {
     setFormData(prev => ({ ...prev, operating_days: checked ? [...prev.operating_days, day] : prev.operating_days.filter(d => d !== day) }));
   };
 
+  const togglePauseRef = useRef(false);
   const togglePauseShop = async () => {
-    if (!sellerProfile) return;
+    if (!sellerProfile || togglePauseRef.current) return;
+    togglePauseRef.current = true;
     const newAvailability = !formData.is_available;
     setFormData(prev => ({ ...prev, is_available: newAvailability }));
     try {
@@ -111,6 +113,7 @@ export function useSellerSettings() {
       toast.success(newAvailability ? 'Store is now open!' : 'Store paused temporarily', { id: 'settings-availability' });
       if ((sellerProfile as any).society_id) logAudit(newAvailability ? 'store_resumed' : 'store_paused', 'seller_profile', sellerProfile.id, (sellerProfile as any).society_id);
     } catch { setFormData(prev => ({ ...prev, is_available: !newAvailability })); toast.error('Failed to update store status', { id: 'settings-availability-error' }); }
+    finally { togglePauseRef.current = false; }
   };
 
   const handleSave = async () => {

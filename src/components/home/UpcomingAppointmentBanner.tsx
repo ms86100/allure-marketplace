@@ -17,6 +17,11 @@ interface UpcomingBooking {
   seller_name?: string;
 }
 
+function timeToMinutes(t: string): number {
+  const parts = t.split(':').map(Number);
+  return (parts[0] || 0) * 60 + (parts[1] || 0);
+}
+
 export function UpcomingAppointmentBanner() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -51,10 +56,10 @@ export function UpcomingAppointmentBanner() {
         return;
       }
 
-      const currentTimeStr = format(now, 'HH:mm:ss');
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
       const todayStr = format(now, 'yyyy-MM-dd');
       const validBooking = data.find((b: any) => {
-        if (b.booking_date === todayStr && b.start_time < currentTimeStr) return false;
+        if (b.booking_date === todayStr && timeToMinutes(b.start_time || '00:00') < nowMinutes) return false;
         return true;
       });
 

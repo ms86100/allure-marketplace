@@ -14,7 +14,6 @@ export function useArrivalDetection(): ArrivalState {
   const watchIdRef = useRef<number | null>(null);
   const societyRef = useRef<{ lat: number; lng: number; radius: number } | null>(null);
 
-  // Haversine
   const getDistance = useCallback((lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371000;
     const toRad = (d: number) => (d * Math.PI) / 180;
@@ -27,7 +26,6 @@ export function useArrivalDetection(): ArrivalState {
   useEffect(() => {
     if (!user || !profile?.society_id) return;
 
-    // Fetch society coordinates
     (async () => {
       const { data } = await supabase
         .from('societies')
@@ -64,7 +62,6 @@ export function useArrivalDetection(): ArrivalState {
       });
     };
 
-    // Use Capacitor on native, web API otherwise
     if (Capacitor.isNativePlatform()) {
       (async () => {
         const { Geolocation } = await import('@capacitor/geolocation');
@@ -74,11 +71,19 @@ export function useArrivalDetection(): ArrivalState {
         watchIdRef.current = parseInt(id, 10);
       })();
     } else {
-      watchIdRef.current = navigator.geolocation.watchPosition(
-        checkPosition,
-        () => {},
-        { enableHighAccuracy: false, maximumAge: 60000, timeout: 10000 }
-      );
+      // Check permission before starting watch on web
+      if (navigator.permissions) {
+        navigator.permissions.query({ name: 'geolocation' }).then(result => {
+          if (result.state === 'granted') {
+            watchIdRef.current = navigator.geolocation.watchPosition(
+              checkPosition,
+              () => {},
+              { enableHighAccuracy: false, maximumAge: 60000, timeout: 10000 }
+            );
+          }
+          // If 'prompt' or 'denied', don't trigger the popup
+        }).catch(() => {});
+      }
     }
 
     return () => {

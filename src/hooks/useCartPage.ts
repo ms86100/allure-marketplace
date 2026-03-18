@@ -292,22 +292,7 @@ export function useCartPage() {
     }
 
     // COD flow — order is confirmed immediately
-    // Guard: check for existing pending unpaid orders to prevent duplicates
     setOrderStep('creating');
-    try {
-      const { data: existingPending } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('buyer_id', user.id)
-        .eq('payment_status', 'pending')
-        .in('status', ['pending', 'accepted', 'confirmed'] as any[])
-        .limit(1);
-      if (existingPending && existingPending.length > 0) {
-        toast.error('You have an unpaid order pending. Please complete or cancel it first.', { id: 'checkout-pending-exists' });
-        setIsPlacingOrder(false);
-        return;
-      }
-    } catch {}
     try {
       const orderIds = await createOrdersForAllSellers('pending');
       if (orderIds.length === 0) throw new Error('Failed to create orders');
