@@ -30,7 +30,12 @@ function getSmartEta(distance: number | null, dbEta: number | null): number | nu
   return dbEta;
 }
 
-function getProximityMessage(distance: number | null, eta: number | null): string {
+function getProximityMessage(distance: number | null, eta: number | null, proximityStatus: string | null): string {
+  // Use proximity_status from backend when available
+  if (proximityStatus === 'at_doorstep') return '🏠 At your doorstep!';
+  if (proximityStatus === 'arriving') return '🏃 Almost there!';
+  if (proximityStatus === 'nearby') return '📍 Arriving soon!';
+
   const smartEta = getSmartEta(distance, eta);
   if (distance !== null && distance < 50) return '🏠 At your doorstep!';
   if (distance !== null && distance < 200) return '🏃 Almost there!';
@@ -46,7 +51,7 @@ function getLastSeenText(lastLocationAt: string | null): string | null {
   if (!lastLocationAt) return null;
   const diffMs = Date.now() - new Date(lastLocationAt).getTime();
   const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return null; // Recent enough
+  if (diffMin < 1) return null;
   if (diffMin > 3) return `Last seen ${diffMin} min ago`;
   return null;
 }
@@ -91,7 +96,7 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView }: LiveDeliveryT
       {isBuyerView && isInTransit && (
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-center">
           <p className="text-sm font-semibold text-primary">
-            {getProximityMessage(tracking.distance, tracking.eta)}
+            {getProximityMessage(tracking.distance, tracking.eta, tracking.proximityStatus)}
           </p>
           {tracking.distance !== null && tracking.distance > 500 && (
             <p className="text-xs text-muted-foreground mt-1">

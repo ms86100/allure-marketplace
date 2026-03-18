@@ -1640,6 +1640,7 @@ export type Database = {
           partner_payout: number
           pickup_at: string | null
           platform_margin: number
+          proximity_status: string | null
           rider_id: string | null
           rider_name: string | null
           rider_phone: string | null
@@ -1677,6 +1678,7 @@ export type Database = {
           partner_payout?: number
           pickup_at?: string | null
           platform_margin?: number
+          proximity_status?: string | null
           rider_id?: string | null
           rider_name?: string | null
           rider_phone?: string | null
@@ -1714,6 +1716,7 @@ export type Database = {
           partner_payout?: number
           pickup_at?: string | null
           platform_margin?: number
+          proximity_status?: string | null
           rider_id?: string | null
           rider_name?: string | null
           rider_phone?: string | null

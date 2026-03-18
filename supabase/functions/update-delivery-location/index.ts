@@ -234,6 +234,7 @@ serve(async (req) => {
       last_location_lng: longitude,
       last_location_at: now,
       distance_meters: distanceMeters,
+      proximity_status: proximity,
     };
     if (!skipEtaUpdate && etaMinutes != null) {
       updateData.eta_minutes = etaMinutes;
