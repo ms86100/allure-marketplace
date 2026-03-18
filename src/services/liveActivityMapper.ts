@@ -11,9 +11,21 @@ const PROGRESS_DESCRIPTIONS: Record<string, string> = {
   on_the_way: 'Order On The Way',
 };
 
+/** Maps order status to a 0.0–1.0 progress value for the animated bar */
+const STATUS_PROGRESS: Record<string, number> = {
+  accepted: 0.10,
+  confirmed: 0.10,
+  preparing: 0.40,
+  ready: 0.75,
+  picked_up: 0.55,
+  on_the_way: 0.70,
+  en_route: 0.80,
+  delivered: 1.0,
+  completed: 1.0,
+};
+
 /**
  * Maps order status + delivery info into a meaningful progress stage string.
- * Returns null when the title alone is sufficient.
  */
 function mapProgressStage(
   status: string,
@@ -22,7 +34,6 @@ function mapProgressStage(
     rider_name?: string | null;
   } | null,
 ): string | null {
-  // For delivery statuses, enrich with rider/ETA info
   if ((status === 'en_route' || status === 'on_the_way' || status === 'picked_up') && delivery) {
     const parts: string[] = [];
     if (delivery.rider_name) parts.push(delivery.rider_name);
@@ -35,7 +46,7 @@ function mapProgressStage(
 
 /**
  * Builds a LiveActivityData payload from an order row and optional
- * delivery assignment data. Works without any React hooks.
+ * delivery assignment data.
  */
 export function buildLiveActivityData(
   order: {
@@ -48,6 +59,7 @@ export function buildLiveActivityData(
     rider_name?: string | null;
     vehicle_type?: string | null;
   } | null,
+  sellerName?: string | null,
 ): LiveActivityData {
   return {
     entity_type: 'order',
@@ -60,5 +72,7 @@ export function buildLiveActivityData(
     driver_name: delivery?.rider_name ?? null,
     vehicle_type: delivery?.vehicle_type ?? null,
     progress_stage: mapProgressStage(order.status, delivery),
+    progress_percent: STATUS_PROGRESS[order.status] ?? null,
+    seller_name: sellerName ?? null,
   };
 }
