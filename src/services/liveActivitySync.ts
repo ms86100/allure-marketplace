@@ -83,7 +83,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
       sellerIds.length > 0
         ? supabase
             .from('seller_profiles')
-            .select('id, business_name, logo_url')
+            .select('id, business_name, profile_image_url')
             .in('id', sellerIds)
         : Promise.resolve({ data: [] as any[] }),
       supabase
@@ -97,7 +97,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
       (deliveriesResult.data ?? []).map((d: any) => [d.order_id, d])
     );
     const sellerMap = new Map(
-      (sellersResult.data ?? []).map((s: any) => [s.id, { name: s.business_name, logo: s.logo_url }])
+      (sellersResult.data ?? []).map((s: any) => [s.id, { name: s.business_name, logo: s.profile_image_url }])
     );
     // Count items per order
     const itemCountMap = new Map<string, number>();

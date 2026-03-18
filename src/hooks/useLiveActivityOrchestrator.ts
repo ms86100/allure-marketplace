@@ -115,13 +115,13 @@ export function useLiveActivityOrchestrator(): void {
             .not('status', 'in', '("cancelled","failed")')
             .maybeSingle(),
           sellerId
-            ? supabase.from('seller_profiles').select('business_name, logo_url').eq('id', sellerId).maybeSingle()
+            ? supabase.from('seller_profiles').select('business_name, profile_image_url').eq('id', sellerId).maybeSingle()
             : Promise.resolve({ data: null }),
           supabase.from('order_items').select('id', { count: 'exact', head: true }).eq('order_id', orderId),
         ]);
         delivery = deliveryRes.data;
         sellerName = (sellerRes.data as any)?.business_name ?? null;
-        sellerLogoUrl = (sellerRes.data as any)?.logo_url ?? null;
+        sellerLogoUrl = (sellerRes.data as any)?.profile_image_url ?? null;
         itemCount = itemCountRes.count ?? null;
       } catch { /* best-effort */ }
 
@@ -224,13 +224,15 @@ export function useLiveActivityOrchestrator(): void {
         if (!order) return;
 
         let sellerName: string | null = null;
+        let sellerLogoUrl: string | null = null;
         if (order.seller_id) {
           const { data: seller } = await supabase
             .from('seller_profiles')
-            .select('business_name')
+            .select('business_name, profile_image_url')
             .eq('id', order.seller_id)
             .maybeSingle();
           sellerName = seller?.business_name ?? null;
+          sellerLogoUrl = seller?.profile_image_url ?? null;
         }
 
         console.log(TAG, `Delivery ${payload.eventType} for order ${order.id}: eta=${row.eta_minutes}, distance=${row.distance_meters}`);
@@ -240,7 +242,7 @@ export function useLiveActivityOrchestrator(): void {
           distance_meters: row?.distance_meters,
           rider_name: row?.rider_name,
           vehicle_type: null,
-        }, sellerName, itemCountRes.count ?? null, flowEntriesRef.current);
+        }, sellerName, itemCountRes.count ?? null, flowEntriesRef.current, sellerLogoUrl);
         await LiveActivityManager.push(data);
       } catch { /* best-effort */ }
     };

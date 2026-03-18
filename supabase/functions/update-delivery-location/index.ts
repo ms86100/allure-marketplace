@@ -16,11 +16,40 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-/** Proximity state based on distance */
-function getProximity(distanceMeters: number): 'at_doorstep' | 'arriving' | 'nearby' | 'en_route' {
-  if (distanceMeters < 50) return 'at_doorstep';
-  if (distanceMeters < 200) return 'arriving';
-  if (distanceMeters < 500) return 'nearby';
+/** Default proximity thresholds — overridden by DB values */
+const DEFAULT_PROXIMITY = {
+  at_doorstep: 50,
+  arriving: 200,
+  nearby: 500,
+};
+
+/** Load proximity thresholds from system_settings */
+async function loadProximityThresholds(
+  supabase: ReturnType<typeof createClient>,
+): Promise<typeof DEFAULT_PROXIMITY> {
+  try {
+    const { data } = await supabase
+      .from('system_settings')
+      .select('key, value')
+      .in('key', ['arrival_doorstep_distance_meters', 'arrival_overlay_distance_meters', 'proximity_nearby_distance_meters']);
+    if (!data || data.length === 0) return DEFAULT_PROXIMITY;
+    const map: Record<string, string> = {};
+    for (const r of data) if (r.key && r.value) map[r.key] = r.value;
+    return {
+      at_doorstep: Number(map.arrival_doorstep_distance_meters) || DEFAULT_PROXIMITY.at_doorstep,
+      arriving: Number(map.arrival_overlay_distance_meters) || DEFAULT_PROXIMITY.arriving,
+      nearby: Number(map.proximity_nearby_distance_meters) || DEFAULT_PROXIMITY.nearby,
+    };
+  } catch {
+    return DEFAULT_PROXIMITY;
+  }
+}
+
+/** Proximity state based on distance and thresholds */
+function getProximity(distanceMeters: number, thresholds: typeof DEFAULT_PROXIMITY): 'at_doorstep' | 'arriving' | 'nearby' | 'en_route' {
+  if (distanceMeters < thresholds.at_doorstep) return 'at_doorstep';
+  if (distanceMeters < thresholds.arriving) return 'arriving';
+  if (distanceMeters < thresholds.nearby) return 'nearby';
   return 'en_route';
 }
 
@@ -201,9 +230,12 @@ serve(async (req) => {
     let proximity: string = 'en_route';
     let skipEtaUpdate = false;
 
+    // Load DB-backed proximity thresholds
+    const proximityThresholds = await loadProximityThresholds(supabase);
+
     if (destLat && destLng) {
       distanceMeters = Math.round(haversineDistance(latitude, longitude, destLat, destLng));
-      proximity = getProximity(distanceMeters);
+      proximity = getProximity(distanceMeters, proximityThresholds);
 
       let historicalAvgMin: number | null = null;
       if ((speed_kmh == null || speed_kmh < 2) && sellerId) {
