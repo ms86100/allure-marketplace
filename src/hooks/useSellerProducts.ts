@@ -257,7 +257,7 @@ export function useSellerProducts() {
       }
       setIsDialogOpen(false); resetForm();
       if (sellerProfile) fetchData(sellerProfile.id);
-    } catch (error: any) { console.error('Error saving product:', error); toast.error(friendlyError(error)); }
+    } catch (error: any) { console.error('Error saving product:', error); toast.error(friendlyError(error), { id: 'product-save-error' }); }
     finally { setIsSaving(false); }
   };
 
