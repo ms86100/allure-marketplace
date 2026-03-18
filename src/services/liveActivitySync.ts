@@ -83,7 +83,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
       sellerIds.length > 0
         ? supabase
             .from('seller_profiles')
-            .select('id, business_name, logo_url')
+            .select('id, business_name, profile_image_url')
             .in('id', sellerIds)
         : Promise.resolve({ data: [] as any[] }),
       supabase
