@@ -1,8 +1,71 @@
 # Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Silent Push Optimization)
+## Status: COMPLETE (All Phases A–I + Blinkit Gap-Fill Phase 1)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+All 9 original phases plus Blinkit parity Phase 1 (APNs Push-to-Live-Activity) are fully implemented.
+
+## Blinkit Gap-Fill Status
+
+### Phase 1: APNs Push-to-Live-Activity — COMPLETE
+
+Live Activities now update even when the app process is killed by iOS, matching Blinkit's reliability.
+
+#### Architecture
+
+```
+Order status change → DB trigger → net.http_post → update-live-activity-apns edge function
+  → APNs push (apns-push-type: liveactivity) → iOS widget receives content-state update
+  → Lock screen / Dynamic Island re-renders
+```
+
+#### Implementation Details
+
+| Component | What Was Done |
+|-----------|---------------|
+| **DB table** | `live_activity_tokens` (user_id, order_id, push_token, platform) with RLS |
+| **Swift plugin** | `LiveActivityPlugin.swift` — requests activity with `pushType: .token`, observes `Activity.pushTokenUpdates`, emits `liveActivityPushToken` event to JS |
+| **LiveActivityManager.ts** | Listens for `liveActivityPushToken` events, upserts token to `live_activity_tokens` table, cleans up on activity end |
+| **Edge function** | `update-live-activity-apns` — receives order status + push token, fetches delivery data (ETA, distance, rider), builds `content-state` matching `LiveDeliveryAttributes.ContentState`, sends APNs push with `apns-push-type: liveactivity` |
+| **DB trigger** | `fn_enqueue_order_status_notification` updated — looks up LA token for order, invokes edge function via `net.http_post` if token exists. Cleans up tokens on terminal statuses. Also now includes `silent_push` and `image_url` in notification payload. |
+
+#### APNs Push Format
+
+```json
+{
+  "aps": {
+    "timestamp": 1710764400,
+    "event": "update",
+    "content-state": {
+      "workflowStatus": "on_the_way",
+      "etaMinutes": 5,
+      "driverDistance": 1.2,
+      "driverName": "Ravi",
+      "progressPercent": 0.7,
+      "sellerName": "Fresh Bakes",
+      "itemCount": 3
+    }
+  }
+}
+```
+
+### Previously Completed Blinkit Gaps
+
+| Feature | Status |
+|---------|--------|
+| Push deep-link routing | ✅ Done |
+| Notification grouping (threadId) | ✅ Done |
+| Rich push images (NSE) | ✅ Done |
+| Dynamic Island tap → order page | ✅ Done |
+| Item count in DI | ✅ Done |
+| GPS-derived progress | ✅ Done |
+
+### Phase 2: Live Map / Rider GPS — DEFERRED
+
+Requires rider-side GPS broadcasting infrastructure (separate product workstream).
+
+### Product Thumbnails in Widget — DEFERRED
+
+Low impact due to Apple's 4KB payload limit and unreliable `AsyncImage` in widgets.
 
 ## Silent Push Optimization: COMPLETE
 
