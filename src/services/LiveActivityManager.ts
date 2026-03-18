@@ -5,6 +5,36 @@ import { getString, setString, removeKey } from '@/lib/persistent-kv';
 import { recordLAError } from '@/services/liveActivityDiagnostics';
 
 const TAG = '[LiveActivity]';
+const OPS_LOG_KEY = 'live_activity_ops_log';
+const MAX_OPS_LOG = 50;
+
+export interface OperationLogEntry {
+  timestamp: number;
+  action: 'start' | 'update' | 'end' | 'end_all';
+  entityId: string;
+  status?: string;
+  success: boolean;
+  error?: string;
+  activityId?: string;
+}
+
+/** In-memory operation log, persisted to KV */
+const operationLog: OperationLogEntry[] = (() => {
+  try {
+    const raw = getString(OPS_LOG_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+})();
+
+function addOpsEntry(entry: OperationLogEntry) {
+  operationLog.push(entry);
+  if (operationLog.length > MAX_OPS_LOG) operationLog.splice(0, operationLog.length - MAX_OPS_LOG);
+  try { setString(OPS_LOG_KEY, JSON.stringify(operationLog)); } catch { /* best-effort */ }
+}
+
+export function getOperationLog(): OperationLogEntry[] {
+  return [...operationLog];
+}
 
 /** Terminal workflow statuses that should end any live activity */
 const TERMINAL_STATUSES = new Set([
