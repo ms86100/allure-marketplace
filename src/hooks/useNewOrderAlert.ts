@@ -173,14 +173,15 @@ export function useNewOrderAlert(sellerId: string | null) {
     return () => { supabase.removeChannel(channel); };
   }, [sellerId, handleNewOrder]);
 
-  // ── Polling fallback — never stops, always keeps a safety net ──
+  // ── Polling fallback — pauses when tab hidden, resumes on visible ──
   useEffect(() => {
     if (!sellerId) return;
 
     let cancelled = false;
+    let pausedByVisibility = false;
 
     const poll = async () => {
-      if (cancelled) return;
+      if (cancelled || pausedByVisibility) return;
       try {
         let query = supabase
           .from('orders')
