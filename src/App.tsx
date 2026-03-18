@@ -78,6 +78,7 @@ const HelpPage = lazyWithRetry(() => import("./pages/HelpPage"));
 const NotificationsPage = lazyWithRetry(() => import("./pages/NotificationsPage"));
 const CommunityRulesPage = lazyWithRetry(() => import("./pages/CommunityRulesPage"));
 const PushDebugPage = lazyWithRetry(() => import("./pages/PushDebugPage"));
+const LiveActivityDebugPage = lazyWithRetry(() => import("./pages/LiveActivityDebugPage"));
 const BulletinPage = lazyWithRetry(() => import("./pages/BulletinPage"));
 const MySubscriptionsPage = lazyWithRetry(() => import("./pages/MySubscriptionsPage"));
 const TrustDirectoryPage = lazyWithRetry(() => import("./pages/TrustDirectoryPage"));
