@@ -56,7 +56,9 @@ function computeDistanceEta(distanceMeters: number): number {
   return Math.max(1, Math.ceil(distanceMeters / 1000 * 4));
 }
 
-function getSmartEta(distance: number | null, dbEta: number | null, roadEta?: number | null): number | null {
+function getSmartEta(distance: number | null, dbEta: number | null, roadEta?: number | null, isLocationStale?: boolean): number | null {
+  // If location data is stale, don't trust any ETA
+  if (isLocationStale) return null;
   if (roadEta != null && roadEta > 0) return roadEta;
   if (distance !== null && distance < 500) {
     return computeDistanceEta(distance);
