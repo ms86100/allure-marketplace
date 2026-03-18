@@ -80,8 +80,11 @@ struct LiveDeliveryWidget: Widget {
                     }
                 }
             } compactLeading: {
-                Image(systemName: "bag.fill")
-                    .foregroundColor(.orange)
+                Image("SocivaIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 20, height: 20)
+                    .clipShape(Circle())
             } compactTrailing: {
                 if let eta = context.state.etaMinutes {
                     Text("\(eta)m")
@@ -89,8 +92,10 @@ struct LiveDeliveryWidget: Widget {
                         .bold()
                 }
             } minimal: {
-                Image(systemName: "bag.fill")
-                    .foregroundColor(.orange)
+                Image("SocivaIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(Circle())
             }
         }
     }
