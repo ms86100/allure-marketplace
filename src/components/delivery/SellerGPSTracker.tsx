@@ -1,17 +1,34 @@
 import { useBackgroundLocationTracking } from '@/hooks/useBackgroundLocationTracking';
-import { MapPin, Navigation, Loader2 } from 'lucide-react';
+import { Navigation, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useEffect, useState } from 'react';
 
 interface SellerGPSTrackerProps {
   assignmentId: string;
+  autoStart?: boolean;
 }
 
-export function SellerGPSTracker({ assignmentId }: SellerGPSTrackerProps) {
+export function SellerGPSTracker({ assignmentId, autoStart = true }: SellerGPSTrackerProps) {
   const { isTracking, permissionDenied, lastSentAt, startTracking, stopTracking } = useBackgroundLocationTracking(assignmentId);
+  const [now, setNow] = useState(Date.now());
+
+  // Auto-start GPS broadcasting on mount (Gap 5)
+  useEffect(() => {
+    if (autoStart && !isTracking && !permissionDenied) {
+      startTracking();
+    }
+  }, [autoStart]); // Only on mount — intentionally not tracking `isTracking`
+
+  // Live timer refresh (Gap 6)
+  useEffect(() => {
+    if (!isTracking) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [isTracking]);
 
   const lastSentText = lastSentAt
-    ? `Updated ${Math.round((Date.now() - lastSentAt) / 1000)}s ago`
+    ? `Updated ${Math.round((now - lastSentAt) / 1000)}s ago`
     : null;
 
   return (
@@ -41,7 +58,7 @@ export function SellerGPSTracker({ assignmentId }: SellerGPSTrackerProps) {
           disabled={permissionDenied}
           className="w-full bg-primary text-primary-foreground h-10 gap-2"
         >
-          <MapPin size={14} />
+          <Navigation size={14} />
           Start Sharing Location
         </Button>
       ) : (
