@@ -11,6 +11,8 @@ import { OrderRejectionDialog } from '@/components/order/OrderRejectionDialog';
 import { DeliveryStatusCard } from '@/components/delivery/DeliveryStatusCard';
 import { LiveDeliveryTracker } from '@/components/delivery/LiveDeliveryTracker';
 import { DeliveryArrivalOverlay } from '@/components/order/DeliveryArrivalOverlay';
+import { SellerGPSTracker } from '@/components/delivery/SellerGPSTracker';
+import { DeliveryMapView } from '@/components/delivery/DeliveryMapView';
 import { useDeliveryTracking } from '@/hooks/useDeliveryTracking';
 
 import { OrderItemCard } from '@/components/order/OrderItemCard';
