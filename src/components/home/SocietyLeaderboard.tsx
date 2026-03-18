@@ -171,7 +171,7 @@ export function SocietyLeaderboard() {
                     onClick={() => navigate(`/seller/${s.id}`)}
                   >
                     <div className="p-3 text-center space-y-1">
-                      <span className="text-lg">{medals[rank]}</span>
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white mx-auto" style={{ backgroundColor: rankColors[rank] }}>{rank + 1}</span>
                       {s.profile_image_url ? (
                         <img src={s.profile_image_url} alt="" className="w-10 h-10 rounded-full mx-auto object-cover" />
                       ) : (
