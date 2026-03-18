@@ -29,6 +29,7 @@ import {
   Award,
   Building2,
   Bug,
+  Activity,
 } from 'lucide-react';
 import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
 import { NotificationHealthCheck } from '@/components/notifications/NotificationHealthCheck';
