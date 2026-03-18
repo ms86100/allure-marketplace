@@ -1,49 +1,104 @@
-# Smart Phone-Native Capabilities — Final Audit Status
 
-## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Duplicate Activity Hardening)
 
-All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
+## Root Cause Found
 
-## Phase I Live Activities — CI Pipeline Status
+The `SocivaBridgeViewController` approach is correct in theory, but it depends on a fragile `sed` replacement in `Main.storyboard`:
 
-### Codemagic Build Pipeline: COMPLETE
-
-Both `ios-release` and `release-all` workflows now include:
-
-| Step | Description |
-|---|---|
-| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
-| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
-| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
-| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
-| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
-| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
-| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
-| IPA validation | Verifies widget extension `.appex` exists in final IPA |
-
-### Codemagic Requirements (User Action)
-
-In App Store Connect, register the widget extension bundle ID:
-- `app.sociva.community.LiveDeliveryWidget`
-
-### Runtime Call Chain (Verified)
-
-```
-Order status change → useLiveActivity hook → LiveActivityManager.push()
-  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
-  → On web: silent no-op
+```bash
+sed -i '' 's/customClass="CAPBridgeViewController"/customClass="SocivaBridgeViewController"/g' "$STORYBOARD"
 ```
 
-## Implementation Matrix
+**If Capacitor 8's generated storyboard does not contain the exact string `customClass="CAPBridgeViewController"`** (e.g., it uses no customClass at all, or a different format), the `sed` silently does nothing. The app continues using the default `CAPBridgeViewController`, `SocivaBridgeViewController` is never instantiated, and `registerPluginInstance` never runs.
 
-| Phase | Feature | Status |
-|---|---|---|
-| A | Enhanced Delivery Proximity | Implemented |
-| B | Multi-Interval Booking Reminders | Implemented |
-| C | Predictive Ordering Engine | Implemented |
-| D | One-Tap Server-Side Reorder | Implemented |
-| E | Historical ETA Intelligence | Implemented |
-| F | Smart Arrival Detection | Implemented |
-| G | Smart Delay Detection | Implemented |
-| H | Notification Payload Standardization | Implemented |
-| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
+Your Codemagic logs confirmed the plugin files copy succeeded, but you did not share the storyboard patch output -- it likely printed `"⚠️ Main.storyboard not found"` or the sed matched nothing.
+
+---
+
+## Fix: Guaranteed Registration via AppDelegate (No Storyboard Dependency)
+
+### Changes to `codemagic.yaml`
+
+#### 1. `ios-release` workflow -- Patch AppDelegate step (lines 123-173)
+
+Add notification-based plugin registration directly inside `AppDelegate.swift` so it works regardless of storyboard:
+
+```swift
+import UIKit
+import Capacitor
+import FirebaseCore
+
+@UIApplicationMain
+class AppDelegate: UIResponder, UIApplicationDelegate {
+    var window: UIWindow?
+
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        FirebaseApp.configure()
+        
+        // Register app-local plugins after Capacitor bridge loads
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(capacitorBridgeDidLoad(_:)),
+            name: NSNotification.Name("CAPBridgeViewControllerDidLoad"),  // or .capacitorDidLoad
+            object: nil
+        )
+        
+        return true
+    }
+    
+    @objc func capacitorBridgeDidLoad(_ notification: Notification) {
+        guard let bridge = notification.object as? CAPBridge else {
+            print("⚠️ capacitorBridgeDidLoad: notification.object is not CAPBridge")
+            return
+        }
+        bridge.registerPluginInstance(LiveActivityPlugin())
+        print("✅ LiveActivityPlugin REGISTERED via AppDelegate notification")
+    }
+    
+    // ... existing URL handling, APNs forwarding unchanged
+}
+```
+
+**Keep the SocivaBridgeViewController + storyboard patch as secondary insurance**, but the AppDelegate notification is the primary guaranteed path.
+
+#### 2. Add storyboard verification step
+
+After the storyboard patch, add a diagnostic step:
+
+```bash
+echo "=== Storyboard contents after patch ==="
+cat "$STORYBOARD" 2>/dev/null || echo "File not found"
+grep -o 'customClass="[^"]*"' "$STORYBOARD" 2>/dev/null || echo "No customClass found in storyboard"
+```
+
+This will show in Codemagic logs whether the storyboard patch actually matched.
+
+#### 3. Fix `release-all` workflow (lines 834-881)
+
+The `release-all` workflow's "Patch AppDelegate" step is **missing the SocivaBridgeViewController and notification registration entirely**. Add the same AppDelegate notification registration there too.
+
+#### 4. Add build verification step
+
+Add a step before `Build iOS app` that confirms the plugin will be discoverable:
+
+```bash
+# Verify LiveActivityPlugin registration is in the binary
+grep -q "registerPluginInstance" ios/App/App/AppDelegate.swift && echo "✅ Plugin registration in AppDelegate" || echo "❌ MISSING plugin registration"
+grep -q "registerPluginInstance" ios/App/App/SocivaBridgeViewController.swift && echo "✅ Plugin registration in BridgeVC" || echo "❌ MISSING BridgeVC registration"
+```
+
+---
+
+## Why This Works
+
+- `NotificationCenter` does not depend on storyboard class names
+- It fires when `CAPBridgeViewController.viewDidLoad()` runs, regardless of whether the VC is the default or a subclass
+- The plugin instance is registered directly on the bridge object
+- Works in both `ios-release` and `release-all` workflows
+
+## Expected Result
+
+After one more Codemagic build:
+- Device logs show: `✅ LiveActivityPlugin REGISTERED via AppDelegate notification`
+- `/la-debug` shows: Plugin Available ✅, getActivities Works ✅
+
