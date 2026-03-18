@@ -410,7 +410,7 @@ Deno.serve(async (req) => {
           );
 
           // If APNs fails and we have a real FCM token, fall back to FCM
-          if (!result.success && result.error !== "INVALID_TOKEN" && !isApnsOnlyToken) {
+           if (!result.success && result.error !== "INVALID_TOKEN" && !isApnsOnlyToken) {
             console.log(`[Push] APNs failed, falling back to FCM`);
             result = await sendFCMNotification(
               accessToken,
@@ -418,7 +418,9 @@ Deno.serve(async (req) => {
               tokenRecord.token,
               title,
               body,
-              data
+              data,
+              threadId,
+              imageUrl,
             );
           }
         } else if (isApnsOnlyToken) {
