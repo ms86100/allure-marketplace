@@ -74,12 +74,16 @@ export async function syncActiveOrders(userId: string): Promise<number> {
     const sellerIds = [...new Set(orders.map((o) => o.seller_id).filter(Boolean))];
 
     // Fetch deliveries, seller names, item counts, and status flows in parallel
+    // Build dynamic exclusion filter from DB-backed terminal statuses
+    const terminalStatuses = [...await getTerminalStatuses()];
+    const terminalFilter = `(${terminalStatuses.map(s => `"${s}"`).join(',')})`;
+
     const [deliveriesResult, sellersResult, itemCountsResult, flowEntries] = await Promise.all([
       supabase
         .from('delivery_assignments')
         .select('order_id, eta_minutes, distance_meters, rider_name')
         .in('order_id', orderIds)
-        .not('status', 'in', '("cancelled","failed")'),
+        .not('status', 'in', terminalFilter),
       sellerIds.length > 0
         ? supabase
             .from('seller_profiles')
