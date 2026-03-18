@@ -2910,6 +2910,36 @@ export type Database = {
           },
         ]
       }
+      live_activity_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          platform: string
+          push_token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          platform?: string
+          push_token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          platform?: string
+          push_token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       maintenance_dues: {
         Row: {
           amount: number
