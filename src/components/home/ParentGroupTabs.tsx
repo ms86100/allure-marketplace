@@ -47,7 +47,12 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
             key={tab.value}
             onClick={() => {
               hapticSelection();
-              onGroupChange(tab.value === '__all__' ? null : tab.value);
+              // Toggle off if already active, otherwise select
+              if (tab.value === '__all__') {
+                onGroupChange(null);
+              } else {
+                onGroupChange(activeGroup === tab.value ? null : tab.value);
+              }
             }}
             className="shrink-0 flex flex-col items-center gap-1.5 transition-all duration-200 group"
           >
@@ -76,7 +81,7 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
             {/* Label */}
             <span
               className={cn(
-                'text-[10px] font-bold leading-tight text-center max-w-[60px] truncate',
+                'text-[10px] font-bold leading-tight text-center w-16 line-clamp-2',
                 isActive ? 'text-primary' : 'text-muted-foreground'
               )}
             >

@@ -115,7 +115,7 @@ export function AutoHighlightStrip() {
     enabled: !!effectiveSocietyId,
   });
 
-  if (isLoading || highlights.length === 0) return null;
+  if (!effectiveSocietyId || isLoading || highlights.length === 0) return null;
 
   return (
     <div className="my-4">
