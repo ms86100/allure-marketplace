@@ -162,7 +162,7 @@ export function useCartPage() {
       const fresh = freshPrices?.find(p => p.id === item.product_id);
       return fresh && Math.abs(fresh.price - (item.product?.price || 0)) > 0.01;
     });
-    if (priceMismatch) { toast.error('Some item prices have changed. Refreshing your cart...'); await refresh(); throw new Error('Price mismatch detected'); }
+    if (priceMismatch) { toast.error('Some item prices have changed. Refreshing your cart...', { id: 'checkout-price-mismatch' }); await refresh(); throw new Error('Price mismatch detected'); }
 
     const deliveryAddressText = fulfillmentType === 'delivery' && selectedDeliveryAddress
       ? [selectedDeliveryAddress.flat_number && `Flat ${selectedDeliveryAddress.flat_number}`, selectedDeliveryAddress.block && `Block ${selectedDeliveryAddress.block}`, selectedDeliveryAddress.building_name, selectedDeliveryAddress.landmark].filter(Boolean).join(', ')
@@ -206,7 +206,7 @@ export function useCartPage() {
 
       const stillPending = existingOrders?.filter(o => o.status !== 'cancelled' && o.payment_status !== 'paid' && o.payment_status !== 'buyer_confirmed');
       if (stillPending && stillPending.length > 0) {
-        toast.error('You have a pending payment. Please complete or cancel it first.');
+        toast.error('You have a pending payment. Please complete or cancel it first.', { id: 'checkout-pending' });
         // Re-open the UPI payment sheet
         setPendingOrderIds(stillPending.map(o => o.id));
         if (paymentMethod === 'upi' && paymentMode.isUpiDeepLink) {
@@ -220,14 +220,14 @@ export function useCartPage() {
     }
 
     const selfSellerGroup = sellerGroups.find(g => { const sellerUserId = (g.items[0]?.product?.seller as any)?.user_id; return sellerUserId && sellerUserId === user.id; });
-    if (selfSellerGroup) { toast.error("You cannot place an order from your own store."); return; }
-    if (!navigator.onLine) { toast.error("You're offline. Please check your connection and try again."); return; }
-    if (fulfillmentType === 'delivery' && !selectedDeliveryAddress) { toast.error('Please select a delivery address before placing your order.'); return; }
-    if (fulfillmentType === 'delivery' && selectedDeliveryAddress && !selectedDeliveryAddress.latitude) { toast.error('Your selected address has no location coordinates. Please update it with a precise location.'); return; }
+    if (selfSellerGroup) { toast.error("You cannot place an order from your own store.", { id: 'checkout-self-order' }); return; }
+    if (!navigator.onLine) { toast.error("You're offline. Please check your connection and try again.", { id: 'checkout-offline' }); return; }
+    if (fulfillmentType === 'delivery' && !selectedDeliveryAddress) { toast.error('Please select a delivery address before placing your order.', { id: 'checkout-no-address' }); return; }
+    if (fulfillmentType === 'delivery' && selectedDeliveryAddress && !selectedDeliveryAddress.latitude) { toast.error('Your selected address has no location coordinates. Please update it with a precise location.', { id: 'checkout-no-coords' }); return; }
 
     for (const group of sellerGroups) {
       const minOrder = (group.items[0]?.product?.seller as any)?.minimum_order_amount;
-      if (minOrder && group.subtotal < minOrder) { toast.error(`${group.sellerName} requires a minimum order of ${formatPrice(minOrder)}. Your current total is ${formatPrice(group.subtotal)}.`); return; }
+      if (minOrder && group.subtotal < minOrder) { toast.error(`${group.sellerName} requires a minimum order of ${formatPrice(minOrder)}. Your current total is ${formatPrice(group.subtotal)}.`, { id: 'checkout-min-order' }); return; }
     }
 
     setIsPlacingOrder(true);
@@ -239,7 +239,7 @@ export function useCartPage() {
       if (freshError) throw freshError;
 
       const unavailable = items.filter(item => { const fresh = freshProducts?.find(p => p.id === item.product_id); return !fresh || !fresh.is_available || fresh.approval_status !== 'approved'; });
-      if (unavailable.length > 0) { toast.error(`Some items are no longer available: ${unavailable.map(i => i.product?.name || 'Unknown').join(', ')}. Please remove them and try again.`); await refresh(); setIsPlacingOrder(false); return; }
+      if (unavailable.length > 0) { toast.error(`Some items are no longer available: ${unavailable.map(i => i.product?.name || 'Unknown').join(', ')}. Please remove them and try again.`, { id: 'checkout-unavailable' }); await refresh(); setIsPlacingOrder(false); return; }
 
       const closedSellers: string[] = [];
       for (const group of sellerGroups) {
@@ -249,10 +249,10 @@ export function useCartPage() {
           if (availability.status !== 'open') closedSellers.push(`${group.sellerName} (${formatStoreClosedMessage(availability) || 'closed'})`);
         }
       }
-      if (closedSellers.length > 0) { toast.error(`Cannot place order — ${closedSellers.join(', ')} ${closedSellers.length === 1 ? 'is' : 'are'} currently closed. Please remove those items or try again later.`); setIsPlacingOrder(false); return; }
-    } catch (err) { console.error('Pre-checkout validation failed:', err); toast.error('Could not verify item availability. Please try again.'); setIsPlacingOrder(false); return; }
+      if (closedSellers.length > 0) { toast.error(`Cannot place order — ${closedSellers.join(', ')} ${closedSellers.length === 1 ? 'is' : 'are'} currently closed. Please remove those items or try again later.`, { id: 'checkout-closed' }); setIsPlacingOrder(false); return; }
+    } catch (err) { console.error('Pre-checkout validation failed:', err); toast.error('Could not verify item availability. Please try again.', { id: 'checkout-validation' }); setIsPlacingOrder(false); return; }
 
-    if (paymentMethod === 'cod' && !acceptsCod) { toast.error('This seller does not accept Cash on Delivery. Please select UPI.'); setIsPlacingOrder(false); return; }
+    if (paymentMethod === 'cod' && !acceptsCod) { toast.error('This seller does not accept Cash on Delivery. Please select UPI.', { id: 'checkout-no-cod' }); setIsPlacingOrder(false); return; }
 
     if (paymentMethod === 'upi') {
       if (!acceptsUpi) { toast.error('UPI payment not available for this seller', { id: 'upi-unavailable' }); setIsPlacingOrder(false); return; }
@@ -277,7 +277,7 @@ export function useCartPage() {
         } else {
           setShowRazorpayCheckout(true);
         }
-      } catch (error: any) { console.error('Error creating orders:', error); toast.error(friendlyError(error)); }
+      } catch (error: any) { console.error('Error creating orders:', error); toast.error(friendlyError(error), { id: 'checkout-create-error' }); }
       finally { setIsPlacingOrder(false); }
       return;
     }
@@ -291,9 +291,9 @@ export function useCartPage() {
       clearCart(); await refresh(); hapticNotification('success');
       requestFullPermission().catch(() => {});
       supabase.functions.invoke('process-notification-queue').catch(() => {});
-      if (orderIds.length === 1) { toast.success('Order placed successfully!'); navigate(`/orders/${orderIds[0]}`); }
-      else { toast.success(`${orderIds.length} orders placed successfully!`); navigate('/orders'); }
-    } catch (error: any) { console.error('Error placing order:', error); toast.error(friendlyError(error)); }
+      if (orderIds.length === 1) { toast.success('Order placed successfully!', { id: 'order-placed' }); navigate(`/orders/${orderIds[0]}`); }
+      else { toast.success(`${orderIds.length} orders placed successfully!`, { id: 'order-placed' }); navigate('/orders'); }
+    } catch (error: any) { console.error('Error placing order:', error); toast.error(friendlyError(error), { id: 'checkout-error' }); }
     finally { setIsPlacingOrder(false); }
   };
 
@@ -305,8 +305,8 @@ export function useCartPage() {
     if (targetOrderId) {
       let confirmed = false;
       for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1500)); const { data } = await supabase.from('orders').select('payment_status').eq('id', targetOrderId).single(); if (data?.payment_status === 'paid') { confirmed = true; break; } }
-      if (!confirmed) toast.info('Payment is being verified. Your order will update shortly.');
-      else toast.success('Payment successful! Order placed.');
+      if (!confirmed) toast.info('Payment is being verified. Your order will update shortly.', { id: 'razorpay-verifying' });
+      else toast.success('Payment successful! Order placed.', { id: 'razorpay-success' });
     }
     supabase.functions.invoke('process-notification-queue').catch(() => {});
     // Clear cart and payment session ONLY after payment success
@@ -318,16 +318,16 @@ export function useCartPage() {
 
   const handleRazorpayFailed = async () => {
     setShowRazorpayCheckout(false);
-    if (!user?.id) { toast.error('Session expired. Please sign in again.'); setPendingOrderIds([]); clearPaymentSession(); return; }
+    if (!user?.id) { toast.error('Session expired. Please sign in again.', { id: 'checkout-session' }); setPendingOrderIds([]); clearPaymentSession(); return; }
     if (pendingOrderIds.length > 0) {
       const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
-      if (recheckOrder?.payment_status === 'paid') { toast.success('Payment verified! Your order is confirmed.'); clearCart(); await refresh(); clearPaymentSession(); navigate(`/orders/${pendingOrderIds[0]}`); setPendingOrderIds([]); return; }
+      if (recheckOrder?.payment_status === 'paid') { toast.success('Payment verified! Your order is confirmed.', { id: 'razorpay-verified' }); clearCart(); await refresh(); clearPaymentSession(); navigate(`/orders/${pendingOrderIds[0]}`); setPendingOrderIds([]); return; }
       try { await supabase.from('orders').update({ status: 'cancelled' } as any).in('id', pendingOrderIds).eq('payment_status', 'pending').eq('buyer_id', user.id); } catch (err) { console.error('Failed to cancel unpaid orders:', err); }
     }
     setPendingOrderIds([]);
     clearPaymentSession();
     // Do NOT clear cart on payment failure — user can retry
-    toast.error('Payment was not completed. Your order has been cancelled. You can try again.');
+    toast.error('Payment was not completed. Your order has been cancelled. You can try again.', { id: 'razorpay-failed' });
   };
 
   const handleUpiDeepLinkSuccess = async () => {
@@ -342,7 +342,7 @@ export function useCartPage() {
 
   const handleUpiDeepLinkFailed = async () => {
     setShowUpiDeepLink(false);
-    if (!user?.id) { toast.error('Session expired.'); setPendingOrderIds([]); clearPaymentSession(); return; }
+    if (!user?.id) { toast.error('Session expired.', { id: 'checkout-session' }); setPendingOrderIds([]); clearPaymentSession(); return; }
     if (pendingOrderIds.length > 0) {
       // Check if payment was actually completed before cancelling
       const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
