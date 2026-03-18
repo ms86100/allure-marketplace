@@ -255,7 +255,10 @@ export function useCartPage() {
     if (paymentMethod === 'cod' && !acceptsCod) { toast.error('This seller does not accept Cash on Delivery. Please select UPI.'); setIsPlacingOrder(false); return; }
 
     if (paymentMethod === 'upi') {
-      if (!acceptsUpi) { toast.error('UPI payment not available for this seller'); setIsPlacingOrder(false); return; }
+      if (!acceptsUpi) { toast.error('UPI payment not available for this seller', { id: 'upi-unavailable' }); setIsPlacingOrder(false); return; }
+      // Pre-validate seller UPI ID before creating orders
+      const firstSeller = sellerGroups[0]?.items[0]?.product?.seller as any;
+      if (!firstSeller?.upi_id) { toast.error('This seller is not accepting UPI payments right now', { id: 'upi-no-id' }); setIsPlacingOrder(false); return; }
       setOrderStep('creating');
       try {
         const orderIds = await createOrdersForAllSellers('pending');
