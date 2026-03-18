@@ -57,6 +57,7 @@ export const initialAuthState: AuthState = {
   sellerProfiles: [],
   currentSellerId: null,
   isLoading: true,
+  isSessionRestored: false,
   isSecurityOfficer: false,
   isWorker: false,
   societyAdminRole: null,
