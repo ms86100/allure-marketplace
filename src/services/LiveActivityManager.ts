@@ -92,6 +92,9 @@ class _LiveActivityManager {
   /** Promise-based hydration lock — all concurrent callers await the same promise */
   private hydrationPromise: Promise<void> | null = null;
 
+  /** In-flight start lock — prevents concurrent startLiveActivity calls for the same entity */
+  private starting = new Set<string>();
+
   /** Set during hydration — if native plugin is unavailable, skip all starts */
   private canStart = true;
 
