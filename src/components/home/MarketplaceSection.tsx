@@ -315,6 +315,7 @@ function ProductListings({
   badgeConfigs?: any[];
   socialProofMap?: Map<string, number>;
 }) {
+  const ml = useMarketplaceLabels();
   if (isLoading) {
     return (
       <div className="px-4 space-y-5 mt-4">
