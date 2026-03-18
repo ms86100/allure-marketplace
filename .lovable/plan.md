@@ -1,145 +1,93 @@
+# Smart Phone-Native Capabilities — Final Audit Status
 
+## Status: COMPLETE (All Phases A–I Implemented + CI Pipeline + Silent Push Optimization)
 
-# Zero-Cron Real-Time Failure Audit — Final Results
+All 9 phases are fully implemented. Phase I Live Activities now includes automated CI build pipeline via Codemagic.
 
-## Audit Summary
+## Silent Push Optimization: COMPLETE
 
-| Component | Real-time? | Cron dep? | Polling dep? | Silent failure? | Status |
-|-----------|-----------|-----------|-------------|----------------|--------|
-| Push trigger (INSERT → edge fn) | Yes | No | No | No | **PASS** |
-| Push inline retry (edge fn) | Yes (inline) | No | No | No | **PASS** |
-| Live Activity (realtime sub) | Yes | No | No | No | **PASS** |
-| Live Activity (app resume) | Yes (one-shot) | No | No | No | **PASS** |
-| Cron job (process-notification-queue) | N/A | N/A | N/A | N/A | **REMOVED** |
-| Seller new-order alert polling | N/A | No | Yes | No | **OUT OF SCOPE** |
+### What It Does
+Reduces push notification noise for mid-flow order statuses when Live Activity is already tracking the order on the lock screen. In-app notification history and badge counts are always preserved.
 
----
+### Notification Matrix
 
-## Phase 1: Push Notification Pipeline — PASS
+| Status | Push? | Live Activity? | Rationale |
+|--------|-------|----------------|-----------|
+| `accepted` | ✅ Always | Yes | Critical — order confirmed |
+| `preparing` | 🔇 Silent | Yes | Mid-flow, Live Activity handles it |
+| `ready` | ✅ Always | Yes | Pickup moment — user must know |
+| `picked_up` | 🔇 Silent | Yes | Mid-flow tracking |
+| `on_the_way` | 🔇 Silent | Yes | Mid-flow tracking |
+| `arrived` | 🔇 Silent | Yes | Live Activity shows on lock screen |
+| `delivered` | ✅ Always | Yes | Critical endpoint |
+| `completed` | ✅ Always | No | Critical endpoint |
+| `cancelled` | ✅ Always | No | Critical — must alert |
+| All service/booking | ✅ Always | No | No Live Activity for these |
 
-**Flow verified:**
-```text
-order.status UPDATE
-  → fn_enqueue_order_status_notification() [trigger]
-    → INSERT into notification_queue
-      → trg_process_notification_queue_realtime [AFTER INSERT trigger]
-        → net.http_post → process-notification-queue edge function
-          → inline retry (3 attempts, 2s/5s delays)
-            → send-push-notification edge function → APNs/FCM → device
+### Implementation
+
+1. **DB column**: `category_status_flows.silent_push` (boolean, default false)
+2. **DB trigger**: `fn_enqueue_order_status_notification` includes `silent_push` in notification payload
+3. **Edge function**: `process-notification-queue` skips APNs/FCM delivery when `silent_push = true`, but still inserts `user_notifications` for in-app history
+
+## Phase I Live Activities — CI Pipeline Status
+
+### Codemagic Build Pipeline: COMPLETE
+
+Both `ios-release` and `release-all` workflows now include:
+
+| Step | Description |
+|---|---|
+| Copy native plugin files | Copies `LiveActivityPlugin.swift` + `LiveDeliveryActivity.swift` into `ios/App/App/` and adds to App target via xcodeproj |
+| Create Widget Extension | Programmatically creates `LiveDeliveryWidgetExtension` target using Ruby xcodeproj gem |
+| ActivityKit entitlements | Adds `com.apple.developer.activitykit` to both App and widget extension entitlements |
+| NSSupportsLiveActivities | Sets `NSSupportsLiveActivities = true` in Info.plist |
+| Deployment target 16.1 | All targets set to iOS 16.1 (required for ActivityKit) |
+| Widget signing | Fetches signing files for `app.sociva.community.LiveDeliveryWidget` |
+| Plugin registration | AppDelegate registers `LiveActivityPlugin` with `#available(iOS 16.1, *)` guard |
+| IPA validation | Verifies widget extension `.appex` exists in final IPA |
+
+### Codemagic Requirements (User Action)
+
+In App Store Connect, register the widget extension bundle ID:
+- `app.sociva.community.LiveDeliveryWidget`
+
+### Runtime Call Chain (Verified)
+
+```
+Order status change → useLiveActivity hook → LiveActivityManager.push()
+  → LiveActivity.startLiveActivity/update/end → Native Plugin Bridge → iOS ActivityKit
+  → On web: silent no-op
 ```
 
-**Trigger function** (`20260318101405`): Has `EXCEPTION WHEN OTHERS THEN RETURN NEW` — INSERT never rolls back on HTTP failure. Uses correct project URL and anon key. Has `SET search_path TO 'public'` and `SECURITY DEFINER`.
+## Implementation Matrix
 
-**Edge function**: Claims batch via `claim_notification_queue` RPC (atomic). Inline retry with 3 attempts and 2s/5s delays. Dead-letters on final failure with `status = 'failed'` and `last_error` populated. No cron dependency.
+| Phase | Feature | Status |
+|---|---|---|
+| A | Enhanced Delivery Proximity | Implemented |
+| B | Multi-Interval Booking Reminders | Implemented |
+| C | Predictive Ordering Engine | Implemented |
+| D | One-Tap Server-Side Reorder | Implemented |
+| E | Historical ETA Intelligence | Implemented |
+| F | Smart Arrival Detection | Implemented |
+| G | Smart Delay Detection | Implemented |
+| H | Notification Payload Standardization | Implemented |
+| I | Lock Screen Live Activities | Implemented (CI pipeline complete) |
 
-**Verdict: No loss, no delay, no cron dependency. PASS.**
+## Reality-Check Audit Fixes (Round 4)
 
----
+### Fix 1: Live Activity Deduplication — COMPLETE
 
-## Phase 2: Cron and Polling Elimination — PASS
+| Layer | Fix |
+|-------|-----|
+| **Swift native** | `startLiveActivity` now checks for existing activity with same `entityId` before `Activity.request()`. If found, updates it and returns existing `activity.id` instead of creating a duplicate. |
+| **LiveActivityManager** | Added `hydrating` flag; `resetHydration()` is now a no-op while hydration is actively running, preventing the poll timer from racing with app-resume sync. |
+| **liveActivitySync** | Added `syncing` mutex flag to prevent concurrent `syncActiveOrders` calls from overlapping. |
+| **Orchestrator** | App-resume handler now pauses the poll timer before syncing, then resumes it after sync completes. |
 
-**Cron jobs:**
-- `process-notification-queue`: Unscheduled in migration `20260318101405` via `SELECT cron.unschedule(...)`. Originally pointed to wrong project URL anyway (dead code). **REMOVED.**
-- Other cron jobs (booking reminders, slot generation, trust scores, maintenance notifications) are legitimate scheduled tasks unrelated to push notifications or live activities. They stay.
+### Fix 2: Toast Conflict Prevention — COMPLETE
 
-**Polling in buyer-side code:**
-- `useLiveActivityOrchestrator.ts`: No `setInterval`. Only one-shot sync on mount and app resume. **PASS.**
-- `liveActivitySync.ts`: Called on-demand only (mount, resume). No timer. **PASS.**
-
-**Polling in seller-side code (out of scope but noted):**
-- `useNewOrderAlert.ts` lines 176-235: Has exponential-backoff polling (3s-30s) as safety net alongside realtime subscription. This is seller-side only and by design (per memory: "persistent exponential-backoff polling safety net that never terminates"). Not a buyer-side concern.
-
-**System works correctly with cron disabled and no polling on buyer side. PASS.**
-
----
-
-## Phase 3: Live Activity Real-Time Behavior — PASS
-
-**Flow:**
-```text
-orders.status UPDATE → Supabase Realtime → orchestrator → LiveActivityManager.push()
-delivery_assignments INSERT/UPDATE → Supabase Realtime → orchestrator → LiveActivityManager.push()
-```
-
-- No polling fallback (removed in previous commit, line 204 confirms: "Polling fallback removed")
-- One activity per order: Swift native dedup + JS `starting` Set + hydration lock
-- Updated in place: `throttledUpdate` with 5s coalesce
-- Never recreated on navigation: `useLiveActivity.ts` deleted (was dead code)
-- App resume: one-shot `syncActiveOrders` reconciliation (not polling)
-
-**ACTIVE_STATUSES** in `liveActivitySync.ts`: `accepted, preparing, ready, picked_up, on_the_way, arrived, confirmed`. The `arrived` status was added in the previous fix. `en_route` is not a DB enum value (mapped to `on_the_way` in the DB).
-
-**PASS.**
-
----
-
-## Phase 4: Silent Failure Detection — PASS
-
-| Scenario | Handled? | How |
-|----------|----------|-----|
-| `net.http_post` fails in trigger | Yes | `EXCEPTION WHEN OTHERS THEN RETURN NEW` — notification saved, push attempted next time edge fn fires |
-| Edge function push fails | Yes | 3 inline retries, then dead-lettered with error in `last_error` |
-| Realtime channel drops | Yes | Logged as warning. App resume re-syncs. No silent degradation to polling |
-| In-app notification duplicate | Yes | `queue_item_id` unique constraint prevents re-insert on retry |
-
-**No silent failures identified. PASS.**
-
----
-
-## Phase 5: State Consistency — PASS
-
-| Layer | Source of Truth | Sync Mechanism |
-|-------|----------------|----------------|
-| Database | `orders.status`, `notification_queue` | Authoritative |
-| Notifications | `user_notifications` (via edge fn) | Idempotent insert with `queue_item_id` dedup |
-| Live Activity | `LiveActivityManager.active` Map + native `Activity.activities` | Reconciled on mount/resume via `syncActiveOrders` |
-| UI | Supabase Realtime subscriptions | Direct from DB changes |
-
-No divergence paths identified. Database is single source of truth.
-
----
-
-## Phase 6: Failure Mode Simulation — PASS
-
-| Failure | Result |
-|---------|--------|
-| Edge function failure | 3 inline retries within same invocation. Dead-letter on failure. Error visible in `notification_queue.last_error` |
-| Network failure (device offline) | Realtime events queue in Supabase channel. App resume triggers `syncActiveOrders` to reconcile |
-| Realtime channel drop | Logged as warning. No fallback to polling. App resume rehydrates |
-
----
-
-## Phase 7: Duplication and Race Conditions — PASS
-
-| Scenario | Protection |
-|----------|-----------|
-| Rapid status updates | 5s throttle in `LiveActivityManager` coalesces |
-| Concurrent push processing | `claim_notification_queue` RPC atomically claims batch |
-| App background/resume | `syncing` mutex prevents concurrent `syncActiveOrders`. `resetHydration()` + one-shot sync |
-| Duplicate push to same device | `apns_token` dedup in `send-push-notification` edge fn |
-| Duplicate in-app notification | `queue_item_id` unique constraint on `user_notifications` |
-
----
-
-## Stale Comment (Cosmetic, Non-blocking)
-
-`useLiveActivityOrchestrator.ts` lines 23-27 still reference "Polling fallback" and "Shared syncActiveOrders for mount/resume/poll" in the JSDoc comment, but polling was removed. This is misleading documentation but has no runtime impact.
-
----
-
-## Final Verdict
-
-**The system is fully real-time with zero cron dependency for push notifications and live activities.**
-
-- Trigger chain: DB trigger → `net.http_post` → edge function (immediate)
-- Push retries: inline (3 attempts, 2s/5s delays) — no deferred retry
-- Live Activities: pure Supabase Realtime subscriptions, no polling
-- Failures: fail fast with dead-lettering, logged with error details
-- Deduplication: atomic claim, unique constraints, native dedup, throttle
-
-**No changes required.** The only cosmetic fix is updating the JSDoc comment in the orchestrator to remove stale polling references.
-
-| # | File | Change | Severity |
-|---|------|--------|----------|
-| 1 | `src/hooks/useLiveActivityOrchestrator.ts` | Update JSDoc comment (lines 23-27) to remove polling references | Cosmetic |
-
+| Layer | Fix |
+|-------|-----|
+| **useCartPage** | Added `upiCompletionRef` guard — only ONE of `handleUpiDeepLinkSuccess` / `handleUpiDeepLinkFailed` can execute per payment session. Both use the same toast ID `'upi-confirmed'` for dedup. Ref resets when a new UPI session starts. |
+| **UpiDeepLinkCheckout** | `handleSystemClose` now skips `onPaymentFailed` when `completionTriggeredRef.current` is true, preventing the sheet unmount from firing a conflicting handler after success. |
