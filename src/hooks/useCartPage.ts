@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentMethod } from '@/types/database';
 import { useCart } from '@/hooks/useCart';
@@ -14,6 +15,15 @@ import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
 import { computeStoreStatus, formatStoreClosedMessage } from '@/lib/store-availability';
+
+/** Simple deterministic hash for idempotency keys */
+function simpleHash(str: string): string {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h).toString(36);
+}
 
 // ── Session persistence for UPI payment state ──
 // Survives app-switch, re-renders, and component remounts
@@ -52,9 +62,11 @@ function clearPaymentSession() {
 
 export function useCartPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, profile, society } = useAuth();
   const { requestFullPermission } = usePushNotifications();
   const { items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, refresh, addItem, isLoading, hasHydrated, pendingMutations } = useCart();
+  const idempotencyKeyRef = useRef<string | null>(null);
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
@@ -179,6 +191,12 @@ export function useCartPage() {
       ? [selectedDeliveryAddress.flat_number && `Flat ${selectedDeliveryAddress.flat_number}`, selectedDeliveryAddress.block && `Block ${selectedDeliveryAddress.block}`, selectedDeliveryAddress.building_name, selectedDeliveryAddress.landmark].filter(Boolean).join(', ')
       : [profile.block, profile.flat_number].filter(Boolean).join(', ');
 
+    // Generate idempotency key if not already set for this attempt
+    if (!idempotencyKeyRef.current) {
+      const cartHash = items.map(i => `${i.product_id}:${i.quantity}`).sort().join('|');
+      idempotencyKeyRef.current = `${user.id}_${Date.now()}_${simpleHash(cartHash)}`;
+    }
+
     const { data, error } = await supabase.rpc('create_multi_vendor_orders', {
       _buyer_id: user.id, _delivery_address: deliveryAddressText,
       _notes: notes || null, _payment_method: paymentMethod, _payment_status: paymentStatus,
@@ -188,18 +206,30 @@ export function useCartPage() {
       _delivery_address_id: selectedDeliveryAddress?.id || null,
       _delivery_lat: selectedDeliveryAddress?.latitude || null,
       _delivery_lng: selectedDeliveryAddress?.longitude || null,
-    });
+      _idempotency_key: idempotencyKeyRef.current,
+    } as any);
     if (error) throw error;
 
-    const result = data as { success: boolean; order_ids?: string[]; order_count?: number; error?: string; unavailable_items?: string[]; closed_sellers?: string[]; out_of_range_sellers?: string[] };
+    const result = data as { success: boolean; order_ids?: string[]; order_count?: number; error?: string; unavailable_items?: string[]; closed_sellers?: string[]; out_of_range_sellers?: string[]; deduplicated?: boolean };
     if (!result?.success) {
       if (result?.error === 'stock_validation_failed' && result?.unavailable_items) throw new Error(`Some items are unavailable:\n• ${result.unavailable_items.join('\n• ')}`);
       if (result?.error === 'store_closed') { const sellers = result.closed_sellers?.join(', '); throw new Error(sellers ? `Store closed: ${sellers}` : 'Store is currently closed. Please try again later.'); }
       if (result?.error === 'delivery_out_of_range') { const sellers = result.out_of_range_sellers?.join('\n• '); throw new Error(sellers ? `Delivery not possible:\n• ${sellers}` : 'Delivery address is out of range for one or more sellers.'); }
       throw new Error('Failed to create orders');
     }
+    // Reset idempotency key after successful (non-deduplicated) creation
+    if (!result.deduplicated) idempotencyKeyRef.current = null;
     return result.order_ids || [];
   };
+
+  /** Force-clear cart from both DB and query cache */
+  const clearCartAndCache = useCallback(async () => {
+    await clearCart();
+    if (user) {
+      queryClient.setQueryData(['cart-items', user.id], []);
+      queryClient.setQueryData(['cart-count', user.id], 0);
+    }
+  }, [clearCart, queryClient, user]);
 
   const handlePlaceOrderInner = async () => {
     if (!user || !profile || sellerGroups.length === 0) return;
@@ -302,8 +332,8 @@ export function useCartPage() {
     try {
       const orderIds = await createOrdersForAllSellers('pending');
       if (orderIds.length === 0) throw new Error('Failed to create orders');
-      // COD: clear cart after successful order creation
-      clearCart(); await refresh(); hapticNotification('success');
+      // COD: await cart clear to ensure DB delete completes before navigating
+      await clearCartAndCache(); hapticNotification('success');
       requestFullPermission().catch(() => {});
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (orderIds.length === 1) { toast.success('Order placed successfully!', { id: 'order-placed' }); navigate(`/orders/${orderIds[0]}`); }
@@ -312,7 +342,7 @@ export function useCartPage() {
     finally { setIsPlacingOrder(false); }
   };
 
-  const handlePlaceOrder = useSubmitGuard(handlePlaceOrderInner, 3000);
+  const handlePlaceOrder = useSubmitGuard(handlePlaceOrderInner, 3000, 5000);
 
   const handleRazorpaySuccess = async (_paymentId: string) => {
     setShowRazorpayCheckout(false);
@@ -325,7 +355,7 @@ export function useCartPage() {
     }
     supabase.functions.invoke('process-notification-queue').catch(() => {});
     // Clear cart and payment session ONLY after payment success
-    clearCart(); await refresh();
+    await clearCartAndCache();
     clearPaymentSession();
     navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
     setPendingOrderIds([]);
@@ -338,7 +368,7 @@ export function useCartPage() {
       // Poll multiple times before cancelling — webhook may be delayed
       for (let attempt = 0; attempt < 3; attempt++) {
         const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
-        if (recheckOrder?.payment_status === 'paid') { toast.success('Payment verified! Your order is confirmed.', { id: 'razorpay-verified' }); clearCart(); await refresh(); clearPaymentSession(); navigate(`/orders/${pendingOrderIds[0]}`); setPendingOrderIds([]); return; }
+        if (recheckOrder?.payment_status === 'paid') { toast.success('Payment verified! Your order is confirmed.', { id: 'razorpay-verified' }); await clearCartAndCache(); clearPaymentSession(); navigate(`/orders/${pendingOrderIds[0]}`); setPendingOrderIds([]); return; }
         if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
       }
       // Cancel only orders that are still unpaid — check each individually to avoid killing webhook-paid ones
@@ -365,7 +395,7 @@ export function useCartPage() {
     setShowUpiDeepLink(false);
     toast.success('Payment submitted! Seller will verify shortly.', { id: 'upi-confirmed' });
     // Clear cart and payment session ONLY after payment confirmation submitted
-    clearCart(); await refresh();
+    await clearCartAndCache();
     clearPaymentSession();
     navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
     setPendingOrderIds([]);
@@ -381,7 +411,7 @@ export function useCartPage() {
       const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
       if (recheckOrder?.payment_status === 'paid' || recheckOrder?.payment_status === 'buyer_confirmed') {
         toast.success('Payment was already confirmed! Your order is active.', { id: 'upi-confirmed' });
-        clearCart(); await refresh();
+        await clearCartAndCache();
         clearPaymentSession();
         navigate(`/orders/${pendingOrderIds[0]}`);
         setPendingOrderIds([]);
