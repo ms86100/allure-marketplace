@@ -150,7 +150,7 @@ export function FeaturedBanners() {
             onClick={() => banner.link_url && navigate(banner.link_url)}
             className={cn(
               'shrink-0 w-[85vw] sm:w-[400px] rounded-3xl overflow-hidden snap-center',
-              'border border-border',
+              'border border-border/20 dark:border-transparent',
               'transition-all duration-200 hover:shadow-md active:scale-[0.99]',
               banner.link_url && 'cursor-pointer'
             )}

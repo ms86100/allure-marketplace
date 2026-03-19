@@ -161,8 +161,8 @@
     --gradient-primary: linear-gradient(135deg, hsl(151 65% 44%) 0%, hsl(168 55% 38%) 100%);
     --gradient-success: linear-gradient(135deg, hsl(151 65% 44%) 0%, hsl(162 50% 36%) 100%);
     --gradient-warm: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(20 85% 50%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(151 65% 44% / 0.05) 0%, hsl(230 18% 7%) 60%);
-    --gradient-glass: linear-gradient(135deg, hsl(230 16% 11% / 0.98) 0%, hsl(230 16% 9% / 0.9) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(151 65% 44% / 0.05) 0%, hsl(0 0% 5%) 60%);
+    --gradient-glass: linear-gradient(135deg, hsl(0 0% 11% / 0.98) 0%, hsl(0 0% 8% / 0.9) 100%);
 
     /* Shadows */
     --shadow-sm: 0 1px 2px hsl(0 0% 0% / 0.35);
