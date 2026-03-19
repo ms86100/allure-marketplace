@@ -497,19 +497,19 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* Buyer Action Bar — DB-driven: renders when buyer has a valid next transition */}
-      {o.isBuyerView && !isTerminalStatus(o.flow, order.status) && o.buyerNextStatus && (
+      {/* Buyer Action Bar — DB-driven: renders when buyer has a forward action OR can cancel */}
+      {o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel) && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
           <div className="px-4 py-3 flex gap-3">
             {o.canBuyerCancel && (
-              <Button variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground h-12" onClick={() => o.updateOrderStatus('cancelled' as OrderStatus)} disabled={o.isUpdating}>
-                <XCircle size={16} className="mr-1.5" />Cancel
+              <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => window.location.reload()} canCancel={o.canBuyerCancel} />
+            )}
+            {o.buyerNextStatus && (
+              <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.buyerNextStatus!)} disabled={o.isUpdating}>
+                {o.isUpdating ? 'Updating...' : o.getFlowStepLabel(o.buyerNextStatus).label}
+                <ChevronRight size={14} className="ml-1" />
               </Button>
             )}
-            <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.buyerNextStatus!)} disabled={o.isUpdating}>
-              {o.isUpdating ? 'Updating...' : o.getFlowStepLabel(o.buyerNextStatus).label}
-              <ChevronRight size={14} className="ml-1" />
-            </Button>
           </div>
         </div>
       )}

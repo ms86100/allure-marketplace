@@ -52,8 +52,8 @@ export function OrderCancellation({ orderId, orderStatus, onCancelled, canCancel
     }
   } catch { /* use defaults */ }
 
-  // Use workflow-driven eligibility if provided, otherwise fall back to legacy check
-  const isEligible = canCancel !== undefined ? canCancel : ['placed', 'accepted'].includes(orderStatus);
+  // Fully DB-driven: no hardcoded fallback
+  const isEligible = canCancel;
 
   if (!isEligible) {
     return null;
