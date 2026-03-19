@@ -75,8 +75,8 @@ function BottomNavInner() {
               )}
             >
               <div className={cn(
-                'relative flex items-center justify-center w-10 h-7 rounded-full transition-all duration-200',
-                isActive && 'bg-primary/12'
+                'relative flex items-center justify-center w-11 h-8 rounded-full transition-all duration-200',
+                isActive && 'bg-primary/15'
               )}>
                 <Icon
                   size={20}
