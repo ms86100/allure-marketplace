@@ -7,6 +7,8 @@ import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statu
 import { Package, ChevronRight, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { jitteredStaleTime } from '@/lib/query-utils';
+import { compactETA } from '@/lib/etaEngine';
+import { TRANSIT_STATUSES } from '@/lib/visibilityEngine';
 
 interface ActiveOrder {
   id: string;
@@ -122,7 +124,7 @@ export function ActiveOrderStrip() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 {/* Pulsing dot for transit statuses — activity illusion */}
-                {['on_the_way', 'out_for_delivery', 'at_gate', 'in_transit'].includes(order.status) && (
+                {TRANSIT_STATUSES.has(order.status as any) && (
                   <motion.span
                     className="w-2 h-2 rounded-full bg-green-500 shrink-0"
                     animate={{ opacity: [1, 0.3, 1] }}
@@ -132,7 +134,7 @@ export function ActiveOrderStrip() {
                 <span className="text-[13px] font-bold text-foreground truncate">
                   {order.display_label}
                 </span>
-                {order.color && !['on_the_way', 'out_for_delivery', 'at_gate', 'in_transit'].includes(order.status) && (
+                {order.color && !TRANSIT_STATUSES.has(order.status as any) && (
                   <span
                     className={`w-2 h-2 rounded-full shrink-0 ${order.color.split(' ')[0]}`}
                   />
@@ -142,10 +144,8 @@ export function ActiveOrderStrip() {
                 {order.seller_name}{order.seller_name && order.item_count > 0 ? ' · ' : ''}
                 {order.item_count > 0 && `${order.item_count} item${order.item_count > 1 ? 's' : ''}`}
                 {order.estimated_delivery_at && (() => {
-                  const mins = Math.max(0, Math.ceil((new Date(order.estimated_delivery_at).getTime() - Date.now()) / 60000));
-                  if (mins <= 0) return ' · Arriving soon';
-                  if (mins <= 60) return ` · ETA ${mins} min`;
-                  return '';
+                  const eta = compactETA(order.estimated_delivery_at);
+                  return eta ? ` · ETA ${eta}` : '';
                 })()}
               </p>
             </div>

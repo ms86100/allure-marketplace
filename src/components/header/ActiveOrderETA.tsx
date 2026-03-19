@@ -2,12 +2,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { getTerminalStatuses } from '@/services/statusFlowCache';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Package, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
-
-const TRANSIT_STATUSES = new Set(['on_the_way', 'out_for_delivery', 'at_gate', 'in_transit']);
+import { compactETA } from '@/lib/etaEngine';
+import { TRANSIT_STATUSES, isRouteHidden, ETA_HIDDEN_ROUTE_PREFIXES } from '@/lib/visibilityEngine';
 
 /**
  * Compact ETA strip shown in the header area when there's an active order.
@@ -17,11 +17,19 @@ const TRANSIT_STATUSES = new Set(['on_the_way', 'out_for_delivery', 'at_gate', '
 export function ActiveOrderETA() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [terminalSet, setTerminalSet] = useState<Set<string> | null>(null);
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     getTerminalStatuses().then(setTerminalSet).catch(() => setTerminalSet(new Set()));
+  }, []);
+
+  // Tick every 60s for live countdown
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(interval);
   }, []);
 
   const { data: activeOrder } = useQuery({
@@ -54,21 +62,12 @@ export function ActiveOrderETA() {
     return () => window.removeEventListener('order-terminal-push', handler);
   }, [queryClient]);
 
-  if (!activeOrder) return null;
+  // Visibility engine: hide on order detail pages (prevents double-ETA with DeliveryETABanner)
+  if (!activeOrder || isRouteHidden(location.pathname, ETA_HIDDEN_ROUTE_PREFIXES)) return null;
 
-  const etaMinutes = activeOrder.estimated_delivery_at
-    ? Math.max(0, Math.ceil((new Date(activeOrder.estimated_delivery_at).getTime() - Date.now()) / 60000))
-    : null;
-
-  const isArriving = etaMinutes !== null && etaMinutes <= 0;
-  const isTransit = TRANSIT_STATUSES.has(activeOrder.status || '');
-
-  const etaText = etaMinutes !== null
-    ? isArriving
-      ? 'Arriving now'
-      : `${etaMinutes} min`
-    : null;
-
+  const isTransit = TRANSIT_STATUSES.has(activeOrder.status as any);
+  const etaText = compactETA(activeOrder.estimated_delivery_at, now);
+  const isArriving = etaText === 'Arriving now' || etaText === 'Arriving soon';
   const statusLabel = activeOrder.status?.replace(/_/g, ' ') || 'Processing';
 
   return (
@@ -86,7 +85,6 @@ export function ActiveOrderETA() {
           <Package size={14} className="text-primary" />
         </div>
         <div className="flex-1 min-w-0 text-left flex items-center gap-2">
-          {/* Pulsing dot for transit statuses — activity illusion */}
           {isTransit && (
             <motion.span
               className="w-2 h-2 rounded-full bg-green-500 shrink-0"

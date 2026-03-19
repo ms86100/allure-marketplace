@@ -6,7 +6,14 @@ import { CartItem, Product } from '@/types/database';
 import { toast } from 'sonner';
 import { handleApiError } from '@/lib/query-utils';
 import { computeStoreStatus, formatStoreClosedMessage, type StoreStatus } from '@/lib/store-availability';
-import { triggerCartFeedback } from '@/lib/cartFeedback';
+import {
+  feedbackAddItem,
+  feedbackAddItemFailed,
+  feedbackRemoveItem,
+  feedbackRemoveItemFailed,
+  feedbackQuantityChanged,
+  feedbackQuantityFailed,
+} from '@/lib/feedbackEngine';
 
 const hasOwn = (obj: unknown, key: string) => Object.prototype.hasOwnProperty.call(obj ?? {}, key);
 
@@ -202,14 +209,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
           const { error } = await supabase.from('cart_items').insert({ user_id: user.id, product_id: product.id, quantity });
           if (error) throw error;
         }
-        if (!silent) triggerCartFeedback(product.name || 'Item');
+        if (!silent) feedbackAddItem(product.name || 'Item');
         // Authoritative reconcile after success
         await reconcile();
       } catch (error) {
         rollback(snap);
         const availabilityError = parseStoreAvailabilityError(error);
         if (availabilityError) toast.error(availabilityError, { id: 'cart-availability-error' });
-        else handleApiError(error, 'Failed to add item');
+        else feedbackAddItemFailed(product.name || 'Item');
       }
     } finally {
       addItemLocksRef.current.delete(product.id);
@@ -231,10 +238,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase.from('cart_items').delete().eq('user_id', user.id).eq('product_id', productId);
       if (error) throw error;
+      feedbackRemoveItem(removedItem?.product?.name || 'Item');
       await reconcile();
     } catch (error) {
       rollback(snap);
-      handleApiError(error, 'Failed to remove item');
+      feedbackRemoveItemFailed();
     } finally {
       setPendingMutations(c => Math.max(0, c - 1));
     }
@@ -256,12 +264,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase.from('cart_items').update({ quantity: cappedQuantity }).eq('user_id', user.id).eq('product_id', productId);
       if (error) throw error;
+      feedbackQuantityChanged();
       await reconcile();
     } catch (error) {
       rollback(snap);
       const availabilityError = parseStoreAvailabilityError(error);
       if (availabilityError) toast.error(availabilityError, { id: 'cart-qty-availability' });
-      else handleApiError(error, 'Failed to update quantity');
+      else feedbackQuantityFailed();
     } finally {
       setPendingMutations(c => Math.max(0, c - 1));
     }
