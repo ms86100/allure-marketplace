@@ -243,7 +243,7 @@ function BannerContent({ banner }: { banner: any }) {
   if (template === 'gradient_cta') {
     return (
       <div
-        className="w-full h-28 flex flex-col items-center justify-center text-center p-3"
+        className="w-full h-36 flex flex-col items-center justify-center text-center p-3"
         style={{ background: `linear-gradient(135deg, ${bg_color}, ${bg_color}cc)` }}
       >
         <h3 className="text-white font-extrabold text-base">{title}</h3>
