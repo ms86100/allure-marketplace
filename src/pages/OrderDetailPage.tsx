@@ -171,7 +171,7 @@ export default function OrderDetailPage() {
 
         <div className="px-4 pt-3 space-y-3">
           {/* Delivery completion celebration — shown once for delivered/completed orders */}
-          {o.isBuyerView && ['delivered', 'completed'].includes(order.status) && !getString(`celebration_${order.id}`) && (() => {
+          {o.isBuyerView && isSuccessfulTerminal(o.flow, order.status) && !getString(`celebration_${order.id}`) && (() => {
             const durationMs = new Date(order.updated_at || order.created_at).getTime() - new Date(order.created_at).getTime();
             const durationMin = Math.max(1, Math.round(durationMs / 60000));
             setString(`celebration_${order.id}`, 'true');
