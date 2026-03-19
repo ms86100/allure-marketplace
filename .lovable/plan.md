@@ -1,50 +1,32 @@
-# Production-Hardened Live Tracking System
 
-## Status: ✅ IMPLEMENTED
 
-## What Changed
+# Fix: Add `at_gate` to `order_status` Enum
 
-### 1. Background Location Tracking (Seller)
-- **Package:** Added `@transistorsoft/capacitor-background-geolocation`
-- **File:** `src/hooks/useBackgroundLocationTracking.ts` — Full rewrite
-  - Native: Transistorsoft plugin with motion-aware tracking, `stopOnTerminate: false`, `preventSuspend: true`
-  - Web: Falls back to `navigator.geolocation.watchPosition`
-  - 20s health watchdog detects stale tracking and attempts recovery via `getCurrentPosition()`
-  - Auto-restart on app resume if native plugin was killed by OS
-  - Permission level tracking (`always` / `when_in_use` / `denied`)
+## Root Cause
 
-### 2. Seller GPS Tracker UI
-- **File:** `src/components/delivery/SellerGPSTracker.tsx`
-  - "Keep screen open" warning only on web (native handles background natively)
-  - Permission upgrade banner when on `when_in_use` with link to Settings
-  - Tracking paused badge + alert when watchdog detects stale state
-  - Settings deep link via `capacitor-native-settings`
+The `order_status` enum in the database does **not** contain the value `'at_gate'`. The current enum values are:
 
-### 3. Delta-Based Live Activity APNs Push
-- **File:** `supabase/functions/update-delivery-location/index.ts`
-  - After updating `delivery_assignments`, queries `live_activity_tokens`
-  - Compares deltas: distance > 50m OR ETA change ≥ 1 min
-  - 15s throttle floor to stay within Apple's APNs budget
-  - Stale retry: pushes if last push was >60s ago regardless of deltas
-  - Stores `last_pushed_eta`, `last_pushed_distance` on `live_activity_tokens`
-  - Timing instrumentation: logs `db=Xms total=Xms la_push=Xms`
+```
+placed, accepted, preparing, ready, picked_up, delivered, completed,
+cancelled, enquired, quoted, scheduled, in_progress, returned,
+on_the_way, arrived, assigned, requested, confirmed, rescheduled, no_show
+```
 
-### 4. APNs Success Tracking
-- **File:** `supabase/functions/update-live-activity-apns/index.ts`
-  - Updates `live_activity_tokens.updated_at` on successful (non-terminal) pushes
+The `delivery_assignments` table uses a **text** column for status, so `at_gate` works fine there. But multiple triggers and the `verify_delivery_otp_and_complete` RPC reference `at_gate` in the context of `orders.status`, which uses the `order_status` enum. When the delivery proximity system detects the seller is near the buyer's gate and sets the assignment status to `at_gate`, a sync trigger attempts to propagate this to `orders.status` — and the database rejects it because the enum value doesn't exist.
 
-### 5. Database
-- **Migration:** Added `last_pushed_eta` (int) and `last_pushed_distance` (int) columns to `live_activity_tokens`
+## Fix
 
-## iOS Build Requirements
-- `Info.plist`: `UIBackgroundModes` → `location`, `fetch`
-- `NSLocationAlwaysAndWhenInUseUsageDescription`
-- `NSLocationWhenInUseUsageDescription`
-- `NSMotionUsageDescription`
+Single database migration:
 
-## Latency Targets
-- Seller GPS → Edge Function: < 2s
-- Edge Function → DB: < 500ms
-- DB → Realtime → Buyer: < 1s
-- Edge Function → APNs → Dynamic Island: < 3s
-- **Total foreground: < 5s | Dynamic Island: < 8s**
+```sql
+ALTER TYPE public.order_status ADD VALUE IF NOT EXISTS 'at_gate';
+```
+
+That is the entire fix. No code changes needed — all the triggers, RPCs, and frontend components already handle `at_gate` correctly. The enum is the only thing missing.
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| Database migration (new) | `ALTER TYPE order_status ADD VALUE 'at_gate'` |
+
