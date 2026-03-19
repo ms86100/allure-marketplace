@@ -55,10 +55,10 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
               }
             }}
             className={cn(
-              'flex items-center gap-1.5 shrink-0 rounded-full px-3 py-2 transition-all duration-200',
+              'flex flex-col items-center gap-1 shrink-0 px-3 py-2 transition-all duration-200 relative',
               isActive
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'bg-secondary text-foreground/70 hover:bg-muted active:scale-95'
+                ? 'text-primary'
+                : 'text-foreground/60 hover:text-foreground active:scale-95'
             )}
           >
             <DynamicIcon
