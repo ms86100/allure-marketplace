@@ -140,11 +140,11 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
   const catKeys = Object.keys(CATEGORY_CONFIG) as BulletinCategory[];
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[85vh] overflow-y-auto rounded-t-2xl">
-        <SheetHeader>
-          <SheetTitle>New Post</SheetTitle>
-        </SheetHeader>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="h-[85vh] overflow-y-auto">
+        <DrawerHeader>
+          <DrawerTitle>New Post</DrawerTitle>
+        </DrawerHeader>
 
         <div className="space-y-4 mt-4">
           {/* Category picker */}
