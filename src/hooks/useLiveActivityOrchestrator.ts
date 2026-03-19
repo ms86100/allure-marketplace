@@ -12,7 +12,7 @@ const TAG = '[LiveActivityOrchestrator]';
 
 /** DB-backed terminal statuses — loaded once at init */
 let terminalStatusesCache: Set<string> = new Set([
-  'delivered', 'completed', 'cancelled', 'no_show', 'failed',
+  'delivered', 'completed', 'cancelled', 'no_show',
 ]);
 
 const MAX_RECONNECT_RETRIES = 3;
