@@ -128,7 +128,7 @@ export function MarketplaceSection() {
   }, [categoryConfigs]);
 
   return (
-    <div className="pb-2">
+    <div className="pb-2 section-reveal">
       {/* ── Hero: Featured Banners OR Auto-Highlights ── */}
       {bannerCount > 0 ? (
         <FeaturedBanners />
