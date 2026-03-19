@@ -139,7 +139,7 @@ function HeaderInner({
             </div>
 
             <div className="flex items-center gap-0.5">
-              <ThemeToggle className="h-9 w-9 rounded-full text-foreground hover:bg-secondary" />
+              <ThemeToggle />
               {isBuilderMember && (
                 <Link to="/builder">
                   <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
