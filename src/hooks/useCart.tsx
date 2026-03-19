@@ -6,7 +6,14 @@ import { CartItem, Product } from '@/types/database';
 import { toast } from 'sonner';
 import { handleApiError } from '@/lib/query-utils';
 import { computeStoreStatus, formatStoreClosedMessage, type StoreStatus } from '@/lib/store-availability';
-import { triggerCartFeedback } from '@/lib/cartFeedback';
+import {
+  feedbackAddItem,
+  feedbackAddItemFailed,
+  feedbackRemoveItem,
+  feedbackRemoveItemFailed,
+  feedbackQuantityChanged,
+  feedbackQuantityFailed,
+} from '@/lib/feedbackEngine';
 
 const hasOwn = (obj: unknown, key: string) => Object.prototype.hasOwnProperty.call(obj ?? {}, key);
 
