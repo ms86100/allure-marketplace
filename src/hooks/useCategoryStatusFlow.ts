@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveTransactionType } from '@/lib/resolveTransactionType';
 
 export interface StatusFlowStep {
   status_key: string;

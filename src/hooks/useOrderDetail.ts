@@ -6,29 +6,9 @@ import { useUrgentOrderSound } from '@/hooks/useUrgentOrderSound';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useCategoryStatusFlow, getNextStatusForActor, getTimelineSteps, isTerminalStatus, isSuccessfulTerminal, canActorCancel, useStatusTransitions } from '@/hooks/useCategoryStatusFlow';
 import { logAudit } from '@/lib/audit';
+import { resolveTransactionType } from '@/lib/resolveTransactionType';
 import { Order, OrderStatus } from '@/types/database';
 import { toast } from 'sonner';
-
-function resolveTransactionType(
-  parentGroup: string,
-  orderType: string | null | undefined,
-  fulfillmentType?: string | null,
-  deliveryHandledBy?: string | null
-): string {
-  if (orderType === 'enquiry') {
-    if (['classes', 'events'].includes(parentGroup)) return 'book_slot';
-    return 'request_service';
-  }
-  if (orderType === 'booking') return 'service_booking';
-  if (fulfillmentType === 'self_pickup') return 'self_fulfillment';
-  // Seller-handled delivery → seller_delivery (includes delivery tracking statuses)
-  if (fulfillmentType === 'seller_delivery') return 'seller_delivery';
-  if (fulfillmentType === 'delivery' && (deliveryHandledBy || 'seller') === 'seller') return 'seller_delivery';
-  if (fulfillmentType === 'delivery' && !deliveryHandledBy) return 'seller_delivery';
-  // Platform-handled delivery
-  if (fulfillmentType === 'delivery' && deliveryHandledBy === 'platform') return 'cart_purchase';
-  return 'self_fulfillment';
-}
 
 export function useOrderDetail(id: string | undefined) {
   const { user, isSeller } = useAuth();
