@@ -168,7 +168,7 @@ export default function SearchPage() {
               category: sp.category,
               description: sp.description || null,
               seller_id: sp.seller_id,
-              seller_name: sp.seller?.business_name || 'Seller',
+              seller_name: sp.seller?.business_name || '',
               seller_rating: 0,
               seller_reviews: 0,
               action_type: sp.action_type,
