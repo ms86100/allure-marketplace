@@ -451,6 +451,8 @@ html.large-font a {
   grid-row: 1 / -1;
 }
 
+/* items-4: default 2x2 grid — no overrides needed */
+
 /* Sonner close button */
 [data-sonner-toast] [data-close-button] {
   left: auto !important;
