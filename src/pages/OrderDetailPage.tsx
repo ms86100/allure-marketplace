@@ -470,7 +470,7 @@ export default function OrderDetailPage() {
         open={isOtpDialogOpen}
         onOpenChange={setIsOtpDialogOpen}
         onVerified={() => {
-          o.setOrder({ ...order, status: 'delivered' } as any);
+          o.setOrder({ ...order, status: 'completed' } as any);
           window.location.reload();
         }}
       />
