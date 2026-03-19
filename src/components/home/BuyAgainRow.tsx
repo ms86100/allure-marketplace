@@ -171,7 +171,7 @@ export function BuyAgainRow() {
               className="shrink-0 w-[140px]"
             >
               {/* Card with teal/green tint */}
-              <div className="rounded-2xl bg-accent/30 dark:bg-[hsl(160_40%_18%/0.4)] border border-primary/15 dark:border-[hsl(160_40%_30%/0.2)] p-2.5 space-y-2">
+              <div className="rounded-2xl bg-accent/30 dark:bg-[hsl(170_35%_18%/0.45)] border border-primary/15 dark:border-[hsl(170_35%_28%/0.25)] p-2.5 space-y-2">
                 {/* Product thumbnails grid */}
                 <div className="grid grid-cols-2 gap-1.5">
                   {displayProducts.map((product) => {
