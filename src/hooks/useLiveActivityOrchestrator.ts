@@ -248,12 +248,25 @@ export function useLiveActivityOrchestrator(): void {
     };
 
     const subscribe = () => {
-      console.log(TAG, `Subscribing to delivery assignment INSERT+UPDATE (attempt ${retryCount + 1})`);
+      const activeIds = [...activeOrderIdsRef.current];
+      // Use eq filter when single active order to reduce server fan-out; otherwise client-side filter
+      const filter = activeIds.length === 1
+        ? `order_id=eq.${activeIds[0]}`
+        : undefined;
+
+      console.log(TAG, `Subscribing to delivery assignment INSERT+UPDATE (attempt ${retryCount + 1}, filter=${filter ?? 'none, client-side'})`);
+
+      const insertOpts: any = { event: 'INSERT', schema: 'public', table: 'delivery_assignments' };
+      const updateOpts: any = { event: 'UPDATE', schema: 'public', table: 'delivery_assignments' };
+      if (filter) {
+        insertOpts.filter = filter;
+        updateOpts.filter = filter;
+      }
 
       const channel = supabase
         .channel(`la-delivery-${userId}-${Date.now()}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'delivery_assignments' }, handleDeliveryChange)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'delivery_assignments' }, handleDeliveryChange)
+        .on('postgres_changes', insertOpts, handleDeliveryChange)
+        .on('postgres_changes', updateOpts, handleDeliveryChange)
         .subscribe((status) => {
           console.log(TAG, `Delivery channel status: ${status}`);
           if (status === 'SUBSCRIBED') {
