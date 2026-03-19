@@ -11,6 +11,22 @@ import { Capacitor } from '@capacitor/core';
 export function useAppLifecycle() {
   const queryClient = useQueryClient();
 
+  // Push-driven sync: invalidate all critical queries on terminal order push
+  useEffect(() => {
+    const onTerminalPush = () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['active-orders-strip'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['seller-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['cart-items'] });
+      queryClient.invalidateQueries({ queryKey: ['cart-count'] });
+      window.dispatchEvent(new Event('order-detail-refetch'));
+    };
+    window.addEventListener('order-terminal-push', onTerminalPush);
+    return () => window.removeEventListener('order-terminal-push', onTerminalPush);
+  }, [queryClient]);
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
@@ -31,7 +47,6 @@ export function useAppLifecycle() {
             queryClient.invalidateQueries({ queryKey: ['products-by-category'] });
             queryClient.invalidateQueries({ queryKey: ['seller-orders'] });
             queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats'] });
-            // C8: Invalidate buyer orders on resume to catch status changes while backgrounded
             queryClient.invalidateQueries({ queryKey: ['orders'] });
 
             // Dispatch custom event so useOrderDetail re-fetches on resume
