@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,17 +24,39 @@ interface BuyerCancelBookingProps {
   status: string;
 }
 
+/** DB-driven terminal status check — cached per session */
+let terminalBookingStatuses: Set<string> | null = null;
+async function loadTerminalBookingStatuses(): Promise<Set<string>> {
+  if (terminalBookingStatuses) return terminalBookingStatuses;
+  const { data } = await supabase
+    .from('category_status_flows')
+    .select('status_key')
+    .eq('is_terminal', true);
+  // Include in_progress as non-cancellable (it's active, not terminal, but cancellation is blocked)
+  const set = new Set<string>(data?.map(r => r.status_key) ?? []);
+  set.add('in_progress');
+  terminalBookingStatuses = set;
+  return set;
+}
+
 export function BuyerCancelBooking({ bookingId, orderId, slotId, status }: BuyerCancelBookingProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
-  const [isChecking, setIsChecking] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [reason, setReason] = useState('');
   const [policyInfo, setPolicyInfo] = useState<{ can_cancel: boolean; fee_percentage: number; reason: string } | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const [hidden, setHidden] = useState(true);
 
-  // Don't show for terminal statuses
-  if (['cancelled', 'completed', 'no_show', 'in_progress'].includes(status)) return null;
+  // DB-driven terminal check on mount
+  useEffect(() => {
+    loadTerminalBookingStatuses().then(set => {
+      setHidden(set.has(status));
+    });
+  }, [status]);
+
+  if (hidden) return null;
 
   const checkPolicy = async () => {
     if (!user) return;

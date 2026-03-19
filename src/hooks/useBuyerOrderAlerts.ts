@@ -23,7 +23,26 @@ const STATUS_MESSAGES: Record<string, { icon: string; title: string; description
   cancelled: { icon: '❌', title: 'Order Cancelled', description: 'Your order has been cancelled.', haptic: 'error' },
   quoted: { icon: '💰', title: 'Quote Received', description: 'The seller sent you a price quote.', haptic: 'success' },
   scheduled: { icon: '📅', title: 'Booking Confirmed', description: 'Your booking has been confirmed.', haptic: 'success' },
+  failed: { icon: '❌', title: 'Delivery Failed', description: 'Your delivery could not be completed.', haptic: 'error' },
 };
+
+/** In-memory cache for DB display labels (fetched once per session). */
+let displayLabelCache: Record<string, string> | null = null;
+async function getDisplayLabel(statusKey: string): Promise<string | null> {
+  if (!displayLabelCache) {
+    const { data } = await supabase
+      .from('category_status_flows')
+      .select('status_key, display_label')
+      .not('display_label', 'is', null);
+    if (data) {
+      displayLabelCache = {};
+      for (const r of data) {
+        if (r.display_label) displayLabelCache[r.status_key] = r.display_label;
+      }
+    }
+  }
+  return displayLabelCache?.[statusKey] ?? null;
+}
 
 export function useBuyerOrderAlerts() {
   const identity = useContext(IdentityContext);
@@ -43,7 +62,7 @@ export function useBuyerOrderAlerts() {
           table: 'orders',
           filter: `buyer_id=eq.${user.id}`,
         },
-        (payload) => {
+        async (payload) => {
           const newStatus = (payload.new as any)?.status;
           const oldStatus = (payload.old as any)?.status;
           const orderId = (payload.new as any)?.id;
@@ -57,8 +76,14 @@ export function useBuyerOrderAlerts() {
           // Suppress during active checkout on cart page
           if (window.location.hash.includes('/cart')) return;
 
-          const msg = STATUS_MESSAGES[newStatus];
-          if (!msg) return;
+          let msg = STATUS_MESSAGES[newStatus];
+
+          // DB-driven fallback: use display_label for admin-added statuses
+          if (!msg) {
+            const label = await getDisplayLabel(newStatus);
+            if (!label) return;
+            msg = { icon: '🔔', title: label, description: `Your order status changed to ${label}.`, haptic: 'success' };
+          }
 
           hapticNotification(msg.haptic);
 
