@@ -6,6 +6,8 @@ export interface StatusFlowStep {
   sort_order: number;
   actor: string;
   is_terminal: boolean;
+  is_success: boolean;
+  requires_otp: boolean;
   display_label: string | null;
   color: string | null;
   icon: string | null;
