@@ -320,7 +320,7 @@ export function usePushNotificationsInternal() {
         // Terminal pushes must always trigger state reconciliation even if LA is tracking
         // DB-driven: use is_terminal flag from push payload, or check cached terminal set
         const pushStatus = data?.status;
-        const isTerminalPush = data?.is_terminal === 'true' || data?.is_terminal === true;
+        const isTerminalPush = data?.is_terminal === 'true';
         const terminalSet = terminalStatusesRef.current;
         const isTerminal = isTerminalPush || (pushStatus && terminalSet.size > 0 && terminalSet.has(pushStatus));
         if (orderId && pushStatus && isTerminal) {
