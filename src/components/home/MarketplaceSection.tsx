@@ -308,7 +308,7 @@ function DiscoveryRow({
   );
 }
 
-// ── Product Listings by Category ──
+// ── Category Product Grid (Blinkit-style themed category cards) ──
 function ProductListings({
   categories, isLoading, onProductTap, onNavigate, categoryConfigs, marketplaceConfig, badgeConfigs, socialProofMap,
 }: {
@@ -322,16 +322,13 @@ function ProductListings({
   socialProofMap?: Map<string, number>;
 }) {
   const ml = useMarketplaceLabels();
+  const navigate = useNavigate();
+
   if (isLoading) {
     return (
-      <div className="px-4 space-y-6 mt-4">
-        {[1, 2].map(i => (
-          <div key={i}>
-            <Skeleton className="h-6 w-44 mb-3 rounded-lg" />
-            <div className="flex gap-3">
-              {[1, 2, 3].map(j => <Skeleton key={j} className="w-[160px] h-60 rounded-2xl shrink-0" />)}
-            </div>
-          </div>
+      <div className="px-4 mt-4 grid grid-cols-3 gap-3">
+        {[1, 2, 3, 4, 5, 6].map(i => (
+          <Skeleton key={i} className="h-40 rounded-2xl" />
         ))}
       </div>
     );
@@ -382,50 +379,62 @@ function ProductListings({
   }
 
   return (
-    <div className="space-y-6 mt-4">
-      {categories.map((cat, catIdx) => {
-        const catConfig = categoryConfigs?.find((c: any) => c.category === cat.category);
-        const catColor = catConfig?.color || null;
+    <div className="px-4 mt-4">
+      <div className="grid grid-cols-3 gap-3">
+        {categories.map((cat) => {
+          const catConfig = categoryConfigs?.find((c: any) => c.category === cat.category);
+          const catColor = catConfig?.color || 'hsl(var(--primary))';
+          const topProducts = cat.products.slice(0, 4);
 
-        return (
-          <div key={cat.category}>
-            <div className="flex items-center justify-between px-4 mb-3">
-              <h3 className="section-header">
-                {catColor && (
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: catColor }} />
-                )}
-                <DynamicIcon name={cat.icon} size={18} className="shrink-0" />
-                {cat.displayName}
-              </h3>
-              <Link
-                to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-                className="text-xs font-bold text-primary flex items-center gap-0.5 hover:underline"
-              >
-                See all <ChevronRight size={14} />
-              </Link>
-            </div>
-            <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory">
-              {cat.products.slice(0, 8).map((product, i) => {
-                const isHero = i === 0 && product.is_bestseller;
-                return (
-                  <div key={product.id} className={cn('shrink-0 snap-start', isHero ? 'w-[220px]' : 'w-[160px]')}>
-                    <ProductListingCard
-                      product={product}
-                      onTap={onProductTap}
-                      onNavigate={onNavigate}
-                      categoryConfigs={categoryConfigs}
-                      marketplaceConfig={marketplaceConfig}
-                      badgeConfigs={badgeConfigs}
-                      socialProofCount={socialProofMap?.get(product.id)}
-                      compact
-                    />
+          return (
+            <button
+              key={cat.category}
+              type="button"
+              onClick={() => navigate(`/category/${cat.parentGroup}?sub=${cat.category}`)}
+              className="rounded-2xl border border-border/50 bg-card overflow-hidden text-left active:scale-[0.97] transition-transform flex flex-col"
+              style={{
+                background: `linear-gradient(160deg, ${catColor}18 0%, ${catColor}08 100%)`,
+              }}
+            >
+              {/* Product image grid */}
+              <div className="grid grid-cols-2 gap-0.5 p-2 flex-1">
+                {topProducts.length > 0 ? (
+                  topProducts.map((p) => (
+                    <div key={p.id} className="aspect-square rounded-xl overflow-hidden bg-secondary/50">
+                      {p.image_url ? (
+                        <img
+                          src={p.image_url}
+                          alt={p.name}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <DynamicIcon name={cat.icon} size={20} className="text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-2 aspect-square flex items-center justify-center">
+                    <DynamicIcon name={cat.icon} size={32} className="text-muted-foreground" />
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+                )}
+              </div>
+
+              {/* Category label */}
+              <div className="px-2 pb-2.5 pt-0.5">
+                <p className="text-[11px] font-bold text-foreground leading-tight line-clamp-2">
+                  {cat.displayName}
+                </p>
+                <p className="text-[9px] text-muted-foreground mt-0.5">
+                  {cat.products.length} item{cat.products.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
