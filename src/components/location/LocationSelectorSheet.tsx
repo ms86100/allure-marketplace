@@ -263,13 +263,13 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
   const isSelected = (id: string) => browsingLocation?.id === id;
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[70dvh] overflow-y-auto">
-        <SheetHeader className="pb-2">
-          <SheetTitle className="text-base font-bold">
+    <Drawer open={open} onOpenChange={handleOpenChange}>
+      <DrawerContent className="max-h-[70dvh] overflow-y-auto">
+        <DrawerHeader className="pb-2">
+          <DrawerTitle className="text-base font-bold">
             {step === 'confirm' ? 'Confirm Detected Location' : 'Browse Near'}
-          </SheetTitle>
-        </SheetHeader>
+          </DrawerTitle>
+        </DrawerHeader>
 
         {step === 'confirm' && detectedLocation ? (
           <div className="space-y-3">
