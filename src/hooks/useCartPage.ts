@@ -368,7 +368,7 @@ export function useCartPage() {
       // Poll multiple times before cancelling — webhook may be delayed
       for (let attempt = 0; attempt < 3; attempt++) {
         const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
-        if (recheckOrder?.payment_status === 'paid') { toast.success('Payment verified! Your order is confirmed.', { id: 'razorpay-verified' }); clearCart(); await refresh(); clearPaymentSession(); navigate(`/orders/${pendingOrderIds[0]}`); setPendingOrderIds([]); return; }
+        if (recheckOrder?.payment_status === 'paid') { toast.success('Payment verified! Your order is confirmed.', { id: 'razorpay-verified' }); await clearCartAndCache(); clearPaymentSession(); navigate(`/orders/${pendingOrderIds[0]}`); setPendingOrderIds([]); return; }
         if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
       }
       // Cancel only orders that are still unpaid — check each individually to avoid killing webhook-paid ones
