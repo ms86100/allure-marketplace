@@ -33,6 +33,9 @@ export function useAppLifecycle() {
             queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats'] });
             // C8: Invalidate buyer orders on resume to catch status changes while backgrounded
             queryClient.invalidateQueries({ queryKey: ['orders'] });
+
+            // Dispatch custom event so useOrderDetail re-fetches on resume
+            window.dispatchEvent(new Event('order-detail-refetch'));
           }
         });
         cleanup = () => listener.remove();

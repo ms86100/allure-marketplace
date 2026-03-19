@@ -106,12 +106,20 @@ export function buildLiveActivityData(
   // Derive progress from DB sort_order
   let progressPercent = deriveProgressPercent(order.status, flowMap);
 
-  // GPS-derived progress when distance is available during transit
-  const transitSet = new Set(config.transit_statuses_la);
+  // ETA-based and GPS-based progress during transit
+  const transitSet = new Set([...config.transit_statuses_la, 'at_gate']);
   const isTransit = transitSet.has(order.status);
-  if (isTransit && distanceKm != null && distanceKm >= 0) {
-    const ratio = Math.min(distanceKm / config.max_delivery_distance_km, 1);
-    progressPercent = Math.max(0.5, 0.95 - ratio * 0.45);
+  if (isTransit) {
+    // Prefer ETA-based progress when available — gives a meaningful countdown
+    if (delivery?.eta_minutes != null && delivery.eta_minutes >= 0) {
+      const MAX_ETA = 45; // minutes — upper bound for normalisation
+      const ratio = Math.min(delivery.eta_minutes / MAX_ETA, 1);
+      progressPercent = Math.max(0.1, Math.min(0.95, 1 - ratio));
+    } else if (distanceKm != null && distanceKm >= 0) {
+      // Fallback to distance-based progress
+      const ratio = Math.min(distanceKm / config.max_delivery_distance_km, 1);
+      progressPercent = Math.max(0.5, 0.95 - ratio * 0.45);
+    }
   }
 
   return {
