@@ -563,3 +563,79 @@ body.razorpay-active iframe[src*="razorpay"] {
   top: env(safe-area-inset-top, 0px) !important;
   height: calc(100% - env(safe-area-inset-top, 0px)) !important;
 }
+
+/* ═══════════════════════════════════════════════
+   NATURE MODE — Component & Motion Overrides
+   ═══════════════════════════════════════════════ */
+
+/* Softer radius & transitions in nature mode */
+.nature {
+  --radius: 1rem;
+}
+
+/* Nature: organic button feel */
+.nature button,
+.nature a,
+.nature [role="button"] {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
+}
+
+/* Nature: softer tap feedback */
+.nature button:active,
+.nature a:active,
+.nature [role="button"]:active {
+  transform: scale(0.98);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Nature: gentle card hover lift */
+.nature .glass-card:hover,
+.nature [class*="rounded-2xl"]:hover {
+  transition: box-shadow 0.4s ease, transform 0.4s ease;
+}
+
+/* Nature: input focus glow instead of sharp ring */
+.nature input:focus,
+.nature textarea:focus,
+.nature select:focus {
+  box-shadow: 0 0 0 3px hsl(142 50% 36% / 0.15);
+  border-color: hsl(var(--primary));
+  outline: none;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+/* Nature: subtle texture overlay on background */
+.nature #root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23228B22' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.6;
+}
+
+/* Nature: ensure content renders above texture */
+.nature #root > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Nature-specific animation: slower, gentler */
+@keyframes natureFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.nature .animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nature .animate-slide-up {
+  animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nature .animate-bounce-in {
+  animation: bounceIn 0.5s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
