@@ -376,7 +376,7 @@ export default function OrderDetailPage() {
           )}
           {/* Seller self-delivery GPS broadcasting */}
           {/* Gap 1: Pass deliveryStatus so GPS auto-stops on terminal states */}
-          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
+          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && o.isInTransit && deliveryAssignmentId && (
             <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart deliveryStatus={order.status} />
           )}
           {/* Persistent OTP card — visible to buyer for ALL non-terminal delivery statuses */}
