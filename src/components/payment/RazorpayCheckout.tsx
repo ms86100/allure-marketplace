@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+} from '@/components/ui/drawer';
 import { Loader2, CreditCard, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { useRazorpay } from '@/hooks/useRazorpay';
 import { useCurrency } from '@/hooks/useCurrency';
