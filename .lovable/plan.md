@@ -1,58 +1,57 @@
+# Blinkit UX Heuristic Analysis — Implementation Tracker
+## Status: ✅ PHASE 2 COMPLETE
 
+## ENGINE LAYER (Phase 1 — Complete)
 
-# Redesign "Meet Your Neighbor Sellers" → High-Conversion Discovery Module
+| # | Task | Status |
+|---|------|--------|
+| 1 | Global Feedback Engine (`feedbackEngine.ts`) | ✅ |
+| 2 | ETA Engine (`etaEngine.ts`) — single source of truth | ✅ |
+| 3 | Visibility Engine (`visibilityEngine.ts`) — route rules | ✅ |
+| 4 | Floating Cart Bar with thumbnails, count, total | ✅ |
+| 5 | ActiveOrderETA in header with live countdown | ✅ |
+| 6 | Unified haptics across all cart actions | ✅ |
 
-## Problem
-The current seller cards show only a colored letter avatar + name. The RPC `search_sellers_by_location` already returns rich data (`matching_products` array with name, price, image_url; `cover_image_url`; `description`; `categories`) but the hook discards it and the UI never displays it.
+## UX POLISH (Phase 1 — Complete)
 
-## Plan
+| # | Task | Status |
+|---|------|--------|
+| 7 | Undo toast for cart item removal (4s with re-add) | ✅ |
+| 8 | Haptic dedup — removed duplicate calls | ✅ |
+| 9 | Search autocomplete with product thumbnails | ✅ |
+| 10 | Recently Viewed products section on home page | ✅ |
+| 11 | CartPage remove button uses centralized feedbackEngine | ✅ |
+| 12 | Coupon feedback via feedbackEngine | ✅ |
+| 13 | Cart cleared feedback via feedbackEngine | ✅ |
+| 14 | Favorite toggle feedback via feedbackEngine | ✅ |
+| 15 | Dummy data elimination (picsum, 'Seller' fallbacks) | ✅ |
 
-### 1. Enrich the data hooks (`useStoreDiscovery.ts`)
-- Expand `LocalSeller` and `NearbySeller` interfaces to include: `cover_image_url`, `description`, `categories`, `completed_order_count`, and a new `topProducts` array (name, price, image_url, category, is_veg)
-- In both `useLocalSellers` and `useNearbySocietySellers`, parse `matching_products` JSON from RPC response, take up to 3 products sorted by price, and attach to each seller object
+## PERCEPTION LAYER (Phase 2 — Complete)
 
-### 2. Redesign seller cards in `ShopByStoreDiscovery.tsx`
-Replace the current minimal avatar+name cards with rich cards that show:
+| # | Task | Status |
+|---|------|--------|
+| 16 | ETA emotional states — emoji + mood tiers (calm/eager/imminent/late) | ✅ |
+| 17 | DeliveryETABanner mood-based gradient backgrounds | ✅ |
+| 18 | ActiveOrderETA emoji + intensified imminent pulse | ✅ |
+| 19 | Cart momentum — CTA changes to "Checkout" at 3+ items | ✅ |
+| 20 | Mini cart preview — bottom sheet from floating cart | ✅ |
+| 21 | Delivery completion celebration banner (one-time, duration-based) | ✅ |
+| 22 | Delivery partner identity card on OrderDetailPage | ✅ |
+| 23 | OrderProgressOverlay — SVG progress ring replaces spinner | ✅ |
+| 24 | Intelligent empty states (OrdersPage, FavoritesPage) | ✅ |
+| 25 | Session continuity — HomePage scroll position restore | ✅ |
+| 26 | Checkout commitment reinforcement — free delivery micro-copy | ✅ |
 
-- **Cover image** or product image mosaic (first 2-3 product images) as card header — if no cover or product images, fall back to current colored avatar
-- **Seller name** (sanitized as today)
-- **Category tags** (e.g., "Snacks", "Home Food") — from actual `categories` array
-- **Top products strip**: horizontal row of 2-3 product thumbnails with name + price below each
-- **Starting price**: "From ₹10" derived from min price of `topProducts`
-- **Social proof badge**: "X orders" if `completed_order_count > 0`, or "New Seller" otherwise (matching existing `SellerCard` pattern)
-
-Card layout: vertical, ~140px wide for local row / ~120px for nearby. Touch-friendly with hover/active scale transitions.
-
-### 3. Nearby society cards (`SocietyCard`)
-Apply the same enrichment — each seller tile inside society cards gets product thumbnails + price instead of bare avatar.
-
-### 4. No database changes needed
-The RPC already returns all required data. No migrations, no new tables.
-
-### Technical Details
-
-**Files modified:**
-- `src/hooks/queries/useStoreDiscovery.ts` — expand interfaces, parse `matching_products` from RPC response
-- `src/components/home/ShopByStoreDiscovery.tsx` — redesign `CategorySellerRow`, `SocietyCard`, and `SellerAvatar` components with product-rich cards
-
-**Data flow:**
-```text
-search_sellers_by_location RPC
-  └─ matching_products (JSON array with name, price, image_url, is_veg)
-  └─ cover_image_url, categories, completed_order_count
-       │
-       ▼
-useLocalSellers / useNearbySocietySellers
-  └─ parse JSON, slice top 3 by price, attach to seller
-       │
-       ▼
-Rich seller card UI
-  └─ product thumbnails + prices + category chips + social proof
-```
-
-**Constraints honored:**
-- Zero hardcoded data — everything from DB
-- Cards with no products gracefully degrade (show avatar + name only)
-- Uses `useCurrency` for price formatting
-- Maintains existing navigation to `/seller/:id`
-
+## Product Laws (Reference)
+1. Every action must produce immediate, consistent feedback across all surfaces
+2. ETA must feel believable, not just accurate
+3. Never show stale state after completion
+4. The cart must be omnipresent
+5. Cognitive load must decrease through the funnel
+6. Speed perception > speed reality
+7. Error prevention is worth 10x error recovery
+8. Transparency builds trust
+9. Promotional upsells must never block primary flow
+10. State transitions must be server-authoritative
+11. Recognition over recall applies to entire session
+12. Every screen must be self-sufficient
