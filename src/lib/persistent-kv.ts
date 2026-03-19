@@ -55,6 +55,8 @@ export async function restoreAppPreferences(): Promise<void> {
     'live_activity_map',
     'live_activity_diagnostics',
     'live_activity_diagnostics_errors',
+    'status_flow_terminal_cache',
+    'status_flow_start_cache',
   ];
 
   for (const prefix of prefixes) {

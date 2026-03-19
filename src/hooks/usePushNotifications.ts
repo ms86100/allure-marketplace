@@ -44,7 +44,7 @@ export function usePushNotificationsInternal() {
   const regStateRef = useRef<RegistrationState>('idle');
   const listenersReadyRef = useRef(false);
   const listenersReadyPromiseRef = useRef<Promise<void> | null>(null);
-  const terminalStatusesRef = useRef<Set<string>>(new Set());
+  // terminalStatusesRef removed — dynamic resolution via getTerminalStatuses() at event time
   const listenersResolveRef = useRef<(() => void) | null>(null);
 
   // ── Set log user ──
@@ -223,10 +223,9 @@ export function usePushNotificationsInternal() {
     let cleanupListeners: (() => void)[] = [];
 
     const setup = async () => {
-      // Load terminal statuses from DB for push-driven terminal sync
-      try {
-        terminalStatusesRef.current = await getTerminalStatuses();
-      } catch { /* best-effort — is_terminal flag in payload is primary */ }
+      // Terminal statuses now resolved dynamically at event time via getTerminalStatuses()
+      // Pre-warm the cache for faster first lookup (best-effort, non-blocking)
+      getTerminalStatuses().catch(() => {});
 
       let PushNotifications: any;
       try {
@@ -326,8 +325,18 @@ export function usePushNotificationsInternal() {
         // DB-driven: use is_terminal flag from push payload, or check cached terminal set
         const pushStatus = data?.status;
         const isTerminalPush = data?.is_terminal === 'true';
-        const terminalSet = terminalStatusesRef.current;
-        const isTerminal = isTerminalPush || (pushStatus && terminalSet.size > 0 && terminalSet.has(pushStatus));
+        // Dynamic resolution: call getTerminalStatuses() at event time (returns from cache in <1ms when warm)
+        let isTerminal = isTerminalPush;
+        if (!isTerminal && pushStatus) {
+          getTerminalStatuses().then(terminalSet => {
+            if (terminalSet.has(pushStatus) && orderId) {
+              pushLog('info', 'TERMINAL_PUSH_SYNC_ASYNC', { orderId, status: pushStatus });
+              window.dispatchEvent(new CustomEvent('order-terminal-push', {
+                detail: { orderId, status: pushStatus },
+              }));
+            }
+          }).catch(() => {});
+        }
         if (orderId && pushStatus && isTerminal) {
           pushLog('info', 'TERMINAL_PUSH_SYNC', { orderId, status: pushStatus });
           window.dispatchEvent(new CustomEvent('order-terminal-push', {
