@@ -93,7 +93,7 @@ function HeaderInner({
         'sticky top-0 z-40 bg-background/95 dark:bg-[hsl(20_12%_8%/0.97)] backdrop-blur-xl border-b border-border/30',
         className
       )}>
-        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 space-y-1.5">
+        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 space-y-1">
           {/* Brand + tagline */}
           <div>
             <h1 className="text-lg font-black text-foreground tracking-tight leading-tight italic">Sociva</h1>
