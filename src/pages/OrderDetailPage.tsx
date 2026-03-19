@@ -65,8 +65,7 @@ export default function OrderDetailPage() {
   useEffect(() => {
     if (!orderId || !order?.status) return;
     if (!Capacitor.isNativePlatform()) return;
-    const TERMINAL = new Set(['delivered', 'completed', 'cancelled', 'no_show']);
-    if (TERMINAL.has(order.status)) {
+    if (isTerminalStatus(o.flow, order.status)) {
       LiveActivityManager.end(orderId).catch(() => {});
     }
   }, [orderId, order?.status]);
