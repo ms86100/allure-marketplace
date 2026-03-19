@@ -191,7 +191,7 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
 
   return (
     <div>
-      {orders.map(order => <OrderCard key={order.id} order={order} type={type} />)}
+      {orders.map(order => <OrderCard key={order.id} order={order} type={type} successTerminals={successSet} />)}
       {hasMore && (
         <div className="flex justify-center py-4">
           <Button variant="secondary" size="default" className="w-full" onClick={loadMore} disabled={isLoadingMore}>
