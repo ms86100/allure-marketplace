@@ -93,14 +93,24 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
               to={`/category/${cat.parentGroup}?sub=${cat.category}`}
               className="flex flex-col items-center group active:scale-[0.95] transition-transform duration-150"
             >
-              {/* Tile card with color tint */}
+              {/* Tile card with glossy color tint */}
               <div
                 className="w-full aspect-square rounded-2xl overflow-hidden relative"
                 style={{
-                  backgroundColor: catColor ? `${catColor}25` : 'hsl(var(--card))',
-                  border: catColor ? `1px solid ${catColor}30` : '1px solid hsl(var(--border))',
+                  backgroundColor: catColor ? `${catColor}30` : 'hsl(var(--card))',
+                  border: catColor ? `1.5px solid ${catColor}40` : '1px solid hsl(var(--border))',
+                  boxShadow: catColor
+                    ? `inset 0 1px 0 ${catColor}25, 0 2px 8px ${catColor}15`
+                    : 'var(--shadow-card)',
                 }}
               >
+                {/* Colored accent bar */}
+                {catColor && (
+                  <div
+                    className="absolute top-0 inset-x-0 h-[2px] z-10"
+                    style={{ backgroundColor: catColor }}
+                  />
+                )}
                 {images.length >= 4 ? (
                   /* 2x2 collage */
                   <div className="category-collage items-4 w-full h-full">
@@ -155,8 +165,8 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
 
                 {/* Bottom gradient label overlay (only when has images) */}
                 {images.length > 0 && (
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-1.5 pb-1.5 pt-4">
-                    <span className="text-[10px] font-bold text-white leading-tight line-clamp-2 drop-shadow-sm">
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent backdrop-blur-[2px] px-1.5 pb-1.5 pt-5">
+                    <span className="text-[10px] font-bold text-white leading-tight line-clamp-2 drop-shadow-md">
                       {cat.displayName}
                     </span>
                   </div>
