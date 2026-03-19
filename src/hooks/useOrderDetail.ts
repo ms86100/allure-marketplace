@@ -110,8 +110,22 @@ export function useOrderDetail(id: string | undefined) {
     return canActorCancel(transitions, order.status, 'buyer');
   }, [order?.status, transitions]);
 
+  // Re-fetch when app resumes (Deep link from Dynamic Island) or visibility changes
+  const [refetchTick, setRefetchTick] = useState(0);
+
+  useEffect(() => {
+    const onResume = () => setRefetchTick(t => t + 1);
+    const onVisibility = () => { if (document.visibilityState === 'visible') setRefetchTick(t => t + 1); };
+    window.addEventListener('order-detail-refetch', onResume);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('order-detail-refetch', onResume);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { let cancelled = false; if (id) { fetchOrder(cancelled); fetchUnreadCount(); } return () => { cancelled = true; }; }, [id]);
+  useEffect(() => { let cancelled = false; if (id) { fetchOrder(cancelled); fetchUnreadCount(); } return () => { cancelled = true; }; }, [id, refetchTick]);
 
   useEffect(() => {
     if (!id) return;

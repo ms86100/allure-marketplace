@@ -65,6 +65,32 @@ export async function syncActiveOrders(userId: string): Promise<number> {
 
     if (!orders || orders.length === 0) {
       console.log(TAG, 'No active orders');
+    }
+
+    const activeOrderIds = new Set((orders ?? []).map((o) => o.id));
+
+    // ── FIX 1: End native activities for orders that became terminal while backgrounded ──
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor.isNativePlatform()) {
+        const { LiveActivity } = await import('@/plugins/live-activity');
+        const { activities: nativeActivities } = await LiveActivity.getActiveActivities();
+        for (const act of nativeActivities) {
+          if (!activeOrderIds.has(act.entityId)) {
+            console.log(TAG, `Ending stale native activity for terminal order ${act.entityId}`);
+            try {
+              await LiveActivityManager.end(act.entityId);
+            } catch (e) {
+              console.warn(TAG, `Failed to end stale activity ${act.entityId}:`, e);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(TAG, 'Failed to clean up stale native activities:', e);
+    }
+
+    if (!orders || orders.length === 0) {
       return 0;
     }
 

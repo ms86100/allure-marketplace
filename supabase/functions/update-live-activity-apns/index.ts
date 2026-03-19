@@ -238,7 +238,7 @@ Deno.serve(async (req) => {
         timestamp: Math.floor(Date.now() / 1000),
         event: isTerminal ? "end" : "update",
         "content-state": contentState,
-        ...(isTerminal ? { "dismissal-date": Math.floor(Date.now() / 1000) + 5 } : {}),
+        ...(isTerminal ? { "dismissal-date": Math.floor(Date.now() / 1000) + 4 } : {}),
       },
     };
 
