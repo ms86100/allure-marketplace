@@ -383,6 +383,23 @@ export function useLiveActivityOrchestrator(): void {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [userId, doSync]);
 
+  // ── Push-driven terminal sync: closes the Realtime-failure gap ──
+  useEffect(() => {
+    if (!userId || !Capacitor.isNativePlatform()) return;
+
+    const handler = async (e: Event) => {
+      const { orderId, status } = (e as CustomEvent).detail;
+      console.log(TAG, 'Push-driven terminal sync:', orderId, status);
+      activeOrderIdsRef.current.delete(orderId);
+      await LiveActivityManager.end(orderId);
+      // Small delay to let DB settle, then sync
+      setTimeout(() => doSync(), 300);
+    };
+
+    window.addEventListener('order-terminal-push', handler);
+    return () => window.removeEventListener('order-terminal-push', handler);
+  }, [userId, doSync]);
+
   // ── App resume re-hydration (one-shot sync) ──
   useEffect(() => {
     if (!userId || !Capacitor.isNativePlatform()) return;
