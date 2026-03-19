@@ -330,9 +330,10 @@ export function UpiDeepLinkCheckout({
                     </button>
                   </div>
                 ) : (
-                  <label className="flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-muted-foreground/25 hover:border-primary/40 transition-colors cursor-pointer bg-muted/20">
-                    <ImagePlus size={16} className="text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Attach payment screenshot <span className="opacity-60">(optional)</span></span>
+                  <label className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-xl border-2 border-dashed border-primary/30 hover:border-primary/50 transition-colors cursor-pointer bg-primary/5">
+                    <ImagePlus size={18} className="text-primary" />
+                    <span className="text-xs font-medium text-primary">Upload payment screenshot</span>
+                    <span className="text-[10px] text-muted-foreground">Required to confirm payment</span>
                     <input type="file" accept="image/*" className="hidden" onChange={handleScreenshotSelect} />
                   </label>
                 )}
