@@ -165,8 +165,8 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
 
                 {/* Bottom gradient label overlay (only when has images) */}
                 {images.length > 0 && (
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent px-1.5 pb-1.5 pt-4">
-                    <span className="text-[10px] font-bold text-white leading-tight line-clamp-2 drop-shadow-sm">
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent backdrop-blur-[2px] px-1.5 pb-1.5 pt-5">
+                    <span className="text-[10px] font-bold text-white leading-tight line-clamp-2 drop-shadow-md">
                       {cat.displayName}
                     </span>
                   </div>
