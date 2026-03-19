@@ -87,33 +87,21 @@ function HeaderInner({
         className
       )}>
         <div className="px-4 pt-[max(0.25rem,env(safe-area-inset-top))] pb-2">
-          {/* Gap #1: Compressed top row — branding + society inline + actions */}
+          {/* Single compressed row: branding + greeting + actions */}
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-[20px] font-extrabold tracking-tight leading-none">
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-[18px] font-extrabold tracking-tight leading-none">
                   <span className="text-[hsl(var(--primary))]">S</span>
                   <span className="text-foreground">oci</span>
                   <span className="text-[hsl(100,60%,45%)]">v</span>
                   <span className="text-foreground">a</span>
                 </h1>
-                {displaySociety && (
-                  <div className="flex items-center gap-1 min-w-0">
-                    <span className="text-muted-foreground/30">·</span>
-                    <Building size={10} className="text-muted-foreground shrink-0" />
-                    <span className="text-[10px] font-semibold text-muted-foreground truncate max-w-[30vw]">
-                      {displaySociety.name}
-                    </span>
-                    {societyStats?.isVerified && (
-                      <Verified size={11} className="text-primary shrink-0" />
-                    )}
-                  </div>
-                )}
+                <span className="text-muted-foreground/25">·</span>
+                <span className="text-[10px] font-semibold text-muted-foreground truncate">
+                  {greeting}
+                </span>
               </div>
-              {/* Gap #2: Time-aware greeting replaces static tagline */}
-              <p className="text-[10px] font-bold text-muted-foreground tracking-wide mt-0.5">
-                {greeting}
-              </p>
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -177,73 +165,33 @@ function HeaderInner({
             </div>
           </div>
 
-          {/* Dynamic location stats chip — only on home (no title) */}
+          {/* Single row: location + search merged into one bar */}
           {!title && (
-            <button
-              type="button"
-              onClick={() => setLocationSheetOpen(true)}
-              className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-full bg-primary/5 border border-primary/15 hover:bg-primary/10 transition-colors max-w-full overflow-hidden"
-            >
-              <MapPin size={11} className="text-primary shrink-0" />
-              {browsingLocation ? (
-                <>
-                  <span className="text-[10px] font-semibold text-foreground truncate">
-                    {browsingLocation.source === 'gps' ? 'Near ' : ''}{browsingLocation.label}
-                  </span>
-                  {locationStats && (
-                    <>
-                      <span className="text-muted-foreground/40 shrink-0">·</span>
-                      <span className="inline-flex items-center gap-0.5 text-[9px] text-muted-foreground whitespace-nowrap">
-                        <Store size={8} className="text-primary/70 shrink-0" />
-                        <span className="font-semibold">{locationStats.sellersNearby}</span> sellers
-                      </span>
-                      {locationStats.ordersToday > 0 && (
-                        <>
-                          <span className="text-muted-foreground/40 shrink-0">·</span>
-                          <span className="text-[9px] text-muted-foreground whitespace-nowrap">
-                            <span className="font-semibold">{locationStats.ordersToday}</span> orders today
-                          </span>
-                        </>
-                      )}
-                    </>
-                  )}
-                </>
-              ) : (
-                <span className="text-[10px] font-semibold text-muted-foreground">
-                  Set your location
+            <div className="flex items-center gap-2 mt-1.5">
+              {/* Location chip — compact, tappable */}
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); setLocationSheetOpen(true); }}
+                className="shrink-0 flex items-center gap-1 px-2 py-1.5 rounded-lg bg-primary/5 border border-primary/15 hover:bg-primary/10 transition-colors"
+              >
+                <MapPin size={11} className="text-primary shrink-0" />
+                <span className="text-[9px] font-semibold text-foreground max-w-[60px] truncate">
+                  {browsingLocation ? browsingLocation.label : 'Location'}
                 </span>
-              )}
-              <ChevronDown size={10} className="text-muted-foreground shrink-0 ml-auto" />
-            </button>
-          )}
+                <ChevronDown size={9} className="text-muted-foreground shrink-0" />
+              </button>
 
-          {/* Search bar - only on home (no title) */}
-          {!title && (
-            <>
-              <Link to="/search" className="block mt-1.5">
-                <div className="flex items-center gap-2.5 bg-secondary rounded-xl px-3.5 py-2 border border-border">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0">
+              {/* Search bar — takes remaining space */}
+              <Link to="/search" className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 bg-secondary rounded-xl px-3 py-1.5 border border-border">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground shrink-0">
                     <circle cx="11" cy="11" r="8"/>
                     <path d="m21 21-4.3-4.3"/>
                   </svg>
                   <TypewriterPlaceholder context="home" />
                 </div>
               </Link>
-              {/* Gap #10: Recent search chips */}
-              {recentSearches.length > 0 && (
-                <div className="flex gap-1.5 mt-1.5 overflow-x-auto scrollbar-hide">
-                  {recentSearches.map((term: string, i: number) => (
-                    <Link
-                      key={i}
-                      to={`/search?q=${encodeURIComponent(term)}`}
-                      className="shrink-0 text-[9px] font-medium text-muted-foreground bg-secondary border border-border rounded-full px-2.5 py-1 hover:bg-muted transition-colors"
-                    >
-                      {term}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </>
+            </div>
           )}
         </div>
 
