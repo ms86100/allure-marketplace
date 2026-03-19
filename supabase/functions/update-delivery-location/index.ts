@@ -416,12 +416,14 @@ serve(async (req) => {
       }
 
       if (distanceMeters < 200) {
+        const thirtySecsAgoImm = new Date(Date.now() - 30_000).toISOString();
         const { count: imminentCount } = await supabase
           .from('notification_queue')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', buyerId)
           .eq('type', 'delivery_proximity_imminent')
-          .eq('reference_path', `/orders/${assignment.order_id}`);
+          .eq('reference_path', `/orders/${assignment.order_id}`)
+          .gte('created_at', thirtySecsAgoImm);
 
         if (!imminentCount || imminentCount === 0) {
           await supabase.from('notification_queue').insert({
