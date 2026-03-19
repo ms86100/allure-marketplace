@@ -298,13 +298,13 @@
     --shadow-glow-green: 0 0 14px hsl(165 35% 30% / 0.2);
     --shadow-glow-accent: 0 0 14px hsl(30 45% 50% / 0.2);
 
-    --sidebar-background: 40 15% 85%;
-    --sidebar-foreground: 0 0% 12%;
-    --sidebar-primary: 165 35% 25%;
-    --sidebar-primary-foreground: 40 10% 93%;
-    --sidebar-accent: 80 5% 78%;
-    --sidebar-accent-foreground: 0 0% 25%;
-    --sidebar-border: 30 8% 78%;
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 40 10% 90%;
+    --sidebar-primary: 165 35% 30%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 13%;
+    --sidebar-accent-foreground: 80 5% 72%;
+    --sidebar-border: 0 0% 16%;
     --sidebar-ring: 175 25% 55%;
 
     /* ═══ Component surface tokens — Nature/WANGLOW ═══ */
