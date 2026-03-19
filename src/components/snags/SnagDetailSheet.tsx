@@ -201,7 +201,7 @@ export function SnagDetailSheet({
             </div>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

@@ -138,8 +138,8 @@ export default function SocietyNoticesPage() {
                   {submitting ? 'Posting...' : 'Post & Notify All Residents'}
                 </Button>
               </div>
-            </SheetContent>
-          </Sheet>
+            </DrawerContent>
+          </Drawer>
         )}
 
          {loading ? (
