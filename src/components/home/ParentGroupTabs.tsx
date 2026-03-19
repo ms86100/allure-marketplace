@@ -40,11 +40,7 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
   const useGrid = tabs.length <= 8;
 
   return (
-    <div className={cn(
-      useGrid
-        ? 'grid grid-cols-4 gap-y-4 gap-x-3 px-4 py-1'
-        : 'flex gap-3 overflow-x-auto scrollbar-hide px-4 py-1'
-    )}>
+    <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-1">
       {tabs.map((tab) => {
         const isActive = tab.value === '__all__' ? activeGroup === null : activeGroup === tab.value;
         return (
@@ -59,30 +55,18 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
               }
             }}
             className={cn(
-              'flex flex-col items-center gap-1.5 transition-all duration-200 group',
-              !useGrid && 'shrink-0'
+              'flex items-center gap-1.5 shrink-0 rounded-full px-3 py-2 transition-all duration-200',
+              isActive
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'bg-secondary text-foreground/70 hover:bg-muted active:scale-95'
             )}
           >
-            <div
-              className={cn(
-                'w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200',
-                isActive
-                  ? 'bg-primary text-primary-foreground shadow-cta scale-105'
-                  : 'bg-secondary text-foreground/60 hover:bg-muted active:scale-95'
-              )}
-            >
-              <DynamicIcon
-                name={tab.icon}
-                size={24}
-                className="transition-colors duration-200"
-              />
-            </div>
-            <span
-              className={cn(
-                'text-[10px] font-semibold leading-tight text-center w-16 line-clamp-1',
-                isActive ? 'text-primary font-bold' : 'text-muted-foreground'
-              )}
-            >
+            <DynamicIcon
+              name={tab.icon}
+              size={16}
+              className="shrink-0"
+            />
+            <span className="text-xs font-semibold whitespace-nowrap">
               {tab.label}
             </span>
           </button>
