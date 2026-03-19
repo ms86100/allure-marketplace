@@ -141,7 +141,7 @@ export function MarketplaceSection() {
       </div>
 
       {/* ── Category Image Grids ── */}
-      {activeParentGroups.slice(0, 4).map((group) => (
+      {activeParentGroups.map((group) => (
         <CategoryImageGrid
           key={group.value}
           parentGroup={group.value}
