@@ -38,13 +38,9 @@ export function getOperationLog(): OperationLogEntry[] {
   return [...operationLog];
 }
 
-/** DB-backed terminal and start status sets — loaded at hydration time */
-let TERMINAL_STATUSES = new Set([
-  'delivered', 'completed', 'cancelled', 'no_show',
-]);
-let START_STATUSES = new Set([
-  'accepted', 'picked_up', 'confirmed', 'preparing', 'en_route', 'on_the_way', 'ready',
-]);
+/** DB-backed terminal and start status sets — loaded at hydration time. No hardcoded fallbacks. */
+let TERMINAL_STATUSES = new Set<string>();
+let START_STATUSES = new Set<string>();
 let statusSetsLoaded = false;
 
 async function loadStatusSets(): Promise<void> {
@@ -54,7 +50,9 @@ async function loadStatusSets(): Promise<void> {
     TERMINAL_STATUSES = terminal;
     START_STATUSES = start;
     statusSetsLoaded = true;
-  } catch { /* keep defaults */ }
+  } catch (e) {
+    console.error(TAG, 'CRITICAL: Failed to load status sets from DB — terminal detection may be incomplete', e);
+  }
 }
 
 const THROTTLE_MS = 5_000;

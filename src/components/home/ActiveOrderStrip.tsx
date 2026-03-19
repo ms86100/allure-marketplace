@@ -8,7 +8,7 @@ import { ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { compactETA } from '@/lib/etaEngine';
-import { TRANSIT_STATUSES } from '@/lib/visibilityEngine';
+import { getTransitStatuses } from '@/lib/visibilityEngine';
 
 interface ActiveOrder {
   id: string;
@@ -115,7 +115,7 @@ export function ActiveOrderStrip() {
       <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         <AnimatePresence>
           {activeOrders.map((order) => {
-            const isTransit = TRANSIT_STATUSES.has(order.status as any);
+            const isTransit = getTransitStatuses().has(order.status);
             const etaText = order.estimated_delivery_at ? compactETA(order.estimated_delivery_at) : null;
             return (
               <motion.div

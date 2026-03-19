@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { hapticNotification } from '@/lib/haptics';
 import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
 import { LiveActivityManager } from '@/services/LiveActivityManager';
+import { getTerminalStatuses } from '@/services/statusFlowCache';
 
 /**
  * BUILD FINGERPRINT — bump on every push-related update.
@@ -43,6 +44,7 @@ export function usePushNotificationsInternal() {
   const regStateRef = useRef<RegistrationState>('idle');
   const listenersReadyRef = useRef(false);
   const listenersReadyPromiseRef = useRef<Promise<void> | null>(null);
+  const terminalStatusesRef = useRef<Set<string>>(new Set());
   const listenersResolveRef = useRef<(() => void) | null>(null);
 
   // ── Set log user ──
@@ -221,6 +223,11 @@ export function usePushNotificationsInternal() {
     let cleanupListeners: (() => void)[] = [];
 
     const setup = async () => {
+      // Load terminal statuses from DB for push-driven terminal sync
+      try {
+        terminalStatusesRef.current = await getTerminalStatuses();
+      } catch { /* best-effort — is_terminal flag in payload is primary */ }
+
       let PushNotifications: any;
       try {
         const pnMod = await import('@capacitor/push-notifications');
@@ -316,9 +323,12 @@ export function usePushNotificationsInternal() {
 
         // CRITICAL: Dispatch terminal sync BEFORE suppression check
         // Terminal pushes must always trigger state reconciliation even if LA is tracking
-        const TERMINAL_STATUSES = ['delivered', 'completed', 'cancelled', 'no_show'];
+        // DB-driven: use is_terminal flag from push payload, or check cached terminal set
         const pushStatus = data?.status;
-        if (orderId && pushStatus && TERMINAL_STATUSES.includes(pushStatus)) {
+        const isTerminalPush = data?.is_terminal === 'true';
+        const terminalSet = terminalStatusesRef.current;
+        const isTerminal = isTerminalPush || (pushStatus && terminalSet.size > 0 && terminalSet.has(pushStatus));
+        if (orderId && pushStatus && isTerminal) {
           pushLog('info', 'TERMINAL_PUSH_SYNC', { orderId, status: pushStatus });
           window.dispatchEvent(new CustomEvent('order-terminal-push', {
             detail: { orderId, status: pushStatus },

@@ -22,10 +22,8 @@ export function isRouteHidden(
   return hiddenPrefixes.some((prefix) => pathname.startsWith(prefix));
 }
 
-/** Transit statuses that indicate active movement — used for activity pulse */
-export const TRANSIT_STATUSES = new Set([
-  'on_the_way',
-  'out_for_delivery',
-  'at_gate',
-  'in_transit',
-] as const);
+/** Transit statuses that indicate active movement — DB-driven via trackingConfig */
+import { getTrackingConfigSync } from '@/services/trackingConfig';
+export function getTransitStatuses(): Set<string> {
+  return new Set(getTrackingConfigSync().transit_statuses_la);
+}

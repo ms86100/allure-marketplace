@@ -10,10 +10,8 @@ import { Capacitor } from '@capacitor/core';
 
 const TAG = '[LiveActivityOrchestrator]';
 
-/** DB-backed terminal statuses — loaded once at init */
-let terminalStatusesCache: Set<string> = new Set([
-  'delivered', 'completed', 'cancelled', 'no_show',
-]);
+/** DB-backed terminal statuses — loaded once at init. No hardcoded fallbacks. */
+let terminalStatusesCache: Set<string> = new Set();
 
 const MAX_RECONNECT_RETRIES = 3;
 const RECONNECT_DELAY_MS = 3000;
