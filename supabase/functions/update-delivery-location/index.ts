@@ -512,6 +512,7 @@ serve(async (req) => {
                 push_token: laToken.push_token,
                 seller_name: sellerName,
                 seller_logo_url: sellerLogoUrl,
+                initial_eta_minutes: etaMinutes,
               },
             });
 

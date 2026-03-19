@@ -218,7 +218,8 @@ Deno.serve(async (req) => {
     // ETA-based progress override for transit statuses (matches client-side logic)
     const TRANSIT_STATUSES = ['on_the_way', 'picked_up', 'at_gate'];
     if (TRANSIT_STATUSES.includes(status) && etaMinutes != null && etaMinutes >= 0) {
-      const MAX_ETA = 15;
+      const initialEta = payload.initial_eta_minutes;
+      const MAX_ETA = (initialEta != null && initialEta > 5) ? initialEta : 15;
       const ratio = Math.min(etaMinutes / MAX_ETA, 1);
       progressPercent = Math.max(0.1, Math.min(0.95, 1 - ratio));
     }
