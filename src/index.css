@@ -217,14 +217,14 @@
      NATURE MODE — Living ecosystem, organic warmth
      ═══════════════════════════════════════════════ */
   .nature {
-    --background: 90 20% 97%;
+    --background: 85 18% 95%;
     --foreground: 160 20% 10%;
 
-    --card: 80 16% 95%;
+    --card: 78 14% 93%;
     --card-foreground: 160 20% 10%;
-    --card-elevated: 75 14% 92%;
+    --card-elevated: 72 12% 90%;
 
-    --popover: 85 18% 96%;
+    --popover: 82 16% 94%;
     --popover-foreground: 160 20% 10%;
 
     --primary: 152 55% 32%;
@@ -267,22 +267,22 @@
     --nav-active-foreground: 60 20% 97%;
 
     /* Product image */
-    --product-image-bg: 85 14% 93%;
+    --product-image-bg: 82 14% 91%;
 
     /* Nature tints */
-    --tint-food: 38 22% 94%;
-    --tint-services: 152 12% 93%;
-    --tint-personal: 310 8% 94%;
-    --tint-resale: 32 18% 93%;
-    --tint-events: 265 8% 94%;
-    --tint-default: 90 10% 93%;
+    --tint-food: 38 22% 92%;
+    --tint-services: 152 12% 91%;
+    --tint-personal: 310 8% 92%;
+    --tint-resale: 32 18% 91%;
+    --tint-events: 265 8% 92%;
+    --tint-default: 90 10% 91%;
 
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(152 55% 32%) 0%, hsl(172 42% 34%) 100%);
     --gradient-success: linear-gradient(135deg, hsl(152 55% 32%) 0%, hsl(162 38% 30%) 100%);
     --gradient-warm: linear-gradient(135deg, hsl(38 65% 55%) 0%, hsl(22 60% 48%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(152 55% 32% / 0.05) 0%, hsl(90 20% 97%) 50%);
-    --gradient-glass: linear-gradient(135deg, hsl(80 16% 95% / 0.98) 0%, hsl(90 14% 93% / 0.94) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(152 55% 32% / 0.08) 0%, hsl(85 18% 95%) 50%);
+    --gradient-glass: linear-gradient(135deg, hsl(78 14% 93% / 0.97) 0%, hsl(85 16% 90% / 0.92) 100%);
 
     /* Shadows — dappled sunlight */
     --shadow-sm: 0 1px 3px hsl(152 25% 18% / 0.06);
@@ -295,7 +295,7 @@
     --shadow-glow-green: 0 0 16px hsl(152 55% 32% / 0.12);
     --shadow-glow-accent: 0 0 16px hsl(38 65% 55% / 0.12);
 
-    --sidebar-background: 80 16% 95%;
+    --sidebar-background: 78 14% 93%;
     --sidebar-foreground: 160 20% 10%;
     --sidebar-primary: 152 55% 32%;
     --sidebar-primary-foreground: 60 20% 97%;
@@ -305,8 +305,8 @@
     --sidebar-ring: 152 55% 32%;
 
     /* ═══ Component surface tokens — Nature ═══ */
-    --header-bg: 90 20% 97% / 0.96;
-    --nav-bg: 90 20% 97% / 0.97;
+    --header-bg: 85 18% 95% / 0.96;
+    --nav-bg: 85 18% 95% / 0.97;
     --nav-border: 95 10% 82% / 0.6;
     --search-bg: 100 16% 90% / 0.6;
     --search-border: 95 12% 78% / 0.5;
@@ -634,23 +634,46 @@ body.razorpay-active iframe[src*="razorpay"] {
   transition: box-shadow 0.35s ease, border-color 0.35s ease;
 }
 
-/* Nature: subtle organic texture (CSS-only, no images) */
+/* ═══ Nature: Multi-layer immersive background ═══ */
+.nature #root {
+  background-color: hsl(85 18% 95%);
+  background-image:
+    radial-gradient(ellipse at 10% 15%, hsl(152 55% 32% / 0.06) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 30%, hsl(38 65% 55% / 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 95%, hsl(195 50% 60% / 0.03) 0%, transparent 45%),
+    radial-gradient(ellipse at 90% 5%, hsl(280 40% 70% / 0.025) 0%, transparent 40%);
+  background-attachment: fixed;
+}
+
+/* Nature: organic leaf-vein texture overlay */
 .nature #root::before {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.35;
+  opacity: 0.025;
   background-image:
-    radial-gradient(ellipse at 15% 50%, hsl(var(--primary) / 0.025) 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 20%, hsl(var(--accent) / 0.03) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 90%, hsl(var(--primary) / 0.02) 0%, transparent 40%);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cpath d='M60 0 C55 30 30 55 0 60 C30 65 55 90 60 120 C65 90 90 65 120 60 C90 55 65 30 60 0Z' fill='none' stroke='%23507a50' stroke-width='0.5' opacity='0.6'/%3E%3Cpath d='M60 20 C57 40 40 57 20 60 C40 63 57 80 60 100 C63 80 80 63 100 60 C80 57 63 40 60 20Z' fill='none' stroke='%23507a50' stroke-width='0.3' opacity='0.4'/%3E%3C/svg%3E");
+  background-size: 120px 120px;
 }
 
 .nature #root > * {
   position: relative;
   z-index: 1;
+}
+
+/* Nature: section-aware gradient bands */
+.nature .nature-section-forest {
+  background-image: linear-gradient(180deg, hsl(152 55% 32% / 0.04) 0%, transparent 100%);
+}
+
+.nature .nature-section-water {
+  background-image: linear-gradient(180deg, hsl(195 50% 60% / 0.035) 0%, transparent 100%);
+}
+
+.nature .nature-section-earth {
+  background-image: linear-gradient(180deg, hsl(38 65% 55% / 0.035) 0%, transparent 100%);
 }
 
 /* Nature: gentler animations */
