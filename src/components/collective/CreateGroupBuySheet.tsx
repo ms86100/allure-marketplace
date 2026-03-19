@@ -44,12 +44,12 @@ export function CreateGroupBuySheet({ onCreated }: Props) {
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
         <Button size="sm" className="text-xs gap-1"><Plus size={14} /> Start Group Buy</Button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader><SheetTitle>Start a Group Buy</SheetTitle></SheetHeader>
+      </DrawerTrigger>
+      <DrawerContent>
+        <DrawerHeader><DrawerTitle>Start a Group Buy</DrawerTitle></DrawerHeader>
         <div className="space-y-4 mt-4">
           <div>
             <Label className="text-xs">What do you want to buy together?</Label>
