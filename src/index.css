@@ -217,7 +217,7 @@
      NATURE MODE — Living ecosystem, organic warmth
      ═══════════════════════════════════════════════ */
   .nature {
-    --background: 85 18% 95%;
+    --background: 88 22% 93%;
     --foreground: 160 20% 10%;
 
     --card: 78 14% 93%;
@@ -634,28 +634,52 @@ body.razorpay-active iframe[src*="razorpay"] {
   transition: box-shadow 0.35s ease, border-color 0.35s ease;
 }
 
-/* ═══ Nature: Multi-layer immersive background ═══ */
+/* ═══ Nature: Multi-layer immersive living background ═══ */
 .nature #root {
-  background-color: hsl(85 18% 95%);
+  background-color: hsl(88 22% 93%);
   background-image:
-    radial-gradient(ellipse at 10% 15%, hsl(152 55% 32% / 0.06) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 30%, hsl(38 65% 55% / 0.04) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 95%, hsl(195 50% 60% / 0.03) 0%, transparent 45%),
-    radial-gradient(ellipse at 90% 5%, hsl(280 40% 70% / 0.025) 0%, transparent 40%);
+    /* Canopy light — dappled sunlight through trees */
+    radial-gradient(ellipse 80% 60% at 8% 8%, hsl(135 50% 40% / 0.09) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 65% 5%, hsl(100 45% 55% / 0.05) 0%, transparent 50%),
+    /* Golden hour — warm afternoon glow */
+    radial-gradient(ellipse 60% 50% at 92% 35%, hsl(42 70% 60% / 0.055) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 30% at 80% 15%, hsl(30 55% 65% / 0.03) 0%, transparent 45%),
+    /* Stream & water — cool refreshing undertones */
+    radial-gradient(ellipse 90% 40% at 40% 100%, hsl(185 45% 55% / 0.045) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 35% at 15% 90%, hsl(200 50% 60% / 0.03) 0%, transparent 45%),
+    /* Floral meadow — faint wildflower hints */
+    radial-gradient(ellipse 35% 25% at 95% 70%, hsl(320 30% 70% / 0.025) 0%, transparent 40%),
+    radial-gradient(ellipse 30% 20% at 5% 55%, hsl(270 25% 65% / 0.02) 0%, transparent 35%),
+    /* Moss ground — grounding earthy base */
+    radial-gradient(ellipse 100% 30% at 50% 105%, hsl(95 25% 45% / 0.04) 0%, transparent 40%);
   background-attachment: fixed;
 }
 
-/* Nature: organic leaf-vein texture overlay */
+/* Nature: organic botanical texture overlay */
 .nature #root::before {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.025;
+  opacity: 0.03;
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cpath d='M60 0 C55 30 30 55 0 60 C30 65 55 90 60 120 C65 90 90 65 120 60 C90 55 65 30 60 0Z' fill='none' stroke='%23507a50' stroke-width='0.5' opacity='0.6'/%3E%3Cpath d='M60 20 C57 40 40 57 20 60 C40 63 57 80 60 100 C63 80 80 63 100 60 C80 57 63 40 60 20Z' fill='none' stroke='%23507a50' stroke-width='0.3' opacity='0.4'/%3E%3C/svg%3E");
-  background-size: 120px 120px;
+    /* Leaf cell / vein pattern — organic tessellation */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cpath d='M100 10 C85 45 45 85 10 100 C45 115 85 155 100 190 C115 155 155 115 190 100 C155 85 115 45 100 10Z' fill='none' stroke='%23507a50' stroke-width='0.4' opacity='0.5'/%3E%3Cpath d='M100 40 C90 60 60 90 40 100 C60 110 90 140 100 160 C110 140 140 110 160 100 C140 90 110 60 100 40Z' fill='none' stroke='%23507a50' stroke-width='0.25' opacity='0.35'/%3E%3Cpath d='M100 10 L100 190' stroke='%23507a50' stroke-width='0.2' opacity='0.3'/%3E%3Cpath d='M10 100 L190 100' stroke='%23507a50' stroke-width='0.2' opacity='0.3'/%3E%3Cpath d='M30 30 Q100 70 170 30' fill='none' stroke='%23507a50' stroke-width='0.15' opacity='0.2'/%3E%3Cpath d='M30 170 Q100 130 170 170' fill='none' stroke='%23507a50' stroke-width='0.15' opacity='0.2'/%3E%3Ccircle cx='100' cy='100' r='3' fill='%23507a50' opacity='0.15'/%3E%3Ccircle cx='50' cy='50' r='1.5' fill='%23507a50' opacity='0.1'/%3E%3Ccircle cx='150' cy='150' r='1.5' fill='%23507a50' opacity='0.1'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* Nature: secondary water-ripple texture */
+.nature #root::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.015;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Ccircle cx='150' cy='150' r='40' fill='none' stroke='%23508a7a' stroke-width='0.4' opacity='0.5'/%3E%3Ccircle cx='150' cy='150' r='80' fill='none' stroke='%23508a7a' stroke-width='0.3' opacity='0.35'/%3E%3Ccircle cx='150' cy='150' r='120' fill='none' stroke='%23508a7a' stroke-width='0.2' opacity='0.2'/%3E%3Ccircle cx='50' cy='250' r='30' fill='none' stroke='%23508a7a' stroke-width='0.3' opacity='0.3'/%3E%3Ccircle cx='50' cy='250' r='60' fill='none' stroke='%23508a7a' stroke-width='0.2' opacity='0.2'/%3E%3Ccircle cx='250' cy='50' r='25' fill='none' stroke='%23508a7a' stroke-width='0.3' opacity='0.25'/%3E%3Ccircle cx='250' cy='50' r='55' fill='none' stroke='%23508a7a' stroke-width='0.2' opacity='0.15'/%3E%3C/svg%3E");
+  background-size: 300px 300px;
 }
 
 .nature #root > * {
@@ -665,15 +689,23 @@ body.razorpay-active iframe[src*="razorpay"] {
 
 /* Nature: section-aware gradient bands */
 .nature .nature-section-forest {
-  background-image: linear-gradient(180deg, hsl(152 55% 32% / 0.04) 0%, transparent 100%);
+  background-image:
+    linear-gradient(180deg, hsl(140 40% 40% / 0.05) 0%, hsl(120 30% 50% / 0.02) 50%, transparent 100%);
 }
 
 .nature .nature-section-water {
-  background-image: linear-gradient(180deg, hsl(195 50% 60% / 0.035) 0%, transparent 100%);
+  background-image:
+    linear-gradient(180deg, hsl(190 45% 55% / 0.04) 0%, hsl(200 40% 60% / 0.015) 50%, transparent 100%);
 }
 
 .nature .nature-section-earth {
-  background-image: linear-gradient(180deg, hsl(38 65% 55% / 0.035) 0%, transparent 100%);
+  background-image:
+    linear-gradient(180deg, hsl(35 50% 55% / 0.04) 0%, hsl(45 40% 50% / 0.015) 50%, transparent 100%);
+}
+
+.nature .nature-section-meadow {
+  background-image:
+    linear-gradient(135deg, hsl(90 35% 50% / 0.03) 0%, hsl(60 40% 55% / 0.02) 50%, transparent 100%);
 }
 
 /* Nature: gentler animations */
@@ -692,4 +724,14 @@ body.razorpay-active iframe[src*="razorpay"] {
 
 .nature .animate-bounce-in {
   animation: bounceIn 0.55s cubic-bezier(0.34, 1.15, 0.64, 1);
+}
+
+/* Nature: card surfaces with organic warmth */
+.nature .glass-card {
+  background: linear-gradient(145deg, hsl(78 14% 93% / 0.95) 0%, hsl(85 16% 91% / 0.9) 100%);
+  border-color: hsl(95 12% 80% / 0.5);
+}
+
+.nature .glass-tinted {
+  background: linear-gradient(145deg, hsl(78 14% 93% / 0.85) 0%, hsl(90 12% 90% / 0.8) 100%);
 }
