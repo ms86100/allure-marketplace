@@ -50,67 +50,51 @@ export function CommunityTeaser() {
 
   if (!effectiveSocietyId) return null;
 
-  // C4: Show empty state instead of disappearing
+  // Gap #8: Reduced visual weight — smaller, footer-like feel
   if (posts.length === 0 && helpCount === 0) {
     return (
-      <div className="px-4 mt-6 mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
-            <MessageCircle size={15} className="text-primary" />
-            {ml.label('label_section_community')}
-          </h3>
-        </div>
-        <Link to="/community">
-          <div className="bg-primary/5 border border-primary/10 rounded-2xl px-4 py-6 text-center active:scale-[0.98] transition-transform">
-            <MessageCircle size={28} className="text-primary mx-auto mb-2 opacity-60" />
-            <p className="text-sm font-semibold text-foreground">{ml.label('label_community_first_post')}</p>
-            <p className="text-[11px] text-muted-foreground mt-1">{ml.label('label_community_first_post_desc')}</p>
-          </div>
+      <div className="px-4 mt-5 mb-4">
+        <Link to="/community" className="flex items-center gap-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+          <MessageCircle size={13} className="text-primary" />
+          <span className="font-semibold">{ml.label('label_community_first_post')}</span>
+          <ChevronRight size={12} className="ml-auto" />
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="px-4 mt-6 mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
-          <MessageCircle size={15} className="text-primary" />
-            {ml.label('label_section_community')}
+    <div className="px-4 mt-5 mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-bold text-[13px] text-foreground tracking-tight flex items-center gap-1.5">
+          <MessageCircle size={13} className="text-primary" />
+          {ml.label('label_section_community')}
         </h3>
-        <Link to="/community" className="text-[11px] font-bold text-primary flex items-center gap-0.5">
-          View all <ChevronRight size={12} />
+        <Link to="/community" className="text-[10px] font-bold text-primary flex items-center gap-0.5">
+          View all <ChevronRight size={11} />
         </Link>
       </div>
 
-      <div className="space-y-2.5">
+      <div className="space-y-1.5">
         {helpCount > 0 && (
           <Link to="/community">
-            <div className="bg-warning/10 border border-warning/20 rounded-2xl px-4 py-3 flex items-center gap-3 active:scale-[0.98] transition-transform">
-              <div className="w-9 h-9 rounded-xl bg-warning/20 flex items-center justify-center shrink-0">
-                <Heart size={16} className="text-warning" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-foreground">
-                  {helpCount} neighbor{helpCount !== 1 ? 's' : ''} need{helpCount === 1 ? 's' : ''} help
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">See how you can assist</p>
-              </div>
-              <ArrowRight size={14} className="text-warning shrink-0" />
+            <div className="flex items-center gap-2 py-1.5 active:opacity-70 transition-opacity">
+              <Heart size={12} className="text-warning shrink-0" />
+              <span className="text-[11px] font-medium text-foreground flex-1 truncate">
+                {helpCount} neighbor{helpCount !== 1 ? 's' : ''} need{helpCount === 1 ? 's' : ''} help
+              </span>
+              <ArrowRight size={11} className="text-muted-foreground shrink-0" />
             </div>
           </Link>
         )}
         
         {posts.map((post) => (
           <Link key={post.id} to="/community">
-            <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-center gap-3 active:scale-[0.98] transition-transform hover:border-primary/20">
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-foreground line-clamp-1">{post.title}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
-                  {post.comment_count} comment{post.comment_count !== 1 ? 's' : ''} · {post.vote_count} vote{post.vote_count !== 1 ? 's' : ''}
-                </p>
-              </div>
-              <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+            <div className="flex items-center gap-2 py-1.5 active:opacity-70 transition-opacity">
+              <span className="text-[11px] font-medium text-foreground flex-1 truncate">{post.title}</span>
+              <span className="text-[9px] text-muted-foreground whitespace-nowrap tabular-nums">
+                {post.comment_count}💬 {post.vote_count}↑
+              </span>
             </div>
           </Link>
         ))}

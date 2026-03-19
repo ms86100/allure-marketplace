@@ -37,24 +37,32 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
     ? [{ value: '__all__', label: 'All', icon: 'LayoutGrid', color: '', description: '', layoutType: 'ecommerce' }, ...filteredGroups]
     : filteredGroups;
 
+  // Gap #4: Use wrap grid when ≤8 items, horizontal scroll when >8
+  const useGrid = tabs.length <= 8;
+
   return (
-    <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 py-1">
+    <div className={cn(
+      useGrid
+        ? 'grid grid-cols-4 gap-y-3 gap-x-2 px-4 py-1'
+        : 'flex gap-3 overflow-x-auto scrollbar-hide px-4 py-1'
+    )}>
       {tabs.map((tab) => {
         const isActive = tab.value === '__all__' ? activeGroup === null : activeGroup === tab.value;
-        const tintColor = tab.color || undefined;
         return (
           <button
             key={tab.value}
             onClick={() => {
               hapticSelection();
-              // Toggle off if already active, otherwise select
               if (tab.value === '__all__') {
                 onGroupChange(null);
               } else {
                 onGroupChange(activeGroup === tab.value ? null : tab.value);
               }
             }}
-            className="shrink-0 flex flex-col items-center gap-1.5 transition-all duration-200 group"
+            className={cn(
+              'flex flex-col items-center gap-1.5 transition-all duration-200 group',
+              !useGrid && 'shrink-0'
+            )}
           >
             {/* Icon circle */}
             <div
