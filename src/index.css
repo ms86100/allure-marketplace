@@ -231,10 +231,10 @@
     --popover-foreground: 40 10% 90%;
 
     --primary: 165 35% 25%;           /* Deep Forest Green — bottle */
-    --primary-foreground: 40 10% 93%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 80 5% 78%;           /* Speckled Moss Stone lightened */
-    --secondary-foreground: 0 0% 25%; /* Dark Basalt */
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 80 5% 72%;
 
     --muted: 0 0% 82%;               /* Light Table Surface */
     --muted-foreground: 80 5% 42%;    /* Moss Stone darkened */
