@@ -44,7 +44,7 @@ export function usePushNotificationsInternal() {
   const regStateRef = useRef<RegistrationState>('idle');
   const listenersReadyRef = useRef(false);
   const listenersReadyPromiseRef = useRef<Promise<void> | null>(null);
-  const terminalStatusesRef = useRef<Set<string>>(new Set());
+  // terminalStatusesRef removed — dynamic resolution via getTerminalStatuses() at event time
   const listenersResolveRef = useRef<(() => void) | null>(null);
 
   // ── Set log user ──
