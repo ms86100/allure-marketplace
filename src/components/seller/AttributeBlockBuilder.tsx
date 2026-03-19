@@ -4,7 +4,7 @@ import { AttributeBlockForm } from './AttributeBlockForm';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2, Puzzle } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import {
