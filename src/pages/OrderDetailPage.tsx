@@ -396,7 +396,7 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {o.isBuyerView && (order.status === 'completed' || order.status === 'delivered') && !getString(`feedback_prompted_${order.id}`) && (
+          {o.isBuyerView && isSuccessfulTerminal(o.flow, order.status) && !getString(`feedback_prompted_${order.id}`) && (
             <div className="bg-secondary/50 border border-border rounded-xl p-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5"><span className="text-lg">💬</span><div><p className="text-sm font-semibold">How was your experience?</p><p className="text-[11px] text-muted-foreground">Share feedback</p></div></div>
               <FeedbackSheet triggerLabel="Share" onSubmitted={() => setString(`feedback_prompted_${order.id}`, 'true')} />
