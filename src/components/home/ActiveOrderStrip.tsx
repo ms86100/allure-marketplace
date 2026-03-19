@@ -109,6 +109,9 @@ export function ActiveOrderStrip() {
 
   return (
     <div className="mt-2 px-4">
+      {activeOrders.length > 1 && (
+        <p className="text-[10px] text-muted-foreground mb-1 font-medium">{activeOrders.length} active orders</p>
+      )}
       <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         <AnimatePresence>
           {activeOrders.map((order) => {
