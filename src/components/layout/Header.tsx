@@ -107,20 +107,21 @@ function HeaderInner({
                 <button
                   type="button"
                   onClick={() => setLocationSheetOpen(true)}
-                  className="flex items-center gap-1.5 group"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-secondary/80 border border-border/60 px-3 py-1.5 group active:scale-[0.98] transition-transform"
                 >
-                  <MapPin size={14} className="text-primary shrink-0" />
-                  <span className="text-[13px] font-semibold text-foreground truncate max-w-[45vw]">
+                  <MapPin size={13} className="text-primary shrink-0" />
+                  <span className="text-[12px] font-semibold text-foreground truncate max-w-[40vw]">
                     {browsingLocation?.label || displaySociety?.name || 'Set location'}
                   </span>
                   {stats && (stats.sellers > 0 || stats.orders > 0) && (
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                      · {stats.sellers > 0 && `🏪 ${stats.sellers} seller${stats.sellers !== 1 ? 's' : ''}`}
-                      {stats.sellers > 0 && stats.orders > 0 && ' · '}
-                      {stats.orders > 0 && `${stats.orders} orders today`}
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                      <span className="text-border">·</span>
+                      {stats.sellers > 0 && <span>🏪 {stats.sellers} seller{stats.sellers !== 1 ? 's' : ''}</span>}
+                      {stats.sellers > 0 && stats.orders > 0 && <span className="text-border">·</span>}
+                      {stats.orders > 0 && <span>{stats.orders} orders today</span>}
                     </span>
                   )}
-                  <ChevronDown size={13} className="text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
+                  <ChevronDown size={12} className="text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
                 </button>
               ) : (
                 <div className="flex items-center gap-3">
