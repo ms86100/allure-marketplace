@@ -133,7 +133,7 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
             <DrawerHeader>
               <DrawerTitle>Add Details to Your Listing</DrawerTitle>
             </DrawerHeader>
-            <div className="mt-4 space-y-2">
+            <div className="mt-4 space-y-2 px-4 pb-4">
               {availableBlocks.map((block) => (
                 <button
                   key={block.block_type}
