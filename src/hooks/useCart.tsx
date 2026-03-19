@@ -238,10 +238,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase.from('cart_items').delete().eq('user_id', user.id).eq('product_id', productId);
       if (error) throw error;
+      feedbackRemoveItem(removedItem?.product?.name || 'Item');
       await reconcile();
     } catch (error) {
       rollback(snap);
-      handleApiError(error, 'Failed to remove item');
+      feedbackRemoveItemFailed();
     } finally {
       setPendingMutations(c => Math.max(0, c - 1));
     }
