@@ -223,10 +223,9 @@ export function usePushNotificationsInternal() {
     let cleanupListeners: (() => void)[] = [];
 
     const setup = async () => {
-      // Load terminal statuses from DB for push-driven terminal sync
-      try {
-        terminalStatusesRef.current = await getTerminalStatuses();
-      } catch { /* best-effort — is_terminal flag in payload is primary */ }
+      // Terminal statuses now resolved dynamically at event time via getTerminalStatuses()
+      // Pre-warm the cache for faster first lookup (best-effort, non-blocking)
+      getTerminalStatuses().catch(() => {});
 
       let PushNotifications: any;
       try {
