@@ -13,7 +13,7 @@ import { useRazorpay } from '@/hooks/useRazorpay';
 import { CheckCircle2, Clock, AlertTriangle, Plus, Download, Loader2 } from 'lucide-react';
 import { exportMaintenanceDues } from '@/lib/csv-export';
 import { FeatureGate } from '@/components/ui/FeatureGate';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
