@@ -185,6 +185,8 @@ export function ServiceBookingFlow({
           payment_type: 'cod',
           payment_status: 'pending',
           notes: notes.trim().slice(0, MAX_NOTES_LENGTH) || null,
+          delivery_address: needsAddress && buyerAddress.trim() ? buyerAddress.trim().slice(0, MAX_ADDRESS_LENGTH) : null,
+          fulfillment_type: locationType || 'at_seller',
         })
         .select('id')
         .single();

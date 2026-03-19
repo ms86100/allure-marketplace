@@ -33,6 +33,7 @@ import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCirc
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { getString, setString } from '@/lib/persistent-kv';
+
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { LiveActivityManager } from '@/services/LiveActivityManager';
@@ -40,6 +41,23 @@ import { Capacitor } from '@capacitor/core';
 
 // Gap 10: Lazy-load map to avoid bundling Leaflet for non-delivery orders
 const DeliveryMapView = lazy(() => import('@/components/delivery/DeliveryMapView').then(m => ({ default: m.DeliveryMapView })));
+
+function CelebrationBanner({ order, isBuyerView, flow }: { order: any; isBuyerView: boolean; flow: any }) {
+  const show = isBuyerView && isSuccessfulTerminal(flow, order.status) && !getString(`celebration_${order.id}`);
+  useEffect(() => {
+    if (show) setString(`celebration_${order.id}`, 'true');
+  }, [show, order.id]);
+  if (!show) return null;
+  const durationMs = new Date(order.updated_at || order.created_at).getTime() - new Date(order.created_at).getTime();
+  const durationMin = Math.max(1, Math.round(durationMs / 60000));
+  return (
+    <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
+      <span className="text-3xl">🎊</span>
+      <p className="text-sm font-bold text-accent mt-1.5">Delivered in {durationMin} min!</p>
+      <p className="text-xs text-muted-foreground mt-0.5">Thank you for supporting your community</p>
+    </div>
+  );
+}
 
 export default function OrderDetailPage() {
   const { id } = useParams();
@@ -171,18 +189,7 @@ export default function OrderDetailPage() {
 
         <div className="px-4 pt-3 space-y-3">
           {/* Delivery completion celebration — shown once for delivered/completed orders */}
-          {o.isBuyerView && isSuccessfulTerminal(o.flow, order.status) && !getString(`celebration_${order.id}`) && (() => {
-            const durationMs = new Date(order.updated_at || order.created_at).getTime() - new Date(order.created_at).getTime();
-            const durationMin = Math.max(1, Math.round(durationMs / 60000));
-            setString(`celebration_${order.id}`, 'true');
-            return (
-              <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
-                <span className="text-3xl">🎊</span>
-                <p className="text-sm font-bold text-accent mt-1.5">Delivered in {durationMin} min!</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Thank you for supporting your community</p>
-              </div>
-            );
-          })()}
+          <CelebrationBanner order={order} isBuyerView={o.isBuyerView} flow={o.flow} />
 
           {/* Gap 11: Order placed celebration banner — shown for newly placed orders */}
           {o.isBuyerView && isFirstFlowStep(o.flow, order.status) && (Date.now() - new Date(order.created_at).getTime() < 60000) && (
