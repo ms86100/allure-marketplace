@@ -1,10 +1,11 @@
-import { useState, useCallback, memo, useMemo } from 'react';
+import { useState, useCallback, memo, useMemo, useEffect } from 'react';
 import { ArrowLeft, Bell, Building2, ShieldCheck, Store, MapPin, ChevronDown, Search } from 'lucide-react';
 
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/hooks/useCart';
 import { cn } from '@/lib/utils';
 import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder';
@@ -54,6 +55,32 @@ function HeaderInner({
   const displaySociety = effectiveSociety || society;
   const isViewingAs = viewAsSocietyId && (isAdmin || isBuilderMember);
 
+  const [stats, setStats] = useState<{ sellers: number; orders: number } | null>(null);
+  useEffect(() => {
+    if (!effectiveSocietyId) return;
+    let cancelled = false;
+    Promise.all([
+      supabase
+        .from('seller_profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('society_id', effectiveSocietyId)
+        .eq('verification_status', 'approved'),
+      supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('society_id', effectiveSocietyId)
+        .in('status', ['completed', 'delivered']),
+    ]).then(([sellersRes, ordersRes]) => {
+      if (!cancelled) {
+        setStats({
+          sellers: sellersRes.count || 0,
+          orders: ordersRes.count || 0,
+        });
+      }
+    });
+    return () => { cancelled = true; };
+  }, [effectiveSocietyId]);
+
   const initials = profile?.name
     ? profile.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : '?';
@@ -70,8 +97,21 @@ function HeaderInner({
           {/* Brand + Tagline */}
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-extrabold text-foreground tracking-tight">Sociva</span>
-            <span className="text-[10px] text-muted-foreground">·</span>
-            <span className="text-[10px] font-medium text-muted-foreground">Your society, your marketplace</span>
+            {stats && (stats.sellers > 0 || stats.orders > 0) ? (
+              <>
+                <span className="text-[10px] text-muted-foreground">·</span>
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  {stats.sellers > 0 && `${stats.sellers} seller${stats.sellers !== 1 ? 's' : ''}`}
+                  {stats.sellers > 0 && stats.orders > 0 && ' · '}
+                  {stats.orders > 0 && `${stats.orders.toLocaleString()} orders served`}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-[10px] text-muted-foreground">·</span>
+                <span className="text-[10px] font-medium text-muted-foreground">Your society, your marketplace</span>
+              </>
+            )}
           </div>
 
           {/* Row 1: Location/greeting + actions */}
