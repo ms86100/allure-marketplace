@@ -128,6 +128,9 @@ serve(async (req) => {
       });
     }
 
+    // Load terminal statuses from DB (single request scope cache)
+    const terminalStatuses = await loadTerminalStatuses(supabase);
+
     // Get assignment
     const { data: assignment, error: aErr } = await supabase
       .from('delivery_assignments')
@@ -142,7 +145,7 @@ serve(async (req) => {
       });
     }
 
-    if (['delivered', 'failed', 'cancelled'].includes(assignment.status)) {
+    if (terminalStatuses.has(assignment.status)) {
       return new Response(JSON.stringify({ error: 'Delivery is no longer active' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
