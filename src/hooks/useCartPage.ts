@@ -355,7 +355,7 @@ export function useCartPage() {
     }
     supabase.functions.invoke('process-notification-queue').catch(() => {});
     // Clear cart and payment session ONLY after payment success
-    clearCart(); await refresh();
+    await clearCartAndCache();
     clearPaymentSession();
     navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
     setPendingOrderIds([]);
