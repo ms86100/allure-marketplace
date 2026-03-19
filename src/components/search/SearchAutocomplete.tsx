@@ -43,13 +43,13 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
   const { data: sellerSuggestions = [] } = useQuery({
     queryKey: ['search-autocomplete-sellers', trimmed],
     queryFn: async (): Promise<SellerSuggestion[]> => {
-      const { data } = await supabase
+      const result: any = await supabase
         .from('seller_profiles')
         .select('id, business_name, description, profile_image_url, categories')
         .eq('is_approved', true)
         .ilike('business_name', `%${trimmed}%`)
-        .limit(3) as { data: any[] | null };
-      return (data || []) as SellerSuggestion[];
+        .limit(3);
+      return (result.data || []) as SellerSuggestion[];
     },
     enabled: trimmed.length >= 2,
     staleTime: 30_000,
