@@ -153,7 +153,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
       <div className={cn("px-2.5 pb-2.5 flex flex-col flex-1", !viewOnly && !isOutOfStock ? "pt-5" : "pt-2.5")}>
         {variantText && (<span className="inline-flex items-center justify-center border border-border rounded-full text-[8px] font-medium px-1.5 py-px mb-1 w-fit text-muted-foreground">{variantText}</span>)}
         <h4 className="font-semibold text-[12px] leading-snug line-clamp-1 text-foreground mb-0.5">{product.name}</h4>
-        {product.seller_name && (
+        {product.seller_name && !compact && (
           <div className="flex items-center gap-1 mt-0.5 flex-wrap">
             <span className="text-[10px] text-muted-foreground truncate">by {product.seller_name}</span>
             {product.seller_id && <SellerTrustBadge sellerId={product.seller_id} size="sm" />}
@@ -161,17 +161,17 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
             {isSellerInactive && (<span className="inline-flex items-center gap-0.5 text-[7px] font-bold text-warning bg-warning/15 rounded-full px-1 py-0.5"><AlertTriangle size={7} />Inactive</span>)}
           </div>
         )}
-        {(product as any).on_time_delivery_pct != null && (product as any).completed_order_count > onTimeBadgeMinOrders && (<span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-primary bg-primary/10 rounded-full px-1.5 py-0.5 w-fit mb-0.5">{ml.label('label_on_time_format').replace('{pct}', String((product as any).on_time_delivery_pct))}</span>)}
-        {socialProofCount != null && socialProofCount > 0 && (<span className="inline-flex items-center gap-1 text-[8px] font-bold text-accent-foreground bg-accent/90 rounded-full px-1.5 py-0.5 w-fit mb-0.5"><Users size={8} className="shrink-0" />{ml.label('label_social_proof_format').replace('{count}', String(socialProofCount)).replace('{unit}', socialProofCount === 1 ? ml.label('label_social_proof_singular') : ml.label('label_social_proof_plural'))}</span>)}
-        {deliveryText && (<div className="flex items-center gap-0.5 mb-0.5"><Clock size={9} className="text-rating-star" /><span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wide leading-none">{deliveryText}</span></div>)}
-        {product.lead_time_hours != null && product.lead_time_hours > 0 && (<div className="flex items-center gap-0.5 mb-0.5"><Clock size={8} className="text-primary" /><span className="text-[8px] font-medium text-muted-foreground leading-none">Order {product.lead_time_hours}h ahead</span></div>)}
-        {product.accepts_preorders && (<span className="inline-block bg-accent/20 text-accent-foreground text-[7px] font-bold px-1 py-0.5 rounded w-fit mb-0.5">Pre-order</span>)}
+        {!compact && (product as any).on_time_delivery_pct != null && (product as any).completed_order_count > onTimeBadgeMinOrders && (<span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-primary bg-primary/10 rounded-full px-1.5 py-0.5 w-fit mb-0.5">{ml.label('label_on_time_format').replace('{pct}', String((product as any).on_time_delivery_pct))}</span>)}
+        {!compact && socialProofCount != null && socialProofCount > 0 && (<span className="inline-flex items-center gap-1 text-[8px] font-bold text-accent-foreground bg-accent/90 rounded-full px-1.5 py-0.5 w-fit mb-0.5"><Users size={8} className="shrink-0" />{ml.label('label_social_proof_format').replace('{count}', String(socialProofCount)).replace('{unit}', socialProofCount === 1 ? ml.label('label_social_proof_singular') : ml.label('label_social_proof_plural'))}</span>)}
+        {!compact && deliveryText && (<div className="flex items-center gap-0.5 mb-0.5"><Clock size={9} className="text-rating-star" /><span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wide leading-none">{deliveryText}</span></div>)}
+        {!compact && product.lead_time_hours != null && product.lead_time_hours > 0 && (<div className="flex items-center gap-0.5 mb-0.5"><Clock size={8} className="text-primary" /><span className="text-[8px] font-medium text-muted-foreground leading-none">Order {product.lead_time_hours}h ahead</span></div>)}
+        {!compact && product.accepts_preorders && (<span className="inline-block bg-accent/20 text-accent-foreground text-[7px] font-bold px-1 py-0.5 rounded w-fit mb-0.5">Pre-order</span>)}
         <div className="flex-1 min-h-0" />
         <div className="flex items-end gap-1.5 mt-auto">
           <span className="font-bold text-[14px] text-foreground leading-none tracking-tight tabular-nums">{formatPrice(product.price)}</span>
           {hasDiscount && (<span className="text-[10px] text-muted-foreground line-through leading-none">MRP {formatPrice(product.mrp!)}</span>)}
         </div>
-        {product.price_per_unit && (<span className="text-[9px] text-muted-foreground leading-none mt-0.5">{product.price_per_unit}</span>)}
+        {!compact && product.price_per_unit && (<span className="text-[9px] text-muted-foreground leading-none mt-0.5">{product.price_per_unit}</span>)}
         {(locationLabel || (product as any).is_same_society !== false) && (
           <div
             className={cn("flex items-center gap-1 mt-1", (product as any).seller_latitude && (product as any).seller_longitude && "cursor-pointer hover:text-primary transition-colors")}
