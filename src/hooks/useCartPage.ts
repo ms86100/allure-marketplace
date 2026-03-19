@@ -222,6 +222,15 @@ export function useCartPage() {
     return result.order_ids || [];
   };
 
+  /** Force-clear cart from both DB and query cache */
+  const clearCartAndCache = useCallback(async () => {
+    await clearCart();
+    if (user) {
+      queryClient.setQueryData(['cart-items', user.id], []);
+      queryClient.setQueryData(['cart-count', user.id], 0);
+    }
+  }, [clearCart, queryClient, user]);
+
   const handlePlaceOrderInner = async () => {
     if (!user || !profile || sellerGroups.length === 0) return;
 
