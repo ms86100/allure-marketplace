@@ -308,15 +308,15 @@
     --sidebar-ring: 175 25% 55%;
 
     /* ═══ Component surface tokens — Nature/WANGLOW ═══ */
-    --header-bg: 40 12% 87% / 0.94;
-    --nav-bg: 40 12% 87% / 0.95;
-    --nav-border: 30 8% 78% / 0.5;
-    --search-bg: 0 0% 82% / 0.5;
-    --search-border: 30 10% 74% / 0.4;
-    --buyagain-card-bg: 175 25% 55% / 0.1;
-    --buyagain-card-border: 175 25% 55% / 0.2;
-    --buyagain-badge-bg: 165 35% 25% / 0.12;
-    --buyagain-badge-text: 165 35% 25%;
+    --header-bg: 0 0% 5% / 0.97;
+    --nav-bg: 20 10% 5% / 0.98;
+    --nav-border: 20 8% 16% / 0.6;
+    --search-bg: 0 0% 12% / 0.8;
+    --search-border: 30 15% 22% / 0.5;
+    --buyagain-card-bg: 170 35% 14% / 0.55;
+    --buyagain-card-border: 170 35% 25% / 0.3;
+    --buyagain-badge-bg: 170 35% 18% / 0.8;
+    --buyagain-badge-text: 0 0% 100%;
   }
 }
 
