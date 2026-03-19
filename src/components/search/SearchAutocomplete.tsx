@@ -48,7 +48,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
         .select('id, business_name, description, profile_image_url, categories')
         .eq('is_approved', true)
         .ilike('business_name', `%${trimmed}%`)
-        .limit(3);
+        .limit(3) as { data: any[] | null };
       return (data || []) as SellerSuggestion[];
     },
     enabled: trimmed.length >= 2,
