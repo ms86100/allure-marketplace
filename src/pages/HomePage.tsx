@@ -86,7 +86,7 @@ export default function HomePage() {
 
   return (
     <AppLayout>
-      <div className="pb-6">
+      <div className="pb-6 space-y-0">
         {/* Active order tracking */}
         <ActiveOrderStrip />
 
