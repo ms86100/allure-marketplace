@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils';
 
 /* ── Section spacer ── */
 function SectionDivider() {
-  return <div className="my-6" />;
+  return <div className="my-4" />;
 }
 
 export function MarketplaceSection() {
