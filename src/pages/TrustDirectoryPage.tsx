@@ -162,9 +162,9 @@ export default function TrustDirectoryPage() {
         <Plus size={22} />
       </Button>
 
-      <Sheet open={showAdd} onOpenChange={setShowAdd}>
-        <SheetContent side="bottom" className="rounded-t-2xl">
-          <SheetHeader><SheetTitle>Add Your Skill</SheetTitle></SheetHeader>
+      <Drawer open={showAdd} onOpenChange={setShowAdd}>
+        <DrawerContent>
+          <DrawerHeader><DrawerTitle>Add Your Skill</DrawerTitle></DrawerHeader>
           <div className="space-y-4 mt-4">
             <div>
               <Label>Skill Name</Label>
