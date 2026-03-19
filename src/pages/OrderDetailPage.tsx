@@ -333,7 +333,7 @@ export default function OrderDetailPage() {
             <BuyerDeliveryConfirmation
               orderId={order.id}
               sellerName={seller?.business_name}
-              onConfirmed={() => window.location.reload()}
+              onConfirmed={() => o.fetchOrder()}
             />
           )}
 
