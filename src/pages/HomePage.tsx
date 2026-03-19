@@ -12,7 +12,7 @@ import { ActiveOrderStrip } from '@/components/home/ActiveOrderStrip';
 import { ForYouSection } from '@/components/home/ForYouSection';
 import { SocietyLeaderboard } from '@/components/home/SocietyLeaderboard';
 import { RecentlyViewedRow } from '@/components/home/RecentlyViewedRow';
-import { ReorderLastOrder } from '@/components/home/ReorderLastOrder';
+
 import { useAuth } from '@/contexts/AuthContext';
 
 import { motion } from 'framer-motion';
@@ -76,8 +76,6 @@ export default function HomePage() {
         {/* Notification banner */}
         <HomeNotificationBanner />
 
-        {/* Quick reorder */}
-        <ReorderLastOrder />
 
         {/* ═══ MARKETPLACE — primary shopping surface ═══ */}
         <MarketplaceSection />
