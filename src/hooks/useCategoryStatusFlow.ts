@@ -160,16 +160,13 @@ export function isTerminalStatus(flow: StatusFlowStep[], status: string): boolea
   return step?.is_terminal === true;
 }
 
-/** Negative terminal outcomes — universal across all workflows */
-const NEGATIVE_TERMINALS = new Set(['cancelled', 'no_show']);
-
 /**
- * Check if a status is a successful terminal state (completed/delivered but NOT cancelled/no_show).
- * DB-driven: uses is_terminal from the flow config.
+ * Check if a status is a successful terminal state.
+ * Fully DB-driven: uses is_terminal AND is_success flags from category_status_flows.
  */
 export function isSuccessfulTerminal(flow: StatusFlowStep[], status: string): boolean {
-  if (NEGATIVE_TERMINALS.has(status)) return false;
-  return isTerminalStatus(flow, status);
+  const step = flow.find(s => s.status_key === status);
+  return step?.is_terminal === true && step?.is_success === true;
 }
 
 /**
