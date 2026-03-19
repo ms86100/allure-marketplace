@@ -2,12 +2,10 @@ import { memo, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
-import { useCurrency } from '@/hooks/useCurrency';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
-import { Users, Tag, Star, ChevronRight } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
+import { ChevronRight } from 'lucide-react';
 
 interface CategoryImageGridProps {
   parentGroup: string;
@@ -15,14 +13,9 @@ interface CategoryImageGridProps {
   activeCategories?: Set<string>;
 }
 
-/* ── Metadata builder ─── */
-
 interface CategoryMeta {
   count: number;
-  sellerCount: number;
-  minPrice: number | null;
-  collageImages: string[];
-  hasBestseller: boolean;
+  representativeImage: string | null;
 }
 
 function buildCategoryMeta(
@@ -31,69 +24,18 @@ function buildCategoryMeta(
   const map: Record<string, CategoryMeta> = {};
   for (const pc of productCategories) {
     const products = pc.products ?? [];
-    const sellers = new Set<string>();
-    const images: string[] = [];
-    let min: number | null = null;
-    let bestseller = false;
-
+    let image: string | null = null;
     for (const p of products) {
-      if (p.seller_id) sellers.add(p.seller_id);
-      if (p.image_url && images.length < 4 && !images.includes(p.image_url)) {
-        images.push(p.image_url);
-      }
-      const price = typeof p.price === 'number' ? p.price : parseFloat(p.price);
-      if (!isNaN(price) && (min === null || price < min)) min = price;
-      if (p.is_bestseller) bestseller = true;
+      if (p.image_url) { image = p.image_url; break; }
     }
-
-    map[pc.category] = { count: products.length, sellerCount: sellers.size, minPrice: min, collageImages: images, hasBestseller: bestseller };
+    map[pc.category] = { count: products.length, representativeImage: image };
   }
   return map;
 }
 
-/* ── Image collage ──────────── */
-
-function ImageCollage({ images, fallbackIcon, fallbackUrl, alt, color }: {
-  images: string[];
-  fallbackIcon: string;
-  fallbackUrl?: string | null;
-  alt: string;
-  color?: string | null;
-}) {
-  if (images.length === 0 && fallbackUrl) {
-    return <img src={fallbackUrl} alt={alt} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />;
-  }
-  if (images.length === 0) {
-    return (
-      <div
-        className="absolute inset-0 flex items-center justify-center"
-        style={{ backgroundColor: color ? `${color}20` : 'hsl(var(--secondary))' }}
-      >
-        <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center"
-          style={{ backgroundColor: color ? `${color}30` : undefined }}
-        >
-          <DynamicIcon name={fallbackIcon} size={36} className="text-foreground/60" style={color ? { color } : undefined} />
-        </div>
-      </div>
-    );
-  }
-  const itemClass = `items-${Math.min(images.length, 4)}`;
-  return (
-    <div className={cn('category-collage absolute inset-0', itemClass)}>
-      {images.slice(0, 4).map((src, i) => (
-        <img key={i} src={src} alt={`${alt} ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
-      ))}
-    </div>
-  );
-}
-
-/* ── Main component ──────────────────────────────────── */
-
 function CategoryImageGridInner({ parentGroup, title, activeCategories }: CategoryImageGridProps) {
   const { groupedConfigs, isLoading } = useCategoryConfigs();
   const { data: productCategories = [], isLoading: productsLoading } = useProductsByCategory();
-  const { formatPrice } = useCurrency();
   const ml = useMarketplaceLabels();
 
   const allCategories = groupedConfigs[parentGroup] || [];
@@ -105,11 +47,14 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
 
   if (isLoading || productsLoading) {
     return (
-      <div className="px-4 mb-5">
+      <div className="px-4 mb-6">
         <Skeleton className="h-5 w-40 mb-3" />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           {[1, 2, 3, 4].map(i => (
-            <Skeleton key={i} className="aspect-[3/2] rounded-2xl" />
+            <div key={i} className="flex flex-col items-center gap-2">
+              <Skeleton className="aspect-square w-full rounded-2xl" />
+              <Skeleton className="h-3 w-14 rounded" />
+            </div>
           ))}
         </div>
       </div>
@@ -119,99 +64,71 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
   if (categories.length === 0) return null;
 
   return (
-    <div className="mb-6 px-4">
+    <div className="mb-8 px-4">
       {/* Section header */}
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{title}</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-extrabold text-base text-foreground tracking-tight">{title}</h3>
         <Link
           to={`/category/${parentGroup}`}
-          className="text-[11px] font-bold text-primary flex items-center gap-0.5 ml-4"
+          className="text-[11px] font-bold text-primary flex items-center gap-0.5"
         >
           See all <ChevronRight size={12} />
         </Link>
       </div>
 
-      {/* Responsive card grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-        {categories.slice(0, 8).map((cat) => {
-          const meta = metaMap[cat.category] || { count: 0, sellerCount: 0, minPrice: null, collageImages: [], hasBestseller: false };
+      {/* 4-column tile grid */}
+      <div className="grid grid-cols-4 gap-x-3 gap-y-4">
+        {categories.slice(0, 12).map((cat) => {
+          const meta = metaMap[cat.category] || { count: 0, representativeImage: null };
           const catColor = cat.color || null;
+          const imageSrc = meta.representativeImage || cat.imageUrl || null;
+
           return (
             <Link
               key={cat.category}
               to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-              className={cn(
-                'block rounded-2xl overflow-hidden active:scale-[0.97] transition-all duration-200 group bg-card border border-border',
-                'hover:shadow-md',
-              )}
-              style={{
-                ['--cat-color' as any]: catColor || 'hsl(var(--primary))',
-              }}
-              onMouseEnter={(e) => {
-                if (catColor) (e.currentTarget as HTMLElement).style.borderColor = `${catColor}40`;
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor = '';
-              }}
+              className="flex flex-col items-center group active:scale-[0.95] transition-transform duration-150"
             >
-              {/* Image area */}
-              <div className="relative aspect-[3/2] overflow-hidden">
-                <ImageCollage
-                  images={meta.collageImages}
-                  fallbackIcon={cat.icon}
-                  fallbackUrl={cat.imageUrl}
-                  alt={cat.displayName}
-                  color={cat.color}
-                />
-                {/* Gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/5" />
-
-                {/* Count badge — top right */}
-                {meta.count > 0 && (
-                  <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground text-[9px] font-bold shadow-sm">
-                    {meta.count} {ml.label('label_item_count')}
+              {/* Tile image */}
+              <div
+                className="w-full aspect-square rounded-2xl overflow-hidden flex items-center justify-center"
+                style={{
+                  backgroundColor: catColor ? `${catColor}15` : 'hsl(var(--secondary))',
+                }}
+              >
+                {imageSrc ? (
+                  <img
+                    src={imageSrc}
+                    alt={cat.displayName}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: catColor ? `${catColor}25` : undefined }}
+                  >
+                    <DynamicIcon
+                      name={cat.icon}
+                      size={24}
+                      className="text-foreground/60"
+                      style={catColor ? { color: catColor } : undefined}
+                    />
                   </div>
                 )}
-
-                {/* Bestseller star — top left */}
-                {meta.hasBestseller && (
-                  <div className="absolute top-2 left-2 w-6 h-6 rounded-full bg-rating-star/90 flex items-center justify-center shadow-sm">
-                    <Star size={12} className="text-foreground fill-foreground" />
-                  </div>
-                )}
-
-                {/* Category name overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-3">
-                  <span className="text-[14px] font-extrabold text-white leading-tight line-clamp-2 drop-shadow-lg tracking-tight">
-                    {cat.displayName}
-                  </span>
-                </div>
               </div>
 
-              {/* Accent bar */}
-              <div className="h-[2px]" style={{ backgroundColor: catColor || 'hsl(var(--primary))' }} />
+              {/* Label below tile */}
+              <span className="text-[11px] font-semibold text-foreground text-center leading-tight mt-1.5 line-clamp-2 px-0.5">
+                {cat.displayName}
+              </span>
 
-              {/* Metadata row */}
-              <div className="flex items-center gap-2.5 px-3 py-2.5 text-[10px] text-muted-foreground">
-                {meta.sellerCount > 0 && (
-                  <span className="inline-flex items-center gap-1">
-                    <Users size={10} className="shrink-0 text-primary/70" />
-                    <span className="font-medium">{meta.sellerCount} {meta.sellerCount === 1 ? ml.label('label_seller_count_singular') : ml.label('label_seller_count_plural')}</span>
-                  </span>
-                )}
-                {meta.minPrice !== null && (
-                  <span className="inline-flex items-center gap-1">
-                    <Tag size={10} className="shrink-0 text-primary/70" />
-                    <span className="font-medium">From {formatPrice(meta.minPrice)}</span>
-                  </span>
-                )}
-                {meta.sellerCount === 0 && meta.minPrice === null && meta.count > 0 && (
-                  <span className="text-muted-foreground/60 font-medium">{ml.label('label_explore_cta')}</span>
-                )}
-                {meta.sellerCount === 0 && meta.count === 0 && (
-                  <span className="text-muted-foreground/50 font-medium italic">{ml.label('label_sellers_setting_up')}</span>
-                )}
-              </div>
+              {/* Item count */}
+              {meta.count > 0 && (
+                <span className="text-[9px] text-muted-foreground font-medium mt-0.5">
+                  {meta.count} {ml.label('label_item_count')}
+                </span>
+              )}
             </Link>
           );
         })}

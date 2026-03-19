@@ -1,91 +1,57 @@
+# Blinkit UX Heuristic Analysis — Implementation Tracker
+## Status: ✅ PHASE 2 COMPLETE
 
+## ENGINE LAYER (Phase 1 — Complete)
 
-## Analysis of Reference UI (Blinkit/Zomato)
+| # | Task | Status |
+|---|------|--------|
+| 1 | Global Feedback Engine (`feedbackEngine.ts`) | ✅ |
+| 2 | ETA Engine (`etaEngine.ts`) — single source of truth | ✅ |
+| 3 | Visibility Engine (`visibilityEngine.ts`) — route rules | ✅ |
+| 4 | Floating Cart Bar with thumbnails, count, total | ✅ |
+| 5 | ActiveOrderETA in header with live countdown | ✅ |
+| 6 | Unified haptics across all cart actions | ✅ |
 
-The reference shows a polished grocery-style marketplace with these key patterns:
-1. **Icon-label tab bar** at top (All, Summer, Ramzan, Electronics, Beauty) with active indicator line underneath
-2. **Category grids** organized by parent group (e.g., "Grocery & Kitchen", "Snacks & Drinks") — 4-column grid of rounded tiles, each with a product image and a category label below
-3. **Themed banner sections** (Ugadi, Navratri Specials) with rich imagery
-4. **"Frequently bought" section** showing grouped past purchases as teal cards with collage images and "+N more" badges
-5. **"Featured this week"** horizontal scroll of curated cards
+## UX POLISH (Phase 1 — Complete)
 
-### Key differences from our current UI:
+| # | Task | Status |
+|---|------|--------|
+| 7 | Undo toast for cart item removal (4s with re-add) | ✅ |
+| 8 | Haptic dedup — removed duplicate calls | ✅ |
+| 9 | Search autocomplete with product thumbnails | ✅ |
+| 10 | Recently Viewed products section on home page | ✅ |
+| 11 | CartPage remove button uses centralized feedbackEngine | ✅ |
+| 12 | Coupon feedback via feedbackEngine | ✅ |
+| 13 | Cart cleared feedback via feedbackEngine | ✅ |
+| 14 | Favorite toggle feedback via feedbackEngine | ✅ |
+| 15 | Dummy data elimination (picsum, 'Seller' fallbacks) | ✅ |
 
-| Aspect | Reference (Blinkit) | Our Current UI |
-|--------|---------------------|----------------|
-| Category tiles | 4-col grid, image on dark rounded card, label BELOW the image | 2-col grid, image with text overlay inside card |
-| Tab bar | Icon + label, horizontal scroll, underline active indicator | Pill-shaped buttons (already close) |
-| Category card style | Dark bg, rounded-xl tiles, product image centered, label underneath as separate text | Card with gradient overlay, text on image |
-| Section headers | Bold white text, left-aligned, no "See all" initially | Has "See all" link — fine |
-| Frequently bought | Teal/green bg cards, 2 product thumbnails + "+N more" badge | We have BuyAgainRow — different pattern |
-| Featured this week | Horizontal scroll of themed cards | We have FeaturedBanners — similar |
+## PERCEPTION LAYER (Phase 2 — Complete)
 
----
+| # | Task | Status |
+|---|------|--------|
+| 16 | ETA emotional states — emoji + mood tiers (calm/eager/imminent/late) | ✅ |
+| 17 | DeliveryETABanner mood-based gradient backgrounds | ✅ |
+| 18 | ActiveOrderETA emoji + intensified imminent pulse | ✅ |
+| 19 | Cart momentum — CTA changes to "Checkout" at 3+ items | ✅ |
+| 20 | Mini cart preview — bottom sheet from floating cart | ✅ |
+| 21 | Delivery completion celebration banner (one-time, duration-based) | ✅ |
+| 22 | Delivery partner identity card on OrderDetailPage | ✅ |
+| 23 | OrderProgressOverlay — SVG progress ring replaces spinner | ✅ |
+| 24 | Intelligent empty states (OrdersPage, FavoritesPage) | ✅ |
+| 25 | Session continuity — HomePage scroll position restore | ✅ |
+| 26 | Checkout commitment reinforcement — free delivery micro-copy | ✅ |
 
-## Implementation Plan
-
-### Step 1: Redesign CategoryImageGrid to match Blinkit-style 4-column tiles
-
-**Current**: 2-col responsive grid with image overlay text and metadata row below.
-**Target**: 4-column grid with:
-- Dark/subtle rounded-xl container per tile (~80px square on mobile)
-- Product image(s) centered inside the tile
-- Category name as text BELOW the tile (not overlaid)
-- No metadata row (seller count, min price) — keep it clean
-- Remove gradient overlay
-
-Changes in `src/components/home/CategoryImageGrid.tsx`:
-- Switch grid from `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` to `grid-cols-4` always
-- Remove the gradient overlay div, count badge, bestseller star, and accent bar
-- Move category `displayName` below the image container as a separate centered text element
-- Remove the metadata row (sellers/price)
-- Make image area square-ish (`aspect-square`) with `bg-secondary` rounded container
-- Show single representative image (first collage image or category image) centered, not as a collage
-
-### Step 2: Enhance ParentGroupTabs with active underline indicator
-
-**Current**: Pill-shaped buttons with bg color change.
-**Target**: Keep current pill style (it's already clean and works well). Minor polish:
-- Ensure icon + label alignment matches reference
-- This is already close to the reference — minimal changes needed
-
-### Step 3: Redesign BuyAgainRow as "Frequently bought" grouped cards
-
-**File**: `src/components/home/BuyAgainRow.tsx`
-- Check current implementation and adapt to show category-grouped purchase history
-- Display as teal/green rounded cards with 2 product thumbnails + "+N more" badge
-- Category name below each card
-- 3-column scrollable layout
-
-### Step 4: Update MarketplaceSection layout order
-
-Reorder sections in `src/components/home/MarketplaceSection.tsx` to:
-1. Featured Banners / Auto-Highlights (keep)
-2. ParentGroupTabs (keep)
-3. Category Image Grids — with new 4-col tile design
-4. Discovery rows (Popular, New This Week) — keep
-5. Product listings by category — keep horizontal scroll
-6. Store discovery — keep
-
-### Step 5: Typography and spacing refinements
-
-- Section headers: increase to `font-extrabold text-base` (already defined in `.section-header`)
-- Add more vertical spacing between category grid sections (`mb-8` instead of `mb-6`)
-- Category tile labels: `text-xs font-semibold text-foreground text-center` with `mt-2`
-
----
-
-## Technical Details
-
-**Files to modify:**
-1. `src/components/home/CategoryImageGrid.tsx` — Major redesign of tile layout (4-col, image-above-label pattern)
-2. `src/components/home/MarketplaceSection.tsx` — Minor reordering, spacing adjustments
-3. `src/components/home/BuyAgainRow.tsx` — Inspect and potentially redesign to match "Frequently bought" pattern
-4. `src/index.css` — Add any needed utility classes for the new tile style
-
-**Constraints honored:**
-- All data-driven from `category_configs`, `products`, `parent_groups`
-- No hardcoded/dummy data
-- No breaking changes to existing functionality
-- Images sourced from actual product `image_url` or `category_configs.imageUrl`
-
+## Product Laws (Reference)
+1. Every action must produce immediate, consistent feedback across all surfaces
+2. ETA must feel believable, not just accurate
+3. Never show stale state after completion
+4. The cart must be omnipresent
+5. Cognitive load must decrease through the funnel
+6. Speed perception > speed reality
+7. Error prevention is worth 10x error recovery
+8. Transparency builds trust
+9. Promotional upsells must never block primary flow
+10. State transitions must be server-authoritative
+11. Recognition over recall applies to entire session
+12. Every screen must be self-sufficient
