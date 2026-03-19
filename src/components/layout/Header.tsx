@@ -67,8 +67,12 @@ function HeaderInner({
         className
       )}>
         <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 space-y-1.5">
-          {/* Tagline */}
-          <p className="text-[11px] font-medium text-primary tracking-wide">Your society, your marketplace</p>
+          {/* Brand + Tagline */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-extrabold text-foreground tracking-tight">Sociva</span>
+            <span className="text-[10px] text-muted-foreground">·</span>
+            <span className="text-[10px] font-medium text-muted-foreground">Your society, your marketplace</span>
+          </div>
 
           {/* Row 1: Location/greeting + actions */}
           <div className="flex items-center justify-between">
