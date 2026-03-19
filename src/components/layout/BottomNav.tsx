@@ -53,7 +53,7 @@ function BottomNavInner() {
 
   return (
     <nav
-      className="fixed bottom-0 z-50 w-full max-w-md left-1/2 -translate-x-1/2 bg-background/98 dark:bg-[hsl(20_10%_5%/0.98)] backdrop-blur-lg border-t border-border/60 dark:border-[hsl(20_8%_16%/0.6)]"
+      className="fixed inset-x-0 bottom-0 z-50 bg-background/98 dark:bg-[hsl(20_10%_5%/0.98)] backdrop-blur-lg border-t border-border/60 dark:border-[hsl(20_8%_16%/0.6)]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="flex items-center justify-around px-1 h-16">

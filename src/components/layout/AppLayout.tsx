@@ -28,7 +28,7 @@ export function AppLayout({
   className,
 }: AppLayoutProps) {
   return (
-    <div className="min-h-[100dvh] bg-background max-w-md mx-auto relative shadow-[0_0_80px_-20px_hsl(var(--primary)/0.08)]">
+    <div className="min-h-[100dvh] bg-background">
       {showHeader && (
         <Header 
           showCart={showCart} 
