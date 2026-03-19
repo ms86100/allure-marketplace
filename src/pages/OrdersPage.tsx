@@ -19,15 +19,15 @@ import { useCurrency } from '@/hooks/useCurrency';
 
 const PAGE_SIZE = 20;
 
-function OrderCard({ order, type }: { order: Order; type: 'buyer' | 'seller' }) {
+function OrderCard({ order, type, successTerminals }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string> }) {
   const { getOrderStatus } = useStatusLabels();
   const { formatPrice } = useCurrency();
   const statusInfo = getOrderStatus(order.status);
   const seller = (order as any).seller;
   const buyer = (order as any).buyer;
   const items = (order as any).items || [];
-  const canReorder = type === 'buyer' && (order.status === 'completed' || order.status === 'delivered');
-  const isCompleted = order.status === 'completed' || order.status === 'delivered';
+  const canReorder = type === 'buyer' && successTerminals.has(order.status);
+  const isCompleted = successTerminals.has(order.status);
 
   return (
     <Link to={`/orders/${order.id}`} className="block">

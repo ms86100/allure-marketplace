@@ -507,8 +507,7 @@ export default function OrderDetailPage() {
         open={isOtpDialogOpen}
         onOpenChange={setIsOtpDialogOpen}
         onVerified={() => {
-          o.setOrder({ ...order, status: 'completed' } as any);
-          // Realtime subscription handles final DB state sync — no reload needed
+          // Trust DB — realtime subscription handles state sync
         }}
       />
 

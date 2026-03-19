@@ -186,10 +186,9 @@ export function useOrderDetail(id: string | undefined) {
 
   const isBuyerView = order ? order.buyer_id === user?.id : false;
   const nextStatus = getNextStatus();
-  const canReview = isBuyerView && (order?.status === 'completed' || order?.status === 'delivered') && !hasReview;
-  // Use is_terminal from flow instead of hardcoded status list
+  const canReview = isBuyerView && order ? isSuccessfulTerminal(flow, order.status) && !hasReview : false;
   const canChat = order ? !isTerminalStatus(flow, order.status) : false;
-  const canReorder = isBuyerView && (order?.status === 'completed' || order?.status === 'delivered');
+  const canReorder = isBuyerView && order ? isSuccessfulTerminal(flow, order.status) : false;
   const chatRecipientId = isSellerView ? order?.buyer_id : seller?.user_id;
   const chatRecipientName = isSellerView ? (order as any)?.buyer?.name : seller?.business_name;
 

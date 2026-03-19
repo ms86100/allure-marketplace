@@ -158,6 +158,64 @@ export function isTerminalStatus(flow: StatusFlowStep[], status: string): boolea
   return step?.is_terminal === true;
 }
 
+/** Negative terminal outcomes — universal across all workflows */
+const NEGATIVE_TERMINALS = new Set(['cancelled', 'no_show']);
+
+/**
+ * Check if a status is a successful terminal state (completed/delivered but NOT cancelled/no_show).
+ * DB-driven: uses is_terminal from the flow config.
+ */
+export function isSuccessfulTerminal(flow: StatusFlowStep[], status: string): boolean {
+  if (NEGATIVE_TERMINALS.has(status)) return false;
+  return isTerminalStatus(flow, status);
+}
+
+/**
+ * Check if the first (lowest sort_order) non-terminal step in the flow matches the given status.
+ * Used for "just placed" celebration banner without hardcoding 'placed'.
+ */
+export function isFirstFlowStep(flow: StatusFlowStep[], status: string): boolean {
+  const nonTerminal = flow.filter(s => !s.is_terminal);
+  if (nonTerminal.length === 0) return false;
+  return nonTerminal[0].status_key === status;
+}
+
+/**
+ * Check if a given next-status step requires OTP verification.
+ * DB-driven: checks if the flow step's actor is 'delivery'.
+ */
+export function stepRequiresOtp(flow: StatusFlowStep[], statusKey: string): boolean {
+  const step = flow.find(s => s.status_key === statusKey);
+  return step?.actor === 'delivery';
+}
+
+/**
+ * Hook that fetches all terminal status keys from the DB once and caches them.
+ * Useful for list views (OrdersPage) where per-order flow loading is too expensive.
+ */
+export function useTerminalStatuses() {
+  const [terminalSet, setTerminalSet] = useState<Set<string>>(new Set());
+  const [successSet, setSuccessSet] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('category_status_flows')
+        .select('status_key, is_terminal')
+        .eq('is_terminal', true);
+
+      if (data) {
+        const all = new Set(data.map(d => d.status_key));
+        const success = new Set(data.filter(d => !NEGATIVE_TERMINALS.has(d.status_key)).map(d => d.status_key));
+        setTerminalSet(all);
+        setSuccessSet(success);
+      }
+    })();
+  }, []);
+
+  return { terminalSet, successSet };
+}
+
 /**
  * Check if a specific actor can transition from currentStatus to 'cancelled'.
  */
