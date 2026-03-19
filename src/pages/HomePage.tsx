@@ -76,8 +76,6 @@ export default function HomePage() {
         {/* Notification banner */}
         <HomeNotificationBanner />
 
-        {/* Quick reorder */}
-        <ReorderLastOrder />
 
         {/* ═══ MARKETPLACE — primary shopping surface ═══ */}
         <MarketplaceSection />
