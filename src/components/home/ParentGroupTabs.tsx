@@ -63,12 +63,15 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
           >
             <DynamicIcon
               name={tab.icon}
-              size={16}
+              size={18}
               className="shrink-0"
             />
-            <span className="text-xs font-semibold whitespace-nowrap">
+            <span className="text-[10px] font-semibold whitespace-nowrap leading-none">
               {tab.label}
             </span>
+            {isActive && (
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
+            )}
           </button>
         );
       })}

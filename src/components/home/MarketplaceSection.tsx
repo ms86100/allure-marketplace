@@ -141,6 +141,9 @@ export function MarketplaceSection() {
         <ParentGroupTabs activeGroup={activeGroup} onGroupChange={setActiveGroup} activeParentGroups={activeParentGroupSet} />
       </div>
 
+      {/* ── Frequently Bought ── */}
+      {!activeGroup && <BuyAgainRow />}
+
       {/* ── Category Image Grids ── */}
       {activeParentGroups.map((group) => (
         <CategoryImageGrid

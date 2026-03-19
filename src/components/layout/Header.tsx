@@ -118,7 +118,7 @@ function HeaderInner({
                       <span className="text-border">·</span>
                       {stats.sellers > 0 && <span>🏪 {stats.sellers} seller{stats.sellers !== 1 ? 's' : ''}</span>}
                       {stats.sellers > 0 && stats.orders > 0 && <span className="text-border">·</span>}
-                      {stats.orders > 0 && <span>{stats.orders} orders today</span>}
+                      {stats.orders > 0 && <span>{stats.orders} orders served</span>}
                     </span>
                   )}
                   <ChevronDown size={12} className="text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />

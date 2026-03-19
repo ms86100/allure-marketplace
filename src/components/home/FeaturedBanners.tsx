@@ -259,7 +259,7 @@ function BannerContent({ banner }: { banner: any }) {
 
   // minimal_text
   return (
-    <div className="w-full h-28 flex flex-col items-center justify-center p-5 bg-card border-l-4" style={{ borderColor: bg_color }}>
+    <div className="w-full h-36 flex flex-col items-center justify-center p-5 bg-card border-l-4" style={{ borderColor: bg_color }}>
       <h3 className="font-bold text-base text-foreground">{title}</h3>
       {subtitle && <p className="text-xs text-muted-foreground mt-1 text-center">{subtitle}</p>}
       {button_text && (
