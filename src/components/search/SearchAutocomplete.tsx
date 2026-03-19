@@ -33,7 +33,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
         .select('id, name, price, image_url, seller_id, category, is_veg, description')
         .eq('is_available', true)
         .ilike('name', `%${trimmed}%`)
-        .limit(5);
+        .limit(5) as { data: any[] | null };
       return data || [];
     },
     enabled: trimmed.length >= 2,
