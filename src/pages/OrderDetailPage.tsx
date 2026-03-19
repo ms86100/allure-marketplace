@@ -299,7 +299,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Gap 11: ETA banner for buyer — shown from acceptance until delivery */}
-          {o.isBuyerView && isDeliveryOrder && (order as any).estimated_delivery_at && !['delivered', 'completed', 'cancelled'].includes(order.status) && !(deliveryAssignmentId && deliveryTracking.eta) && (
+          {o.isBuyerView && isDeliveryOrder && (order as any).estimated_delivery_at && !isTerminalStatus(o.flow, order.status) && !(deliveryAssignmentId && deliveryTracking.eta) && (
             <DeliveryETABanner estimatedDeliveryAt={(order as any).estimated_delivery_at} />
           )}
 
