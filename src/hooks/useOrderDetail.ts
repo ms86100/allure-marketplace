@@ -229,16 +229,8 @@ export function useOrderDetail(id: string | undefined) {
     // Use flow data: a status is in-transit if it has actor='delivery' or is explicitly a delivery-phase step
     const transitStep = flow.find(s => s.status_key === order.status);
     if (transitStep?.actor === 'delivery') return true;
-    // Fallback: check against system_settings transit_statuses (loaded via trackingConfig)
-    // Since this is a React hook, we import the sync version
-    try {
-      const { getTrackingConfigSync } = require('@/services/trackingConfig');
-      const cfg = getTrackingConfigSync();
-      return cfg.transit_statuses.includes(order.status);
-    } catch {
-      // Ultimate fallback
-      return ['picked_up', 'on_the_way', 'at_gate'].includes(order.status);
-    }
+    // No hardcoded fallback — if flow and tracking config are unavailable, do not assume transit
+    return false;
   }, [order?.status, flow]);
 
   return {
