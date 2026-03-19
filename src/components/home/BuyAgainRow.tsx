@@ -210,7 +210,7 @@ export function BuyAgainRow() {
                 {/* +N more badge */}
                 {moreCount > 0 && (
                   <div className="text-center">
-                   <span className="text-[10px] font-bold text-primary dark:text-white dark:bg-[hsl(170_35%_18%/0.8)] px-2 py-0.5 rounded-full">
+                   <span className="text-[10px] font-bold text-[hsl(var(--buyagain-badge-text))] bg-[hsl(var(--buyagain-badge-bg))] px-2 py-0.5 rounded-full">
                       +{moreCount} more
                     </span>
                   </div>

@@ -3,9 +3,9 @@ import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 
 const themes = [
-  { key: 'light', icon: Sun, emoji: '☀️', label: 'Light' },
-  { key: 'dark', icon: Moon, emoji: '🌙', label: 'Dark' },
-  { key: 'nature', icon: Leaf, emoji: '🌿', label: 'Nature' },
+  { key: 'light', icon: Sun, label: 'Light' },
+  { key: 'dark', icon: Moon, label: 'Dark' },
+  { key: 'nature', icon: Leaf, label: 'Nature' },
 ] as const;
 
 /** Compact 3-button pill for the header */
@@ -22,11 +22,9 @@ export function ThemeToggle({ className }: { className?: string }) {
             type="button"
             onClick={() => setTheme(key)}
             className={cn(
-              'flex items-center justify-center h-7 w-7 rounded-full transition-all duration-250',
+              'flex items-center justify-center h-7 w-7 rounded-full transition-all duration-200',
               active
-                ? key === 'nature'
-                  ? 'bg-[hsl(142_50%_36%)] text-white shadow-sm'
-                  : 'bg-primary text-primary-foreground shadow-sm'
+                ? 'bg-primary text-primary-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
             )}
             aria-label={label}
@@ -46,7 +44,7 @@ export function ThemePicker({ className }: { className?: string }) {
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      {themes.map(({ key, icon: Icon, emoji, label }) => {
+      {themes.map(({ key, icon: Icon, label }) => {
         const active = theme === key;
         return (
           <button
@@ -56,9 +54,7 @@ export function ThemePicker({ className }: { className?: string }) {
             className={cn(
               'flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all duration-300 text-sm font-semibold',
               active
-                ? key === 'nature'
-                  ? 'bg-[hsl(142_50%_36%/0.12)] border-[hsl(142_50%_36%/0.4)] text-[hsl(142_50%_36%)]'
-                  : 'bg-primary/10 border-primary/40 text-primary'
+                ? 'bg-primary/10 border-primary/40 text-primary'
                 : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-foreground/20'
             )}
             aria-label={label}
