@@ -124,7 +124,7 @@ export function ActiveOrderStrip() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 {/* Pulsing dot for transit statuses — activity illusion */}
-                {['on_the_way', 'out_for_delivery', 'at_gate', 'in_transit'].includes(order.status) && (
+                {TRANSIT_STATUSES.has(order.status as any) && (
                   <motion.span
                     className="w-2 h-2 rounded-full bg-green-500 shrink-0"
                     animate={{ opacity: [1, 0.3, 1] }}
