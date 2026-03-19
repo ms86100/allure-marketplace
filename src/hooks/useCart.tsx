@@ -202,7 +202,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           const { error } = await supabase.from('cart_items').insert({ user_id: user.id, product_id: product.id, quantity });
           if (error) throw error;
         }
-        if (!silent) toast.success('Added to cart', { id: 'cart-add' });
+        if (!silent) triggerCartFeedback(product.name || 'Item');
         // Authoritative reconcile after success
         await reconcile();
       } catch (error) {
