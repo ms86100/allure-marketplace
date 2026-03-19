@@ -23,6 +23,10 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { showOnboarding, hasChecked, completeOnboarding } = useOnboarding(user?.id);
 
+  // Session continuity: restore scroll position
+  const scrollKey = 'home-scroll-y';
+  const hasRestoredRef = useRef(false);
+
   // Auto-redirect to profile edit if profile is incomplete
   useEffect(() => {
     if (profile) {
@@ -32,14 +36,6 @@ export default function HomePage() {
       }
     }
   }, [profile, navigate]);
-
-  if (hasChecked && showOnboarding && profile) {
-    return <OnboardingWalkthrough onComplete={completeOnboarding} />;
-  }
-
-  // Session continuity: restore scroll position
-  const scrollKey = 'home-scroll-y';
-  const hasRestoredRef = useRef(false);
 
   useEffect(() => {
     if (!hasRestoredRef.current && profile) {
@@ -53,6 +49,10 @@ export default function HomePage() {
       sessionStorage.setItem(scrollKey, String(window.scrollY));
     };
   }, [profile]);
+
+  if (hasChecked && showOnboarding && profile) {
+    return <OnboardingWalkthrough onComplete={completeOnboarding} />;
+  }
 
   if (!profile) {
     return (
