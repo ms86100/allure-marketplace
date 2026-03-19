@@ -42,6 +42,23 @@ import { Capacitor } from '@capacitor/core';
 // Gap 10: Lazy-load map to avoid bundling Leaflet for non-delivery orders
 const DeliveryMapView = lazy(() => import('@/components/delivery/DeliveryMapView').then(m => ({ default: m.DeliveryMapView })));
 
+function CelebrationBanner({ order, isBuyerView, flow }: { order: any; isBuyerView: boolean; flow: any }) {
+  const show = isBuyerView && isSuccessfulTerminal(flow, order.status) && !getString(`celebration_${order.id}`);
+  useEffect(() => {
+    if (show) setString(`celebration_${order.id}`, 'true');
+  }, [show, order.id]);
+  if (!show) return null;
+  const durationMs = new Date(order.updated_at || order.created_at).getTime() - new Date(order.created_at).getTime();
+  const durationMin = Math.max(1, Math.round(durationMs / 60000));
+  return (
+    <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
+      <span className="text-3xl">🎊</span>
+      <p className="text-sm font-bold text-accent mt-1.5">Delivered in {durationMin} min!</p>
+      <p className="text-xs text-muted-foreground mt-0.5">Thank you for supporting your community</p>
+    </div>
+  );
+}
+
 export default function OrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
