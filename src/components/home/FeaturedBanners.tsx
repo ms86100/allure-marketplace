@@ -87,7 +87,8 @@ export function FeaturedBanners() {
     const container = document.getElementById('banner-carousel');
     if (container && container.children[activeIndex]) {
       const child = container.children[activeIndex] as HTMLElement;
-      child.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      const scrollLeft = child.offsetLeft - (container.offsetWidth - child.offsetWidth) / 2;
+      container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
     }
   }, [activeIndex]);
 
