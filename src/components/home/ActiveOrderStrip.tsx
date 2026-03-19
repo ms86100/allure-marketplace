@@ -108,7 +108,7 @@ export function ActiveOrderStrip() {
   if (activeOrders.length === 0) return null;
 
   return (
-    <div className="px-4 mt-2 space-y-1.5">
+    <div className="px-4 mt-3 space-y-2">
       <AnimatePresence>
         {activeOrders.map((order) => {
           const isTransit = TRANSIT_STATUSES.has(order.status as any);
@@ -116,52 +116,54 @@ export function ActiveOrderStrip() {
           return (
             <motion.div
               key={order.id}
-              initial={{ opacity: 0, y: -6 }}
+              initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
+              exit={{ opacity: 0, y: -8 }}
               onClick={() => navigate(`/orders/${order.id}`)}
-              className="flex items-center gap-2.5 rounded-xl bg-primary/6 border border-primary/12 px-3 py-2 cursor-pointer active:scale-[0.98] transition-transform"
+              className="flex items-center gap-3 rounded-2xl bg-card border border-primary/15 px-4 py-3 cursor-pointer active:scale-[0.98] transition-transform shadow-card"
             >
               {/* Product thumbnail */}
-              <div className="w-8 h-8 rounded-lg bg-primary/8 shrink-0 overflow-hidden flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-primary/8 shrink-0 overflow-hidden flex items-center justify-center">
                 {order.first_product_image ? (
                   <img src={order.first_product_image} alt="" className="w-full h-full object-cover" loading="lazy" />
                 ) : (
-                  <span className="text-sm">📦</span>
+                  <span className="text-base">📦</span>
                 )}
               </div>
 
               {/* Status + seller */}
-              <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                {isTransit && (
-                  <motion.span
-                    className="w-1.5 h-1.5 rounded-full bg-primary shrink-0"
-                    animate={{ opacity: [1, 0.3, 1] }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                  />
-                )}
-                <span className="text-[12px] font-bold text-foreground truncate">
-                  {order.display_label}
-                </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  {isTransit && (
+                    <motion.span
+                      className="w-2 h-2 rounded-full bg-primary shrink-0"
+                      animate={{ opacity: [1, 0.3, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                    />
+                  )}
+                  <span className="text-[13px] font-bold text-foreground truncate">
+                    {order.display_label}
+                  </span>
+                </div>
                 {order.seller_name && (
-                  <span className="text-[10px] text-muted-foreground truncate">
-                    · {order.seller_name}
+                  <span className="text-[11px] text-muted-foreground truncate block mt-0.5">
+                    {order.seller_name}
                   </span>
                 )}
               </div>
 
               {/* ETA or item count */}
-              <div className="shrink-0 flex items-center gap-1.5">
+              <div className="shrink-0 flex items-center gap-2">
                 {etaText ? (
-                  <span className="text-[11px] font-bold text-primary whitespace-nowrap">
+                  <span className="text-xs font-bold text-primary whitespace-nowrap bg-primary/8 px-2.5 py-1 rounded-full">
                     {etaText}
                   </span>
                 ) : order.item_count > 0 ? (
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                  <span className="text-[11px] text-muted-foreground whitespace-nowrap">
                     {order.item_count} item{order.item_count > 1 ? 's' : ''}
                   </span>
                 ) : null}
-                <ChevronRight size={14} className="text-muted-foreground/50 shrink-0" />
+                <ChevronRight size={16} className="text-muted-foreground/40 shrink-0" />
               </div>
             </motion.div>
           );

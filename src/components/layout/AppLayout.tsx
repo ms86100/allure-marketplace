@@ -37,7 +37,7 @@ export function AppLayout({
           title={headerTitle} 
         />
       )}
-      <main className={cn('pb-20', className)}>
+      <main className={cn('pb-24', className)}>
         <EnableNotificationsBanner />
         {children}
       </main>

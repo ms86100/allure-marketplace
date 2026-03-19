@@ -50,49 +50,52 @@ export function CommunityTeaser() {
 
   if (!effectiveSocietyId) return null;
 
-  // Gap #8: Reduced visual weight — smaller, footer-like feel
   if (posts.length === 0 && helpCount === 0) {
     return (
-      <div className="px-4 mt-5 mb-4">
-        <Link to="/community" className="flex items-center gap-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
-          <MessageCircle size={13} className="text-primary" />
-          <span className="font-semibold">{ml.label('label_community_first_post')}</span>
-          <ChevronRight size={12} className="ml-auto" />
+      <div className="px-4 mt-6 mb-4">
+        <Link to="/community" className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3.5 shadow-card hover:shadow-elevated transition-shadow">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <MessageCircle size={16} className="text-primary" />
+          </div>
+          <span className="font-semibold text-sm text-foreground flex-1">{ml.label('label_community_first_post')}</span>
+          <ChevronRight size={16} className="text-muted-foreground" />
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="px-4 mt-5 mb-4">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="font-bold text-[13px] text-foreground tracking-tight flex items-center gap-1.5">
-          <MessageCircle size={13} className="text-primary" />
+    <div className="px-4 mt-6 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="section-header">
+          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <MessageCircle size={14} className="text-primary" />
+          </div>
           {ml.label('label_section_community')}
         </h3>
-        <Link to="/community" className="text-[10px] font-bold text-primary flex items-center gap-0.5">
-          View all <ChevronRight size={11} />
+        <Link to="/community" className="text-xs font-bold text-primary flex items-center gap-0.5 hover:underline">
+          View all <ChevronRight size={13} />
         </Link>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {helpCount > 0 && (
           <Link to="/community">
-            <div className="flex items-center gap-2 py-1.5 active:opacity-70 transition-opacity">
-              <Heart size={12} className="text-warning shrink-0" />
-              <span className="text-[11px] font-medium text-foreground flex-1 truncate">
+            <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl bg-warning/5 border border-warning/10 active:opacity-70 transition-opacity">
+              <Heart size={14} className="text-warning shrink-0" />
+              <span className="text-xs font-semibold text-foreground flex-1 truncate">
                 {helpCount} neighbor{helpCount !== 1 ? 's' : ''} need{helpCount === 1 ? 's' : ''} help
               </span>
-              <ArrowRight size={11} className="text-muted-foreground shrink-0" />
+              <ArrowRight size={13} className="text-muted-foreground shrink-0" />
             </div>
           </Link>
         )}
         
         {posts.map((post) => (
           <Link key={post.id} to="/community">
-            <div className="flex items-center gap-2 py-1.5 active:opacity-70 transition-opacity">
-              <span className="text-[11px] font-medium text-foreground flex-1 truncate">{post.title}</span>
-              <span className="text-[9px] text-muted-foreground whitespace-nowrap tabular-nums">
+            <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-secondary/50 active:opacity-70 transition-all">
+              <span className="text-xs font-medium text-foreground flex-1 truncate">{post.title}</span>
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap tabular-nums">
                 {post.comment_count}💬 {post.vote_count}↑
               </span>
             </div>

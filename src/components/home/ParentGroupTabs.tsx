@@ -24,9 +24,9 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
     return (
       <div className="grid grid-cols-4 gap-3 px-4 py-1">
         {[1, 2, 3, 4].map(i => (
-          <div key={i} className="flex flex-col items-center gap-1.5">
-            <Skeleton className="w-12 h-12 rounded-xl" />
-            <Skeleton className="w-10 h-2.5 rounded" />
+          <div key={i} className="flex flex-col items-center gap-2">
+            <Skeleton className="w-14 h-14 rounded-2xl" />
+            <Skeleton className="w-12 h-2.5 rounded" />
           </div>
         ))}
       </div>
@@ -42,7 +42,7 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
   return (
     <div className={cn(
       useGrid
-        ? 'grid grid-cols-4 gap-y-3 gap-x-3 px-4 py-1'
+        ? 'grid grid-cols-4 gap-y-4 gap-x-3 px-4 py-1'
         : 'flex gap-3 overflow-x-auto scrollbar-hide px-4 py-1'
     )}>
       {tabs.map((tab) => {
@@ -59,31 +59,28 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
               }
             }}
             className={cn(
-              'flex flex-col items-center gap-1 transition-all duration-150 group',
+              'flex flex-col items-center gap-1.5 transition-all duration-200 group',
               !useGrid && 'shrink-0'
             )}
           >
             <div
               className={cn(
-                'w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-150',
+                'w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-200',
                 isActive
-                  ? 'bg-primary/10 ring-1.5 ring-primary'
-                  : 'bg-secondary hover:bg-muted active:scale-95'
+                  ? 'bg-primary text-primary-foreground shadow-cta scale-105'
+                  : 'bg-secondary text-foreground/60 hover:bg-muted active:scale-95'
               )}
             >
               <DynamicIcon
                 name={tab.icon}
-                size={22}
-                className={cn(
-                  'transition-colors duration-150',
-                  isActive ? 'text-primary' : 'text-foreground/60'
-                )}
+                size={24}
+                className="transition-colors duration-200"
               />
             </div>
             <span
               className={cn(
-                'text-[10px] font-semibold leading-tight text-center w-14 line-clamp-1',
-                isActive ? 'text-primary' : 'text-muted-foreground'
+                'text-[10px] font-semibold leading-tight text-center w-16 line-clamp-1',
+                isActive ? 'text-primary font-bold' : 'text-muted-foreground'
               )}
             >
               {tab.label}

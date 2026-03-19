@@ -124,10 +124,11 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
       ref={cardRef}
       onClick={handleCardClick}
       className={cn(
-        'bg-card rounded-xl cursor-pointer flex flex-col h-full relative',
-        'border border-border/60',
-        'transition-all duration-100',
-        'active:scale-[0.98]',
+        'bg-card rounded-2xl cursor-pointer flex flex-col h-full relative',
+        'border border-border/70 shadow-card',
+        'transition-all duration-150',
+        'hover:shadow-elevated hover:border-border',
+        'active:scale-[0.97]',
         isOutOfStock && 'opacity-40 grayscale-[50%]',
         isStoreClosed && !isOutOfStock && 'opacity-50 grayscale-[30%]',
         className
@@ -135,47 +136,47 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
     >
       {/* Image */}
       <div className="relative">
-        <div className="relative aspect-square rounded-t-xl overflow-hidden product-image-bg">
+        <div className="relative aspect-square rounded-t-2xl overflow-hidden product-image-bg">
           {product.image_url ? (
             <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
           ) : (
             <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: placeholderBg || 'hsl(var(--muted))' }}>
-              <span className="text-2xl">{placeholderEmoji}</span>
+              <span className="text-3xl">{placeholderEmoji}</span>
             </div>
           )}
 
           {isOutOfStock && (
-            <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
-              <span className="text-[9px] font-bold text-muted-foreground bg-card/90 px-2 py-1 rounded-md uppercase tracking-wider">{mc.labels.outOfStock}</span>
+            <div className="absolute inset-0 bg-background/60 flex items-center justify-center backdrop-blur-[2px]">
+              <span className="text-[10px] font-bold text-muted-foreground bg-card px-3 py-1.5 rounded-full uppercase tracking-wider shadow-sm">{mc.labels.outOfStock}</span>
             </div>
           )}
 
           {isStoreClosed && !isOutOfStock && (
-            <div className="absolute inset-0 bg-background/40 flex items-center justify-center">
-              <span className="text-[9px] font-bold text-muted-foreground bg-card/90 px-2 py-1 rounded-md uppercase tracking-wider flex items-center gap-1">
-                <Clock size={9} />{storeClosedMessage}
+            <div className="absolute inset-0 bg-background/50 flex items-center justify-center backdrop-blur-[2px]">
+              <span className="text-[10px] font-bold text-muted-foreground bg-card px-3 py-1.5 rounded-full uppercase tracking-wider shadow-sm flex items-center gap-1">
+                <Clock size={10} />{storeClosedMessage}
               </span>
             </div>
           )}
 
           {/* Badges — top left */}
           {badges.length > 0 && (
-            <div className="absolute top-1.5 left-1.5 flex flex-col gap-0.5">
+            <div className="absolute top-2 left-2 flex flex-col gap-1">
               {badges.map((b, i) => (
-                <Badge key={i} className={cn('text-[7px] leading-none px-1.5 py-0.5 font-bold rounded border-0', b.color)}>{b.label}</Badge>
+                <Badge key={i} className={cn('text-[8px] leading-none px-2 py-0.5 font-bold rounded-full border-0 shadow-sm', b.color)}>{b.label}</Badge>
               ))}
             </div>
           )}
 
           {/* Discount — top right */}
           {hasDiscount && discountPct > 0 && (
-            <div className="absolute top-1.5 right-1.5">
-              <span className="bg-primary text-primary-foreground text-[8px] font-bold px-1.5 py-0.5 rounded-md">{discountPct}% OFF</span>
+            <div className="absolute top-2 right-2">
+              <span className="bg-primary text-primary-foreground text-[9px] font-bold px-2 py-1 rounded-full shadow-sm">{discountPct}% OFF</span>
             </div>
           )}
 
           {showVegBadge && (
-            <div className="absolute bottom-1.5 right-1.5">
+            <div className="absolute bottom-2 right-2">
               <VegBadge isVeg={product.is_veg} size="sm" />
             </div>
           )}
@@ -183,21 +184,21 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
 
         {/* Add button — overlapping image bottom */}
         {!viewOnly && !isOutOfStock && !isStoreClosed && (
-          <div className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 z-10">
+          <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 z-10">
             {isCartAction && quantity > 0 ? (
-              <div className="flex items-center bg-primary rounded-lg overflow-hidden shadow-sm animate-stepper-pop">
-                <button onClick={handleDecrement} className="px-3 py-1.5 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[40px] min-h-[36px] flex items-center justify-center">
-                  <Minus size={12} strokeWidth={3} />
+              <div className="flex items-center bg-primary rounded-xl overflow-hidden shadow-cta animate-stepper-pop">
+                <button onClick={handleDecrement} className="px-3.5 py-2 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[42px] min-h-[36px] flex items-center justify-center">
+                  <Minus size={13} strokeWidth={3} />
                 </button>
-                <span className="font-bold text-xs text-primary-foreground px-1.5 tabular-nums">{quantity}</span>
-                <button onClick={handleIncrement} className="px-3 py-1.5 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[40px] min-h-[36px] flex items-center justify-center">
-                  <Plus size={12} strokeWidth={3} />
+                <span className="font-bold text-sm text-primary-foreground px-2 tabular-nums">{quantity}</span>
+                <button onClick={handleIncrement} className="px-3.5 py-2 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[42px] min-h-[36px] flex items-center justify-center">
+                  <Plus size={13} strokeWidth={3} />
                 </button>
               </div>
             ) : (
               <button
                 onClick={handleAdd}
-                className="bg-card text-primary font-bold text-[11px] px-5 py-1.5 rounded-lg border border-primary/30 hover:bg-primary hover:text-primary-foreground transition-all duration-150 uppercase tracking-wide active:scale-95 min-h-[36px] shadow-sm"
+                className="bg-card text-primary font-bold text-xs px-6 py-2 rounded-xl border-2 border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all duration-200 uppercase tracking-wide active:scale-95 min-h-[36px] shadow-card"
               >
                 {actionConfig.shortLabel}
               </button>
@@ -207,74 +208,74 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
       </div>
 
       {/* Content */}
-      <div className={cn("px-2.5 pb-2.5 flex flex-col flex-1", !viewOnly && !isOutOfStock ? "pt-5" : "pt-2.5")}>
+      <div className={cn("px-3 pb-3 flex flex-col flex-1", !viewOnly && !isOutOfStock ? "pt-6" : "pt-3")}>
         {variantText && (
-          <span className="text-[9px] font-medium text-muted-foreground mb-0.5">{variantText}</span>
+          <span className="text-[10px] font-medium text-muted-foreground mb-0.5">{variantText}</span>
         )}
 
-        <h4 className="font-semibold text-[12px] leading-snug line-clamp-2 text-foreground">{product.name}</h4>
+        <h4 className="font-semibold text-[13px] leading-snug line-clamp-2 text-foreground">{product.name}</h4>
 
         {product.seller_name && !compact && (
-          <div className="flex items-center gap-1 mt-1 flex-wrap">
-            <span className="text-[10px] text-muted-foreground truncate">{product.seller_name}</span>
+          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+            <span className="text-[11px] text-muted-foreground truncate">{product.seller_name}</span>
             {product.seller_id && <SellerTrustBadge sellerId={product.seller_id} size="sm" />}
-            {activityLabel && <span className="text-[8px] text-muted-foreground/70">· {activityLabel}</span>}
+            {activityLabel && <span className="text-[9px] text-muted-foreground/70">· {activityLabel}</span>}
             {isSellerInactive && (
-              <span className="inline-flex items-center gap-0.5 text-[7px] font-bold text-warning bg-warning/10 rounded px-1 py-0.5">
-                <AlertTriangle size={7} />Inactive
+              <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-warning bg-warning/10 rounded-full px-1.5 py-0.5">
+                <AlertTriangle size={8} />Inactive
               </span>
             )}
           </div>
         )}
 
         {!compact && (product as any).on_time_delivery_pct != null && (product as any).completed_order_count > onTimeBadgeMinOrders && (
-          <span className="inline-flex items-center gap-0.5 text-[8px] font-semibold text-primary bg-primary/8 rounded px-1.5 py-0.5 w-fit mt-1">
+          <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-primary bg-primary/8 rounded-full px-2 py-0.5 w-fit mt-1.5">
             {ml.label('label_on_time_format').replace('{pct}', String((product as any).on_time_delivery_pct))}
           </span>
         )}
 
         {!compact && socialProofCount != null && socialProofCount > 0 && (
-          <span className="inline-flex items-center gap-1 text-[8px] font-semibold text-muted-foreground bg-secondary rounded px-1.5 py-0.5 w-fit mt-0.5">
-            <Users size={8} className="shrink-0" />
+          <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-muted-foreground bg-secondary rounded-full px-2 py-0.5 w-fit mt-1">
+            <Users size={9} className="shrink-0" />
             {ml.label('label_social_proof_format').replace('{count}', String(socialProofCount)).replace('{unit}', socialProofCount === 1 ? ml.label('label_social_proof_singular') : ml.label('label_social_proof_plural'))}
           </span>
         )}
 
         {!compact && deliveryText && (
-          <div className="flex items-center gap-1 mt-1">
-            <Clock size={9} className="text-muted-foreground" />
-            <span className="text-[9px] font-medium text-muted-foreground">{deliveryText}</span>
+          <div className="flex items-center gap-1 mt-1.5">
+            <Clock size={10} className="text-muted-foreground" />
+            <span className="text-[10px] font-medium text-muted-foreground">{deliveryText}</span>
           </div>
         )}
 
         {!compact && product.lead_time_hours != null && product.lead_time_hours > 0 && (
-          <div className="flex items-center gap-0.5 mt-0.5">
-            <Clock size={8} className="text-muted-foreground" />
-            <span className="text-[8px] font-medium text-muted-foreground">Order {product.lead_time_hours}h ahead</span>
+          <div className="flex items-center gap-1 mt-1">
+            <Clock size={9} className="text-muted-foreground" />
+            <span className="text-[9px] font-medium text-muted-foreground">Order {product.lead_time_hours}h ahead</span>
           </div>
         )}
 
         {!compact && product.accepts_preorders && (
-          <span className="inline-block bg-primary/8 text-primary text-[7px] font-bold px-1.5 py-0.5 rounded w-fit mt-0.5">Pre-order</span>
+          <span className="inline-block bg-primary/8 text-primary text-[8px] font-bold px-2 py-0.5 rounded-full w-fit mt-1">Pre-order</span>
         )}
 
         <div className="flex-1 min-h-0" />
 
         {/* Price row */}
-        <div className="flex items-end gap-1.5 mt-1.5">
-          <span className="font-bold text-[14px] text-foreground leading-none tracking-tight tabular-nums">{formatPrice(product.price)}</span>
+        <div className="flex items-end gap-2 mt-2">
+          <span className="font-bold text-[15px] text-foreground leading-none tracking-tight tabular-nums">{formatPrice(product.price)}</span>
           {hasDiscount && (
-            <span className="text-[10px] text-muted-foreground line-through leading-none tabular-nums">{formatPrice(product.mrp!)}</span>
+            <span className="text-[11px] text-muted-foreground line-through leading-none tabular-nums">{formatPrice(product.mrp!)}</span>
           )}
         </div>
 
         {!compact && product.price_per_unit && (
-          <span className="text-[9px] text-muted-foreground leading-none mt-0.5">{product.price_per_unit}</span>
+          <span className="text-[10px] text-muted-foreground leading-none mt-0.5">{product.price_per_unit}</span>
         )}
 
         {(locationLabel || (product as any).is_same_society !== false) && (
           <div
-            className={cn("flex items-center gap-1 mt-1", (product as any).seller_latitude && (product as any).seller_longitude && "cursor-pointer hover:text-primary transition-colors")}
+            className={cn("flex items-center gap-1 mt-1.5", (product as any).seller_latitude && (product as any).seller_longitude && "cursor-pointer hover:text-primary transition-colors")}
             onClick={(e) => {
               const lat = (product as any).seller_latitude;
               const lng = (product as any).seller_longitude;
@@ -286,8 +287,8 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
             }}
             title={(product as any).seller_latitude ? "Open in Google Maps" : undefined}
           >
-            <MapPin size={9} className="shrink-0 text-muted-foreground" />
-            <span className="text-[9px] font-medium text-muted-foreground leading-tight truncate">
+            <MapPin size={10} className="shrink-0 text-muted-foreground" />
+            <span className="text-[10px] font-medium text-muted-foreground leading-tight truncate">
               {locationLabel || ml.label('label_in_your_society')}
             </span>
           </div>
@@ -295,10 +296,10 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
       </div>
 
       {viewOnly && (
-        <div className="px-2.5 pb-2.5">
+        <div className="px-3 pb-3">
           <button
             onClick={(e) => { e.stopPropagation(); if (onViewClick) { onViewClick(); } else { onNavigate?.(`/seller/${product.seller_id}`); } }}
-            className="w-full border border-primary text-primary font-semibold text-[11px] py-2 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors"
+            className="w-full border-2 border-primary text-primary font-bold text-xs py-2.5 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all duration-200"
           >
             {onViewClick ? 'View Details' : mc.labels.viewButton}
           </button>
@@ -313,15 +314,11 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
 function formatSellerActivity(lastActiveAt: string, ml: ReturnType<typeof useMarketplaceLabels>): string {
   try {
     const d = new Date(lastActiveAt);
-    const diffMs = Date.now() - d.getTime();
-    const diffHours = diffMs / (1000 * 60 * 60);
-    if (diffHours < 1) return ml.label('label_active_now');
-    if (diffHours < 24) return ml.label('label_active_hours_ago').replace('{hours}', String(Math.floor(diffHours)));
-    if (diffHours < 48) return ml.label('label_active_yesterday');
-    return formatDistanceToNowStrict(d, { addSuffix: true });
-  } catch { return ''; }
+    if (isNaN(d.getTime())) return '';
+    return ml.label('label_active_ago').replace('{time}', formatDistanceToNowStrict(d, { addSuffix: false }));
+  } catch {
+    return '';
+  }
 }
 
-export const ProductListingCard = memo(ProductListingCardInner, (prev, next) => {
-  return prev.product.id === next.product.id && prev.product.is_available === next.product.is_available && prev.product.price === next.product.price && prev.product.stock_quantity === next.product.stock_quantity && prev.product.seller_is_available === next.product.seller_is_available && prev.product.seller_availability_start === next.product.seller_availability_start && prev.product.seller_availability_end === next.product.seller_availability_end && prev.product.distance_km === next.product.distance_km && prev.product.society_name === next.product.society_name && prev.layout === next.layout && prev.viewOnly === next.viewOnly && prev.className === next.className && prev.categoryConfigs === next.categoryConfigs && prev.marketplaceConfig === next.marketplaceConfig && prev.badgeConfigs === next.badgeConfigs && prev.socialProofCount === next.socialProofCount && prev.compact === next.compact;
-});
+export const ProductListingCard = memo(ProductListingCardInner);

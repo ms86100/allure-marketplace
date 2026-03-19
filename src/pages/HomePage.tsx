@@ -55,11 +55,11 @@ export default function HomePage() {
     return (
       <AppLayout>
         <div className="px-4 py-6 space-y-4">
-          <div className="h-10 rounded-lg bg-muted animate-pulse" />
-          <div className="h-28 rounded-xl bg-muted animate-pulse" />
+          <div className="h-12 rounded-2xl bg-secondary animate-pulse" />
+          <div className="h-32 rounded-2xl bg-secondary animate-pulse" />
           <div className="grid grid-cols-2 gap-3">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="aspect-square rounded-xl bg-muted animate-pulse" />
+              <div key={i} className="aspect-square rounded-2xl bg-secondary animate-pulse" />
             ))}
           </div>
         </div>
@@ -69,7 +69,7 @@ export default function HomePage() {
 
   return (
     <AppLayout>
-      <div className="pb-4">
+      <div className="pb-6">
         {/* Active order tracking */}
         <ActiveOrderStrip />
 
@@ -93,18 +93,18 @@ export default function HomePage() {
           const hint = `Add your ${missing[0]} to continue`;
           return (
             <motion.div
-              initial={{ opacity: 0, y: -6 }}
+              initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mx-4 mt-4 rounded-xl bg-secondary border border-border p-3"
+              className="mx-4 mt-5 rounded-2xl bg-card border border-border p-4 shadow-card"
             >
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-[11px] font-semibold text-foreground">Profile {pct}% complete</p>
-                <Link to="/profile/edit" className="text-[11px] font-bold text-primary shrink-0 hover:underline">Update</Link>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-bold text-foreground">Profile {pct}% complete</p>
+                <Link to="/profile/edit" className="text-xs font-bold text-primary shrink-0 hover:underline">Update</Link>
               </div>
-              <div className="h-1 rounded-full bg-muted overflow-hidden">
+              <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
                 <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6 }} className="h-full rounded-full bg-primary" />
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1">{hint}</p>
+              <p className="text-[11px] text-muted-foreground mt-1.5">{hint}</p>
             </motion.div>
           );
         })()}
@@ -119,7 +119,7 @@ export default function HomePage() {
         <SocietyQuickLinks />
 
         {/* Leaderboard */}
-        <div className="mt-4">
+        <div className="mt-6">
           <SocietyLeaderboard />
         </div>
 

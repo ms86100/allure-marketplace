@@ -24,9 +24,9 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
-/* ── Simple spacer between sections ── */
+/* ── Section spacer ── */
 function SectionDivider() {
-  return <div className="my-4" />;
+  return <div className="my-6" />;
 }
 
 export function MarketplaceSection() {
@@ -45,7 +45,6 @@ export function MarketplaceSection() {
   const { data: localCategories = [], isLoading: loadingLocal } = useProductsByCategory(80);
   const { parentGroupInfos } = useParentGroups();
 
-  // Check if featured banners exist to decide whether to show auto-highlights
   const { data: bannerCount = 0 } = useQuery({
     queryKey: ['featured-banner-count', effectiveSocietyId],
     queryFn: async () => {
@@ -137,7 +136,7 @@ export function MarketplaceSection() {
       )}
 
       {/* ── Icon-forward Category Tabs ── */}
-      <div className="pt-3 pb-4">
+      <div className="pt-4 pb-5">
         <ParentGroupTabs activeGroup={activeGroup} onGroupChange={setActiveGroup} activeParentGroups={activeParentGroupSet} />
       </div>
 
@@ -151,13 +150,13 @@ export function MarketplaceSection() {
         />
       ))}
 
-      {/* ── Discovery Rows — Gap #12: Added "See all" links ── */}
+      {/* ── Discovery Rows ── */}
       {!activeGroup && popularNearYou.length > (discoveryMinProducts || 3) && (
         <>
           <SectionDivider />
           <DiscoveryRow
             title={browsingLocation?.label ? `${ml.label('label_discovery_popular')} · ${browsingLocation.label}` : ml.label('label_discovery_popular')}
-            icon={<Flame size={14} className="text-destructive" />}
+            icon={<Flame size={15} className="text-destructive" />}
             accentClass="bg-destructive/10 text-destructive"
             products={popularNearYou}
             onProductTap={handleProductTap}
@@ -175,7 +174,7 @@ export function MarketplaceSection() {
           <SectionDivider />
           <DiscoveryRow
             title={ml.label('label_discovery_new')}
-            icon={<Sparkles size={14} className="text-primary" />}
+            icon={<Sparkles size={15} className="text-primary" />}
             accentClass="bg-primary/10 text-primary"
             products={newThisWeek}
             onProductTap={handleProductTap}
@@ -202,11 +201,13 @@ export function MarketplaceSection() {
         socialProofMap={socialProofMap}
       />
 
-      {/* ── Gap #19: Store Discovery — stronger header ── */}
-      <div className="py-5 mt-3">
-        <div className="flex items-center gap-1.5 px-4 mb-2">
-          <Store size={14} className="text-primary" />
-          <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{ml.label('label_section_store_discovery')}</h3>
+      {/* ── Store Discovery ── */}
+      <div className="py-6 mt-4">
+        <div className="flex items-center gap-2 px-4 mb-3">
+          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Store size={16} className="text-primary" />
+          </div>
+          <h3 className="section-header">{ml.label('label_section_store_discovery')}</h3>
         </div>
         <ShopByStoreDiscovery />
       </div>
@@ -241,7 +242,7 @@ export function MarketplaceSection() {
   );
 }
 
-// ── Discovery Row with accent header — Gap #12: Added "See all" link ──
+// ── Discovery Row ──
 function DiscoveryRow({
   title, icon, accentClass, products, onProductTap, onNavigate, categoryConfigs, marketplaceConfig, badgeConfigs, socialProofMap,
 }: {
@@ -256,7 +257,6 @@ function DiscoveryRow({
   badgeConfigs?: any[];
   socialProofMap?: Map<string, number>;
 }) {
-  // Find the hero product (bestseller or highest orders)
   const heroIdx = useMemo(() => {
     const bsIdx = products.findIndex(p => p.is_bestseller);
     if (bsIdx >= 0) return bsIdx;
@@ -272,7 +272,6 @@ function DiscoveryRow({
     return -1;
   }, [products]);
 
-  // Derive a category link from the first product
   const firstProduct = products[0];
   const seeAllLink = firstProduct ? `/category/${(firstProduct as any).parentGroup || 'all'}` : null;
 
@@ -281,21 +280,21 @@ function DiscoveryRow({
       <div className="flex items-center justify-between px-4 mb-3">
         <div className="flex items-center gap-2">
           {accentClass && (
-            <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold', accentClass)}>
+            <span className={cn('inline-flex items-center justify-center w-8 h-8 rounded-xl', accentClass)}>
               {icon}
             </span>
           )}
-          <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{title}</h3>
+          <h3 className="section-header">{title}</h3>
         </div>
         {seeAllLink && (
-          <Link to={seeAllLink} className="text-[11px] font-bold text-primary flex items-center gap-0.5">
-            See all <ChevronRight size={12} />
+          <Link to={seeAllLink} className="text-xs font-bold text-primary flex items-center gap-0.5 hover:underline">
+            See all <ChevronRight size={14} />
           </Link>
         )}
       </div>
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1 snap-x snap-mandatory">
+      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory">
         {products.map((product, i) => (
-          <div key={product.id} className={cn('shrink-0 snap-start', i === heroIdx ? 'w-[220px]' : 'w-[155px]')}>
+          <div key={product.id} className={cn('shrink-0 snap-start', i === heroIdx ? 'w-[220px]' : 'w-[160px]')}>
             <ProductListingCard
               product={product}
               onTap={onProductTap}
@@ -329,12 +328,12 @@ function ProductListings({
   const ml = useMarketplaceLabels();
   if (isLoading) {
     return (
-      <div className="px-4 space-y-5 mt-4">
+      <div className="px-4 space-y-6 mt-4">
         {[1, 2].map(i => (
           <div key={i}>
-            <Skeleton className="h-5 w-40 mb-3" />
+            <Skeleton className="h-6 w-44 mb-3 rounded-lg" />
             <div className="flex gap-3">
-              {[1, 2, 3].map(j => <Skeleton key={j} className="w-[150px] h-56 rounded-xl shrink-0" />)}
+              {[1, 2, 3].map(j => <Skeleton key={j} className="w-[160px] h-60 rounded-2xl shrink-0" />)}
             </div>
           </div>
         ))}
@@ -344,42 +343,42 @@ function ProductListings({
 
   if (categories.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+      <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
-          className="relative mb-6"
+          className="relative mb-8"
         >
-          <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
-            <ShoppingBag size={40} className="text-primary" />
+          <div className="w-28 h-28 rounded-3xl bg-primary/10 flex items-center justify-center">
+            <ShoppingBag size={48} className="text-primary" />
           </div>
-          <div className="absolute -top-2 -right-2">
-            <div className="w-8 h-8 rounded-full bg-warning/20 flex items-center justify-center">
-              <Sparkles size={16} className="text-warning" />
+          <div className="absolute -top-3 -right-3">
+            <div className="w-10 h-10 rounded-2xl bg-warning/20 flex items-center justify-center">
+              <Sparkles size={18} className="text-warning" />
             </div>
           </div>
         </motion.div>
 
         <motion.div
-          initial={{ y: 10, opacity: 0 }}
+          initial={{ y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.2, duration: 0.4 }}
           className="space-y-3"
         >
-          <h2 className="text-lg font-extrabold text-foreground tracking-tight">{ml.label('label_empty_marketplace_title')}</h2>
+          <h2 className="text-xl font-extrabold text-foreground tracking-tight">{ml.label('label_empty_marketplace_title')}</h2>
           <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
             {ml.label('label_empty_marketplace_desc')}
           </p>
         </motion.div>
 
         <motion.div
-          initial={{ y: 10, opacity: 0 }}
+          initial={{ y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.4, duration: 0.4 }}
-          className="mt-6 flex items-center gap-2 text-xs text-muted-foreground bg-card border border-border rounded-full px-4 py-2"
+          className="mt-8 flex items-center gap-2 text-xs text-muted-foreground bg-card border border-border rounded-2xl px-5 py-3 shadow-card"
         >
-          <Clock size={14} />
+          <Clock size={15} />
           <span>{ml.label('label_empty_marketplace_hint')}</span>
         </motion.div>
       </div>
@@ -387,35 +386,33 @@ function ProductListings({
   }
 
   return (
-    <div className="space-y-8 mt-5">
+    <div className="space-y-8 mt-6">
       {categories.map((cat, catIdx) => {
-        // Get category color for accent dot
         const catConfig = categoryConfigs?.find((c: any) => c.category === cat.category);
         const catColor = catConfig?.color || null;
 
         return (
           <div key={cat.category}>
             <div className="flex items-center justify-between px-4 mb-3">
-              <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
+              <h3 className="section-header">
                 {catColor && (
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: catColor }} />
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: catColor }} />
                 )}
-                <DynamicIcon name={cat.icon} size={16} className="shrink-0" />
+                <DynamicIcon name={cat.icon} size={18} className="shrink-0" />
                 {cat.displayName}
               </h3>
               <Link
                 to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-                className="text-[11px] font-bold text-primary flex items-center gap-0.5"
+                className="text-xs font-bold text-primary flex items-center gap-0.5 hover:underline"
               >
-                see all <ChevronRight size={12} />
+                See all <ChevronRight size={14} />
               </Link>
             </div>
-            <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1 snap-x snap-mandatory">
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory">
               {cat.products.slice(0, 8).map((product, i) => {
-                // First bestseller in each category row gets hero treatment
                 const isHero = i === 0 && product.is_bestseller;
                 return (
-                  <div key={product.id} className={cn('shrink-0 snap-start', isHero ? 'w-[220px]' : 'w-[155px]')}>
+                  <div key={product.id} className={cn('shrink-0 snap-start', isHero ? 'w-[220px]' : 'w-[160px]')}>
                     <ProductListingCard
                       product={product}
                       onTap={onProductTap}

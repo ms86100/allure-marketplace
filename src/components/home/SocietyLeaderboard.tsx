@@ -90,8 +90,8 @@ export function SocietyLeaderboard() {
   if (loading) {
     return (
       <div className="space-y-3 p-4">
-        <Skeleton className="h-6 w-48" />
-        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-7 w-52 rounded-lg" />
+        <Skeleton className="h-28 w-full rounded-2xl" />
       </div>
     );
   }
@@ -99,33 +99,33 @@ export function SocietyLeaderboard() {
   if (topSellers.length === 0 && topProducts.length === 0) return null;
 
   return (
-    <div className="space-y-5 px-4">
-      {/* ── Gap #7: Simplified Top Sellers — compact horizontal scroll, no podium ── */}
+    <div className="space-y-6 px-4">
+      {/* Top Sellers */}
       {topSellers.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-warning/20 flex items-center justify-center">
-              <Trophy size={14} className="text-warning" />
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-xl bg-warning/15 flex items-center justify-center">
+              <Trophy size={16} className="text-warning" />
             </div>
-            <h3 className="font-bold text-sm text-foreground">{ml.label('label_section_leaderboard_sellers')}</h3>
+            <h3 className="section-header">{ml.label('label_section_leaderboard_sellers')}</h3>
           </div>
 
-          <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
             {topSellers.map((s) => {
               const hue = hashToHue(s.id);
               return (
                 <div
                   key={s.id}
-                  className="shrink-0 flex flex-col items-center gap-1.5 cursor-pointer active:scale-[0.97] transition-transform w-[72px]"
+                  className="shrink-0 flex flex-col items-center gap-2 cursor-pointer active:scale-[0.97] transition-transform w-[76px]"
                   onClick={() => navigate(`/seller/${s.id}`)}
                 >
-                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-border">
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-border shadow-sm">
                     {s.profile_image_url ? (
                       <img src={s.profile_image_url} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <div
-                        className="w-full h-full flex items-center justify-center font-bold text-white text-sm"
-                        style={{ backgroundColor: `hsl(${hue}, 55%, 50%)` }}
+                        className="w-full h-full flex items-center justify-center font-bold text-white text-lg"
+                        style={{ backgroundColor: `hsl(${hue}, 50%, 45%)` }}
                       >
                         {s.business_name.charAt(0).toUpperCase()}
                       </div>
@@ -134,9 +134,9 @@ export function SocietyLeaderboard() {
                   <p className="text-[10px] font-semibold text-foreground truncate text-center w-full leading-tight">
                     {s.business_name}
                   </p>
-                  <div className="flex items-center gap-0.5">
-                    <Star size={9} className="text-warning fill-warning" />
-                    <span className="text-[9px] font-medium text-muted-foreground">{s.rating.toFixed(1)}</span>
+                  <div className="flex items-center gap-0.5 -mt-0.5">
+                    <Star size={10} className="text-warning fill-warning" />
+                    <span className="text-[10px] font-medium text-muted-foreground">{s.rating.toFixed(1)}</span>
                   </div>
                 </div>
               );
@@ -145,32 +145,32 @@ export function SocietyLeaderboard() {
         </div>
       )}
 
-      {/* ── Most Ordered Products ── */}
+      {/* Most Ordered Products */}
       {topProducts.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 mb-2.5">
-            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-              <ShoppingBag size={14} className="text-primary" />
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+              <ShoppingBag size={16} className="text-primary" />
             </div>
-            <h3 className="font-bold text-sm text-foreground">{ml.label('label_section_leaderboard_products')}</h3>
+            <h3 className="section-header">{ml.label('label_section_leaderboard_products')}</h3>
           </div>
-          <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
             {topProducts.map((p) => (
-              <div key={p.product_id} className="shrink-0 w-[140px] rounded-2xl bg-card border border-border overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/seller/${p.seller_id}`)}>
-                <div className="relative aspect-[4/3] bg-muted">
+              <div key={p.product_id} className="shrink-0 w-[150px] rounded-2xl bg-card border border-border overflow-hidden cursor-pointer hover:shadow-elevated transition-shadow shadow-card" onClick={() => navigate(`/seller/${p.seller_id}`)}>
+                <div className="relative aspect-[4/3] bg-secondary">
                   {p.image_url ? (
                     <img src={p.image_url} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <ShoppingBag size={20} className="text-muted-foreground/40" />
+                      <ShoppingBag size={22} className="text-muted-foreground/40" />
                     </div>
                   )}
-                  <span className="absolute bottom-1 right-1 text-[8px] font-bold text-primary-foreground bg-primary/90 backdrop-blur-sm rounded-full px-1.5 py-0.5">{p.order_count}× ordered</span>
+                  <span className="absolute bottom-1.5 right-1.5 text-[9px] font-bold text-primary-foreground bg-primary/90 backdrop-blur-sm rounded-full px-2 py-0.5">{p.order_count}× ordered</span>
                 </div>
-                <div className="p-2">
-                  <p className="text-[10px] font-semibold text-foreground truncate leading-tight">{p.product_name}</p>
-                  <p className="text-[9px] text-muted-foreground truncate mt-0.5">{p.seller_name}</p>
-                  <p className="text-[10px] font-bold text-primary mt-0.5">{formatPrice(p.price)}</p>
+                <div className="p-2.5">
+                  <p className="text-[11px] font-semibold text-foreground truncate leading-tight">{p.product_name}</p>
+                  <p className="text-[10px] text-muted-foreground truncate mt-0.5">{p.seller_name}</p>
+                  <p className="text-[11px] font-bold text-primary mt-1">{formatPrice(p.price)}</p>
                 </div>
               </div>
             ))}
