@@ -93,40 +93,34 @@ function HeaderInner({
         'sticky top-0 z-40 bg-background border-b border-border/50',
         className
       )}>
-        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 space-y-1">
-          {/* Brand row */}
-          <div className="flex items-baseline gap-2">
-            <span className="text-[15px] font-extrabold text-foreground tracking-tight leading-none">Sociva</span>
-            <span className="text-[10px] font-medium text-muted-foreground leading-none">Your society, your marketplace</span>
+        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 space-y-1.5">
+          {/* Brand + tagline */}
+          <div>
+            <h1 className="text-lg font-black text-foreground tracking-tight leading-tight italic">Sociva</h1>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest leading-none mt-0.5">Your society, your store</p>
           </div>
-          {stats && (stats.sellers > 0 || stats.orders > 0) && (
-            <p className="text-[10px] text-muted-foreground leading-none">
-              {stats.sellers > 0 && `${stats.sellers} seller${stats.sellers !== 1 ? 's' : ''}`}
-              {stats.sellers > 0 && stats.orders > 0 && ' · '}
-              {stats.orders > 0 && `${stats.orders.toLocaleString()} orders served`}
-            </p>
-          )}
 
-          {/* Row 1: Location/greeting + actions */}
+          {/* Location row with stats */}
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               {!title ? (
                 <button
                   type="button"
                   onClick={() => setLocationSheetOpen(true)}
-                  className="flex items-center gap-2 group"
+                  className="flex items-center gap-1.5 group"
                 >
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <MapPin size={15} className="text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm font-bold text-foreground truncate max-w-[50vw]">
-                        {browsingLocation?.label || displaySociety?.name || 'Set location'}
-                      </span>
-                      <ChevronDown size={14} className="text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
-                    </div>
-                  </div>
+                  <MapPin size={14} className="text-primary shrink-0" />
+                  <span className="text-[13px] font-semibold text-foreground truncate max-w-[45vw]">
+                    {browsingLocation?.label || displaySociety?.name || 'Set location'}
+                  </span>
+                  {stats && (stats.sellers > 0 || stats.orders > 0) && (
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                      · {stats.sellers > 0 && `🏪 ${stats.sellers} seller${stats.sellers !== 1 ? 's' : ''}`}
+                      {stats.sellers > 0 && stats.orders > 0 && ' · '}
+                      {stats.orders > 0 && `${stats.orders} orders today`}
+                    </span>
+                  )}
+                  <ChevronDown size={13} className="text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
                 </button>
               ) : (
                 <div className="flex items-center gap-3">
