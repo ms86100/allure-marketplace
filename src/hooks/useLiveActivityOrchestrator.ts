@@ -132,6 +132,7 @@ export function useLiveActivityOrchestrator(): void {
         itemCount,
         flowEntriesRef.current,
         sellerLogoUrl,
+        delivery?.eta_minutes ?? null,
       );
       await LiveActivityManager.push(activityData);
     };
