@@ -186,7 +186,7 @@ function HeaderInner({
           {/* Row 2: Search bar — only on home */}
           {!title && (
             <Link to="/search" className="block mt-2">
-              <div className="flex items-center gap-3 bg-[hsl(var(--search-bg))] border border-[hsl(var(--search-border))] rounded-full px-4 py-3 backdrop-blur-sm transition-all hover:border-primary/30 hover:shadow-sm">
+              <div className="flex items-center gap-3 bg-[hsl(var(--search-bg))] border border-[hsl(var(--search-border))] rounded-full px-4 py-3 backdrop-blur-lg backdrop-saturate-150 transition-all hover:border-primary/30 hover:shadow-sm">
                 <Search size={16} className="text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
                   <TypewriterPlaceholder context="home" />

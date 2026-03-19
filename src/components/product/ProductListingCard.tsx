@@ -198,7 +198,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
             ) : (
               <button
                 onClick={handleAdd}
-                className="bg-card text-primary font-bold text-xs px-6 py-2 rounded-xl border-2 border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all duration-200 uppercase tracking-wide active:scale-95 min-h-[36px] shadow-card"
+                className="bg-card/80 backdrop-blur-md backdrop-saturate-150 text-primary font-bold text-xs px-6 py-2 rounded-xl border border-primary/15 hover:bg-primary hover:text-primary-foreground transition-all duration-200 uppercase tracking-wide active:scale-95 min-h-[36px] shadow-elevated"
               >
                 {actionConfig.shortLabel}
               </button>
