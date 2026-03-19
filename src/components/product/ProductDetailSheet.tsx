@@ -213,19 +213,19 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
               <div className="w-full h-12 flex items-center justify-center bg-muted rounded-xl"><Clock size={16} className="text-muted-foreground mr-2" /><span className="text-sm font-medium text-muted-foreground">{storeClosedMsg}</span></div>
             ) : d.isCartAction ? (
               d.quantity === 0 ? (
-                <Button className="w-full h-12 text-base font-bold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl" onClick={() => { hapticImpact('medium'); d.handleAdd(); }}>{d.actionType === 'buy_now' ? 'Buy Now' : 'Add to cart'} · {d.formatPrice(product.price)}</Button>
+                <Button className="w-full h-12 text-base font-bold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl" onClick={() => { d.handleAdd(); }}>{d.actionType === 'buy_now' ? 'Buy Now' : 'Add to cart'} · {d.formatPrice(product.price)}</Button>
               ) : (
                 <div className="flex items-center justify-between">
                   <div><span className="text-lg font-bold text-foreground">{d.formatPrice(product.price * d.quantity)}</span><span className="text-xs text-muted-foreground ml-1.5">{d.quantity} item{d.quantity > 1 ? 's' : ''}</span></div>
                   <div className="flex items-center bg-accent rounded-xl overflow-hidden">
-                    <button className="px-3 py-2.5 text-accent-foreground" onClick={() => { hapticImpact('medium'); d.updateQuantity(product.product_id, d.quantity - 1); }}><Minus size={16} strokeWidth={3} /></button>
+                    <button className="px-3 py-2.5 text-accent-foreground" onClick={() => { d.updateQuantity(product.product_id, d.quantity - 1); }}><Minus size={16} strokeWidth={3} /></button>
                     <span className="font-bold text-base text-accent-foreground min-w-[28px] text-center tabular-nums">{d.quantity}</span>
-                    <button className="px-3 py-2.5 text-accent-foreground" onClick={() => { hapticImpact('medium'); d.updateQuantity(product.product_id, d.quantity + 1); }}><Plus size={16} strokeWidth={3} /></button>
+                    <button className="px-3 py-2.5 text-accent-foreground" onClick={() => { d.updateQuantity(product.product_id, d.quantity + 1); }}><Plus size={16} strokeWidth={3} /></button>
                   </div>
                 </div>
               )
             ) : (
-              <Button className="w-full h-12 text-base font-bold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl" onClick={() => { hapticImpact('medium'); if (isServiceBookingAction && product) { setBookingOpen(true); } else { d.handleAdd(); } }}>
+              <Button className="w-full h-12 text-base font-bold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl" onClick={() => { hapticSelection(); if (isServiceBookingAction && product) { setBookingOpen(true); } else { d.handleAdd(); } }}>
                 <d.ActionIcon size={18} className="mr-2" />{d.config.label}
               </Button>
             )}
