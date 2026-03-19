@@ -72,6 +72,23 @@ export function ActiveOrderETA() {
   const isImminent = etaResult?.mood === 'imminent';
   const statusLabel = activeOrder.status?.replace(/_/g, ' ') || 'Processing';
 
+  // Map status to progress step (0-3)
+  const statusStepMap: Record<string, number> = {
+    placed: 0, confirmed: 0, accepted: 0,
+    preparing: 1, processing: 1, packed: 1, ready: 1,
+    in_transit: 2, out_for_delivery: 2, shipped: 2, dispatched: 2,
+    arriving: 3, at_door: 3, delivered: 3, completed: 3,
+  };
+  const currentStep = statusStepMap[activeOrder.status] ?? 0;
+
+  const moodBg = etaResult?.mood === 'imminent'
+    ? 'bg-green-500/10 border-green-500/20'
+    : etaResult?.mood === 'late'
+      ? 'bg-amber-500/10 border-amber-500/20'
+      : etaResult?.mood === 'eager'
+        ? 'bg-blue-500/10 border-blue-500/20'
+        : 'bg-primary/8 border-primary/15';
+
   return (
     <AnimatePresence>
       <motion.button
@@ -81,26 +98,39 @@ export function ActiveOrderETA() {
         exit={{ height: 0, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         onClick={() => navigate(`/orders/${activeOrder.id}`)}
-        className="w-full flex items-center gap-2.5 px-4 py-2 bg-primary/8 border-b border-primary/15 overflow-hidden"
+        className={`w-full flex items-center gap-2.5 px-4 py-2.5 border-b overflow-hidden ${moodBg}`}
       >
         <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
           <Package size={14} className="text-primary" />
         </div>
-        <div className="flex-1 min-w-0 text-left flex items-center gap-2">
-          {isTransit && (
-            <motion.span
-              className="w-2 h-2 rounded-full bg-green-500 shrink-0"
-              animate={{ opacity: [1, 0.3, 1] }}
-              transition={{ duration: isImminent ? 0.8 : 1.5, repeat: Infinity, ease: 'easeInOut' }}
-            />
-          )}
-          <p className="text-[12px] font-bold text-foreground capitalize truncate">
-            {etaResult?.emoji && <span className="mr-1">{etaResult.emoji}</span>}
-            {statusLabel}
-          </p>
+        <div className="flex-1 min-w-0 text-left">
+          <div className="flex items-center gap-2">
+            {isTransit && (
+              <motion.span
+                className="w-2 h-2 rounded-full bg-green-500 shrink-0"
+                animate={{ opacity: [1, 0.3, 1] }}
+                transition={{ duration: isImminent ? 0.6 : 1.5, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            )}
+            <p className="text-[13px] font-bold text-foreground capitalize truncate">
+              {etaResult?.emoji && <span className="mr-1">{etaResult.emoji}</span>}
+              {statusLabel}
+            </p>
+          </div>
+          {/* 4-stage progress dots */}
+          <div className="flex items-center gap-1 mt-1">
+            {[0, 1, 2, 3].map((step) => (
+              <div
+                key={step}
+                className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
+                  step <= currentStep ? 'bg-primary' : 'bg-muted-foreground/20'
+                }`}
+              />
+            ))}
+          </div>
         </div>
         {etaText && (
-          <span className={`text-[12px] font-extrabold whitespace-nowrap ${isArriving ? 'text-green-600 dark:text-green-400' : 'text-primary'}`}>
+          <span className={`text-[13px] font-extrabold whitespace-nowrap ${isArriving ? 'text-green-600 dark:text-green-400' : 'text-primary'}`}>
             {etaText}
           </span>
         )}
