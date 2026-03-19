@@ -78,16 +78,16 @@ export function AddMilestoneSheet({ onAdded, towers = [] }: AddMilestoneSheetPro
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
         <Button size="sm" className="gap-1">
           <Plus size={14} /> Add Milestone
         </Button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Add Construction Milestone</SheetTitle>
-        </SheetHeader>
+      </DrawerTrigger>
+      <DrawerContent className="max-h-[85vh] overflow-y-auto">
+        <DrawerHeader>
+          <DrawerTitle>Add Construction Milestone</DrawerTitle>
+        </DrawerHeader>
         <div className="space-y-4 mt-4">
           {towers.length > 0 && (
             <div>
