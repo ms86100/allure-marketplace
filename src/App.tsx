@@ -449,7 +449,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} themes={['light', 'dark', 'nature']}>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} themes={['light', 'dark']}>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <OfflineBanner />

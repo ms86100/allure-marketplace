@@ -1,14 +1,13 @@
-import { Moon, Sun, Leaf } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 
 const themes = [
   { key: 'light', icon: Sun, label: 'Light' },
   { key: 'dark', icon: Moon, label: 'Dark' },
-  { key: 'nature', icon: Leaf, label: 'Nature' },
 ] as const;
 
-/** Compact 3-button pill for the header */
+/** Compact 2-button pill for the header */
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
 
