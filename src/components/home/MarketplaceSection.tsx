@@ -155,20 +155,18 @@ export function MarketplaceSection() {
       {!activeGroup && popularNearYou.length > (discoveryMinProducts || 3) && (
         <>
           <SectionDivider />
-          <div className="bg-secondary/20 py-4 rounded-none">
-            <DiscoveryRow
-              title={browsingLocation?.label ? `${ml.label('label_discovery_popular')} · ${browsingLocation.label}` : ml.label('label_discovery_popular')}
-              icon={<Flame size={14} className="text-destructive" />}
-              accentClass="bg-destructive/10 text-destructive"
-              products={popularNearYou}
-              onProductTap={handleProductTap}
-              onNavigate={navigate}
-              categoryConfigs={categoryConfigs}
-              marketplaceConfig={mc}
-              badgeConfigs={badgeConfigs}
-              socialProofMap={socialProofMap}
-            />
-          </div>
+          <DiscoveryRow
+            title={browsingLocation?.label ? `${ml.label('label_discovery_popular')} · ${browsingLocation.label}` : ml.label('label_discovery_popular')}
+            icon={<Flame size={14} className="text-destructive" />}
+            accentClass="bg-destructive/10 text-destructive"
+            products={popularNearYou}
+            onProductTap={handleProductTap}
+            onNavigate={navigate}
+            categoryConfigs={categoryConfigs}
+            marketplaceConfig={mc}
+            badgeConfigs={badgeConfigs}
+            socialProofMap={socialProofMap}
+          />
         </>
       )}
 
