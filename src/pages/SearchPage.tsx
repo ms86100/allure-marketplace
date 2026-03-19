@@ -18,6 +18,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useSearchPage, ProductSearchResult } from '@/hooks/useSearchPage';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { CommunitySuggestions } from '@/components/search/CommunitySuggestions';
+import { SearchAutocomplete } from '@/components/search/SearchAutocomplete';
 import { type ProductDetail } from '@/hooks/useProductDetail';
 
 function toProductWithSeller(p: ProductSearchResult): ProductWithSeller {
