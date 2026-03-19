@@ -1,57 +1,78 @@
-# Blinkit UX Heuristic Analysis — Implementation Tracker
-## Status: ✅ PHASE 2 COMPLETE
 
-## ENGINE LAYER (Phase 1 — Complete)
 
-| # | Task | Status |
-|---|------|--------|
-| 1 | Global Feedback Engine (`feedbackEngine.ts`) | ✅ |
-| 2 | ETA Engine (`etaEngine.ts`) — single source of truth | ✅ |
-| 3 | Visibility Engine (`visibilityEngine.ts`) — route rules | ✅ |
-| 4 | Floating Cart Bar with thumbnails, count, total | ✅ |
-| 5 | ActiveOrderETA in header with live countdown | ✅ |
-| 6 | Unified haptics across all cart actions | ✅ |
+# Fix Payment Flow, Seller Verification & OTP Status Issues
 
-## UX POLISH (Phase 1 — Complete)
+## Root Causes Found
 
-| # | Task | Status |
-|---|------|--------|
-| 7 | Undo toast for cart item removal (4s with re-add) | ✅ |
-| 8 | Haptic dedup — removed duplicate calls | ✅ |
-| 9 | Search autocomplete with product thumbnails | ✅ |
-| 10 | Recently Viewed products section on home page | ✅ |
-| 11 | CartPage remove button uses centralized feedbackEngine | ✅ |
-| 12 | Coupon feedback via feedbackEngine | ✅ |
-| 13 | Cart cleared feedback via feedbackEngine | ✅ |
-| 14 | Favorite toggle feedback via feedbackEngine | ✅ |
-| 15 | Dummy data elimination (picsum, 'Seller' fallbacks) | ✅ |
+### Issue 1: UPI Confirmation "stuck at Submitting" without screenshot
+The `confirm_upi_payment` RPC accepts empty UTR and null screenshot, so technically it should work. However, the `confirmSubmittedRef` idempotency guard blocks re-attempts after the first call. If the visibility-change handler fires mid-flow or a transient network error occurs, the guard stays locked. The user's request: make screenshot mandatory and prevent submission without it.
 
-## PERCEPTION LAYER (Phase 2 — Complete)
+### Issue 2: Seller cannot view payment proof
+`SellerPaymentConfirmation.tsx` receives `utrRef` but never fetches or displays `payment_screenshot_url`. The order data already includes this column, but it's not passed to the component.
 
-| # | Task | Status |
-|---|------|--------|
-| 16 | ETA emotional states — emoji + mood tiers (calm/eager/imminent/late) | ✅ |
-| 17 | DeliveryETABanner mood-based gradient backgrounds | ✅ |
-| 18 | ActiveOrderETA emoji + intensified imminent pulse | ✅ |
-| 19 | Cart momentum — CTA changes to "Checkout" at 3+ items | ✅ |
-| 20 | Mini cart preview — bottom sheet from floating cart | ✅ |
-| 21 | Delivery completion celebration banner (one-time, duration-based) | ✅ |
-| 22 | Delivery partner identity card on OrderDetailPage | ✅ |
-| 23 | OrderProgressOverlay — SVG progress ring replaces spinner | ✅ |
-| 24 | Intelligent empty states (OrdersPage, FavoritesPage) | ✅ |
-| 25 | Session continuity — HomePage scroll position restore | ✅ |
-| 26 | Checkout commitment reinforcement — free delivery micro-copy | ✅ |
+### Issue 3: OTP → "Invalid status transition from On the Way to Completed"
+**This is the critical bug.** The `verify_delivery_otp_and_complete` RPC (migration `20260319044026`) sets `status = 'completed'` directly. But the `seller_delivery` transition table only allows:
+```text
+on_the_way → delivered (seller)
+delivered  → completed (buyer/system)
+```
+So the DB trigger rejects `on_the_way → completed` as invalid. The RPC must transition to `delivered`, not `completed`.
 
-## Product Laws (Reference)
-1. Every action must produce immediate, consistent feedback across all surfaces
-2. ETA must feel believable, not just accurate
-3. Never show stale state after completion
-4. The cart must be omnipresent
-5. Cognitive load must decrease through the funnel
-6. Speed perception > speed reality
-7. Error prevention is worth 10x error recovery
-8. Transparency builds trust
-9. Promotional upsells must never block primary flow
-10. State transitions must be server-authoritative
-11. Recognition over recall applies to entire session
-12. Every screen must be self-sufficient
+### Issue 4: OTP error feedback
+The dialog shows a toast on error, but no inline visual feedback. Users may miss the toast.
+
+---
+
+## Plan
+
+### 1. Fix OTP RPC: transition to `delivered` not `completed`
+**File:** New migration SQL
+
+Update `verify_delivery_otp_and_complete` to set `status = 'delivered'` instead of `status = 'completed'`. This aligns with the `seller_delivery` workflow where `on_the_way → delivered` is a valid seller transition, and `delivered → completed` happens via buyer confirmation.
+
+The `app.otp_verified` config is already set before the UPDATE, so the delivery-code guard in the trigger will pass.
+
+### 2. Make screenshot mandatory for UPI confirmation
+**File:** `src/components/payment/UpiDeepLinkCheckout.tsx`
+
+- Change the label from "optional" to **"required"** on the screenshot upload area
+- Disable the "Confirm Payment" button when no screenshot is attached
+- Show inline validation message: "Upload payment screenshot to confirm"
+- Reset `confirmSubmittedRef` more aggressively on component mount/step change to prevent stuck states
+
+### 3. Show payment proof to seller
+**File:** `src/components/payment/SellerPaymentConfirmation.tsx`
+
+- Add `screenshotUrl` prop (passed from `OrderDetailPage`)
+- When present, render an inline thumbnail (max-h-32, rounded, tap to enlarge in a dialog)
+- Text label: "Payment proof attached" or "No proof attached"
+
+**File:** `src/pages/OrderDetailPage.tsx`
+
+- Pass `(order as any).payment_screenshot_url` to the `SellerPaymentConfirmation` component
+
+### 4. Improve OTP error feedback
+**File:** `src/components/delivery/DeliveryCompletionOtpDialog.tsx`
+
+- Add inline error state below the OTP input (red text: "Invalid code, please try again")
+- Clear error on OTP change
+- Keep the toast as secondary feedback
+
+### Technical Details
+
+**Migration SQL (Issue 3):**
+```sql
+-- Fix: transition to 'delivered' instead of 'completed'
+-- The buyer confirmation step moves delivered → completed
+UPDATE in verify_delivery_otp_and_complete:
+  SET status = 'delivered'  -- was 'completed'
+RETURN 'delivered'::order_status  -- was 'completed'
+```
+
+**Files modified:**
+- `src/components/payment/UpiDeepLinkCheckout.tsx` — screenshot mandatory, button guard
+- `src/components/payment/SellerPaymentConfirmation.tsx` — inline screenshot preview
+- `src/pages/OrderDetailPage.tsx` — pass screenshot URL prop
+- `src/components/delivery/DeliveryCompletionOtpDialog.tsx` — inline error state
+- New migration — fix `verify_delivery_otp_and_complete` RPC
+
