@@ -6,12 +6,10 @@
  *
  * Rules:
  *   • FloatingCartBar: visible when cart has items AND not on cart/checkout
- *   • ActiveOrderETA (header): visible when active order AND not on order detail
  *   • ActiveOrderStrip (home): visible when active order AND on home page
  */
 
 export const CART_HIDDEN_ROUTES = ['/cart', '/checkout'] as const;
-export const ETA_HIDDEN_ROUTE_PREFIXES = ['/orders/'] as const;
 
 /**
  * Returns true if the given pathname should hide the element.

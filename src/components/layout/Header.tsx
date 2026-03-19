@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/hooks/useCart';
 import { cn } from '@/lib/utils';
 import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder';
-import { ActiveOrderETA } from '@/components/header/ActiveOrderETA';
+
 import { useUnreadNotificationCount } from '@/hooks/useUnreadNotificationCount';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { LocationSelectorSheet } from '@/components/location/LocationSelectorSheet';
@@ -196,7 +196,7 @@ function HeaderInner({
           )}
         </div>
 
-        <ActiveOrderETA />
+        
         <LocationSelectorSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} />
       </header>
 
