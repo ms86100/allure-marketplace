@@ -190,92 +190,99 @@
      NATURE MODE — Living ecosystem, organic warmth
      ═══════════════════════════════════════════════ */
   .nature {
-    --background: 80 25% 96%;
-    --foreground: 150 15% 12%;
+    /* ═══ Background: warm parchment / misty sage ═══ */
+    --background: 90 20% 97%;
+    --foreground: 160 20% 10%;
 
-    --card: 75 20% 94%;
-    --card-foreground: 150 15% 12%;
-    --card-elevated: 70 18% 91%;
+    /* Cards: warm cream with subtle green undertone */
+    --card: 80 16% 95%;
+    --card-foreground: 160 20% 10%;
+    --card-elevated: 75 14% 92%;
 
-    --popover: 75 22% 95%;
-    --popover-foreground: 150 15% 12%;
+    --popover: 85 18% 96%;
+    --popover-foreground: 160 20% 10%;
 
-    --primary: 142 50% 36%;
-    --primary-foreground: 0 0% 100%;
+    /* Primary: deep forest green */
+    --primary: 152 55% 32%;
+    --primary-foreground: 60 20% 97%;
 
-    --secondary: 85 18% 88%;
-    --secondary-foreground: 140 12% 28%;
+    /* Secondary: sage / moss */
+    --secondary: 100 16% 90%;
+    --secondary-foreground: 150 14% 25%;
 
-    --muted: 80 14% 90%;
-    --muted-foreground: 140 8% 46%;
+    /* Muted: dried leaf tones */
+    --muted: 85 12% 88%;
+    --muted-foreground: 140 10% 42%;
 
-    --accent: 48 70% 52%;
-    --accent-foreground: 150 15% 12%;
+    /* Accent: warm golden / floral amber */
+    --accent: 38 65% 55%;
+    --accent-foreground: 160 20% 10%;
 
-    --destructive: 4 60% 50%;
+    --destructive: 8 55% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 80 12% 85%;
-    --input: 80 14% 88%;
-    --ring: 142 50% 36%;
+    /* Borders: soft sage */
+    --border: 95 10% 82%;
+    --input: 90 12% 87%;
+    --ring: 152 55% 32%;
 
     --radius: 1rem;
 
-    /* Semantic — earthy */
-    --veg: 142 50% 36%;
-    --non-veg: 4 60% 50%;
-    --success: 142 50% 36%;
-    --warning: 42 80% 52%;
-    --info: 200 60% 50%;
-    --favorite: 340 65% 55%;
+    /* Semantic — earthy palette */
+    --veg: 152 55% 32%;
+    --non-veg: 8 55% 48%;
+    --success: 152 55% 32%;
+    --warning: 38 75% 50%;
+    --info: 195 50% 48%;
+    --favorite: 335 55% 52%;
 
     /* Badge */
-    --badge-new: 342 55% 52%;
-    --badge-bought: 180 55% 42%;
-    --badge-discount: 28 80% 52%;
-    --rating-star: 48 85% 50%;
+    --badge-new: 335 50% 50%;
+    --badge-bought: 172 45% 38%;
+    --badge-discount: 32 72% 50%;
+    --rating-star: 45 80% 52%;
 
-    /* Nav */
-    --nav-active: 142 50% 36%;
-    --nav-active-foreground: 0 0% 100%;
+    /* Nav — forest active */
+    --nav-active: 152 55% 32%;
+    --nav-active-foreground: 60 20% 97%;
 
     /* Product image */
-    --product-image-bg: 75 18% 92%;
+    --product-image-bg: 85 14% 93%;
 
-    /* Nature tints — warm earthy tones */
-    --tint-food: 42 25% 94%;
-    --tint-services: 160 15% 93%;
-    --tint-personal: 320 10% 94%;
-    --tint-resale: 38 20% 93%;
-    --tint-events: 270 10% 94%;
-    --tint-default: 80 12% 93%;
+    /* Nature tints — layered earth tones */
+    --tint-food: 38 22% 94%;
+    --tint-services: 152 12% 93%;
+    --tint-personal: 310 8% 94%;
+    --tint-resale: 32 18% 93%;
+    --tint-events: 265 8% 94%;
+    --tint-default: 90 10% 93%;
 
-    /* Gradients — organic, calm */
-    --gradient-primary: linear-gradient(135deg, hsl(142 50% 36%) 0%, hsl(165 45% 38%) 100%);
-    --gradient-success: linear-gradient(135deg, hsl(142 50% 36%) 0%, hsl(155 40% 34%) 100%);
-    --gradient-warm: linear-gradient(135deg, hsl(42 80% 52%) 0%, hsl(28 75% 50%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(142 50% 36% / 0.06) 0%, hsl(80 25% 96%) 60%);
-    --gradient-glass: linear-gradient(135deg, hsl(75 20% 94% / 0.98) 0%, hsl(80 18% 92% / 0.92) 100%);
+    /* Gradients — dawn mist, forest depth */
+    --gradient-primary: linear-gradient(135deg, hsl(152 55% 32%) 0%, hsl(172 42% 34%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(152 55% 32%) 0%, hsl(162 38% 30%) 100%);
+    --gradient-warm: linear-gradient(135deg, hsl(38 65% 55%) 0%, hsl(22 60% 48%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(152 55% 32% / 0.05) 0%, hsl(90 20% 97%) 50%);
+    --gradient-glass: linear-gradient(135deg, hsl(80 16% 95% / 0.98) 0%, hsl(90 14% 93% / 0.94) 100%);
 
-    /* Shadows — soft, organic */
-    --shadow-sm: 0 1px 3px hsl(142 20% 20% / 0.06);
-    --shadow-md: 0 4px 14px hsl(142 20% 20% / 0.08);
-    --shadow-lg: 0 8px 30px hsl(142 20% 20% / 0.12);
-    --shadow-card: 0 2px 8px hsl(142 20% 20% / 0.06), 0 0 0 1px hsl(80 12% 85% / 0.5);
-    --shadow-elevated: 0 6px 24px hsl(142 20% 20% / 0.1);
-    --shadow-glow: 0 0 20px hsl(142 50% 36% / 0.12);
-    --shadow-cta: 0 4px 16px hsl(142 50% 36% / 0.2);
-    --shadow-glow-green: 0 0 14px hsl(142 50% 36% / 0.15);
-    --shadow-glow-accent: 0 0 14px hsl(48 70% 52% / 0.15);
+    /* Shadows — dappled sunlight feel */
+    --shadow-sm: 0 1px 3px hsl(152 25% 18% / 0.06);
+    --shadow-md: 0 4px 16px hsl(152 20% 18% / 0.07);
+    --shadow-lg: 0 10px 40px hsl(152 20% 18% / 0.1);
+    --shadow-card: 0 2px 10px hsl(152 20% 18% / 0.05), 0 0 0 1px hsl(95 10% 82% / 0.6);
+    --shadow-elevated: 0 8px 28px hsl(152 20% 18% / 0.09);
+    --shadow-glow: 0 0 24px hsl(152 55% 32% / 0.1);
+    --shadow-cta: 0 4px 18px hsl(152 55% 32% / 0.18);
+    --shadow-glow-green: 0 0 16px hsl(152 55% 32% / 0.12);
+    --shadow-glow-accent: 0 0 16px hsl(38 65% 55% / 0.12);
 
-    --sidebar-background: 75 20% 94%;
-    --sidebar-foreground: 150 15% 12%;
-    --sidebar-primary: 142 50% 36%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 85 18% 88%;
-    --sidebar-accent-foreground: 140 12% 28%;
-    --sidebar-border: 80 12% 85%;
-    --sidebar-ring: 142 50% 36%;
+    --sidebar-background: 80 16% 95%;
+    --sidebar-foreground: 160 20% 10%;
+    --sidebar-primary: 152 55% 32%;
+    --sidebar-primary-foreground: 60 20% 97%;
+    --sidebar-accent: 100 16% 90%;
+    --sidebar-accent-foreground: 150 14% 25%;
+    --sidebar-border: 95 10% 82%;
+    --sidebar-ring: 152 55% 32%;
   }
 }
 
