@@ -126,12 +126,12 @@ export default function WorkerSalaryPage() {
       <FeatureGate feature="worker_salary">
       <div className="p-4 space-y-4">
         {canManage && (
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
+          <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+            <DrawerTrigger asChild>
               <Button size="sm" className="gap-1"><Plus size={14} /> Record Salary</Button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="rounded-t-2xl">
-              <SheetHeader><SheetTitle>Record Worker Salary</SheetTitle></SheetHeader>
+            </DrawerTrigger>
+            <DrawerContent>
+              <DrawerHeader><DrawerTitle>Record Worker Salary</DrawerTitle></DrawerHeader>
               <div className="space-y-4 mt-4">
                 <div>
                   <Label>Worker</Label>
