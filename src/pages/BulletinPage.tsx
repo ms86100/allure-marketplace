@@ -239,12 +239,12 @@ export default function BulletinPage() {
       />
 
       {/* Help Request Detail Sheet */}
-      <Sheet open={!!selectedHelp} onOpenChange={(o) => !o && setSelectedHelp(null)}>
-        <SheetContent side="bottom" className="h-[80vh] overflow-y-auto rounded-t-2xl">
+      <Drawer open={!!selectedHelp} onOpenChange={(o) => !o && setSelectedHelp(null)}>
+        <DrawerContent className="h-[80vh] overflow-y-auto">
           {selectedHelp && (
             <>
-              <SheetHeader>
-                <SheetTitle>{selectedHelp.title}</SheetTitle>
+              <DrawerHeader>
+                <DrawerTitle>{selectedHelp.title}</DrawerTitle>
                 <p className="text-xs text-muted-foreground">
                   {selectedHelp.author?.name} · {selectedHelp.author?.block}-{selectedHelp.author?.flat_number}
                 </p>
