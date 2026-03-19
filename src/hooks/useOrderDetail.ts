@@ -139,7 +139,7 @@ export function useOrderDetail(id: string | undefined) {
       if (error) throw error;
       if (cancelled) return;
       setOrder(data as any);
-      if (data?.status === 'completed' || data?.status === 'delivered') {
+      if (data?.status && isSuccessfulTerminal(flow, data.status)) {
         const { data: reviewData } = await supabase.from('reviews').select('id').eq('order_id', id).maybeSingle();
         if (!cancelled) setHasReview(!!reviewData);
       } else { if (!cancelled) setHasReview(false); }
