@@ -395,7 +395,7 @@ export function useCartPage() {
     setShowUpiDeepLink(false);
     toast.success('Payment submitted! Seller will verify shortly.', { id: 'upi-confirmed' });
     // Clear cart and payment session ONLY after payment confirmation submitted
-    clearCart(); await refresh();
+    await clearCartAndCache();
     clearPaymentSession();
     navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
     setPendingOrderIds([]);
