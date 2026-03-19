@@ -50,7 +50,7 @@ export function ActiveOrderStrip() {
         .eq('buyer_id', user.id)
         .not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`)
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(5);
 
       if (error) {
         console.warn('[ActiveOrderStrip] Query error:', error.message);
