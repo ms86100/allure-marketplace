@@ -108,6 +108,9 @@ export default function HomePage() {
         {/* ═══ PERSONALIZED SECTIONS (conditional) ═══ */}
         <ForYouSection />
 
+        {/* ═══ RECENTLY VIEWED ═══ */}
+        <RecentlyViewedRow />
+
         {/* ═══ LEADERBOARD & COMMUNITY ═══ */}
         <div className="bg-secondary/30 py-4 mt-2">
           <SocietyLeaderboard />
