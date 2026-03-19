@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { getTerminalStatuses } from '@/services/statusFlowCache';
+import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statusFlowCache';
 import { Package, ChevronRight, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { jitteredStaleTime } from '@/lib/query-utils';
