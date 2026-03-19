@@ -23,6 +23,7 @@ interface ActiveOrder {
 export function ActiveOrderStrip() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [terminalSet, setTerminalSet] = useState<Set<string> | null>(null);
 
   useEffect(() => {
