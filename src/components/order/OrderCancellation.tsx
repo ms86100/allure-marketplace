@@ -21,8 +21,8 @@ interface OrderCancellationProps {
   orderId: string;
   orderStatus: string;
   onCancelled: () => void;
-  /** Whether buyer→cancelled transition is allowed by the workflow engine */
-  canCancel?: boolean;
+  /** Whether buyer→cancelled transition is allowed by the workflow engine (required, DB-driven) */
+  canCancel: boolean;
 }
 
 const DEFAULT_REASONS = [
@@ -52,8 +52,8 @@ export function OrderCancellation({ orderId, orderStatus, onCancelled, canCancel
     }
   } catch { /* use defaults */ }
 
-  // Use workflow-driven eligibility if provided, otherwise fall back to legacy check
-  const isEligible = canCancel !== undefined ? canCancel : ['placed', 'accepted'].includes(orderStatus);
+  // Fully DB-driven: no hardcoded fallback
+  const isEligible = canCancel;
 
   if (!isEligible) {
     return null;
