@@ -154,8 +154,8 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
                 </p>
               )}
             </div>
-          </SheetContent>
-        </Sheet>
+          </DrawerContent>
+        </Drawer>
       </CollapsibleContent>
     </Collapsible>
   );

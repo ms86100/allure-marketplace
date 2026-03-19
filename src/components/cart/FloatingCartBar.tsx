@@ -147,8 +147,9 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
           <Button className="w-full mt-4 rounded-xl" onClick={() => { setPreviewOpen(false); navigate('/cart'); }}>
             View Full Cart · {formatPrice(totalAmount)}
           </Button>
-        </SheetContent>
-      </Sheet>
+          </div>
+        </DrawerContent>
+      </Drawer>
     </AnimatePresence>
   );
 }

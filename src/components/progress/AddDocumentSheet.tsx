@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -47,15 +47,15 @@ export function AddDocumentSheet({ onAdded }: { onAdded: () => void }) {
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
         <Button size="sm" variant="outline" className="gap-1 h-7 text-xs">
           <Plus size={12} /> Upload
         </Button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
-        <SheetHeader><SheetTitle>Upload Document</SheetTitle></SheetHeader>
-        <div className="space-y-4 mt-4">
+      </DrawerTrigger>
+      <DrawerContent className="max-h-[85vh] overflow-y-auto">
+        <DrawerHeader><DrawerTitle>Upload Document</DrawerTitle></DrawerHeader>
+        <div className="space-y-4 px-4 pb-6">
           <div>
             <label className="text-sm font-medium">Category</label>
             <Select value={category} onValueChange={setCategory}>
@@ -91,7 +91,7 @@ export function AddDocumentSheet({ onAdded }: { onAdded: () => void }) {
             <p className="text-xs text-muted-foreground text-center">You are viewing another society. Switch back to create content.</p>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

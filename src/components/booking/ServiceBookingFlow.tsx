@@ -506,7 +506,7 @@ export function ServiceBookingFlow({
             </Button>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

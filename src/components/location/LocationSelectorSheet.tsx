@@ -415,7 +415,7 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
             )}
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }
