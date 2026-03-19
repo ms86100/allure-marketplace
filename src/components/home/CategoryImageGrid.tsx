@@ -78,11 +78,10 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
         </Link>
       </div>
 
-      {/* 4-column tile grid */}
+      {/* 4-column tile grid — Blinkit style: dark card + 2×2 images + label below */}
       <div className="grid grid-cols-4 gap-x-3 gap-y-4">
         {categories.slice(0, 8).map((cat) => {
           const meta = metaMap[cat.category] || { count: 0, images: [] };
-          const catColor = cat.color || null;
           const images = meta.images.length > 0
             ? meta.images
             : cat.imageUrl ? [cat.imageUrl] : [];
@@ -91,48 +90,30 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
             <Link
               key={cat.category}
               to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-              className="flex flex-col items-center group active:scale-[0.95] transition-transform duration-150"
+              className="flex flex-col items-center group active:scale-[0.96] transition-transform duration-150"
             >
-              {/* Tile card with glossy color tint */}
-              <div
-                className="w-full aspect-square rounded-2xl overflow-hidden relative"
-                style={{
-                  backgroundColor: catColor ? `${catColor}30` : 'hsl(var(--card))',
-                  border: catColor ? `1.5px solid ${catColor}40` : '1px solid hsl(var(--border))',
-                  boxShadow: catColor
-                    ? `inset 0 1px 0 ${catColor}25, 0 2px 8px ${catColor}15`
-                    : 'var(--shadow-card)',
-                }}
-              >
-                {/* Colored accent bar */}
-                {catColor && (
-                  <div
-                    className="absolute top-0 inset-x-0 h-[2px] z-10"
-                    style={{ backgroundColor: catColor }}
-                  />
-                )}
+              {/* Dark card tile */}
+              <div className="w-full aspect-square rounded-2xl overflow-hidden bg-card border border-border">
                 {images.length >= 4 ? (
-                  /* 2x2 collage */
-                  <div className="category-collage items-4 w-full h-full">
+                  <div className="grid grid-cols-2 grid-rows-2 w-full h-full gap-[2px] p-[2px]">
                     {images.slice(0, 4).map((src, i) => (
                       <img
                         key={i}
                         src={src}
                         alt=""
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover rounded-lg"
                         loading="lazy"
                       />
                     ))}
                   </div>
                 ) : images.length >= 2 ? (
-                  /* 2-3 images collage */
-                  <div className={`category-collage items-${images.length} w-full h-full`}>
-                    {images.map((src, i) => (
+                  <div className="grid grid-cols-2 w-full h-full gap-[2px] p-[2px]">
+                    {images.slice(0, 2).map((src, i) => (
                       <img
                         key={i}
                         src={src}
                         alt=""
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover rounded-lg"
                         loading="lazy"
                       />
                     ))}
@@ -145,40 +126,20 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                     loading="lazy"
                   />
                 ) : (
-                  /* No images — icon with color gradient */
-                  <div
-                    className="w-full h-full flex items-center justify-center"
-                    style={{
-                      background: catColor
-                        ? `radial-gradient(circle at center, ${catColor}35 0%, ${catColor}15 70%)`
-                        : undefined,
-                    }}
-                  >
+                  <div className="w-full h-full flex items-center justify-center bg-muted">
                     <DynamicIcon
                       name={cat.icon}
-                      size={36}
-                      className="text-foreground/50"
-                      style={catColor ? { color: catColor } : undefined}
+                      size={32}
+                      className="text-muted-foreground"
                     />
-                  </div>
-                )}
-
-                {/* Bottom gradient label overlay (only when has images) */}
-                {images.length > 0 && (
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent backdrop-blur-[2px] px-1.5 pb-1.5 pt-5">
-                    <span className="text-[10px] font-bold text-white leading-tight line-clamp-2 drop-shadow-md">
-                      {cat.displayName}
-                    </span>
                   </div>
                 )}
               </div>
 
-              {/* Label below tile (only when no images — fallback) */}
-              {images.length === 0 && (
-                <span className="text-[11px] font-semibold text-foreground text-center leading-tight mt-1.5 line-clamp-2 px-0.5">
-                  {cat.displayName}
-                </span>
-              )}
+              {/* Label below card */}
+              <span className="text-[11px] font-bold text-foreground text-center leading-tight mt-1.5 line-clamp-2 px-0.5">
+                {cat.displayName}
+              </span>
 
               {/* Item count */}
               {meta.count > 0 && (
