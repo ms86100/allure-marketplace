@@ -44,6 +44,8 @@ interface ProductListingCardProps {
   categoryConfigs?: CategoryConfig[]; marketplaceConfig?: MarketplaceConfig;
   badgeConfigs?: BadgeConfigRow[]; socialProofCount?: number;
   onViewClick?: () => void;
+  /** Gap #13: When true, hides secondary metadata for compact home-page horizontal scrolls */
+  compact?: boolean;
 }
 
 function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, className, viewOnly = false, categoryConfigs = [], marketplaceConfig, badgeConfigs = [], socialProofCount, onViewClick }: ProductListingCardProps) {
