@@ -44,7 +44,7 @@ export function ActiveOrderStrip() {
           order_items(id)
         `)
         .eq('buyer_id', user.id)
-        .not('status', 'in', `(${terminalArr.join(',')})`)
+        .not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`)
         .order('created_at', { ascending: false })
         .limit(3);
 
