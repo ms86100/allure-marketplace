@@ -634,23 +634,46 @@ body.razorpay-active iframe[src*="razorpay"] {
   transition: box-shadow 0.35s ease, border-color 0.35s ease;
 }
 
-/* Nature: subtle organic texture (CSS-only, no images) */
+/* ═══ Nature: Multi-layer immersive background ═══ */
+.nature #root {
+  background-color: hsl(85 18% 95%);
+  background-image:
+    radial-gradient(ellipse at 10% 15%, hsl(152 55% 32% / 0.06) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 30%, hsl(38 65% 55% / 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 95%, hsl(195 50% 60% / 0.03) 0%, transparent 45%),
+    radial-gradient(ellipse at 90% 5%, hsl(280 40% 70% / 0.025) 0%, transparent 40%);
+  background-attachment: fixed;
+}
+
+/* Nature: organic leaf-vein texture overlay */
 .nature #root::before {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.35;
+  opacity: 0.025;
   background-image:
-    radial-gradient(ellipse at 15% 50%, hsl(var(--primary) / 0.025) 0%, transparent 50%),
-    radial-gradient(ellipse at 85% 20%, hsl(var(--accent) / 0.03) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 90%, hsl(var(--primary) / 0.02) 0%, transparent 40%);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cpath d='M60 0 C55 30 30 55 0 60 C30 65 55 90 60 120 C65 90 90 65 120 60 C90 55 65 30 60 0Z' fill='none' stroke='%23507a50' stroke-width='0.5' opacity='0.6'/%3E%3Cpath d='M60 20 C57 40 40 57 20 60 C40 63 57 80 60 100 C63 80 80 63 100 60 C80 57 63 40 60 20Z' fill='none' stroke='%23507a50' stroke-width='0.3' opacity='0.4'/%3E%3C/svg%3E");
+  background-size: 120px 120px;
 }
 
 .nature #root > * {
   position: relative;
   z-index: 1;
+}
+
+/* Nature: section-aware gradient bands */
+.nature .nature-section-forest {
+  background-image: linear-gradient(180deg, hsl(152 55% 32% / 0.04) 0%, transparent 100%);
+}
+
+.nature .nature-section-water {
+  background-image: linear-gradient(180deg, hsl(195 50% 60% / 0.035) 0%, transparent 100%);
+}
+
+.nature .nature-section-earth {
+  background-image: linear-gradient(180deg, hsl(38 65% 55% / 0.035) 0%, transparent 100%);
 }
 
 /* Nature: gentler animations */
