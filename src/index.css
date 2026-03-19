@@ -220,12 +220,12 @@
      ═══════════════════════════════════════════════ */
   .nature {
     /* ═══ WANGLOW extracted palette ═══ */
-    --background: 40 10% 90%;         /* Ivory/Pumice White */
-    --foreground: 0 0% 12%;           /* Matte Black */
+    --background: 0 0% 5%;             /* Near-black like dark mode */
+    --foreground: 40 10% 90%;          /* Ivory text on dark */
 
-    --card: 40 15% 85%;               /* Light Limestone */
-    --card-foreground: 0 0% 12%;      /* Matte Black */
-    --card-elevated: 0 0% 82%;        /* Light Table Surface */
+    --card: 20 4% 12%;                 /* Dark card like dark mode */
+    --card-foreground: 40 10% 90%;
+    --card-elevated: 20 3% 15%;
 
     --popover: 40 15% 85%;
     --popover-foreground: 0 0% 12%;
