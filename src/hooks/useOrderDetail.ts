@@ -123,10 +123,13 @@ export function useOrderDetail(id: string | undefined) {
   useEffect(() => {
     const onResume = () => setRefetchTick(t => t + 1);
     const onVisibility = () => { if (document.visibilityState === 'visible') setRefetchTick(t => t + 1); };
+    const onTerminalPush = () => setRefetchTick(t => t + 1);
     window.addEventListener('order-detail-refetch', onResume);
+    window.addEventListener('order-terminal-push', onTerminalPush);
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       window.removeEventListener('order-detail-refetch', onResume);
+      window.removeEventListener('order-terminal-push', onTerminalPush);
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
