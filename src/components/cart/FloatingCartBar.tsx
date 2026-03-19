@@ -144,10 +144,9 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
               <p className="text-xs text-muted-foreground text-center">+{items.length - 3} more item{items.length - 3 !== 1 ? 's' : ''}</p>
             )}
           </div>
-          <Button className="w-full mt-4 rounded-xl" onClick={() => { setPreviewOpen(false); navigate('/cart'); }}>
+          <Button className="w-full mt-4 rounded-xl px-4" onClick={() => { setPreviewOpen(false); navigate('/cart'); }}>
             View Full Cart · {formatPrice(totalAmount)}
           </Button>
-          </div>
         </DrawerContent>
       </Drawer>
     </AnimatePresence>
