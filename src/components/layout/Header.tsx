@@ -66,7 +66,10 @@ function HeaderInner({
         'sticky top-0 z-40 bg-background border-b border-border/50',
         className
       )}>
-        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 space-y-1.5">
+          {/* Tagline */}
+          <p className="text-[11px] font-medium text-primary tracking-wide">Your society, your marketplace</p>
+
           {/* Row 1: Location/greeting + actions */}
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
@@ -86,9 +89,6 @@ function HeaderInner({
                       </span>
                       <ChevronDown size={14} className="text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
                     </div>
-                    <p className="text-[11px] text-muted-foreground leading-none mt-0.5 truncate">
-                      Your society, your marketplace
-                    </p>
                   </div>
                 </button>
               ) : (
