@@ -72,15 +72,20 @@ export function DeliveryCompletionOtpDialog({ orderId, open, onOpenChange, onVer
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-2 flex justify-center">
-          <InputOTP maxLength={4} value={otp} onChange={setOtp} autoFocus>
-            <InputOTPGroup className="gap-3">
-              <InputOTPSlot index={0} className="w-12 h-12 rounded-xl border-2" />
-              <InputOTPSlot index={1} className="w-12 h-12 rounded-xl border-2" />
-              <InputOTPSlot index={2} className="w-12 h-12 rounded-xl border-2" />
-              <InputOTPSlot index={3} className="w-12 h-12 rounded-xl border-2" />
-            </InputOTPGroup>
-          </InputOTP>
+        <div className="py-2 space-y-2">
+          <div className="flex justify-center">
+            <InputOTP maxLength={4} value={otp} onChange={handleOtpChange} autoFocus>
+              <InputOTPGroup className="gap-3">
+                <InputOTPSlot index={0} className={`w-12 h-12 rounded-xl border-2 ${errorMessage ? 'border-destructive' : ''}`} />
+                <InputOTPSlot index={1} className={`w-12 h-12 rounded-xl border-2 ${errorMessage ? 'border-destructive' : ''}`} />
+                <InputOTPSlot index={2} className={`w-12 h-12 rounded-xl border-2 ${errorMessage ? 'border-destructive' : ''}`} />
+                <InputOTPSlot index={3} className={`w-12 h-12 rounded-xl border-2 ${errorMessage ? 'border-destructive' : ''}`} />
+              </InputOTPGroup>
+            </InputOTP>
+          </div>
+          {errorMessage && (
+            <p className="text-xs text-destructive text-center font-medium">{errorMessage}</p>
+          )}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-2">

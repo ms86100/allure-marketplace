@@ -339,11 +339,15 @@ export function UpiDeepLinkCheckout({
                 )}
               </div>
 
+              {!screenshotFile && (
+                <p className="text-xs text-destructive text-center font-medium">Please upload a payment screenshot to confirm</p>
+              )}
+
               <div className="flex flex-col gap-3 pt-1">
                 <Button
                   className="w-full gap-2"
                   onClick={handleSubmitConfirmation}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !screenshotFile}
                 >
                   {isSubmitting ? (
                     <><Loader2 className="animate-spin" size={16} />Submitting...</>
