@@ -159,7 +159,7 @@ export function PostDetailSheet({ post, open, onOpenChange, onVote }: PostDetail
           <div className="text-xs text-muted-foreground">
             {post.author?.name} · {post.author?.block}-{post.author?.flat_number} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
           </div>
-        </SheetHeader>
+        </DrawerHeader>
 
         <div className="mt-4 space-y-4">
           {/* Body */}
