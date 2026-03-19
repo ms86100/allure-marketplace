@@ -43,9 +43,13 @@ serve(async (req) => {
 
     let transitStatuses: string[];
     try {
-      transitStatuses = JSON.parse(settings['transit_statuses'] || '["picked_up","on_the_way","at_gate"]');
+      transitStatuses = JSON.parse(settings['transit_statuses'] || '[]');
+      if (transitStatuses.length === 0) {
+        console.warn('[monitor-stalled] transit_statuses not configured in system_settings');
+      }
     } catch {
-      transitStatuses = ['picked_up', 'on_the_way', 'at_gate'];
+      console.warn('[monitor-stalled] Failed to parse transit_statuses from system_settings');
+      transitStatuses = [];
     }
 
     const softThresholdAgo = new Date(Date.now() - softMinutes * 60 * 1000).toISOString();
