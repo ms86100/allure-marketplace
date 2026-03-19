@@ -1,74 +1,45 @@
-# Production-Hardened Live Tracking System
 
-## Status: ✅ IMPLEMENTED
 
-## What Changed
+# Verification: What's Actually Implemented vs. Claimed
 
-### 1. Background Location Tracking (Seller)
-- **Package:** Added `@transistorsoft/capacitor-background-geolocation`
-- **File:** `src/hooks/useBackgroundLocationTracking.ts` — Full rewrite
-  - Native: Transistorsoft plugin with motion-aware tracking, `stopOnTerminate: false`, `preventSuspend: true`
-  - Web: Falls back to `navigator.geolocation.watchPosition`
-  - 20s health watchdog detects stale tracking and attempts recovery via `getCurrentPosition()`
-  - Auto-restart on app resume if native plugin was killed by OS
-  - Permission level tracking (`always` / `when_in_use` / `denied`)
+After reading every affected file and querying the database, here is the honest status of all 20 bugs:
 
-### 2. Seller GPS Tracker UI
-- **File:** `src/components/delivery/SellerGPSTracker.tsx`
-  - "Keep screen open" warning only on web (native handles background natively)
-  - Permission upgrade banner when on `when_in_use` with link to Settings
-  - Tracking paused badge + alert when watchdog detects stale state
-  - Settings deep link via `capacitor-native-settings`
+## ACTUALLY FIXED (verified in code + DB):
 
-### 3. Delta-Based Live Activity APNs Push
-- **File:** `supabase/functions/update-delivery-location/index.ts`
-  - After updating `delivery_assignments`, queries `live_activity_tokens`
-  - Compares deltas: distance > 50m OR ETA change ≥ 1 min
-  - 15s throttle floor to stay within Apple's APNs budget
-  - Stale retry: pushes if last push was >60s ago regardless of deltas
-  - Stores `last_pushed_eta`, `last_pushed_distance` on `live_activity_tokens`
-  - Timing instrumentation: logs `db=Xms total=Xms la_push=Xms`
+| Bug | Claim | Verified |
+|-----|-------|----------|
+| **1** | `failed` removed + `22P02` error handling | Yes — `statusFlowCache.ts` line 41 has no `failed`, `ActiveOrderStrip` line 53 handles `22P02` |
+| **2** | DB update `is_terminal=true` for seller_delivery `delivered` | Yes — DB query confirms both rows now have `is_terminal: true` |
+| **3** | Color dot uses `className` instead of `style` | Yes — line 118 uses `className={...order.color.split(' ')[0]}` |
+| **4** | `profile_image_url` in edge function | Yes — line 500 uses `profile_image_url` |
+| **5** | `stalled_notified` reset on movement >100m | Yes — lines 256-268 implement `resetStalled` logic |
+| **6** | Proximity includes `at_gate` | Yes — line 386: `['picked_up', 'on_the_way', 'at_gate']` |
+| **7** | Delay detection includes `on_the_way` | Yes — line 340: `['picked_up', 'on_the_way', 'at_gate']` |
+| **8** | `doUpdate` guard check | Yes — line 485: `if (!this.active.has(data.entity_id)) return;` |
+| **9** | `at_gate` in `transit_statuses_la` defaults | Yes — line 45: `['on_the_way', 'picked_up', 'at_gate']` |
+| **10** | `en_route` removed from defaults | Yes — no longer in `transit_statuses_la` |
+| **11** | Realtime filter on delivery channel | Partially — line 253-254: applies `eq` filter only when exactly 1 active order; falls back to no filter for 2+ orders |
+| **12** | Sync uses terminal-exclusion | Yes — `liveActivitySync.ts` line 49 uses `getTerminalStatuses()` and `.not('status', 'in', ...)` |
+| **15** | APNs priority `5` for updates, `10` for terminal | Yes — line 259: `isTerminal ? "10" : "5"` |
+| **18** | `delivered` excluded from `getStartStatuses` | Yes — line 52: `e.status_key !== 'delivered'` |
+| **19** | Dynamic MAX_ETA from `initialEtaMinutes` | Yes — line 117: uses `initialEtaMinutes` param with 15m default |
+| **20** | Quoted terminal statuses in `ActiveOrderStrip` | Yes — line 47: `.map(s => \`"${s}"\`)` |
 
-### 4. APNs Success Tracking
-- **File:** `supabase/functions/update-live-activity-apns/index.ts`
-  - Updates `live_activity_tokens.updated_at` on successful (non-terminal) pushes
-  - `dismissal-date` set to now+4s (Apple minimum) for terminal events
+## NOT FULLY FIXED — still has gaps:
 
-### 5. Database
-- **Migration:** Added `last_pushed_eta` (int) and `last_pushed_distance` (int) columns to `live_activity_tokens`
-- **Migration:** Updated `verify_delivery_otp_and_complete` RPC → sets `completed` directly, clears `needs_attention`
-- **Migration:** Added `at_gate` to `transit_statuses_la` system setting
+| Bug | Issue | Detail |
+|-----|-------|--------|
+| **11** | Realtime filter only works for 1 order | When 2+ orders are active, `filter` is `undefined` (line 255), so it falls back to **no server-side filter** — the original scalability problem. Supabase Realtime `in` filters are not supported on channels, so the fix only helps single-order scenarios. This was honestly acknowledged in the code comment but the previous summary claimed it was fully fixed. |
+| **13** | AnimatePresence ref warning | Marked as "not fixed" in the plan and accepted. No code change was ever made. The previous summaries did not claim it was fixed, so this is fine. |
+| **16** | `order_number` not fetched | `liveActivitySync.ts` line 59 still selects `'id, status, seller_id'` without `order_number`. The orchestrator's `doSync` (line 52) also doesn't fetch it. The previous summary said "skipped as column doesn't exist" — but this was never verified by querying the DB schema. |
 
-### 6. Auto-Complete on OTP Verification
-- **RPC:** `verify_delivery_otp_and_complete` now sets order status to `completed` (not `delivered`), clears `needs_attention` flags
-- **UI:** `BuyerDeliveryConfirmation` hidden for delivery orders (OTP = proof of delivery)
-- **UI:** Attention banner hidden on terminal statuses (`delivered`, `completed`, `cancelled`)
+## ACCEPTED AS-IS (correctly not fixed per plan):
+- **Bug 14** — Polling `lastKnownRef` cold start (harmless extra sync)
+- **Bug 17** — `delivery_en_route` dedup (more conservative approach is fine)
 
-### 7. Dynamic Stalled Delivery Alerts
-- **File:** `supabase/functions/monitor-stalled-deliveries/index.ts`
-  - Computes actual elapsed time from `last_location_at`
-  - Contextual messages: "a few minutes" → "X minutes" → "over X hours"
+## Summary: What was hallucinated
 
-### 8. Dynamic Island Fixes
-- **File:** `src/services/liveActivitySync.ts` — End stale native activities on app resume
-  - After syncing active orders, queries `getActiveActivities()` and ends any whose order is no longer active
-- **File:** `src/hooks/useOrderDetail.ts` — Force refetch on app resume / visibility change
-  - Listens for `order-detail-refetch` event and `visibilitychange` to re-fetch order data
-- **File:** `src/hooks/useAppLifecycle.ts` — Dispatches `order-detail-refetch` event on resume
-- **File:** `src/services/liveActivityMapper.ts` — ETA-based progress during transit
-  - Uses `1 - (eta_minutes / 45)` clamped to [0.1, 0.95] when ETA available
-  - Falls back to distance-based progress
-  - `at_gate` included in transit statuses
+Only **Bug 11** was overstated. The fix is real but partial — it only applies a Postgres filter when exactly 1 active order exists. For 2+ concurrent orders, every buyer still receives all global `delivery_assignments` events. The Supabase Realtime API does not support `in` filters on channels, so there is no clean server-side fix for the multi-order case. The client-side filtering (line 207: `activeOrderIdsRef.current.has(row.order_id)`) remains the actual mitigation.
 
-## iOS Build Requirements
-- `Info.plist`: `UIBackgroundModes` → `location`, `fetch`
-- `NSLocationAlwaysAndWhenInUseUsageDescription`
-- `NSLocationWhenInUseUsageDescription`
-- `NSMotionUsageDescription`
+Everything else (Bugs 1-10, 12, 15, 18-20) is genuinely implemented and verified in the current codebase. Bug 2's DB update was also confirmed executed.
 
-## Latency Targets
-- Seller GPS → Edge Function: < 2s
-- Edge Function → DB: < 500ms
-- DB → Realtime → Buyer: < 1s
-- Edge Function → APNs → Dynamic Island: < 3s
-- **Total foreground: < 5s | Dynamic Island: < 8s**
