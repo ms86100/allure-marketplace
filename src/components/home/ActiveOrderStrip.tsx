@@ -125,7 +125,7 @@ export function ActiveOrderStrip() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 onClick={() => navigate(`/orders/${order.id}`)}
                 className="flex items-center gap-2 rounded-xl bg-primary/[0.06] border border-primary/12 px-2.5 py-2 cursor-pointer active:scale-[0.97] transition-transform shrink-0 min-w-0"
-                style={{ maxWidth: activeOrders.length === 1 ? '100%' : '70vw' }}
+                style={{ maxWidth: activeOrders.length === 1 ? '100%' : '55vw' }}
               >
                 {/* Thumbnail */}
                 <div className="w-9 h-9 rounded-xl bg-primary/10 shrink-0 overflow-hidden flex items-center justify-center">
