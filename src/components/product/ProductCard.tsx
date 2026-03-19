@@ -54,7 +54,7 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
   if (variant === 'vertical') {
     return (
       <Card className={cn('overflow-hidden', isStoreClosed && !product.is_available ? '' : isStoreClosed ? 'opacity-60 grayscale-[30%]' : '')}>
-        <div className="relative aspect-square">
+        <div className="relative aspect-[4/3]">
           {product.image_url ? (
             <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
           ) : (
@@ -82,18 +82,18 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
             <VegBadge isVeg={product.is_veg} size="sm" className="mt-1" />
             <div className="flex-1 min-w-0">
               <h4 className="font-medium text-sm truncate">{product.name}</h4>
-              <p className="text-sm font-semibold text-primary mt-1 tabular-nums">{formatPrice(product.price)}</p>
+              <p className="text-base font-bold text-primary mt-1 tabular-nums">{formatPrice(product.price)}</p>
             </div>
           </div>
           <div className="mt-3">
             {isCartAction && quantity > 0 && !isStoreClosed ? (
               <div className="flex items-center justify-center gap-3 border border-primary rounded-md">
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-primary" onClick={handleDecrement}><Minus size={16} /></Button>
+                <Button size="sm" variant="ghost" className="h-10 w-10 p-0 text-primary" onClick={handleDecrement}><Minus size={16} /></Button>
                 <span className="font-semibold text-primary w-6 text-center tabular-nums">{quantity}</span>
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-primary" onClick={handleIncrement}><Plus size={16} /></Button>
+                <Button size="sm" variant="ghost" className="h-10 w-10 p-0 text-primary" onClick={handleIncrement}><Plus size={16} /></Button>
               </div>
             ) : (
-              <Button size="sm" variant="outline" className="w-full border-primary text-primary hover:bg-primary hover:text-primary-foreground" onClick={handleAdd} disabled={isDisabled}>
+              <Button variant="outline" className="w-full h-10 border-primary text-primary hover:bg-primary hover:text-primary-foreground font-bold" onClick={handleAdd} disabled={isDisabled}>
                 {isStoreClosed ? (<><Clock size={14} className="mr-1" /> {storeClosedMessage || 'Closed'}</>) : (<>{isCartAction && <Plus size={14} className="mr-1" />}{actionConfig.shortLabel}</>)}
               </Button>
             )}
