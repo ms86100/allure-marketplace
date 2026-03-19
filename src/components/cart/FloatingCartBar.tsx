@@ -115,13 +115,13 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
         </motion.div>
       </motion.div>
 
-      {/* Mini Cart Preview Sheet */}
-      <Sheet open={previewOpen} onOpenChange={setPreviewOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl px-4 pb-6">
-          <SheetHeader className="pb-3">
-            <SheetTitle className="text-sm font-bold">Cart Preview</SheetTitle>
-          </SheetHeader>
-          <div className="space-y-3">
+      {/* Mini Cart Preview Drawer */}
+      <Drawer open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DrawerContent>
+          <DrawerHeader className="pb-3">
+            <DrawerTitle className="text-sm font-bold">Cart Preview</DrawerTitle>
+          </DrawerHeader>
+          <div className="space-y-3 px-4">
             {previewItems.map((item) => (
               <div key={item.id} className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-xl overflow-hidden shrink-0 bg-secondary">
