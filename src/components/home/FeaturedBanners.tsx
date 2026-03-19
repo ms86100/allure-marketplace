@@ -145,16 +145,18 @@ export function FeaturedBanners() {
         id="banner-carousel"
         className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1 snap-x snap-mandatory"
       >
-        {banners.map((banner: any) => (
+        {banners.map((banner: any, idx: number) => (
           <div
             key={banner.id}
             onClick={() => banner.link_url && navigate(banner.link_url)}
             className={cn(
               'shrink-0 w-[85vw] sm:w-[400px] rounded-3xl overflow-hidden snap-center',
               'border border-border/20 dark:border-transparent',
-              'transition-all duration-200 hover:shadow-md active:scale-[0.99]',
+              'banner-depth',
+              'transition-all duration-200 active:scale-[0.99]',
               banner.link_url && 'cursor-pointer'
             )}
+            style={{ animationDelay: `${idx * 0.1}s` }}
           >
             <BannerContent banner={banner} />
           </div>

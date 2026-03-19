@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { OnboardingWalkthrough, useOnboarding } from '@/components/onboarding/OnboardingWalkthrough';
@@ -47,6 +47,23 @@ export default function HomePage() {
     };
   }, [profile]);
 
+  // IntersectionObserver for scroll-reveal sections
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
+    );
+    const sections = document.querySelectorAll('.reveal-on-scroll');
+    sections.forEach(el => observer.observe(el));
+    return () => observer.disconnect();
+  }, [profile]);
+
   if (hasChecked && showOnboarding && profile) {
     return <OnboardingWalkthrough onComplete={completeOnboarding} />;
   }
@@ -69,7 +86,7 @@ export default function HomePage() {
 
   return (
     <AppLayout>
-      <div className="pb-6">
+      <div className="pb-6 space-y-0">
         {/* Active order tracking */}
         <ActiveOrderStrip />
 
@@ -108,21 +125,29 @@ export default function HomePage() {
         })()}
 
         {/* Personalized */}
-        <ForYouSection />
+        <div className="reveal-on-scroll">
+          <ForYouSection />
+        </div>
 
         {/* Recently viewed */}
-        <RecentlyViewedRow />
+        <div className="reveal-on-scroll">
+          <RecentlyViewedRow />
+        </div>
 
         {/* Society links */}
-        <SocietyQuickLinks />
+        <div className="reveal-on-scroll">
+          <SocietyQuickLinks />
+        </div>
 
         {/* Leaderboard */}
-        <div className="mt-6">
+        <div className="mt-6 reveal-on-scroll">
           <SocietyLeaderboard />
         </div>
 
         {/* Community */}
-        <CommunityTeaser />
+        <div className="reveal-on-scroll">
+          <CommunityTeaser />
+        </div>
       </div>
     </AppLayout>
   );
