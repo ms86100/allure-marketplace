@@ -141,7 +141,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
       const sellerName = sellerInfo?.name ?? null;
       const sellerLogo = sellerInfo?.logo ?? null;
       const itemCount = itemCountMap.get(order.id) ?? null;
-      const data = buildLiveActivityData(order, delivery, sellerName, itemCount, flowEntries, sellerLogo);
+      const data = buildLiveActivityData(order, delivery, sellerName, itemCount, flowEntries, sellerLogo, delivery?.eta_minutes ?? null);
       try {
         await LiveActivityManager.push(data);
       } catch (e) {

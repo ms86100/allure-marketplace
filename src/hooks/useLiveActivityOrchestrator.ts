@@ -132,6 +132,7 @@ export function useLiveActivityOrchestrator(): void {
         itemCount,
         flowEntriesRef.current,
         sellerLogoUrl,
+        delivery?.eta_minutes ?? null,
       );
       await LiveActivityManager.push(activityData);
     };
@@ -242,7 +243,7 @@ export function useLiveActivityOrchestrator(): void {
           distance_meters: row?.distance_meters,
           rider_name: row?.rider_name,
           vehicle_type: null,
-        }, sellerName, itemCountRes.count ?? null, flowEntriesRef.current, sellerLogoUrl);
+        }, sellerName, itemCountRes.count ?? null, flowEntriesRef.current, sellerLogoUrl, row?.eta_minutes ?? null);
         await LiveActivityManager.push(data);
       } catch { /* best-effort */ }
     };

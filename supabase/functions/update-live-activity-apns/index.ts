@@ -210,9 +210,17 @@ Deno.serve(async (req) => {
     const itemCount = itemCountRes.count ?? null;
 
     // DB-backed progress and labels
-    const progressPercent = deriveProgressPercent(status, flowMap);
     const flowEntry = flowMap.get(status);
     const progressStage = flowEntry?.display_label ?? null;
+    let progressPercent = deriveProgressPercent(status, flowMap);
+
+    // ETA-based progress override for transit statuses (matches client-side logic)
+    const TRANSIT_STATUSES = ['on_the_way', 'picked_up', 'at_gate'];
+    if (TRANSIT_STATUSES.includes(status) && etaMinutes != null && etaMinutes >= 0) {
+      const MAX_ETA = 15;
+      const ratio = Math.min(etaMinutes / MAX_ETA, 1);
+      progressPercent = Math.max(0.1, Math.min(0.95, 1 - ratio));
+    }
 
     // Derive short order ID from UUID
     const orderShortId = `#${order_id.replace(/-/g, "").slice(-4).toUpperCase()}`;
