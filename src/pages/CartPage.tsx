@@ -198,7 +198,7 @@ export default function CartPage() {
           <MapPin size={16} className="text-primary shrink-0" />
           <div className="flex-1 min-w-0">
             {c.fulfillmentType === 'self_pickup' ? (
-              <><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pickup from</p><p className="text-sm font-medium mt-0.5">{c.sellerGroups[0]?.sellerName || 'Seller'}</p><p className="text-xs text-muted-foreground">{c.society?.name || 'Your Society'}</p></>
+              <><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pickup from</p><p className="text-sm font-medium mt-0.5">{c.sellerGroups[0]?.sellerName || ''}</p><p className="text-xs text-muted-foreground">{c.society?.name || 'Your Society'}</p></>
             ) : c.selectedDeliveryAddress ? (
               <>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deliver to</p>
