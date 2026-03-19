@@ -35,6 +35,8 @@ import { useNavigate } from 'react-router-dom';
 import { getString, setString } from '@/lib/persistent-kv';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { LiveActivityManager } from '@/services/LiveActivityManager';
+import { Capacitor } from '@capacitor/core';
 
 // Gap 10: Lazy-load map to avoid bundling Leaflet for non-delivery orders
 const DeliveryMapView = lazy(() => import('@/components/delivery/DeliveryMapView').then(m => ({ default: m.DeliveryMapView })));
@@ -58,6 +60,16 @@ export default function OrderDetailPage() {
 
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
   const trackingConfig = useTrackingConfig();
+
+  // Defensive guard: end any lingering Live Activity if order is terminal
+  useEffect(() => {
+    if (!orderId || !order?.status) return;
+    if (!Capacitor.isNativePlatform()) return;
+    const TERMINAL = new Set(['delivered', 'completed', 'cancelled', 'no_show']);
+    if (TERMINAL.has(order.status)) {
+      LiveActivityManager.end(orderId).catch(() => {});
+    }
+  }, [orderId, order?.status]);
 
   // Gap A: Fetch delivery OTP for buyer display
 
