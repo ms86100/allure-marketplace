@@ -97,16 +97,16 @@ export function BuilderSetupWizard({ societyId, societyName, enabledFeatures = [
   const step = visibleSteps[currentStep];
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5">
           <Wand2 size={14} /> Setup Wizard
         </Button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[80vh] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Setup: {societyName}</SheetTitle>
-        </SheetHeader>
+      </DrawerTrigger>
+      <DrawerContent className="max-h-[80vh] overflow-y-auto">
+        <DrawerHeader>
+          <DrawerTitle>Setup: {societyName}</DrawerTitle>
+        </DrawerHeader>
         <div className="mt-4 space-y-4">
           {/* Progress */}
           <div className="flex gap-2 flex-wrap">

@@ -108,15 +108,15 @@ export function AdminPaymentMilestones() {
             {totalPct === 100 ? '✓ Complete' : `${100 - totalPct}% remaining`}
           </Badge>
         </div>
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetTrigger asChild>
+        <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+          <DrawerTrigger asChild>
             <Button size="sm"><Plus size={14} className="mr-1" /> Add</Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>Add Payment Milestone</SheetTitle>
-              <SheetDescription>Define a construction-linked payment stage</SheetDescription>
-            </SheetHeader>
+          </DrawerTrigger>
+          <DrawerContent className="max-h-[85vh] overflow-y-auto">
+            <DrawerHeader>
+              <DrawerTitle>Add Payment Milestone</DrawerTitle>
+              <DrawerDescription>Define a construction-linked payment stage</DrawerDescription>
+            </DrawerHeader>
             <div className="space-y-4 py-4">
               <div>
                 <Label>Title *</Label>

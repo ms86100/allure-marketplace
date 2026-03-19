@@ -70,16 +70,16 @@ export function ReportSheet({ open, onOpenChange, targetType, targetId, targetNa
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader className="text-left pb-4">
-          <SheetTitle className="flex items-center gap-2">
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader className="text-left pb-4">
+          <DrawerTitle className="flex items-center gap-2">
             <Flag size={18} className="text-destructive" />
             Report {targetType === 'post' ? 'Post' : targetType === 'product' ? 'Product' : 'Seller'}
-          </SheetTitle>
-          <SheetDescription>
+          </DrawerTitle>
+          <DrawerDescription>
             {targetName && <span>Reporting: {targetName}</span>}
-          </SheetDescription>
+          </DrawerDescription>
         </SheetHeader>
 
         <div className="space-y-4 pb-4">

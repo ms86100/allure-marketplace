@@ -83,16 +83,16 @@ export function SearchFilters({
             </span>
           )}
         </button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl">
-        <SheetHeader>
+      </DrawerTrigger>
+      <DrawerContent className="h-[85vh]">
+        <DrawerHeader>
           <div className="flex items-center justify-between">
-            <SheetTitle>Filters & Sort</SheetTitle>
+            <DrawerTitle>Filters & Sort</DrawerTitle>
             <Button variant="ghost" size="sm" onClick={handleReset}>
               Reset all
             </Button>
           </div>
-        </SheetHeader>
+        </DrawerHeader>
 
         <div className="mt-6 space-y-6 overflow-y-auto pb-20">
           {/* Sort By */}

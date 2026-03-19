@@ -67,11 +67,11 @@ export function CreateHelpSheet({ open, onOpenChange, onCreated }: CreateHelpShe
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader>
-          <SheetTitle>Ask for Help</SheetTitle>
-        </SheetHeader>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>Ask for Help</DrawerTitle>
+        </DrawerHeader>
         <div className="space-y-4 mt-4">
           <div className="flex gap-2 flex-wrap">
             {TAGS.map(t => {

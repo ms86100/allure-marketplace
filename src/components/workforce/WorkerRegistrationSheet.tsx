@@ -17,12 +17,12 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
   const w = useWorkerRegistration(open, onOpenChange, onSuccess, categories);
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Register Worker</SheetTitle>
-          <SheetDescription>Live photo capture is optional. No gallery uploads.</SheetDescription>
-        </SheetHeader>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="max-h-[90vh] overflow-y-auto">
+        <DrawerHeader>
+          <DrawerTitle>Register Worker</DrawerTitle>
+          <DrawerDescription>Live photo capture is optional. No gallery uploads.</DrawerDescription>
+        </DrawerHeader>
 
         <div className="space-y-4 py-4">
           {/* Live Photo */}

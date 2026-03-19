@@ -16,16 +16,16 @@ export const AddressPicker = forwardRef<HTMLDivElement, AddressPickerProps>(
 
     return (
       <div ref={ref}>
-        <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger asChild>
+        <Drawer open={open} onOpenChange={setOpen}>
+          <DrawerTrigger asChild>
             {trigger || (
               <button className="text-xs text-primary font-semibold">Change</button>
             )}
-          </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl max-h-[70dvh]">
-            <SheetHeader>
-              <SheetTitle className="text-base">Select Delivery Address</SheetTitle>
-            </SheetHeader>
+          </DrawerTrigger>
+          <DrawerContent className="max-h-[70dvh]">
+            <DrawerHeader>
+              <DrawerTitle className="text-base">Select Delivery Address</DrawerTitle>
+            </DrawerHeader>
             <div className="mt-4 space-y-2 overflow-y-auto pb-4">
               {isLoading ? (
                 <div className="space-y-2">

@@ -145,9 +145,9 @@ export function PostDetailSheet({ post, open, onOpenChange, onVote }: PostDetail
   const CatIcon = cat.icon;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[90vh] overflow-y-auto rounded-t-2xl">
-        <SheetHeader>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="h-[90vh] overflow-y-auto">
+        <DrawerHeader>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className={cn('text-[10px] gap-1', cat.bg, cat.color)}>
               <CatIcon size={10} />
@@ -155,7 +155,7 @@ export function PostDetailSheet({ post, open, onOpenChange, onVote }: PostDetail
             </Badge>
             {post.is_pinned && <Pin size={12} className="text-primary fill-primary" />}
           </div>
-          <SheetTitle className="text-left">{post.title}</SheetTitle>
+          <DrawerTitle className="text-left">{post.title}</DrawerTitle>
           <div className="text-xs text-muted-foreground">
             {post.author?.name} · {post.author?.block}-{post.author?.flat_number} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
           </div>
