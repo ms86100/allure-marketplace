@@ -88,7 +88,7 @@ export function EmergencyBroadcastSheet() {
         <p className="text-xs text-muted-foreground mt-1">
           This will send a push notification to ALL residents in {viewAsSocietyId ? 'the selected' : 'your'} society.
         </p>
-        <div className="space-y-4 mt-4">
+        <div className="space-y-4 px-4 pb-6">
           <div>
             <label className="text-sm font-medium">Category</label>
             <Select value={category} onValueChange={setCategory}>
