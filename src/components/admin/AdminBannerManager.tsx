@@ -229,11 +229,11 @@ export function AdminBannerManager() {
       )}
 
       {/* Create/Edit Sheet */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="bottom" className="h-[90vh] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="font-bold">{editingId ? 'Edit Banner' : 'Create Banner'}</SheetTitle>
-          </SheetHeader>
+      <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+        <DrawerContent className="h-[90vh] overflow-y-auto">
+          <DrawerHeader>
+            <DrawerTitle className="font-bold">{editingId ? 'Edit Banner' : 'Create Banner'}</DrawerTitle>
+          </DrawerHeader>
 
           <div className="mt-4 space-y-5">
             {/* Template Selection */}
