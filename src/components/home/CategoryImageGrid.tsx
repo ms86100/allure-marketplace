@@ -90,7 +90,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
             <Link
               key={cat.category}
               to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-              className="flex flex-col items-center group active:scale-[0.96] transition-transform duration-150"
+              className="flex flex-col items-center group active:scale-[0.96] transition-transform duration-150 card-hover"
             >
               {/* Dark card tile */}
               <div className="w-full aspect-square rounded-2xl overflow-hidden bg-card border border-border">
