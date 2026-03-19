@@ -218,7 +218,7 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {order.status === 'cancelled' && order.rejection_reason && o.isBuyerView && (
+          {order.rejection_reason && isTerminalStatus(o.flow, order.status) && !isSuccessfulTerminal(o.flow, order.status) && o.isBuyerView && (
             <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 flex items-start gap-2.5">
               <XCircle className="text-destructive shrink-0 mt-0.5" size={16} />
               <div><p className="text-sm font-semibold text-destructive">Order Cancelled</p><p className="text-xs text-muted-foreground mt-0.5">{order.rejection_reason}</p></div>
