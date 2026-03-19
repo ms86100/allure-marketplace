@@ -108,8 +108,8 @@ export function ActiveOrderStrip() {
   if (activeOrders.length === 0) return null;
 
   return (
-    <div className="mt-3 px-4">
-      <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
+    <div className="mt-2 px-4">
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         <AnimatePresence>
           {activeOrders.map((order) => {
             const isTransit = TRANSIT_STATUSES.has(order.status as any);
