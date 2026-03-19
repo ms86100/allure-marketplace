@@ -45,7 +45,10 @@ export function SocietyLeaderboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!effectiveSocietyId) return;
+    if (!effectiveSocietyId) {
+      setLoading(false);
+      return;
+    }
     fetchLeaderboard();
   }, [effectiveSocietyId]);
 
