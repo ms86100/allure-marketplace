@@ -152,11 +152,11 @@ export default function BuilderInspectionsPage() {
       </div>
 
       {/* Detail Sheet */}
-      <Sheet open={!!selectedChecklist} onOpenChange={(open) => { if (!open) setSelectedChecklist(null); }}>
-        <SheetContent side="bottom" className="rounded-t-2xl h-[85vh] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Inspection – Flat {selectedChecklist?.flat_number}</SheetTitle>
-          </SheetHeader>
+      <Drawer open={!!selectedChecklist} onOpenChange={(open) => { if (!open) setSelectedChecklist(null); }}>
+        <DrawerContent className="h-[85vh] overflow-y-auto">
+          <DrawerHeader>
+            <DrawerTitle>Inspection – Flat {selectedChecklist?.flat_number}</DrawerTitle>
+          </DrawerHeader>
           {selectedChecklist && (
             <div className="mt-4 space-y-4">
               {/* Summary */}
