@@ -9,6 +9,7 @@ import { ParentGroupTabs } from '@/components/home/ParentGroupTabs';
 import { CategoryImageGrid } from '@/components/home/CategoryImageGrid';
 import { FeaturedBanners } from '@/components/home/FeaturedBanners';
 import { AutoHighlightStrip } from '@/components/home/AutoHighlightStrip';
+import { BuyAgainRow } from '@/components/home/BuyAgainRow';
 import { ShopByStoreDiscovery } from '@/components/home/ShopByStoreDiscovery';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
@@ -139,6 +140,9 @@ export function MarketplaceSection() {
       <div className="pt-4 pb-5">
         <ParentGroupTabs activeGroup={activeGroup} onGroupChange={setActiveGroup} activeParentGroups={activeParentGroupSet} />
       </div>
+
+      {/* ── Frequently Bought ── */}
+      {!activeGroup && <BuyAgainRow />}
 
       {/* ── Category Image Grids ── */}
       {activeParentGroups.map((group) => (

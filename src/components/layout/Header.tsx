@@ -118,7 +118,7 @@ function HeaderInner({
                       <span className="text-border">·</span>
                       {stats.sellers > 0 && <span>🏪 {stats.sellers} seller{stats.sellers !== 1 ? 's' : ''}</span>}
                       {stats.sellers > 0 && stats.orders > 0 && <span className="text-border">·</span>}
-                      {stats.orders > 0 && <span>{stats.orders} orders today</span>}
+                      {stats.orders > 0 && <span>{stats.orders} orders served</span>}
                     </span>
                   )}
                   <ChevronDown size={12} className="text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
@@ -186,7 +186,7 @@ function HeaderInner({
           {/* Row 2: Search bar — only on home */}
           {!title && (
             <Link to="/search" className="block mt-3">
-              <div className="flex items-center gap-3 bg-secondary/80 border border-border/50 rounded-xl px-4 py-2.5 transition-all hover:border-primary/30 hover:shadow-sm">
+              <div className="flex items-center gap-3 bg-secondary/80 border border-border/50 rounded-full px-4 py-2.5 transition-all hover:border-primary/30 hover:shadow-sm">
                 <Search size={16} className="text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
                   <TypewriterPlaceholder context="home" />

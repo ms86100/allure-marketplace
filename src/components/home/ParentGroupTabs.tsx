@@ -55,20 +55,23 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
               }
             }}
             className={cn(
-              'flex items-center gap-1.5 shrink-0 rounded-full px-3 py-2 transition-all duration-200',
+              'flex flex-col items-center gap-1 shrink-0 px-3 py-2 transition-all duration-200 relative',
               isActive
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'bg-secondary text-foreground/70 hover:bg-muted active:scale-95'
+                ? 'text-primary'
+                : 'text-foreground/60 hover:text-foreground active:scale-95'
             )}
           >
             <DynamicIcon
               name={tab.icon}
-              size={16}
+              size={18}
               className="shrink-0"
             />
-            <span className="text-xs font-semibold whitespace-nowrap">
+            <span className="text-[10px] font-semibold whitespace-nowrap leading-none">
               {tab.label}
             </span>
+            {isActive && (
+              <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-primary" />
+            )}
           </button>
         );
       })}
