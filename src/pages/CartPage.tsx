@@ -268,7 +268,7 @@ export default function CartPage() {
         <p className="text-[10px] text-muted-foreground text-center pt-1 px-4">Payments are processed by third-party providers and are not covered by Apple. <Link to="/terms" className="underline">Refund & Cancellation Policy</Link></p>
         <div className="px-4 py-3 flex items-center gap-3">
           <div className="flex-1"><p className="text-xs text-muted-foreground">Total</p><p className="text-lg font-bold tabular-nums">{c.formatPrice(c.finalAmount)}</p></div>
-          <Button className="px-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold" size="lg" onClick={() => c.setShowConfirmDialog(true)} disabled={c.isPlacingOrder || c.hasBelowMinimumOrder || c.noPaymentMethodAvailable || (c.fulfillmentType === 'delivery' && !c.selectedDeliveryAddress)}>{c.isPlacingOrder ? 'Placing...' : 'Place Order'}<ChevronRight size={18} className="ml-1" /></Button>
+          <Button className="px-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold" size="lg" onClick={() => { if (c.paymentMethod === 'cod') { c.handlePlaceOrder(); } else { c.setShowConfirmDialog(true); } }} disabled={c.isPlacingOrder || c.hasBelowMinimumOrder || c.noPaymentMethodAvailable || (c.fulfillmentType === 'delivery' && !c.selectedDeliveryAddress)}>{c.isPlacingOrder ? 'Placing...' : 'Place Order'}<ChevronRight size={18} className="ml-1" /></Button>
         </div>
       </div>
 
