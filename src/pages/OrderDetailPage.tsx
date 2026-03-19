@@ -315,7 +315,7 @@ export default function OrderDetailPage() {
                 return hints;
               })()} />
               {/* Gap A: Show delivery OTP to buyer */}
-              {o.isBuyerView && buyerOtp && isInTransit && (
+              {o.isBuyerView && buyerOtp && isInTransit && !['delivered', 'completed'].includes(order.status) && (
                 <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 text-center">
                   <p className="text-xs text-muted-foreground mb-1">Your Delivery OTP</p>
                   <p className="text-3xl font-bold tracking-[0.3em] text-primary">{buyerOtp}</p>
