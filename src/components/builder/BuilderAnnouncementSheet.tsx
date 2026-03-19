@@ -73,7 +73,7 @@ export function BuilderAnnouncementSheet({ societies, builderId, onSent }: Props
           <DrawerTitle>Send Announcement</DrawerTitle>
           <DrawerDescription>Send an update to all residents of a society</DrawerDescription>
         </DrawerHeader>
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 px-4 pb-6">
           {societies.length > 1 && (
             <div>
               <Label>Society</Label>
