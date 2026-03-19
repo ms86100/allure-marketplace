@@ -196,7 +196,7 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
                     <button key={sp.id} className="shrink-0 w-28 text-left" onClick={() => { onSelectProduct?.(sp); }}>
                       <div className="w-28 h-28 rounded-xl bg-muted overflow-hidden mb-1.5">{sp.image_url ? <img src={sp.image_url} alt={sp.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl">🛍️</div>}</div>
                       <p className="text-[11px] font-medium line-clamp-1">{sp.name}</p>
-                      <p className="text-[11px] text-muted-foreground">{sp.seller?.business_name}</p>
+                      {sp.seller?.business_name && <p className="text-[11px] text-muted-foreground">{sp.seller.business_name}</p>}
                       {sp.price > 0 && <p className="text-xs font-bold">{d.formatPrice(sp.price)}</p>}
                     </button>
                   ))}

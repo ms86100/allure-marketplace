@@ -100,6 +100,43 @@ export function feedbackPaymentResult(success: boolean, message?: string) {
   }
 }
 
+// ── Coupon Feedback ─────────────────────────────────────────────────
+
+export function feedbackCouponApplied(savings: string) {
+  hapticImpact('medium');
+  toast.success(`Coupon applied! You save ${savings}`, {
+    id: 'coupon-applied',
+    duration: 2200,
+  });
+  dispatch('coupon-applied');
+}
+
+export function feedbackCouponFailed(reason: string) {
+  toast.error(reason, {
+    id: 'coupon-failed',
+    duration: 2500,
+  });
+}
+
+// ── Cart Cleared Feedback ───────────────────────────────────────────
+
+export function feedbackCartCleared() {
+  hapticImpact('light');
+  toast('Cart cleared', { id: 'cart-cleared', duration: 1800 });
+  dispatch('cart-cleared');
+}
+
+// ── Favorite Feedback ───────────────────────────────────────────────
+
+export function feedbackFavoriteToggled(added: boolean, productName: string) {
+  hapticImpact('light');
+  toast(added ? `${truncate(productName)} saved` : `${truncate(productName)} removed from saved`, {
+    id: 'favorite-toggle',
+    duration: 1800,
+  });
+  dispatch('favorite-toggled');
+}
+
 // ── Delivery Status Feedback ────────────────────────────────────────
 
 export function feedbackStatusChange(status: string) {

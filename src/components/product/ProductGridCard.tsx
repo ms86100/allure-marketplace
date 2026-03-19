@@ -69,7 +69,11 @@ export function ProductGridCard({ product, behavior, onTap, className, viewOnly 
     <div onClick={handleCardClick} className={cn('bg-card rounded-xl border border-border cursor-pointer flex flex-col h-full relative', 'transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.98]', isOutOfStock && 'opacity-50 grayscale-[40%]', isStoreClosed && !isOutOfStock && 'opacity-60 grayscale-[30%]', className)}>
       <div className="relative p-2 pb-0">
         <div className="relative aspect-square rounded-[10px] overflow-hidden product-image-bg">
-          <img src={product.image_url || `https://picsum.photos/seed/${product.id}/300/300`} alt={product.name} className={cn("w-full h-full", product.image_url ? "object-contain" : "object-cover")} loading="lazy" />
+          {product.image_url ? (
+            <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" loading="lazy" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-muted"><span className="text-3xl">📦</span></div>
+          )}
           {isOutOfStock && (<div className="absolute inset-0 bg-background/60 flex items-center justify-center rounded-[10px]"><span className="text-[9px] font-bold text-muted-foreground uppercase">Out of stock</span></div>)}
           {isStoreClosed && !isOutOfStock && (<div className="absolute inset-0 bg-background/40 flex items-center justify-center rounded-[10px]"><span className="text-[8px] font-bold text-muted-foreground bg-muted/90 px-1.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1"><Clock size={8} />{storeClosedMessage || 'Closed'}</span></div>)}
           {product.is_bestseller && (<Badge className="absolute top-1 left-1 bg-badge-new text-primary-foreground text-[8px] px-1.5 py-0.5 font-bold shadow-sm rounded border-0">Bestseller</Badge>)}

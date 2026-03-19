@@ -107,23 +107,22 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
     setIsValidating(true);
     try {
       const { data: coupon, error } = await supabase.from('coupons').select('*').eq('code', code.toUpperCase().trim()).eq('seller_id', sellerId).eq('is_active', true).single();
-      if (error || !coupon) { toast.error('Invalid or expired coupon code'); return; }
-      if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) { toast.error('This coupon has expired'); return; }
-      if (new Date(coupon.starts_at) > new Date()) { toast.error('This coupon is not yet active'); return; }
-      if (coupon.usage_limit && coupon.times_used >= coupon.usage_limit) { toast.error('This coupon has reached its usage limit'); return; }
+      if (error || !coupon) { feedbackCouponFailed('Invalid or expired coupon code'); return; }
+      if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) { feedbackCouponFailed('This coupon has expired'); return; }
+      if (new Date(coupon.starts_at) > new Date()) { feedbackCouponFailed('This coupon is not yet active'); return; }
+      if (coupon.usage_limit && coupon.times_used >= coupon.usage_limit) { feedbackCouponFailed('This coupon has reached its usage limit'); return; }
       const { count } = await supabase.from('coupon_redemptions').select('*', { count: 'exact', head: true }).eq('coupon_id', coupon.id).eq('user_id', user.id);
-      if (count !== null && count >= coupon.per_user_limit) { toast.error('You have already used this coupon'); return; }
-      if (coupon.min_order_amount && totalAmount < coupon.min_order_amount) { toast.error(`Minimum order of ${formatPrice(coupon.min_order_amount)} required`); return; }
+      if (count !== null && count >= coupon.per_user_limit) { feedbackCouponFailed('You have already used this coupon'); return; }
+      if (coupon.min_order_amount && totalAmount < coupon.min_order_amount) { feedbackCouponFailed(`Minimum order of ${formatPrice(coupon.min_order_amount)} required`); return; }
       let discountAmount = 0;
       if (coupon.discount_type === 'percentage') {
         discountAmount = (totalAmount * coupon.discount_value) / 100;
         if (coupon.max_discount_amount) discountAmount = Math.min(discountAmount, coupon.max_discount_amount);
       } else { discountAmount = Math.min(coupon.discount_value, totalAmount); }
       discountAmount = Math.round(discountAmount * 100) / 100;
-      hapticImpact('medium');
       onApply({ id: coupon.id, code: coupon.code, discountAmount, discount_type: coupon.discount_type, discount_value: coupon.discount_value, max_discount_amount: coupon.max_discount_amount });
-      toast.success(`Coupon applied! You save ${formatPrice(discountAmount)}`);
-    } catch { toast.error('Failed to validate coupon'); }
+      feedbackCouponApplied(formatPrice(discountAmount));
+    } catch { feedbackCouponFailed('Failed to validate coupon'); }
     finally { setIsValidating(false); }
   };
 

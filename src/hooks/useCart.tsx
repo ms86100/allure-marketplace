@@ -159,7 +159,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       items.reduce<Record<string, SellerGroup>>((groups, item) => {
         const sellerId = item.product?.seller_id || 'unknown';
         if (!groups[sellerId]) {
-          groups[sellerId] = { sellerId, sellerName: (item.product as any)?.seller?.business_name || 'Seller', items: [], subtotal: 0 };
+          groups[sellerId] = { sellerId, sellerName: (item.product as any)?.seller?.business_name || '', items: [], subtotal: 0 };
         }
         groups[sellerId].items.push(item);
         groups[sellerId].subtotal += (item.product?.price || 0) * item.quantity;
