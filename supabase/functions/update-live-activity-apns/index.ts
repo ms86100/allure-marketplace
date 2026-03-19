@@ -28,7 +28,7 @@ interface LAUpdatePayload {
 
 /** Safety-net fallback — overridden by DB query below */
 const FALLBACK_TERMINAL = new Set([
-  "delivered", "completed", "cancelled", "no_show", "failed",
+  "delivered", "completed", "cancelled", "no_show",
 ]);
 
 async function loadTerminalStatuses(

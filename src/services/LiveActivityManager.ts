@@ -40,7 +40,7 @@ export function getOperationLog(): OperationLogEntry[] {
 
 /** DB-backed terminal and start status sets — loaded at hydration time */
 let TERMINAL_STATUSES = new Set([
-  'delivered', 'completed', 'cancelled', 'no_show', 'failed',
+  'delivered', 'completed', 'cancelled', 'no_show',
 ]);
 let START_STATUSES = new Set([
   'accepted', 'picked_up', 'confirmed', 'preparing', 'en_route', 'on_the_way', 'ready',

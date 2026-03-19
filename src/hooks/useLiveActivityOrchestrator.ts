@@ -306,13 +306,33 @@ export function useLiveActivityOrchestrator(): void {
       if (!mountedRef.current) return;
       const terminalArr = [...terminalStatusesCache];
       try {
+        // Check ALL orders for this buyer (including potentially terminal ones)
+        // to detect orders that became terminal while realtime was down
         const { data } = await supabase
           .from('orders')
           .select('id, status')
           .eq('buyer_id', userId)
           .not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`);
 
-        if (!data || data.length === 0) return;
+        if (!data || data.length === 0) {
+          // All orders are terminal — end any lingering Live Activities
+          for (const [orderId] of lastKnownRef) {
+            console.log(TAG, `Polling: order ${orderId} no longer active, ending LA`);
+            await LiveActivityManager.end(orderId);
+          }
+          lastKnownRef.clear();
+          return;
+        }
+
+        // Detect orders that disappeared from active set (became terminal)
+        const activeIds = new Set(data.map(o => o.id));
+        for (const [orderId] of lastKnownRef) {
+          if (!activeIds.has(orderId)) {
+            console.log(TAG, `Polling: order ${orderId} became terminal, ending LA`);
+            await LiveActivityManager.end(orderId);
+            lastKnownRef.delete(orderId);
+          }
+        }
 
         let hasMismatch = false;
         for (const order of data) {
