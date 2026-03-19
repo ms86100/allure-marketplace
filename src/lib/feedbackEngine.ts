@@ -41,11 +41,12 @@ export function feedbackAddItemFailed(productName: string) {
   });
 }
 
-export function feedbackRemoveItem(productName: string) {
+export function feedbackRemoveItem(productName: string, undoFn?: () => void) {
   hapticImpact('light');
   toast(`${truncate(productName)} removed`, {
     id: 'cart-remove',
-    duration: 1800,
+    duration: 4000,
+    ...(undoFn ? { action: { label: 'Undo', onClick: undoFn } } : {}),
   });
   dispatch('cart-item-removed');
 }

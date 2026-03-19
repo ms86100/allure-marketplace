@@ -105,8 +105,7 @@ export function BuyAgainRow() {
       toast.error('Cannot add this item — missing seller info');
       return;
     }
-    impact('medium');
-    // addItem already checks store availability via seller_id lookup
+    // addItem already handles haptic feedback via feedbackEngine
     await addItem({
       id: product.id,
       seller_id: product.seller_id,
