@@ -371,8 +371,8 @@ export function AdminBannerManager() {
               </Button>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }
