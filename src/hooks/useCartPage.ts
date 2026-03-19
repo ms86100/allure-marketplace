@@ -411,7 +411,7 @@ export function useCartPage() {
       const { data: recheckOrder } = await supabase.from('orders').select('payment_status').eq('id', pendingOrderIds[0]).single();
       if (recheckOrder?.payment_status === 'paid' || recheckOrder?.payment_status === 'buyer_confirmed') {
         toast.success('Payment was already confirmed! Your order is active.', { id: 'upi-confirmed' });
-        clearCart(); await refresh();
+        await clearCartAndCache();
         clearPaymentSession();
         navigate(`/orders/${pendingOrderIds[0]}`);
         setPendingOrderIds([]);
