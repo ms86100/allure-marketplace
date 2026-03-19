@@ -243,7 +243,7 @@ export function AdminWorkflowManager() {
             <div className="flex items-center justify-between">
               <DrawerTitle className="text-base font-bold">
                 {selectedWorkflow && `${formatName(selectedWorkflow.parent_group)} — ${formatName(selectedWorkflow.transaction_type)}`}
-              </SheetTitle>
+              </DrawerTitle>
               <Button
                 variant="ghost"
                 size="sm"
