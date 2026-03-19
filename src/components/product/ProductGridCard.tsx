@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useMemo } from 'react';
 import { Plus, Minus, Store, Clock } from 'lucide-react';
-import { hapticImpact, hapticSelection } from '@/lib/haptics';
+import { hapticSelection } from '@/lib/haptics';
 import { Badge } from '@/components/ui/badge';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { useCart } from '@/hooks/useCart';
