@@ -245,8 +245,8 @@
     --destructive: 8 40% 45%;         /* Warm terracotta-red */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 30 8% 78%;              /* Warm stone edge */
-    --input: 30 12% 76%;              /* Warm Sand input */
+    --border: 0 0% 16%;
+    --input: 0 0% 14%;
     --ring: 175 25% 55%;              /* Sage Teal — focus glow */
 
     --radius: 1rem;
