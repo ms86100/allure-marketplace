@@ -208,6 +208,7 @@ function HeaderInner({
           )}
         </div>
 
+        <ActiveOrderETA />
         <LocationSelectorSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} />
 
         {/* Breadcrumb bar - shown when title is present */}
