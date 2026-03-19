@@ -1,22 +1,26 @@
 # Blinkit UX Heuristic Analysis — Implementation Tracker
-## Status: 🚧 IN PROGRESS
+## Status: ✅ COMPLETE
 
-## HIGH Priority (Implementing Now)
-
-| # | Task | Status |
-|---|------|--------|
-| 1 | Enhance FloatingCartBar — more prominent pill with total amount | 🚧 |
-| 2 | Add active order ETA anchor to header | 🚧 |
-| 3 | Unified add-to-cart haptic feedback | 🚧 |
-
-## MEDIUM Priority (Future)
+## ENGINE LAYER (Complete)
 
 | # | Task | Status |
 |---|------|--------|
-| 4 | "Order Again" section on home screen | ⬜ |
-| 5 | Sidebar sub-category navigation | ⬜ |
-| 6 | Search autocomplete with thumbnails | ⬜ |
-| 7 | Undo for destructive cart actions | ⬜ |
+| 1 | Global Feedback Engine (`feedbackEngine.ts`) | ✅ |
+| 2 | ETA Engine (`etaEngine.ts`) — single source of truth | ✅ |
+| 3 | Visibility Engine (`visibilityEngine.ts`) — route rules | ✅ |
+| 4 | Floating Cart Bar with thumbnails, count, total | ✅ |
+| 5 | ActiveOrderETA in header with live countdown | ✅ |
+| 6 | Unified haptics across all cart actions | ✅ |
+
+## UX POLISH (Complete)
+
+| # | Task | Status |
+|---|------|--------|
+| 7 | Undo toast for cart item removal (4s with re-add) | ✅ |
+| 8 | Haptic dedup — removed duplicate calls from ProductListingCard, ProductGridCard, BuyAgainRow, CartPage | ✅ |
+| 9 | Search autocomplete with product thumbnails | ✅ |
+| 10 | Recently Viewed products section on home page | ✅ |
+| 11 | CartPage remove button uses centralized feedbackEngine | ✅ |
 
 ## Product Laws (Reference)
 1. Every action must produce immediate, consistent feedback across all surfaces
