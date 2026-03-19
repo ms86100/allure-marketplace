@@ -32,9 +32,33 @@
 ### 4. APNs Success Tracking
 - **File:** `supabase/functions/update-live-activity-apns/index.ts`
   - Updates `live_activity_tokens.updated_at` on successful (non-terminal) pushes
+  - `dismissal-date` set to now+4s (Apple minimum) for terminal events
 
 ### 5. Database
 - **Migration:** Added `last_pushed_eta` (int) and `last_pushed_distance` (int) columns to `live_activity_tokens`
+- **Migration:** Updated `verify_delivery_otp_and_complete` RPC → sets `completed` directly, clears `needs_attention`
+- **Migration:** Added `at_gate` to `transit_statuses_la` system setting
+
+### 6. Auto-Complete on OTP Verification
+- **RPC:** `verify_delivery_otp_and_complete` now sets order status to `completed` (not `delivered`), clears `needs_attention` flags
+- **UI:** `BuyerDeliveryConfirmation` hidden for delivery orders (OTP = proof of delivery)
+- **UI:** Attention banner hidden on terminal statuses (`delivered`, `completed`, `cancelled`)
+
+### 7. Dynamic Stalled Delivery Alerts
+- **File:** `supabase/functions/monitor-stalled-deliveries/index.ts`
+  - Computes actual elapsed time from `last_location_at`
+  - Contextual messages: "a few minutes" → "X minutes" → "over X hours"
+
+### 8. Dynamic Island Fixes
+- **File:** `src/services/liveActivitySync.ts` — End stale native activities on app resume
+  - After syncing active orders, queries `getActiveActivities()` and ends any whose order is no longer active
+- **File:** `src/hooks/useOrderDetail.ts` — Force refetch on app resume / visibility change
+  - Listens for `order-detail-refetch` event and `visibilitychange` to re-fetch order data
+- **File:** `src/hooks/useAppLifecycle.ts` — Dispatches `order-detail-refetch` event on resume
+- **File:** `src/services/liveActivityMapper.ts` — ETA-based progress during transit
+  - Uses `1 - (eta_minutes / 45)` clamped to [0.1, 0.95] when ETA available
+  - Falls back to distance-based progress
+  - `at_gate` included in transit statuses
 
 ## iOS Build Requirements
 - `Info.plist`: `UIBackgroundModes` → `location`, `fetch`
