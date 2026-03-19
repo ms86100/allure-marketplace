@@ -386,8 +386,8 @@ export function AdminWorkflowManager() {
               {isSaving ? 'Saving...' : 'Save Workflow'}
             </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
 
       {/* Dialogs */}
       <CreateWorkflowDialog
