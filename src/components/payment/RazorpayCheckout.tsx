@@ -90,14 +90,14 @@ export function RazorpayCheckout({
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={handleClose}>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader className="text-center pb-4">
-          <SheetTitle>Pay with UPI</SheetTitle>
-          <SheetDescription>
+    <Drawer open={isOpen} onOpenChange={handleClose}>
+      <DrawerContent>
+        <DrawerHeader className="text-center pb-4">
+          <DrawerTitle>Pay with UPI</DrawerTitle>
+          <DrawerDescription>
             Pay {formatPrice(amount)} to {sellerName}
-          </SheetDescription>
-        </SheetHeader>
+          </DrawerDescription>
+        </DrawerHeader>
 
         <div className="py-6">
           {status === 'pending' && (
