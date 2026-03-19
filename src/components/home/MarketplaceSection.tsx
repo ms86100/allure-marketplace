@@ -193,18 +193,6 @@ export function MarketplaceSection() {
 
       <SectionDivider />
 
-      {/* ── Product Listings ── */}
-      <ProductListings
-        categories={filteredCategories}
-        isLoading={loadingLocal}
-        onProductTap={handleProductTap}
-        onNavigate={navigate}
-        categoryConfigs={categoryConfigs}
-        marketplaceConfig={mc}
-        badgeConfigs={badgeConfigs}
-        socialProofMap={socialProofMap}
-      />
-
       {/* ── Store Discovery ── */}
       <div className="py-6 mt-4">
         <div className="flex items-center gap-2 px-4 mb-3">
