@@ -1,49 +1,50 @@
+# Production-Hardened Live Tracking System
 
+## Status: ✅ IMPLEMENTED
 
-# Fix: Auto-Complete on OTP + Smart Attention Alerts
+## What Changed
 
-## Problem 1: Redundant "Yes, I received my order" after OTP
+### 1. Background Location Tracking (Seller)
+- **Package:** Added `@transistorsoft/capacitor-background-geolocation`
+- **File:** `src/hooks/useBackgroundLocationTracking.ts` — Full rewrite
+  - Native: Transistorsoft plugin with motion-aware tracking, `stopOnTerminate: false`, `preventSuspend: true`
+  - Web: Falls back to `navigator.geolocation.watchPosition`
+  - 20s health watchdog detects stale tracking and attempts recovery via `getCurrentPosition()`
+  - Auto-restart on app resume if native plugin was killed by OS
+  - Permission level tracking (`always` / `when_in_use` / `denied`)
 
-The OTP verification (`verify_delivery_otp_and_complete`) sets the order to `delivered`. Then the buyer sees a "Did you receive your order?" confirmation card that calls `buyer_confirm_delivery` to move to `completed`. This is redundant — the OTP **is** the proof of delivery. The buyer shouldn't need to confirm twice.
+### 2. Seller GPS Tracker UI
+- **File:** `src/components/delivery/SellerGPSTracker.tsx`
+  - "Keep screen open" warning only on web (native handles background natively)
+  - Permission upgrade banner when on `when_in_use` with link to Settings
+  - Tracking paused badge + alert when watchdog detects stale state
+  - Settings deep link via `capacitor-native-settings`
 
-**Fix:** Modify the `verify_delivery_otp_and_complete` RPC to set the order status directly to `completed` (not `delivered`), and also clear `needs_attention` / `needs_attention_reason` since the delivery is now confirmed. Then hide the `BuyerDeliveryConfirmation` component for delivery orders where OTP was used.
+### 3. Delta-Based Live Activity APNs Push
+- **File:** `supabase/functions/update-delivery-location/index.ts`
+  - After updating `delivery_assignments`, queries `live_activity_tokens`
+  - Compares deltas: distance > 50m OR ETA change ≥ 1 min
+  - 15s throttle floor to stay within Apple's APNs budget
+  - Stale retry: pushes if last push was >60s ago regardless of deltas
+  - Stores `last_pushed_eta`, `last_pushed_distance` on `live_activity_tokens`
+  - Timing instrumentation: logs `db=Xms total=Xms la_push=Xms`
 
-**Changes:**
-- **Database migration:** Update `verify_delivery_otp_and_complete` to set `status = 'completed'` instead of `'delivered'`, and reset `needs_attention = false, needs_attention_reason = null`
-- **`src/pages/OrderDetailPage.tsx`:** Hide the `BuyerDeliveryConfirmation` card when order is a delivery order (OTP-verified deliveries skip `delivered` and go straight to `completed`)
+### 4. APNs Success Tracking
+- **File:** `supabase/functions/update-live-activity-apns/index.ts`
+  - Updates `live_activity_tokens.updated_at` on successful (non-terminal) pushes
 
-## Problem 2: Generic "10 minutes" attention message even after 10+ hours
+### 5. Database
+- **Migration:** Added `last_pushed_eta` (int) and `last_pushed_distance` (int) columns to `live_activity_tokens`
 
-The `monitor-stalled-deliveries` edge function hardcodes: `"GPS tracking paused for over 1.5 minutes during active delivery"`. It never updates the message as time passes.
+## iOS Build Requirements
+- `Info.plist`: `UIBackgroundModes` → `location`, `fetch`
+- `NSLocationAlwaysAndWhenInUseUsageDescription`
+- `NSLocationWhenInUseUsageDescription`
+- `NSMotionUsageDescription`
 
-**Fix:** Make the attention reason dynamic — compute the actual elapsed time from `last_location_at` and format it as a human-readable duration.
-
-**Changes:**
-- **`supabase/functions/monitor-stalled-deliveries/index.ts`:** Compute actual elapsed time from `assignment.last_location_at` and format it contextually:
-  - < 5 min: "GPS updates paused for a few minutes"
-  - 5–30 min: "GPS updates paused for X minutes"
-  - 30–60 min: "Tracking has been inactive for over 30 minutes"
-  - 1+ hours: "Tracking has been inactive for over X hours"
-- Also clear `needs_attention` when delivery completes (handled by the RPC fix above)
-
-## Problem 3: Attention banner persists after delivery is complete
-
-The `needs_attention` flag is never cleared. Even after successful OTP verification and delivery completion, the warning banner remains visible.
-
-**Fix:** The RPC update (Problem 1) will clear the flag. Additionally, hide the attention banner on terminal statuses (`delivered`, `completed`) in the frontend as a safety net.
-
-**Changes:**
-- **`src/pages/OrderDetailPage.tsx`:** Add condition to hide attention banner when status is `delivered` or `completed`
-
-## Problem 4: Delivery Code card still visible after delivery
-
-The OTP card shows for "all non-terminal delivery statuses" but after OTP verification the order jumps to `completed` (terminal), so this resolves itself with the RPC fix.
-
-## Summary of Changes
-
-| File | Change |
-|------|--------|
-| Database migration (new) | Update `verify_delivery_otp_and_complete`: set `completed` instead of `delivered`, clear `needs_attention` |
-| `supabase/functions/monitor-stalled-deliveries/index.ts` | Dynamic elapsed-time formatting for `needs_attention_reason` |
-| `src/pages/OrderDetailPage.tsx` | Hide attention banner on terminal statuses; hide `BuyerDeliveryConfirmation` for OTP-verified delivery orders |
-
+## Latency Targets
+- Seller GPS → Edge Function: < 2s
+- Edge Function → DB: < 500ms
+- DB → Realtime → Buyer: < 1s
+- Edge Function → APNs → Dynamic Island: < 3s
+- **Total foreground: < 5s | Dynamic Island: < 8s**

@@ -68,15 +68,29 @@ serve(async (req) => {
 
       const isHardStall = assignment.last_location_at && new Date(assignment.last_location_at).toISOString() < hardThresholdAgo;
 
-      if (!order.needs_attention) {
-        await supabase
-          .from('orders')
-          .update({
-            needs_attention: true,
-            needs_attention_reason: `GPS tracking paused for over ${softMinutes} minutes during active delivery`,
-          } as any)
-          .eq('id', order.id);
+      // Compute human-readable elapsed time
+      const elapsedMs = Date.now() - new Date(assignment.last_location_at!).getTime();
+      const elapsedMin = Math.floor(elapsedMs / 60000);
+      let elapsedLabel: string;
+      if (elapsedMin < 5) {
+        elapsedLabel = 'GPS updates paused for a few minutes during active delivery';
+      } else if (elapsedMin < 30) {
+        elapsedLabel = `GPS updates paused for ${elapsedMin} minutes during active delivery`;
+      } else if (elapsedMin < 60) {
+        elapsedLabel = 'Tracking has been inactive for over 30 minutes during active delivery';
+      } else {
+        const hours = Math.floor(elapsedMin / 60);
+        elapsedLabel = `Tracking has been inactive for over ${hours} hour${hours > 1 ? 's' : ''} during active delivery`;
       }
+
+      // Always update the reason to reflect current elapsed time
+      await supabase
+        .from('orders')
+        .update({
+          needs_attention: true,
+          needs_attention_reason: elapsedLabel,
+        } as any)
+        .eq('id', order.id);
 
       // Notify only once
       if (!assignment.stalled_notified) {

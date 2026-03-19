@@ -175,8 +175,8 @@ export default function OrderDetailPage() {
 
           {o.isUrgentOrder && order.auto_cancel_at && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} />}
 
-          {/* Gap 8: Needs attention banner for buyer */}
-          {o.isBuyerView && (order as any).needs_attention && (
+          {/* Gap 8: Needs attention banner for buyer — hide on terminal statuses */}
+          {o.isBuyerView && (order as any).needs_attention && !['delivered', 'completed', 'cancelled'].includes(order.status) && (
             <div className="bg-warning/10 border border-warning/20 rounded-xl p-3 flex items-start gap-2.5">
               <AlertTriangle className="text-warning shrink-0 mt-0.5" size={16} />
               <div>
@@ -277,8 +277,8 @@ export default function OrderDetailPage() {
             <DeliveryETABanner estimatedDeliveryAt={(order as any).estimated_delivery_at} />
           )}
 
-          {/* Gap 8: Buyer delivery confirmation — shown when seller marks delivered */}
-          {o.isBuyerView && order.status === 'delivered' && isDeliveryOrder && (
+          {/* Gap 8: Buyer delivery confirmation — only for non-delivery orders (delivery orders use OTP as proof) */}
+          {o.isBuyerView && order.status === 'delivered' && !isDeliveryOrder && (
             <BuyerDeliveryConfirmation
               orderId={order.id}
               sellerName={seller?.business_name}
@@ -470,7 +470,7 @@ export default function OrderDetailPage() {
         open={isOtpDialogOpen}
         onOpenChange={setIsOtpDialogOpen}
         onVerified={() => {
-          o.setOrder({ ...order, status: 'delivered' } as any);
+          o.setOrder({ ...order, status: 'completed' } as any);
           window.location.reload();
         }}
       />
