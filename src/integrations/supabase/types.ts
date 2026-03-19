@@ -8703,6 +8703,7 @@ export type Database = {
               _delivery_lat?: number
               _delivery_lng?: number
               _fulfillment_type?: string
+              _idempotency_key?: string
               _notes?: string
               _payment_method: string
               _payment_status: string
