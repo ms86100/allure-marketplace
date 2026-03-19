@@ -109,7 +109,7 @@ export function BookingSheet({
           </DrawerTitle>
         </DrawerHeader>
 
-        <div className="space-y-6 overflow-y-auto pb-20">
+        <div className="space-y-6 overflow-y-auto pb-20 px-4">
           {/* Listing Summary */}
           <div className="flex gap-3 p-3 bg-muted rounded-lg">
             {listing.image_url && (
