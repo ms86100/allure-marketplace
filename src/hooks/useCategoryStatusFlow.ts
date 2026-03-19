@@ -243,11 +243,22 @@ export function useStatusTransitions(
     if (!parentGroup || !transactionType) return;
 
     (async () => {
-      const { data } = await supabase
+      let { data } = await supabase
         .from('category_status_transitions')
         .select('from_status, to_status, allowed_actor')
         .eq('parent_group', parentGroup)
         .eq('transaction_type', transactionType);
+
+      // Fallback to 'default' if no rows found for specific parent_group
+      if ((!data || data.length === 0) && parentGroup !== 'default') {
+        const fallback = await supabase
+          .from('category_status_transitions')
+          .select('from_status, to_status, allowed_actor')
+          .eq('parent_group', 'default')
+          .eq('transaction_type', transactionType);
+
+        if (fallback.data) data = fallback.data;
+      }
 
       if (data) setTransitions(data as StatusTransition[]);
     })();
