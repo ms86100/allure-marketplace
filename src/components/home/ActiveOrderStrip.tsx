@@ -112,56 +112,67 @@ export function ActiveOrderStrip() {
   if (activeOrders.length === 0) return null;
 
   return (
-    <div className="px-4 mt-3 space-y-2">
+    <div className="px-4 mt-2">
       <AnimatePresence>
-        {activeOrders.map((order) => (
-          <motion.div
-            key={order.id}
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            onClick={() => navigate(`/orders/${order.id}`)}
-            className="rounded-2xl bg-primary/5 border border-primary/15 px-4 py-3 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-transform"
-          >
-            {/* Gap #11: Product thumbnail instead of generic icon */}
-            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
-              {order.first_product_image ? (
-                <img src={order.first_product_image} alt="" className="w-full h-full object-cover" loading="lazy" />
-              ) : (
-                <span className="text-lg">📦</span>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                {/* Pulsing dot for transit statuses — activity illusion */}
-                {TRANSIT_STATUSES.has(order.status as any) && (
+        {activeOrders.map((order) => {
+          const isTransit = TRANSIT_STATUSES.has(order.status as any);
+          const etaText = order.estimated_delivery_at ? compactETA(order.estimated_delivery_at) : null;
+          return (
+            <motion.div
+              key={order.id}
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              onClick={() => navigate(`/orders/${order.id}`)}
+              className="flex items-center gap-2.5 rounded-xl bg-primary/8 border border-primary/15 pl-1.5 pr-3 py-1.5 cursor-pointer active:scale-[0.98] transition-transform mb-1.5 last:mb-0"
+            >
+              {/* Compact product thumbnail */}
+              <div className="w-8 h-8 rounded-lg bg-primary/10 shrink-0 overflow-hidden flex items-center justify-center">
+                {order.first_product_image ? (
+                  <img src={order.first_product_image} alt="" className="w-full h-full object-cover" loading="lazy" />
+                ) : (
+                  <span className="text-sm">📦</span>
+                )}
+              </div>
+
+              {/* Status + seller — single dense row */}
+              <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                {isTransit && (
                   <motion.span
-                    className="w-2 h-2 rounded-full bg-green-500 shrink-0"
+                    className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"
                     animate={{ opacity: [1, 0.3, 1] }}
                     transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
                   />
                 )}
-                <span className="text-[13px] font-bold text-foreground truncate">
+                {!isTransit && order.color && (
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${order.color.split(' ')[0]}`} />
+                )}
+                <span className="text-[12px] font-bold text-foreground truncate">
                   {order.display_label}
                 </span>
-                {order.color && !TRANSIT_STATUSES.has(order.status as any) && (
-                  <span
-                    className={`w-2 h-2 rounded-full shrink-0 ${order.color.split(' ')[0]}`}
-                  />
+                {order.seller_name && (
+                  <span className="text-[10px] text-muted-foreground truncate">
+                    · {order.seller_name}
+                  </span>
                 )}
               </div>
-              <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                {order.seller_name}{order.seller_name && order.item_count > 0 ? ' · ' : ''}
-                {order.item_count > 0 && `${order.item_count} item${order.item_count > 1 ? 's' : ''}`}
-                {order.estimated_delivery_at && (() => {
-                  const eta = compactETA(order.estimated_delivery_at);
-                  return eta ? ` · ETA ${eta}` : '';
-                })()}
-              </p>
-            </div>
-            <ChevronRight size={16} className="text-muted-foreground shrink-0" />
-          </motion.div>
-        ))}
+
+              {/* Right: ETA or item count — eye-catching */}
+              <div className="shrink-0 flex items-center gap-1.5">
+                {etaText ? (
+                  <span className="text-[11px] font-extrabold text-primary whitespace-nowrap">
+                    {etaText}
+                  </span>
+                ) : order.item_count > 0 ? (
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                    {order.item_count} item{order.item_count > 1 ? 's' : ''}
+                  </span>
+                ) : null}
+                <ChevronRight size={14} className="text-muted-foreground/60 shrink-0" />
+              </div>
+            </motion.div>
+          );
+        })}
       </AnimatePresence>
     </div>
   );
