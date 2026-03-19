@@ -70,7 +70,7 @@ export default function SearchPage() {
     <AppLayout showHeader={false}>
       <div className="pb-24">
         {/* Sticky search header */}
-        <div className="sticky top-0 z-40 bg-background safe-top">
+        <div className="sticky top-0 z-40 bg-background safe-top overflow-visible">
           <div className="px-4 pt-3 pb-2">
             <div className="flex items-center gap-2">
               <button onClick={() => window.history.back()} className="shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center"><ArrowLeft size={18} className="text-foreground" /></button>
