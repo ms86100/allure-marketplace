@@ -277,8 +277,8 @@ export default function OrderDetailPage() {
             <DeliveryETABanner estimatedDeliveryAt={(order as any).estimated_delivery_at} />
           )}
 
-          {/* Gap 8: Buyer delivery confirmation — shown when seller marks delivered */}
-          {o.isBuyerView && order.status === 'delivered' && isDeliveryOrder && (
+          {/* Gap 8: Buyer delivery confirmation — only for non-delivery orders (delivery orders use OTP as proof) */}
+          {o.isBuyerView && order.status === 'delivered' && !isDeliveryOrder && (
             <BuyerDeliveryConfirmation
               orderId={order.id}
               sellerName={seller?.business_name}
