@@ -47,10 +47,25 @@ export function useLatestActionNotification(userId: string | undefined) {
         .eq('is_read', false)
         .not('payload', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(1);
+        .limit(5);
       const notifications = (data as unknown as UserNotification[]) || [];
-      const n = notifications[0];
-      if (n?.payload?.action) return n;
+      const deliveryTypes = ['delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent'];
+      for (const n of notifications) {
+        if (!n?.payload?.action) continue;
+        // Skip delivery notifications for orders already delivered/completed
+        if (deliveryTypes.includes(n.type)) {
+          const orderId = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
+          if (orderId) {
+            const { data: order } = await supabase.from('orders').select('status').eq('id', orderId).maybeSingle();
+            if (order && ['delivered', 'completed', 'cancelled'].includes(order.status)) {
+              // Auto-mark as read so it won't appear again
+              await supabase.from('user_notifications').update({ is_read: true }).eq('id', n.id);
+              continue;
+            }
+          }
+        }
+        return n;
+      }
       return null;
     },
     enabled: !!userId,
