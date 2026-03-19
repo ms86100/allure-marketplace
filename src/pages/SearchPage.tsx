@@ -78,6 +78,7 @@ export default function SearchPage() {
                 {!s.query && <div className="absolute left-9 top-1/2 -translate-y-1/2 pointer-events-none pr-16 overflow-hidden whitespace-nowrap max-w-[calc(100%-4rem)]"><TypewriterPlaceholder context="search" /></div>}
                 <Input placeholder="" value={s.query} onChange={(e) => s.setQuery(e.target.value)} className="pl-9 pr-16 h-10 rounded-xl text-sm bg-muted border-0 focus-visible:ring-1" autoFocus />
                 {s.query && <button onClick={() => s.setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"><X size={14} /></button>}
+                <SearchAutocomplete query={s.query} onSelect={(p) => { s.setQuery(''); setSelectedProduct(p); setDetailOpen(true); }} />
               </div>
             </div>
           </div>
