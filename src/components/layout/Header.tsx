@@ -97,8 +97,21 @@ function HeaderInner({
           {/* Brand + Tagline */}
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-extrabold text-foreground tracking-tight">Sociva</span>
-            <span className="text-[10px] text-muted-foreground">·</span>
-            <span className="text-[10px] font-medium text-muted-foreground">Your society, your marketplace</span>
+            {stats && (stats.sellers > 0 || stats.orders > 0) ? (
+              <>
+                <span className="text-[10px] text-muted-foreground">·</span>
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  {stats.sellers > 0 && `${stats.sellers} seller${stats.sellers !== 1 ? 's' : ''}`}
+                  {stats.sellers > 0 && stats.orders > 0 && ' · '}
+                  {stats.orders > 0 && `${stats.orders.toLocaleString()} orders served`}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-[10px] text-muted-foreground">·</span>
+                <span className="text-[10px] font-medium text-muted-foreground">Your society, your marketplace</span>
+              </>
+            )}
           </div>
 
           {/* Row 1: Location/greeting + actions */}
