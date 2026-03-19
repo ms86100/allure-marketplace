@@ -30,26 +30,27 @@ export async function getStatusFlowEntries(): Promise<FlowEntry[]> {
   return cached;
 }
 
-/** Statuses marked is_terminal in the DB */
+/** Statuses marked is_terminal in the DB — DB is the sole source of truth */
 export async function getTerminalStatuses(): Promise<Set<string>> {
   const entries = await getStatusFlowEntries();
   const terminal = new Set<string>();
   for (const e of entries) {
     if (e.is_terminal) terminal.add(e.status_key);
   }
-  // Always include these as safety net
-  for (const s of ['delivered', 'completed', 'cancelled', 'no_show']) {
-    terminal.add(s);
+  if (terminal.size === 0) {
+    console.warn('[statusFlowCache] No terminal statuses found in DB — this is a configuration issue');
   }
   return terminal;
 }
 
-/** Non-terminal, non-placed statuses that should start a Live Activity */
+/** Non-terminal statuses beyond the very first step — should start a Live Activity */
 export async function getStartStatuses(): Promise<Set<string>> {
   const entries = await getStatusFlowEntries();
+  if (entries.length === 0) return new Set();
+  const minSort = Math.min(...entries.map(e => e.sort_order));
   const start = new Set<string>();
   for (const e of entries) {
-    if (!e.is_terminal && e.status_key !== 'placed' && e.status_key !== 'delivered') {
+    if (!e.is_terminal && e.sort_order > minSort) {
       start.add(e.status_key);
     }
   }

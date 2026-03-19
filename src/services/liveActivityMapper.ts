@@ -107,8 +107,8 @@ export function buildLiveActivityData(
   // Derive progress from DB sort_order
   let progressPercent = deriveProgressPercent(order.status, flowMap);
 
-  // ETA-based and GPS-based progress during transit
-  const transitSet = new Set([...config.transit_statuses_la, 'at_gate']);
+  // ETA-based and GPS-based progress during transit — fully DB-driven via system_settings
+  const transitSet = new Set(config.transit_statuses_la);
   const isTransit = transitSet.has(order.status);
   if (isTransit) {
     // Prefer ETA-based progress when available — gives a meaningful countdown

@@ -316,9 +316,12 @@ export function usePushNotificationsInternal() {
 
         // CRITICAL: Dispatch terminal sync BEFORE suppression check
         // Terminal pushes must always trigger state reconciliation even if LA is tracking
-        const TERMINAL_STATUSES = ['delivered', 'completed', 'cancelled', 'no_show'];
+        // DB-driven: use is_terminal flag from push payload, or check cached terminal set
         const pushStatus = data?.status;
-        if (orderId && pushStatus && TERMINAL_STATUSES.includes(pushStatus)) {
+        const isTerminalPush = data?.is_terminal === 'true' || data?.is_terminal === true;
+        const terminalSet = terminalStatusesRef.current;
+        const isTerminal = isTerminalPush || (pushStatus && terminalSet.size > 0 && terminalSet.has(pushStatus));
+        if (orderId && pushStatus && isTerminal) {
           pushLog('info', 'TERMINAL_PUSH_SYNC', { orderId, status: pushStatus });
           window.dispatchEvent(new CustomEvent('order-terminal-push', {
             detail: { orderId, status: pushStatus },
