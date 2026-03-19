@@ -3,62 +3,71 @@ import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 
 const themes = [
-  { key: 'light', icon: Sun, label: '☀️', ariaLabel: 'Light mode' },
-  { key: 'dark', icon: Moon, label: '🌙', ariaLabel: 'Dark mode' },
-  { key: 'nature', icon: Leaf, label: '🌿', ariaLabel: 'Nature mode' },
+  { key: 'light', icon: Sun, emoji: '☀️', label: 'Light' },
+  { key: 'dark', icon: Moon, emoji: '🌙', label: 'Dark' },
+  { key: 'nature', icon: Leaf, emoji: '🌿', label: 'Nature' },
 ] as const;
 
+/** Compact 3-button pill for the header */
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
 
-  const cycle = () => {
-    const idx = themes.findIndex(t => t.key === theme);
-    const next = themes[(idx + 1) % themes.length];
-    setTheme(next.key);
-  };
-
-  const current = themes.find(t => t.key === theme) || themes[0];
-  const Icon = current.icon;
-
   return (
-    <button
-      type="button"
-      onClick={cycle}
-      className={cn(
-        'inline-flex items-center justify-center h-9 w-9 rounded-full transition-all duration-300',
-        'hover:bg-secondary text-foreground',
-        theme === 'nature' && 'text-[hsl(var(--primary))]',
-        className
-      )}
-      aria-label={current.ariaLabel}
-    >
-      <Icon className="h-[18px] w-[18px] transition-transform duration-300" />
-    </button>
+    <div className={cn('inline-flex items-center gap-0.5 rounded-full bg-secondary/70 p-0.5', className)}>
+      {themes.map(({ key, icon: Icon, label }) => {
+        const active = theme === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTheme(key)}
+            className={cn(
+              'flex items-center justify-center h-7 w-7 rounded-full transition-all duration-250',
+              active
+                ? key === 'nature'
+                  ? 'bg-[hsl(142_50%_36%)] text-white shadow-sm'
+                  : 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+            )}
+            aria-label={label}
+            title={label}
+          >
+            <Icon className="h-3.5 w-3.5" strokeWidth={active ? 2.4 : 1.8} />
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
-/** Expanded 3-option picker for settings pages */
+/** Expanded picker for settings / profile pages */
 export function ThemePicker({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div className={cn('inline-flex items-center gap-1 rounded-full bg-muted p-1', className)}>
-      {themes.map(({ key, icon: Icon, ariaLabel }) => (
-        <button
-          key={key}
-          type="button"
-          onClick={() => setTheme(key)}
-          className={cn(
-            'flex items-center justify-center h-8 w-8 rounded-full transition-all duration-300',
-            theme === key
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-          aria-label={ariaLabel}
-        >
-          <Icon className="h-4 w-4" />
-        </button>
-      ))}
+    <div className={cn('flex items-center gap-2', className)}>
+      {themes.map(({ key, icon: Icon, emoji, label }) => {
+        const active = theme === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTheme(key)}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all duration-300 text-sm font-semibold',
+              active
+                ? key === 'nature'
+                  ? 'bg-[hsl(142_50%_36%/0.12)] border-[hsl(142_50%_36%/0.4)] text-[hsl(142_50%_36%)]'
+                  : 'bg-primary/10 border-primary/40 text-primary'
+                : 'bg-card border-border text-muted-foreground hover:text-foreground hover:border-foreground/20'
+            )}
+            aria-label={label}
+          >
+            <Icon className="h-4 w-4" />
+            <span>{label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

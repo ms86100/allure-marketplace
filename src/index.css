@@ -575,74 +575,103 @@ body.razorpay-active iframe[src*="razorpay"] {
    NATURE MODE — Component & Motion Overrides
    ═══════════════════════════════════════════════ */
 
-/* Softer radius & transitions in nature mode */
-.nature {
-  --radius: 1rem;
+/* Nature: organic transitions everywhere */
+.nature *,
+.nature *::before,
+.nature *::after {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-/* Nature: organic button feel */
 .nature button,
 .nature a,
 .nature [role="button"] {
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 300ms;
+  transition-duration: 280ms;
 }
 
-/* Nature: softer tap feedback */
+/* Nature: softer, breathing tap feedback */
 .nature button:active,
 .nature a:active,
 .nature [role="button"]:active {
-  transform: scale(0.98);
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scale(0.985);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Nature: gentle card hover lift */
-.nature .glass-card:hover,
-.nature [class*="rounded-2xl"]:hover {
+/* Nature: cards get warm shadow on hover */
+.nature .glass-card:hover {
+  box-shadow: 0 6px 24px hsl(152 20% 18% / 0.08);
   transition: box-shadow 0.4s ease, transform 0.4s ease;
 }
 
-/* Nature: input focus glow instead of sharp ring */
+/* Nature: input focus = soft forest glow */
 .nature input:focus,
 .nature textarea:focus,
 .nature select:focus {
-  box-shadow: 0 0 0 3px hsl(142 50% 36% / 0.15);
+  box-shadow: 0 0 0 3px hsl(152 55% 32% / 0.12), 0 0 12px hsl(152 55% 32% / 0.06);
   border-color: hsl(var(--primary));
   outline: none;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  transition: box-shadow 0.35s ease, border-color 0.35s ease;
 }
 
-/* Nature: subtle texture overlay on background */
+/* Nature: parchment grain texture (SVG, ultra-light) */
 .nature #root::before {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23228B22' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-  opacity: 0.6;
+  opacity: 0.4;
+  background-image:
+    radial-gradient(ellipse at 20% 50%, hsl(152 55% 32% / 0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, hsl(38 65% 55% / 0.04) 0%, transparent 50%),
+    url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23556B2F' fill-opacity='0.018'%3E%3Ccircle cx='40' cy='40' r='1.5'/%3E%3Ccircle cx='10' cy='10' r='1'/%3E%3Ccircle cx='70' cy='70' r='1'/%3E%3Ccircle cx='20' cy='60' r='0.8'/%3E%3Ccircle cx='60' cy='15' r='0.8'/%3E%3C/g%3E%3C/svg%3E");
 }
 
-/* Nature: ensure content renders above texture */
 .nature #root > * {
   position: relative;
   z-index: 1;
 }
 
-/* Nature-specific animation: slower, gentler */
+/* Nature: header gets a warm forest-mist gradient */
+.nature header {
+  background: linear-gradient(180deg, hsl(90 20% 97% / 0.98) 0%, hsl(90 20% 97% / 0.94) 100%) !important;
+  backdrop-filter: blur(16px) saturate(1.2);
+}
+
+/* Nature: bottom nav warm tint */
+.nature nav[class*="fixed"][class*="bottom-0"] {
+  background: hsl(90 20% 97% / 0.97) !important;
+  backdrop-filter: blur(16px) saturate(1.2);
+}
+
+/* Nature: cards get a subtle warm gradient */
+.nature [class*="bg-card"] {
+  background: linear-gradient(175deg, hsl(80 16% 95%) 0%, hsl(85 14% 93%) 100%);
+}
+
+/* Nature-specific keyframes */
 @keyframes natureFloat {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes natureFadeIn {
+  0% { opacity: 0; transform: translateY(6px) scale(0.995); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .nature .animate-fade-in {
-  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: natureFadeIn 0.45s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nature .animate-slide-up {
-  animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: slideUp 0.45s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nature .animate-bounce-in {
-  animation: bounceIn 0.5s cubic-bezier(0.34, 1.2, 0.64, 1);
+  animation: bounceIn 0.55s cubic-bezier(0.34, 1.15, 0.64, 1);
+}
+
+/* Nature: badges get earthy rounded treatment */
+.nature [class*="rounded-full"][class*="bg-primary"] {
+  box-shadow: 0 2px 8px hsl(152 55% 32% / 0.18);
 }
