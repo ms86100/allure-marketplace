@@ -301,7 +301,7 @@ export default function OrderDetailPage() {
               utrRef={(order as any).upi_transaction_ref}
               buyerName={buyer?.name}
               screenshotUrl={(order as any).payment_screenshot_url}
-              onConfirmed={() => window.location.reload()}
+              onConfirmed={() => o.fetchOrder()}
             />
           )}
 
