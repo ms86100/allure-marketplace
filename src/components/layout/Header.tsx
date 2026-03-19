@@ -87,7 +87,7 @@ function HeaderInner({
                       <ChevronDown size={14} className="text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-none mt-0.5 truncate">
-                      {greeting}
+                      Your society, your marketplace
                     </p>
                   </div>
                 </button>
