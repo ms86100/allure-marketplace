@@ -334,20 +334,14 @@ export default function CategoriesPage() {
                       >
                         <Link
                           to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-                          className="block rounded-2xl overflow-hidden active:scale-[0.97] transition-all duration-200 group bg-card border border-border hover:shadow-md"
-                          style={{
-                            borderLeftWidth: '4px',
-                            borderLeftColor: getWanglowColor(cat.parentGroup),
-                            boxShadow: `var(--shadow-card)`,
-                          }}
+                          className="block rounded-2xl overflow-hidden shadow-sm active:scale-[0.97] transition-all duration-200 group bg-card border border-border hover:shadow-md"
+                          style={{ borderLeftWidth: '4px', borderLeftColor: catColor || 'hsl(var(--primary))' }}
                           onMouseEnter={(e) => {
-                            const c = getWanglowColor(cat.parentGroup);
-                            (e.currentTarget as HTMLElement).style.borderColor = `${c}50`;
-                            (e.currentTarget as HTMLElement).style.borderLeftColor = c;
+                            if (catColor) (e.currentTarget as HTMLElement).style.borderColor = `${catColor}60`;
                           }}
                           onMouseLeave={(e) => {
                             (e.currentTarget as HTMLElement).style.borderColor = '';
-                            (e.currentTarget as HTMLElement).style.borderLeftColor = getWanglowColor(cat.parentGroup);
+                            (e.currentTarget as HTMLElement).style.borderLeftColor = catColor || 'hsl(var(--primary))';
                           }}
                         >
                           {/* Image area */}
