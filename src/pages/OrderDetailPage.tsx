@@ -509,10 +509,10 @@ export default function OrderDetailPage() {
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
           <div className="px-4 py-3 flex gap-3">
             {o.canBuyerCancel && (
-              <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => window.location.reload()} canCancel={o.canBuyerCancel} />
+              <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => o.fetchOrder()} canCancel={o.canBuyerCancel} />
             )}
             {o.buyerNextStatus && (
-              <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.buyerNextStatus!)} disabled={o.isUpdating}>
+              <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.buyerAdvanceOrder(o.buyerNextStatus!)} disabled={o.isUpdating}>
                 {o.isUpdating ? 'Updating...' : o.getFlowStepLabel(o.buyerNextStatus).label}
                 <ChevronRight size={14} className="ml-1" />
               </Button>

@@ -257,6 +257,6 @@ export function useOrderDetail(id: string | undefined) {
     getOrderStatus, getPaymentStatus, getItemStatus,
     getFlowStepLabel, getBuyerHint, getSellerHint,
     formatPrice, user,
-    updateOrderStatus, handleReject, handleTimeout, copyOrderId,
+    updateOrderStatus, buyerAdvanceOrder, handleReject, handleTimeout, copyOrderId, fetchOrder,
   };
 }
