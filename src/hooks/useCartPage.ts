@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentMethod } from '@/types/database';
 import { useCart } from '@/hooks/useCart';
@@ -14,6 +15,15 @@ import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
 import { computeStoreStatus, formatStoreClosedMessage } from '@/lib/store-availability';
+
+/** Simple deterministic hash for idempotency keys */
+function simpleHash(str: string): string {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h).toString(36);
+}
 
 // ── Session persistence for UPI payment state ──
 // Survives app-switch, re-renders, and component remounts
