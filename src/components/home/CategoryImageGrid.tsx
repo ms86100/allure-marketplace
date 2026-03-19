@@ -93,7 +93,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
               className="flex flex-col items-center group active:scale-[0.96] transition-transform duration-150 card-hover"
             >
               {/* Dark card tile */}
-              <div className="w-full aspect-square rounded-2xl overflow-hidden bg-card border border-border img-zoom">
+              <div className="w-full aspect-square rounded-2xl overflow-hidden bg-card border border-border img-zoom relative">
                 {images.length >= 4 ? (
                   <div className="grid grid-cols-2 grid-rows-2 w-full h-full gap-[2px] p-[2px]">
                     {images.slice(0, 4).map((src, i) => (
@@ -134,6 +134,12 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                     />
                   </div>
                 )}
+                {/* Glassmorphic overlay label */}
+                {meta.count > 0 && (
+                  <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 bg-background/40 backdrop-blur-lg backdrop-saturate-150 border border-foreground/[0.08] rounded-full px-2 py-0.5">
+                    <span className="text-[8px] font-bold text-foreground/90 whitespace-nowrap">{meta.count} {ml.label('label_item_count')}</span>
+                  </div>
+                )}
               </div>
 
               {/* Label below card */}
@@ -141,12 +147,6 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                 {cat.displayName}
               </span>
 
-              {/* Item count */}
-              {meta.count > 0 && (
-                <span className="text-[9px] text-muted-foreground font-medium mt-0.5">
-                  {meta.count} {ml.label('label_item_count')}
-                </span>
-              )}
             </Link>
           );
         })}

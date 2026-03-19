@@ -124,7 +124,7 @@ export function ActiveOrderStrip() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 onClick={() => navigate(`/orders/${order.id}`)}
-                className="flex items-center gap-2 rounded-xl bg-primary/[0.06] border border-primary/12 px-2.5 py-2 cursor-pointer active:scale-[0.97] transition-transform shrink-0 min-w-0"
+                className="flex items-center gap-2 rounded-xl bg-primary/[0.06] backdrop-blur-lg backdrop-saturate-150 border border-primary/[0.1] px-2.5 py-2 cursor-pointer active:scale-[0.97] transition-transform shrink-0 min-w-0"
                 style={{ maxWidth: activeOrders.length === 1 ? '100%' : '55vw' }}
               >
                 {/* Thumbnail */}
