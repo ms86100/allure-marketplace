@@ -313,7 +313,7 @@ export function UpiDeepLinkCheckout({
 
               <div className="bg-muted/50 rounded-xl p-3.5">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Complete the payment using your UPI app. Once done, tap <span className="font-medium text-foreground">"Confirm Payment"</span> to notify the seller. You can optionally attach a screenshot for faster verification.
+                  Complete the payment using your UPI app. Once done, <span className="font-medium text-foreground">upload a screenshot of your payment</span> and tap <span className="font-medium text-foreground">"Confirm Payment"</span> to notify the seller.
                 </p>
               </div>
 
@@ -330,19 +330,24 @@ export function UpiDeepLinkCheckout({
                     </button>
                   </div>
                 ) : (
-                  <label className="flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-muted-foreground/25 hover:border-primary/40 transition-colors cursor-pointer bg-muted/20">
-                    <ImagePlus size={16} className="text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Attach payment screenshot <span className="opacity-60">(optional)</span></span>
+                  <label className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-xl border-2 border-dashed border-primary/30 hover:border-primary/50 transition-colors cursor-pointer bg-primary/5">
+                    <ImagePlus size={18} className="text-primary" />
+                    <span className="text-xs font-medium text-primary">Upload payment screenshot</span>
+                    <span className="text-[10px] text-muted-foreground">Required to confirm payment</span>
                     <input type="file" accept="image/*" className="hidden" onChange={handleScreenshotSelect} />
                   </label>
                 )}
               </div>
 
+              {!screenshotFile && (
+                <p className="text-xs text-destructive text-center font-medium">Please upload a payment screenshot to confirm</p>
+              )}
+
               <div className="flex flex-col gap-3 pt-1">
                 <Button
                   className="w-full gap-2"
                   onClick={handleSubmitConfirmation}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !screenshotFile}
                 >
                   {isSubmitting ? (
                     <><Loader2 className="animate-spin" size={16} />Submitting...</>
