@@ -80,7 +80,7 @@ export function ReportSheet({ open, onOpenChange, targetType, targetId, targetNa
           <DrawerDescription>
             {targetName && <span>Reporting: {targetName}</span>}
           </DrawerDescription>
-        </SheetHeader>
+        </DrawerHeader>
 
         <div className="space-y-4 pb-4">
           <div className="space-y-2">
