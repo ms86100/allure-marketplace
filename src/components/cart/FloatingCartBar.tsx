@@ -6,7 +6,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { CART_HIDDEN_ROUTES, isRouteHidden } from '@/lib/visibilityEngine';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 
 interface FloatingCartBarProps {
