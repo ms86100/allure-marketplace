@@ -191,6 +191,12 @@ export function useCartPage() {
       ? [selectedDeliveryAddress.flat_number && `Flat ${selectedDeliveryAddress.flat_number}`, selectedDeliveryAddress.block && `Block ${selectedDeliveryAddress.block}`, selectedDeliveryAddress.building_name, selectedDeliveryAddress.landmark].filter(Boolean).join(', ')
       : [profile.block, profile.flat_number].filter(Boolean).join(', ');
 
+    // Generate idempotency key if not already set for this attempt
+    if (!idempotencyKeyRef.current) {
+      const cartHash = items.map(i => `${i.product_id}:${i.quantity}`).sort().join('|');
+      idempotencyKeyRef.current = `${user.id}_${Date.now()}_${simpleHash(cartHash)}`;
+    }
+
     const { data, error } = await supabase.rpc('create_multi_vendor_orders', {
       _buyer_id: user.id, _delivery_address: deliveryAddressText,
       _notes: notes || null, _payment_method: paymentMethod, _payment_status: paymentStatus,
@@ -200,7 +206,8 @@ export function useCartPage() {
       _delivery_address_id: selectedDeliveryAddress?.id || null,
       _delivery_lat: selectedDeliveryAddress?.latitude || null,
       _delivery_lng: selectedDeliveryAddress?.longitude || null,
-    });
+      _idempotency_key: idempotencyKeyRef.current,
+    } as any);
     if (error) throw error;
 
     const result = data as { success: boolean; order_ids?: string[]; order_count?: number; error?: string; unavailable_items?: string[]; closed_sellers?: string[]; out_of_range_sellers?: string[] };
