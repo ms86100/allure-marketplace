@@ -78,7 +78,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
 
       {/* 4-column tile grid */}
       <div className="grid grid-cols-4 gap-x-3 gap-y-4">
-        {categories.slice(0, 12).map((cat) => {
+        {categories.slice(0, 8).map((cat) => {
           const meta = metaMap[cat.category] || { count: 0, representativeImage: null };
           const catColor = cat.color || null;
           const imageSrc = meta.representativeImage || cat.imageUrl || null;
