@@ -200,12 +200,14 @@ export function useTerminalStatuses() {
     (async () => {
       const { data } = await supabase
         .from('category_status_flows')
-        .select('status_key, is_terminal')
+        .select('status_key, is_terminal, is_success')
         .eq('is_terminal', true);
 
       if (data) {
         const all = new Set(data.map(d => d.status_key));
-        const success = new Set(data.filter(d => !NEGATIVE_TERMINALS.has(d.status_key)).map(d => d.status_key));
+        const success = new Set(
+          data.filter(d => d.is_success === true).map(d => d.status_key)
+        );
         setTerminalSet(all);
         setSuccessSet(success);
       }
