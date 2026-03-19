@@ -368,6 +368,21 @@ export function useLiveActivityOrchestrator(): void {
     return () => clearInterval(intervalId);
   }, [userId]);
 
+  // ── Visibility change: immediate sync when user returns to tab/webview ──
+  useEffect(() => {
+    if (!userId || !Capacitor.isNativePlatform()) return;
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && mountedRef.current) {
+        console.log(TAG, 'Visibility regained — immediate sync');
+        doSync();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [userId, doSync]);
+
   // ── App resume re-hydration (one-shot sync) ──
   useEffect(() => {
     if (!userId || !Capacitor.isNativePlatform()) return;

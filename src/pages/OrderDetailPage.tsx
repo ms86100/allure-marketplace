@@ -35,6 +35,8 @@ import { useNavigate } from 'react-router-dom';
 import { getString, setString } from '@/lib/persistent-kv';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { LiveActivityManager } from '@/services/LiveActivityManager';
+import { Capacitor } from '@capacitor/core';
 
 // Gap 10: Lazy-load map to avoid bundling Leaflet for non-delivery orders
 const DeliveryMapView = lazy(() => import('@/components/delivery/DeliveryMapView').then(m => ({ default: m.DeliveryMapView })));
