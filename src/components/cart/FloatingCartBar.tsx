@@ -5,6 +5,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
+import { CART_HIDDEN_ROUTES, isRouteHidden } from '@/lib/visibilityEngine';
 
 interface FloatingCartBarProps {
   className?: string;
