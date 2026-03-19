@@ -233,6 +233,11 @@ export default function CartPage() {
         </div>
 
         {/* Neighborhood Guarantee */}
+        {/* Browse more shortcut */}
+        <div className="mx-4 mt-3 text-center">
+          <Link to="/search" className="text-xs font-semibold text-primary hover:underline">+ Browse more items</Link>
+        </div>
+
         <div className="mx-4 mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50">
           <span className="text-sm">{ml.label('label_neighborhood_guarantee_emoji')}</span>
           <p className="text-[10px] text-muted-foreground">
