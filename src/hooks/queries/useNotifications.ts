@@ -47,23 +47,58 @@ export function useLatestActionNotification(userId: string | undefined) {
         .eq('is_read', false)
         .not('payload', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(10);
       const notifications = (data as unknown as UserNotification[]) || [];
-      const deliveryTypes = ['delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent'];
+      if (notifications.length === 0) return null;
+
+      const deliveryTypes = new Set(['delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent']);
+
+      // Collect delivery notifications that need order status checks
+      const deliveryNotifs: UserNotification[] = [];
+      const orderIds = new Set<string>();
       for (const n of notifications) {
-        if (!n?.payload?.action) continue;
-        // Skip delivery notifications for orders already delivered/completed
-        if (deliveryTypes.includes(n.type)) {
-          const orderId = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
-          if (orderId) {
-            const { data: order } = await supabase.from('orders').select('status').eq('id', orderId).maybeSingle();
-            if (order && ['delivered', 'completed', 'cancelled'].includes(order.status)) {
-              // Auto-mark as read so it won't appear again
-              await supabase.from('user_notifications').update({ is_read: true }).eq('id', n.id);
-              continue;
-            }
+        if (deliveryTypes.has(n.type)) {
+          const oid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
+          if (oid) {
+            orderIds.add(oid);
+            deliveryNotifs.push(n);
           }
         }
+      }
+
+      // Batch-fetch order statuses for all delivery notifications at once
+      let terminalOrderIds = new Set<string>();
+      if (orderIds.size > 0) {
+        const { data: orders } = await supabase
+          .from('orders')
+          .select('id, status')
+          .in('id', [...orderIds])
+          .in('status', ['delivered', 'completed', 'cancelled', 'no_show']);
+        if (orders) {
+          terminalOrderIds = new Set(orders.map((o: any) => o.id));
+        }
+      }
+
+      // Batch-mark stale delivery notifications as read
+      const staleIds: string[] = [];
+      for (const n of deliveryNotifs) {
+        const oid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
+        if (oid && terminalOrderIds.has(oid)) {
+          staleIds.push(n.id);
+        }
+      }
+      if (staleIds.length > 0) {
+        await supabase
+          .from('user_notifications')
+          .update({ is_read: true })
+          .in('id', staleIds);
+      }
+
+      // Return first valid notification
+      const staleSet = new Set(staleIds);
+      for (const n of notifications) {
+        if (staleSet.has(n.id)) continue;
+        if (!n?.payload?.action) continue;
         return n;
       }
       return null;

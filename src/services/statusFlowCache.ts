@@ -38,7 +38,7 @@ export async function getTerminalStatuses(): Promise<Set<string>> {
     if (e.is_terminal) terminal.add(e.status_key);
   }
   // Always include these as safety net
-  for (const s of ['delivered', 'completed', 'cancelled', 'no_show', 'failed']) {
+  for (const s of ['delivered', 'completed', 'cancelled', 'no_show']) {
     terminal.add(s);
   }
   return terminal;

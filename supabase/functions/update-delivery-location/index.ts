@@ -342,12 +342,14 @@ serve(async (req) => {
       }
 
       if (etaSpike || headingReversal) {
+        const thirtySecsAgoDelay = new Date(Date.now() - 30_000).toISOString();
         const { count: delayCount } = await supabase
           .from('notification_queue')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', buyerId)
           .eq('type', 'delivery_delayed')
-          .eq('reference_path', `/orders/${assignment.order_id}`);
+          .eq('reference_path', `/orders/${assignment.order_id}`)
+          .gte('created_at', thirtySecsAgoDelay);
 
         if (!delayCount || delayCount === 0) {
           const reason = etaSpike ? 'Traffic or route change detected.' : 'Your delivery partner may have taken a different route.';
@@ -384,12 +386,14 @@ serve(async (req) => {
       }
 
       if (distanceMeters < 500) {
+        const thirtySecsAgo = new Date(Date.now() - 30_000).toISOString();
         const { count } = await supabase
           .from('notification_queue')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', buyerId)
           .eq('type', 'delivery_proximity')
-          .eq('reference_path', `/orders/${assignment.order_id}`);
+          .eq('reference_path', `/orders/${assignment.order_id}`)
+          .gte('created_at', thirtySecsAgo);
 
         if (!count || count === 0) {
           await supabase.from('notification_queue').insert({
@@ -414,12 +418,14 @@ serve(async (req) => {
       }
 
       if (distanceMeters < 200) {
+        const thirtySecsAgoImm = new Date(Date.now() - 30_000).toISOString();
         const { count: imminentCount } = await supabase
           .from('notification_queue')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', buyerId)
           .eq('type', 'delivery_proximity_imminent')
-          .eq('reference_path', `/orders/${assignment.order_id}`);
+          .eq('reference_path', `/orders/${assignment.order_id}`)
+          .gte('created_at', thirtySecsAgoImm);
 
         if (!imminentCount || imminentCount === 0) {
           await supabase.from('notification_queue').insert({
