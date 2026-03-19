@@ -210,7 +210,7 @@ export function BuyAgainRow() {
                 {/* +N more badge */}
                 {moreCount > 0 && (
                   <div className="text-center">
-                    <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                    <span className="text-[10px] font-bold text-primary">
                       +{moreCount} more
                     </span>
                   </div>
