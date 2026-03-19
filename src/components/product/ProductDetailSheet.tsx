@@ -17,7 +17,7 @@ import { PriceStabilityBadge } from '@/components/trust/PriceStabilityBadge';
 import { RefundTierBadge } from '@/components/trust/RefundTierBadge';
 import { Plus, Minus, Store, MapPin, Home, Clock, Truck, Users, Zap, RotateCcw, ChevronRight, ChevronDown, Shield, Flag, X } from 'lucide-react';
 import { useProductDetail, ProductDetail } from '@/hooks/useProductDetail';
-import { hapticImpact } from '@/lib/haptics';
+import { hapticSelection } from '@/lib/haptics';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { computeStoreStatus, formatStoreClosedMessage, type StoreAvailability } from '@/lib/store-availability';
