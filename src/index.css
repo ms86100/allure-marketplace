@@ -97,24 +97,24 @@
   }
 
   .dark {
-    /* ═══ DARK — Rich deep brown-black, vivid green (Blinkit-style) ═══ */
-    --background: 15 14% 5%;
-    --foreground: 30 8% 94%;
+    /* ═══ DARK — Neutral near-black, vivid green (Blinkit-style) ═══ */
+    --background: 0 0% 5%;
+    --foreground: 0 0% 94%;
 
-    --card: 18 12% 11%;
-    --card-foreground: 30 8% 94%;
+    --card: 0 0% 11%;
+    --card-foreground: 0 0% 94%;
 
-    --popover: 15 12% 7%;
-    --popover-foreground: 30 8% 94%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 94%;
 
     --primary: 151 65% 44%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 18 10% 15%;
-    --secondary-foreground: 30 6% 72%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 72%;
 
-    --muted: 18 8% 14%;
-    --muted-foreground: 30 5% 52%;
+    --muted: 0 0% 13%;
+    --muted-foreground: 0 0% 52%;
 
     --accent: 151 65% 44%;
     --accent-foreground: 0 0% 100%;
@@ -122,8 +122,8 @@
     --destructive: 4 66% 52%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 18 8% 18%;
-    --input: 18 10% 15%;
+    --border: 0 0% 16%;
+    --input: 0 0% 14%;
     --ring: 151 65% 44%;
 
     --radius: 0.75rem;
