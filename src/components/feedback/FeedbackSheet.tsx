@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
@@ -51,19 +51,19 @@ export function FeedbackSheet({ triggerLabel, onSubmitted, triggerOpen, onOpenCh
   };
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { setOpen(v); if (!v) onOpenChange?.(); }}>
-      <SheetTrigger asChild>
+    <Drawer open={open} onOpenChange={(v) => { setOpen(v); if (!v) onOpenChange?.(); }}>
+      <DrawerTrigger asChild>
         <button className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted/50 active:bg-muted transition-colors w-full">
           <MessageSquareHeart size={18} className="text-muted-foreground shrink-0" />
           <span className="flex-1 text-sm font-medium text-left">{triggerLabel || 'Share Feedback'}</span>
           <span className="text-muted-foreground">›</span>
         </button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader>
-          <SheetTitle>How's your experience?</SheetTitle>
-        </SheetHeader>
-        <div className="py-4 space-y-5">
+      </DrawerTrigger>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>How's your experience?</DrawerTitle>
+        </DrawerHeader>
+        <div className="px-4 pb-6 space-y-5">
           {/* Emoji Rating */}
           <div className="flex justify-center gap-4">
             {EMOJIS.map((emoji, i) => {
@@ -104,7 +104,7 @@ export function FeedbackSheet({ triggerLabel, onSubmitted, triggerOpen, onOpenCh
             {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

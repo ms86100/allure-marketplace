@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -76,18 +76,18 @@ export function CreateDisputeSheet({ open, onOpenChange, onCreated }: Props) {
   const handleSubmit = useSubmitGuard(handleSubmitInner);
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle className="flex items-center gap-2">
             <ShieldAlert size={18} />
             {ml.label('label_neighborhood_guarantee')}
-          </SheetTitle>
+          </DrawerTitle>
           <p className="text-xs text-muted-foreground mt-1">
             {ml.label('label_neighborhood_guarantee_desc')}
           </p>
-        </SheetHeader>
-        <div className="space-y-4 mt-4">
+        </DrawerHeader>
+        <div className="space-y-4 px-4 pb-6">
           <div>
             <Label>Category</Label>
             <Select value={category} onValueChange={setCategory}>
@@ -123,7 +123,7 @@ export function CreateDisputeSheet({ open, onOpenChange, onCreated }: Props) {
             <p className="text-xs text-muted-foreground text-center">You are viewing another society. Switch back to create content.</p>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

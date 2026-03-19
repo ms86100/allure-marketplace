@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { TimeSlotPicker } from './TimeSlotPicker';
@@ -101,15 +101,15 @@ export function BookingSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl">
-        <SheetHeader className="pb-4">
-          <SheetTitle>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="h-[85vh]">
+        <DrawerHeader className="pb-4">
+          <DrawerTitle>
             {enquiryOnly ? 'Contact Seller' : hasDateRange ? 'Reserve Rental' : 'Book Service'}
-          </SheetTitle>
-        </SheetHeader>
+          </DrawerTitle>
+        </DrawerHeader>
 
-        <div className="space-y-6 overflow-y-auto pb-20">
+        <div className="space-y-6 overflow-y-auto pb-20 px-4">
           {/* Listing Summary */}
           <div className="flex gap-3 p-3 bg-muted rounded-lg">
             {listing.image_url && (
@@ -192,7 +192,7 @@ export function BookingSheet({
               : 'Confirm Booking'}
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -237,13 +237,13 @@ export function AdminWorkflowManager() {
       </div>
 
       {/* Editor Sheet */}
-      <Sheet open={!!selectedWorkflow} onOpenChange={(open) => !open && setSelectedWorkflow(null)}>
-        <SheetContent side="bottom" className="h-[90dvh] p-0 rounded-t-2xl">
-          <SheetHeader className="px-4 pt-4 pb-3 border-b border-border">
+      <Drawer open={!!selectedWorkflow} onOpenChange={(open) => !open && setSelectedWorkflow(null)}>
+        <DrawerContent className="h-[90dvh] p-0">
+          <DrawerHeader className="px-4 pt-4 pb-3 border-b border-border">
             <div className="flex items-center justify-between">
-              <SheetTitle className="text-base font-bold">
+              <DrawerTitle className="text-base font-bold">
                 {selectedWorkflow && `${formatName(selectedWorkflow.parent_group)} — ${formatName(selectedWorkflow.transaction_type)}`}
-              </SheetTitle>
+              </DrawerTitle>
               <Button
                 variant="ghost"
                 size="sm"
@@ -256,7 +256,7 @@ export function AdminWorkflowManager() {
             {selectedWorkflow && (
               <WorkflowLinkage parentGroup={selectedWorkflow.parent_group} transactionType={selectedWorkflow.transaction_type} />
             )}
-          </SheetHeader>
+          </DrawerHeader>
 
           <ScrollArea className="h-[calc(90dvh-120px)]">
             <div className="px-4 py-4 space-y-5">
@@ -386,8 +386,8 @@ export function AdminWorkflowManager() {
               {isSaving ? 'Saving...' : 'Save Workflow'}
             </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
 
       {/* Dialogs */}
       <CreateWorkflowDialog

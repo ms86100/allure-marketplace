@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,9 +25,9 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
   const b = useBulkUpload(sellerId, allowedCategories, onSuccess, onClose);
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="bottom" className="h-[85vh]">
-        <SheetHeader><SheetTitle>Bulk Add Products</SheetTitle></SheetHeader>
+    <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DrawerContent className="h-[85vh]">
+        <DrawerHeader><DrawerTitle>Bulk Add Products</DrawerTitle></DrawerHeader>
 
         <Tabs defaultValue="grid" className="mt-4">
           <TabsList className="w-full">
@@ -136,7 +136,7 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
             </Button>
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

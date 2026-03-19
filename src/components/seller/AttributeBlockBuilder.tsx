@@ -4,7 +4,7 @@ import { AttributeBlockForm } from './AttributeBlockForm';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2, Puzzle } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import {
@@ -128,12 +128,12 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
           Add More Details
         </Button>
 
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetContent side="bottom" className="rounded-t-2xl max-h-[60vh] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>Add Details to Your Listing</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4 space-y-2">
+        <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+          <DrawerContent className="max-h-[60vh] overflow-y-auto">
+            <DrawerHeader>
+              <DrawerTitle>Add Details to Your Listing</DrawerTitle>
+            </DrawerHeader>
+            <div className="mt-4 space-y-2 px-4 pb-4">
               {availableBlocks.map((block) => (
                 <button
                   key={block.block_type}
@@ -154,8 +154,8 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
                 </p>
               )}
             </div>
-          </SheetContent>
-        </Sheet>
+          </DrawerContent>
+        </Drawer>
       </CollapsibleContent>
     </Collapsible>
   );

@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmAction } from '@/components/ui/confirm-action';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ImageUpload } from '@/components/ui/image-upload';
 import { useAuth } from '@/contexts/AuthContext';
@@ -100,13 +100,13 @@ export default function AuthorizedPersonsPage() {
           Family members and trusted individuals authorized for gate entry without OTP.
         </p>
 
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetTrigger asChild>
+        <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+          <DrawerTrigger asChild>
             <Button size="sm" className="gap-1"><Plus size={14} /> Add Person</Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl">
-            <SheetHeader><SheetTitle>Add Authorized Person</SheetTitle></SheetHeader>
-            <div className="space-y-4 mt-4">
+          </DrawerTrigger>
+          <DrawerContent>
+            <DrawerHeader><DrawerTitle>Add Authorized Person</DrawerTitle></DrawerHeader>
+            <div className="space-y-4 px-4 pb-6">
               <div><Label>Name *</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Full name" /></div>
               <div><Label>Relationship</Label>
                 <Select value={relationship} onValueChange={setRelationship}>
@@ -125,8 +125,8 @@ export default function AuthorizedPersonsPage() {
                 {submitting ? <Loader2 size={16} className="mr-1 animate-spin" /> : null} Add Person
               </Button>
             </div>
-          </SheetContent>
-        </Sheet>
+          </DrawerContent>
+        </Drawer>
 
         {persons.filter(p => p.is_active).length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">

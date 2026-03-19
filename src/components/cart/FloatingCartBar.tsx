@@ -6,7 +6,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { CART_HIDDEN_ROUTES, isRouteHidden } from '@/lib/visibilityEngine';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 
 interface FloatingCartBarProps {
@@ -115,13 +115,13 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
         </motion.div>
       </motion.div>
 
-      {/* Mini Cart Preview Sheet */}
-      <Sheet open={previewOpen} onOpenChange={setPreviewOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl px-4 pb-6">
-          <SheetHeader className="pb-3">
-            <SheetTitle className="text-sm font-bold">Cart Preview</SheetTitle>
-          </SheetHeader>
-          <div className="space-y-3">
+      {/* Mini Cart Preview Drawer */}
+      <Drawer open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DrawerContent>
+          <DrawerHeader className="pb-3">
+            <DrawerTitle className="text-sm font-bold">Cart Preview</DrawerTitle>
+          </DrawerHeader>
+          <div className="space-y-3 px-4">
             {previewItems.map((item) => (
               <div key={item.id} className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-xl overflow-hidden shrink-0 bg-secondary">
@@ -144,11 +144,11 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
               <p className="text-xs text-muted-foreground text-center">+{items.length - 3} more item{items.length - 3 !== 1 ? 's' : ''}</p>
             )}
           </div>
-          <Button className="w-full mt-4 rounded-xl" onClick={() => { setPreviewOpen(false); navigate('/cart'); }}>
+          <Button className="w-full mt-4 rounded-xl px-4" onClick={() => { setPreviewOpen(false); navigate('/cart'); }}>
             View Full Cart · {formatPrice(totalAmount)}
           </Button>
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
     </AnimatePresence>
   );
 }

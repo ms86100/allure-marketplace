@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer';
 import { Textarea } from '@/components/ui/textarea';
 import { HelpCircle, Clock, Package, CreditCard, MessageCircle, ChevronRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -37,7 +37,6 @@ export function OrderHelpSheet({ orderId, onChatOpen }: OrderHelpSheetProps) {
 
     setIsSubmitting(true);
     try {
-      // Route to seller chat as the primary resolution path
       if (onChatOpen) {
         setIsOpen(false);
         onChatOpen();
@@ -58,20 +57,19 @@ export function OrderHelpSheet({ orderId, onChatOpen }: OrderHelpSheetProps) {
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>
+    <Drawer open={isOpen} onOpenChange={setIsOpen}>
+      <DrawerTrigger asChild>
         <Button variant="ghost" size="sm" className="text-muted-foreground">
           <HelpCircle size={16} className="mr-2" />
           Need help?
         </Button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader>
-          <SheetTitle>Need help with this order?</SheetTitle>
-        </SheetHeader>
+      </DrawerTrigger>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>Need help with this order?</DrawerTitle>
+        </DrawerHeader>
 
-        <div className="mt-6 space-y-4">
-          {/* Quick Chat Option */}
+        <div className="px-4 pb-6 space-y-4">
           {onChatOpen && (
             <button
               onClick={handleChatWithSeller}
@@ -88,7 +86,6 @@ export function OrderHelpSheet({ orderId, onChatOpen }: OrderHelpSheetProps) {
             </button>
           )}
 
-          {/* Issue Options */}
           <div className="space-y-2">
             <p className="text-sm font-medium text-muted-foreground">Or select an issue:</p>
             {HELP_OPTIONS.map(({ id, icon: Icon, label, description }) => (
@@ -110,7 +107,6 @@ export function OrderHelpSheet({ orderId, onChatOpen }: OrderHelpSheetProps) {
             ))}
           </div>
 
-          {/* Details */}
           {selectedIssue && (
             <div className="space-y-2">
               <label className="text-sm font-medium">Additional details (optional)</label>
@@ -123,7 +119,6 @@ export function OrderHelpSheet({ orderId, onChatOpen }: OrderHelpSheetProps) {
             </div>
           )}
 
-          {/* Submit */}
           {selectedIssue && (
             <Button
               className="w-full"
@@ -137,7 +132,7 @@ export function OrderHelpSheet({ orderId, onChatOpen }: OrderHelpSheetProps) {
             </Button>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

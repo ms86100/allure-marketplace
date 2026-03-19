@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -91,12 +91,12 @@ export function AddExpenseSheet({ open, onOpenChange, onCreated, type }: Props) 
   const categories = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_SOURCES;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader>
-          <SheetTitle>Add {type === 'expense' ? 'Expense' : 'Income'}</SheetTitle>
-        </SheetHeader>
-        <div className="space-y-4 mt-4">
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>Add {type === 'expense' ? 'Expense' : 'Income'}</DrawerTitle>
+        </DrawerHeader>
+        <div className="space-y-4 px-4 pb-6">
           <div>
             <Label>{type === 'expense' ? 'Category' : 'Source'}</Label>
             <Select value={category} onValueChange={setCategory}>
@@ -138,7 +138,7 @@ export function AddExpenseSheet({ open, onOpenChange, onCreated, type }: Props) 
             <p className="text-xs text-muted-foreground text-center">You are viewing another society. Switch back to create content.</p>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

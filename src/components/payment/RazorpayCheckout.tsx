@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+} from '@/components/ui/drawer';
 import { Loader2, CreditCard, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { useRazorpay } from '@/hooks/useRazorpay';
 import { useCurrency } from '@/hooks/useCurrency';
@@ -90,16 +90,16 @@ export function RazorpayCheckout({
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={handleClose}>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader className="text-center pb-4">
-          <SheetTitle>Pay with UPI</SheetTitle>
-          <SheetDescription>
+    <Drawer open={isOpen} onOpenChange={handleClose}>
+      <DrawerContent>
+        <DrawerHeader className="text-center pb-4">
+          <DrawerTitle>Pay with UPI</DrawerTitle>
+          <DrawerDescription>
             Pay {formatPrice(amount)} to {sellerName}
-          </SheetDescription>
-        </SheetHeader>
+          </DrawerDescription>
+        </DrawerHeader>
 
-        <div className="py-6">
+        <div className="py-6 px-4">
           {status === 'pending' && (
             <div className="text-center space-y-6">
               <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
@@ -186,7 +186,7 @@ export function RazorpayCheckout({
             </div>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

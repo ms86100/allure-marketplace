@@ -50,7 +50,7 @@ export function ActiveOrderStrip() {
         .eq('buyer_id', user.id)
         .not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`)
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(5);
 
       if (error) {
         console.warn('[ActiveOrderStrip] Query error:', error.message);
@@ -109,6 +109,9 @@ export function ActiveOrderStrip() {
 
   return (
     <div className="mt-2 px-4">
+      {activeOrders.length > 1 && (
+        <p className="text-[10px] text-muted-foreground mb-1 font-medium">{activeOrders.length} active orders</p>
+      )}
       <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         <AnimatePresence>
           {activeOrders.map((order) => {
@@ -122,7 +125,7 @@ export function ActiveOrderStrip() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 onClick={() => navigate(`/orders/${order.id}`)}
                 className="flex items-center gap-2 rounded-xl bg-primary/[0.06] border border-primary/12 px-2.5 py-2 cursor-pointer active:scale-[0.97] transition-transform shrink-0 min-w-0"
-                style={{ maxWidth: activeOrders.length === 1 ? '100%' : '70vw' }}
+                style={{ maxWidth: activeOrders.length === 1 ? '100%' : '55vw' }}
               >
                 {/* Thumbnail */}
                 <div className="w-9 h-9 rounded-xl bg-primary/10 shrink-0 overflow-hidden flex items-center justify-center">

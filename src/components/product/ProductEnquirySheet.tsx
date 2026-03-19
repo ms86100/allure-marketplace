@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -169,16 +169,16 @@ export function ProductEnquirySheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader className="pb-3">
-          <SheetTitle className="flex items-center gap-2">
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader className="pb-3">
+          <DrawerTitle className="flex items-center gap-2">
             <Icon size={18} className="text-primary" />
             {meta.title}
-          </SheetTitle>
-        </SheetHeader>
+          </DrawerTitle>
+        </DrawerHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 px-4 pb-6">
           {/* Product summary */}
           <div className="p-3 bg-muted rounded-lg">
             <p className="font-medium text-sm">{productName}</p>
@@ -219,7 +219,7 @@ export function ProductEnquirySheet({
             Your contact details will be shared with the seller
           </p>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

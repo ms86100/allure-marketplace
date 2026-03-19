@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Plus, Trash2 } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { useAuth } from '@/contexts/AuthContext';
@@ -79,13 +79,13 @@ export function WorkerCategoryManager() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-muted-foreground">Worker Categories</h3>
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild>
+        <Drawer open={isOpen} onOpenChange={setIsOpen}>
+          <DrawerTrigger asChild>
             <Button size="sm" variant="outline"><Plus size={14} className="mr-1" /> Add</Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl">
-            <SheetHeader><SheetTitle>Add Worker Category</SheetTitle></SheetHeader>
-            <div className="space-y-4 py-4">
+          </DrawerTrigger>
+          <DrawerContent>
+            <DrawerHeader><DrawerTitle>Add Worker Category</DrawerTitle></DrawerHeader>
+            <div className="space-y-4 px-4 pb-6">
               <div>
                 <Label>Category Name *</Label>
                 <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. AC Technician" />
@@ -126,8 +126,8 @@ export function WorkerCategoryManager() {
               </div>
               <Button onClick={handleAdd} disabled={!name.trim()} className="w-full">Add Category</Button>
             </div>
-          </SheetContent>
-        </Sheet>
+          </DrawerContent>
+        </Drawer>
       </div>
 
       {categories.map(cat => (

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { MapPin, Home, Briefcase, Tag, Building, Navigation, Loader2, Plus, Check, ArrowLeft } from 'lucide-react';
 import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
@@ -263,13 +263,13 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
   const isSelected = (id: string) => browsingLocation?.id === id;
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[70dvh] overflow-y-auto">
-        <SheetHeader className="pb-2">
-          <SheetTitle className="text-base font-bold">
+    <Drawer open={open} onOpenChange={handleOpenChange}>
+      <DrawerContent className="max-h-[70dvh] overflow-y-auto">
+        <DrawerHeader className="pb-2">
+          <DrawerTitle className="text-base font-bold">
             {step === 'confirm' ? 'Confirm Detected Location' : 'Browse Near'}
-          </SheetTitle>
-        </SheetHeader>
+          </DrawerTitle>
+        </DrawerHeader>
 
         {step === 'confirm' && detectedLocation ? (
           <div className="space-y-3">
@@ -415,7 +415,7 @@ export function LocationSelectorSheet({ open, onOpenChange }: LocationSelectorSh
             )}
           </div>
         )}
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }
