@@ -236,8 +236,8 @@
     --secondary: 0 0% 14%;
     --secondary-foreground: 80 5% 72%;
 
-    --muted: 0 0% 82%;               /* Light Table Surface */
-    --muted-foreground: 80 5% 42%;    /* Moss Stone darkened */
+    --muted: 0 0% 13%;
+    --muted-foreground: 80 5% 52%;
 
     --accent: 30 45% 50%;             /* Golden Amber — terracotta rock */
     --accent-foreground: 40 10% 95%;
