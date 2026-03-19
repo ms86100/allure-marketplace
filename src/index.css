@@ -273,12 +273,12 @@
     --product-image-bg: 0 0% 13%;
 
     /* Nature tints — mineral-inspired */
-    --tint-food: 30 15% 87%;          /* Warm Sand tint */
-    --tint-services: 175 10% 86%;     /* Sage hint */
-    --tint-personal: 40 12% 87%;      /* Limestone tint */
-    --tint-resale: 30 18% 86%;        /* Amber warm */
-    --tint-events: 0 0% 85%;          /* Studio Gray */
-    --tint-default: 40 10% 87%;       /* Ivory tint */
+    --tint-food: 0 0% 9%;
+    --tint-services: 0 0% 9%;
+    --tint-personal: 0 0% 9%;
+    --tint-resale: 0 0% 9%;
+    --tint-events: 0 0% 9%;
+    --tint-default: 0 0% 9%;
 
     /* Gradients — stone & mineral */
     --gradient-primary: linear-gradient(135deg, hsl(165 35% 25%) 0%, hsl(175 30% 30%) 100%);
