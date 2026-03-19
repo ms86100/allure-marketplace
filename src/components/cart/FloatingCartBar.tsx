@@ -14,7 +14,9 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
   const { formatPrice } = useCurrency();
   const location = useLocation();
 
-  if (itemCount === 0 || location.pathname === '/cart') return null;
+  // Hide on cart page and checkout
+  const hiddenPaths = ['/cart', '/checkout'];
+  if (itemCount === 0 || hiddenPaths.some(p => location.pathname.startsWith(p))) return null;
 
   const thumbnails = items
     .filter(i => i.product?.image_url)
@@ -24,36 +26,52 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
   return (
     <AnimatePresence>
       <motion.div
+        key="floating-cart"
         initial={{ y: 80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 80, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-        className={cn('fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-3 pb-2', className)}
+        className={cn(
+          'fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-3 pb-2',
+          className
+        )}
       >
         <Link to="/cart">
           <motion.div
-            className="rounded-2xl bg-primary px-4 py-3.5 flex items-center justify-between shadow-cta"
+            className="rounded-2xl bg-primary px-4 py-3 flex items-center justify-between shadow-[0_4px_24px_-4px_hsl(var(--primary)/0.4)]"
             whileTap={{ scale: 0.97 }}
           >
-            <div className="flex items-center gap-2.5">
+            {/* Left: thumbnails + item count */}
+            <div className="flex items-center gap-3">
               {thumbnails.length > 0 && (
                 <div className="flex -space-x-2">
                   {thumbnails.map((url, i) => (
-                    <div key={i} className="w-7 h-7 rounded-full border-2 border-primary-foreground/20 overflow-hidden product-image-bg">
-                      <img src={url} alt="" className="w-full h-full object-cover" />
-                    </div>
+                    <motion.div
+                      key={i}
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: i * 0.05 }}
+                      className="w-8 h-8 rounded-full border-2 border-primary-foreground/20 overflow-hidden product-image-bg"
+                    >
+                      <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    </motion.div>
                   ))}
                 </div>
               )}
-              <div>
-                <p className="text-primary-foreground text-sm font-bold">
-                  {itemCount} item{itemCount !== 1 ? 's' : ''} · {formatPrice(totalAmount)}
-                </p>
+              <div className="flex flex-col">
+                <span className="text-primary-foreground text-[13px] font-extrabold leading-tight">
+                  {itemCount} item{itemCount !== 1 ? 's' : ''}
+                </span>
+                <span className="text-primary-foreground/70 text-[11px] font-semibold leading-tight">
+                  {formatPrice(totalAmount)}
+                </span>
               </div>
             </div>
-            <div className="flex items-center gap-0.5 text-primary-foreground font-bold text-sm">
+
+            {/* Right: View Cart CTA */}
+            <div className="flex items-center gap-1 text-primary-foreground font-bold text-sm">
               View Cart
-              <ChevronRight size={14} />
+              <ChevronRight size={16} strokeWidth={2.5} />
             </div>
           </motion.div>
         </Link>
