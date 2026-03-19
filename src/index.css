@@ -15,6 +15,7 @@
 
     --card: 0 0% 100%;
     --card-foreground: 240 10% 8%;
+    --card-elevated: 0 0% 98%;
 
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 8%;
@@ -76,7 +77,7 @@
     --gradient-hero: linear-gradient(180deg, hsl(151 65% 38% / 0.04) 0%, hsl(40 20% 99%) 60%);
     --gradient-glass: linear-gradient(135deg, hsl(0 0% 100% / 0.98) 0%, hsl(40 10% 98% / 0.92) 100%);
 
-    /* Shadows — clean + purposeful */
+    /* Shadows */
     --shadow-sm: 0 1px 2px hsl(240 10% 8% / 0.04);
     --shadow-md: 0 4px 12px hsl(240 10% 8% / 0.06);
     --shadow-lg: 0 8px 30px hsl(240 10% 8% / 0.1);
@@ -84,6 +85,8 @@
     --shadow-elevated: 0 6px 20px hsl(240 10% 8% / 0.08);
     --shadow-glow: 0 0 0 transparent;
     --shadow-cta: 0 4px 14px hsl(151 65% 38% / 0.25);
+    --shadow-glow-green: 0 0 0 transparent;
+    --shadow-glow-accent: 0 0 0 transparent;
 
     /* Sidebar */
     --sidebar-background: 0 0% 100%;
@@ -94,10 +97,23 @@
     --sidebar-accent-foreground: 240 8% 30%;
     --sidebar-border: 40 10% 90%;
     --sidebar-ring: 151 65% 38%;
+
+    /* ═══ Component surface tokens — Light ═══ */
+    --header-bg: 40 20% 99% / 0.95;
+    --nav-bg: 40 20% 99% / 0.98;
+    --nav-border: 40 10% 90% / 0.6;
+    --search-bg: 40 15% 95% / 0.6;
+    --search-border: 40 10% 90% / 0.4;
+    --buyagain-card-bg: 151 65% 38% / 0.08;
+    --buyagain-card-border: 151 65% 38% / 0.15;
+    --buyagain-badge-bg: 151 65% 38% / 0.1;
+    --buyagain-badge-text: 151 65% 38%;
   }
 
+  /* ═══════════════════════════════════════════════
+     DARK MODE — Neutral near-black, vivid green
+     ═══════════════════════════════════════════════ */
   .dark {
-    /* ═══ DARK — Neutral near-black, vivid green (Blinkit-style) ═══ */
     --background: 0 0% 5%;
     --foreground: 0 0% 94%;
 
@@ -137,7 +153,7 @@
     --info: 217 91% 60%;
     --favorite: 350 80% 55%;
 
-    /* Badge colors */
+    /* Badge */
     --badge-new: 4 76% 56%;
     --badge-bought: 199 89% 48%;
     --badge-discount: 25 95% 53%;
@@ -150,7 +166,7 @@
     /* Product image */
     --product-image-bg: 0 0% 13%;
 
-    /* Dark tints — neutral */
+    /* Dark tints */
     --tint-food: 0 0% 9%;
     --tint-services: 0 0% 9%;
     --tint-personal: 0 0% 9%;
@@ -158,7 +174,7 @@
     --tint-events: 0 0% 9%;
     --tint-default: 0 0% 9%;
 
-    /* Gradients — neutral base */
+    /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(151 65% 44%) 0%, hsl(168 55% 38%) 100%);
     --gradient-success: linear-gradient(135deg, hsl(151 65% 44%) 0%, hsl(162 50% 36%) 100%);
     --gradient-warm: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(20 85% 50%) 100%);
@@ -184,17 +200,26 @@
     --sidebar-accent-foreground: 0 0% 72%;
     --sidebar-border: 0 0% 16%;
     --sidebar-ring: 151 65% 44%;
+
+    /* ═══ Component surface tokens — Dark ═══ */
+    --header-bg: 0 0% 5% / 0.97;
+    --nav-bg: 20 10% 5% / 0.98;
+    --nav-border: 20 8% 16% / 0.6;
+    --search-bg: 0 0% 12% / 0.8;
+    --search-border: 30 15% 22% / 0.5;
+    --buyagain-card-bg: 170 35% 14% / 0.55;
+    --buyagain-card-border: 170 35% 25% / 0.3;
+    --buyagain-badge-bg: 170 35% 18% / 0.8;
+    --buyagain-badge-text: 0 0% 100%;
   }
 
   /* ═══════════════════════════════════════════════
      NATURE MODE — Living ecosystem, organic warmth
      ═══════════════════════════════════════════════ */
   .nature {
-    /* ═══ Background: warm parchment / misty sage ═══ */
     --background: 90 20% 97%;
     --foreground: 160 20% 10%;
 
-    /* Cards: warm cream with subtle green undertone */
     --card: 80 16% 95%;
     --card-foreground: 160 20% 10%;
     --card-elevated: 75 14% 92%;
@@ -202,33 +227,28 @@
     --popover: 85 18% 96%;
     --popover-foreground: 160 20% 10%;
 
-    /* Primary: deep forest green */
     --primary: 152 55% 32%;
     --primary-foreground: 60 20% 97%;
 
-    /* Secondary: sage / moss */
     --secondary: 100 16% 90%;
     --secondary-foreground: 150 14% 25%;
 
-    /* Muted: dried leaf tones */
     --muted: 85 12% 88%;
     --muted-foreground: 140 10% 42%;
 
-    /* Accent: warm golden / floral amber */
     --accent: 38 65% 55%;
     --accent-foreground: 160 20% 10%;
 
     --destructive: 8 55% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders: soft sage */
     --border: 95 10% 82%;
     --input: 90 12% 87%;
     --ring: 152 55% 32%;
 
     --radius: 1rem;
 
-    /* Semantic — earthy palette */
+    /* Semantic */
     --veg: 152 55% 32%;
     --non-veg: 8 55% 48%;
     --success: 152 55% 32%;
@@ -242,14 +262,14 @@
     --badge-discount: 32 72% 50%;
     --rating-star: 45 80% 52%;
 
-    /* Nav — forest active */
+    /* Nav */
     --nav-active: 152 55% 32%;
     --nav-active-foreground: 60 20% 97%;
 
     /* Product image */
     --product-image-bg: 85 14% 93%;
 
-    /* Nature tints — layered earth tones */
+    /* Nature tints */
     --tint-food: 38 22% 94%;
     --tint-services: 152 12% 93%;
     --tint-personal: 310 8% 94%;
@@ -257,14 +277,14 @@
     --tint-events: 265 8% 94%;
     --tint-default: 90 10% 93%;
 
-    /* Gradients — dawn mist, forest depth */
+    /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(152 55% 32%) 0%, hsl(172 42% 34%) 100%);
     --gradient-success: linear-gradient(135deg, hsl(152 55% 32%) 0%, hsl(162 38% 30%) 100%);
     --gradient-warm: linear-gradient(135deg, hsl(38 65% 55%) 0%, hsl(22 60% 48%) 100%);
     --gradient-hero: linear-gradient(180deg, hsl(152 55% 32% / 0.05) 0%, hsl(90 20% 97%) 50%);
     --gradient-glass: linear-gradient(135deg, hsl(80 16% 95% / 0.98) 0%, hsl(90 14% 93% / 0.94) 100%);
 
-    /* Shadows — dappled sunlight feel */
+    /* Shadows — dappled sunlight */
     --shadow-sm: 0 1px 3px hsl(152 25% 18% / 0.06);
     --shadow-md: 0 4px 16px hsl(152 20% 18% / 0.07);
     --shadow-lg: 0 10px 40px hsl(152 20% 18% / 0.1);
@@ -283,6 +303,17 @@
     --sidebar-accent-foreground: 150 14% 25%;
     --sidebar-border: 95 10% 82%;
     --sidebar-ring: 152 55% 32%;
+
+    /* ═══ Component surface tokens — Nature ═══ */
+    --header-bg: 90 20% 97% / 0.96;
+    --nav-bg: 90 20% 97% / 0.97;
+    --nav-border: 95 10% 82% / 0.6;
+    --search-bg: 100 16% 90% / 0.6;
+    --search-border: 95 12% 78% / 0.5;
+    --buyagain-card-bg: 152 40% 88% / 0.5;
+    --buyagain-card-border: 152 35% 70% / 0.25;
+    --buyagain-badge-bg: 152 45% 28% / 0.15;
+    --buyagain-badge-text: 152 55% 32%;
   }
 }
 
