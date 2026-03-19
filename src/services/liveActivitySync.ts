@@ -108,7 +108,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
         .from('delivery_assignments')
         .select('order_id, eta_minutes, distance_meters, rider_name')
         .in('order_id', orderIds)
-        .not('status', 'in', terminalFilter),
+        .not('status', 'in', deliveryTerminalFilter),
       sellerIds.length > 0
         ? supabase
             .from('seller_profiles')
