@@ -99,7 +99,7 @@ export function RazorpayCheckout({
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="py-6">
+        <div className="py-6 px-4">
           {status === 'pending' && (
             <div className="text-center space-y-6">
               <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
