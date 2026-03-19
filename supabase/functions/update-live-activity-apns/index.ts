@@ -24,6 +24,7 @@ interface LAUpdatePayload {
   seller_name?: string;
   seller_logo?: string;
   seller_logo_url?: string;
+  initial_eta_minutes?: number | null;
 }
 
 /** Safety-net fallback — overridden by DB query below */
