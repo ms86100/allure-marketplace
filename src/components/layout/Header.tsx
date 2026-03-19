@@ -90,7 +90,7 @@ function HeaderInner({
   return (
     <>
       <header className={cn(
-        'sticky top-0 z-40 bg-background/95 dark:bg-[hsl(20_12%_8%/0.97)] backdrop-blur-xl border-b border-border/30',
+        'sticky top-0 z-40 bg-background/95 dark:bg-[hsl(0_0%_5%/0.97)] backdrop-blur-xl border-b border-border/30',
         className
       )}>
         <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 space-y-1">
