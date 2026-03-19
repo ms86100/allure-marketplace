@@ -51,6 +51,22 @@ function getProximity(distanceMeters: number, thresholds: typeof DEFAULT_PROXIMI
   return 'en_route';
 }
 
+/** Load terminal statuses from category_status_flows — DB-driven, no hardcoding */
+async function loadTerminalStatuses(supabase: ReturnType<typeof createClient>): Promise<Set<string>> {
+  const FALLBACK = new Set(['delivered', 'failed', 'cancelled']);
+  try {
+    const { data } = await supabase
+      .from('category_status_flows')
+      .select('status_key')
+      .in('transaction_type', ['cart_purchase', 'seller_delivery'])
+      .eq('is_terminal', true);
+    if (data && data.length > 0) {
+      return new Set(data.map((r: { status_key: string }) => r.status_key));
+    }
+  } catch { /* fall through */ }
+  return FALLBACK;
+}
+
 function calculateEta(distanceMeters: number, speedKmh: number | null, accuracyMeters: number | null, historicalAvgMin: number | null = null): { eta: number | null; skipUpdate: boolean } {
   if (accuracyMeters != null && accuracyMeters > 100) {
     return { eta: null, skipUpdate: true };
@@ -128,6 +144,9 @@ serve(async (req) => {
       });
     }
 
+    // Load terminal statuses from DB (single request scope cache)
+    const terminalStatuses = await loadTerminalStatuses(supabase);
+
     // Get assignment
     const { data: assignment, error: aErr } = await supabase
       .from('delivery_assignments')
@@ -142,7 +161,7 @@ serve(async (req) => {
       });
     }
 
-    if (['delivered', 'failed', 'cancelled'].includes(assignment.status)) {
+    if (terminalStatuses.has(assignment.status)) {
       return new Response(JSON.stringify({ error: 'Delivery is no longer active' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
