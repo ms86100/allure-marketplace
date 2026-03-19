@@ -137,6 +137,28 @@ export function useOrderDetail(id: string | undefined) {
     finally { if (!cancelled) setIsLoading(false); }
   };
 
+  /** Buyer-safe status advance via SECURITY DEFINER RPC — bypasses RLS correctly */
+  const buyerAdvanceOrder = async (newStatus: OrderStatus) => {
+    if (!order || !user) return;
+    setIsUpdating(true);
+    try {
+      const { error } = await supabase.rpc('buyer_advance_order', {
+        _order_id: order.id,
+        _new_status: newStatus,
+      });
+      if (error) throw error;
+      setOrder({ ...order, status: newStatus });
+      toast.success(`Order ${getOrderStatus(newStatus).label.toLowerCase()}`, { id: `order-${order.id}-update` });
+      supabase.functions.invoke('process-notification-queue').catch(() => {});
+      if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus });
+    } catch (error: any) {
+      console.error('Buyer advance order failed:', error);
+      const errMsg = error?.message || error?.details || '';
+      toast.error(errMsg.includes('Invalid buyer transition') ? 'This action is no longer available' : `Failed to update order: ${errMsg || 'Unknown error'}`, { id: `order-${order.id}-error` });
+      fetchOrder(); // Re-fetch to get real state
+    } finally { setIsUpdating(false); }
+  };
+
   const fetchUnreadCount = async () => {
     if (!user || !id) return;
     const { count } = await supabase.from('chat_messages').select('id', { count: 'exact', head: true }).eq('order_id', id).eq('receiver_id', user.id).eq('read_status', false);
