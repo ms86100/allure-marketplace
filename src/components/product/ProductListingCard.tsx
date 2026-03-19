@@ -277,7 +277,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
           <span className="text-[10px] text-muted-foreground leading-none mt-0.5">{product.price_per_unit}</span>
         )}
 
-        {(locationLabel || (product as any).is_same_society !== false) && (
+        {!compact && (locationLabel || (product as any).is_same_society !== false) && (
           <div
             className={cn("flex items-center gap-1 mt-1.5", (product as any).seller_latitude && (product as any).seller_longitude && "cursor-pointer hover:text-primary transition-colors")}
             onClick={(e) => {

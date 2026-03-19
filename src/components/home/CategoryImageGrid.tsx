@@ -105,13 +105,17 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                   />
                 ) : (
                   <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: catColor ? `${catColor}25` : undefined }}
+                    className="w-full h-full flex items-center justify-center"
+                    style={{
+                      background: catColor
+                        ? `radial-gradient(circle at center, ${catColor}20 0%, ${catColor}08 70%)`
+                        : undefined,
+                    }}
                   >
                     <DynamicIcon
                       name={cat.icon}
-                      size={24}
-                      className="text-foreground/60"
+                      size={36}
+                      className="text-foreground/50"
                       style={catColor ? { color: catColor } : undefined}
                     />
                   </div>
