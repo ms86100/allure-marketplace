@@ -101,11 +101,8 @@ export async function syncActiveOrders(userId: string): Promise<number> {
     const orderIds = orders.map((o) => o.id);
     const sellerIds = [...new Set(orders.map((o) => o.seller_id).filter(Boolean))];
 
-    // Fetch deliveries, seller names, item counts, and status flows in parallel
-    // Build dynamic exclusion filter from DB-backed terminal statuses
-    const terminalStatuses = [...await getTerminalStatuses()];
-    const terminalFilter = `(${terminalStatuses.map(s => `"${s}"`).join(',')})`;
-
+    // Reuse the terminal filter already computed above for delivery exclusion
+    const deliveryTerminalFilter = terminalFilter;
     const [deliveriesResult, sellersResult, itemCountsResult, flowEntries] = await Promise.all([
       supabase
         .from('delivery_assignments')
