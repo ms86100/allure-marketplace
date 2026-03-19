@@ -15,21 +15,6 @@ import { cn } from '@/lib/utils';
 import { useSearchPlaceholder } from '@/hooks/useSearchPlaceholder';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 
-/* ── WANGLOW palette — parent group to stone/mineral color ── */
-const WANGLOW_GROUP_COLORS: Record<string, string> = {
-  food_beverages: '#B87D3C',    // Golden Amber — terracotta rock
-  home_services: '#6BA89E',     // Sage Teal — soap puck
-  education_learning: '#2D6B5A', // Deep Forest Green — bottle
-  events: '#A5A39E',            // Speckled Moss Stone
-  personal_care: '#C9B99A',     // Warm Sand/Beige — light bottle
-  domestic_help: '#9E9E9E',     // Warm Studio Gray — wall
-  resale: '#708A7A',            // Muted forest-sage blend
-};
-
-function getWanglowColor(parentGroup: string): string {
-  return WANGLOW_GROUP_COLORS[parentGroup] || '#6BA89E';
-}
-
 /* ── Helpers ─────────────────────────────────────────────── */
 
 interface CategoryMeta {
@@ -349,20 +334,14 @@ export default function CategoriesPage() {
                       >
                         <Link
                           to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-                          className="block rounded-2xl overflow-hidden active:scale-[0.97] transition-all duration-200 group bg-card border border-border hover:shadow-md"
-                          style={{
-                            borderLeftWidth: '4px',
-                            borderLeftColor: getWanglowColor(cat.parentGroup),
-                            boxShadow: `var(--shadow-card)`,
-                          }}
+                          className="block rounded-2xl overflow-hidden shadow-sm active:scale-[0.97] transition-all duration-200 group bg-card border border-border hover:shadow-md"
+                          style={{ borderLeftWidth: '4px', borderLeftColor: catColor || 'hsl(var(--primary))' }}
                           onMouseEnter={(e) => {
-                            const c = getWanglowColor(cat.parentGroup);
-                            (e.currentTarget as HTMLElement).style.borderColor = `${c}50`;
-                            (e.currentTarget as HTMLElement).style.borderLeftColor = c;
+                            if (catColor) (e.currentTarget as HTMLElement).style.borderColor = `${catColor}60`;
                           }}
                           onMouseLeave={(e) => {
                             (e.currentTarget as HTMLElement).style.borderColor = '';
-                            (e.currentTarget as HTMLElement).style.borderLeftColor = getWanglowColor(cat.parentGroup);
+                            (e.currentTarget as HTMLElement).style.borderLeftColor = catColor || 'hsl(var(--primary))';
                           }}
                         >
                           {/* Image area */}
