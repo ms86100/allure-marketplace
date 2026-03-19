@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { getTerminalStatuses } from '@/services/statusFlowCache';
+import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statusFlowCache';
 import { Package, ChevronRight, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { jitteredStaleTime } from '@/lib/query-utils';
@@ -44,11 +44,18 @@ export function ActiveOrderStrip() {
           order_items(id)
         `)
         .eq('buyer_id', user.id)
-        .not('status', 'in', `(${terminalArr.join(',')})`)
+        .not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`)
         .order('created_at', { ascending: false })
         .limit(3);
 
-      if (error || !data) return [];
+      if (error) {
+        console.warn('[ActiveOrderStrip] Query error:', error.message);
+        if (error.code === '22P02') {
+          invalidateStatusFlowCache();
+        }
+        return [];
+      }
+      if (!data) return [];
 
       // Fetch display labels for these statuses from category_status_flows
       const statusKeys = [...new Set(data.map((o: any) => o.status))];
@@ -108,8 +115,7 @@ export function ActiveOrderStrip() {
                 </span>
                 {order.color && (
                   <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: order.color }}
+                    className={`w-2 h-2 rounded-full shrink-0 ${order.color.split(' ')[0]}`}
                   />
                 )}
               </div>

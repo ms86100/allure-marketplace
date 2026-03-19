@@ -251,12 +251,21 @@ serve(async (req) => {
 
     // Build update payload
     const now = new Date().toISOString();
+
+    // Bug 5: Reset stalled_notified when meaningful movement resumes (>100m since last known)
+    let resetStalled = false;
+    if (assignment.stalled_notified && assignment.last_location_lat && assignment.last_location_lng) {
+      const moveDelta = haversineDistance(assignment.last_location_lat, assignment.last_location_lng, latitude, longitude);
+      if (moveDelta > 100) resetStalled = true;
+    }
+
     const updateData: Record<string, unknown> = {
       last_location_lat: latitude,
       last_location_lng: longitude,
       last_location_at: now,
       distance_meters: distanceMeters,
       proximity_status: proximity,
+      ...(resetStalled ? { stalled_notified: false } : {}),
     };
     if (!skipEtaUpdate && etaMinutes != null) {
       updateData.eta_minutes = etaMinutes;
@@ -328,7 +337,7 @@ serve(async (req) => {
     }
 
     // ═══ Smart Delay Detection ═══
-    if (distanceMeters !== null && buyerId && ['picked_up', 'at_gate'].includes(assignment.status)) {
+    if (distanceMeters !== null && buyerId && ['picked_up', 'on_the_way', 'at_gate'].includes(assignment.status)) {
       const prevEta = assignment.eta_minutes;
       const etaSpike = prevEta != null && etaMinutes != null && (etaMinutes - prevEta) > 5;
 
@@ -374,7 +383,7 @@ serve(async (req) => {
     }
 
     // ═══ Proximity notifications ═══
-    if (distanceMeters !== null && buyerId && ['picked_up', 'on_the_way'].includes(assignment.status)) {
+    if (distanceMeters !== null && buyerId && ['picked_up', 'on_the_way', 'at_gate'].includes(assignment.status)) {
       let vehicleType: string | null = null;
       if (assignment.rider_id) {
         const { data: riderInfo } = await supabase
@@ -488,11 +497,11 @@ serve(async (req) => {
             if (sellerId) {
               const { data: sp } = await supabase
                 .from('seller_profiles')
-                .select('business_name, logo_url')
+                .select('business_name, profile_image_url')
                 .eq('id', sellerId)
                 .single();
               sellerName = sp?.business_name ?? null;
-              sellerLogoUrl = sp?.logo_url ?? null;
+              sellerLogoUrl = sp?.profile_image_url ?? null;
             }
 
             // Invoke APNs push

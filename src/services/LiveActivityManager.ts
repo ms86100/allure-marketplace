@@ -481,6 +481,11 @@ class _LiveActivityManager {
   }
 
   private async doUpdate(entry: ActiveEntry, data: LiveActivityData): Promise<void> {
+    // Bug 8: Guard against stale timer firing after end() already removed the entry
+    if (!this.active.has(data.entity_id)) {
+      console.log(TAG, `SKIP doUpdate — entity ${data.entity_id} no longer active (ended during throttle)`);
+      return;
+    }
     entry.lastUpdate = Date.now();
     entry.pendingTimer = null;
     try {
