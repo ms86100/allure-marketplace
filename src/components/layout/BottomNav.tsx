@@ -11,9 +11,9 @@ import type { FeatureKey } from '@/hooks/useEffectiveFeatures';
 const residentNavItems: { to: string; icon: typeof Home; label: string; featureKey?: FeatureKey; badge?: string }[] = [
   { to: '/', icon: Home, label: 'Home' },
   { to: '/society', icon: Building2, label: 'Society' },
-  { to: '/categories', icon: LayoutGrid, label: 'Categories' },
+  { to: '/categories', icon: LayoutGrid, label: 'Browse' },
   { to: '/cart', icon: ShoppingCart, label: 'Cart', badge: 'cart' },
-  { to: '/profile', icon: User, label: 'Profile' },
+  { to: '/profile', icon: User, label: 'Account' },
 ];
 
 const securityNavItems: { to: string; icon: typeof Shield; label: string }[] = [
@@ -34,7 +34,6 @@ function BottomNavInner() {
   const { isAdmin, isSocietyAdmin, isBuilderMember, roles, isSecurityOfficer, isWorker } = useAuth();
   const itemCount = useCartCount();
 
-
   const isPrimaryRoleUser = isAdmin || isSocietyAdmin || isBuilderMember;
   const navItems = !isPrimaryRoleUser && isSecurityOfficer
     ? securityNavItems
@@ -53,9 +52,11 @@ function BottomNavInner() {
       });
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 bg-card border-t border-border"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-      <div className="flex items-center justify-around px-1 pt-1.5 pb-1.5">
+    <nav
+      className="fixed inset-x-0 bottom-0 z-50 bg-background/95 backdrop-blur-md border-t border-border"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
+      <div className="flex items-center justify-around px-2 h-14">
         {visibleItems.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname === to || 
             (to !== '/' && location.pathname.startsWith(to));
@@ -67,27 +68,30 @@ function BottomNavInner() {
               to={to}
               onClick={() => hapticSelection()}
               className={cn(
-                'flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-all duration-200 min-w-[48px] relative',
+                'flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors min-w-[48px] relative',
                 isActive
-                  ? 'text-nav-active'
-                  : 'text-muted-foreground'
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
               )}
             >
               <div className="relative">
-                {/* Active state: orange/peach glow circle behind icon */}
-                {isActive && (
-                  <div className="absolute -inset-1.5 rounded-full bg-nav-active/15" />
-                )}
-                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} className="relative z-10" />
+                <Icon
+                  size={20}
+                  strokeWidth={isActive ? 2.5 : 1.8}
+                  className={cn(
+                    'transition-all duration-150',
+                    isActive && 'scale-105'
+                  )}
+                />
                 {showCartBadge && (
-                  <span className="absolute -top-1 -right-1.5 min-w-[16px] h-[16px] px-0.5 rounded-full bg-badge-new text-primary-foreground text-[8px] font-bold flex items-center justify-center z-20">
+                  <span className="absolute -top-1 -right-2 min-w-[16px] h-[16px] px-0.5 rounded-full bg-primary text-primary-foreground text-[8px] font-bold flex items-center justify-center">
                     {itemCount > 9 ? '9+' : itemCount}
                   </span>
                 )}
               </div>
               <span className={cn(
                 'text-[10px] leading-tight',
-                isActive ? 'font-bold text-nav-active' : 'font-medium'
+                isActive ? 'font-bold' : 'font-medium'
               )}>
                 {label}
               </span>
