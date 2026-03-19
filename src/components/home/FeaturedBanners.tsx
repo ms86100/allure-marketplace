@@ -190,9 +190,9 @@ function BannerContent({ banner }: { banner: any }) {
 
   if (template === 'image_only') {
     return image_url ? (
-      <img src={image_url} alt={title || 'Featured'} className="w-full h-28 object-cover" loading="lazy" />
+      <img src={image_url} alt={title || 'Featured'} className="w-full h-36 object-cover" loading="lazy" />
     ) : (
-      <div className="w-full h-28 flex items-center justify-center p-6 bg-primary">
+      <div className="w-full h-36 flex items-center justify-center p-6 bg-primary">
         <h3 className="text-lg font-bold text-primary-foreground text-center">{title || 'Featured'}</h3>
       </div>
     );
