@@ -1,6 +1,6 @@
 import { forwardRef, useState } from 'react';
 import { MapPin, Check } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 
 interface AddressPickerProps {
