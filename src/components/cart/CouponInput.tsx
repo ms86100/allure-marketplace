@@ -93,14 +93,13 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
 
   const applyCouponDirectly = (coupon: CouponData) => {
     if (!canApplyCoupon(coupon)) {
-      if (coupon.min_order_amount && totalAmount < coupon.min_order_amount) toast.error(`Minimum order of ${formatPrice(coupon.min_order_amount)} required`);
-      else toast.error('You have already used this coupon');
+      if (coupon.min_order_amount && totalAmount < coupon.min_order_amount) feedbackCouponFailed(`Minimum order of ${formatPrice(coupon.min_order_amount)} required`);
+      else feedbackCouponFailed('You have already used this coupon');
       return;
     }
-    hapticImpact('medium');
     const discountAmount = calculateDiscount(coupon);
     onApply({ id: coupon.id, code: coupon.code, discountAmount, discount_type: coupon.discount_type, discount_value: coupon.discount_value, max_discount_amount: coupon.max_discount_amount });
-    toast.success(`Coupon applied! You save ${formatPrice(discountAmount)}`);
+    feedbackCouponApplied(formatPrice(discountAmount));
   };
 
   const handleApply = async () => {
