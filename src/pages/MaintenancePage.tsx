@@ -13,7 +13,7 @@ import { useRazorpay } from '@/hooks/useRazorpay';
 import { CheckCircle2, Clock, AlertTriangle, Plus, Download, Loader2 } from 'lucide-react';
 import { exportMaintenanceDues } from '@/lib/csv-export';
 import { FeatureGate } from '@/components/ui/FeatureGate';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -167,16 +167,16 @@ export default function MaintenancePage() {
       <div className="p-4 space-y-4">
         {canManage && (
           <div className="flex gap-2">
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
+          <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+            <DrawerTrigger asChild>
               <Button className="w-full gap-2">
                 <Plus size={16} /> Generate Monthly Dues
               </Button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="rounded-t-2xl">
-              <SheetHeader>
-                <SheetTitle>Generate Monthly Dues</SheetTitle>
-              </SheetHeader>
+            </DrawerTrigger>
+            <DrawerContent>
+              <DrawerHeader>
+                <DrawerTitle>Generate Monthly Dues</DrawerTitle>
+              </DrawerHeader>
               <div className="space-y-4 mt-4">
                 <div>
                   <label className="text-sm font-medium">Month (YYYY-MM)</label>
@@ -199,8 +199,8 @@ export default function MaintenancePage() {
                   {generating ? 'Checking...' : 'Preview & Generate'}
                 </Button>
               </div>
-            </SheetContent>
-          </Sheet>
+            </DrawerContent>
+          </Drawer>
           {dues.length > 0 && (
             <Button variant="outline" size="icon" onClick={() => exportMaintenanceDues(dues)} title="Export CSV">
               <Download size={16} />

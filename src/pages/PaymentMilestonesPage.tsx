@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
@@ -291,11 +291,11 @@ export default function PaymentMilestonesPage() {
       </div>
 
       {/* Create/Edit Sheet */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl h-[70vh] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{editing ? 'Edit Milestone' : 'New Payment Milestone'}</SheetTitle>
-          </SheetHeader>
+      <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+        <DrawerContent className="h-[70vh] overflow-y-auto">
+          <DrawerHeader>
+            <DrawerTitle>{editing ? 'Edit Milestone' : 'New Payment Milestone'}</DrawerTitle>
+          </DrawerHeader>
           <div className="space-y-4 mt-4">
             <div><Label>Title</Label><Input value={formTitle} onChange={e => setFormTitle(e.target.value)} placeholder="e.g. Foundation Complete" /></div>
             <div><Label>Description</Label><Textarea value={formDesc} onChange={e => setFormDesc(e.target.value)} placeholder="Details..." rows={2} /></div>
@@ -325,8 +325,8 @@ export default function PaymentMilestonesPage() {
               {editing ? 'Update Milestone' : 'Create Milestone'}
             </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
       </FeatureGate>
     </AppLayout>
   );

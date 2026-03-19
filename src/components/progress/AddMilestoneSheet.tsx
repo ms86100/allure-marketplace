@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -78,16 +78,16 @@ export function AddMilestoneSheet({ onAdded, towers = [] }: AddMilestoneSheetPro
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
         <Button size="sm" className="gap-1">
           <Plus size={14} /> Add Milestone
         </Button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Add Construction Milestone</SheetTitle>
-        </SheetHeader>
+      </DrawerTrigger>
+      <DrawerContent className="max-h-[85vh] overflow-y-auto">
+        <DrawerHeader>
+          <DrawerTitle>Add Construction Milestone</DrawerTitle>
+        </DrawerHeader>
         <div className="space-y-4 mt-4">
           {towers.length > 0 && (
             <div>
@@ -157,7 +157,7 @@ export function AddMilestoneSheet({ onAdded, towers = [] }: AddMilestoneSheetPro
             <p className="text-xs text-muted-foreground text-center">You are viewing another society. Switch back to create content.</p>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

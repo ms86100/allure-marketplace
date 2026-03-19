@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
@@ -122,12 +122,12 @@ export default function WorkerLeavePage() {
       <FeatureGate feature="worker_leave">
       <div className="p-4 space-y-4">
         {canManage && (
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
+          <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+            <DrawerTrigger asChild>
               <Button size="sm" className="gap-1"><Plus size={14} /> Record Leave</Button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="rounded-t-2xl">
-              <SheetHeader><SheetTitle>Record Worker Leave</SheetTitle></SheetHeader>
+            </DrawerTrigger>
+            <DrawerContent>
+              <DrawerHeader><DrawerTitle>Record Worker Leave</DrawerTitle></DrawerHeader>
               <div className="space-y-4 mt-4">
                 <div>
                   <Label>Worker</Label>
@@ -157,8 +157,8 @@ export default function WorkerLeavePage() {
                   {submitting ? <Loader2 size={16} className="mr-1 animate-spin" /> : null} Record Leave
                 </Button>
               </div>
-            </SheetContent>
-          </Sheet>
+            </DrawerContent>
+          </Drawer>
         )}
 
         {leaves.length === 0 ? (

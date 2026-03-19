@@ -1,4 +1,4 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -75,9 +75,9 @@ export function SnagDetailSheet({
   const handleReopen = () => handleStatusUpdate('reported');
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
-        <SheetHeader><SheetTitle>Snag Details</SheetTitle></SheetHeader>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="max-h-[90vh] overflow-y-auto">
+        <DrawerHeader><DrawerTitle>Snag Details</DrawerTitle></DrawerHeader>
         <div className="space-y-4 mt-4">
           {/* Description */}
           <div>
@@ -201,7 +201,7 @@ export function SnagDetailSheet({
             </div>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

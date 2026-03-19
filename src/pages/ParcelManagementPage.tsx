@@ -9,8 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger
-} from '@/components/ui/sheet';
+  Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerTrigger
+} from '@/components/ui/drawer';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -189,15 +189,15 @@ export default function ParcelManagementPage() {
                 <p className="text-2xl font-bold text-primary tabular-nums">{parcels.length}</p>
               </div>
             </div>
-            <Sheet open={isAddOpen} onOpenChange={setIsAddOpen}>
-              <SheetTrigger asChild>
+            <Drawer open={isAddOpen} onOpenChange={setIsAddOpen}>
+              <DrawerTrigger asChild>
                 <Button size="sm"><Plus size={16} className="mr-1" /> Log</Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="rounded-t-2xl max-h-[80vh] overflow-y-auto">
-                <SheetHeader>
-                  <SheetTitle>{canLogParcels ? 'Log Parcel for Resident' : 'Log a Parcel'}</SheetTitle>
-                  <SheetDescription>{canLogParcels ? 'Enter flat number to identify the resident' : 'Record a delivery for tracking'}</SheetDescription>
-                </SheetHeader>
+              </DrawerTrigger>
+              <DrawerContent className="max-h-[80vh] overflow-y-auto">
+                <DrawerHeader>
+                  <DrawerTitle>{canLogParcels ? 'Log Parcel for Resident' : 'Log a Parcel'}</DrawerTitle>
+                  <DrawerDescription>{canLogParcels ? 'Enter flat number to identify the resident' : 'Record a delivery for tracking'}</DrawerDescription>
+                </DrawerHeader>
                 <div className="space-y-4 py-4">
                   {canLogParcels && (
                     <div className="space-y-2 p-3 bg-muted rounded-lg">
@@ -252,8 +252,8 @@ export default function ParcelManagementPage() {
                     {isSubmitting ? <><Loader2 size={16} className="mr-1 animate-spin" /> Logging...</> : 'Log Parcel'}
                   </Button>
                 </div>
-              </SheetContent>
-            </Sheet>
+              </DrawerContent>
+            </Drawer>
           </CardContent>
         </Card>
 

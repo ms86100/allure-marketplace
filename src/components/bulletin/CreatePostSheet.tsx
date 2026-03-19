@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -140,11 +140,11 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
   const catKeys = Object.keys(CATEGORY_CONFIG) as BulletinCategory[];
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[85vh] overflow-y-auto rounded-t-2xl">
-        <SheetHeader>
-          <SheetTitle>New Post</SheetTitle>
-        </SheetHeader>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="h-[85vh] overflow-y-auto">
+        <DrawerHeader>
+          <DrawerTitle>New Post</DrawerTitle>
+        </DrawerHeader>
 
         <div className="space-y-4 mt-4">
           {/* Category picker */}
@@ -341,7 +341,7 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
             <p className="text-xs text-muted-foreground text-center">You are viewing another society. Switch back to create content.</p>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

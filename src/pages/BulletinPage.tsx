@@ -11,7 +11,7 @@ import { CreateHelpSheet } from '@/components/bulletin/CreateHelpSheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { supabase } from '@/integrations/supabase/client';
 import { escapeIlike } from '@/lib/query-utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -239,16 +239,16 @@ export default function BulletinPage() {
       />
 
       {/* Help Request Detail Sheet */}
-      <Sheet open={!!selectedHelp} onOpenChange={(o) => !o && setSelectedHelp(null)}>
-        <SheetContent side="bottom" className="h-[80vh] overflow-y-auto rounded-t-2xl">
+      <Drawer open={!!selectedHelp} onOpenChange={(o) => !o && setSelectedHelp(null)}>
+        <DrawerContent className="h-[80vh] overflow-y-auto">
           {selectedHelp && (
             <>
-              <SheetHeader>
-                <SheetTitle>{selectedHelp.title}</SheetTitle>
+              <DrawerHeader>
+                <DrawerTitle>{selectedHelp.title}</DrawerTitle>
                 <p className="text-xs text-muted-foreground">
                   {selectedHelp.author?.name} · {selectedHelp.author?.block}-{selectedHelp.author?.flat_number}
                 </p>
-              </SheetHeader>
+              </DrawerHeader>
               <div className="mt-4 space-y-4">
                 {selectedHelp.description && (
                   <p className="text-sm text-foreground">{selectedHelp.description}</p>
@@ -287,8 +287,8 @@ export default function BulletinPage() {
               </div>
             </>
           )}
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
       </FeatureGate>
     </AppLayout>
   );

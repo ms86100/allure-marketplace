@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -56,14 +56,14 @@ export function CreateSnagSheet({ onCreated }: { onCreated: () => void }) {
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
         <Button size="sm" className="gap-1">
           <Plus size={14} /> Report Snag
         </Button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
-        <SheetHeader><SheetTitle>Report a Defect</SheetTitle></SheetHeader>
+      </DrawerTrigger>
+      <DrawerContent className="max-h-[85vh] overflow-y-auto">
+        <DrawerHeader><DrawerTitle>Report a Defect</DrawerTitle></DrawerHeader>
         <div className="space-y-4 mt-4">
           <div>
             <label className="text-sm font-medium">Category</label>
@@ -97,7 +97,7 @@ export function CreateSnagSheet({ onCreated }: { onCreated: () => void }) {
             <p className="text-xs text-muted-foreground text-center">You are viewing another society. Switch back to create content.</p>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

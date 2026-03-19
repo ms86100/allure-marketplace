@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerTrigger } from '@/components/ui/drawer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmAction } from '@/components/ui/confirm-action';
@@ -36,13 +36,13 @@ export default function VisitorManagementPage() {
                 <p className="text-2xl font-bold text-primary tabular-nums">{v.todayCount}</p>
               </div>
             </div>
-          <Sheet open={v.isAddOpen} onOpenChange={v.setIsAddOpen}>
+          <Drawer open={v.isAddOpen} onOpenChange={v.setIsAddOpen}>
             <div className="flex gap-2">
               {v.visitors.length > 0 && <Button size="sm" variant="outline" onClick={v.handleExport} title="Export CSV"><Download size={16} /></Button>}
-              <SheetTrigger asChild><Button size="sm"><UserPlus size={16} className="mr-1" />Add</Button></SheetTrigger>
+              <DrawerTrigger asChild><Button size="sm"><UserPlus size={16} className="mr-1" />Add</Button></DrawerTrigger>
             </div>
-            <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
-              <SheetHeader><SheetTitle>Add Visitor</SheetTitle><SheetDescription>Pre-approve a visitor with an OTP for gate entry</SheetDescription></SheetHeader>
+            <DrawerContent className="max-h-[85vh] overflow-y-auto">
+              <DrawerHeader><DrawerTitle>Add Visitor</DrawerTitle><DrawerDescription>Pre-approve a visitor with an OTP for gate entry</DrawerDescription></DrawerHeader>
               <div className="space-y-4 py-4">
                 <div><Label>Visitor Name *</Label><Input value={v.visitorName} onChange={e => v.setVisitorName(e.target.value)} placeholder="Enter name" /></div>
                 <div><Label>Phone Number</Label><Input value={v.visitorPhone} onChange={e => v.setVisitorPhone(e.target.value)} placeholder="+91 XXXXX XXXXX" /></div>
@@ -61,8 +61,8 @@ export default function VisitorManagementPage() {
                 )}
                 <Button onClick={v.handleAddVisitor} disabled={!v.visitorName.trim() || v.isSubmitting} className="w-full">{v.isSubmitting ? <><Loader2 size={16} className="mr-1 animate-spin" /> Adding...</> : 'Add Visitor & Generate OTP'}</Button>
               </div>
-            </SheetContent>
-          </Sheet>
+            </DrawerContent>
+          </Drawer>
           </CardContent>
         </Card>
 

@@ -14,8 +14,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle,
-} from '@/components/ui/sheet';
+  Drawer, DrawerContent, DrawerHeader, DrawerTitle,
+} from '@/components/ui/drawer';
 import { useCategoryConfig } from '@/hooks/queries/useCategoryConfig';
 import { Plus, Pencil, Trash2, GripVertical, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -321,11 +321,11 @@ export function AdminAttributeBlockManager() {
       )}
 
       {/* Create / Edit Sheet */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="bottom" className="h-[90vh]">
-          <SheetHeader>
-            <SheetTitle>{editingBlock ? 'Edit Block' : 'Create Attribute Block'}</SheetTitle>
-          </SheetHeader>
+      <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+        <DrawerContent className="h-[90vh]">
+          <DrawerHeader>
+            <DrawerTitle>{editingBlock ? 'Edit Block' : 'Create Attribute Block'}</DrawerTitle>
+          </DrawerHeader>
           <ScrollArea className="h-[calc(90vh-80px)] pr-2 mt-4">
             <div className="space-y-4 pb-8">
               {/* Basic Info */}
@@ -474,8 +474,8 @@ export function AdminAttributeBlockManager() {
               </Button>
             </div>
           </ScrollArea>
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }

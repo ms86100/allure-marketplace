@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -68,8 +68,8 @@ export function SearchFilters({
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>
+    <Drawer open={isOpen} onOpenChange={setIsOpen}>
+      <DrawerTrigger asChild>
         <button className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors ${
           activeFilterCount > 0
             ? 'border-primary bg-primary/10 text-primary'
@@ -83,16 +83,16 @@ export function SearchFilters({
             </span>
           )}
         </button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl">
-        <SheetHeader>
+      </DrawerTrigger>
+      <DrawerContent className="h-[85vh]">
+        <DrawerHeader>
           <div className="flex items-center justify-between">
-            <SheetTitle>Filters & Sort</SheetTitle>
+            <DrawerTitle>Filters & Sort</DrawerTitle>
             <Button variant="ghost" size="sm" onClick={handleReset}>
               Reset all
             </Button>
           </div>
-        </SheetHeader>
+        </DrawerHeader>
 
         <div className="mt-6 space-y-6 overflow-y-auto pb-20">
           {/* Sort By */}
@@ -223,8 +223,8 @@ export function SearchFilters({
             Apply Filters
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }
 

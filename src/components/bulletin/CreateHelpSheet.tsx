@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -67,11 +67,11 @@ export function CreateHelpSheet({ open, onOpenChange, onCreated }: CreateHelpShe
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader>
-          <SheetTitle>Ask for Help</SheetTitle>
-        </SheetHeader>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>Ask for Help</DrawerTitle>
+        </DrawerHeader>
         <div className="space-y-4 mt-4">
           <div className="flex gap-2 flex-wrap">
             {TAGS.map(t => {
@@ -110,7 +110,7 @@ export function CreateHelpSheet({ open, onOpenChange, onCreated }: CreateHelpShe
             <p className="text-xs text-muted-foreground text-center">You are viewing another society. Switch back to create content.</p>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -70,17 +70,17 @@ export function ReportSheet({ open, onOpenChange, targetType, targetId, targetNa
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader className="text-left pb-4">
-          <SheetTitle className="flex items-center gap-2">
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader className="text-left pb-4">
+          <DrawerTitle className="flex items-center gap-2">
             <Flag size={18} className="text-destructive" />
             Report {targetType === 'post' ? 'Post' : targetType === 'product' ? 'Product' : 'Seller'}
-          </SheetTitle>
-          <SheetDescription>
+          </DrawerTitle>
+          <DrawerDescription>
             {targetName && <span>Reporting: {targetName}</span>}
-          </SheetDescription>
-        </SheetHeader>
+          </DrawerDescription>
+        </DrawerHeader>
 
         <div className="space-y-4 pb-4">
           <div className="space-y-2">
@@ -121,7 +121,7 @@ export function ReportSheet({ open, onOpenChange, targetType, targetId, targetNa
             </Button>
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

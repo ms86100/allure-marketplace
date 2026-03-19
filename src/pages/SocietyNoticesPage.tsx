@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FeatureGate } from '@/components/ui/FeatureGate';
 import { useAuth } from '@/contexts/AuthContext';
@@ -102,14 +102,14 @@ export default function SocietyNoticesPage() {
       <FeatureGate feature="society_notices">
       <div className="p-4 space-y-4">
         {canPost && (
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
+          <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+            <DrawerTrigger asChild>
               <Button className="w-full gap-2">
                 <Plus size={16} /> Post Notice
               </Button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
-              <SheetHeader><SheetTitle>Post Official Notice</SheetTitle></SheetHeader>
+            </DrawerTrigger>
+            <DrawerContent className="max-h-[85vh] overflow-y-auto">
+              <DrawerHeader><DrawerTitle>Post Official Notice</DrawerTitle></DrawerHeader>
               <div className="space-y-4 mt-4">
                 <div>
                   <Label>Title *</Label>
@@ -138,8 +138,8 @@ export default function SocietyNoticesPage() {
                   {submitting ? 'Posting...' : 'Post & Notify All Residents'}
                 </Button>
               </div>
-            </SheetContent>
-          </Sheet>
+            </DrawerContent>
+          </Drawer>
         )}
 
          {loading ? (

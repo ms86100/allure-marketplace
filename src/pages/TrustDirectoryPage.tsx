@@ -3,7 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
@@ -162,9 +162,9 @@ export default function TrustDirectoryPage() {
         <Plus size={22} />
       </Button>
 
-      <Sheet open={showAdd} onOpenChange={setShowAdd}>
-        <SheetContent side="bottom" className="rounded-t-2xl">
-          <SheetHeader><SheetTitle>Add Your Skill</SheetTitle></SheetHeader>
+      <Drawer open={showAdd} onOpenChange={setShowAdd}>
+        <DrawerContent>
+          <DrawerHeader><DrawerTitle>Add Your Skill</DrawerTitle></DrawerHeader>
           <div className="space-y-4 mt-4">
             <div>
               <Label>Skill Name</Label>
@@ -183,8 +183,8 @@ export default function TrustDirectoryPage() {
               Add Skill
             </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
     </AppLayout>
   );
 }

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { addDays } from 'date-fns';
@@ -44,12 +44,12 @@ export function CreateGroupBuySheet({ onCreated }: Props) {
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
         <Button size="sm" className="text-xs gap-1"><Plus size={14} /> Start Group Buy</Button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader><SheetTitle>Start a Group Buy</SheetTitle></SheetHeader>
+      </DrawerTrigger>
+      <DrawerContent>
+        <DrawerHeader><DrawerTitle>Start a Group Buy</DrawerTitle></DrawerHeader>
         <div className="space-y-4 mt-4">
           <div>
             <Label className="text-xs">What do you want to buy together?</Label>
@@ -74,7 +74,7 @@ export function CreateGroupBuySheet({ onCreated }: Props) {
           </div>
           <Button className="w-full" onClick={handleSubmit} disabled={saving}>{saving ? 'Creating...' : 'Create Group Buy'}</Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

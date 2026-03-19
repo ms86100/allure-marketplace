@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -122,12 +122,12 @@ export function DisputeDetailSheet({ ticket, open, onOpenChange, onUpdated, isAd
   if (!ticket) return null;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl h-[85vh] flex flex-col">
-        <SheetHeader>
-          <SheetTitle className="text-left">{ml.label('label_neighborhood_guarantee')}</SheetTitle>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="h-[85vh] flex flex-col">
+        <DrawerHeader>
+          <DrawerTitle className="text-left">{ml.label('label_neighborhood_guarantee')}</DrawerTitle>
           <p className="text-xs text-muted-foreground">{ml.label('label_neighborhood_guarantee_desc')}</p>
-        </SheetHeader>
+        </DrawerHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 mt-4">
           {/* Ticket Info */}
@@ -236,7 +236,7 @@ export function DisputeDetailSheet({ ticket, open, onOpenChange, onUpdated, isAd
             {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

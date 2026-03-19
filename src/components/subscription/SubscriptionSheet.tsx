@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -58,11 +58,11 @@ export function SubscriptionSheet({ open, onOpenChange, product }: SubscriptionS
   if (!product) return null;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader>
-          <SheetTitle>Subscribe to {product.name}</SheetTitle>
-        </SheetHeader>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader>
+          <DrawerTitle>Subscribe to {product.name}</DrawerTitle>
+        </DrawerHeader>
         <div className="space-y-4 mt-4">
           <div className="p-3 rounded-lg bg-muted/50 border border-border">
             <p className="font-medium text-sm">{product.name}</p>
@@ -123,7 +123,7 @@ export function SubscriptionSheet({ open, onOpenChange, product }: SubscriptionS
             Start Subscription
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FeatureGate } from '@/components/ui/FeatureGate';
@@ -112,14 +112,14 @@ export default function DeliveryPartnerManagementPage() {
                 <p className="text-2xl font-bold text-primary tabular-nums">{partners.filter(p => p.is_active).length}</p>
               </div>
             </div>
-            <Sheet open={isAddOpen} onOpenChange={setIsAddOpen}>
-              <SheetTrigger asChild>
+            <Drawer open={isAddOpen} onOpenChange={setIsAddOpen}>
+              <DrawerTrigger asChild>
                 <Button size="sm"><Plus size={16} className="mr-1" /> Add</Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="rounded-t-2xl max-h-[80vh] overflow-y-auto">
-                <SheetHeader>
-                  <SheetTitle>Add Delivery Partner</SheetTitle>
-                </SheetHeader>
+              </DrawerTrigger>
+              <DrawerContent className="max-h-[80vh] overflow-y-auto">
+                <DrawerHeader>
+                  <DrawerTitle>Add Delivery Partner</DrawerTitle>
+                </DrawerHeader>
                 <div className="space-y-4 py-4">
                   <div>
                     <Label>Name *</Label>
@@ -155,8 +155,8 @@ export default function DeliveryPartnerManagementPage() {
                     Add Partner
                   </Button>
                 </div>
-              </SheetContent>
-            </Sheet>
+              </DrawerContent>
+            </Drawer>
           </CardContent>
         </Card>
 

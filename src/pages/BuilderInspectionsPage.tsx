@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
@@ -152,11 +152,11 @@ export default function BuilderInspectionsPage() {
       </div>
 
       {/* Detail Sheet */}
-      <Sheet open={!!selectedChecklist} onOpenChange={(open) => { if (!open) setSelectedChecklist(null); }}>
-        <SheetContent side="bottom" className="rounded-t-2xl h-[85vh] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Inspection – Flat {selectedChecklist?.flat_number}</SheetTitle>
-          </SheetHeader>
+      <Drawer open={!!selectedChecklist} onOpenChange={(open) => { if (!open) setSelectedChecklist(null); }}>
+        <DrawerContent className="h-[85vh] overflow-y-auto">
+          <DrawerHeader>
+            <DrawerTitle>Inspection – Flat {selectedChecklist?.flat_number}</DrawerTitle>
+          </DrawerHeader>
           {selectedChecklist && (
             <div className="mt-4 space-y-4">
               {/* Summary */}
@@ -231,8 +231,8 @@ export default function BuilderInspectionsPage() {
               )}
             </div>
           )}
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
     </AppLayout>
   );
 }
