@@ -344,7 +344,7 @@ export default function OrderDetailPage() {
             <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart deliveryStatus={order.status} />
           )}
           {/* Persistent OTP card — visible to buyer for ALL non-terminal delivery statuses */}
-          {o.isBuyerView && isDeliveryOrder && buyerOtp && !isTerminalStatus(o.flow, order.status) && (
+          {o.isBuyerView && isDeliveryOrder && buyerOtp && !isTerminalStatus(o.flow, order.status) && !['delivered', 'completed'].includes(order.status) && (
             <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 text-center">
               <p className="text-xs text-muted-foreground mb-1">Your Delivery Code</p>
               <p className="text-3xl font-bold tracking-[0.3em] text-primary">{buyerOtp}</p>
