@@ -21,7 +21,26 @@ app.post("/", async (c) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Find orders that have passed their auto_cancel_at time and are still in 'placed' status
+    // Load admin-configured statuses from system_settings
+    const { data: settingsRows } = await supabase
+      .from("system_settings")
+      .select("key, value")
+      .in("key", ["cancellable_statuses", "auto_completable_statuses"]);
+
+    const settings: Record<string, string> = {};
+    for (const row of settingsRows || []) {
+      if (row.key && row.value) settings[row.key] = row.value;
+    }
+
+    let cancellableStatuses: string[];
+    try { cancellableStatuses = JSON.parse(settings["cancellable_statuses"] || '["placed"]'); }
+    catch { cancellableStatuses = ["placed"]; }
+
+    let autoCompletableStatuses: string[];
+    try { autoCompletableStatuses = JSON.parse(settings["auto_completable_statuses"] || '["delivered"]'); }
+    catch { autoCompletableStatuses = ["delivered"]; }
+
+    // Find orders that have passed their auto_cancel_at time and are still in cancellable statuses
     const now = new Date().toISOString();
     const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
 
@@ -29,7 +48,7 @@ app.post("/", async (c) => {
     const { data: urgentExpired, error: urgentErr } = await supabase
       .from("orders")
       .select("id, buyer_id, seller_id, total_amount")
-      .eq("status", "placed")
+      .in("status", cancellableStatuses)
       .not("auto_cancel_at", "is", null)
       .lt("auto_cancel_at", now)
       .not("payment_status", "in", "(buyer_confirmed,paid)");
@@ -38,7 +57,7 @@ app.post("/", async (c) => {
     const { data: orphanedUpi, error: orphanErr } = await supabase
       .from("orders")
       .select("id, buyer_id, seller_id, total_amount")
-      .eq("status", "placed")
+      .in("status", cancellableStatuses)
       .eq("payment_status", "pending")
       .neq("payment_type", "cod")
       .lt("created_at", fifteenMinAgo);
@@ -64,7 +83,7 @@ app.post("/", async (c) => {
     const { data: deliveredExpired, error: deliveredErr } = await supabase
       .from("orders")
       .select("id, buyer_id, seller_id")
-      .eq("status", "delivered")
+      .in("status", autoCompletableStatuses)
       .not("auto_complete_at", "is", null)
       .lt("auto_complete_at", now);
 

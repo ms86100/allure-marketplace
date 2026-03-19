@@ -27,11 +27,6 @@ interface LAUpdatePayload {
   initial_eta_minutes?: number | null;
 }
 
-/** Safety-net fallback — overridden by DB query below */
-const FALLBACK_TERMINAL = new Set([
-  "delivered", "completed", "cancelled", "no_show",
-]);
-
 async function loadTerminalStatuses(
   supabase: ReturnType<typeof createClient>,
 ): Promise<Set<string>> {
@@ -40,13 +35,14 @@ async function loadTerminalStatuses(
       .from("category_status_flows")
       .select("status_key")
       .eq("is_terminal", true);
-    if (error || !data || data.length === 0) return FALLBACK_TERMINAL;
-    const dbSet = new Set(data.map((r: any) => r.status_key));
-    // Union with fallbacks for safety
-    for (const s of FALLBACK_TERMINAL) dbSet.add(s);
-    return dbSet;
+    if (error || !data || data.length === 0) {
+      console.warn("[LA-APNs] No terminal statuses from DB, using empty set");
+      return new Set();
+    }
+    return new Set(data.map((r: any) => r.status_key));
   } catch {
-    return FALLBACK_TERMINAL;
+    console.warn("[LA-APNs] Failed to load terminal statuses from DB");
+    return new Set();
   }
 }
 
@@ -215,9 +211,18 @@ Deno.serve(async (req) => {
     const progressStage = flowEntry?.display_label ?? null;
     let progressPercent = deriveProgressPercent(status, flowMap);
 
-    // ETA-based progress override for transit statuses (matches client-side logic)
-    const TRANSIT_STATUSES = ['on_the_way', 'picked_up', 'at_gate'];
-    if (TRANSIT_STATUSES.includes(status) && etaMinutes != null && etaMinutes >= 0) {
+    // ETA-based progress override for transit statuses — loaded from DB via system_settings
+    const { data: transitSetting } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", "transit_statuses")
+      .maybeSingle();
+
+    let transitStatuses: string[];
+    try { transitStatuses = JSON.parse(transitSetting?.value || '[]'); }
+    catch { transitStatuses = []; }
+
+    if (transitStatuses.includes(status) && etaMinutes != null && etaMinutes >= 0) {
       const initialEta = payload.initial_eta_minutes;
       const MAX_ETA = (initialEta != null && initialEta > 5) ? initialEta : 15;
       const ratio = Math.min(etaMinutes / MAX_ETA, 1);

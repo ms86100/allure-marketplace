@@ -6,6 +6,8 @@ export interface StatusFlowStep {
   sort_order: number;
   actor: string;
   is_terminal: boolean;
+  is_success: boolean;
+  requires_otp: boolean;
   display_label: string | null;
   color: string | null;
   icon: string | null;
@@ -40,7 +42,7 @@ export function useCategoryStatusFlow(
       
       let { data, error } = await supabase
         .from('category_status_flows')
-        .select('status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint')
+        .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint')
         .eq('parent_group', parentGroup)
         .eq('transaction_type', transactionType)
         .order('sort_order', { ascending: true });
@@ -49,7 +51,7 @@ export function useCategoryStatusFlow(
       if (!error && (!data || data.length === 0) && parentGroup !== 'default') {
         const fallback = await supabase
           .from('category_status_flows')
-          .select('status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint')
+          .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint')
           .eq('parent_group', 'default')
           .eq('transaction_type', transactionType)
           .order('sort_order', { ascending: true });
@@ -147,7 +149,7 @@ export function getNextStatusForActor(
  * Returns the display steps for the timeline (non-terminal, non-cancelled).
  */
 export function getTimelineSteps(flow: StatusFlowStep[]): StatusFlowStep[] {
-  return flow.filter(s => !s.is_terminal && s.status_key !== 'cancelled');
+  return flow.filter(s => !s.is_terminal);
 }
 
 /**
@@ -158,16 +160,13 @@ export function isTerminalStatus(flow: StatusFlowStep[], status: string): boolea
   return step?.is_terminal === true;
 }
 
-/** Negative terminal outcomes — universal across all workflows */
-const NEGATIVE_TERMINALS = new Set(['cancelled', 'no_show']);
-
 /**
- * Check if a status is a successful terminal state (completed/delivered but NOT cancelled/no_show).
- * DB-driven: uses is_terminal from the flow config.
+ * Check if a status is a successful terminal state.
+ * Fully DB-driven: uses is_terminal AND is_success flags from category_status_flows.
  */
 export function isSuccessfulTerminal(flow: StatusFlowStep[], status: string): boolean {
-  if (NEGATIVE_TERMINALS.has(status)) return false;
-  return isTerminalStatus(flow, status);
+  const step = flow.find(s => s.status_key === status);
+  return step?.is_terminal === true && step?.is_success === true;
 }
 
 /**
@@ -182,11 +181,11 @@ export function isFirstFlowStep(flow: StatusFlowStep[], status: string): boolean
 
 /**
  * Check if a given next-status step requires OTP verification.
- * DB-driven: checks if the flow step's actor is 'delivery'.
+ * Fully DB-driven: uses requires_otp flag from category_status_flows.
  */
 export function stepRequiresOtp(flow: StatusFlowStep[], statusKey: string): boolean {
   const step = flow.find(s => s.status_key === statusKey);
-  return step?.actor === 'delivery';
+  return step?.requires_otp === true;
 }
 
 /**
@@ -201,12 +200,14 @@ export function useTerminalStatuses() {
     (async () => {
       const { data } = await supabase
         .from('category_status_flows')
-        .select('status_key, is_terminal')
+        .select('status_key, is_terminal, is_success')
         .eq('is_terminal', true);
 
       if (data) {
         const all = new Set(data.map(d => d.status_key));
-        const success = new Set(data.filter(d => !NEGATIVE_TERMINALS.has(d.status_key)).map(d => d.status_key));
+        const success = new Set(
+          data.filter(d => d.is_success === true).map(d => d.status_key)
+        );
         setTerminalSet(all);
         setSuccessSet(success);
       }

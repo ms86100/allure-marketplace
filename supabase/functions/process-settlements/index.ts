@@ -73,7 +73,17 @@ Deno.serve(async (req) => {
 
     for (const settlement of eligibleSettlements) {
       // 3. Verify delivery/completion is confirmed
-      // DEFECT 5 FIX: For self-pickup or seller-delivery orders, check order status instead of delivery_assignments
+      // Query DB for terminal success statuses instead of hardcoding
+      const { data: terminalSuccessRows } = await supabase
+        .from("category_status_flows")
+        .select("status_key")
+        .eq("is_terminal", true)
+        .eq("is_success", true);
+
+      const terminalSuccessStatuses = new Set(
+        (terminalSuccessRows || []).map((r: any) => r.status_key)
+      );
+
       const { data: orderData } = await supabase
         .from("orders")
         .select("status, fulfillment_type, delivery_handled_by")
@@ -84,8 +94,8 @@ Deno.serve(async (req) => {
         (orderData?.delivery_handled_by !== 'platform');
 
       if (isNonPlatformDelivery) {
-        // For self-pickup / seller-delivery: order must be completed or delivered
-        if (!orderData || !['delivered', 'completed'].includes(orderData.status)) {
+        // For self-pickup / seller-delivery: order must be in a terminal success state
+        if (!orderData || !terminalSuccessStatuses.has(orderData.status)) {
           errors.push({ id: settlement.id, error: "Order not completed" });
           continue;
         }
