@@ -136,7 +136,7 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
             </Button>
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

@@ -125,8 +125,8 @@ export default function AuthorizedPersonsPage() {
                 {submitting ? <Loader2 size={16} className="mr-1 animate-spin" /> : null} Add Person
               </Button>
             </div>
-          </SheetContent>
-        </Sheet>
+          </DrawerContent>
+        </Drawer>
 
         {persons.filter(p => p.is_active).length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
