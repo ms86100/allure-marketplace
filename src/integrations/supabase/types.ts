@@ -1055,6 +1055,7 @@ export type Database = {
           display_label: string | null
           icon: string | null
           id: string
+          is_success: boolean
           is_terminal: boolean | null
           notification_action: string | null
           notification_body: string | null
@@ -1063,6 +1064,7 @@ export type Database = {
           notify_buyer: boolean | null
           notify_seller: boolean | null
           parent_group: string
+          requires_otp: boolean
           seller_hint: string | null
           seller_notification_body: string | null
           seller_notification_title: string | null
@@ -1079,6 +1081,7 @@ export type Database = {
           display_label?: string | null
           icon?: string | null
           id?: string
+          is_success?: boolean
           is_terminal?: boolean | null
           notification_action?: string | null
           notification_body?: string | null
@@ -1087,6 +1090,7 @@ export type Database = {
           notify_buyer?: boolean | null
           notify_seller?: boolean | null
           parent_group: string
+          requires_otp?: boolean
           seller_hint?: string | null
           seller_notification_body?: string | null
           seller_notification_title?: string | null
@@ -1103,6 +1107,7 @@ export type Database = {
           display_label?: string | null
           icon?: string | null
           id?: string
+          is_success?: boolean
           is_terminal?: boolean | null
           notification_action?: string | null
           notification_body?: string | null
@@ -1111,6 +1116,7 @@ export type Database = {
           notify_buyer?: boolean | null
           notify_seller?: boolean | null
           parent_group?: string
+          requires_otp?: boolean
           seller_hint?: string | null
           seller_notification_body?: string | null
           seller_notification_title?: string | null
