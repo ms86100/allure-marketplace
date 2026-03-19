@@ -200,7 +200,7 @@ function BannerContent({ banner }: { banner: any }) {
 
   if (template === 'text_overlay') {
     return (
-      <div className="relative w-full h-28">
+      <div className="relative w-full h-36">
         {image_url ? (
           <img src={image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
         ) : (
