@@ -91,7 +91,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
             >
               {/* Tile image */}
               <div
-                className="w-full aspect-square rounded-2xl overflow-hidden flex items-center justify-center border border-foreground/[0.04]"
+                className="w-full aspect-square rounded-2xl overflow-hidden flex items-center justify-center border border-foreground/[0.06]"
                 style={{
                   backgroundColor: catColor ? `${catColor}12` : 'hsl(var(--card))',
                 }}
