@@ -101,8 +101,9 @@
     --background: 0 0% 5%;
     --foreground: 0 0% 94%;
 
-    --card: 0 0% 11%;
+    --card: 0 0% 12%;
     --card-foreground: 0 0% 94%;
+    --card-elevated: 0 0% 15%;
 
     --popover: 0 0% 7%;
     --popover-foreground: 0 0% 94%;
@@ -449,6 +450,8 @@ html.large-font a {
 .category-collage.items-3 > :first-child {
   grid-row: 1 / -1;
 }
+
+/* items-4: default 2x2 grid — no overrides needed */
 
 /* Sonner close button */
 [data-sonner-toast] [data-close-button] {
