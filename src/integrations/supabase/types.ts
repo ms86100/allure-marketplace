@@ -8449,6 +8449,13 @@ export type Database = {
         }
         Returns: Json
       }
+      buyer_advance_order: {
+        Args: {
+          _new_status: Database["public"]["Enums"]["order_status"]
+          _order_id: string
+        }
+        Returns: undefined
+      }
       buyer_cancel_order: {
         Args: {
           _expected_status?: Database["public"]["Enums"]["order_status"]

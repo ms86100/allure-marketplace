@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveTransactionType } from '@/lib/resolveTransactionType';
 
 export interface StatusFlowStep {
   status_key: string;
@@ -71,29 +72,7 @@ export function useCategoryStatusFlow(
   return { flow, isLoading };
 }
 
-function resolveTransactionType(
-  parentGroup: string,
-  orderType: string | null | undefined,
-  fulfillmentType?: string | null,
-  deliveryHandledBy?: string | null
-): string {
-  if (orderType === 'enquiry') {
-    if (['classes', 'events'].includes(parentGroup)) return 'book_slot';
-    return 'request_service';
-  }
-  if (orderType === 'booking') {
-    return 'service_booking';
-  }
-  if (fulfillmentType === 'self_pickup') return 'self_fulfillment';
-  // Seller-handled delivery → seller_delivery (includes delivery tracking statuses)
-  if (fulfillmentType === 'seller_delivery') return 'seller_delivery';
-  if (fulfillmentType === 'delivery' && (deliveryHandledBy === 'seller' || !deliveryHandledBy)) {
-    return 'seller_delivery';
-  }
-  // Platform-handled delivery
-  if (fulfillmentType === 'delivery' && deliveryHandledBy === 'platform') return 'cart_purchase';
-  return 'self_fulfillment';
-}
+
 
 /**
  * Given a flow, transitions, current status, and actor, returns valid next statuses
