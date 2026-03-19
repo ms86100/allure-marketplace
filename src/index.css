@@ -638,47 +638,39 @@ body.razorpay-active iframe[src*="razorpay"] {
 
 /* ═══ Nature: WANGLOW mineral background ═══ */
 .nature #root {
-  background-color: hsl(40 10% 90%);
+  background-color: hsl(0 0% 5%);
   background-image:
-    /* Warm Studio Gray mist — top ambient */
-    radial-gradient(ellipse 90% 60% at 50% 0%, hsl(0 0% 62% / 0.06) 0%, transparent 55%),
-    /* Deep Forest Green subtle canopy — very restrained */
-    radial-gradient(ellipse 50% 40% at 8% 15%, hsl(165 35% 25% / 0.05) 0%, transparent 50%),
-    /* Sage Teal center hint */
+    /* Deep Forest Green subtle glow — top left */
+    radial-gradient(ellipse 50% 40% at 8% 15%, hsl(165 35% 25% / 0.08) 0%, transparent 50%),
+    /* Sage Teal ambient — center */
     radial-gradient(ellipse 60% 40% at 50% 50%, hsl(175 25% 55% / 0.04) 0%, transparent 55%),
-    /* Golden Amber warmth — right side */
+    /* Golden Amber warmth — right */
     radial-gradient(ellipse 45% 35% at 90% 35%, hsl(30 45% 50% / 0.04) 0%, transparent 50%),
-    /* Warm Sand wash — bottom */
-    radial-gradient(ellipse 100% 40% at 50% 100%, hsl(30 20% 78% / 0.05) 0%, transparent 50%),
-    /* Dark Basalt grounding — very subtle */
-    radial-gradient(ellipse 70% 30% at 30% 95%, hsl(0 0% 25% / 0.02) 0%, transparent 45%);
+    /* Deep green grounding — bottom */
+    radial-gradient(ellipse 100% 40% at 50% 100%, hsl(165 35% 25% / 0.05) 0%, transparent 50%);
   background-attachment: fixed;
 }
 
-/* Nature: mineral fiber texture — stone grain */
+/* Nature: subtle texture on dark */
 .nature #root::before {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.03;
+  opacity: 0.02;
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cg opacity='0.6'%3E%3Cpath d='M20 30 Q60 25 100 35 Q140 28 180 32' fill='none' stroke='%23999080' stroke-width='0.4'/%3E%3Cpath d='M15 70 Q55 65 95 72 Q135 68 175 74' fill='none' stroke='%23999080' stroke-width='0.3'/%3E%3Cpath d='M25 110 Q65 105 105 115 Q145 108 185 112' fill='none' stroke='%23999080' stroke-width='0.35'/%3E%3Cpath d='M10 150 Q50 145 90 153 Q130 148 170 155' fill='none' stroke='%23999080' stroke-width='0.3'/%3E%3Cpath d='M18 190 Q58 185 98 192 Q138 188 178 194' fill='none' stroke='%23999080' stroke-width='0.25'/%3E%3C/g%3E%3Ccircle cx='50' cy='50' r='1' fill='%23999080' opacity='0.15'/%3E%3Ccircle cx='150' cy='120' r='0.8' fill='%23999080' opacity='0.1'/%3E%3Ccircle cx='90' cy='170' r='0.6' fill='%23999080' opacity='0.08'/%3E%3C/svg%3E");
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cg opacity='0.6'%3E%3Cpath d='M20 30 Q60 25 100 35 Q140 28 180 32' fill='none' stroke='%23508a6a' stroke-width='0.4'/%3E%3Cpath d='M15 70 Q55 65 95 72 Q135 68 175 74' fill='none' stroke='%23508a6a' stroke-width='0.3'/%3E%3Cpath d='M25 110 Q65 105 105 115 Q145 108 185 112' fill='none' stroke='%23508a6a' stroke-width='0.35'/%3E%3Cpath d='M10 150 Q50 145 90 153 Q130 148 170 155' fill='none' stroke='%23508a6a' stroke-width='0.3'/%3E%3C/g%3E%3C/svg%3E");
   background-size: 200px 200px;
 }
 
-/* Nature: subtle water-contour texture */
 .nature #root::after {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.015;
-  background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Cg fill='none' stroke='%23708a7a' stroke-width='0.3'%3E%3Cpath d='M150 80 Q190 105 210 145 Q195 185 150 205 Q105 185 90 145 Q110 105 150 80Z' opacity='0.4'/%3E%3Cpath d='M150 110 Q175 125 185 150 Q178 175 150 185 Q122 175 115 150 Q125 125 150 110Z' opacity='0.3'/%3E%3C/g%3E%3C/svg%3E");
-  background-size: 300px 300px;
+  opacity: 0;
 }
 
 .nature #root > * {
@@ -686,25 +678,25 @@ body.razorpay-active iframe[src*="razorpay"] {
   z-index: 1;
 }
 
-/* Nature: mineral section bands */
+/* Nature: section bands on dark */
 .nature .nature-section-forest {
   background-image:
-    linear-gradient(180deg, hsl(165 35% 25% / 0.04) 0%, hsl(165 25% 30% / 0.015) 50%, transparent 100%);
+    linear-gradient(180deg, hsl(165 35% 25% / 0.06) 0%, transparent 100%);
 }
 
 .nature .nature-section-water {
   background-image:
-    linear-gradient(180deg, hsl(175 25% 55% / 0.05) 0%, hsl(175 20% 60% / 0.02) 50%, transparent 100%);
+    linear-gradient(180deg, hsl(175 25% 55% / 0.05) 0%, transparent 100%);
 }
 
 .nature .nature-section-earth {
   background-image:
-    linear-gradient(180deg, hsl(30 45% 50% / 0.04) 0%, hsl(30 35% 55% / 0.015) 50%, transparent 100%);
+    linear-gradient(180deg, hsl(30 45% 50% / 0.04) 0%, transparent 100%);
 }
 
 .nature .nature-section-meadow {
   background-image:
-    linear-gradient(135deg, hsl(40 15% 85% / 0.06) 0%, hsl(30 20% 78% / 0.03) 50%, transparent 100%);
+    linear-gradient(135deg, hsl(165 35% 20% / 0.04) 0%, transparent 100%);
 }
 
 /* Nature: gentler animations */
@@ -725,35 +717,46 @@ body.razorpay-active iframe[src*="razorpay"] {
   animation: bounceIn 0.55s cubic-bezier(0.34, 1.15, 0.64, 1);
 }
 
-/* Nature: organic card surfaces — limestone & pumice */
+/* Nature: dark glass cards */
 .nature .glass-card {
-  background: linear-gradient(155deg, hsl(40 15% 85% / 0.94) 0%, hsl(0 0% 82% / 0.88) 100%);
-  border-color: hsl(30 8% 76% / 0.5);
-  box-shadow: var(--shadow-card), inset 0 1px 0 hsl(40 12% 92% / 0.5);
+  background: linear-gradient(155deg, hsl(0 0% 11% / 0.94) 0%, hsl(0 0% 7% / 0.88) 100%);
+  border-color: hsl(0 0% 18% / 0.5);
+  box-shadow: var(--shadow-card);
 }
 
 .nature .glass-tinted {
-  background: linear-gradient(155deg, hsl(40 15% 85% / 0.84) 0%, hsl(40 10% 82% / 0.78) 100%);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 hsl(40 12% 92% / 0.4);
+  background: linear-gradient(155deg, hsl(0 0% 11% / 0.84) 0%, hsl(0 0% 8% / 0.78) 100%);
+  box-shadow: var(--shadow-sm);
 }
 
-/* Nature: buttons with deep forest depth */
+/* Nature: green-tinted primary buttons */
 .nature .bg-primary {
   background-image: var(--gradient-primary);
-  box-shadow: var(--shadow-cta), inset 0 1px 0 hsl(165 35% 35% / 0.3);
+  box-shadow: var(--shadow-cta), inset 0 1px 0 hsl(165 35% 40% / 0.3);
 }
 
-/* Nature: scrollbar — warm stone tones */
+/* Nature: dark scrollbar */
 .nature ::-webkit-scrollbar {
   width: 6px;
 }
 .nature ::-webkit-scrollbar-track {
-  background: hsl(40 10% 86%);
+  background: hsl(0 0% 8%);
 }
 .nature ::-webkit-scrollbar-thumb {
-  background: hsl(30 15% 60% / 0.4);
+  background: hsl(165 25% 30% / 0.4);
   border-radius: 3px;
 }
 .nature ::-webkit-scrollbar-thumb:hover {
-  background: hsl(165 25% 40% / 0.5);
+  background: hsl(165 30% 35% / 0.5);
+}
+
+/* Nature: green glow utilities on dark */
+.nature .glow-green {
+  box-shadow: var(--shadow-glow-green);
+}
+.nature .glow-primary {
+  box-shadow: var(--shadow-glow);
+}
+.nature .glow-accent {
+  box-shadow: var(--shadow-glow-accent);
 }
