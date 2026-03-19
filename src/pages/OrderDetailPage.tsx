@@ -304,7 +304,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Delivery partner identity card — shown when assignment exists */}
-          {o.isBuyerView && isDeliveryOrder && deliveryAssignmentId && deliveryTracking.riderName && !['delivered', 'completed', 'cancelled'].includes(order.status) && (
+          {o.isBuyerView && isDeliveryOrder && deliveryAssignmentId && deliveryTracking.riderName && !isTerminalStatus(o.flow, order.status) && (
             <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <Truck size={18} className="text-primary" />
