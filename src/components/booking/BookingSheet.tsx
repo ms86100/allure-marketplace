@@ -192,7 +192,7 @@ export function BookingSheet({
               : 'Confirm Booking'}
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

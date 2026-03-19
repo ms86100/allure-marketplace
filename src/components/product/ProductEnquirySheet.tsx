@@ -219,7 +219,7 @@ export function ProductEnquirySheet({
             Your contact details will be shared with the seller
           </p>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

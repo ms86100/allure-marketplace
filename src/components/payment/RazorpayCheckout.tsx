@@ -186,7 +186,7 @@ export function RazorpayCheckout({
             </div>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

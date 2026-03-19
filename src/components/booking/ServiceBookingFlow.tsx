@@ -305,18 +305,18 @@ export function ServiceBookingFlow({
     : 'At Seller Location';
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl">
-        <SheetHeader className="pb-4">
-          <SheetTitle className="flex items-center gap-2">
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="h-[85vh]">
+        <DrawerHeader className="pb-4">
+          <DrawerTitle className="flex items-center gap-2">
             {step === 'review' && (
               <Button variant="ghost" size="icon" className="h-7 w-7 -ml-1" onClick={handleBackToSelect}>
                 <ArrowLeft size={16} />
               </Button>
             )}
             {step === 'select' ? 'Book Service' : 'Review Booking'}
-          </SheetTitle>
-        </SheetHeader>
+          </DrawerTitle>
+        </DrawerHeader>
 
         <div className="space-y-6 overflow-y-auto pb-20">
           {step === 'select' && (
