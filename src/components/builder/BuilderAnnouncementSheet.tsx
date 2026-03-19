@@ -62,17 +62,17 @@ export function BuilderAnnouncementSheet({ societies, builderId, onSent }: Props
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
         <Button size="sm" variant="outline">
           <Megaphone size={14} className="mr-1" /> Announce
         </Button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Send Announcement</SheetTitle>
-          <SheetDescription>Send an update to all residents of a society</SheetDescription>
-        </SheetHeader>
+      </DrawerTrigger>
+      <DrawerContent className="max-h-[85vh] overflow-y-auto">
+        <DrawerHeader>
+          <DrawerTitle>Send Announcement</DrawerTitle>
+          <DrawerDescription>Send an update to all residents of a society</DrawerDescription>
+        </DrawerHeader>
         <div className="space-y-4 py-4">
           {societies.length > 1 && (
             <div>
