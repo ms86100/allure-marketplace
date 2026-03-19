@@ -18,14 +18,21 @@ export function DeliveryCompletionOtpDialog({ orderId, open, onOpenChange, onVer
   const [internalOpen, setInternalOpen] = useState(false);
   const [otp, setOtp] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const controlledOpen = open ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
   const canSubmit = useMemo(() => otp.trim().length === 4 && !isSubmitting, [otp, isSubmitting]);
 
+  const handleOtpChange = (value: string) => {
+    setOtp(value);
+    if (errorMessage) setErrorMessage(null);
+  };
+
   const handleVerify = async () => {
     if (!canSubmit) return;
     setIsSubmitting(true);
+    setErrorMessage(null);
     try {
       const { error } = await supabase.rpc('verify_delivery_otp_and_complete', {
         _order_id: orderId,
@@ -36,10 +43,16 @@ export function DeliveryCompletionOtpDialog({ orderId, open, onOpenChange, onVer
 
       toast.success('Delivery verified and completed');
       setOtp('');
+      setErrorMessage(null);
       setOpen(false);
       onVerified?.();
     } catch (error: any) {
-      toast.error(error?.message || 'Invalid delivery code');
+      const msg = error?.message || 'Invalid delivery code';
+      const friendly = msg.toLowerCase().includes('invalid delivery code')
+        ? 'Invalid code, please try again'
+        : msg;
+      setErrorMessage(friendly);
+      toast.error(friendly);
     } finally {
       setIsSubmitting(false);
     }
