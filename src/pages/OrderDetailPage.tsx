@@ -61,6 +61,16 @@ export default function OrderDetailPage() {
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
   const trackingConfig = useTrackingConfig();
 
+  // Defensive guard: end any lingering Live Activity if order is terminal
+  useEffect(() => {
+    if (!orderId || !order?.status) return;
+    if (!Capacitor.isNativePlatform()) return;
+    const TERMINAL = new Set(['delivered', 'completed', 'cancelled', 'no_show']);
+    if (TERMINAL.has(order.status)) {
+      LiveActivityManager.end(orderId).catch(() => {});
+    }
+  }, [orderId, order?.status]);
+
   // Gap A: Fetch delivery OTP for buyer display
 
   useEffect(() => {
