@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { useHaptics } from '@/hooks/useHaptics';
 import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
+import { ActiveOrderETA } from '@/components/header/ActiveOrderETA';
 import { useUnreadNotificationCount } from '@/hooks/useUnreadNotificationCount';
 import { useSocietyStats } from '@/hooks/useSocietyStats';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
@@ -207,6 +208,7 @@ function HeaderInner({
           )}
         </div>
 
+        <ActiveOrderETA />
         <LocationSelectorSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} />
 
         {/* Breadcrumb bar - shown when title is present */}
