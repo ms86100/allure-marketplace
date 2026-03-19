@@ -497,11 +497,11 @@ serve(async (req) => {
             if (sellerId) {
               const { data: sp } = await supabase
                 .from('seller_profiles')
-                .select('business_name, logo_url')
+                .select('business_name, profile_image_url')
                 .eq('id', sellerId)
                 .single();
               sellerName = sp?.business_name ?? null;
-              sellerLogoUrl = sp?.logo_url ?? null;
+              sellerLogoUrl = sp?.profile_image_url ?? null;
             }
 
             // Invoke APNs push

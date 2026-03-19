@@ -49,7 +49,7 @@ export async function getStartStatuses(): Promise<Set<string>> {
   const entries = await getStatusFlowEntries();
   const start = new Set<string>();
   for (const e of entries) {
-    if (!e.is_terminal && e.status_key !== 'placed') {
+    if (!e.is_terminal && e.status_key !== 'placed' && e.status_key !== 'delivered') {
       start.add(e.status_key);
     }
   }

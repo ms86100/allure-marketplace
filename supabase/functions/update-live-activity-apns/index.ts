@@ -256,7 +256,7 @@ Deno.serve(async (req) => {
           Authorization: `bearer ${jwt}`,
           "apns-topic": laTopic,
           "apns-push-type": "liveactivity",
-          "apns-priority": "10",
+          "apns-priority": isTerminal ? "10" : "5",
           "Content-Type": "application/json",
         },
         body: JSON.stringify(apnsPayload),

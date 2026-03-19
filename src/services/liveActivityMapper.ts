@@ -113,7 +113,8 @@ export function buildLiveActivityData(
   if (isTransit) {
     // Prefer ETA-based progress when available — gives a meaningful countdown
     if (delivery?.eta_minutes != null && delivery.eta_minutes >= 0) {
-      const MAX_ETA = 45; // minutes — upper bound for normalisation
+      // Bug 19: Use dynamic MAX_ETA from initial ETA or default to 15 for short deliveries
+      const MAX_ETA = initialEtaMinutes && initialEtaMinutes > 5 ? initialEtaMinutes : 15;
       const ratio = Math.min(delivery.eta_minutes / MAX_ETA, 1);
       progressPercent = Math.max(0.1, Math.min(0.95, 1 - ratio));
     } else if (distanceKm != null && distanceKm >= 0) {

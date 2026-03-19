@@ -42,7 +42,7 @@ const DEFAULTS: TrackingConfig = {
   map_animation_duration_ms: 2000,
   max_delivery_distance_km: 10,
   transit_statuses: ['picked_up', 'on_the_way', 'at_gate'],
-  transit_statuses_la: ['en_route', 'on_the_way', 'picked_up'],
+  transit_statuses_la: ['on_the_way', 'picked_up', 'at_gate'],
   arrival_overlay_distance_meters: 200,
   arrival_doorstep_distance_meters: 50,
 };

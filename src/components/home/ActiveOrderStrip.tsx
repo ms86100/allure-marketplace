@@ -108,8 +108,7 @@ export function ActiveOrderStrip() {
                 </span>
                 {order.color && (
                   <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: order.color }}
+                    className={`w-2 h-2 rounded-full shrink-0 ${order.color.split(' ')[0]}`}
                   />
                 )}
               </div>
