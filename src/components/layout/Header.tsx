@@ -93,26 +93,19 @@ function HeaderInner({
         'sticky top-0 z-40 bg-background border-b border-border/50',
         className
       )}>
-        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 space-y-1.5">
-          {/* Brand + Tagline */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-extrabold text-foreground tracking-tight">Sociva</span>
-            {stats && (stats.sellers > 0 || stats.orders > 0) ? (
-              <>
-                <span className="text-[10px] text-muted-foreground">·</span>
-                <span className="text-[10px] font-medium text-muted-foreground">
-                  {stats.sellers > 0 && `${stats.sellers} seller${stats.sellers !== 1 ? 's' : ''}`}
-                  {stats.sellers > 0 && stats.orders > 0 && ' · '}
-                  {stats.orders > 0 && `${stats.orders.toLocaleString()} orders served`}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="text-[10px] text-muted-foreground">·</span>
-                <span className="text-[10px] font-medium text-muted-foreground">Your society, your marketplace</span>
-              </>
-            )}
+        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3 space-y-1">
+          {/* Brand row */}
+          <div className="flex items-baseline gap-2">
+            <span className="text-[15px] font-extrabold text-foreground tracking-tight leading-none">Sociva</span>
+            <span className="text-[10px] font-medium text-muted-foreground leading-none">Your society, your marketplace</span>
           </div>
+          {stats && (stats.sellers > 0 || stats.orders > 0) && (
+            <p className="text-[10px] text-muted-foreground leading-none">
+              {stats.sellers > 0 && `${stats.sellers} seller${stats.sellers !== 1 ? 's' : ''}`}
+              {stats.sellers > 0 && stats.orders > 0 && ' · '}
+              {stats.orders > 0 && `${stats.orders.toLocaleString()} orders served`}
+            </p>
+          )}
 
           {/* Row 1: Location/greeting + actions */}
           <div className="flex items-center justify-between">
