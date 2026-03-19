@@ -411,7 +411,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Gap 12: Delivery-specific rating — separate from product review */}
-          {o.isBuyerView && isDeliveryOrder && (order.status === 'completed' || order.status === 'delivered') && !hasDeliveryFeedback && (
+          {o.isBuyerView && isDeliveryOrder && isSuccessfulTerminal(o.flow, order.status) && !hasDeliveryFeedback && (
             <div className="bg-accent/5 border border-accent/20 rounded-xl p-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="text-lg">🚚</span>
