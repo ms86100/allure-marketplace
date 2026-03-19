@@ -45,18 +45,20 @@ export async function syncActiveOrders(userId: string): Promise<number> {
   try {
     console.log(TAG, 'Syncing active buyer orders for', userId);
 
-    // DB-backed active statuses from category_status_flows
-    const activeStatuses = [...await getStartStatuses()];
-    if (activeStatuses.length === 0) {
-      console.warn(TAG, 'No active statuses from DB, skipping sync');
+    // Use terminal-exclusion (same as orchestrator heartbeat) to avoid divergence
+    const terminalStatuses = [...await getTerminalStatuses()];
+    if (terminalStatuses.length === 0) {
+      console.warn(TAG, 'No terminal statuses from DB, skipping sync');
       return 0;
     }
+
+    const terminalFilter = `(${terminalStatuses.map(s => `"${s}"`).join(',')})`;
 
     const { data: orders, error } = await supabase
       .from('orders')
       .select('id, status, seller_id')
       .eq('buyer_id', userId)
-      .in('status', activeStatuses as any);
+      .not('status', 'in', terminalFilter);
 
     if (error) {
       console.error(TAG, 'Failed to fetch active orders:', error.message);
