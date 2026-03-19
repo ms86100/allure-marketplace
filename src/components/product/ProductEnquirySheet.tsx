@@ -169,16 +169,16 @@ export function ProductEnquirySheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader className="pb-3">
-          <SheetTitle className="flex items-center gap-2">
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent>
+        <DrawerHeader className="pb-3">
+          <DrawerTitle className="flex items-center gap-2">
             <Icon size={18} className="text-primary" />
             {meta.title}
-          </SheetTitle>
-        </SheetHeader>
+          </DrawerTitle>
+        </DrawerHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 px-4 pb-6">
           {/* Product summary */}
           <div className="p-3 bg-muted rounded-lg">
             <p className="font-medium text-sm">{productName}</p>
