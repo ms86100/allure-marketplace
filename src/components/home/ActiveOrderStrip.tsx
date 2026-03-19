@@ -8,7 +8,7 @@ import { ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { compactETA } from '@/lib/etaEngine';
-import { TRANSIT_STATUSES } from '@/lib/visibilityEngine';
+import { getTransitStatuses } from '@/lib/visibilityEngine';
 
 interface ActiveOrder {
   id: string;
