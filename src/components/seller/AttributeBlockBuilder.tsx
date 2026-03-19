@@ -128,11 +128,11 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
           Add More Details
         </Button>
 
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetContent side="bottom" className="rounded-t-2xl max-h-[60vh] overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>Add Details to Your Listing</SheetTitle>
-            </SheetHeader>
+        <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+          <DrawerContent className="max-h-[60vh] overflow-y-auto">
+            <DrawerHeader>
+              <DrawerTitle>Add Details to Your Listing</DrawerTitle>
+            </DrawerHeader>
             <div className="mt-4 space-y-2">
               {availableBlocks.map((block) => (
                 <button
