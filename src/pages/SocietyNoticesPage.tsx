@@ -102,14 +102,14 @@ export default function SocietyNoticesPage() {
       <FeatureGate feature="society_notices">
       <div className="p-4 space-y-4">
         {canPost && (
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
+          <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+            <DrawerTrigger asChild>
               <Button className="w-full gap-2">
                 <Plus size={16} /> Post Notice
               </Button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
-              <SheetHeader><SheetTitle>Post Official Notice</SheetTitle></SheetHeader>
+            </DrawerTrigger>
+            <DrawerContent className="max-h-[85vh] overflow-y-auto">
+              <DrawerHeader><DrawerTitle>Post Official Notice</DrawerTitle></DrawerHeader>
               <div className="space-y-4 mt-4">
                 <div>
                   <Label>Title *</Label>
