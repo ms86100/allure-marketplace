@@ -120,19 +120,15 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
   const placeholderBg = catConfig?.color ? `${catConfig.color}15` : undefined;
 
   return (
-    <div ref={cardRef} onClick={handleCardClick} className={cn('bg-card rounded-xl cursor-pointer flex flex-col h-full relative', 'border border-border', 'transition-all duration-200 ease-out', 'active:scale-[0.98] hover:scale-[1.02]', isOutOfStock && 'opacity-50 grayscale-[40%]', isStoreClosed && !isOutOfStock && 'opacity-60 grayscale-[30%]', className)}>
+    <div ref={cardRef} onClick={handleCardClick} className={cn('bg-card rounded-xl cursor-pointer flex flex-col h-full relative', 'border border-border', 'transition-all duration-150 ease-out', 'active:scale-[0.97]', isOutOfStock && 'opacity-50 grayscale-[40%]', isStoreClosed && !isOutOfStock && 'opacity-60 grayscale-[30%]', className)}>
       <div className="relative">
-        <div className="relative aspect-[4/3] rounded-t-xl overflow-hidden product-image-bg">
+        <div className="relative aspect-[5/4] rounded-t-xl overflow-hidden product-image-bg">
           {product.image_url ? (
             <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
           ) : (
             <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: placeholderBg || 'hsl(var(--muted))' }}>
               <span className="text-3xl">{placeholderEmoji}</span>
             </div>
-          )}
-          {/* Bottom gradient for button contrast */}
-          {product.image_url && (
-            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-black/15 to-transparent pointer-events-none" />
           )}
           {isOutOfStock && (<div className="absolute inset-0 bg-background/60 flex items-center justify-center"><span className="text-[8px] font-bold text-muted-foreground bg-muted/90 px-1.5 py-0.5 rounded-full uppercase tracking-wider">{mc.labels.outOfStock}</span></div>)}
           {isStoreClosed && !isOutOfStock && (<div className="absolute inset-0 bg-background/40 flex items-center justify-center"><span className="text-[8px] font-bold text-muted-foreground bg-muted/90 px-1.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1"><Clock size={8} />{storeClosedMessage}</span></div>)}
@@ -141,14 +137,14 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
           {showVegBadge && (<div className="absolute bottom-1.5 right-1.5"><VegBadge isVeg={product.is_veg} size="sm" /></div>)}
         </div>
         {!viewOnly && !isOutOfStock && !isStoreClosed && (
-          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10">
+          <div className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 z-10">
             {isCartAction && quantity > 0 ? (
               <div className="flex items-center bg-primary rounded-lg overflow-hidden shadow-cta animate-stepper-pop">
-                <button onClick={handleDecrement} className="px-2.5 py-1 text-primary-foreground hover:bg-primary/80 transition-colors"><Minus size={12} strokeWidth={3} /></button>
-                <span className="font-bold text-[11px] text-primary-foreground px-1">{quantity}</span>
-                <button onClick={handleIncrement} className="px-2.5 py-1 text-primary-foreground hover:bg-primary/80 transition-colors"><Plus size={12} strokeWidth={3} /></button>
+                <button onClick={handleDecrement} className="px-3 py-1.5 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Minus size={13} strokeWidth={3} /></button>
+                <span className="font-bold text-xs text-primary-foreground px-1">{quantity}</span>
+                <button onClick={handleIncrement} className="px-3 py-1.5 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Plus size={13} strokeWidth={3} /></button>
               </div>
-            ) : (<button onClick={handleAdd} className="bg-primary text-primary-foreground font-bold text-[10px] px-4 py-1 rounded-md shadow-cta hover:opacity-90 transition-all duration-150 uppercase tracking-wide active:scale-95">{actionConfig.shortLabel}</button>)}
+            ) : (<button onClick={handleAdd} className="bg-primary text-primary-foreground font-bold text-[11px] px-5 py-1.5 rounded-lg shadow-cta hover:opacity-90 transition-all duration-150 uppercase tracking-wide active:scale-95 min-h-[44px]">{actionConfig.shortLabel}</button>)}
           </div>
         )}
       </div>
