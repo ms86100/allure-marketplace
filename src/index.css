@@ -175,13 +175,13 @@
     --shadow-glow-green: 0 0 14px hsl(151 65% 44% / 0.2);
     --shadow-glow-accent: 0 0 14px hsl(38 92% 50% / 0.2);
 
-    --sidebar-background: 230 18% 8%;
-    --sidebar-foreground: 40 10% 94%;
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 0 0% 94%;
     --sidebar-primary: 151 65% 44%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 230 14% 15%;
-    --sidebar-accent-foreground: 230 8% 72%;
-    --sidebar-border: 230 12% 18%;
+    --sidebar-accent: 0 0% 14%;
+    --sidebar-accent-foreground: 0 0% 72%;
+    --sidebar-border: 0 0% 16%;
     --sidebar-ring: 151 65% 44%;
   }
 }
