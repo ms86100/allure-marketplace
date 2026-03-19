@@ -171,6 +171,20 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="px-4 pt-3 space-y-3">
+          {/* Delivery completion celebration — shown once for delivered/completed orders */}
+          {o.isBuyerView && ['delivered', 'completed'].includes(order.status) && !getString(`celebration_${order.id}`) && (() => {
+            const durationMs = new Date(order.updated_at || order.created_at).getTime() - new Date(order.created_at).getTime();
+            const durationMin = Math.max(1, Math.round(durationMs / 60000));
+            setString(`celebration_${order.id}`, 'true');
+            return (
+              <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
+                <span className="text-3xl">🎊</span>
+                <p className="text-sm font-bold text-accent mt-1.5">Delivered in {durationMin} min!</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Thank you for supporting your community</p>
+              </div>
+            );
+          })()}
+
           {/* Gap 11: Order placed celebration banner — shown for newly placed orders */}
           {o.isBuyerView && order.status === 'placed' && (Date.now() - new Date(order.created_at).getTime() < 60000) && (
             <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
@@ -287,6 +301,24 @@ export default function OrderDetailPage() {
           {/* Gap 11: ETA banner for buyer — shown from acceptance until delivery */}
           {o.isBuyerView && isDeliveryOrder && (order as any).estimated_delivery_at && !['delivered', 'completed', 'cancelled'].includes(order.status) && !(deliveryAssignmentId && deliveryTracking.eta) && (
             <DeliveryETABanner estimatedDeliveryAt={(order as any).estimated_delivery_at} />
+          )}
+
+          {/* Delivery partner identity card — shown when assignment exists */}
+          {o.isBuyerView && isDeliveryOrder && deliveryAssignmentId && deliveryTracking.riderName && !['delivered', 'completed', 'cancelled'].includes(order.status) && (
+            <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Truck size={18} className="text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Your delivery partner</p>
+                <p className="text-sm font-semibold truncate">{deliveryTracking.riderName}</p>
+              </div>
+              {deliveryTracking.riderPhone && (
+                <a href={`tel:${deliveryTracking.riderPhone}`} className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
+                  <Phone size={16} className="text-accent" />
+                </a>
+              )}
+            </div>
           )}
 
           {/* Gap 8: Buyer delivery confirmation — only for non-delivery orders (delivery orders use OTP as proof) */}

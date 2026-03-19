@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { OnboardingWalkthrough, useOnboarding } from '@/components/onboarding/OnboardingWalkthrough';
@@ -23,6 +23,10 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { showOnboarding, hasChecked, completeOnboarding } = useOnboarding(user?.id);
 
+  // Session continuity: restore scroll position
+  const scrollKey = 'home-scroll-y';
+  const hasRestoredRef = useRef(false);
+
   // Auto-redirect to profile edit if profile is incomplete
   useEffect(() => {
     if (profile) {
@@ -32,6 +36,19 @@ export default function HomePage() {
       }
     }
   }, [profile, navigate]);
+
+  useEffect(() => {
+    if (!hasRestoredRef.current && profile) {
+      const saved = sessionStorage.getItem(scrollKey);
+      if (saved) {
+        requestAnimationFrame(() => window.scrollTo(0, parseInt(saved, 10)));
+      }
+      hasRestoredRef.current = true;
+    }
+    return () => {
+      sessionStorage.setItem(scrollKey, String(window.scrollY));
+    };
+  }, [profile]);
 
   if (hasChecked && showOnboarding && profile) {
     return <OnboardingWalkthrough onComplete={completeOnboarding} />;

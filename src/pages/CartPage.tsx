@@ -265,6 +265,14 @@ export default function CartPage() {
             {communityText}
           </p>
         )}
+        {/* Checkout reinforcement micro-copy */}
+        {c.fulfillmentType === 'delivery' && c.settings.freeDeliveryThreshold > 0 && (
+          c.totalAmount >= c.settings.freeDeliveryThreshold ? (
+            <p className="text-[10px] text-accent font-semibold text-center pt-1 px-4">🎉 Free delivery unlocked!</p>
+          ) : (
+            <p className="text-[10px] text-muted-foreground text-center pt-1 px-4">Add {c.formatPrice(c.settings.freeDeliveryThreshold - c.totalAmount)} more for free delivery</p>
+          )
+        )}
         <p className="text-[10px] text-muted-foreground text-center pt-1 px-4">Payments are processed by third-party providers and are not covered by Apple. <Link to="/terms" className="underline">Refund & Cancellation Policy</Link></p>
         <div className="px-4 py-3 flex items-center gap-3">
           <div className="flex-1"><p className="text-xs text-muted-foreground">Total</p><p className="text-lg font-bold tabular-nums">{c.formatPrice(c.finalAmount)}</p></div>

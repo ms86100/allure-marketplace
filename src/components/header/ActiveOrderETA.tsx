@@ -6,7 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Package, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { compactETA } from '@/lib/etaEngine';
+import { compactETA, computeETA } from '@/lib/etaEngine';
 import { TRANSIT_STATUSES, isRouteHidden, ETA_HIDDEN_ROUTE_PREFIXES } from '@/lib/visibilityEngine';
 
 /**
@@ -67,7 +67,9 @@ export function ActiveOrderETA() {
 
   const isTransit = TRANSIT_STATUSES.has(activeOrder.status as any);
   const etaText = compactETA(activeOrder.estimated_delivery_at, now);
+  const etaResult = activeOrder.estimated_delivery_at ? computeETA(activeOrder.estimated_delivery_at, now) : null;
   const isArriving = etaText === 'Arriving now' || etaText === 'Arriving soon';
+  const isImminent = etaResult?.mood === 'imminent';
   const statusLabel = activeOrder.status?.replace(/_/g, ' ') || 'Processing';
 
   return (
@@ -89,10 +91,11 @@ export function ActiveOrderETA() {
             <motion.span
               className="w-2 h-2 rounded-full bg-green-500 shrink-0"
               animate={{ opacity: [1, 0.3, 1] }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+              transition={{ duration: isImminent ? 0.8 : 1.5, repeat: Infinity, ease: 'easeInOut' }}
             />
           )}
           <p className="text-[12px] font-bold text-foreground capitalize truncate">
+            {etaResult?.emoji && <span className="mr-1">{etaResult.emoji}</span>}
             {statusLabel}
           </p>
         </div>
