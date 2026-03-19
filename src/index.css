@@ -240,7 +240,7 @@
     --muted-foreground: 80 5% 52%;
 
     --accent: 30 45% 50%;             /* Golden Amber — terracotta rock */
-    --accent-foreground: 40 10% 95%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 8 40% 45%;         /* Warm terracotta-red */
     --destructive-foreground: 0 0% 100%;
