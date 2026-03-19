@@ -276,7 +276,7 @@ function DiscoveryRow({
           </Link>
         )}
       </div>
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory">
+      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory stagger-children">
         {products.map((product, i) => (
           <div key={product.id} className={cn('shrink-0 snap-start', i === heroIdx ? 'w-[220px]' : 'w-[160px]')}>
             <ProductListingCard
