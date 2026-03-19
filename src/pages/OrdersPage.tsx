@@ -115,6 +115,7 @@ function EmptyState({ message, type }: { message: string; type?: 'buyer' | 'sell
 }
 
 function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userId: string; sellerId?: string }) {
+  const { successSet } = useTerminalStatuses();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
