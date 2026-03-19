@@ -44,7 +44,7 @@ export function useOrderDetail(id: string | undefined) {
 
   const seller = (order as any)?.seller;
   const isSellerView = isSeller && seller?.user_id === user?.id;
-  const isUrgentOrder = order?.auto_cancel_at && order.status === 'placed' && isSellerView;
+  const isUrgentOrder = order?.auto_cancel_at && isSellerView;
 
   useUrgentOrderSound(!!isUrgentOrder);
 
