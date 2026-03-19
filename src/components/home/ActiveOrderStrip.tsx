@@ -108,8 +108,8 @@ export function ActiveOrderStrip() {
   if (activeOrders.length === 0) return null;
 
   return (
-    <div className="mt-3 px-4">
-      <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
+    <div className="mt-2 px-4">
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         <AnimatePresence>
           {activeOrders.map((order) => {
             const isTransit = TRANSIT_STATUSES.has(order.status as any);
@@ -121,8 +121,8 @@ export function ActiveOrderStrip() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 onClick={() => navigate(`/orders/${order.id}`)}
-                className="flex items-center gap-2.5 rounded-2xl bg-primary/[0.06] border border-primary/12 px-3 py-2.5 cursor-pointer active:scale-[0.97] transition-transform shrink-0 min-w-0"
-                style={{ maxWidth: activeOrders.length === 1 ? '100%' : '75vw' }}
+                className="flex items-center gap-2 rounded-xl bg-primary/[0.06] border border-primary/12 px-2.5 py-2 cursor-pointer active:scale-[0.97] transition-transform shrink-0 min-w-0"
+                style={{ maxWidth: activeOrders.length === 1 ? '100%' : '70vw' }}
               >
                 {/* Thumbnail */}
                 <div className="w-9 h-9 rounded-xl bg-primary/10 shrink-0 overflow-hidden flex items-center justify-center">

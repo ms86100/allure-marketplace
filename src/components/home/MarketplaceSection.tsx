@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils';
 
 /* ── Section spacer ── */
 function SectionDivider() {
-  return <div className="my-6" />;
+  return <div className="my-4" />;
 }
 
 export function MarketplaceSection() {
@@ -382,7 +382,7 @@ function ProductListings({
   }
 
   return (
-    <div className="space-y-8 mt-6">
+    <div className="space-y-6 mt-4">
       {categories.map((cat, catIdx) => {
         const catConfig = categoryConfigs?.find((c: any) => c.category === cat.category);
         const catColor = catConfig?.color || null;

@@ -1,75 +1,57 @@
+# Blinkit UX Heuristic Analysis — Implementation Tracker
+## Status: ✅ PHASE 2 COMPLETE
 
+## ENGINE LAYER (Phase 1 — Complete)
 
-# Why Sociva Doesn't Match Blinkit — Root Cause Analysis & Fix Plan
+| # | Task | Status |
+|---|------|--------|
+| 1 | Global Feedback Engine (`feedbackEngine.ts`) | ✅ |
+| 2 | ETA Engine (`etaEngine.ts`) — single source of truth | ✅ |
+| 3 | Visibility Engine (`visibilityEngine.ts`) — route rules | ✅ |
+| 4 | Floating Cart Bar with thumbnails, count, total | ✅ |
+| 5 | ActiveOrderETA in header with live countdown | ✅ |
+| 6 | Unified haptics across all cart actions | ✅ |
 
-## The Real Problems (from your screenshots)
+## UX POLISH (Phase 1 — Complete)
 
-Looking at the current Sociva screenshots, the issues go far beyond color. Here's what's actually wrong:
+| # | Task | Status |
+|---|------|--------|
+| 7 | Undo toast for cart item removal (4s with re-add) | ✅ |
+| 8 | Haptic dedup — removed duplicate calls | ✅ |
+| 9 | Search autocomplete with product thumbnails | ✅ |
+| 10 | Recently Viewed products section on home page | ✅ |
+| 11 | CartPage remove button uses centralized feedbackEngine | ✅ |
+| 12 | Coupon feedback via feedbackEngine | ✅ |
+| 13 | Cart cleared feedback via feedbackEngine | ✅ |
+| 14 | Favorite toggle feedback via feedbackEngine | ✅ |
+| 15 | Dummy data elimination (picsum, 'Seller' fallbacks) | ✅ |
 
-### Problem 1: No Max-Width Container — Desktop Looks Stretched
-The app renders full-width at 1336px. Blinkit constrains to ~480px centered on desktop (it's a mobile-first app). Everything in Sociva stretches edge-to-edge, making it look like a broken web page, not a polished app.
+## PERCEPTION LAYER (Phase 2 — Complete)
 
-### Problem 2: Empty Product Images Everywhere
-3 out of 4 category tiles show grey cards with tiny placeholder icons instead of product photos. Discovery rows show shopping cart icons. This makes the entire page look barren and unfinished — no amount of color polish fixes empty content.
+| # | Task | Status |
+|---|------|--------|
+| 16 | ETA emotional states — emoji + mood tiers (calm/eager/imminent/late) | ✅ |
+| 17 | DeliveryETABanner mood-based gradient backgrounds | ✅ |
+| 18 | ActiveOrderETA emoji + intensified imminent pulse | ✅ |
+| 19 | Cart momentum — CTA changes to "Checkout" at 3+ items | ✅ |
+| 20 | Mini cart preview — bottom sheet from floating cart | ✅ |
+| 21 | Delivery completion celebration banner (one-time, duration-based) | ✅ |
+| 22 | Delivery partner identity card on OrderDetailPage | ✅ |
+| 23 | OrderProgressOverlay — SVG progress ring replaces spinner | ✅ |
+| 24 | Intelligent empty states (OrdersPage, FavoritesPage) | ✅ |
+| 25 | Session continuity — HomePage scroll position restore | ✅ |
+| 26 | Checkout commitment reinforcement — free delivery micro-copy | ✅ |
 
-### Problem 3: Product Cards Too Tall and Over-Detailed
-Blinkit cards are compact: image → ADD button → name → price. Our cards show seller name, location, trust badges, delivery info — all stacked vertically, making each card ~60% taller than Blinkit's.
-
-### Problem 4: Active Order Strip Too Prominent
-Three order cards shown horizontally in the main content area push the actual shopping content below the fold.
-
-### Problem 5: Section Spacing Too Loose
-Large gaps between sections (`my-6`, `space-y-8`, `mt-6`) create too much whitespace.
-
----
-
-## Implementation Plan
-
-### 1. Add Mobile-First Max-Width Container (`AppLayout.tsx`)
-Wrap the entire app content in a `max-w-md mx-auto` (or `max-w-lg`) container so on desktop it looks like a mobile app preview — exactly like Blinkit behaves on desktop.
-
-### 2. Improve Placeholder Image Treatment (`ProductListingCard.tsx`, `CategoryImageGrid.tsx`)
-- For product cards without images: use a larger emoji/icon on a tinted `bg-card` — make the placeholder area feel intentional, not broken
-- For category tiles without images: use a larger icon with the category color as a subtle radial gradient background, filling the square better
-- Increase placeholder icon size from 24px to 40px in category tiles
-
-### 3. Make Product Cards More Compact (`ProductListingCard.tsx`)
-When `compact` prop is true (used in discovery rows):
-- Hide location label
-- Hide seller name  
-- Reduce padding from `px-3 pb-3` to `px-2.5 pb-2.5`
-- Reduce name font from `text-[13px]` to `text-[12px]`
-- These are already partially done but need tightening
-
-### 4. Tighten Section Spacing (`MarketplaceSection.tsx`)
-- Reduce `SectionDivider` from `my-6` to `my-4`
-- Reduce product listing `space-y-8` to `space-y-6`
-- Reduce `mt-6` on product listings to `mt-4`
-
-### 5. Make Active Order Strip More Compact (`ActiveOrderStrip.tsx`)
-- Reduce card width from whatever it is now to a tighter horizontal scroll
-- Or collapse to show only the most recent order with a "+N more" indicator
-
-### 6. Header Density (`Header.tsx`)
-- Reduce vertical padding: `pb-3` to `pb-2`, `space-y-1.5` to `space-y-1`
-- Remove `mt-3` on search bar, use `mt-2`
-
----
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/layout/AppLayout.tsx` | Add `max-w-md mx-auto` wrapper for mobile-first layout |
-| `src/components/home/CategoryImageGrid.tsx` | Better placeholder: larger icons, radial gradient bg |
-| `src/components/product/ProductListingCard.tsx` | Tighter compact mode: smaller padding, hide extras |
-| `src/components/home/MarketplaceSection.tsx` | Reduce section spacing |
-| `src/components/layout/Header.tsx` | Tighten vertical spacing |
-| `src/components/home/ActiveOrderStrip.tsx` | More compact order cards |
-
-## Constraints
-- No dummy data or hardcoded content
-- No breaking changes to existing functionality
-- All existing data-driven behavior preserved
-- Light mode unaffected
-
+## Product Laws (Reference)
+1. Every action must produce immediate, consistent feedback across all surfaces
+2. ETA must feel believable, not just accurate
+3. Never show stale state after completion
+4. The cart must be omnipresent
+5. Cognitive load must decrease through the funnel
+6. Speed perception > speed reality
+7. Error prevention is worth 10x error recovery
+8. Transparency builds trust
+9. Promotional upsells must never block primary flow
+10. State transitions must be server-authoritative
+11. Recognition over recall applies to entire session
+12. Every screen must be self-sufficient
