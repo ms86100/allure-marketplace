@@ -4,9 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Ticket, X, Check, Tag, ChevronDown, ChevronUp } from 'lucide-react';
-import { toast } from 'sonner';
 import { useCurrency } from '@/hooks/useCurrency';
-import { hapticImpact } from '@/lib/haptics';
+import { feedbackCouponApplied, feedbackCouponFailed } from '@/lib/feedbackEngine';
 
 interface CouponData {
   id: string;
