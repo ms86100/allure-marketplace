@@ -148,9 +148,9 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
           </div>
         )}
       </div>
-      <div className={cn("px-2.5 pb-2.5 flex flex-col flex-1", !viewOnly && !isOutOfStock ? "pt-4" : "pt-2.5")}>
+      <div className={cn("px-2.5 pb-2.5 flex flex-col flex-1", !viewOnly && !isOutOfStock ? "pt-5" : "pt-2.5")}>
         {variantText && (<span className="inline-flex items-center justify-center border border-border rounded-full text-[8px] font-medium px-1.5 py-px mb-1 w-fit text-muted-foreground">{variantText}</span>)}
-        <h4 className="font-semibold text-[12px] leading-snug line-clamp-2 text-foreground mb-0.5">{product.name}</h4>
+        <h4 className="font-semibold text-[12px] leading-snug line-clamp-1 text-foreground mb-0.5">{product.name}</h4>
         {product.seller_name && (
           <div className="flex items-center gap-1 mt-0.5 flex-wrap">
             <span className="text-[10px] text-muted-foreground truncate">by {product.seller_name}</span>
