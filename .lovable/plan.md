@@ -1,77 +1,95 @@
 
 
-# Revised Plan: Hardening the DB-Driven Status Engine with Failure-Safe Fallbacks
+# Round 2: Live Activity + Tracking + Notification — Production Audit
 
-## Gaps Being Fixed (from review feedback)
+## Summary
 
-1. **Empty fallback is dangerous** — if DB fails, Live Activities never end
-2. **Push handler loads terminal set once at init** — misses cold-start race
-3. **`getStartStatuses` derives from sort_order** — fragile for non-linear flows
-4. **Duplicate flow row deletion is risky** — could break historical references
-5. **Transit statuses should eventually be a DB flag** — acknowledged, deferred
+Round 1 fixes successfully eliminated all critical hardcoded status sets from the Live Activity stack. The three-tier fallback (DB → expired cache → KV → safe minimum) is correctly implemented. The `starts_live_activity` DB column is in place and populated. The push handler now resolves terminal statuses dynamically.
 
-## Changes
+**Overall verdict: The core architecture is now DB-driven and production-ready, with 3 remaining issues (1 High, 2 Medium).**
 
-### 1. Three-Tier Fallback in `statusFlowCache.ts`
+---
 
-Replace the current "empty on failure" approach with: **DB → expired cache → persistent KV → minimal safe fallback**
+## SECTION 1: Findings
 
-```
-DB fresh?  → use it
-DB stale?  → use expired cache (still in memory)
-No cache?  → load from persistent-kv (last known good, survives app restart)
-Nothing?   → safe fallback: Set(['completed']) + console.error
-```
+### Issue 1 — Hardcoded delivery-terminal guard in edge function
+- **Location:** `supabase/functions/update-delivery-location/index.ts:145`
+- **Code:** `['delivered', 'failed', 'cancelled'].includes(assignment.status)`
+- **Severity:** High
+- **User Impact:** If admin adds new terminal delivery statuses (e.g. `returned`, `failed_delivery`), location updates will still be processed for those assignments, wasting resources and potentially sending stale APNs pushes. More critically, `failed` is not in `category_status_flows` for `cart_purchase`/`seller_delivery` — this is a phantom status that may cause confusion.
+- **Fix:** Replace with a DB-driven terminal check. Load terminal statuses from `category_status_flows` (already done later in the function for transit statuses — reuse the same pattern) or query the assignment's order status against the terminal set.
 
-On every successful DB load, persist the terminal set to persistent-kv (`status_flow_terminal_cache`). This means even after a cold start with no network, the last-known terminal set is available synchronously.
+### Issue 2 — `STATUS_MESSAGES` map in useBuyerOrderAlerts is hardcoded
+- **Location:** `src/hooks/useBuyerOrderAlerts.ts:15-26`
+- **Severity:** Medium
+- **User Impact:** Admin-added statuses (e.g. `quoted`, `scheduled` are present but others like `at_gate`, `enquired`, `in_progress` are missing) won't show any toast to the buyer. The toast silently fails (`if (!msg) return`). This is a UX gap, not a crash, but means buyers get no real-time feedback for custom workflow steps.
+- **Fix:** Fall back to DB `display_label` from `category_status_flows` when no hardcoded message exists. Query the flow entry for the status and use `display_label` as the toast title with a generic description.
 
-The safe fallback `['completed']` is the absolute minimum — it only contains the universal final state. It is NOT business logic; it's a degradation safety net. A critical warning is logged whenever it activates.
+### Issue 3 — `BuyerCancelBooking` hardcodes terminal status check
+- **Location:** `src/components/booking/BuyerCancelBooking.tsx:37`
+- **Code:** `['cancelled', 'completed', 'no_show', 'in_progress'].includes(status)`
+- **Severity:** Medium
+- **User Impact:** If admin adds new terminal statuses for service bookings, the cancel button would still show (it should be hidden). Low risk since the backend would reject the transition, but it's a UX inconsistency.
+- **Fix:** Use `isTerminalStatus()` flow helper or check `is_terminal` from the flow data already available in the booking detail context.
 
-### 2. Push Handler: Dynamic Terminal Resolution
+---
 
-Current code loads `terminalStatusesRef.current` once at listener setup. Fix:
+## SECTION 2: Architecture Assessment (Post Round 1)
 
-- **Primary**: Use `is_terminal` flag from the push payload (already implemented: `data?.is_terminal === 'true'`). This is the most reliable — it travels with the push itself.
-- **Secondary**: Call `getTerminalStatuses()` **at event time** (not init time) inside the foreground handler. Since `getTerminalStatuses()` returns from cache in <1ms when warm, this has zero performance cost. When cold, it triggers a DB fetch which resolves quickly.
-- Remove `terminalStatusesRef` entirely — it's unnecessary indirection when `getTerminalStatuses()` already caches internally.
+| System | Round 1 | Round 2 | Notes |
+|--------|---------|---------|-------|
+| **statusFlowCache three-tier fallback** | NEW | PASS | DB → expired cache → KV → safe fallback correctly implemented. KV keys in persistent-kv restore list. |
+| **starts_live_activity column** | NEW | PASS | Column exists, populated for cart_purchase + seller_delivery non-terminal statuses. |
+| **Push handler terminal resolution** | FAIL | PASS | `terminalStatusesRef` removed. Dynamic `getTerminalStatuses()` at event time + `is_terminal` payload flag. |
+| **LiveActivityManager status sets** | FAIL | PASS | No hardcoded fallbacks. `loadStatusSets()` always re-fetches (no `statusSetsLoaded` gate). |
+| **Orchestrator terminal cache** | FAIL | PASS | Starts empty, loaded from DB at init. Three-tier fallback propagates automatically. |
+| **Transit statuses (client)** | FAIL | PASS | `visibilityEngine`, `liveActivityMapper`, `ActiveOrderStrip`, `useBuyerOrderAlerts` all use `getTrackingConfigSync().transit_statuses_la`. |
+| **Transit statuses (edge function)** | FAIL | PASS | `update-delivery-location` loads `transit_statuses_la` from `system_settings`. Fallback to `['picked_up', 'on_the_way', 'at_gate']` only if DB key missing (acceptable). |
+| **Deduplication (native)** | PASS | PASS | Hydration dedup + `starting` set + native `getActiveActivities()` check before start. |
+| **Throttle terminal race** | PASS | PASS | `doUpdate` guard (`!this.active.has(data.entity_id)`) prevents stale timer firing after `end()`. |
+| **APNs background updates** | PASS | PASS | Delta-based with 15s throttle floor. Terminal sends `event: "end"` with `dismissal-date`. |
+| **Dynamic Island navigation** | PASS | PASS | Tap → `appStateChange` → deferred navigation via `sessionStorage`. |
+| **Notification dedup** | PASS | PASS | 30s cool-down in DB trigger + toast ID dedup in frontend. |
+| **Multi-device** | PASS | PASS | Per-device APNs token via `apns_token` dedup. |
+| **Visibility/resume sync** | PASS | PASS | Immediate sync on `visibilitychange` + `appStateChange`. Cache invalidation on resume. |
+| **Polling safety net** | PASS | PASS | 15s heartbeat detects terminal orders missed by realtime. |
 
-This eliminates the cold-start race: even if the push arrives before DB loads, the `is_terminal` payload flag catches it. And if the payload flag is missing (older push format), the dynamic call fetches from cache/KV/fallback.
+---
 
-### 3. Explicit `starts_live_activity` DB Column
+## SECTION 3: Missing DB Entries
 
-Add `starts_live_activity boolean NOT NULL DEFAULT false` to `category_status_flows`.
+- **`no_show` and `failed` are NOT in `cart_purchase` or `seller_delivery` flows.** The edge function checks for `failed` but it doesn't exist in the flow config. This is a data gap — if a delivery partner marks an order as `failed`, the system has no flow entry for it.
+- **Recommendation:** Add `no_show` (is_terminal=true) and `failed` (is_terminal=true) to `cart_purchase` and `seller_delivery` flows, or remove the `failed` check from the edge function if it's not a valid business status.
 
-Set `true` for all non-initial, non-terminal statuses in `cart_purchase` and `seller_delivery` flows (the flows that have Live Activity support).
+---
 
-Update `getStartStatuses()` to simply: `SELECT status_key WHERE starts_live_activity = true`.
+## SECTION 4: Fix Plan
 
-This removes the fragile `sort_order > min` derivation. Admins can now explicitly control which statuses trigger Live Activity start.
+### Fix 1: Edge function delivery-terminal guard (High)
+**File:** `supabase/functions/update-delivery-location/index.ts:145`
+- Load terminal statuses from `category_status_flows` (or reuse the `transit_statuses_la` system_settings query pattern to also load terminal statuses)
+- Replace `['delivered', 'failed', 'cancelled'].includes(...)` with `terminalStatuses.includes(assignment.status)`
+- Cache within the function invocation (single request scope)
 
-### 4. Duplicate Flow Rows: Soft Deprecation (NOT hard delete)
+### Fix 2: DB-driven toast fallback in useBuyerOrderAlerts (Medium)
+**File:** `src/hooks/useBuyerOrderAlerts.ts`
+- Keep `STATUS_MESSAGES` as a rich override map (icons, custom descriptions)
+- When `STATUS_MESSAGES[newStatus]` is undefined, fetch/cache the `display_label` from `category_status_flows` and show a generic toast with that label
+- This makes admin-added statuses visible to buyers without requiring code changes
 
-The duplicate `request_service` rows (sort_order 1-7 vs 10-70) belong to different `parent_group` values (`education_learning` vs `default`), so they're actually NOT duplicates — they were confirmed correct in the previous round. No action needed here.
+### Fix 3: BuyerCancelBooking terminal check (Medium)
+**File:** `src/components/booking/BuyerCancelBooking.tsx:37`
+- Replace hardcoded array with flow-aware terminal check using the order's flow data (already available in parent context)
 
-### 5. LiveActivityManager: Same Three-Tier Fallback
+### Fix 4 (Data): Add `failed` status to delivery flows
+**Migration:** Insert `failed` as `is_terminal=true, is_success=false` for `cart_purchase` and `seller_delivery` flows to match the edge function's expectation.
 
-`loadStatusSets()` already calls `getTerminalStatuses()` and `getStartStatuses()`. Since those functions now implement the three-tier fallback, the manager automatically benefits. Remove the `statusSetsLoaded` gate that prevents retry — if the first load got the safe fallback, allow re-fetch on next `push()` call.
-
-### 6. Orchestrator: Same Pattern
-
-`terminalStatusesCache` in the orchestrator already calls `getTerminalStatuses()`. The three-tier fallback propagates automatically. No structural change needed beyond removing the empty-set initialization comment.
+---
 
 ## Files to Modify
 
-1. **Migration** — Add `starts_live_activity` column to `category_status_flows`
-2. **Data update** — Set `starts_live_activity = true` for appropriate statuses
-3. **`src/services/statusFlowCache.ts`** — Implement three-tier fallback (DB → expired cache → persistent-KV → safe minimum), persist terminal set to KV on success, use `starts_live_activity` column
-4. **`src/hooks/usePushNotifications.ts`** — Remove `terminalStatusesRef`, call `getTerminalStatuses()` dynamically at event time
-5. **`src/services/LiveActivityManager.ts`** — Remove `statusSetsLoaded` gate to allow re-fetch after fallback
-6. **`src/lib/persistent-kv.ts`** — Add `status_flow_terminal_cache` and `status_flow_start_cache` to the restore prefixes list
-
-## What This Achieves
-
-- **Zero-downtime degradation**: System always has a terminal set, even during DB outages or cold starts
-- **No hardcoded business logic**: The safe fallback (`completed`) is not a business decision — it's a universal truth that "completed" means done
-- **Push handler is race-proof**: `is_terminal` payload flag + dynamic cache lookup = no timing dependency
-- **Admin-explicit LA control**: `starts_live_activity` flag means admins decide, not sort_order math
+1. `supabase/functions/update-delivery-location/index.ts` — DB-driven terminal guard
+2. `src/hooks/useBuyerOrderAlerts.ts` — Fallback to DB display_label for unknown statuses
+3. `src/components/booking/BuyerCancelBooking.tsx` — Flow-aware terminal check
+4. **Migration** — Add `failed` status to cart_purchase and seller_delivery flows
 
