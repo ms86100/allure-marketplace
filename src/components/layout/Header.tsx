@@ -55,6 +55,32 @@ function HeaderInner({
   const displaySociety = effectiveSociety || society;
   const isViewingAs = viewAsSocietyId && (isAdmin || isBuilderMember);
 
+  const [stats, setStats] = useState<{ sellers: number; orders: number } | null>(null);
+  useEffect(() => {
+    if (!effectiveSocietyId) return;
+    let cancelled = false;
+    Promise.all([
+      supabase
+        .from('seller_profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('society_id', effectiveSocietyId)
+        .eq('verification_status', 'approved'),
+      supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('society_id', effectiveSocietyId)
+        .in('status', ['completed', 'delivered']),
+    ]).then(([sellersRes, ordersRes]) => {
+      if (!cancelled) {
+        setStats({
+          sellers: sellersRes.count || 0,
+          orders: ordersRes.count || 0,
+        });
+      }
+    });
+    return () => { cancelled = true; };
+  }, [effectiveSocietyId]);
+
   const initials = profile?.name
     ? profile.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : '?';
