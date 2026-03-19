@@ -150,12 +150,12 @@
     --product-image-bg: 230 14% 15%;
 
     /* Dark tints */
-    --tint-food: 230 14% 11%;
-    --tint-services: 210 10% 11%;
-    --tint-personal: 300 4% 11%;
-    --tint-resale: 38 6% 11%;
-    --tint-events: 260 4% 11%;
-    --tint-default: 230 14% 11%;
+    --tint-food: 0 0% 10%;
+    --tint-services: 0 0% 10%;
+    --tint-personal: 0 0% 10%;
+    --tint-resale: 0 0% 10%;
+    --tint-events: 0 0% 10%;
+    --tint-default: 0 0% 10%;
 
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(151 65% 44%) 0%, hsl(168 55% 38%) 100%);
