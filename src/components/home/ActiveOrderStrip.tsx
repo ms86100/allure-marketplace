@@ -48,7 +48,14 @@ export function ActiveOrderStrip() {
         .order('created_at', { ascending: false })
         .limit(3);
 
-      if (error || !data) return [];
+      if (error) {
+        console.warn('[ActiveOrderStrip] Query error:', error.message);
+        if (error.code === '22P02') {
+          invalidateStatusFlowCache();
+        }
+        return [];
+      }
+      if (!data) return [];
 
       // Fetch display labels for these statuses from category_status_flows
       const statusKeys = [...new Set(data.map((o: any) => o.status))];
