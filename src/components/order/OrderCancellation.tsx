@@ -21,8 +21,8 @@ interface OrderCancellationProps {
   orderId: string;
   orderStatus: string;
   onCancelled: () => void;
-  /** Whether buyer→cancelled transition is allowed by the workflow engine */
-  canCancel?: boolean;
+  /** Whether buyer→cancelled transition is allowed by the workflow engine (required, DB-driven) */
+  canCancel: boolean;
 }
 
 const DEFAULT_REASONS = [
