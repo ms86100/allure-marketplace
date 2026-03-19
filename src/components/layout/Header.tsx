@@ -96,7 +96,7 @@ function HeaderInner({
         <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 space-y-1">
           {/* Brand + tagline */}
           <div>
-            <h1 className="text-lg font-black text-foreground tracking-tight leading-tight italic">Sociva</h1>
+            <h1 className="text-lg font-black text-foreground tracking-tight leading-tight italic"><span className="text-primary">S</span>oci<span className="text-primary">v</span>a</h1>
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest leading-none mt-0.5">Your society, your store</p>
           </div>
 
