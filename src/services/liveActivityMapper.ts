@@ -89,6 +89,7 @@ export function buildLiveActivityData(
   itemCount?: number | null,
   statusFlowEntries?: StatusFlowEntry[],
   sellerLogoUrl?: string | null,
+  initialEtaMinutes?: number | null,
 ): LiveActivityData {
   const config = getTrackingConfigSync();
   const distanceKm = delivery?.distance_meters != null
