@@ -13,6 +13,7 @@ import {
   feedbackRemoveItemFailed,
   feedbackQuantityChanged,
   feedbackQuantityFailed,
+  feedbackCartCleared,
 } from '@/lib/feedbackEngine';
 
 const hasOwn = (obj: unknown, key: string) => Object.prototype.hasOwnProperty.call(obj ?? {}, key);
