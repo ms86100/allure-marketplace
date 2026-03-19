@@ -167,16 +167,16 @@ export default function MaintenancePage() {
       <div className="p-4 space-y-4">
         {canManage && (
           <div className="flex gap-2">
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetTrigger asChild>
+          <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+            <DrawerTrigger asChild>
               <Button className="w-full gap-2">
                 <Plus size={16} /> Generate Monthly Dues
               </Button>
-            </SheetTrigger>
-            <SheetContent side="bottom" className="rounded-t-2xl">
-              <SheetHeader>
-                <SheetTitle>Generate Monthly Dues</SheetTitle>
-              </SheetHeader>
+            </DrawerTrigger>
+            <DrawerContent>
+              <DrawerHeader>
+                <DrawerTitle>Generate Monthly Dues</DrawerTitle>
+              </DrawerHeader>
               <div className="space-y-4 mt-4">
                 <div>
                   <label className="text-sm font-medium">Month (YYYY-MM)</label>
