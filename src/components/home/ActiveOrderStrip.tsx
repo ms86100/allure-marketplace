@@ -134,7 +134,7 @@ export function ActiveOrderStrip() {
                 <span className="text-[13px] font-bold text-foreground truncate">
                   {order.display_label}
                 </span>
-                {order.color && !['on_the_way', 'out_for_delivery', 'at_gate', 'in_transit'].includes(order.status) && (
+                {order.color && !TRANSIT_STATUSES.has(order.status as any) && (
                   <span
                     className={`w-2 h-2 rounded-full shrink-0 ${order.color.split(' ')[0]}`}
                   />
