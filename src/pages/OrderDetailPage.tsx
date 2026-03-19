@@ -171,6 +171,20 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="px-4 pt-3 space-y-3">
+          {/* Delivery completion celebration — shown once for delivered/completed orders */}
+          {o.isBuyerView && ['delivered', 'completed'].includes(order.status) && !getString(`celebration_${order.id}`) && (() => {
+            const durationMs = new Date(order.updated_at || order.created_at).getTime() - new Date(order.created_at).getTime();
+            const durationMin = Math.max(1, Math.round(durationMs / 60000));
+            setString(`celebration_${order.id}`, 'true');
+            return (
+              <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
+                <span className="text-3xl">🎊</span>
+                <p className="text-sm font-bold text-accent mt-1.5">Delivered in {durationMin} min!</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Thank you for supporting your community</p>
+              </div>
+            );
+          })()}
+
           {/* Gap 11: Order placed celebration banner — shown for newly placed orders */}
           {o.isBuyerView && order.status === 'placed' && (Date.now() - new Date(order.created_at).getTime() < 60000) && (
             <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
