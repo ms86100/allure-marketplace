@@ -121,10 +121,18 @@ export function ActiveOrderStrip() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
+                {/* Pulsing dot for transit statuses — activity illusion */}
+                {['on_the_way', 'out_for_delivery', 'at_gate', 'in_transit'].includes(order.status) && (
+                  <motion.span
+                    className="w-2 h-2 rounded-full bg-green-500 shrink-0"
+                    animate={{ opacity: [1, 0.3, 1] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                )}
                 <span className="text-[13px] font-bold text-foreground truncate">
                   {order.display_label}
                 </span>
-                {order.color && (
+                {order.color && !['on_the_way', 'out_for_delivery', 'at_gate', 'in_transit'].includes(order.status) && (
                   <span
                     className={`w-2 h-2 rounded-full shrink-0 ${order.color.split(' ')[0]}`}
                   />

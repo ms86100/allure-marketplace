@@ -2,8 +2,9 @@ import { Link, useLocation } from 'react-router-dom';
 import { ShoppingCart, ChevronRight } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { useCurrency } from '@/hooks/useCurrency';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useEffect } from 'react';
 
 interface FloatingCartBarProps {
   className?: string;
@@ -13,6 +14,19 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
   const { itemCount, totalAmount, items } = useCart();
   const { formatPrice } = useCurrency();
   const location = useLocation();
+  const controls = useAnimation();
+
+  // Listen for centralized cart-item-added event → bounce pill
+  useEffect(() => {
+    const handler = () => {
+      controls.start({
+        scale: [1, 1.06, 0.97, 1],
+        transition: { duration: 0.35, ease: 'easeOut' },
+      });
+    };
+    window.addEventListener('cart-item-added', handler);
+    return () => window.removeEventListener('cart-item-added', handler);
+  }, [controls]);
 
   // Hide on cart page and checkout
   const hiddenPaths = ['/cart', '/checkout'];
@@ -38,6 +52,7 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
       >
         <Link to="/cart">
           <motion.div
+            animate={controls}
             className="rounded-2xl bg-primary px-4 py-3 flex items-center justify-between shadow-[0_4px_24px_-4px_hsl(var(--primary)/0.4)]"
             whileTap={{ scale: 0.97 }}
           >

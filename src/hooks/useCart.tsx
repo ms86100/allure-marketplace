@@ -6,6 +6,7 @@ import { CartItem, Product } from '@/types/database';
 import { toast } from 'sonner';
 import { handleApiError } from '@/lib/query-utils';
 import { computeStoreStatus, formatStoreClosedMessage, type StoreStatus } from '@/lib/store-availability';
+import { triggerCartFeedback } from '@/lib/cartFeedback';
 
 const hasOwn = (obj: unknown, key: string) => Object.prototype.hasOwnProperty.call(obj ?? {}, key);
 
@@ -201,7 +202,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           const { error } = await supabase.from('cart_items').insert({ user_id: user.id, product_id: product.id, quantity });
           if (error) throw error;
         }
-        if (!silent) toast.success('Added to cart', { id: 'cart-add' });
+        if (!silent) triggerCartFeedback(product.name || 'Item');
         // Authoritative reconcile after success
         await reconcile();
       } catch (error) {

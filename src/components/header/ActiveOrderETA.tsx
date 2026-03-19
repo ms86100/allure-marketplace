@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { getTerminalStatuses } from '@/services/statusFlowCache';
@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { Package, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
+
+const TRANSIT_STATUSES = new Set(['on_the_way', 'out_for_delivery', 'at_gate', 'in_transit']);
 
 /**
  * Compact ETA strip shown in the header area when there's an active order.
@@ -15,6 +17,7 @@ import { useEffect, useState } from 'react';
 export function ActiveOrderETA() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [terminalSet, setTerminalSet] = useState<Set<string> | null>(null);
 
   useEffect(() => {
@@ -42,14 +45,14 @@ export function ActiveOrderETA() {
     refetchOnWindowFocus: true,
   });
 
-  // Listen for terminal pushes to clear
+  // Listen for terminal pushes → invalidate to clear stale strip
   useEffect(() => {
     const handler = () => {
-      // Will trigger refetch via invalidation
+      queryClient.invalidateQueries({ queryKey: ['active-order-eta'] });
     };
     window.addEventListener('order-terminal-push', handler);
     return () => window.removeEventListener('order-terminal-push', handler);
-  }, []);
+  }, [queryClient]);
 
   if (!activeOrder) return null;
 
@@ -57,8 +60,11 @@ export function ActiveOrderETA() {
     ? Math.max(0, Math.ceil((new Date(activeOrder.estimated_delivery_at).getTime() - Date.now()) / 60000))
     : null;
 
+  const isArriving = etaMinutes !== null && etaMinutes <= 0;
+  const isTransit = TRANSIT_STATUSES.has(activeOrder.status || '');
+
   const etaText = etaMinutes !== null
-    ? etaMinutes <= 0
+    ? isArriving
       ? 'Arriving now'
       : `${etaMinutes} min`
     : null;
@@ -79,13 +85,21 @@ export function ActiveOrderETA() {
         <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
           <Package size={14} className="text-primary" />
         </div>
-        <div className="flex-1 min-w-0 text-left">
+        <div className="flex-1 min-w-0 text-left flex items-center gap-2">
+          {/* Pulsing dot for transit statuses — activity illusion */}
+          {isTransit && (
+            <motion.span
+              className="w-2 h-2 rounded-full bg-green-500 shrink-0"
+              animate={{ opacity: [1, 0.3, 1] }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          )}
           <p className="text-[12px] font-bold text-foreground capitalize truncate">
             {statusLabel}
           </p>
         </div>
         {etaText && (
-          <span className="text-[12px] font-extrabold text-primary whitespace-nowrap">
+          <span className={`text-[12px] font-extrabold whitespace-nowrap ${isArriving ? 'text-green-600 dark:text-green-400' : 'text-primary'}`}>
             {etaText}
           </span>
         )}
