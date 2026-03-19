@@ -6,12 +6,10 @@ import { OnboardingWalkthrough, useOnboarding } from '@/components/onboarding/On
 import { MarketplaceSection } from '@/components/home/MarketplaceSection';
 import { SocietyQuickLinks } from '@/components/home/SocietyQuickLinks';
 
-import { HomeSearchSuggestions } from '@/components/home/HomeSearchSuggestions';
 import { CommunityTeaser } from '@/components/home/CommunityTeaser';
 import { HomeNotificationBanner } from '@/components/notifications/HomeNotificationBanner';
 import { ActiveOrderStrip } from '@/components/home/ActiveOrderStrip';
 import { ForYouSection } from '@/components/home/ForYouSection';
-import { SocietyTrustStrip } from '@/components/home/SocietyTrustStrip';
 import { SocietyLeaderboard } from '@/components/home/SocietyLeaderboard';
 import { RecentlyViewedRow } from '@/components/home/RecentlyViewedRow';
 import { useAuth } from '@/contexts/AuthContext';
@@ -110,31 +108,19 @@ export default function HomePage() {
         {/* ═══ RICH NOTIFICATION BANNER ═══ */}
         <HomeNotificationBanner />
 
-        {/* ═══ SOCIETY TRUST STRIP ═══ */}
-        <SocietyTrustStrip />
-
-        {/* ═══ DISCOVER ═══ */}
-        <HomeSearchSuggestions />
-
-        <div className="h-px bg-border mx-4 my-1" />
-
-        {/* ═══ MARKETPLACE (CORE VALUE — HIGH PRIORITY) ═══ */}
+        {/* ═══ MARKETPLACE (DOMINANT — 60-70% of screen) ═══ */}
         <MarketplaceSection />
 
-        <div className="h-px bg-border mx-4 my-1" />
-
-        {/* ═══ SOCIETY QUICK LINKS ═══ */}
-        <SocietyQuickLinks />
-
-        {/* ═══ PERSONALIZED SECTIONS (conditional) ═══ */}
+        {/* ═══ PERSONALIZED SECTIONS ═══ */}
         <ForYouSection />
 
         {/* ═══ RECENTLY VIEWED ═══ */}
         <RecentlyViewedRow />
 
-        <div className="h-px bg-border mx-4 my-1" />
+        {/* ═══ SOCIETY QUICK LINKS (deprioritized) ═══ */}
+        <SocietyQuickLinks />
 
-        {/* ═══ LEADERBOARD & COMMUNITY ═══ */}
+        {/* ═══ LEADERBOARD & COMMUNITY (tertiary) ═══ */}
         <div className="bg-secondary/30 py-4 mt-2">
           <SocietyLeaderboard />
         </div>

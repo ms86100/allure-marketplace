@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingCart, ChevronRight, ChevronUp, X } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { useCurrency } from '@/hooks/useCurrency';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useEffect } from 'react';
 import { CART_HIDDEN_ROUTES, isRouteHidden } from '@/lib/visibilityEngine';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -21,14 +20,19 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
   const navigate = useNavigate();
   const controls = useAnimation();
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [showAdded, setShowAdded] = useState(false);
 
-  // Listen for centralized cart-item-added event → bounce pill
+  // Listen for centralized cart-item-added event → bounce pill + flash "Added ✓"
   useEffect(() => {
     const handler = () => {
       controls.start({
-        scale: [1, 1.06, 0.97, 1],
+        scale: [1, 1.08, 0.96, 1],
+        y: [0, -4, 0],
         transition: { duration: 0.35, ease: 'easeOut' },
       });
+      setShowAdded(true);
+      const t = setTimeout(() => setShowAdded(false), 1500);
+      return () => clearTimeout(t);
     };
     window.addEventListener('cart-item-added', handler);
     return () => window.removeEventListener('cart-item-added', handler);
@@ -60,7 +64,12 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
       >
         <motion.div
           animate={controls}
-          className="rounded-2xl bg-primary shadow-[0_4px_24px_-4px_hsl(var(--primary)/0.4)] overflow-hidden"
+          className={cn(
+            "rounded-2xl bg-primary overflow-hidden transition-shadow duration-300",
+            isMomentum
+              ? "shadow-[0_4px_32px_-2px_hsl(var(--primary)/0.55)]"
+              : "shadow-[0_4px_24px_-4px_hsl(var(--primary)/0.4)]"
+          )}
         >
           <Link to="/cart">
             <motion.div
@@ -85,9 +94,29 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
                   </div>
                 )}
                 <div className="flex flex-col">
-                  <span className="text-primary-foreground text-[13px] font-extrabold leading-tight">
-                    {itemCount} item{itemCount !== 1 ? 's' : ''}
-                  </span>
+                  <AnimatePresence mode="wait">
+                    {showAdded ? (
+                      <motion.span
+                        key="added"
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        className="text-primary-foreground text-[13px] font-extrabold leading-tight"
+                      >
+                        Added ✓
+                      </motion.span>
+                    ) : (
+                      <motion.span
+                        key="count"
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        className="text-primary-foreground text-[13px] font-extrabold leading-tight"
+                      >
+                        {itemCount} item{itemCount !== 1 ? 's' : ''}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                   <span className="text-primary-foreground/70 text-[11px] font-semibold leading-tight">
                     {formatPrice(totalAmount)}
                   </span>
@@ -104,7 +133,7 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.2 }}
                   >
-                    {isMomentum ? 'Checkout' : 'View Cart'}
+                    {isMomentum ? 'Checkout now' : 'View Cart'}
                   </motion.span>
                 </AnimatePresence>
                 <ChevronRight size={16} strokeWidth={2.5} />
