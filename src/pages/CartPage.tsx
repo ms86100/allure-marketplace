@@ -12,8 +12,7 @@ import { CouponInput } from '@/components/cart/CouponInput';
 import { FulfillmentSelector } from '@/components/delivery/FulfillmentSelector';
 import { OrderProgressOverlay } from '@/components/checkout/OrderProgressOverlay';
 import { useCartPage } from '@/hooks/useCartPage';
-import { hapticImpact } from '@/lib/haptics';
-import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { AlertCircle } from 'lucide-react';
 import { AddressPicker } from '@/components/profile/AddressPicker';
@@ -139,9 +138,9 @@ export default function CartPage() {
                     <div className="flex items-center gap-1.5">
                       {item.product && (
                         <div className="inline-flex items-center bg-accent rounded-lg overflow-hidden">
-                          <button className="h-8 w-8 flex items-center justify-center active:scale-95 transition-transform" onClick={() => { hapticImpact('medium'); c.updateQuantity(item.product_id, item.quantity - 1); }}><Minus size={14} className="text-accent-foreground" /></button>
-                          <span className="w-6 text-center text-sm font-bold text-accent-foreground tabular-nums">{item.quantity}</span>
-                          <button className="h-8 w-8 flex items-center justify-center active:scale-95 transition-transform" onClick={() => { hapticImpact('medium'); c.updateQuantity(item.product_id, item.quantity + 1); }}><Plus size={14} className="text-accent-foreground" /></button>
+                          <button className="h-8 w-8 flex items-center justify-center active:scale-95 transition-transform" onClick={() => { c.updateQuantity(item.product_id, item.quantity - 1); }}><Minus size={14} className="text-accent-foreground" /></button>
+                          <AnimatePresence mode="popLayout"><motion.span key={item.quantity} initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }} transition={{ duration: 0.15 }} className="w-6 text-center text-sm font-bold text-accent-foreground tabular-nums">{item.quantity}</motion.span></AnimatePresence>
+                          <button className="h-8 w-8 flex items-center justify-center active:scale-95 transition-transform" onClick={() => { c.updateQuantity(item.product_id, item.quantity + 1); }}><Plus size={14} className="text-accent-foreground" /></button>
                         </div>
                       )}
                       <button className="h-8 w-8 flex items-center justify-center text-muted-foreground" onClick={() => { c.removeItem(item.product_id); }}><Trash2 size={15} /></button>
@@ -199,7 +198,7 @@ export default function CartPage() {
           <MapPin size={16} className="text-primary shrink-0" />
           <div className="flex-1 min-w-0">
             {c.fulfillmentType === 'self_pickup' ? (
-              <><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pickup from</p><p className="text-sm font-medium mt-0.5">{c.sellerGroups[0]?.sellerName || 'Seller'}</p><p className="text-xs text-muted-foreground">{c.society?.name || 'Your Society'}</p></>
+              <><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pickup from</p><p className="text-sm font-medium mt-0.5">{c.sellerGroups[0]?.sellerName || ''}</p><p className="text-xs text-muted-foreground">{c.society?.name || 'Your Society'}</p></>
             ) : c.selectedDeliveryAddress ? (
               <>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deliver to</p>
@@ -234,6 +233,11 @@ export default function CartPage() {
         </div>
 
         {/* Neighborhood Guarantee */}
+        {/* Browse more shortcut */}
+        <div className="mx-4 mt-3 text-center">
+          <Link to="/search" className="text-xs font-semibold text-primary hover:underline">+ Browse more items</Link>
+        </div>
+
         <div className="mx-4 mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50">
           <span className="text-sm">{ml.label('label_neighborhood_guarantee_emoji')}</span>
           <p className="text-[10px] text-muted-foreground">
@@ -264,7 +268,7 @@ export default function CartPage() {
         <p className="text-[10px] text-muted-foreground text-center pt-1 px-4">Payments are processed by third-party providers and are not covered by Apple. <Link to="/terms" className="underline">Refund & Cancellation Policy</Link></p>
         <div className="px-4 py-3 flex items-center gap-3">
           <div className="flex-1"><p className="text-xs text-muted-foreground">Total</p><p className="text-lg font-bold tabular-nums">{c.formatPrice(c.finalAmount)}</p></div>
-          <Button className="px-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold" size="lg" onClick={() => c.setShowConfirmDialog(true)} disabled={c.isPlacingOrder || c.hasBelowMinimumOrder || c.noPaymentMethodAvailable || (c.fulfillmentType === 'delivery' && !c.selectedDeliveryAddress)}>{c.isPlacingOrder ? 'Placing...' : 'Place Order'}<ChevronRight size={18} className="ml-1" /></Button>
+          <Button className="px-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold" size="lg" onClick={() => { if (c.paymentMethod === 'cod') { c.handlePlaceOrder(); } else { c.setShowConfirmDialog(true); } }} disabled={c.isPlacingOrder || c.hasBelowMinimumOrder || c.noPaymentMethodAvailable || (c.fulfillmentType === 'delivery' && !c.selectedDeliveryAddress)}>{c.isPlacingOrder ? 'Placing...' : 'Place Order'}<ChevronRight size={18} className="ml-1" /></Button>
         </div>
       </div>
 
@@ -290,7 +294,7 @@ export default function CartPage() {
       <OrderProgressOverlay isVisible={c.isPlacingOrder} step={c.orderStep} onCancel={() => { c.cancelPlacingOrder(); }} />
 
       {c.pendingOrderIds.length > 0 && c.paymentMode.isRazorpay && (
-        <RazorpayCheckout isOpen={c.showRazorpayCheckout} onClose={() => { /* neutral close — do nothing, let success/fail handlers drive */ }} orderId={c.pendingOrderIds[0]} amount={c.finalAmount} sellerId={c.sellerGroups[0]?.sellerId || ''} sellerName={c.sellerGroups[0]?.sellerName || 'Seller'} customerName={c.profile?.name || ''} customerEmail={c.user?.email || ''} customerPhone={c.profile?.phone || ''} onPaymentSuccess={c.handleRazorpaySuccess} onPaymentFailed={c.handleRazorpayFailed} />
+        <RazorpayCheckout isOpen={c.showRazorpayCheckout} onClose={() => {}} orderId={c.pendingOrderIds[0]} amount={c.finalAmount} sellerId={c.sellerGroups[0]?.sellerId || ''} sellerName={c.sellerGroups[0]?.sellerName || ''} customerName={c.profile?.name || ''} customerEmail={c.user?.email || ''} customerPhone={c.profile?.phone || ''} onPaymentSuccess={c.handleRazorpaySuccess} onPaymentFailed={c.handleRazorpayFailed} />
       )}
 
       {/* CRITICAL: Render UPI sheet whenever pendingOrderIds exist — independent of cart state.

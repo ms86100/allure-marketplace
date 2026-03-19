@@ -99,8 +99,12 @@ export default function HomePage() {
         {/* ═══ DISCOVER ═══ */}
         <HomeSearchSuggestions />
 
+        <div className="h-px bg-border mx-4 my-1" />
+
         {/* ═══ MARKETPLACE (CORE VALUE — HIGH PRIORITY) ═══ */}
         <MarketplaceSection />
+
+        <div className="h-px bg-border mx-4 my-1" />
 
         {/* ═══ SOCIETY QUICK LINKS ═══ */}
         <SocietyQuickLinks />
@@ -110,6 +114,8 @@ export default function HomePage() {
 
         {/* ═══ RECENTLY VIEWED ═══ */}
         <RecentlyViewedRow />
+
+        <div className="h-px bg-border mx-4 my-1" />
 
         {/* ═══ LEADERBOARD & COMMUNITY ═══ */}
         <div className="bg-secondary/30 py-4 mt-2">

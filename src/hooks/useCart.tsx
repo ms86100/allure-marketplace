@@ -13,6 +13,7 @@ import {
   feedbackRemoveItemFailed,
   feedbackQuantityChanged,
   feedbackQuantityFailed,
+  feedbackCartCleared,
 } from '@/lib/feedbackEngine';
 
 const hasOwn = (obj: unknown, key: string) => Object.prototype.hasOwnProperty.call(obj ?? {}, key);
@@ -158,7 +159,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       items.reduce<Record<string, SellerGroup>>((groups, item) => {
         const sellerId = item.product?.seller_id || 'unknown';
         if (!groups[sellerId]) {
-          groups[sellerId] = { sellerId, sellerName: (item.product as any)?.seller?.business_name || 'Seller', items: [], subtotal: 0 };
+          groups[sellerId] = { sellerId, sellerName: (item.product as any)?.seller?.business_name || '', items: [], subtotal: 0 };
         }
         groups[sellerId].items.push(item);
         groups[sellerId].subtotal += (item.product?.price || 0) * item.quantity;
@@ -288,6 +289,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase.from('cart_items').delete().eq('user_id', user.id);
       if (error) throw error;
+      feedbackCartCleared();
     } catch (error) {
       rollback(snap);
       console.error('Error clearing cart:', error);
