@@ -312,7 +312,20 @@ export function usePushNotificationsInternal() {
 
         // Suppress duplicate alert if Live Activity is already tracking this order
         const data = notification?.data as Record<string, string> | undefined;
-        const orderId = data?.order_id ?? data?.entity_id;
+        const orderId = data?.orderId ?? data?.order_id ?? data?.entity_id;
+
+        // CRITICAL: Dispatch terminal sync BEFORE suppression check
+        // Terminal pushes must always trigger state reconciliation even if LA is tracking
+        const TERMINAL_STATUSES = ['delivered', 'completed', 'cancelled', 'no_show'];
+        const pushStatus = data?.status;
+        if (orderId && pushStatus && TERMINAL_STATUSES.includes(pushStatus)) {
+          pushLog('info', 'TERMINAL_PUSH_SYNC', { orderId, status: pushStatus });
+          window.dispatchEvent(new CustomEvent('order-terminal-push', {
+            detail: { orderId, status: pushStatus },
+          }));
+        }
+
+        // Suppress duplicate alert if Live Activity is already tracking this order
         if (orderId && LiveActivityManager.isTracking(orderId)) {
           pushLog('info', 'FOREGROUND_SUPPRESSED_LA_ACTIVE', { orderId });
           return;

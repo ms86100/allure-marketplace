@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statusFlowCache';
@@ -23,6 +23,7 @@ interface ActiveOrder {
 export function ActiveOrderStrip() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [terminalSet, setTerminalSet] = useState<Set<string> | null>(null);
 
   useEffect(() => {
@@ -89,7 +90,17 @@ export function ActiveOrderStrip() {
     enabled: !!user?.id && !!terminalSet,
     staleTime: jitteredStaleTime(30_000),
     refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
+
+  // Push-driven terminal sync: immediately remove stale active orders
+  useEffect(() => {
+    const handler = () => {
+      queryClient.invalidateQueries({ queryKey: ['active-orders-strip'] });
+    };
+    window.addEventListener('order-terminal-push', handler);
+    return () => window.removeEventListener('order-terminal-push', handler);
+  }, [queryClient]);
 
   if (activeOrders.length === 0) return null;
 
