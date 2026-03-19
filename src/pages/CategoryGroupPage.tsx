@@ -112,6 +112,7 @@ export default function CategoryGroupPage() {
                 id: s.seller_id,
                 business_name: s.business_name,
                 profile_image_url: s.profile_image_url,
+                cover_image_url: s.cover_image_url ?? null,
                 rating: s.rating,
                 total_reviews: s.total_reviews,
                 is_featured: s.is_featured,
@@ -119,6 +120,10 @@ export default function CategoryGroupPage() {
                 primary_group: s.primary_group,
                 distance_km: s.distance_km,
                 society_name: s.society_name,
+                is_available: s.is_available ?? true,
+                availability_start: s.availability_start ?? null,
+                availability_end: s.availability_end ?? null,
+                operating_days: s.operating_days ?? null,
               });
             }
           });
