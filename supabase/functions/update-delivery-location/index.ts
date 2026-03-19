@@ -461,7 +461,15 @@ serve(async (req) => {
 
     // ═══ Live Activity delta-based APNs push ═══
     let laPushMs: number | null = null;
-    if (['picked_up', 'on_the_way', 'at_gate'].includes(assignment.status)) {
+    // DB-driven transit check — load transit_statuses_la from system_settings
+    const { data: transitSetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'transit_statuses_la')
+      .maybeSingle();
+    const transitStatuses: string[] = transitSetting?.value ? (() => { try { return JSON.parse(transitSetting.value); } catch { return ['picked_up', 'on_the_way', 'at_gate']; } })() : ['picked_up', 'on_the_way', 'at_gate'];
+
+    if (transitStatuses.includes(assignment.status)) {
       try {
         const { data: laToken } = await supabase
           .from('live_activity_tokens')
