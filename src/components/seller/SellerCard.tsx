@@ -20,7 +20,7 @@ export function SellerCard({ seller, featuredProduct, showFavorite = true }: Sel
     seller.availability_start,
     seller.availability_end,
     seller.operating_days,
-    seller.is_available
+    seller.is_available ?? true
   );
   const isOpen = storeAvailability.status === 'open';
   const { formatPrice } = useCurrency();
