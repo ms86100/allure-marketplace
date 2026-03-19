@@ -53,6 +53,18 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
   const [bookingOpen, setBookingOpen] = useState(false);
   const isServiceBookingAction = d.actionType === 'book' || d.actionType === 'request_service';
 
+  // Track recently viewed
+  useEffect(() => {
+    if (open && product?.product_id) {
+      try {
+        const key = 'recently_viewed';
+        const prev: string[] = JSON.parse(localStorage.getItem(key) || '[]');
+        const next = [product.product_id, ...prev.filter(id => id !== product.product_id)].slice(0, 10);
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch {}
+    }
+  }, [open, product?.product_id]);
+
   const inlineAvailability = useMemo(() => {
     const p = product as any;
     const seller = p?.seller as any;

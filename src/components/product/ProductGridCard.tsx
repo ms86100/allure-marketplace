@@ -58,9 +58,9 @@ export function ProductGridCard({ product, behavior, onTap, className, viewOnly 
   const isStoreClosed = storeAvailability.status !== 'open';
   const storeClosedMessage = isStoreClosed ? formatStoreClosedMessage(storeAvailability) : '';
 
-  const handleAdd = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); hapticImpact('medium'); if (!isCartAction) { if (onTap) onTap(product); return; } addItem(product); };
-  const handleIncrement = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); hapticImpact('medium'); updateQuantity(product.id, quantity + 1); };
-  const handleDecrement = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); hapticImpact('medium'); updateQuantity(product.id, quantity - 1); };
+  const handleAdd = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); if (!isCartAction) { if (onTap) onTap(product); return; } addItem(product); };
+  const handleIncrement = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); updateQuantity(product.id, quantity + 1); };
+  const handleDecrement = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); updateQuantity(product.id, quantity - 1); };
   const handleCardClick = () => { hapticSelection(); if (onTap) { onTap(product); } else { navigate(`/seller/${product.seller_id}`); } };
 
   const isOutOfStock = !product.is_available;
