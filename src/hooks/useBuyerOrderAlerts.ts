@@ -65,7 +65,7 @@ export function useBuyerOrderAlerts() {
           // Use unique ID per order+status to deduplicate with push notifications
           const toastId = `order-${orderId}-${newStatus}`;
 
-          const isTransit = TRANSIT_STATUSES.has(newStatus);
+          const isTransit = getTransitStatuses().has(newStatus);
 
           toast(msg.title, {
             id: toastId,
