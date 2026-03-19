@@ -144,10 +144,8 @@ export function ActiveOrderStrip() {
                 {order.seller_name}{order.seller_name && order.item_count > 0 ? ' · ' : ''}
                 {order.item_count > 0 && `${order.item_count} item${order.item_count > 1 ? 's' : ''}`}
                 {order.estimated_delivery_at && (() => {
-                  const mins = Math.max(0, Math.ceil((new Date(order.estimated_delivery_at).getTime() - Date.now()) / 60000));
-                  if (mins <= 0) return ' · Arriving soon';
-                  if (mins <= 60) return ` · ETA ${mins} min`;
-                  return '';
+                  const eta = compactETA(order.estimated_delivery_at);
+                  return eta ? ` · ETA ${eta}` : '';
                 })()}
               </p>
             </div>

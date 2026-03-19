@@ -264,12 +264,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase.from('cart_items').update({ quantity: cappedQuantity }).eq('user_id', user.id).eq('product_id', productId);
       if (error) throw error;
+      feedbackQuantityChanged();
       await reconcile();
     } catch (error) {
       rollback(snap);
       const availabilityError = parseStoreAvailabilityError(error);
       if (availabilityError) toast.error(availabilityError, { id: 'cart-qty-availability' });
-      else handleApiError(error, 'Failed to update quantity');
+      else feedbackQuantityFailed();
     } finally {
       setPendingMutations(c => Math.max(0, c - 1));
     }

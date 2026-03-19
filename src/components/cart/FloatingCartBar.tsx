@@ -29,9 +29,8 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
     return () => window.removeEventListener('cart-item-added', handler);
   }, [controls]);
 
-  // Hide on cart page and checkout
-  const hiddenPaths = ['/cart', '/checkout'];
-  if (itemCount === 0 || hiddenPaths.some(p => location.pathname.startsWith(p))) return null;
+  // Visibility engine: hide on cart/checkout pages
+  if (itemCount === 0 || isRouteHidden(location.pathname, CART_HIDDEN_ROUTES)) return null;
 
   const thumbnails = items
     .filter(i => i.product?.image_url)
