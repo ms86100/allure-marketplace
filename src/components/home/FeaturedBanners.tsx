@@ -131,7 +131,7 @@ export function FeaturedBanners() {
     return (
       <div className="px-4 my-4">
         {/* Gap #6: Reduced skeleton height */}
-        <Skeleton className="h-28 rounded-2xl" />
+        <Skeleton className="h-36 rounded-2xl" />
       </div>
     );
   }
