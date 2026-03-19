@@ -49,7 +49,7 @@ export default function CategoryGroupPage() {
       category: product.category,
       description: product.description,
       seller_id: product.seller_id,
-      seller_name: product.seller_name || 'Seller',
+      seller_name: product.seller_name || '',
       seller_rating: product.seller_rating || 0,
       seller_reviews: product.seller_reviews || 0,
       action_type: product.action_type,
