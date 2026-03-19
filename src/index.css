@@ -185,6 +185,98 @@
     --sidebar-border: 0 0% 16%;
     --sidebar-ring: 151 65% 44%;
   }
+
+  /* ═══════════════════════════════════════════════
+     NATURE MODE — Living ecosystem, organic warmth
+     ═══════════════════════════════════════════════ */
+  .nature {
+    --background: 80 25% 96%;
+    --foreground: 150 15% 12%;
+
+    --card: 75 20% 94%;
+    --card-foreground: 150 15% 12%;
+    --card-elevated: 70 18% 91%;
+
+    --popover: 75 22% 95%;
+    --popover-foreground: 150 15% 12%;
+
+    --primary: 142 50% 36%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 85 18% 88%;
+    --secondary-foreground: 140 12% 28%;
+
+    --muted: 80 14% 90%;
+    --muted-foreground: 140 8% 46%;
+
+    --accent: 48 70% 52%;
+    --accent-foreground: 150 15% 12%;
+
+    --destructive: 4 60% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 80 12% 85%;
+    --input: 80 14% 88%;
+    --ring: 142 50% 36%;
+
+    --radius: 1rem;
+
+    /* Semantic — earthy */
+    --veg: 142 50% 36%;
+    --non-veg: 4 60% 50%;
+    --success: 142 50% 36%;
+    --warning: 42 80% 52%;
+    --info: 200 60% 50%;
+    --favorite: 340 65% 55%;
+
+    /* Badge */
+    --badge-new: 342 55% 52%;
+    --badge-bought: 180 55% 42%;
+    --badge-discount: 28 80% 52%;
+    --rating-star: 48 85% 50%;
+
+    /* Nav */
+    --nav-active: 142 50% 36%;
+    --nav-active-foreground: 0 0% 100%;
+
+    /* Product image */
+    --product-image-bg: 75 18% 92%;
+
+    /* Nature tints — warm earthy tones */
+    --tint-food: 42 25% 94%;
+    --tint-services: 160 15% 93%;
+    --tint-personal: 320 10% 94%;
+    --tint-resale: 38 20% 93%;
+    --tint-events: 270 10% 94%;
+    --tint-default: 80 12% 93%;
+
+    /* Gradients — organic, calm */
+    --gradient-primary: linear-gradient(135deg, hsl(142 50% 36%) 0%, hsl(165 45% 38%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(142 50% 36%) 0%, hsl(155 40% 34%) 100%);
+    --gradient-warm: linear-gradient(135deg, hsl(42 80% 52%) 0%, hsl(28 75% 50%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(142 50% 36% / 0.06) 0%, hsl(80 25% 96%) 60%);
+    --gradient-glass: linear-gradient(135deg, hsl(75 20% 94% / 0.98) 0%, hsl(80 18% 92% / 0.92) 100%);
+
+    /* Shadows — soft, organic */
+    --shadow-sm: 0 1px 3px hsl(142 20% 20% / 0.06);
+    --shadow-md: 0 4px 14px hsl(142 20% 20% / 0.08);
+    --shadow-lg: 0 8px 30px hsl(142 20% 20% / 0.12);
+    --shadow-card: 0 2px 8px hsl(142 20% 20% / 0.06), 0 0 0 1px hsl(80 12% 85% / 0.5);
+    --shadow-elevated: 0 6px 24px hsl(142 20% 20% / 0.1);
+    --shadow-glow: 0 0 20px hsl(142 50% 36% / 0.12);
+    --shadow-cta: 0 4px 16px hsl(142 50% 36% / 0.2);
+    --shadow-glow-green: 0 0 14px hsl(142 50% 36% / 0.15);
+    --shadow-glow-accent: 0 0 14px hsl(48 70% 52% / 0.15);
+
+    --sidebar-background: 75 20% 94%;
+    --sidebar-foreground: 150 15% 12%;
+    --sidebar-primary: 142 50% 36%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 85 18% 88%;
+    --sidebar-accent-foreground: 140 12% 28%;
+    --sidebar-border: 80 12% 85%;
+    --sidebar-ring: 142 50% 36%;
+  }
 }
 
 @layer base {
