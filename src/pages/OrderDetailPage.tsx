@@ -28,7 +28,7 @@ import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
 import { SellerPaymentConfirmation } from '@/components/payment/SellerPaymentConfirmation';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
-import { isTerminalStatus } from '@/hooks/useCategoryStatusFlow';
+import { isTerminalStatus, isFirstFlowStep, stepRequiresOtp } from '@/hooks/useCategoryStatusFlow';
 import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck, Loader2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -186,7 +186,7 @@ export default function OrderDetailPage() {
           })()}
 
           {/* Gap 11: Order placed celebration banner — shown for newly placed orders */}
-          {o.isBuyerView && order.status === 'placed' && (Date.now() - new Date(order.created_at).getTime() < 60000) && (
+          {o.isBuyerView && isFirstFlowStep(o.flow, order.status) && (Date.now() - new Date(order.created_at).getTime() < 60000) && (
             <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
               <span className="text-3xl">🎉</span>
               <p className="text-sm font-bold text-primary mt-1.5">Order Placed Successfully!</p>
@@ -482,10 +482,10 @@ export default function OrderDetailPage() {
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
           <div className="px-4 py-3 flex gap-3">
             {o.canSellerReject && <Button variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground h-12" onClick={() => o.setIsRejectionDialogOpen(true)} disabled={o.isUpdating}><XCircle size={16} className="mr-1.5" />Reject</Button>}
-            {o.orderFulfillmentType === 'delivery' && order.status === 'ready' && (order as any).delivery_handled_by === 'platform' ? (
+            {o.orderFulfillmentType === 'delivery' && o.flow.find(s => s.status_key === order.status)?.actor === 'system' && (order as any).delivery_handled_by === 'platform' ? (
               <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground"><Truck size={16} className="text-primary" /><span>Awaiting delivery pickup</span></div>
             ) : o.nextStatus ? (
-              o.nextStatus === 'delivered' && isDeliveryOrder && deliveryAssignmentId ? (
+              stepRequiresOtp(o.flow, o.nextStatus) && isDeliveryOrder && deliveryAssignmentId ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : 'Verify & Deliver'}
                   <ChevronRight size={14} className="ml-1" />
@@ -507,8 +507,7 @@ export default function OrderDetailPage() {
         open={isOtpDialogOpen}
         onOpenChange={setIsOtpDialogOpen}
         onVerified={() => {
-          o.setOrder({ ...order, status: 'completed' } as any);
-          // Realtime subscription handles final DB state sync — no reload needed
+          // Trust DB — realtime subscription handles state sync
         }}
       />
 

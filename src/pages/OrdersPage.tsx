@@ -12,21 +12,22 @@ import { BuyerBookingsCalendar } from '@/components/booking/BuyerBookingsCalenda
 import { useAuth } from '@/contexts/AuthContext';
 import { Order } from '@/types/database';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
+import { useTerminalStatuses } from '@/hooks/useCategoryStatusFlow';
 import { Package, ChevronRight, Loader2, ArrowLeft, CheckCircle, Truck } from 'lucide-react';
 import { format } from 'date-fns';
 import { useCurrency } from '@/hooks/useCurrency';
 
 const PAGE_SIZE = 20;
 
-function OrderCard({ order, type }: { order: Order; type: 'buyer' | 'seller' }) {
+function OrderCard({ order, type, successTerminals }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string> }) {
   const { getOrderStatus } = useStatusLabels();
   const { formatPrice } = useCurrency();
   const statusInfo = getOrderStatus(order.status);
   const seller = (order as any).seller;
   const buyer = (order as any).buyer;
   const items = (order as any).items || [];
-  const canReorder = type === 'buyer' && (order.status === 'completed' || order.status === 'delivered');
-  const isCompleted = order.status === 'completed' || order.status === 'delivered';
+  const canReorder = type === 'buyer' && successTerminals.has(order.status);
+  const isCompleted = successTerminals.has(order.status);
 
   return (
     <Link to={`/orders/${order.id}`} className="block">
@@ -114,6 +115,7 @@ function EmptyState({ message, type }: { message: string; type?: 'buyer' | 'sell
 }
 
 function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userId: string; sellerId?: string }) {
+  const { successSet } = useTerminalStatuses();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
@@ -189,7 +191,7 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
 
   return (
     <div>
-      {orders.map(order => <OrderCard key={order.id} order={order} type={type} />)}
+      {orders.map(order => <OrderCard key={order.id} order={order} type={type} successTerminals={successSet} />)}
       {hasMore && (
         <div className="flex justify-center py-4">
           <Button variant="secondary" size="default" className="w-full" onClick={loadMore} disabled={isLoadingMore}>

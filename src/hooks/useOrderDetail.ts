@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { useUrgentOrderSound } from '@/hooks/useUrgentOrderSound';
 import { useCurrency } from '@/hooks/useCurrency';
-import { useCategoryStatusFlow, getNextStatusForActor, getTimelineSteps, isTerminalStatus, canActorCancel, useStatusTransitions } from '@/hooks/useCategoryStatusFlow';
+import { useCategoryStatusFlow, getNextStatusForActor, getTimelineSteps, isTerminalStatus, isSuccessfulTerminal, canActorCancel, useStatusTransitions } from '@/hooks/useCategoryStatusFlow';
 import { logAudit } from '@/lib/audit';
 import { Order, OrderStatus } from '@/types/database';
 import { toast } from 'sonner';
@@ -44,7 +44,7 @@ export function useOrderDetail(id: string | undefined) {
 
   const seller = (order as any)?.seller;
   const isSellerView = isSeller && seller?.user_id === user?.id;
-  const isUrgentOrder = order?.auto_cancel_at && order.status === 'placed' && isSellerView;
+  const isUrgentOrder = order?.auto_cancel_at && isSellerView;
 
   useUrgentOrderSound(!!isUrgentOrder);
 
@@ -139,7 +139,7 @@ export function useOrderDetail(id: string | undefined) {
       if (error) throw error;
       if (cancelled) return;
       setOrder(data as any);
-      if (data?.status === 'completed' || data?.status === 'delivered') {
+      if (data?.status && isSuccessfulTerminal(flow, data.status)) {
         const { data: reviewData } = await supabase.from('reviews').select('id').eq('order_id', id).maybeSingle();
         if (!cancelled) setHasReview(!!reviewData);
       } else { if (!cancelled) setHasReview(false); }
@@ -186,10 +186,9 @@ export function useOrderDetail(id: string | undefined) {
 
   const isBuyerView = order ? order.buyer_id === user?.id : false;
   const nextStatus = getNextStatus();
-  const canReview = isBuyerView && (order?.status === 'completed' || order?.status === 'delivered') && !hasReview;
-  // Use is_terminal from flow instead of hardcoded status list
+  const canReview = isBuyerView && order ? isSuccessfulTerminal(flow, order.status) && !hasReview : false;
   const canChat = order ? !isTerminalStatus(flow, order.status) : false;
-  const canReorder = isBuyerView && (order?.status === 'completed' || order?.status === 'delivered');
+  const canReorder = isBuyerView && order ? isSuccessfulTerminal(flow, order.status) : false;
   const chatRecipientId = isSellerView ? order?.buyer_id : seller?.user_id;
   const chatRecipientName = isSellerView ? (order as any)?.buyer?.name : seller?.business_name;
 
