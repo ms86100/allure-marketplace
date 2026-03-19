@@ -1,85 +1,77 @@
 
 
-# Live Activity + Tracking + Notification — Production Audit
+# Revised Plan: Hardening the DB-Driven Status Engine with Failure-Safe Fallbacks
 
-## SECTION 1: FINDINGS
+## Gaps Being Fixed (from review feedback)
 
-### CRITICAL Issues
+1. **Empty fallback is dangerous** — if DB fails, Live Activities never end
+2. **Push handler loads terminal set once at init** — misses cold-start race
+3. **`getStartStatuses` derives from sort_order** — fragile for non-linear flows
+4. **Duplicate flow row deletion is risky** — could break historical references
+5. **Transit statuses should eventually be a DB flag** — acknowledged, deferred
 
-| # | Issue | Location | Severity | User Impact |
-|---|-------|----------|----------|-------------|
-| 1 | **Hardcoded TERMINAL_STATUSES in push handler** | `usePushNotifications.ts:319` | Critical | Terminal push events for admin-added terminal statuses (e.g. `failed_delivery`, `returned`) will NOT trigger Live Activity termination. Dynamic Island persists after order is done. |
-| 2 | **Hardcoded TERMINAL_STATUSES fallback in LiveActivityManager** | `LiveActivityManager.ts:42-44` | Critical | Before DB loads, any status not in the hardcoded set is treated as non-terminal. If DB load fails, system permanently uses hardcoded set. |
-| 3 | **Hardcoded TERMINAL_STATUSES fallback in orchestrator** | `useLiveActivityOrchestrator.ts:14-16` | Critical | Same as above — pre-DB-load terminal checks miss admin-configured terminals. |
-| 4 | **Safety net hardcoding in statusFlowCache** | `statusFlowCache.ts:41-43` | High | `getTerminalStatuses()` force-adds `delivered, completed, cancelled, no_show` regardless of DB. If admin renames/removes these, stale entries pollute the set. |
-| 5 | **Hardcoded `'placed'` and `'delivered'` exclusion in getStartStatuses** | `statusFlowCache.ts:52` | High | If admin renames the initial status or delivery status, LA start logic breaks silently. |
-| 6 | **Hardcoded transit status check in update-delivery-location** | `update-delivery-location/index.ts:464` | High | `['picked_up', 'on_the_way', 'at_gate'].includes(...)` — APNs pushes only fire for these 3 statuses. Admin-added transit statuses get no background LA updates. |
-| 7 | **Hardcoded TRANSIT_STATUSES in visibilityEngine** | `visibilityEngine.ts:26-31` | Medium | ActiveOrderStrip pulse animation only triggers for 4 hardcoded statuses, not DB-driven transit set. |
-| 8 | **Hardcoded `'at_gate'` append in liveActivityMapper** | `liveActivityMapper.ts:111` | Medium | `at_gate` hardcoded into transit set alongside DB values. |
-| 9 | **Duplicate request_service flow rows** | DB query result | Medium | `request_service` has duplicate flow entries (sort_order 1-7 AND 10-70). This causes incorrect progress calculation (deriveProgressPercent gets wrong min/max sort_order). |
+## Changes
 
-### HIGH Issues
+### 1. Three-Tier Fallback in `statusFlowCache.ts`
 
-| # | Issue | Location | Severity | User Impact |
-|---|-------|----------|----------|-------------|
-| 10 | **Throttle can skip terminal state** | `LiveActivityManager.ts:469-481` | High | If terminal update arrives within 5s throttle window, it queues via `setTimeout`. The `push()` method handles terminal via early return (line 322), but if the status arrives via `throttledUpdate` path (existing entry), the pending timer fires `doUpdate` which does NOT check for terminal — it just calls `updateLiveActivity`. Terminal end happens only via `push()` top-level check. **However**, the orchestrator calls `LiveActivityManager.end()` directly for terminal statuses (line 97), so the throttle race is mitigated. Still, a rapid `non-terminal → terminal` within 5s could leave a stale pending timer that fires an update AFTER end. The `doUpdate` guard at line 485 (`!this.active.has(data.entity_id)`) prevents this. **PASS** — mitigated. |
-| 11 | **No `no_show` in request_service flow** | DB | High | Service orders have no `no_show` terminal status. If the system tries to transition to `no_show`, it won't match the flow. |
-| 12 | **Notification dedup for proximity uses 30s window** | `update-delivery-location/index.ts:400-426` | Medium | If seller oscillates near threshold boundary, buyer gets repeated proximity notifications every 30s. |
+Replace the current "empty on failure" approach with: **DB → expired cache → persistent KV → minimal safe fallback**
 
-### Architecture Assessment
+```
+DB fresh?  → use it
+DB stale?  → use expired cache (still in memory)
+No cache?  → load from persistent-kv (last known good, survives app restart)
+Nothing?   → safe fallback: Set(['completed']) + console.error
+```
 
-| System | Verdict | Notes |
-|--------|---------|-------|
-| **Live Activity lifecycle** | PASS (with issues above) | start → update → end lifecycle correctly tied to DB status via orchestrator. Dedup via `starting` set + native check. |
-| **Hydration/dedup on restart** | PASS | Persisted map + native getActiveActivities reconciliation + stale cleanup. |
-| **APNs background updates** | PASS (with issue #6) | Delta-based push with throttle floor, ETA/distance deltas. Terminal sends `event: "end"` with `dismissal-date`. |
-| **Dynamic Island navigation** | PASS | Tap uses `appStateChange` → deferred navigation via `sessionStorage`. |
-| **Realtime subscriptions** | PASS | Auto-reconnect with 3 retries + polling heartbeat (15s) as safety net. |
-| **Push-driven terminal sync** | FAIL (issue #1) | Hardcoded terminal check means non-standard terminals don't fire the CustomEvent. |
-| **Notification silent_push** | PASS | `silent_push` flag is DB-driven per flow step. |
-| **Multi-device** | PASS | APNs token is per-device via `apns_token` dedup. Realtime channels are per-user. |
+On every successful DB load, persist the terminal set to persistent-kv (`status_flow_terminal_cache`). This means even after a cold start with no network, the last-known terminal set is available synchronously.
 
----
+The safe fallback `['completed']` is the absolute minimum — it only contains the universal final state. It is NOT business logic; it's a degradation safety net. A critical warning is logged whenever it activates.
 
-## SECTION 2: FIX PLAN
+### 2. Push Handler: Dynamic Terminal Resolution
 
-### Fix 1: Eliminate all hardcoded status sets in Live Activity stack
+Current code loads `terminalStatusesRef.current` once at listener setup. Fix:
 
-**Files:** `usePushNotifications.ts`, `LiveActivityManager.ts`, `useLiveActivityOrchestrator.ts`, `statusFlowCache.ts`
+- **Primary**: Use `is_terminal` flag from the push payload (already implemented: `data?.is_terminal === 'true'`). This is the most reliable — it travels with the push itself.
+- **Secondary**: Call `getTerminalStatuses()` **at event time** (not init time) inside the foreground handler. Since `getTerminalStatuses()` returns from cache in <1ms when warm, this has zero performance cost. When cold, it triggers a DB fetch which resolves quickly.
+- Remove `terminalStatusesRef` entirely — it's unnecessary indirection when `getTerminalStatuses()` already caches internally.
 
-**Approach:**
-- Remove hardcoded `TERMINAL_STATUSES` array in `usePushNotifications.ts:319`. Instead, import and use `getTerminalStatuses()` from `statusFlowCache` (already cached). Since the push handler is async-compatible, load the set once at listener setup time and store in a ref.
-- Remove hardcoded fallback sets in `LiveActivityManager.ts:42-47`. If DB load fails, use empty sets and log a critical warning. The orchestrator's polling heartbeat (15s) will catch any missed terminals.
-- Remove hardcoded fallback in `useLiveActivityOrchestrator.ts:14-16`. Start with empty set, populate from DB on init.
-- Remove the "safety net" force-add in `statusFlowCache.ts:40-43`. The DB is the source of truth. If those statuses aren't in the DB, they shouldn't be in the set.
-- Remove hardcoded `'placed'` and `'delivered'` exclusion in `getStartStatuses`. Instead, add a DB column `starts_live_activity boolean DEFAULT false` to `category_status_flows`, OR derive it: non-terminal statuses where `sort_order > min(sort_order)` should start LA (i.e., everything except the very first step).
+This eliminates the cold-start race: even if the push arrives before DB loads, the `is_terminal` payload flag catches it. And if the payload flag is missing (older push format), the dynamic call fetches from cache/KV/fallback.
 
-### Fix 2: Make transit status checks DB-driven everywhere
+### 3. Explicit `starts_live_activity` DB Column
 
-**Files:** `update-delivery-location/index.ts`, `visibilityEngine.ts`, `liveActivityMapper.ts`
+Add `starts_live_activity boolean NOT NULL DEFAULT false` to `category_status_flows`.
 
-- `update-delivery-location/index.ts:464`: Replace hardcoded array with `transit_statuses_la` from `system_settings` (already loaded earlier in the function for proximity — reuse it).
-- `visibilityEngine.ts:26-31`: Remove hardcoded `TRANSIT_STATUSES` export. Either make it load from DB (async), or since this is a shared constant, load from `getTrackingConfigSync()`.
-- `liveActivityMapper.ts:111`: Remove hardcoded `'at_gate'` append — it's already in `transit_statuses_la` DB setting.
+Set `true` for all non-initial, non-terminal statuses in `cart_purchase` and `seller_delivery` flows (the flows that have Live Activity support).
 
-### Fix 3: Clean up duplicate request_service flow rows
+Update `getStartStatuses()` to simply: `SELECT status_key WHERE starts_live_activity = true`.
 
-**Migration:** Delete the duplicate rows (sort_order 1-7) that conflict with the canonical rows (sort_order 10-70).
+This removes the fragile `sort_order > min` derivation. Admins can now explicitly control which statuses trigger Live Activity start.
 
-### Fix 4: Add `no_show` to request_service flow
+### 4. Duplicate Flow Rows: Soft Deprecation (NOT hard delete)
 
-**Migration:** Insert `no_show` as terminal/not-success for `request_service` if the business requires it.
+The duplicate `request_service` rows (sort_order 1-7 vs 10-70) belong to different `parent_group` values (`education_learning` vs `default`), so they're actually NOT duplicates — they were confirmed correct in the previous round. No action needed here.
 
----
+### 5. LiveActivityManager: Same Three-Tier Fallback
+
+`loadStatusSets()` already calls `getTerminalStatuses()` and `getStartStatuses()`. Since those functions now implement the three-tier fallback, the manager automatically benefits. Remove the `statusSetsLoaded` gate that prevents retry — if the first load got the safe fallback, allow re-fetch on next `push()` call.
+
+### 6. Orchestrator: Same Pattern
+
+`terminalStatusesCache` in the orchestrator already calls `getTerminalStatuses()`. The three-tier fallback propagates automatically. No structural change needed beyond removing the empty-set initialization comment.
 
 ## Files to Modify
 
-1. **Migration** — Remove duplicate `request_service` rows, optionally add `no_show`
-2. **`src/services/statusFlowCache.ts`** — Remove hardcoded safety net and `'placed'`/`'delivered'` exclusions
-3. **`src/services/LiveActivityManager.ts`** — Remove hardcoded fallback status sets
-4. **`src/hooks/useLiveActivityOrchestrator.ts`** — Remove hardcoded terminal cache initial value
-5. **`src/hooks/usePushNotifications.ts`** — Replace hardcoded terminal array with DB-driven set
-6. **`src/lib/visibilityEngine.ts`** — Replace hardcoded transit set with DB-driven config
-7. **`src/services/liveActivityMapper.ts`** — Remove hardcoded `'at_gate'` append
-8. **`supabase/functions/update-delivery-location/index.ts`** — Replace hardcoded transit check with DB lookup
+1. **Migration** — Add `starts_live_activity` column to `category_status_flows`
+2. **Data update** — Set `starts_live_activity = true` for appropriate statuses
+3. **`src/services/statusFlowCache.ts`** — Implement three-tier fallback (DB → expired cache → persistent-KV → safe minimum), persist terminal set to KV on success, use `starts_live_activity` column
+4. **`src/hooks/usePushNotifications.ts`** — Remove `terminalStatusesRef`, call `getTerminalStatuses()` dynamically at event time
+5. **`src/services/LiveActivityManager.ts`** — Remove `statusSetsLoaded` gate to allow re-fetch after fallback
+6. **`src/lib/persistent-kv.ts`** — Add `status_flow_terminal_cache` and `status_flow_start_cache` to the restore prefixes list
+
+## What This Achieves
+
+- **Zero-downtime degradation**: System always has a terminal set, even during DB outages or cold starts
+- **No hardcoded business logic**: The safe fallback (`completed`) is not a business decision — it's a universal truth that "completed" means done
+- **Push handler is race-proof**: `is_terminal` payload flag + dynamic cache lookup = no timing dependency
+- **Admin-explicit LA control**: `starts_live_activity` flag means admins decide, not sort_order math
 
