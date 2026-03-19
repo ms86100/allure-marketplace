@@ -171,7 +171,7 @@ export function BuyAgainRow() {
               className="shrink-0 w-[140px]"
             >
               {/* Card with teal/green tint */}
-              <div className="rounded-2xl bg-accent/40 dark:bg-accent/20 border border-primary/20 p-2.5 space-y-2">
+              <div className="rounded-2xl bg-accent/30 dark:bg-[hsl(160_40%_18%/0.4)] border border-primary/15 dark:border-[hsl(160_40%_30%/0.2)] p-2.5 space-y-2">
                 {/* Product thumbnails grid */}
                 <div className="grid grid-cols-2 gap-1.5">
                   {displayProducts.map((product) => {
@@ -210,7 +210,7 @@ export function BuyAgainRow() {
                 {/* +N more badge */}
                 {moreCount > 0 && (
                   <div className="text-center">
-                    <span className="text-[10px] font-bold text-primary">
+                   <span className="text-[10px] font-bold text-primary dark:text-primary-foreground dark:bg-[hsl(160_40%_22%/0.6)] px-2 py-0.5 rounded-full">
                       +{moreCount} more
                     </span>
                   </div>
