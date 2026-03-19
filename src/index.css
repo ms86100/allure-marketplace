@@ -500,3 +500,133 @@ body.razorpay-active iframe[src*="razorpay"] {
   height: calc(100% - env(safe-area-inset-top, 0px)) !important;
 }
 
+/* ═══════════════════════════════════════════════
+   PREMIUM INTERACTION SYSTEM
+   GPU-accelerated, performance-safe animations
+   ═══════════════════════════════════════════════ */
+
+/* ── Card hover: lift + shadow expansion ── */
+.card-hover {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+.card-hover:hover {
+  transform: translateY(-3px) scale(1.012);
+  box-shadow: 0 8px 25px hsl(var(--foreground) / 0.12),
+              0 2px 8px hsl(var(--foreground) / 0.06);
+}
+.card-hover:active {
+  transform: translateY(0) scale(0.98);
+  transition-duration: 0.1s;
+}
+
+/* ── Button press: satisfying micro-feedback ── */
+.btn-press {
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.15s ease;
+}
+.btn-press:active {
+  transform: scale(0.95);
+  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.1);
+}
+
+/* ── Section reveal: fade + slide from below ── */
+@keyframes sectionReveal {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.section-reveal {
+  animation: sectionReveal 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Staggered children reveal ── */
+.stagger-children > * {
+  opacity: 0;
+  animation: sectionReveal 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
+.stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
+.stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
+
+/* ── Carousel smooth float ── */
+@keyframes gentleFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.carousel-float {
+  animation: gentleFloat 3s ease-in-out infinite;
+}
+.carousel-float:hover {
+  animation-play-state: paused;
+}
+
+/* ── Subtle background ambient motion ── */
+@keyframes ambientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.ambient-bg {
+  background-size: 200% 200%;
+  animation: ambientShift 15s ease infinite;
+}
+
+/* ── Image hover zoom (for product/category images) ── */
+.img-zoom {
+  overflow: hidden;
+}
+.img-zoom img,
+.img-zoom > div {
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.img-zoom:hover img,
+.img-zoom:hover > div {
+  transform: scale(1.05);
+}
+
+/* ── Add-to-cart pop feedback ── */
+@keyframes cartPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.cart-pop {
+  animation: cartPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Smooth section fade-slide (IntersectionObserver friendly) ── */
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal-on-scroll.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Banner carousel parallax depth ── */
+.banner-depth {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s ease;
+}
+.banner-depth:hover {
+  transform: perspective(800px) rotateY(-1deg) translateZ(8px);
+  box-shadow: 0 12px 40px hsl(var(--foreground) / 0.15);
+}
+
+/* ── Discovery row scroll hint pulse ── */
+@keyframes scrollHint {
+  0%, 100% { opacity: 0.4; transform: translateX(0); }
+  50% { opacity: 1; transform: translateX(4px); }
+}
+.scroll-hint-arrow {
+  animation: scrollHint 2s ease-in-out infinite;
+}
