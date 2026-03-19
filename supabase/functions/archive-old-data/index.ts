@@ -18,14 +18,25 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
     const results: Record<string, any> = {};
 
-    // 1. Archive completed orders older than 90 days
+    // Load admin-configured archivable statuses from system_settings
+    const { data: settingsRows } = await supabase
+      .from("system_settings")
+      .select("key, value")
+      .eq("key", "archivable_statuses")
+      .single();
+
+    let archivableStatuses: string[];
+    try { archivableStatuses = JSON.parse(settingsRows?.value || '["completed"]'); }
+    catch { archivableStatuses = ["completed"]; }
+
+    // 1. Archive orders in archivable statuses older than 90 days
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
     const { data: oldOrders, error: ordersFetchErr } = await supabase
       .from("orders")
       .select("*")
-      .eq("status", "completed")
+      .in("status", archivableStatuses)
       .lt("created_at", ninetyDaysAgo.toISOString())
       .limit(500);
 

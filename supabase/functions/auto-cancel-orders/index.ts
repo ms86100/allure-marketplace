@@ -83,7 +83,7 @@ app.post("/", async (c) => {
     const { data: deliveredExpired, error: deliveredErr } = await supabase
       .from("orders")
       .select("id, buyer_id, seller_id")
-      .eq("status", "delivered")
+      .in("status", autoCompletableStatuses)
       .not("auto_complete_at", "is", null)
       .lt("auto_complete_at", now);
 

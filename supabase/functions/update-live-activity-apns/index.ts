@@ -211,9 +211,18 @@ Deno.serve(async (req) => {
     const progressStage = flowEntry?.display_label ?? null;
     let progressPercent = deriveProgressPercent(status, flowMap);
 
-    // ETA-based progress override for transit statuses (matches client-side logic)
-    const TRANSIT_STATUSES = ['on_the_way', 'picked_up', 'at_gate'];
-    if (TRANSIT_STATUSES.includes(status) && etaMinutes != null && etaMinutes >= 0) {
+    // ETA-based progress override for transit statuses — loaded from DB via system_settings
+    const { data: transitSetting } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", "transit_statuses")
+      .maybeSingle();
+
+    let transitStatuses: string[];
+    try { transitStatuses = JSON.parse(transitSetting?.value || '[]'); }
+    catch { transitStatuses = []; }
+
+    if (transitStatuses.includes(status) && etaMinutes != null && etaMinutes >= 0) {
       const initialEta = payload.initial_eta_minutes;
       const MAX_ETA = (initialEta != null && initialEta > 5) ? initialEta : 15;
       const ratio = Math.min(etaMinutes / MAX_ETA, 1);
