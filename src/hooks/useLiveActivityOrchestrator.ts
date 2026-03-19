@@ -312,7 +312,7 @@ export function useLiveActivityOrchestrator(): void {
   useEffect(() => {
     if (!userId || !Capacitor.isNativePlatform()) return;
 
-    const POLL_INTERVAL_MS = 45_000; // 45 seconds
+    const POLL_INTERVAL_MS = 15_000; // 15 seconds — tighter safety net
     /** Last-known statuses to avoid redundant processing */
     const lastKnownRef = new Map<string, string>();
 
