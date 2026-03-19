@@ -181,11 +181,11 @@ export function isFirstFlowStep(flow: StatusFlowStep[], status: string): boolean
 
 /**
  * Check if a given next-status step requires OTP verification.
- * DB-driven: checks if the flow step's actor is 'delivery'.
+ * Fully DB-driven: uses requires_otp flag from category_status_flows.
  */
 export function stepRequiresOtp(flow: StatusFlowStep[], statusKey: string): boolean {
   const step = flow.find(s => s.status_key === statusKey);
-  return step?.actor === 'delivery';
+  return step?.requires_otp === true;
 }
 
 /**
