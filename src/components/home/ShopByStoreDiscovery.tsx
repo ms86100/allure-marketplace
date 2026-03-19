@@ -350,7 +350,7 @@ function ProductMini({ product }: { product: TopProduct }) {
       <div className="px-1 py-0.5">
         <p className="text-[8px] text-foreground font-medium line-clamp-1">{product.name}</p>
         <div className="flex items-center gap-0.5">
-          {product.is_veg !== null && <VegBadge isVeg={product.is_veg} size="xs" />}
+          {product.is_veg !== null && <VegBadge isVeg={product.is_veg} size="sm" />}
           <span className="text-[8px] font-bold text-foreground">{formatPrice(product.price)}</span>
         </div>
       </div>
