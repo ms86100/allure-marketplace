@@ -5,21 +5,37 @@ import { jitteredStaleTime } from '@/lib/query-utils';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 
+export interface TopProduct {
+  id: string;
+  name: string;
+  price: number;
+  image_url: string | null;
+  category: string | null;
+  is_veg: boolean | null;
+  mrp: number | null;
+  discount_percentage: number | null;
+}
+
 export interface LocalSeller {
   id: string;
   business_name: string;
   profile_image_url: string | null;
+  cover_image_url: string | null;
+  description: string | null;
   rating: number;
   total_reviews: number;
   primary_group: string | null;
   categories: string[] | null;
   is_featured: boolean;
+  topProducts: TopProduct[];
 }
 
 export interface NearbySeller {
   seller_id: string;
   business_name: string;
   profile_image_url: string | null;
+  cover_image_url: string | null;
+  description: string | null;
   rating: number;
   total_reviews: number;
   primary_group: string | null;
@@ -27,6 +43,7 @@ export interface NearbySeller {
   society_name: string;
   distance_km: number;
   is_featured: boolean;
+  topProducts: TopProduct[];
 }
 
 export interface DistanceBand {
@@ -42,9 +59,28 @@ export interface SocietyGroup {
   sellersByGroup: Record<string, NearbySeller[]>;
 }
 
+/** Parse matching_products JSON from RPC, return top 3 by lowest price */
+function parseTopProducts(raw: any): TopProduct[] {
+  if (!raw || !Array.isArray(raw)) return [];
+  const products: TopProduct[] = raw
+    .filter((p: any) => p && p.name && typeof p.price === 'number')
+    .map((p: any) => ({
+      id: p.id || '',
+      name: p.name,
+      price: p.price,
+      image_url: p.image_url || null,
+      category: p.category || null,
+      is_veg: p.is_veg ?? null,
+      mrp: p.mrp ?? null,
+      discount_percentage: p.discount_percentage ?? null,
+    }));
+  // Sort by price ascending, take top 3
+  products.sort((a, b) => a.price - b.price);
+  return products.slice(0, 3);
+}
+
 /**
  * Coordinate-based "local" sellers within ~2 km of browsingLocation.
- * Replaces the old society_id–based query.
  */
 export function useLocalSellers() {
   const { browsingLocation } = useBrowsingLocation();
@@ -67,7 +103,6 @@ export function useLocalSellers() {
         return {};
       }
 
-      // Group by primary_group, same shape as before
       const grouped: Record<string, LocalSeller[]> = {};
       for (const seller of (data || []) as any[]) {
         const group = seller.primary_group || 'Other';
@@ -76,11 +111,14 @@ export function useLocalSellers() {
           id: seller.seller_id,
           business_name: seller.business_name,
           profile_image_url: seller.profile_image_url,
+          cover_image_url: seller.cover_image_url || null,
+          description: seller.description || null,
           rating: seller.rating || 0,
           total_reviews: seller.total_reviews || 0,
           primary_group: seller.primary_group,
           categories: seller.categories,
           is_featured: seller.is_featured || false,
+          topProducts: parseTopProducts(seller.matching_products),
         });
       }
       return grouped;
@@ -92,7 +130,6 @@ export function useLocalSellers() {
 
 /**
  * Coordinate-based nearby sellers grouped by distance band.
- * Always uses search_sellers_by_location with browsingLocation.
  */
 export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM, enabled: boolean = true) {
   const { browsingLocation } = useBrowsingLocation();
@@ -115,7 +152,21 @@ export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM
         return [];
       }
 
-      const sellers = (data as NearbySeller[]) || [];
+      const sellers: NearbySeller[] = ((data as any[]) || []).map((s: any) => ({
+        seller_id: s.seller_id,
+        business_name: s.business_name,
+        profile_image_url: s.profile_image_url,
+        cover_image_url: s.cover_image_url || null,
+        description: s.description || null,
+        rating: s.rating || 0,
+        total_reviews: s.total_reviews || 0,
+        primary_group: s.primary_group,
+        categories: s.categories,
+        society_name: s.society_name,
+        distance_km: s.distance_km,
+        is_featured: s.is_featured || false,
+        topProducts: parseTopProducts(s.matching_products),
+      }));
 
       const ALL_BANDS: { label: string; minKm: number; maxKm: number }[] = [
         { label: 'Within 2 km', minKm: 0, maxKm: 2 },

@@ -7,20 +7,22 @@ import {
   type NearbySeller,
   type DistanceBand,
   type SocietyGroup,
+  type TopProduct,
 } from '@/hooks/queries/useStoreDiscovery';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Store, Star, MapPin, ChevronDown, Building2 } from 'lucide-react';
+import { Store, MapPin, ChevronDown, Building2, Users, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useMemo } from 'react';
+import { useCurrency } from '@/hooks/useCurrency';
+import { VegBadge } from '@/components/ui/veg-badge';
 
-/** Replaces pure-numeric business names (e.g. phone numbers) with empty string */
+/* ── Helpers ── */
+
 function sanitizeSellerName(name: string): string {
   return /^\d+$/.test(name.trim()) ? '' : name;
 }
 
-/** Deterministic hue from a string (seller ID) for colored avatars */
 function hashToHue(str: string): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -29,37 +31,7 @@ function hashToHue(str: string): number {
   return Math.abs(hash) % 360;
 }
 
-function SellerAvatar({ name, id, imageUrl, size = 'md' }: {
-  name: string; id: string; imageUrl: string | null; size?: 'sm' | 'md';
-}) {
-  const dims = size === 'sm' ? 'w-9 h-9' : 'w-12 h-12';
-  const sanitized = sanitizeSellerName(name);
-  const initial = sanitized.charAt(0).toUpperCase();
-  const hue = useMemo(() => hashToHue(id), [id]);
-
-  if (imageUrl) {
-    return (
-      <img
-        src={imageUrl}
-        alt={sanitized}
-        className={cn('rounded-xl object-cover', dims)}
-        loading="lazy"
-      />
-    );
-  }
-
-  return (
-    <div
-      className={cn('rounded-xl flex items-center justify-center font-bold text-white', dims)}
-      style={{
-        backgroundColor: `hsl(${hue}, 55%, 50%)`,
-        fontSize: size === 'sm' ? '12px' : '16px',
-      }}
-    >
-      {initial}
-    </div>
-  );
-}
+/* ── Main Component ── */
 
 export function ShopByStoreDiscovery() {
   const { effectiveSociety, profile } = useAuth();
@@ -95,16 +67,7 @@ export function ShopByStoreDiscovery() {
           ) : (
             <div className="space-y-3">
               {Object.entries(localGrouped).map(([group, sellers]) => (
-                <CategorySellerRow
-                  key={group}
-                  groupLabel={group}
-                  sellers={sellers.map(s => ({
-                    id: s.id,
-                    business_name: s.business_name,
-                    profile_image_url: s.profile_image_url,
-                    rating: s.rating,
-                  }))}
-                />
+                <CategorySellerRow key={group} groupLabel={group} sellers={sellers} />
               ))}
             </div>
           )}
@@ -134,7 +97,8 @@ export function ShopByStoreDiscovery() {
   );
 }
 
-// ── Distance Band (collapsible) ──
+/* ── Distance Band (collapsible) ── */
+
 function DistanceBandSection({ band }: { band: DistanceBand }) {
   const [open, setOpen] = useState(true);
 
@@ -146,10 +110,7 @@ function DistanceBandSection({ band }: { band: DistanceBand }) {
         </span>
         <ChevronDown
           size={14}
-          className={cn(
-            'text-muted-foreground transition-transform',
-            open && 'rotate-180'
-          )}
+          className={cn('text-muted-foreground transition-transform', open && 'rotate-180')}
         />
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-2.5 mt-2">
@@ -161,59 +122,41 @@ function DistanceBandSection({ band }: { band: DistanceBand }) {
   );
 }
 
-// ── Format distance nicely ──
+/* ── Format distance ── */
+
 function formatDistance(km: number): string {
-  if (km < 0.1) return `${Math.round(km * 1000)} m`;
   if (km < 1) return `${Math.round(km * 1000)} m`;
   return `${Math.round(km * 10) / 10} km`;
 }
 
-// ── Society Card inside a distance band ──
+/* ── Society Card ── */
+
 function SocietyCard({ society }: { society: SocietyGroup }) {
-  const navigate = useNavigate();
-  const allSellers = Object.entries(society.sellersByGroup).flatMap(([group, sellers]) =>
-    sellers.map(s => ({
-      id: s.seller_id,
-      business_name: s.business_name,
-      profile_image_url: s.profile_image_url,
-      rating: s.rating,
-      group,
-    }))
-  );
+  const allSellers = Object.entries(society.sellersByGroup).flatMap(([, sellers]) => sellers);
 
   return (
     <div className="mx-4 rounded-2xl border border-border bg-card overflow-hidden">
       <div className="px-3 py-2.5 bg-secondary flex items-center justify-between">
         <span className="text-xs font-bold text-foreground">{society.societyName}</span>
-        <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{formatDistance(society.distanceKm)}</span>
+        <span className="text-[10px] font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+          {formatDistance(society.distanceKm)}
+        </span>
       </div>
-      <div className="relative p-2">
+      <div className="p-2">
         <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1">
           {allSellers.map(seller => (
-            <div
-              key={seller.id}
-              onClick={() => navigate(`/seller/${seller.id}`)}
-              className={cn(
-                'shrink-0 w-24 rounded-2xl overflow-hidden cursor-pointer',
-                'bg-card border border-border',
-                'transition-all duration-200 hover:scale-[1.02] active:scale-[0.97]',
-              )}
-            >
-              <div className="flex items-center justify-center h-16 p-2">
-                <SellerAvatar name={seller.business_name} id={seller.id} imageUrl={seller.profile_image_url} size="md" />
-              </div>
-              <div className="px-1.5 pb-2 pt-1.5 text-center">
-                <p className="font-bold text-foreground line-clamp-2 leading-tight text-[10px]">
-                  {sanitizeSellerName(seller.business_name)}
-                </p>
-                {seller.rating > 0 && (
-                  <div className="flex items-center justify-center gap-0.5 mt-0.5">
-                    <Star size={8} className="text-warning fill-warning" />
-                    <span className="text-[9px] font-bold text-muted-foreground">{seller.rating}</span>
-                  </div>
-                )}
-              </div>
-            </div>
+            <RichSellerCard
+              key={seller.seller_id}
+              id={seller.seller_id}
+              name={seller.business_name}
+              profileImage={seller.profile_image_url}
+              coverImage={seller.cover_image_url}
+              categories={seller.categories}
+              topProducts={seller.topProducts}
+              totalReviews={seller.total_reviews}
+              isFeatured={seller.is_featured}
+              compact
+            />
           ))}
         </div>
       </div>
@@ -221,66 +164,202 @@ function SocietyCard({ society }: { society: SocietyGroup }) {
   );
 }
 
-// ── Horizontal seller row for a category group ──
+/* ── Category Seller Row (local sellers) ── */
+
 function CategorySellerRow({
   groupLabel,
   sellers,
-  compact = false,
 }: {
   groupLabel: string;
-  sellers: { id: string; business_name: string; profile_image_url: string | null; rating: number }[];
-  compact?: boolean;
+  sellers: LocalSeller[];
 }) {
-  const navigate = useNavigate();
-
   return (
     <div>
       <div className="px-4 mb-1.5">
-        <Badge variant="secondary" className="text-[10px] px-2 py-0 capitalize">
+        <span className="text-[10px] font-semibold text-muted-foreground bg-secondary px-2 py-0.5 rounded-full capitalize">
           {groupLabel.replace(/_/g, ' ')}
-        </Badge>
+        </span>
       </div>
-      <div className="relative">
-        <div className="flex gap-2.5 overflow-x-auto scrollbar-hide px-4 pb-1">
-          {sellers.map(seller => (
-            <div
-              key={seller.id}
-              onClick={() => navigate(`/seller/${seller.id}`)}
-              className={cn(
-                'shrink-0 rounded-2xl overflow-hidden cursor-pointer',
-                'bg-card border border-border',
-                'transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.97]',
-                compact ? 'w-20' : 'w-28'
-              )}
-            >
-              <div className={cn('flex items-center justify-center', compact ? 'h-12 p-1.5' : 'h-20 p-2')}>
-                <SellerAvatar
-                  name={seller.business_name}
-                  id={seller.id}
-                  imageUrl={seller.profile_image_url}
-                  size={compact ? 'sm' : 'md'}
-                />
-              </div>
-              <div className="px-1.5 pb-2 pt-1.5 text-center">
-                <p className={cn('font-bold text-foreground line-clamp-2 leading-tight', compact ? 'text-[9px]' : 'text-[11px]')}>
-                  {sanitizeSellerName(seller.business_name)}
-                </p>
-                {seller.rating > 0 && (
-                  <div className="flex items-center justify-center gap-0.5 mt-0.5">
-                    <Star size={8} className="text-warning fill-warning" />
-                    <span className="text-[9px] font-bold text-muted-foreground">{seller.rating}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+      <div className="flex gap-2.5 overflow-x-auto scrollbar-hide px-4 pb-1">
+        {sellers.map(seller => (
+          <RichSellerCard
+            key={seller.id}
+            id={seller.id}
+            name={seller.business_name}
+            profileImage={seller.profile_image_url}
+            coverImage={seller.cover_image_url}
+            categories={seller.categories}
+            topProducts={seller.topProducts}
+            totalReviews={seller.total_reviews}
+            isFeatured={seller.is_featured}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Rich Seller Card ── */
+
+interface RichSellerCardProps {
+  id: string;
+  name: string;
+  profileImage: string | null;
+  coverImage: string | null;
+  categories: string[] | null;
+  topProducts: TopProduct[];
+  totalReviews: number;
+  isFeatured: boolean;
+  compact?: boolean;
+}
+
+function RichSellerCard({
+  id,
+  name,
+  profileImage,
+  coverImage,
+  categories,
+  topProducts,
+  totalReviews,
+  isFeatured,
+  compact = false,
+}: RichSellerCardProps) {
+  const navigate = useNavigate();
+  const { formatPrice } = useCurrency();
+  const sanitized = sanitizeSellerName(name);
+  const hue = useMemo(() => hashToHue(id), [id]);
+
+  const hasProducts = topProducts.length > 0;
+  const minPrice = hasProducts ? Math.min(...topProducts.map(p => p.price)) : null;
+  const heroImage = coverImage || (hasProducts ? topProducts[0]?.image_url : null) || profileImage;
+  const isNew = totalReviews === 0;
+  const cardWidth = compact ? 'w-[140px]' : 'w-[156px]';
+
+  return (
+    <div
+      onClick={() => navigate(`/seller/${id}`)}
+      className={cn(
+        'shrink-0 rounded-2xl overflow-hidden cursor-pointer',
+        'bg-card border border-border',
+        'transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.97]',
+        cardWidth,
+      )}
+    >
+      {/* Hero image / fallback avatar */}
+      <div className="relative h-20 bg-muted overflow-hidden">
+        {heroImage ? (
+          <img
+            src={heroImage}
+            alt={sanitized}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div
+            className="w-full h-full flex items-center justify-center text-2xl font-bold text-white"
+            style={{ backgroundColor: `hsl(${hue}, 55%, 50%)` }}
+          >
+            {sanitized.charAt(0).toUpperCase()}
+          </div>
+        )}
+
+        {/* Featured badge */}
+        {isFeatured && (
+          <span className="absolute top-1.5 left-1.5 text-[8px] font-bold bg-accent text-accent-foreground px-1.5 py-0.5 rounded-full">
+            Trusted
+          </span>
+        )}
+
+        {/* Social proof */}
+        <span className="absolute bottom-1 right-1 text-[8px] font-semibold bg-background/80 backdrop-blur-sm text-foreground px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+          {isNew ? (
+            <>
+              <Store size={8} />
+              New
+            </>
+          ) : (
+            <>
+              <Users size={8} />
+              {totalReviews} reviews
+            </>
+          )}
+        </span>
+      </div>
+
+      {/* Seller info */}
+      <div className="px-2 pt-1.5 pb-1">
+        <p className="font-bold text-foreground text-[11px] leading-tight line-clamp-1">
+          {sanitized}
+        </p>
+
+        {/* Category chips */}
+        {categories && categories.length > 0 && (
+          <div className="flex gap-1 mt-1 overflow-hidden">
+            {categories.slice(0, 2).map(cat => (
+              <span
+                key={cat}
+                className="text-[8px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground truncate max-w-[60px]"
+              >
+                {cat.replace(/_/g, ' ')}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Top Products strip */}
+      {hasProducts && (
+        <div className="px-1.5 pb-2">
+          <div className="flex gap-1">
+            {topProducts.slice(0, 2).map((product) => (
+              <ProductMini key={product.id} product={product} />
+            ))}
+          </div>
+
+          {/* Starting price */}
+          {minPrice !== null && (
+            <p className="text-[9px] font-semibold text-success mt-1 px-0.5">
+              From {formatPrice(minPrice)}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Product mini thumbnail ── */
+
+function ProductMini({ product }: { product: TopProduct }) {
+  const { formatPrice } = useCurrency();
+
+  return (
+    <div className="flex-1 min-w-0 rounded-lg bg-muted/50 overflow-hidden">
+      {product.image_url ? (
+        <img
+          src={product.image_url}
+          alt={product.name}
+          className="w-full h-12 object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <div className="w-full h-12 flex items-center justify-center bg-secondary">
+          <ShoppingBag size={14} className="text-muted-foreground" />
+        </div>
+      )}
+      <div className="px-1 py-0.5">
+        <p className="text-[8px] text-foreground font-medium line-clamp-1">{product.name}</p>
+        <div className="flex items-center gap-0.5">
+          {product.is_veg !== null && <VegBadge isVeg={product.is_veg} size="xs" />}
+          <span className="text-[8px] font-bold text-foreground">{formatPrice(product.price)}</span>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Skeletons ──
+/* ── Skeletons ── */
+
 function LocalSkeleton() {
   return (
     <div className="px-4 space-y-3">
@@ -288,7 +367,9 @@ function LocalSkeleton() {
         <div key={i}>
           <Skeleton className="h-4 w-16 mb-2 rounded-full" />
           <div className="flex gap-2.5">
-            {[1, 2, 3].map(j => <Skeleton key={j} className="w-28 h-32 rounded-2xl shrink-0" />)}
+            {[1, 2, 3].map(j => (
+              <Skeleton key={j} className="w-[156px] h-44 rounded-2xl shrink-0" />
+            ))}
           </div>
         </div>
       ))}
@@ -300,9 +381,9 @@ function NearbySkeleton() {
   return (
     <div className="px-4 space-y-3">
       <Skeleton className="h-5 w-24 rounded-full" />
-      <Skeleton className="h-32 w-full rounded-xl" />
+      <Skeleton className="h-44 w-full rounded-xl" />
       <Skeleton className="h-5 w-24 rounded-full" />
-      <Skeleton className="h-32 w-full rounded-xl" />
+      <Skeleton className="h-44 w-full rounded-xl" />
     </div>
   );
 }
