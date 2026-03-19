@@ -56,14 +56,14 @@ export function CreateSnagSheet({ onCreated }: { onCreated: () => void }) {
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
         <Button size="sm" className="gap-1">
           <Plus size={14} /> Report Snag
         </Button>
-      </SheetTrigger>
-      <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
-        <SheetHeader><SheetTitle>Report a Defect</SheetTitle></SheetHeader>
+      </DrawerTrigger>
+      <DrawerContent className="max-h-[85vh] overflow-y-auto">
+        <DrawerHeader><DrawerTitle>Report a Defect</DrawerTitle></DrawerHeader>
         <div className="space-y-4 mt-4">
           <div>
             <label className="text-sm font-medium">Category</label>
