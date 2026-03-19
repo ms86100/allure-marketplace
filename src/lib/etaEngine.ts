@@ -7,6 +7,8 @@
  * Rule: No component should compute `Math.ceil((eta - now) / 60000)` inline.
  */
 
+export type ETAMood = 'calm' | 'eager' | 'imminent' | 'late';
+
 export interface ETAResult {
   /** Raw minutes remaining (null if no ETA) */
   minutes: number | null;
@@ -20,6 +22,10 @@ export interface ETAResult {
   displayTime: string | null;
   /** Subtitle / secondary text */
   subtitle: string;
+  /** Emotional mood tier */
+  mood: ETAMood;
+  /** Emoji representing mood */
+  emoji: string;
 }
 
 export function computeETA(
@@ -34,6 +40,8 @@ export function computeETA(
       displayText: 'Processing',
       displayTime: null,
       subtitle: '',
+      mood: 'calm',
+      emoji: '📦',
     };
   }
 
@@ -42,6 +50,23 @@ export function computeETA(
   const isLate = diffMs < 0;
   const rawMinutes = isLate ? 0 : Math.ceil(diffMs / 60000);
   const isArriving = !isLate && rawMinutes <= 1;
+
+  // Mood tiers
+  let mood: ETAMood;
+  let emoji: string;
+  if (isLate) {
+    mood = 'late';
+    emoji = '🕐';
+  } else if (rawMinutes <= 10) {
+    mood = 'imminent';
+    emoji = '⚡';
+  } else if (rawMinutes <= 30) {
+    mood = 'eager';
+    emoji = '🚀';
+  } else {
+    mood = 'calm';
+    emoji = '😊';
+  }
 
   let displayText: string;
   if (isLate) {
@@ -72,6 +97,8 @@ export function computeETA(
     displayText,
     displayTime,
     subtitle,
+    mood,
+    emoji,
   };
 }
 

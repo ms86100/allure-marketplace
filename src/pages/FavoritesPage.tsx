@@ -86,9 +86,9 @@ export default function FavoritesPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16">
+          <div className="text-center py-16 animate-fade-in">
             <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
-              <Heart size={28} className="text-muted-foreground" />
+              <Heart size={28} className="text-muted-foreground animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
             </div>
             <h2 className="text-base font-semibold mb-1">No favourites yet</h2>
             <p className="text-sm text-muted-foreground mb-4">

@@ -37,6 +37,23 @@ export default function HomePage() {
     return <OnboardingWalkthrough onComplete={completeOnboarding} />;
   }
 
+  // Session continuity: restore scroll position
+  const scrollKey = 'home-scroll-y';
+  const hasRestoredRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasRestoredRef.current && profile) {
+      const saved = sessionStorage.getItem(scrollKey);
+      if (saved) {
+        requestAnimationFrame(() => window.scrollTo(0, parseInt(saved, 10)));
+      }
+      hasRestoredRef.current = true;
+    }
+    return () => {
+      sessionStorage.setItem(scrollKey, String(window.scrollY));
+    };
+  }, [profile]);
+
   if (!profile) {
     return (
       <AppLayout>

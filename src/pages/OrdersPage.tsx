@@ -89,17 +89,26 @@ function OrderCard({ order, type }: { order: Order; type: 'buyer' | 'seller' }) 
 
 function EmptyState({ message, type }: { message: string; type?: 'buyer' | 'seller' }) {
   return (
-    <div className="text-center py-16">
+    <div className="text-center py-16 animate-fade-in">
       <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
         <Package size={28} className="text-muted-foreground" />
       </div>
-      <p className="text-sm text-muted-foreground mb-1">{message}</p>
+      <h3 className="text-base font-semibold mb-1">{message}</h3>
+      {type === 'buyer' && (
+        <p className="text-sm text-muted-foreground mb-4 max-w-[240px] mx-auto">
+          Discover products and services from your community
+        </p>
+      )}
       {type === 'seller' && (
         <p className="text-xs text-muted-foreground mb-4 max-w-[220px] mx-auto">
           Share your store link with neighbors to get your first order
         </p>
       )}
-      <Link to="/"><Button size="sm">Browse Sellers</Button></Link>
+      <Link to="/">
+        <Button size="sm">
+          {type === 'buyer' ? '🛒 Place your first order' : 'Browse Sellers'}
+        </Button>
+      </Link>
     </div>
   );
 }
