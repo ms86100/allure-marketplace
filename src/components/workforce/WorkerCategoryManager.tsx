@@ -126,8 +126,8 @@ export function WorkerCategoryManager() {
               </div>
               <Button onClick={handleAdd} disabled={!name.trim()} className="w-full">Add Category</Button>
             </div>
-          </SheetContent>
-        </Sheet>
+          </DrawerContent>
+        </Drawer>
       </div>
 
       {categories.map(cat => (

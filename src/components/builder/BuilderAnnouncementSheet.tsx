@@ -111,7 +111,7 @@ export function BuilderAnnouncementSheet({ societies, builderId, onSent }: Props
             {isSubmitting ? 'Sending...' : 'Send to All Residents'}
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

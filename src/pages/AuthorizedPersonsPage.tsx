@@ -100,13 +100,13 @@ export default function AuthorizedPersonsPage() {
           Family members and trusted individuals authorized for gate entry without OTP.
         </p>
 
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetTrigger asChild>
+        <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+          <DrawerTrigger asChild>
             <Button size="sm" className="gap-1"><Plus size={14} /> Add Person</Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl">
-            <SheetHeader><SheetTitle>Add Authorized Person</SheetTitle></SheetHeader>
-            <div className="space-y-4 mt-4">
+          </DrawerTrigger>
+          <DrawerContent>
+            <DrawerHeader><DrawerTitle>Add Authorized Person</DrawerTitle></DrawerHeader>
+            <div className="space-y-4 px-4 pb-6">
               <div><Label>Name *</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Full name" /></div>
               <div><Label>Relationship</Label>
                 <Select value={relationship} onValueChange={setRelationship}>

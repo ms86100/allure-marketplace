@@ -127,7 +127,7 @@ export function EmergencyBroadcastSheet() {
             Send to All Residents
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

@@ -25,9 +25,9 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
   const b = useBulkUpload(sellerId, allowedCategories, onSuccess, onClose);
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="bottom" className="h-[85vh]">
-        <SheetHeader><SheetTitle>Bulk Add Products</SheetTitle></SheetHeader>
+    <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DrawerContent className="h-[85vh]">
+        <DrawerHeader><DrawerTitle>Bulk Add Products</DrawerTitle></DrawerHeader>
 
         <Tabs defaultValue="grid" className="mt-4">
           <TabsList className="w-full">

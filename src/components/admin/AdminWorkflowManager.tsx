@@ -237,11 +237,11 @@ export function AdminWorkflowManager() {
       </div>
 
       {/* Editor Sheet */}
-      <Sheet open={!!selectedWorkflow} onOpenChange={(open) => !open && setSelectedWorkflow(null)}>
-        <SheetContent side="bottom" className="h-[90dvh] p-0 rounded-t-2xl">
-          <SheetHeader className="px-4 pt-4 pb-3 border-b border-border">
+      <Drawer open={!!selectedWorkflow} onOpenChange={(open) => !open && setSelectedWorkflow(null)}>
+        <DrawerContent className="h-[90dvh] p-0">
+          <DrawerHeader className="px-4 pt-4 pb-3 border-b border-border">
             <div className="flex items-center justify-between">
-              <SheetTitle className="text-base font-bold">
+              <DrawerTitle className="text-base font-bold">
                 {selectedWorkflow && `${formatName(selectedWorkflow.parent_group)} — ${formatName(selectedWorkflow.transaction_type)}`}
               </SheetTitle>
               <Button
