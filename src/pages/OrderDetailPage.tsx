@@ -201,7 +201,7 @@ export default function OrderDetailPage() {
           {o.isUrgentOrder && order.auto_cancel_at && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} />}
 
           {/* Gap 8: Needs attention banner for buyer — hide on terminal statuses */}
-          {o.isBuyerView && (order as any).needs_attention && !['delivered', 'completed', 'cancelled'].includes(order.status) && (
+          {o.isBuyerView && (order as any).needs_attention && !isTerminalStatus(o.flow, order.status) && (
             <div className="bg-warning/10 border border-warning/20 rounded-xl p-3 flex items-start gap-2.5">
               <AlertTriangle className="text-warning shrink-0 mt-0.5" size={16} />
               <div>
