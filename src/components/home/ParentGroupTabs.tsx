@@ -59,23 +59,19 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
             {/* Icon circle */}
             <div
               className={cn(
-                'w-14 h-14 rounded-full flex items-center justify-center transition-all duration-200',
+                'w-14 h-14 min-w-[56px] min-h-[56px] rounded-full flex items-center justify-center transition-all duration-150 bg-secondary',
                 isActive
-                  ? 'ring-2 ring-primary ring-offset-2 ring-offset-background shadow-md'
-                  : 'hover:scale-105 active:scale-95'
+                  ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                  : 'active:scale-95'
               )}
-              style={{
-                backgroundColor: tintColor ? `${tintColor}20` : 'hsl(var(--secondary))',
-              }}
             >
               <DynamicIcon
                 name={tab.icon}
                 size={24}
                 className={cn(
-                  'transition-colors duration-200',
+                  'transition-colors duration-150',
                   isActive ? 'text-primary' : 'text-foreground/70'
                 )}
-                style={tintColor && !isActive ? { color: tintColor } : undefined}
               />
             </div>
             {/* Label */}

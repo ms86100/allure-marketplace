@@ -115,7 +115,7 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
               {product.is_recommended && (<Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-success/20 text-success">Recommended</Badge>)}
             </div>
             {product.description && (<p className="text-sm text-muted-foreground line-clamp-2 mt-1">{product.description}</p>)}
-            <p className="font-semibold mt-2 tabular-nums">{formatPrice(product.price)}</p>
+            <p className="font-bold text-base mt-2 tabular-nums">{formatPrice(product.price)}</p>
             {isStoreClosed && (<p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1"><Clock size={9} /> {storeClosedMessage || 'Store closed'}</p>)}
           </div>
         </div>

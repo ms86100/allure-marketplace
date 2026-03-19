@@ -166,7 +166,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
         {product.accepts_preorders && (<span className="inline-block bg-accent/20 text-accent-foreground text-[7px] font-bold px-1 py-0.5 rounded w-fit mb-0.5">Pre-order</span>)}
         <div className="flex-1 min-h-0" />
         <div className="flex items-end gap-1.5 mt-auto">
-          <span className="font-semibold text-[13px] text-foreground leading-none tracking-tight tabular-nums">{formatPrice(product.price)}</span>
+          <span className="font-bold text-[14px] text-foreground leading-none tracking-tight tabular-nums">{formatPrice(product.price)}</span>
           {hasDiscount && (<span className="text-[10px] text-muted-foreground line-through leading-none">MRP {formatPrice(product.mrp!)}</span>)}
         </div>
         {product.price_per_unit && (<span className="text-[9px] text-muted-foreground leading-none mt-0.5">{product.price_per_unit}</span>)}

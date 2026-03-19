@@ -66,9 +66,9 @@ export function ProductGridCard({ product, behavior, onTap, className, viewOnly 
   const isOutOfStock = !product.is_available;
 
   return (
-    <div onClick={handleCardClick} className={cn('bg-card rounded-xl border border-border cursor-pointer flex flex-col h-full relative', 'transition-all duration-200 ease-out hover:scale-[1.02] active:scale-[0.98]', isOutOfStock && 'opacity-50 grayscale-[40%]', isStoreClosed && !isOutOfStock && 'opacity-60 grayscale-[30%]', className)}>
+    <div onClick={handleCardClick} className={cn('bg-card rounded-xl border border-border cursor-pointer flex flex-col h-full relative', 'transition-all duration-150 ease-out active:scale-[0.97]', isOutOfStock && 'opacity-50 grayscale-[40%]', isStoreClosed && !isOutOfStock && 'opacity-60 grayscale-[30%]', className)}>
       <div className="relative p-2 pb-0">
-        <div className="relative aspect-square rounded-[10px] overflow-hidden product-image-bg">
+        <div className="relative aspect-[4/3] rounded-[10px] overflow-hidden product-image-bg">
           {product.image_url ? (
             <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" loading="lazy" />
           ) : (
@@ -80,25 +80,26 @@ export function ProductGridCard({ product, behavior, onTap, className, viewOnly 
           <div className="absolute top-1 right-1"><VegBadge isVeg={product.is_veg} size="sm" /></div>
         </div>
         {!viewOnly && !isOutOfStock && !isStoreClosed && (
-          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 z-10">
+          <div className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 z-10">
             {isCartAction && quantity > 0 ? (
               <div className="flex items-center bg-primary rounded-lg overflow-hidden shadow-cta animate-stepper-pop">
-                <button onClick={handleDecrement} className="px-2.5 py-1.5 text-primary-foreground"><Minus size={13} strokeWidth={3} /></button>
-                <span className="font-bold text-xs text-primary-foreground min-w-[20px] text-center">{quantity}</span>
-                <button onClick={handleIncrement} className="px-2.5 py-1.5 text-primary-foreground"><Plus size={13} strokeWidth={3} /></button>
+                <button onClick={handleDecrement} className="px-3 py-2 text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"><Minus size={14} strokeWidth={3} /></button>
+                <span className="font-bold text-sm text-primary-foreground min-w-[24px] text-center">{quantity}</span>
+                <button onClick={handleIncrement} className="px-3 py-2 text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"><Plus size={14} strokeWidth={3} /></button>
               </div>
             ) : (
-              <button onClick={handleAdd} className="bg-primary text-primary-foreground font-bold text-[11px] px-5 py-1.5 rounded-lg shadow-cta hover:opacity-90 transition-all uppercase tracking-wide active:scale-95">{actionConfig.shortLabel}</button>
+              <button onClick={handleAdd} className="bg-primary text-primary-foreground font-bold text-xs px-6 py-2 rounded-lg shadow-cta hover:opacity-90 transition-all uppercase tracking-wide active:scale-95 min-h-[44px]">{actionConfig.shortLabel}</button>
             )}
           </div>
         )}
       </div>
-      <div className="px-2.5 pb-2.5 pt-4 flex flex-col flex-1">
+      <div className="px-2.5 pb-2.5 pt-5 flex flex-col flex-1">
         <h4 className="font-semibold text-[12px] leading-tight line-clamp-2 text-foreground mb-0.5">{product.name}</h4>
         {product.seller_name && (<div className="flex items-center gap-1 mt-0.5"><Store size={9} className="text-muted-foreground shrink-0" /><span className="text-[10px] text-muted-foreground truncate">{product.seller_name}</span></div>)}
         <div className="flex-1 min-h-0.5" />
-        <div className="flex items-end gap-1 mt-auto"><span className="font-semibold text-[13px] text-foreground leading-none tabular-nums">{formatPrice(product.price)}</span></div>
+        <div className="flex items-end gap-1 mt-auto"><span className="font-bold text-sm text-foreground leading-none tabular-nums">{formatPrice(product.price)}</span></div>
       </div>
+    </div>
     </div>
   );
 }
