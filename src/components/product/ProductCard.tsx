@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Plus, Minus, Star, Award, Clock } from 'lucide-react';
-import { hapticImpact } from '@/lib/haptics';
+import { hapticSelection } from '@/lib/haptics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { VegBadge } from '@/components/ui/veg-badge';
