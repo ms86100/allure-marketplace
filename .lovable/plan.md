@@ -1,34 +1,59 @@
-# Production Audit: 20 Bugs + Extended Audit + Final Validation — Status
-## Status: ✅ ALL RESOLVED
 
-All 20 bugs from the production audit have been addressed. 18 are fully fixed, 2 are accepted with documented limitations.
 
-## Fixed Bugs (18/20)
+# Fix Plan: Close the Two Product Gaps
 
-| # | Bug | Fix | Status |
-|---|-----|-----|--------|
-| 1 | `failed` in terminal statuses causing 400 | Removed + `22P02` error handling in `ActiveOrderStrip` | ✅ |
-| 2 | `delivered` conflicting `is_terminal` | DB updated: `is_terminal=true` for seller_delivery `delivered` | ✅ |
-| 3 | Color dot invalid CSS | Uses `className` with Tailwind class splitting | ✅ |
-| 4 | Wrong column `logo_url` | Changed to `profile_image_url` in edge function | ✅ |
-| 5 | `stalled_notified` never resets | Resets on movement >100m | ✅ |
-| 6 | Proximity misses `at_gate` | Added to status list | ✅ |
-| 7 | Delay detection misses `on_the_way` | Added to status list | ✅ |
-| 8 | Throttle drops final update | `doUpdate` guard: `if (!this.active.has(...))` | ✅ |
-| 9 | Inconsistent transit status lists | Unified defaults with `at_gate` | ✅ |
-| 10 | `en_route` dead code | Removed from defaults | ✅ |
-| 12 | Sync/heartbeat divergence | Both use terminal-exclusion via `getTerminalStatuses()` | ✅ |
-| 15 | APNs priority always 10 | `isTerminal ? "10" : "5"` | ✅ |
-| 18 | `delivered` in START_STATUSES | Excluded from `getStartStatuses()` | ✅ |
-| 19 | Hardcoded MAX_ETA=45 | Dynamic from `initialEtaMinutes`, 15m default | ✅ |
-| 20 | Inconsistent quoting in filters | Standardized quoted values | ✅ |
-| 14 | Polling cold start | Accepted — harmless extra sync | ✅ |
-| 17 | en_route dedup | Accepted — more conservative approach | ✅ |
-| 16 | `order_number` not fetched | Accepted — column does not exist in `orders` table | ✅ |
+## What's already solved (no work needed)
+- **Progress consistency (APNs vs client):** Already fixed in the previous round. `update-live-activity-apns` line 221-224 uses `payload.initial_eta_minutes` with the same `(initialEta > 5) ? initialEta : 15` formula as the client mapper. `update-delivery-location` passes `initial_eta_minutes` to the APNs invocation. Verified in code — no mismatch remains.
+- **App resume sync:** The orchestrator's resume handler (line 380) already calls `doSync()` → `syncActiveOrders()` which ends activities for terminal orders (liveActivitySync.ts line 74-93). Resume is covered.
 
-## Accepted Limitations (2/20)
+## What needs fixing
 
-| # | Bug | Limitation |
-|---|-----|-----------|
-| 11 | Realtime delivery channel no filter | Postgres `eq` filter applied for single-order case. For 2+ concurrent orders, Supabase Realtime does not support `in` filters on channels — client-side filtering via `activeOrderIdsRef` remains the mitigation. Acceptable until ~100 concurrent deliveries. |
-| 13 | AnimatePresence ref warning | Cosmetic — `motion.div` elements support refs natively. Warning likely from sibling component. No functional impact. |
+### Gap: 45-second stale state window (foreground, realtime dropped)
+**Scenario:** App stays in foreground, Supabase Realtime silently drops, order transitions to `delivered` server-side. The client's only safety net is the 45s polling heartbeat.
+
+**Two changes, both minimal:**
+
+#### Change 1: Reduce poll interval from 45s to 15s
+**File:** `src/hooks/useLiveActivityOrchestrator.ts`, line 315
+
+- Before: `const POLL_INTERVAL_MS = 45_000;`
+- After: `const POLL_INTERVAL_MS = 15_000;`
+
+**Why 15s:** This is a single lightweight query (`SELECT id, status FROM orders WHERE buyer_id = ?`). The cost is negligible — one small read every 15s. Blinkit polls at 10s. This closes the worst-case window from 45s to 15s.
+
+#### Change 2: Add `visibilitychange` listener for immediate sync
+**File:** `src/hooks/useLiveActivityOrchestrator.ts` — new effect
+
+When the browser tab / webview regains visibility (user switches back to the app, or opens from multitasking), trigger an immediate poll instead of waiting for the next 15s tick. This is **different from** `appStateChange` (which fires on full background→foreground). `visibilitychange` also fires on tab focus, split-screen transitions, and notification shade dismissal.
+
+```
+useEffect — on visibilitychange:
+  if document is visible AND userId exists:
+    run doSync() immediately
+```
+
+This ensures: when the user is actually looking at the screen, stale state is caught within milliseconds, not seconds.
+
+#### Change 3: Defensive guard on OrderDetailPage
+**File:** `src/pages/OrderDetailPage.tsx`
+
+Add a one-time check when the order detail page mounts or when order data refreshes: if the order status is terminal, call `LiveActivityManager.end(orderId)`. This is belt-and-suspenders — ensures that if a user navigates to a delivered order, any lingering activity is killed immediately.
+
+```
+useEffect — when order.status changes:
+  if status is in terminal set:
+    LiveActivityManager.end(orderId)
+```
+
+---
+
+## Summary
+
+| Change | File | Impact |
+|--------|------|--------|
+| Reduce poll to 15s | `useLiveActivityOrchestrator.ts` | Max stale window: 45s → 15s |
+| Add `visibilitychange` sync | `useLiveActivityOrchestrator.ts` | Instant sync on tab/app focus |
+| Defensive guard on order detail | `OrderDetailPage.tsx` | Belt-and-suspenders kill on mount |
+
+**Total: 3 small, surgical changes. No new features. No architectural changes.**
+
