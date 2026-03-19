@@ -24,9 +24,9 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
-/* ── Gradient Divider ── */
+/* ── Simple spacer between sections ── */
 function SectionDivider() {
-  return <div className="my-5 mx-4 h-px bg-gradient-to-r from-transparent via-border to-transparent" />;
+  return <div className="my-4" />;
 }
 
 export function MarketplaceSection() {
