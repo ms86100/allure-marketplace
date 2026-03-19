@@ -349,27 +349,20 @@ export default function CategoriesPage() {
                       >
                         <Link
                           to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-                          className="block rounded-2xl overflow-hidden active:scale-[0.97] transition-all duration-200 group bg-card hover:shadow-md"
+                          className="block rounded-2xl overflow-hidden active:scale-[0.97] transition-all duration-200 group bg-card border border-border hover:shadow-md"
                           style={{
-                            border: `1.5px solid ${catColor ? `${catColor}35` : 'hsl(var(--border))'}`,
-                            borderBottomWidth: '3px',
-                            borderBottomColor: catColor || 'hsl(var(--primary))',
-                            boxShadow: catColor
-                              ? `0 2px 12px ${catColor}12, 0 0 0 0.5px ${catColor}18`
-                              : 'var(--shadow-card)',
+                            borderLeftWidth: '4px',
+                            borderLeftColor: getWanglowColor(cat.parentGroup),
+                            boxShadow: `var(--shadow-card)`,
                           }}
                           onMouseEnter={(e) => {
-                            if (catColor) {
-                              (e.currentTarget as HTMLElement).style.borderColor = `${catColor}55`;
-                              (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 20px ${catColor}20`;
-                            }
+                            const c = getWanglowColor(cat.parentGroup);
+                            (e.currentTarget as HTMLElement).style.borderColor = `${c}50`;
+                            (e.currentTarget as HTMLElement).style.borderLeftColor = c;
                           }}
                           onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLElement).style.borderColor = catColor ? `${catColor}35` : '';
-                            (e.currentTarget as HTMLElement).style.borderBottomColor = catColor || 'hsl(var(--primary))';
-                            (e.currentTarget as HTMLElement).style.boxShadow = catColor
-                              ? `0 2px 12px ${catColor}12, 0 0 0 0.5px ${catColor}18`
-                              : 'var(--shadow-card)';
+                            (e.currentTarget as HTMLElement).style.borderColor = '';
+                            (e.currentTarget as HTMLElement).style.borderLeftColor = getWanglowColor(cat.parentGroup);
                           }}
                         >
                           {/* Image area */}
