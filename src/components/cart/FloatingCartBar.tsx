@@ -22,13 +22,11 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [showAdded, setShowAdded] = useState(false);
 
-  // Listen for centralized cart-item-added event → bounce pill + flash "Added ✓"
   useEffect(() => {
     const handler = () => {
       controls.start({
-        scale: [1, 1.08, 0.96, 1],
-        y: [0, -4, 0],
-        transition: { duration: 0.35, ease: 'easeOut' },
+        scale: [1, 1.05, 0.97, 1],
+        transition: { duration: 0.3, ease: 'easeOut' },
       });
       setShowAdded(true);
       const t = setTimeout(() => setShowAdded(false), 1500);
@@ -38,13 +36,7 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
     return () => window.removeEventListener('cart-item-added', handler);
   }, [controls]);
 
-  // Visibility engine: hide on cart/checkout pages
   if (itemCount === 0 || isRouteHidden(location.pathname, CART_HIDDEN_ROUTES)) return null;
-
-  const thumbnails = items
-    .filter(i => i.product?.image_url)
-    .slice(0, 3)
-    .map(i => i.product!.image_url!);
 
   const previewItems = items.slice(0, 3);
   const isMomentum = itemCount >= 3;
@@ -53,46 +45,26 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
     <AnimatePresence>
       <motion.div
         key="floating-cart"
-        initial={{ y: 80, opacity: 0 }}
+        initial={{ y: 60, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 80, opacity: 0 }}
+        exit={{ y: 60, opacity: 0 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         className={cn(
-          'fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-3 pb-2',
+          'fixed bottom-[calc(3.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-4 pb-2',
           className
         )}
       >
         <motion.div
           animate={controls}
-          className={cn(
-            "rounded-2xl bg-primary overflow-hidden transition-shadow duration-300",
-            isMomentum
-              ? "shadow-[0_4px_32px_-2px_hsl(var(--primary)/0.55)]"
-              : "shadow-[0_4px_24px_-4px_hsl(var(--primary)/0.4)]"
-          )}
+          className="rounded-xl bg-primary shadow-md overflow-hidden"
         >
           <Link to="/cart">
             <motion.div
               className="px-4 py-3 flex items-center justify-between"
-              whileTap={{ scale: 0.97 }}
+              whileTap={{ scale: 0.98 }}
             >
-              {/* Left: thumbnails + item count */}
-              <div className="flex items-center gap-3">
-                {thumbnails.length > 0 && (
-                  <div className="flex -space-x-2">
-                    {thumbnails.map((url, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ delay: i * 0.05 }}
-                        className="w-8 h-8 rounded-full border-2 border-primary-foreground/20 overflow-hidden product-image-bg"
-                      >
-                        <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
+              {/* Left: item count + total */}
+              <div className="flex items-center gap-2.5">
                 <div className="flex flex-col">
                   <AnimatePresence mode="wait">
                     {showAdded ? (
@@ -101,7 +73,7 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
                         initial={{ opacity: 0, y: 4 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
-                        className="text-primary-foreground text-[13px] font-extrabold leading-tight"
+                        className="text-primary-foreground text-[13px] font-bold leading-tight"
                       >
                         Added ✓
                       </motion.span>
@@ -111,49 +83,38 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
                         initial={{ opacity: 0, y: 4 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
-                        className="text-primary-foreground text-[13px] font-extrabold leading-tight"
+                        className="text-primary-foreground text-[13px] font-bold leading-tight"
                       >
-                        {itemCount} item{itemCount !== 1 ? 's' : ''}
+                        {itemCount} item{itemCount !== 1 ? 's' : ''} · {formatPrice(totalAmount)}
                       </motion.span>
                     )}
                   </AnimatePresence>
-                  <span className="text-primary-foreground/70 text-[11px] font-semibold leading-tight">
-                    {formatPrice(totalAmount)}
-                  </span>
                 </div>
               </div>
 
-              {/* Right: CTA with momentum text */}
+              {/* Right: CTA */}
               <div className="flex items-center gap-1 text-primary-foreground font-bold text-sm">
                 <AnimatePresence mode="wait">
                   <motion.span
                     key={isMomentum ? 'checkout' : 'view'}
-                    initial={{ opacity: 0, y: 6 }}
+                    initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.2 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.15 }}
                   >
-                    {isMomentum ? 'Checkout now' : 'View Cart'}
+                    {isMomentum ? 'Checkout' : 'View Cart'}
                   </motion.span>
                 </AnimatePresence>
                 <ChevronRight size={16} strokeWidth={2.5} />
               </div>
             </motion.div>
           </Link>
-
-          {/* Mini preview expand trigger */}
-          <button
-            onClick={(e) => { e.stopPropagation(); setPreviewOpen(true); }}
-            className="w-full flex items-center justify-center py-1 border-t border-primary-foreground/10 text-primary-foreground/50 hover:text-primary-foreground/70 transition-colors"
-          >
-            <ChevronUp size={14} />
-          </button>
         </motion.div>
       </motion.div>
 
       {/* Mini Cart Preview Sheet */}
       <Sheet open={previewOpen} onOpenChange={setPreviewOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl px-4 pb-6">
+        <SheetContent side="bottom" className="rounded-t-xl px-4 pb-6">
           <SheetHeader className="pb-3">
             <SheetTitle className="text-sm font-bold">Cart Preview</SheetTitle>
           </SheetHeader>

@@ -22,11 +22,9 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { showOnboarding, hasChecked, completeOnboarding } = useOnboarding(user?.id);
 
-  // Session continuity: restore scroll position
   const scrollKey = 'home-scroll-y';
   const hasRestoredRef = useRef(false);
 
-  // Auto-redirect to profile edit if profile is incomplete
   useEffect(() => {
     if (profile) {
       const isIncomplete = !profile.name || profile.name === 'User';
@@ -56,16 +54,12 @@ export default function HomePage() {
   if (!profile) {
     return (
       <AppLayout>
-        <div className="px-4 py-6 space-y-5">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="w-24 h-9 rounded-full bg-muted animate-pulse shrink-0" />
-            ))}
-          </div>
-          <div className="h-36 rounded-2xl bg-muted animate-pulse" />
+        <div className="px-4 py-6 space-y-4">
+          <div className="h-10 rounded-lg bg-muted animate-pulse" />
+          <div className="h-28 rounded-xl bg-muted animate-pulse" />
           <div className="grid grid-cols-2 gap-3">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="aspect-[3/2] rounded-2xl bg-muted animate-pulse" />
+              <div key={i} className="aspect-square rounded-xl bg-muted animate-pulse" />
             ))}
           </div>
         </div>
@@ -75,20 +69,20 @@ export default function HomePage() {
 
   return (
     <AppLayout>
-      <div className="pb-6">
-        {/* ═══ ACTIVE ORDER TRACKING ═══ */}
+      <div className="pb-4">
+        {/* Active order tracking */}
         <ActiveOrderStrip />
 
-        {/* ═══ RICH NOTIFICATION BANNER ═══ */}
+        {/* Notification banner */}
         <HomeNotificationBanner />
 
-        {/* ═══ Gap #5: REORDER — above marketplace for 1-tap checkout ═══ */}
+        {/* Quick reorder */}
         <ReorderLastOrder />
 
-        {/* ═══ MARKETPLACE (DOMINANT — 60-70% of screen) ═══ */}
+        {/* ═══ MARKETPLACE — primary shopping surface ═══ */}
         <MarketplaceSection />
 
-        {/* ═══ Gap #20: PROFILE COMPLETION BANNER — below marketplace ═══ */}
+        {/* Profile completion — below marketplace */}
         {profile && (() => {
           const missing: string[] = [];
           if (!profile.name) missing.push('name');
@@ -99,9 +93,9 @@ export default function HomePage() {
           const hint = `Add your ${missing[0]} to continue`;
           return (
             <motion.div
-              initial={{ opacity: 0, y: -8 }}
+              initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mx-4 mt-4 rounded-2xl bg-primary/5 border border-primary/15 p-3"
+              className="mx-4 mt-4 rounded-xl bg-secondary border border-border p-3"
             >
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-[11px] font-semibold text-foreground">Profile {pct}% complete</p>
@@ -115,19 +109,21 @@ export default function HomePage() {
           );
         })()}
 
-        {/* ═══ PERSONALIZED SECTIONS ═══ */}
+        {/* Personalized */}
         <ForYouSection />
 
-        {/* ═══ RECENTLY VIEWED ═══ */}
+        {/* Recently viewed */}
         <RecentlyViewedRow />
 
-        {/* ═══ SOCIETY QUICK LINKS (deprioritized) ═══ */}
+        {/* Society links */}
         <SocietyQuickLinks />
 
-        {/* ═══ Gap #15: LEADERBOARD — no background wrapper, spacing only ═══ */}
-        <div className="mt-6">
+        {/* Leaderboard */}
+        <div className="mt-4">
           <SocietyLeaderboard />
         </div>
+
+        {/* Community */}
         <CommunityTeaser />
       </div>
     </AppLayout>

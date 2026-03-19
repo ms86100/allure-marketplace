@@ -1,5 +1,5 @@
-import { useMemo, useState, memo } from 'react';
-import { Plus, Minus, Clock, MapPin, ShoppingCart, Activity, Bell, AlertTriangle, Users } from 'lucide-react';
+import { useMemo, memo } from 'react';
+import { Plus, Minus, Clock, MapPin, AlertTriangle, Users } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { useHaptics } from '@/hooks/useHaptics';
 import { Badge } from '@/components/ui/badge';
@@ -44,7 +44,6 @@ interface ProductListingCardProps {
   categoryConfigs?: CategoryConfig[]; marketplaceConfig?: MarketplaceConfig;
   badgeConfigs?: BadgeConfigRow[]; socialProofCount?: number;
   onViewClick?: () => void;
-  /** Gap #13: When true, hides secondary metadata for compact home-page horizontal scrolls */
   compact?: boolean;
 }
 
@@ -118,60 +117,161 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
   const activityLabel = useMemo(() => { if (!(product as any).last_active_at) return ''; return formatSellerActivity((product as any).last_active_at, ml); }, [(product as any).last_active_at, ml]);
   const onTimeBadgeMinOrders = ml.threshold('on_time_badge_min_orders');
 
-  // Tinted placeholder background from category color
-  const placeholderBg = catConfig?.color ? `${catConfig.color}15` : undefined;
+  const placeholderBg = catConfig?.color ? `${catConfig.color}10` : undefined;
 
   return (
-    <div ref={cardRef} onClick={handleCardClick} className={cn('bg-card rounded-xl cursor-pointer flex flex-col h-full relative', 'border border-border', 'transition-all duration-150 ease-out', 'active:scale-[0.97]', isOutOfStock && 'opacity-50 grayscale-[40%]', isStoreClosed && !isOutOfStock && 'opacity-60 grayscale-[30%]', className)}>
+    <div
+      ref={cardRef}
+      onClick={handleCardClick}
+      className={cn(
+        'bg-card rounded-xl cursor-pointer flex flex-col h-full relative',
+        'border border-border/60',
+        'transition-all duration-100',
+        'active:scale-[0.98]',
+        isOutOfStock && 'opacity-40 grayscale-[50%]',
+        isStoreClosed && !isOutOfStock && 'opacity-50 grayscale-[30%]',
+        className
+      )}
+    >
+      {/* Image */}
       <div className="relative">
-        <div className="relative aspect-[5/4] rounded-t-xl overflow-hidden product-image-bg">
+        <div className="relative aspect-square rounded-t-xl overflow-hidden product-image-bg">
           {product.image_url ? (
             <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
           ) : (
             <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: placeholderBg || 'hsl(var(--muted))' }}>
-              <span className="text-3xl">{placeholderEmoji}</span>
+              <span className="text-2xl">{placeholderEmoji}</span>
             </div>
           )}
-          {isOutOfStock && (<div className="absolute inset-0 bg-background/60 flex items-center justify-center"><span className="text-[8px] font-bold text-muted-foreground bg-muted/90 px-1.5 py-0.5 rounded-full uppercase tracking-wider">{mc.labels.outOfStock}</span></div>)}
-          {isStoreClosed && !isOutOfStock && (<div className="absolute inset-0 bg-background/40 flex items-center justify-center"><span className="text-[8px] font-bold text-muted-foreground bg-muted/90 px-1.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1"><Clock size={8} />{storeClosedMessage}</span></div>)}
-          {badges.length > 0 && (<div className="absolute top-1.5 left-1.5 flex flex-col gap-0.5">{badges.map((b, i) => (<Badge key={i} className={cn('text-[7px] leading-none px-1.5 py-0.5 font-bold shadow-sm rounded border-0', b.color)}>{b.label}</Badge>))}</div>)}
-          {hasDiscount && discountPct > 0 && (<div className="absolute top-1.5 right-1.5"><span className="bg-badge-discount text-foreground text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">{discountPct}% OFF</span></div>)}
-          {showVegBadge && (<div className="absolute bottom-1.5 right-1.5"><VegBadge isVeg={product.is_veg} size="sm" /></div>)}
+
+          {isOutOfStock && (
+            <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
+              <span className="text-[9px] font-bold text-muted-foreground bg-card/90 px-2 py-1 rounded-md uppercase tracking-wider">{mc.labels.outOfStock}</span>
+            </div>
+          )}
+
+          {isStoreClosed && !isOutOfStock && (
+            <div className="absolute inset-0 bg-background/40 flex items-center justify-center">
+              <span className="text-[9px] font-bold text-muted-foreground bg-card/90 px-2 py-1 rounded-md uppercase tracking-wider flex items-center gap-1">
+                <Clock size={9} />{storeClosedMessage}
+              </span>
+            </div>
+          )}
+
+          {/* Badges — top left */}
+          {badges.length > 0 && (
+            <div className="absolute top-1.5 left-1.5 flex flex-col gap-0.5">
+              {badges.map((b, i) => (
+                <Badge key={i} className={cn('text-[7px] leading-none px-1.5 py-0.5 font-bold rounded border-0', b.color)}>{b.label}</Badge>
+              ))}
+            </div>
+          )}
+
+          {/* Discount — top right */}
+          {hasDiscount && discountPct > 0 && (
+            <div className="absolute top-1.5 right-1.5">
+              <span className="bg-primary text-primary-foreground text-[8px] font-bold px-1.5 py-0.5 rounded-md">{discountPct}% OFF</span>
+            </div>
+          )}
+
+          {showVegBadge && (
+            <div className="absolute bottom-1.5 right-1.5">
+              <VegBadge isVeg={product.is_veg} size="sm" />
+            </div>
+          )}
         </div>
+
+        {/* Add button — overlapping image bottom */}
         {!viewOnly && !isOutOfStock && !isStoreClosed && (
           <div className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 z-10">
             {isCartAction && quantity > 0 ? (
-              <div className="flex items-center bg-primary rounded-lg overflow-hidden shadow-cta animate-stepper-pop">
-                <button onClick={handleDecrement} className="px-3 py-1.5 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Minus size={13} strokeWidth={3} /></button>
-                <span className="font-bold text-xs text-primary-foreground px-1">{quantity}</span>
-                <button onClick={handleIncrement} className="px-3 py-1.5 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Plus size={13} strokeWidth={3} /></button>
+              <div className="flex items-center bg-primary rounded-lg overflow-hidden shadow-sm animate-stepper-pop">
+                <button onClick={handleDecrement} className="px-3 py-1.5 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[40px] min-h-[36px] flex items-center justify-center">
+                  <Minus size={12} strokeWidth={3} />
+                </button>
+                <span className="font-bold text-xs text-primary-foreground px-1.5 tabular-nums">{quantity}</span>
+                <button onClick={handleIncrement} className="px-3 py-1.5 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[40px] min-h-[36px] flex items-center justify-center">
+                  <Plus size={12} strokeWidth={3} />
+                </button>
               </div>
-            ) : (<button onClick={handleAdd} className="bg-primary text-primary-foreground font-bold text-[11px] px-5 py-1.5 rounded-lg shadow-cta hover:opacity-90 transition-all duration-150 uppercase tracking-wide active:scale-95 min-h-[44px]">{actionConfig.shortLabel}</button>)}
+            ) : (
+              <button
+                onClick={handleAdd}
+                className="bg-card text-primary font-bold text-[11px] px-5 py-1.5 rounded-lg border border-primary/30 hover:bg-primary hover:text-primary-foreground transition-all duration-150 uppercase tracking-wide active:scale-95 min-h-[36px] shadow-sm"
+              >
+                {actionConfig.shortLabel}
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Content */}
       <div className={cn("px-2.5 pb-2.5 flex flex-col flex-1", !viewOnly && !isOutOfStock ? "pt-5" : "pt-2.5")}>
-        {variantText && (<span className="inline-flex items-center justify-center border border-border rounded-full text-[8px] font-medium px-1.5 py-px mb-1 w-fit text-muted-foreground">{variantText}</span>)}
-        <h4 className="font-semibold text-[12px] leading-snug line-clamp-1 text-foreground mb-0.5">{product.name}</h4>
+        {variantText && (
+          <span className="text-[9px] font-medium text-muted-foreground mb-0.5">{variantText}</span>
+        )}
+
+        <h4 className="font-semibold text-[12px] leading-snug line-clamp-2 text-foreground">{product.name}</h4>
+
         {product.seller_name && !compact && (
-          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-            <span className="text-[10px] text-muted-foreground truncate">by {product.seller_name}</span>
+          <div className="flex items-center gap-1 mt-1 flex-wrap">
+            <span className="text-[10px] text-muted-foreground truncate">{product.seller_name}</span>
             {product.seller_id && <SellerTrustBadge sellerId={product.seller_id} size="sm" />}
-            {activityLabel && <span className="text-[8px] opacity-70">· {activityLabel}</span>}
-            {isSellerInactive && (<span className="inline-flex items-center gap-0.5 text-[7px] font-bold text-warning bg-warning/15 rounded-full px-1 py-0.5"><AlertTriangle size={7} />Inactive</span>)}
+            {activityLabel && <span className="text-[8px] text-muted-foreground/70">· {activityLabel}</span>}
+            {isSellerInactive && (
+              <span className="inline-flex items-center gap-0.5 text-[7px] font-bold text-warning bg-warning/10 rounded px-1 py-0.5">
+                <AlertTriangle size={7} />Inactive
+              </span>
+            )}
           </div>
         )}
-        {!compact && (product as any).on_time_delivery_pct != null && (product as any).completed_order_count > onTimeBadgeMinOrders && (<span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-primary bg-primary/10 rounded-full px-1.5 py-0.5 w-fit mb-0.5">{ml.label('label_on_time_format').replace('{pct}', String((product as any).on_time_delivery_pct))}</span>)}
-        {!compact && socialProofCount != null && socialProofCount > 0 && (<span className="inline-flex items-center gap-1 text-[8px] font-bold text-accent-foreground bg-accent/90 rounded-full px-1.5 py-0.5 w-fit mb-0.5"><Users size={8} className="shrink-0" />{ml.label('label_social_proof_format').replace('{count}', String(socialProofCount)).replace('{unit}', socialProofCount === 1 ? ml.label('label_social_proof_singular') : ml.label('label_social_proof_plural'))}</span>)}
-        {!compact && deliveryText && (<div className="flex items-center gap-0.5 mb-0.5"><Clock size={9} className="text-rating-star" /><span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wide leading-none">{deliveryText}</span></div>)}
-        {!compact && product.lead_time_hours != null && product.lead_time_hours > 0 && (<div className="flex items-center gap-0.5 mb-0.5"><Clock size={8} className="text-primary" /><span className="text-[8px] font-medium text-muted-foreground leading-none">Order {product.lead_time_hours}h ahead</span></div>)}
-        {!compact && product.accepts_preorders && (<span className="inline-block bg-accent/20 text-accent-foreground text-[7px] font-bold px-1 py-0.5 rounded w-fit mb-0.5">Pre-order</span>)}
+
+        {!compact && (product as any).on_time_delivery_pct != null && (product as any).completed_order_count > onTimeBadgeMinOrders && (
+          <span className="inline-flex items-center gap-0.5 text-[8px] font-semibold text-primary bg-primary/8 rounded px-1.5 py-0.5 w-fit mt-1">
+            {ml.label('label_on_time_format').replace('{pct}', String((product as any).on_time_delivery_pct))}
+          </span>
+        )}
+
+        {!compact && socialProofCount != null && socialProofCount > 0 && (
+          <span className="inline-flex items-center gap-1 text-[8px] font-semibold text-muted-foreground bg-secondary rounded px-1.5 py-0.5 w-fit mt-0.5">
+            <Users size={8} className="shrink-0" />
+            {ml.label('label_social_proof_format').replace('{count}', String(socialProofCount)).replace('{unit}', socialProofCount === 1 ? ml.label('label_social_proof_singular') : ml.label('label_social_proof_plural'))}
+          </span>
+        )}
+
+        {!compact && deliveryText && (
+          <div className="flex items-center gap-1 mt-1">
+            <Clock size={9} className="text-muted-foreground" />
+            <span className="text-[9px] font-medium text-muted-foreground">{deliveryText}</span>
+          </div>
+        )}
+
+        {!compact && product.lead_time_hours != null && product.lead_time_hours > 0 && (
+          <div className="flex items-center gap-0.5 mt-0.5">
+            <Clock size={8} className="text-muted-foreground" />
+            <span className="text-[8px] font-medium text-muted-foreground">Order {product.lead_time_hours}h ahead</span>
+          </div>
+        )}
+
+        {!compact && product.accepts_preorders && (
+          <span className="inline-block bg-primary/8 text-primary text-[7px] font-bold px-1.5 py-0.5 rounded w-fit mt-0.5">Pre-order</span>
+        )}
+
         <div className="flex-1 min-h-0" />
-        <div className="flex items-end gap-1.5 mt-auto">
+
+        {/* Price row */}
+        <div className="flex items-end gap-1.5 mt-1.5">
           <span className="font-bold text-[14px] text-foreground leading-none tracking-tight tabular-nums">{formatPrice(product.price)}</span>
-          {hasDiscount && (<span className="text-[10px] text-muted-foreground line-through leading-none">MRP {formatPrice(product.mrp!)}</span>)}
+          {hasDiscount && (
+            <span className="text-[10px] text-muted-foreground line-through leading-none tabular-nums">{formatPrice(product.mrp!)}</span>
+          )}
         </div>
-        {!compact && product.price_per_unit && (<span className="text-[9px] text-muted-foreground leading-none mt-0.5">{product.price_per_unit}</span>)}
+
+        {!compact && product.price_per_unit && (
+          <span className="text-[9px] text-muted-foreground leading-none mt-0.5">{product.price_per_unit}</span>
+        )}
+
         {(locationLabel || (product as any).is_same_society !== false) && (
           <div
             className={cn("flex items-center gap-1 mt-1", (product as any).seller_latitude && (product as any).seller_longitude && "cursor-pointer hover:text-primary transition-colors")}
@@ -186,14 +286,25 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
             }}
             title={(product as any).seller_latitude ? "Open in Google Maps" : undefined}
           >
-            <MapPin size={9} className="shrink-0 text-primary" />
+            <MapPin size={9} className="shrink-0 text-muted-foreground" />
             <span className="text-[9px] font-medium text-muted-foreground leading-tight truncate">
               {locationLabel || ml.label('label_in_your_society')}
             </span>
           </div>
         )}
       </div>
-      {viewOnly && (<div className="px-2.5 pb-2.5"><button onClick={(e) => { e.stopPropagation(); if (onViewClick) { onViewClick(); } else { onNavigate?.(`/seller/${product.seller_id}`); } }} className="w-full border border-primary text-primary font-bold text-[11px] py-1.5 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors">{onViewClick ? 'View Details' : mc.labels.viewButton}</button></div>)}
+
+      {viewOnly && (
+        <div className="px-2.5 pb-2.5">
+          <button
+            onClick={(e) => { e.stopPropagation(); if (onViewClick) { onViewClick(); } else { onNavigate?.(`/seller/${product.seller_id}`); } }}
+            className="w-full border border-primary text-primary font-semibold text-[11px] py-2 rounded-lg hover:bg-primary hover:text-primary-foreground transition-colors"
+          >
+            {onViewClick ? 'View Details' : mc.labels.viewButton}
+          </button>
+        </div>
+      )}
+
       {!viewOnly && isOutOfStock && (<NotifyMeButton productId={product.id} />)}
     </div>
   );

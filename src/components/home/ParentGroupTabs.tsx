@@ -22,11 +22,11 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
 
   if (isLoading) {
     return (
-      <div className="flex gap-4 overflow-x-auto scrollbar-hide px-4 py-1 justify-start">
-        {[1, 2, 3, 4, 5].map(i => (
-          <div key={i} className="flex flex-col items-center gap-1.5 shrink-0">
-            <Skeleton className="w-12 h-12 rounded-full" />
-            <Skeleton className="w-10 h-3 rounded" />
+      <div className="grid grid-cols-4 gap-3 px-4 py-1">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="flex flex-col items-center gap-1.5">
+            <Skeleton className="w-12 h-12 rounded-xl" />
+            <Skeleton className="w-10 h-2.5 rounded" />
           </div>
         ))}
       </div>
@@ -37,13 +37,12 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
     ? [{ value: '__all__', label: 'All', icon: 'LayoutGrid', color: '', description: '', layoutType: 'ecommerce' }, ...filteredGroups]
     : filteredGroups;
 
-  // Gap #4: Use wrap grid when ≤8 items, horizontal scroll when >8
   const useGrid = tabs.length <= 8;
 
   return (
     <div className={cn(
       useGrid
-        ? 'grid grid-cols-4 gap-y-3 gap-x-2 px-4 py-1'
+        ? 'grid grid-cols-4 gap-y-3 gap-x-3 px-4 py-1'
         : 'flex gap-3 overflow-x-auto scrollbar-hide px-4 py-1'
     )}>
       {tabs.map((tab) => {
@@ -60,32 +59,30 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
               }
             }}
             className={cn(
-              'flex flex-col items-center gap-1.5 transition-all duration-200 group',
+              'flex flex-col items-center gap-1 transition-all duration-150 group',
               !useGrid && 'shrink-0'
             )}
           >
-            {/* Icon circle */}
             <div
               className={cn(
-                'w-14 h-14 min-w-[56px] min-h-[56px] rounded-full flex items-center justify-center transition-all duration-150 bg-secondary',
+                'w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-150',
                 isActive
-                  ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
-                  : 'active:scale-95'
+                  ? 'bg-primary/10 ring-1.5 ring-primary'
+                  : 'bg-secondary hover:bg-muted active:scale-95'
               )}
             >
               <DynamicIcon
                 name={tab.icon}
-                size={24}
+                size={22}
                 className={cn(
                   'transition-colors duration-150',
-                  isActive ? 'text-primary' : 'text-foreground/70'
+                  isActive ? 'text-primary' : 'text-foreground/60'
                 )}
               />
             </div>
-            {/* Label */}
             <span
               className={cn(
-                'text-[10px] font-bold leading-tight text-center w-16 line-clamp-2',
+                'text-[10px] font-semibold leading-tight text-center w-14 line-clamp-1',
                 isActive ? 'text-primary' : 'text-muted-foreground'
               )}
             >

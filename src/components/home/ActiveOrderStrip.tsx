@@ -40,7 +40,6 @@ export function ActiveOrderStrip() {
 
       const terminalArr = [...terminalSet];
 
-      // Gap #11: Include first product thumbnail via order_items → products
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -62,7 +61,6 @@ export function ActiveOrderStrip() {
       }
       if (!data) return [];
 
-      // Fetch display labels for these statuses from category_status_flows
       const statusKeys = [...new Set(data.map((o: any) => o.status))];
       const { data: flowData } = await supabase
         .from('category_status_flows')
@@ -78,7 +76,6 @@ export function ActiveOrderStrip() {
 
       return data.map((o: any) => {
         const flow = flowMap.get(o.status);
-        // Get first product image from order items
         const firstImage = o.order_items?.find((oi: any) => oi.product?.image_url)?.product?.image_url || null;
         return {
           id: o.id,
@@ -100,7 +97,6 @@ export function ActiveOrderStrip() {
     refetchOnWindowFocus: true,
   });
 
-  // Push-driven terminal sync: immediately remove stale active orders
   useEffect(() => {
     const handler = () => {
       queryClient.invalidateQueries({ queryKey: ['active-orders-strip'] });
@@ -112,7 +108,7 @@ export function ActiveOrderStrip() {
   if (activeOrders.length === 0) return null;
 
   return (
-    <div className="px-4 mt-2">
+    <div className="px-4 mt-2 space-y-1.5">
       <AnimatePresence>
         {activeOrders.map((order) => {
           const isTransit = TRANSIT_STATUSES.has(order.status as any);
@@ -120,14 +116,14 @@ export function ActiveOrderStrip() {
           return (
             <motion.div
               key={order.id}
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -12 }}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
               onClick={() => navigate(`/orders/${order.id}`)}
-              className="flex items-center gap-2.5 rounded-xl bg-primary/8 border border-primary/15 pl-1.5 pr-3 py-1.5 cursor-pointer active:scale-[0.98] transition-transform mb-1.5 last:mb-0"
+              className="flex items-center gap-2.5 rounded-xl bg-primary/6 border border-primary/12 px-3 py-2 cursor-pointer active:scale-[0.98] transition-transform"
             >
-              {/* Compact product thumbnail */}
-              <div className="w-8 h-8 rounded-lg bg-primary/10 shrink-0 overflow-hidden flex items-center justify-center">
+              {/* Product thumbnail */}
+              <div className="w-8 h-8 rounded-lg bg-primary/8 shrink-0 overflow-hidden flex items-center justify-center">
                 {order.first_product_image ? (
                   <img src={order.first_product_image} alt="" className="w-full h-full object-cover" loading="lazy" />
                 ) : (
@@ -135,17 +131,14 @@ export function ActiveOrderStrip() {
                 )}
               </div>
 
-              {/* Status + seller — single dense row */}
+              {/* Status + seller */}
               <div className="flex-1 min-w-0 flex items-center gap-1.5">
                 {isTransit && (
                   <motion.span
-                    className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"
+                    className="w-1.5 h-1.5 rounded-full bg-primary shrink-0"
                     animate={{ opacity: [1, 0.3, 1] }}
                     transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
                   />
-                )}
-                {!isTransit && order.color && (
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${order.color.split(' ')[0]}`} />
                 )}
                 <span className="text-[12px] font-bold text-foreground truncate">
                   {order.display_label}
@@ -157,10 +150,10 @@ export function ActiveOrderStrip() {
                 )}
               </div>
 
-              {/* Right: ETA or item count — eye-catching */}
+              {/* ETA or item count */}
               <div className="shrink-0 flex items-center gap-1.5">
                 {etaText ? (
-                  <span className="text-[11px] font-extrabold text-primary whitespace-nowrap">
+                  <span className="text-[11px] font-bold text-primary whitespace-nowrap">
                     {etaText}
                   </span>
                 ) : order.item_count > 0 ? (
@@ -168,7 +161,7 @@ export function ActiveOrderStrip() {
                     {order.item_count} item{order.item_count > 1 ? 's' : ''}
                   </span>
                 ) : null}
-                <ChevronRight size={14} className="text-muted-foreground/60 shrink-0" />
+                <ChevronRight size={14} className="text-muted-foreground/50 shrink-0" />
               </div>
             </motion.div>
           );
