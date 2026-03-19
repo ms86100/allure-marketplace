@@ -216,7 +216,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         rollback(snap);
         const availabilityError = parseStoreAvailabilityError(error);
         if (availabilityError) toast.error(availabilityError, { id: 'cart-availability-error' });
-        else handleApiError(error, 'Failed to add item');
+        else feedbackAddItemFailed(product.name || 'Item');
       }
     } finally {
       addItemLocksRef.current.delete(product.id);
