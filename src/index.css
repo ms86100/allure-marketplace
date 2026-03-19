@@ -227,8 +227,8 @@
     --card-foreground: 40 10% 90%;
     --card-elevated: 20 3% 15%;
 
-    --popover: 40 15% 85%;
-    --popover-foreground: 0 0% 12%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 40 10% 90%;
 
     --primary: 165 35% 25%;           /* Deep Forest Green — bottle */
     --primary-foreground: 40 10% 93%;
