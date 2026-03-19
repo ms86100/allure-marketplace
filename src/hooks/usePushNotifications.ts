@@ -223,6 +223,11 @@ export function usePushNotificationsInternal() {
     let cleanupListeners: (() => void)[] = [];
 
     const setup = async () => {
+      // Load terminal statuses from DB for push-driven terminal sync
+      try {
+        terminalStatusesRef.current = await getTerminalStatuses();
+      } catch { /* best-effort — is_terminal flag in payload is primary */ }
+
       let PushNotifications: any;
       try {
         const pnMod = await import('@capacitor/push-notifications');
