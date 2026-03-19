@@ -281,11 +281,11 @@
     --tint-default: 0 0% 9%;
 
     /* Gradients — stone & mineral */
-    --gradient-primary: linear-gradient(135deg, hsl(165 35% 25%) 0%, hsl(175 30% 30%) 100%);
-    --gradient-success: linear-gradient(135deg, hsl(165 35% 25%) 0%, hsl(170 28% 28%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(165 35% 28%) 0%, hsl(175 30% 32%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(165 35% 28%) 0%, hsl(170 28% 30%) 100%);
     --gradient-warm: linear-gradient(135deg, hsl(30 45% 50%) 0%, hsl(20 40% 45%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(165 35% 25% / 0.08) 0%, hsl(40 10% 90%) 55%);
-    --gradient-glass: linear-gradient(135deg, hsl(40 15% 85% / 0.96) 0%, hsl(40 10% 82% / 0.9) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(165 35% 25% / 0.06) 0%, hsl(0 0% 5%) 55%);
+    --gradient-glass: linear-gradient(135deg, hsl(0 0% 11% / 0.96) 0%, hsl(0 0% 7% / 0.9) 100%);
 
     /* Shadows — warm stone dappled light */
     --shadow-sm: 0 1px 3px hsl(30 15% 20% / 0.06);
