@@ -147,12 +147,6 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                 {cat.displayName}
               </span>
 
-              {/* Item count */}
-              {meta.count > 0 && (
-                <span className="text-[9px] text-muted-foreground font-medium mt-0.5">
-                  {meta.count} {ml.label('label_item_count')}
-                </span>
-              )}
             </Link>
           );
         })}
