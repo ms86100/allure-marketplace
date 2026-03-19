@@ -383,7 +383,7 @@ serve(async (req) => {
     }
 
     // ═══ Proximity notifications ═══
-    if (distanceMeters !== null && buyerId && ['picked_up', 'on_the_way'].includes(assignment.status)) {
+    if (distanceMeters !== null && buyerId && ['picked_up', 'on_the_way', 'at_gate'].includes(assignment.status)) {
       let vehicleType: string | null = null;
       if (assignment.rider_id) {
         const { data: riderInfo } = await supabase
