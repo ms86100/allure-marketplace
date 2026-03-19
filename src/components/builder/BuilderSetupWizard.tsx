@@ -200,7 +200,7 @@ export function BuilderSetupWizard({ societyId, societyName, enabledFeatures = [
             </div>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

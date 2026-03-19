@@ -282,7 +282,7 @@ export function PostDetailSheet({ post, open, onOpenChange, onVote }: PostDetail
             </Button>
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

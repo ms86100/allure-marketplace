@@ -131,7 +131,7 @@ export function WorkerRegistrationSheet({ open, onOpenChange, onSuccess, categor
             {w.isSubmitting ? 'Registering...' : 'Register Worker'}
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

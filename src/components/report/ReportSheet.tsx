@@ -121,7 +121,7 @@ export function ReportSheet({ open, onOpenChange, targetType, targetId, targetNa
             </Button>
           </div>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

@@ -223,8 +223,8 @@ export function SearchFilters({
             Apply Filters
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }
 

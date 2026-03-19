@@ -54,8 +54,8 @@ export const AddressPicker = forwardRef<HTMLDivElement, AddressPickerProps>(
                 ))
               )}
             </div>
-          </SheetContent>
-        </Sheet>
+          </DrawerContent>
+        </Drawer>
       </div>
     );
   }

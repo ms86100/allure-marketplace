@@ -155,8 +155,8 @@ export default function DeliveryPartnerManagementPage() {
                     Add Partner
                   </Button>
                 </div>
-              </SheetContent>
-            </Sheet>
+              </DrawerContent>
+            </Drawer>
           </CardContent>
         </Card>
 

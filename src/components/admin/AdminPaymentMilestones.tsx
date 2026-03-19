@@ -163,8 +163,8 @@ export function AdminPaymentMilestones() {
                 Create Milestone
               </Button>
             </div>
-          </SheetContent>
-        </Sheet>
+          </DrawerContent>
+        </Drawer>
       </div>
 
       {milestones.length === 0 ? (

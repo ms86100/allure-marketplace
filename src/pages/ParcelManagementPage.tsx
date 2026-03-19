@@ -252,8 +252,8 @@ export default function ParcelManagementPage() {
                     {isSubmitting ? <><Loader2 size={16} className="mr-1 animate-spin" /> Logging...</> : 'Log Parcel'}
                   </Button>
                 </div>
-              </SheetContent>
-            </Sheet>
+              </DrawerContent>
+            </Drawer>
           </CardContent>
         </Card>
 
