@@ -196,7 +196,7 @@ function HeaderInner({
           )}
         </div>
 
-        <ActiveOrderETA />
+        
         <LocationSelectorSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} />
       </header>
 
