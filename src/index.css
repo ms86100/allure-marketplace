@@ -149,13 +149,13 @@
     /* Product image */
     --product-image-bg: 20 8% 14%;
 
-    /* Dark tints — warm brown */
-    --tint-food: 20 8% 10%;
-    --tint-services: 20 8% 10%;
-    --tint-personal: 20 8% 10%;
-    --tint-resale: 20 8% 10%;
-    --tint-events: 20 8% 10%;
-    --tint-default: 20 8% 10%;
+    /* Dark tints — neutral */
+    --tint-food: 0 0% 9%;
+    --tint-services: 0 0% 9%;
+    --tint-personal: 0 0% 9%;
+    --tint-resale: 0 0% 9%;
+    --tint-events: 0 0% 9%;
+    --tint-default: 0 0% 9%;
 
     /* Gradients — warm base */
     --gradient-primary: linear-gradient(135deg, hsl(151 65% 44%) 0%, hsl(168 55% 38%) 100%);
