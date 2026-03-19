@@ -251,12 +251,21 @@ serve(async (req) => {
 
     // Build update payload
     const now = new Date().toISOString();
+
+    // Bug 5: Reset stalled_notified when meaningful movement resumes (>100m since last known)
+    let resetStalled = false;
+    if (assignment.stalled_notified && assignment.last_location_lat && assignment.last_location_lng) {
+      const moveDelta = haversineDistance(assignment.last_location_lat, assignment.last_location_lng, latitude, longitude);
+      if (moveDelta > 100) resetStalled = true;
+    }
+
     const updateData: Record<string, unknown> = {
       last_location_lat: latitude,
       last_location_lng: longitude,
       last_location_at: now,
       distance_meters: distanceMeters,
       proximity_status: proximity,
+      ...(resetStalled ? { stalled_notified: false } : {}),
     };
     if (!skipEtaUpdate && etaMinutes != null) {
       updateData.eta_minutes = etaMinutes;
