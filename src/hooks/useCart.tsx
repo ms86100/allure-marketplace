@@ -289,6 +289,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase.from('cart_items').delete().eq('user_id', user.id);
       if (error) throw error;
+      feedbackCartCleared();
     } catch (error) {
       rollback(snap);
       console.error('Error clearing cart:', error);
