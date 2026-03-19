@@ -13,6 +13,7 @@ import { ActiveOrderStrip } from '@/components/home/ActiveOrderStrip';
 import { ForYouSection } from '@/components/home/ForYouSection';
 import { SocietyTrustStrip } from '@/components/home/SocietyTrustStrip';
 import { SocietyLeaderboard } from '@/components/home/SocietyLeaderboard';
+import { RecentlyViewedRow } from '@/components/home/RecentlyViewedRow';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { motion } from 'framer-motion';
@@ -106,6 +107,9 @@ export default function HomePage() {
 
         {/* ═══ PERSONALIZED SECTIONS (conditional) ═══ */}
         <ForYouSection />
+
+        {/* ═══ RECENTLY VIEWED ═══ */}
+        <RecentlyViewedRow />
 
         {/* ═══ LEADERBOARD & COMMUNITY ═══ */}
         <div className="bg-secondary/30 py-4 mt-2">

@@ -238,7 +238,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase.from('cart_items').delete().eq('user_id', user.id).eq('product_id', productId);
       if (error) throw error;
-      feedbackRemoveItem(removedItem?.product?.name || 'Item');
+      feedbackRemoveItem(removedItem?.product?.name || 'Item', removedItem ? () => {
+        addItem(removedItem.product, removedQty, true);
+      } : undefined);
       await reconcile();
     } catch (error) {
       rollback(snap);

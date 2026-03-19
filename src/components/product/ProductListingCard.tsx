@@ -69,9 +69,9 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
 
   const { ref: cardRef, onCardClick: trackClick, onAddClick: trackAdd } = useCardAnalytics({ productId: product.id, category: product.category, price: product.price, sellerId: product.seller_id, layout: resolvedLayout });
 
-  const handleAdd = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); impact('medium'); trackAdd(); if (!isCartAction) { if (onTap) onTap(product); return; } addItem(product as any); };
-  const handleIncrement = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); impact('medium'); updateQuantity(product.id, quantity + 1); };
-  const handleDecrement = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); impact('medium'); updateQuantity(product.id, quantity - 1); };
+  const handleAdd = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); trackAdd(); if (!isCartAction) { if (onTap) onTap(product); return; } addItem(product as any); };
+  const handleIncrement = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); updateQuantity(product.id, quantity + 1); };
+  const handleDecrement = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); updateQuantity(product.id, quantity - 1); };
   const handleCardClick = () => { selectionChanged(); trackClick(); if (onTap) onTap(product); else onNavigate?.(`/seller/${product.seller_id}`); };
 
   const isOutOfStock = !product.is_available;
