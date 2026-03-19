@@ -221,7 +221,7 @@ function BannerContent({ banner }: { banner: any }) {
 
   if (template === 'split_left') {
     return (
-      <div className="flex h-28" style={{ backgroundColor: bg_color }}>
+      <div className="flex h-36" style={{ backgroundColor: bg_color }}>
         <div className="flex-1 flex flex-col justify-center p-3">
           <h3 className="text-white font-bold text-sm leading-tight">{title}</h3>
           {subtitle && <p className="text-white/80 text-[10px] mt-1">{subtitle}</p>}
