@@ -28,7 +28,7 @@ import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
 import { SellerPaymentConfirmation } from '@/components/payment/SellerPaymentConfirmation';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
-import { isTerminalStatus, isFirstFlowStep, stepRequiresOtp } from '@/hooks/useCategoryStatusFlow';
+import { isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, stepRequiresOtp } from '@/hooks/useCategoryStatusFlow';
 import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck, Loader2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -65,8 +65,7 @@ export default function OrderDetailPage() {
   useEffect(() => {
     if (!orderId || !order?.status) return;
     if (!Capacitor.isNativePlatform()) return;
-    const TERMINAL = new Set(['delivered', 'completed', 'cancelled', 'no_show']);
-    if (TERMINAL.has(order.status)) {
+    if (isTerminalStatus(o.flow, order.status)) {
       LiveActivityManager.end(orderId).catch(() => {});
     }
   }, [orderId, order?.status]);
@@ -172,7 +171,7 @@ export default function OrderDetailPage() {
 
         <div className="px-4 pt-3 space-y-3">
           {/* Delivery completion celebration — shown once for delivered/completed orders */}
-          {o.isBuyerView && ['delivered', 'completed'].includes(order.status) && !getString(`celebration_${order.id}`) && (() => {
+          {o.isBuyerView && isSuccessfulTerminal(o.flow, order.status) && !getString(`celebration_${order.id}`) && (() => {
             const durationMs = new Date(order.updated_at || order.created_at).getTime() - new Date(order.created_at).getTime();
             const durationMin = Math.max(1, Math.round(durationMs / 60000));
             setString(`celebration_${order.id}`, 'true');
@@ -202,7 +201,7 @@ export default function OrderDetailPage() {
           {o.isUrgentOrder && order.auto_cancel_at && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} />}
 
           {/* Gap 8: Needs attention banner for buyer — hide on terminal statuses */}
-          {o.isBuyerView && (order as any).needs_attention && !['delivered', 'completed', 'cancelled'].includes(order.status) && (
+          {o.isBuyerView && (order as any).needs_attention && !isTerminalStatus(o.flow, order.status) && (
             <div className="bg-warning/10 border border-warning/20 rounded-xl p-3 flex items-start gap-2.5">
               <AlertTriangle className="text-warning shrink-0 mt-0.5" size={16} />
               <div>
@@ -219,7 +218,7 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {order.status === 'cancelled' && order.rejection_reason && o.isBuyerView && (
+          {order.rejection_reason && isTerminalStatus(o.flow, order.status) && !isSuccessfulTerminal(o.flow, order.status) && o.isBuyerView && (
             <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 flex items-start gap-2.5">
               <XCircle className="text-destructive shrink-0 mt-0.5" size={16} />
               <div><p className="text-sm font-semibold text-destructive">Order Cancelled</p><p className="text-xs text-muted-foreground mt-0.5">{order.rejection_reason}</p></div>
@@ -300,12 +299,12 @@ export default function OrderDetailPage() {
           )}
 
           {/* Gap 11: ETA banner for buyer — shown from acceptance until delivery */}
-          {o.isBuyerView && isDeliveryOrder && (order as any).estimated_delivery_at && !['delivered', 'completed', 'cancelled'].includes(order.status) && !(deliveryAssignmentId && deliveryTracking.eta) && (
+          {o.isBuyerView && isDeliveryOrder && (order as any).estimated_delivery_at && !isTerminalStatus(o.flow, order.status) && !(deliveryAssignmentId && deliveryTracking.eta) && (
             <DeliveryETABanner estimatedDeliveryAt={(order as any).estimated_delivery_at} />
           )}
 
           {/* Delivery partner identity card — shown when assignment exists */}
-          {o.isBuyerView && isDeliveryOrder && deliveryAssignmentId && deliveryTracking.riderName && !['delivered', 'completed', 'cancelled'].includes(order.status) && (
+          {o.isBuyerView && isDeliveryOrder && deliveryAssignmentId && deliveryTracking.riderName && !isTerminalStatus(o.flow, order.status) && (
             <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <Truck size={18} className="text-primary" />
@@ -323,7 +322,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Gap 8: Buyer delivery confirmation — only for non-delivery orders (delivery orders use OTP as proof) */}
-          {o.isBuyerView && order.status === 'delivered' && !isDeliveryOrder && (
+          {o.isBuyerView && isSuccessfulTerminal(o.flow, order.status) && !isDeliveryOrder && (
             <BuyerDeliveryConfirmation
               orderId={order.id}
               sellerName={seller?.business_name}
@@ -377,11 +376,11 @@ export default function OrderDetailPage() {
           )}
           {/* Seller self-delivery GPS broadcasting */}
           {/* Gap 1: Pass deliveryStatus so GPS auto-stops on terminal states */}
-          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && ['picked_up', 'on_the_way'].includes(order.status) && deliveryAssignmentId && (
+          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && o.isInTransit && deliveryAssignmentId && (
             <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart deliveryStatus={order.status} />
           )}
           {/* Persistent OTP card — visible to buyer for ALL non-terminal delivery statuses */}
-          {o.isBuyerView && isDeliveryOrder && buyerOtp && !isTerminalStatus(o.flow, order.status) && !['delivered', 'completed'].includes(order.status) && (
+          {o.isBuyerView && isDeliveryOrder && buyerOtp && !isTerminalStatus(o.flow, order.status) && (
             <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 text-center">
               <p className="text-xs text-muted-foreground mb-1">Your Delivery Code</p>
               <p className="text-3xl font-bold tracking-[0.3em] text-primary">{buyerOtp}</p>
@@ -397,7 +396,7 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {o.isBuyerView && (order.status === 'completed' || order.status === 'delivered') && !getString(`feedback_prompted_${order.id}`) && (
+          {o.isBuyerView && isSuccessfulTerminal(o.flow, order.status) && !getString(`feedback_prompted_${order.id}`) && (
             <div className="bg-secondary/50 border border-border rounded-xl p-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5"><span className="text-lg">💬</span><div><p className="text-sm font-semibold">How was your experience?</p><p className="text-[11px] text-muted-foreground">Share feedback</p></div></div>
               <FeedbackSheet triggerLabel="Share" onSubmitted={() => setString(`feedback_prompted_${order.id}`, 'true')} />
@@ -412,7 +411,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Gap 12: Delivery-specific rating — separate from product review */}
-          {o.isBuyerView && isDeliveryOrder && (order.status === 'completed' || order.status === 'delivered') && !hasDeliveryFeedback && (
+          {o.isBuyerView && isDeliveryOrder && isSuccessfulTerminal(o.flow, order.status) && !hasDeliveryFeedback && (
             <div className="bg-accent/5 border border-accent/20 rounded-xl p-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="text-lg">🚚</span>
@@ -494,6 +493,23 @@ export default function OrderDetailPage() {
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.nextStatus!)} disabled={o.isUpdating}>{o.isUpdating ? 'Updating...' : `Mark ${o.getOrderStatus(o.nextStatus).label}`}<ChevronRight size={14} className="ml-1" /></Button>
               )
             ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* Buyer Action Bar — DB-driven: renders when buyer has a valid next transition */}
+      {o.isBuyerView && !isTerminalStatus(o.flow, order.status) && o.buyerNextStatus && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
+          <div className="px-4 py-3 flex gap-3">
+            {o.canBuyerCancel && (
+              <Button variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground h-12" onClick={() => o.updateOrderStatus('cancelled' as OrderStatus)} disabled={o.isUpdating}>
+                <XCircle size={16} className="mr-1.5" />Cancel
+              </Button>
+            )}
+            <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.buyerNextStatus!)} disabled={o.isUpdating}>
+              {o.isUpdating ? 'Updating...' : o.getFlowStepLabel(o.buyerNextStatus).label}
+              <ChevronRight size={14} className="ml-1" />
+            </Button>
           </div>
         </div>
       )}

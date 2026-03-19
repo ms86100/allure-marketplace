@@ -89,7 +89,6 @@ export function useOrderDetail(id: string | undefined) {
 
   const getNextStatus = (): OrderStatus | null => {
     if (!order) return null;
-    // Use is_terminal from flow instead of hardcoded status checks
     if (isTerminalStatus(flow, order.status)) return null;
     if (flow.length > 0) {
       const next = getNextStatusForActor(flow, order.status, 'seller', transitions);
@@ -97,6 +96,14 @@ export function useOrderDetail(id: string | undefined) {
     }
     return null;
   };
+
+  // Buyer's next allowed action — DB-driven via transitions
+  const buyerNextStatus = useMemo((): OrderStatus | null => {
+    if (!order || isTerminalStatus(flow, order.status)) return null;
+    if (flow.length === 0 || transitions.length === 0) return null;
+    const next = getNextStatusForActor(flow, order.status, 'buyer', transitions);
+    return next as OrderStatus | null;
+  }, [order?.status, flow, transitions]);
 
   // Check if seller can reject (transition to cancelled exists for seller)
   const canSellerReject = useMemo(() => {
@@ -237,7 +244,7 @@ export function useOrderDetail(id: string | undefined) {
     isChatOpen, setIsChatOpen, unreadMessages, fetchUnreadCount,
     isRejectionDialogOpen, setIsRejectionDialogOpen,
     seller, isSellerView, isUrgentOrder, isBuyerView, isEnquiryOrder,
-    nextStatus, canReview, canChat, canReorder,
+    nextStatus, buyerNextStatus, canReview, canChat, canReorder,
     canSellerReject, canBuyerCancel, isInTransit, isFlowLoading,
     chatRecipientId, chatRecipientName,
     orderFulfillmentType, currentStatusIndex, statusOrder,
