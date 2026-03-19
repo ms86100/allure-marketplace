@@ -157,8 +157,8 @@ export default function WorkerLeavePage() {
                   {submitting ? <Loader2 size={16} className="mr-1 animate-spin" /> : null} Record Leave
                 </Button>
               </div>
-            </SheetContent>
-          </Sheet>
+            </DrawerContent>
+          </Drawer>
         )}
 
         {leaves.length === 0 ? (

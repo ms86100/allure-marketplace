@@ -74,7 +74,7 @@ export function CreateGroupBuySheet({ onCreated }: Props) {
           </div>
           <Button className="w-full" onClick={handleSubmit} disabled={saving}>{saving ? 'Creating...' : 'Create Group Buy'}</Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

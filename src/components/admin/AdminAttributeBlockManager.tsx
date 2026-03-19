@@ -474,8 +474,8 @@ export function AdminAttributeBlockManager() {
               </Button>
             </div>
           </ScrollArea>
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }

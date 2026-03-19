@@ -97,7 +97,7 @@ export function CreateSnagSheet({ onCreated }: { onCreated: () => void }) {
             <p className="text-xs text-muted-foreground text-center">You are viewing another society. Switch back to create content.</p>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

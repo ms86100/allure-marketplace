@@ -199,8 +199,8 @@ export default function MaintenancePage() {
                   {generating ? 'Checking...' : 'Preview & Generate'}
                 </Button>
               </div>
-            </SheetContent>
-          </Sheet>
+            </DrawerContent>
+          </Drawer>
           {dues.length > 0 && (
             <Button variant="outline" size="icon" onClick={() => exportMaintenanceDues(dues)} title="Export CSV">
               <Download size={16} />

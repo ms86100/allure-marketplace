@@ -231,8 +231,8 @@ export default function BuilderInspectionsPage() {
               )}
             </div>
           )}
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
     </AppLayout>
   );
 }

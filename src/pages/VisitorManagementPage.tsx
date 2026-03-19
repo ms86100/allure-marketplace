@@ -61,8 +61,8 @@ export default function VisitorManagementPage() {
                 )}
                 <Button onClick={v.handleAddVisitor} disabled={!v.visitorName.trim() || v.isSubmitting} className="w-full">{v.isSubmitting ? <><Loader2 size={16} className="mr-1 animate-spin" /> Adding...</> : 'Add Visitor & Generate OTP'}</Button>
               </div>
-            </SheetContent>
-          </Sheet>
+            </DrawerContent>
+          </Drawer>
           </CardContent>
         </Card>
 

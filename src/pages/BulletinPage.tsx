@@ -287,8 +287,8 @@ export default function BulletinPage() {
               </div>
             </>
           )}
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
       </FeatureGate>
     </AppLayout>
   );

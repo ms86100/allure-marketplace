@@ -123,7 +123,7 @@ export function SubscriptionSheet({ open, onOpenChange, product }: SubscriptionS
             Start Subscription
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }

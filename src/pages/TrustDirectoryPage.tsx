@@ -183,8 +183,8 @@ export default function TrustDirectoryPage() {
               Add Skill
             </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
     </AppLayout>
   );
 }

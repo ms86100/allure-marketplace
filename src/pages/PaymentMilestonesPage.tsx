@@ -325,8 +325,8 @@ export default function PaymentMilestonesPage() {
               {editing ? 'Update Milestone' : 'Create Milestone'}
             </Button>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DrawerContent>
+      </Drawer>
       </FeatureGate>
     </AppLayout>
   );

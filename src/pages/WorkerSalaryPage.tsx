@@ -150,8 +150,8 @@ export default function WorkerSalaryPage() {
                   {submitting ? <Loader2 size={16} className="mr-1 animate-spin" /> : null} Record Salary
                 </Button>
               </div>
-            </SheetContent>
-          </Sheet>
+            </DrawerContent>
+          </Drawer>
         )}
 
         {salaries.length === 0 ? (
