@@ -5,7 +5,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { LiveActivityManager } from '@/services/LiveActivityManager';
 import { buildLiveActivityData, type StatusFlowEntry } from '@/services/liveActivityMapper';
-import { getStartStatuses, getTerminalStatuses } from '@/services/statusFlowCache';
+import { getTerminalStatuses } from '@/services/statusFlowCache';
 
 const TAG = '[LA-Sync]';
 
