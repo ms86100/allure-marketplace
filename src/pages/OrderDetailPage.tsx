@@ -303,6 +303,24 @@ export default function OrderDetailPage() {
             <DeliveryETABanner estimatedDeliveryAt={(order as any).estimated_delivery_at} />
           )}
 
+          {/* Delivery partner identity card — shown when assignment exists */}
+          {o.isBuyerView && isDeliveryOrder && deliveryAssignmentId && deliveryTracking.riderName && !['delivered', 'completed', 'cancelled'].includes(order.status) && (
+            <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Truck size={18} className="text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Your delivery partner</p>
+                <p className="text-sm font-semibold truncate">{deliveryTracking.riderName}</p>
+              </div>
+              {deliveryTracking.riderPhone && (
+                <a href={`tel:${deliveryTracking.riderPhone}`} className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center shrink-0">
+                  <Phone size={16} className="text-accent" />
+                </a>
+              )}
+            </div>
+          )}
+
           {/* Gap 8: Buyer delivery confirmation — only for non-delivery orders (delivery orders use OTP as proof) */}
           {o.isBuyerView && order.status === 'delivered' && !isDeliveryOrder && (
             <BuyerDeliveryConfirmation
