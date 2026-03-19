@@ -53,10 +53,10 @@ function BottomNavInner() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 bg-background/95 backdrop-blur-md border-t border-border"
+      className="fixed inset-x-0 bottom-0 z-50 bg-background/98 backdrop-blur-lg border-t border-border/60"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
-      <div className="flex items-center justify-around px-2 h-14">
+      <div className="flex items-center justify-around px-1 h-16">
         {visibleItems.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname === to || 
             (to !== '/' && location.pathname.startsWith(to));
@@ -68,29 +68,29 @@ function BottomNavInner() {
               to={to}
               onClick={() => hapticSelection()}
               className={cn(
-                'flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors min-w-[48px] relative',
+                'flex flex-col items-center justify-center gap-1 px-3 py-1 rounded-2xl transition-all duration-200 min-w-[52px] relative',
                 isActive
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <div className="relative">
+              <div className={cn(
+                'relative flex items-center justify-center w-10 h-7 rounded-full transition-all duration-200',
+                isActive && 'bg-primary/12'
+              )}>
                 <Icon
                   size={20}
-                  strokeWidth={isActive ? 2.5 : 1.8}
-                  className={cn(
-                    'transition-all duration-150',
-                    isActive && 'scale-105'
-                  )}
+                  strokeWidth={isActive ? 2.4 : 1.7}
+                  className="transition-all duration-200"
                 />
                 {showCartBadge && (
-                  <span className="absolute -top-1 -right-2 min-w-[16px] h-[16px] px-0.5 rounded-full bg-primary text-primary-foreground text-[8px] font-bold flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-0.5 rounded-full bg-primary text-primary-foreground text-[8px] font-bold flex items-center justify-center shadow-sm">
                     {itemCount > 9 ? '9+' : itemCount}
                   </span>
                 )}
               </div>
               <span className={cn(
-                'text-[10px] leading-tight',
+                'text-[10px] leading-none',
                 isActive ? 'font-bold' : 'font-medium'
               )}>
                 {label}

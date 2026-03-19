@@ -45,45 +45,48 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
     <AnimatePresence>
       <motion.div
         key="floating-cart"
-        initial={{ y: 60, opacity: 0 }}
+        initial={{ y: 80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 60, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        exit={{ y: 80, opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 350, damping: 28 }}
         className={cn(
-          'fixed bottom-[calc(3.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-4 pb-2',
+          'fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-4 pb-2',
           className
         )}
       >
         <motion.div
           animate={controls}
-          className="rounded-xl bg-primary shadow-md overflow-hidden"
+          className="rounded-2xl bg-primary shadow-cta overflow-hidden"
         >
           <Link to="/cart">
             <motion.div
-              className="px-4 py-3 flex items-center justify-between"
+              className="px-5 py-3.5 flex items-center justify-between"
               whileTap={{ scale: 0.98 }}
             >
               {/* Left: item count + total */}
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-primary-foreground/15 flex items-center justify-center">
+                  <ShoppingCart size={16} className="text-primary-foreground" />
+                </div>
                 <div className="flex flex-col">
                   <AnimatePresence mode="wait">
                     {showAdded ? (
                       <motion.span
                         key="added"
-                        initial={{ opacity: 0, y: 4 }}
+                        initial={{ opacity: 0, y: 6 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        className="text-primary-foreground text-[13px] font-bold leading-tight"
+                        exit={{ opacity: 0, y: -6 }}
+                        className="text-primary-foreground text-sm font-bold leading-tight"
                       >
                         Added ✓
                       </motion.span>
                     ) : (
                       <motion.span
                         key="count"
-                        initial={{ opacity: 0, y: 4 }}
+                        initial={{ opacity: 0, y: 6 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        className="text-primary-foreground text-[13px] font-bold leading-tight"
+                        exit={{ opacity: 0, y: -6 }}
+                        className="text-primary-foreground text-sm font-bold leading-tight"
                       >
                         {itemCount} item{itemCount !== 1 ? 's' : ''} · {formatPrice(totalAmount)}
                       </motion.span>
@@ -93,19 +96,19 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
               </div>
 
               {/* Right: CTA */}
-              <div className="flex items-center gap-1 text-primary-foreground font-bold text-sm">
+              <div className="flex items-center gap-1.5 text-primary-foreground font-bold text-sm">
                 <AnimatePresence mode="wait">
                   <motion.span
                     key={isMomentum ? 'checkout' : 'view'}
-                    initial={{ opacity: 0, y: 4 }}
+                    initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
+                    exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.15 }}
                   >
                     {isMomentum ? 'Checkout' : 'View Cart'}
                   </motion.span>
                 </AnimatePresence>
-                <ChevronRight size={16} strokeWidth={2.5} />
+                <ChevronRight size={18} strokeWidth={2.5} />
               </div>
             </motion.div>
           </Link>
@@ -114,14 +117,14 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
 
       {/* Mini Cart Preview Sheet */}
       <Sheet open={previewOpen} onOpenChange={setPreviewOpen}>
-        <SheetContent side="bottom" className="rounded-t-xl px-4 pb-6">
+        <SheetContent side="bottom" className="rounded-t-2xl px-4 pb-6">
           <SheetHeader className="pb-3">
             <SheetTitle className="text-sm font-bold">Cart Preview</SheetTitle>
           </SheetHeader>
           <div className="space-y-3">
             {previewItems.map((item) => (
               <div key={item.id} className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 bg-muted">
+                <div className="w-11 h-11 rounded-xl overflow-hidden shrink-0 bg-secondary">
                   {item.product?.image_url ? (
                     <img src={item.product.image_url} alt={item.product.name} className="w-full h-full object-cover" />
                   ) : (
@@ -132,7 +135,7 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
                   <p className="text-sm font-medium truncate">{item.product?.name || 'Item'}</p>
                   <p className="text-xs text-muted-foreground">×{item.quantity}</p>
                 </div>
-                <span className="text-sm font-semibold tabular-nums">
+                <span className="text-sm font-bold tabular-nums">
                   {formatPrice((item.product?.price || 0) * item.quantity)}
                 </span>
               </div>
@@ -141,7 +144,7 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
               <p className="text-xs text-muted-foreground text-center">+{items.length - 3} more item{items.length - 3 !== 1 ? 's' : ''}</p>
             )}
           </div>
-          <Button className="w-full mt-4" onClick={() => { setPreviewOpen(false); navigate('/cart'); }}>
+          <Button className="w-full mt-4 rounded-xl" onClick={() => { setPreviewOpen(false); navigate('/cart'); }}>
             View Full Cart · {formatPrice(totalAmount)}
           </Button>
         </SheetContent>

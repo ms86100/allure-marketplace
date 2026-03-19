@@ -63,84 +63,86 @@ function HeaderInner({
   return (
     <>
       <header className={cn(
-        'sticky top-0 z-40 bg-background/95 backdrop-blur-md',
+        'sticky top-0 z-40 bg-background border-b border-border/50',
         className
       )}>
-        <div className="px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2.5">
-          {/* Top row: Location/greeting + actions */}
-          <div className="flex items-center justify-between mb-2">
+        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+          {/* Row 1: Location/greeting + actions */}
+          <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               {!title ? (
                 <button
                   type="button"
                   onClick={() => setLocationSheetOpen(true)}
-                  className="flex items-center gap-1.5 group"
+                  className="flex items-center gap-2 group"
                 >
-                  <MapPin size={14} className="text-primary shrink-0" />
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <MapPin size={15} className="text-primary" />
+                  </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1">
-                      <span className="text-[13px] font-bold text-foreground truncate max-w-[45vw]">
+                      <span className="text-sm font-bold text-foreground truncate max-w-[50vw]">
                         {browsingLocation?.label || displaySociety?.name || 'Set location'}
                       </span>
-                      <ChevronDown size={12} className="text-muted-foreground shrink-0" />
+                      <ChevronDown size={14} className="text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
                     </div>
-                    <p className="text-[10px] text-muted-foreground leading-none mt-0.5 truncate">
+                    <p className="text-[11px] text-muted-foreground leading-none mt-0.5 truncate">
                       {greeting}
                     </p>
                   </div>
                 </button>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 rounded-lg shrink-0"
+                    className="h-9 w-9 rounded-full shrink-0"
                     onClick={handleBack}
                   >
-                    <ArrowLeft size={16} />
+                    <ArrowLeft size={18} />
                   </Button>
-                  <span className="text-[15px] font-bold text-foreground truncate">{title}</span>
+                  <span className="text-base font-bold text-foreground truncate">{title}</span>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center gap-1">
-              <ThemeToggle className="h-8 w-8 rounded-lg text-foreground hover:bg-secondary" />
+            <div className="flex items-center gap-0.5">
+              <ThemeToggle className="h-9 w-9 rounded-full text-foreground hover:bg-secondary" />
               {isBuilderMember && (
                 <Link to="/builder">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
-                    <Building2 size={16} />
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+                    <Building2 size={17} />
                   </Button>
                 </Link>
               )}
               {isAdmin && (
                 <Link to="/admin">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
-                    <ShieldCheck size={16} />
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+                    <ShieldCheck size={17} />
                   </Button>
                 </Link>
               )}
               {isSeller && (
                 <Link to="/seller">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
-                    <Store size={16} />
+                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+                    <Store size={17} />
                   </Button>
                 </Link>
               )}
               {user && (
                 <>
                   <Link to="/notifications/inbox">
-                    <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-lg">
-                      <Bell size={16} />
+                    <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full">
+                      <Bell size={17} />
                       {unreadCount > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                        <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
                           {unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                       )}
                     </Button>
                   </Link>
                   <Link to="/profile">
-                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold cursor-pointer hover:bg-primary/15 transition-colors">
+                    <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[11px] font-bold cursor-pointer hover:opacity-90 transition-opacity">
                       {initials}
                     </div>
                   </Link>
@@ -149,11 +151,11 @@ function HeaderInner({
             </div>
           </div>
 
-          {/* Search bar — only on home */}
+          {/* Row 2: Search bar — only on home */}
           {!title && (
-            <Link to="/search" className="block">
-              <div className="flex items-center gap-2.5 bg-secondary rounded-lg px-3.5 py-2.5 transition-colors hover:bg-muted">
-                <Search size={15} className="text-muted-foreground shrink-0" />
+            <Link to="/search" className="block mt-3">
+              <div className="flex items-center gap-3 bg-secondary/80 border border-border/50 rounded-xl px-4 py-2.5 transition-all hover:border-primary/30 hover:shadow-sm">
+                <Search size={16} className="text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
                   <TypewriterPlaceholder context="home" />
                 </div>
@@ -167,7 +169,7 @@ function HeaderInner({
       </header>
 
       {isViewingAs && (
-        <div className="sticky top-[120px] z-39 bg-warning/10 border-b border-warning/20 px-4 py-1.5 flex items-center justify-between">
+        <div className="sticky top-[130px] z-39 bg-warning/10 border-b border-warning/20 px-4 py-2 flex items-center justify-between">
           <p className="text-xs font-medium text-foreground">
             Viewing: <span className="font-bold">{effectiveSociety?.name}</span>
           </p>

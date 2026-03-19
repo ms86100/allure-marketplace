@@ -81,6 +81,7 @@ export default {
         sm: "calc(var(--radius) - 4px)",
         xl: "calc(var(--radius) + 4px)",
         "2xl": "calc(var(--radius) + 8px)",
+        "3xl": "calc(var(--radius) + 14px)",
       },
       boxShadow: {
         sm: "var(--shadow-sm)",

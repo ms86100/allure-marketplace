@@ -33,34 +33,35 @@ export function SocietyQuickLinks() {
   const visibleLinks = quickLinks.filter(l => !l.featureKey || isFeatureEnabled(l.featureKey));
   if (visibleLinks.length === 0) return null;
 
-  // Gap #14: Use 3-column grid when ≤6 links, horizontal scroll when >6
   const useGrid = visibleLinks.length <= 6;
 
   return (
-    <div className="mt-4 mb-2">
+    <div className="mt-6 mb-2">
       <div className="px-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-extrabold text-[15px] text-foreground tracking-tight flex items-center gap-1.5">
-            <Building2 size={15} className="text-primary" />
+          <h3 className="section-header">
+            <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Building2 size={16} className="text-primary" />
+            </div>
             {ml.label('label_section_society_links')}
           </h3>
-          <Link to="/society" className="text-[11px] font-bold text-primary flex items-center gap-0.5 ml-4">
-            View all <ChevronRight size={12} />
+          <Link to="/society" className="text-xs font-bold text-primary flex items-center gap-0.5 hover:underline">
+            View all <ChevronRight size={14} />
           </Link>
         </div>
       </div>
       <div className={cn(
         useGrid
-          ? 'grid grid-cols-3 gap-2 px-4 pb-1'
-          : 'flex gap-2 overflow-x-auto scrollbar-hide pb-1 px-4 snap-x snap-mandatory'
+          ? 'grid grid-cols-3 gap-2.5 px-4 pb-1'
+          : 'flex gap-2.5 overflow-x-auto scrollbar-hide pb-1 px-4 snap-x snap-mandatory'
       )}>
         {visibleLinks.slice(0, 6).map(({ icon: Icon, label, to }) => (
           <Link key={to} to={to} className={cn(!useGrid && 'shrink-0 snap-start')}>
-            <div className="bg-card border border-border rounded-2xl px-3 py-3 flex items-center gap-2 active:scale-[0.97] transition-all duration-200 hover:border-primary/30">
-              <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Icon size={14} className="text-primary" />
+            <div className="bg-card border border-border rounded-2xl px-3 py-3.5 flex items-center gap-2.5 active:scale-[0.97] transition-all duration-200 hover:shadow-card hover:border-primary/20 shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Icon size={16} className="text-primary" />
               </div>
-              <span className="text-[11px] font-semibold text-foreground whitespace-nowrap">{label}</span>
+              <span className="text-xs font-semibold text-foreground whitespace-nowrap">{label}</span>
             </div>
           </Link>
         ))}

@@ -66,7 +66,6 @@ export function ReorderLastOrder() {
     setIsLoading(true);
     
     try {
-      // Check if cart has existing items
       const { data: existingCart } = await supabase
         .from('cart_items')
         .select('id')
@@ -98,7 +97,6 @@ export function ReorderLastOrder() {
         .in('id', productIds)
         .eq('is_available', true);
 
-      // Check seller availability before reordering
       if (available && available.length > 0) {
         const sellerIds = [...new Set(available.map(p => p.seller_id).filter(Boolean))];
         if (sellerIds.length > 0) {
@@ -140,7 +138,6 @@ export function ReorderLastOrder() {
         return;
       }
 
-      // Use the cart provider's replaceCart — seeds cache before navigation
       await replaceCart(inserts);
 
       if (unavailableCount > 0) {
@@ -163,20 +160,20 @@ export function ReorderLastOrder() {
       <button
         onClick={handleReorder}
         disabled={isLoading}
-        className="w-full flex items-center gap-3 bg-card border border-border rounded-xl p-3 active:scale-[0.98] transition-all"
+        className="w-full flex items-center gap-3 bg-card border border-border rounded-2xl p-3.5 active:scale-[0.98] transition-all shadow-card hover:shadow-elevated"
       >
-        <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center shrink-0">
-          <RefreshCw size={18} className={`text-accent-foreground ${isLoading ? 'animate-spin' : ''}`} />
+        <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <RefreshCw size={20} className={`text-primary ${isLoading ? 'animate-spin' : ''}`} />
         </div>
         <div className="flex-1 min-w-0 text-left">
-          <p className="text-sm font-semibold text-foreground truncate">
+          <p className="text-sm font-bold text-foreground truncate">
             {ml.label('label_reorder_prefix')} {lastOrder.seller_name}
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground mt-0.5">
             {lastOrder.item_count} item{lastOrder.item_count !== 1 ? 's' : ''} · {formatPrice(lastOrder.total_amount)} · {timeLabel}
           </p>
         </div>
-        <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+        <ChevronRight size={18} className="text-muted-foreground shrink-0" />
       </button>
 
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
