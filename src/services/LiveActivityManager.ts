@@ -38,20 +38,18 @@ export function getOperationLog(): OperationLogEntry[] {
   return [...operationLog];
 }
 
-/** DB-backed terminal and start status sets — loaded at hydration time. No hardcoded fallbacks. */
+/** DB-backed terminal and start status sets — loaded via three-tier fallback in statusFlowCache. */
 let TERMINAL_STATUSES = new Set<string>();
 let START_STATUSES = new Set<string>();
-let statusSetsLoaded = false;
 
 async function loadStatusSets(): Promise<void> {
-  if (statusSetsLoaded) return;
+  // Always re-fetch — if previous load got safe fallback, this allows upgrade to real data
   try {
     const [terminal, start] = await Promise.all([getTerminalStatuses(), getStartStatuses()]);
     TERMINAL_STATUSES = terminal;
     START_STATUSES = start;
-    statusSetsLoaded = true;
   } catch (e) {
-    console.error(TAG, 'CRITICAL: Failed to load status sets from DB — terminal detection may be incomplete', e);
+    console.error(TAG, 'CRITICAL: Failed to load status sets — using current fallback sets', e);
   }
 }
 

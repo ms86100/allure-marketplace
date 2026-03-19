@@ -325,8 +325,18 @@ export function usePushNotificationsInternal() {
         // DB-driven: use is_terminal flag from push payload, or check cached terminal set
         const pushStatus = data?.status;
         const isTerminalPush = data?.is_terminal === 'true';
-        const terminalSet = terminalStatusesRef.current;
-        const isTerminal = isTerminalPush || (pushStatus && terminalSet.size > 0 && terminalSet.has(pushStatus));
+        // Dynamic resolution: call getTerminalStatuses() at event time (returns from cache in <1ms when warm)
+        let isTerminal = isTerminalPush;
+        if (!isTerminal && pushStatus) {
+          getTerminalStatuses().then(terminalSet => {
+            if (terminalSet.has(pushStatus) && orderId) {
+              pushLog('info', 'TERMINAL_PUSH_SYNC_ASYNC', { orderId, status: pushStatus });
+              window.dispatchEvent(new CustomEvent('order-terminal-push', {
+                detail: { orderId, status: pushStatus },
+              }));
+            }
+          }).catch(() => {});
+        }
         if (orderId && pushStatus && isTerminal) {
           pushLog('info', 'TERMINAL_PUSH_SYNC', { orderId, status: pushStatus });
           window.dispatchEvent(new CustomEvent('order-terminal-push', {
