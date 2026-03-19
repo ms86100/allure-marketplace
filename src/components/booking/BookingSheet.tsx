@@ -101,13 +101,13 @@ export function BookingSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="h-[85vh] rounded-t-3xl">
-        <SheetHeader className="pb-4">
-          <SheetTitle>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="h-[85vh]">
+        <DrawerHeader className="pb-4">
+          <DrawerTitle>
             {enquiryOnly ? 'Contact Seller' : hasDateRange ? 'Reserve Rental' : 'Book Service'}
-          </SheetTitle>
-        </SheetHeader>
+          </DrawerTitle>
+        </DrawerHeader>
 
         <div className="space-y-6 overflow-y-auto pb-20">
           {/* Listing Summary */}
