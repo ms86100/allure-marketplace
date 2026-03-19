@@ -313,7 +313,7 @@ export function UpiDeepLinkCheckout({
 
               <div className="bg-muted/50 rounded-xl p-3.5">
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Complete the payment using your UPI app. Once done, tap <span className="font-medium text-foreground">"Confirm Payment"</span> to notify the seller. You can optionally attach a screenshot for faster verification.
+                  Complete the payment using your UPI app. Once done, <span className="font-medium text-foreground">upload a screenshot of your payment</span> and tap <span className="font-medium text-foreground">"Confirm Payment"</span> to notify the seller.
                 </p>
               </div>
 
