@@ -125,21 +125,29 @@ export default function HomePage() {
         })()}
 
         {/* Personalized */}
-        <ForYouSection />
+        <div className="reveal-on-scroll">
+          <ForYouSection />
+        </div>
 
         {/* Recently viewed */}
-        <RecentlyViewedRow />
+        <div className="reveal-on-scroll">
+          <RecentlyViewedRow />
+        </div>
 
         {/* Society links */}
-        <SocietyQuickLinks />
+        <div className="reveal-on-scroll">
+          <SocietyQuickLinks />
+        </div>
 
         {/* Leaderboard */}
-        <div className="mt-6">
+        <div className="mt-6 reveal-on-scroll">
           <SocietyLeaderboard />
         </div>
 
         {/* Community */}
-        <CommunityTeaser />
+        <div className="reveal-on-scroll">
+          <CommunityTeaser />
+        </div>
       </div>
     </AppLayout>
   );
