@@ -98,11 +98,9 @@ export function SocietyLeaderboard() {
 
   if (topSellers.length === 0 && topProducts.length === 0) return null;
 
-  const rankColors = ['hsl(45, 93%, 47%)', 'hsl(0, 0%, 66%)', 'hsl(30, 67%, 50%)', 'hsl(var(--muted-foreground))', 'hsl(var(--muted-foreground))'];
-
   return (
     <div className="space-y-5 px-4">
-      {/* ── Top Sellers — Podium Style ── */}
+      {/* ── Gap #7: Simplified Top Sellers — compact horizontal scroll, no podium ── */}
       {topSellers.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-3">
@@ -112,88 +110,38 @@ export function SocietyLeaderboard() {
             <h3 className="font-bold text-sm text-foreground">{ml.label('label_section_leaderboard_sellers')}</h3>
           </div>
 
-          {/* Podium: top 3 with center elevated */}
-          {topSellers.length >= 3 ? (
-            <div className="flex items-end justify-center gap-2 mb-3">
-              {[topSellers[1], topSellers[0], topSellers[2]].map((s, visualIdx) => {
-                const isCenter = visualIdx === 1;
-                const rank = isCenter ? 0 : visualIdx === 0 ? 1 : 2;
-                const hue = hashToHue(s.id);
-                return (
-                  <div
-                    key={s.id}
-                    onClick={() => navigate(`/seller/${s.id}`)}
-                    className={cn(
-                      'flex flex-col items-center cursor-pointer transition-all hover:scale-[1.03] active:scale-[0.97]',
-                      isCenter ? 'w-28' : 'w-24',
-                    )}
-                  >
-                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white mb-1" style={{ backgroundColor: rankColors[rank] }}>{rank + 1}</span>
-                    <div className={cn(
-                      'rounded-full overflow-hidden border-2 mb-1.5',
-                      isCenter ? 'w-16 h-16 border-warning' : 'w-12 h-12 border-border',
-                    )}>
-                      {s.profile_image_url ? (
-                        <img src={s.profile_image_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div
-                          className="w-full h-full flex items-center justify-center font-bold text-white"
-                          style={{ backgroundColor: `hsl(${hue}, 55%, 50%)`, fontSize: isCenter ? '18px' : '14px' }}
-                        >
-                          {s.business_name.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-                    <p className={cn('font-semibold text-foreground truncate text-center w-full', isCenter ? 'text-[12px]' : 'text-[10px]')}>
-                      {s.business_name}
-                    </p>
-                    <div className="flex items-center gap-0.5 mt-0.5">
-                      <Star size={9} className="text-warning fill-warning" />
-                      <span className="text-[9px] font-medium text-muted-foreground">{s.rating.toFixed(1)}</span>
-                    </div>
-                    <p className="text-[8px] text-muted-foreground">{s.completed_order_count} orders</p>
-                  </div>
-                );
-              })}
-            </div>
-          ) : null}
-
-          {/* Remaining sellers (or all if < 3) as horizontal scroll */}
-          {(topSellers.length < 3 ? topSellers : topSellers.slice(3)).length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {(topSellers.length < 3 ? topSellers : topSellers.slice(3)).map((s, i) => {
-                const rank = topSellers.length < 3 ? i : i + 3;
-                const hue = hashToHue(s.id);
-                return (
-                  <div
-                    key={s.id}
-                    className="shrink-0 w-28 rounded-2xl bg-card border border-border overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => navigate(`/seller/${s.id}`)}
-                  >
-                    <div className="p-3 text-center space-y-1">
-                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white mx-auto" style={{ backgroundColor: rankColors[rank] }}>{rank + 1}</span>
-                      {s.profile_image_url ? (
-                        <img src={s.profile_image_url} alt="" className="w-10 h-10 rounded-full mx-auto object-cover" />
-                      ) : (
-                        <div
-                          className="w-10 h-10 rounded-full mx-auto flex items-center justify-center font-bold text-white"
-                          style={{ backgroundColor: `hsl(${hue}, 55%, 50%)` }}
-                        >
-                          {s.business_name.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <p className="text-[11px] font-semibold truncate">{s.business_name}</p>
-                      <div className="flex items-center justify-center gap-0.5">
-                        <Star size={10} className="text-warning fill-warning" />
-                        <span className="text-[10px] font-medium">{s.rating.toFixed(1)}</span>
+          <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
+            {topSellers.map((s) => {
+              const hue = hashToHue(s.id);
+              return (
+                <div
+                  key={s.id}
+                  className="shrink-0 flex flex-col items-center gap-1.5 cursor-pointer active:scale-[0.97] transition-transform w-[72px]"
+                  onClick={() => navigate(`/seller/${s.id}`)}
+                >
+                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-border">
+                    {s.profile_image_url ? (
+                      <img src={s.profile_image_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div
+                        className="w-full h-full flex items-center justify-center font-bold text-white text-sm"
+                        style={{ backgroundColor: `hsl(${hue}, 55%, 50%)` }}
+                      >
+                        {s.business_name.charAt(0).toUpperCase()}
                       </div>
-                      <p className="text-[9px] text-muted-foreground">{s.completed_order_count} orders</p>
-                    </div>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  <p className="text-[10px] font-semibold text-foreground truncate text-center w-full leading-tight">
+                    {s.business_name}
+                  </p>
+                  <div className="flex items-center gap-0.5">
+                    <Star size={9} className="text-warning fill-warning" />
+                    <span className="text-[9px] font-medium text-muted-foreground">{s.rating.toFixed(1)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -207,23 +155,22 @@ export function SocietyLeaderboard() {
             <h3 className="font-bold text-sm text-foreground">{ml.label('label_section_leaderboard_products')}</h3>
           </div>
           <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
-            {topProducts.map((p, i) => (
-              <div key={p.product_id} className="shrink-0 w-[155px] rounded-2xl bg-card border border-border overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/seller/${p.seller_id}`)}>
-                <div className="relative aspect-square bg-muted">
+            {topProducts.map((p) => (
+              <div key={p.product_id} className="shrink-0 w-[140px] rounded-2xl bg-card border border-border overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/seller/${p.seller_id}`)}>
+                <div className="relative aspect-[4/3] bg-muted">
                   {p.image_url ? (
                     <img src={p.image_url} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <ShoppingBag size={24} className="text-muted-foreground/40" />
+                      <ShoppingBag size={20} className="text-muted-foreground/40" />
                     </div>
                   )}
-                  <span className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-background/80 backdrop-blur-sm" style={{ backgroundColor: rankColors[i] }}>{i + 1}</span>
-                  <span className="absolute bottom-1.5 right-1.5 text-[9px] font-bold text-primary-foreground bg-primary/90 backdrop-blur-sm rounded-full px-2 py-0.5">{p.order_count}× ordered</span>
+                  <span className="absolute bottom-1 right-1 text-[8px] font-bold text-primary-foreground bg-primary/90 backdrop-blur-sm rounded-full px-1.5 py-0.5">{p.order_count}× ordered</span>
                 </div>
-                <div className="p-2.5">
-                  <p className="text-[11px] font-semibold text-foreground truncate leading-tight">{p.product_name}</p>
-                  <p className="text-[10px] text-muted-foreground truncate mt-0.5">{p.seller_name}</p>
-                  <p className="text-[11px] font-bold text-primary mt-1">{formatPrice(p.price)}</p>
+                <div className="p-2">
+                  <p className="text-[10px] font-semibold text-foreground truncate leading-tight">{p.product_name}</p>
+                  <p className="text-[9px] text-muted-foreground truncate mt-0.5">{p.seller_name}</p>
+                  <p className="text-[10px] font-bold text-primary mt-0.5">{formatPrice(p.price)}</p>
                 </div>
               </div>
             ))}

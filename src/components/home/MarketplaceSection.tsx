@@ -13,7 +13,7 @@ import { ShopByStoreDiscovery } from '@/components/home/ShopByStoreDiscovery';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronRight, ShoppingBag, Sparkles, Clock, TrendingUp, Flame } from 'lucide-react';
+import { ChevronRight, ShoppingBag, Sparkles, Clock, TrendingUp, Flame, Store } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { motion } from 'framer-motion';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
@@ -151,7 +151,7 @@ export function MarketplaceSection() {
         />
       ))}
 
-      {/* ── Discovery Rows ── */}
+      {/* ── Discovery Rows — Gap #12: Added "See all" links ── */}
       {!activeGroup && popularNearYou.length > (discoveryMinProducts || 3) && (
         <>
           <SectionDivider />
@@ -202,10 +202,11 @@ export function MarketplaceSection() {
         socialProofMap={socialProofMap}
       />
 
-      {/* ── Store Discovery ── */}
+      {/* ── Gap #19: Store Discovery — stronger header ── */}
       <div className="py-5 mt-3">
-        <div className="flex items-center gap-1.5 px-4 mb-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{ml.label('label_section_store_discovery')}</span>
+        <div className="flex items-center gap-1.5 px-4 mb-2">
+          <Store size={14} className="text-primary" />
+          <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{ml.label('label_section_store_discovery')}</h3>
         </div>
         <ShopByStoreDiscovery />
       </div>
@@ -240,7 +241,7 @@ export function MarketplaceSection() {
   );
 }
 
-// ── Discovery Row with accent header ──
+// ── Discovery Row with accent header — Gap #12: Added "See all" link ──
 function DiscoveryRow({
   title, icon, accentClass, products, onProductTap, onNavigate, categoryConfigs, marketplaceConfig, badgeConfigs, socialProofMap,
 }: {
@@ -271,15 +272,26 @@ function DiscoveryRow({
     return -1;
   }, [products]);
 
+  // Derive a category link from the first product
+  const firstProduct = products[0];
+  const seeAllLink = firstProduct ? `/category/${(firstProduct as any).parentGroup || 'all'}` : null;
+
   return (
     <div>
-      <div className="flex items-center gap-2 px-4 mb-3">
-        {accentClass && (
-          <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold', accentClass)}>
-            {icon}
-          </span>
+      <div className="flex items-center justify-between px-4 mb-3">
+        <div className="flex items-center gap-2">
+          {accentClass && (
+            <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold', accentClass)}>
+              {icon}
+            </span>
+          )}
+          <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{title}</h3>
+        </div>
+        {seeAllLink && (
+          <Link to={seeAllLink} className="text-[11px] font-bold text-primary flex items-center gap-0.5">
+            See all <ChevronRight size={12} />
+          </Link>
         )}
-        <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{title}</h3>
       </div>
       <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1 snap-x snap-mandatory">
         {products.map((product, i) => (
@@ -292,6 +304,7 @@ function DiscoveryRow({
               marketplaceConfig={marketplaceConfig}
               badgeConfigs={badgeConfigs}
               socialProofCount={socialProofMap?.get(product.id)}
+              compact
             />
           </div>
         ))}
@@ -411,6 +424,7 @@ function ProductListings({
                       marketplaceConfig={marketplaceConfig}
                       badgeConfigs={badgeConfigs}
                       socialProofCount={socialProofMap?.get(product.id)}
+                      compact
                     />
                   </div>
                 );

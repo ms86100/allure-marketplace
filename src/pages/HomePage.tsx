@@ -12,6 +12,7 @@ import { ActiveOrderStrip } from '@/components/home/ActiveOrderStrip';
 import { ForYouSection } from '@/components/home/ForYouSection';
 import { SocietyLeaderboard } from '@/components/home/SocietyLeaderboard';
 import { RecentlyViewedRow } from '@/components/home/RecentlyViewedRow';
+import { ReorderLastOrder } from '@/components/home/ReorderLastOrder';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { motion } from 'framer-motion';
@@ -75,7 +76,19 @@ export default function HomePage() {
   return (
     <AppLayout>
       <div className="pb-6">
-        {/* ═══ PROFILE COMPLETION BANNER ═══ */}
+        {/* ═══ ACTIVE ORDER TRACKING ═══ */}
+        <ActiveOrderStrip />
+
+        {/* ═══ RICH NOTIFICATION BANNER ═══ */}
+        <HomeNotificationBanner />
+
+        {/* ═══ Gap #5: REORDER — above marketplace for 1-tap checkout ═══ */}
+        <ReorderLastOrder />
+
+        {/* ═══ MARKETPLACE (DOMINANT — 60-70% of screen) ═══ */}
+        <MarketplaceSection />
+
+        {/* ═══ Gap #20: PROFILE COMPLETION BANNER — below marketplace ═══ */}
         {profile && (() => {
           const missing: string[] = [];
           if (!profile.name) missing.push('name');
@@ -88,28 +101,19 @@ export default function HomePage() {
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mx-4 mt-3 rounded-2xl bg-primary/5 border border-primary/15 p-3.5"
+              className="mx-4 mt-4 rounded-2xl bg-primary/5 border border-primary/15 p-3"
             >
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-foreground">Profile {pct}% complete</p>
-                <Link to="/profile/edit" className="text-xs font-bold text-primary shrink-0 hover:underline">Update</Link>
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[11px] font-semibold text-foreground">Profile {pct}% complete</p>
+                <Link to="/profile/edit" className="text-[11px] font-bold text-primary shrink-0 hover:underline">Update</Link>
               </div>
-              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+              <div className="h-1 rounded-full bg-muted overflow-hidden">
                 <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6 }} className="h-full rounded-full bg-primary" />
               </div>
-              <p className="text-[11px] text-muted-foreground mt-1.5">{hint}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">{hint}</p>
             </motion.div>
           );
         })()}
-
-        {/* ═══ ACTIVE ORDER TRACKING ═══ */}
-        <ActiveOrderStrip />
-
-        {/* ═══ RICH NOTIFICATION BANNER ═══ */}
-        <HomeNotificationBanner />
-
-        {/* ═══ MARKETPLACE (DOMINANT — 60-70% of screen) ═══ */}
-        <MarketplaceSection />
 
         {/* ═══ PERSONALIZED SECTIONS ═══ */}
         <ForYouSection />
@@ -120,8 +124,8 @@ export default function HomePage() {
         {/* ═══ SOCIETY QUICK LINKS (deprioritized) ═══ */}
         <SocietyQuickLinks />
 
-        {/* ═══ LEADERBOARD & COMMUNITY (tertiary) ═══ */}
-        <div className="bg-secondary/30 py-4 mt-2">
+        {/* ═══ Gap #15: LEADERBOARD — no background wrapper, spacing only ═══ */}
+        <div className="mt-6">
           <SocietyLeaderboard />
         </div>
         <CommunityTeaser />

@@ -130,7 +130,8 @@ export function FeaturedBanners() {
   if (isLoading) {
     return (
       <div className="px-4 my-4">
-        <Skeleton className="h-36 rounded-2xl" />
+        {/* Gap #6: Reduced skeleton height */}
+        <Skeleton className="h-28 rounded-2xl" />
       </div>
     );
   }
@@ -182,16 +183,16 @@ export function FeaturedBanners() {
   );
 }
 
-/* ── Template-based rendering ── */
+/* ── Template-based rendering — Gap #6: Reduced height from h-36 to h-28 ── */
 function BannerContent({ banner }: { banner: any }) {
   const template = banner.template || 'image_only';
   const { title, subtitle, image_url, button_text, bg_color = '#16a34a' } = banner;
 
   if (template === 'image_only') {
     return image_url ? (
-      <img src={image_url} alt={title || 'Featured'} className="w-full h-36 object-cover" loading="lazy" />
+      <img src={image_url} alt={title || 'Featured'} className="w-full h-28 object-cover" loading="lazy" />
     ) : (
-      <div className="w-full h-36 flex items-center justify-center p-6 bg-primary">
+      <div className="w-full h-28 flex items-center justify-center p-6 bg-primary">
         <h3 className="text-lg font-bold text-primary-foreground text-center">{title || 'Featured'}</h3>
       </div>
     );
@@ -199,17 +200,17 @@ function BannerContent({ banner }: { banner: any }) {
 
   if (template === 'text_overlay') {
     return (
-      <div className="relative w-full h-36">
+      <div className="relative w-full h-28">
         {image_url ? (
           <img src={image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full" style={{ backgroundColor: bg_color }} />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent flex flex-col justify-end p-4">
-          <h3 className="text-white font-bold text-base">{title}</h3>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent flex flex-col justify-end p-3">
+          <h3 className="text-white font-bold text-sm">{title}</h3>
           {subtitle && <p className="text-white/80 text-xs mt-0.5">{subtitle}</p>}
           {button_text && (
-            <span className="mt-2 inline-block bg-white text-black text-xs font-bold px-3 py-1 rounded-full w-fit">
+            <span className="mt-1.5 inline-block bg-white text-black text-xs font-bold px-3 py-1 rounded-full w-fit">
               {button_text}
             </span>
           )}
@@ -220,12 +221,12 @@ function BannerContent({ banner }: { banner: any }) {
 
   if (template === 'split_left') {
     return (
-      <div className="flex h-36" style={{ backgroundColor: bg_color }}>
-        <div className="flex-1 flex flex-col justify-center p-4">
+      <div className="flex h-28" style={{ backgroundColor: bg_color }}>
+        <div className="flex-1 flex flex-col justify-center p-3">
           <h3 className="text-white font-bold text-sm leading-tight">{title}</h3>
           {subtitle && <p className="text-white/80 text-[10px] mt-1">{subtitle}</p>}
           {button_text && (
-            <span className="mt-2 inline-block bg-white text-xs font-bold px-3 py-1 rounded-full w-fit" style={{ color: bg_color }}>
+            <span className="mt-1.5 inline-block bg-white text-xs font-bold px-3 py-1 rounded-full w-fit" style={{ color: bg_color }}>
               {button_text}
             </span>
           )}
@@ -242,13 +243,13 @@ function BannerContent({ banner }: { banner: any }) {
   if (template === 'gradient_cta') {
     return (
       <div
-        className="w-full h-36 flex flex-col items-center justify-center text-center p-4"
+        className="w-full h-28 flex flex-col items-center justify-center text-center p-3"
         style={{ background: `linear-gradient(135deg, ${bg_color}, ${bg_color}cc)` }}
       >
-        <h3 className="text-white font-extrabold text-lg">{title}</h3>
+        <h3 className="text-white font-extrabold text-base">{title}</h3>
         {subtitle && <p className="text-white/85 text-xs mt-1 max-w-[80%]">{subtitle}</p>}
         {button_text && (
-          <span className="mt-3 bg-white text-xs font-bold px-4 py-1.5 rounded-full" style={{ color: bg_color }}>
+          <span className="mt-2 bg-white text-xs font-bold px-4 py-1.5 rounded-full" style={{ color: bg_color }}>
             {button_text}
           </span>
         )}
@@ -258,11 +259,11 @@ function BannerContent({ banner }: { banner: any }) {
 
   // minimal_text
   return (
-    <div className="w-full h-36 flex flex-col items-center justify-center p-6 bg-card border-l-4" style={{ borderColor: bg_color }}>
+    <div className="w-full h-28 flex flex-col items-center justify-center p-5 bg-card border-l-4" style={{ borderColor: bg_color }}>
       <h3 className="font-bold text-base text-foreground">{title}</h3>
       {subtitle && <p className="text-xs text-muted-foreground mt-1 text-center">{subtitle}</p>}
       {button_text && (
-        <span className="mt-3 text-xs font-bold px-4 py-1.5 rounded-full border" style={{ color: bg_color, borderColor: bg_color }}>
+        <span className="mt-2 text-xs font-bold px-4 py-1.5 rounded-full border" style={{ color: bg_color, borderColor: bg_color }}>
           {button_text}
         </span>
       )}

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statusFlowCache';
-import { Package, ChevronRight, Clock } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { compactETA } from '@/lib/etaEngine';
@@ -20,6 +20,7 @@ interface ActiveOrder {
   display_label: string | null;
   color: string | null;
   icon: string | null;
+  first_product_image: string | null;
 }
 
 export function ActiveOrderStrip() {
@@ -39,12 +40,13 @@ export function ActiveOrderStrip() {
 
       const terminalArr = [...terminalSet];
 
+      // Gap #11: Include first product thumbnail via order_items → products
       const { data, error } = await supabase
         .from('orders')
         .select(`
           id, status, created_at, estimated_delivery_at,
           seller:seller_profiles!orders_seller_id_fkey(business_name),
-          order_items(id)
+          order_items(id, product:products(image_url))
         `)
         .eq('buyer_id', user.id)
         .not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`)
@@ -76,6 +78,8 @@ export function ActiveOrderStrip() {
 
       return data.map((o: any) => {
         const flow = flowMap.get(o.status);
+        // Get first product image from order items
+        const firstImage = o.order_items?.find((oi: any) => oi.product?.image_url)?.product?.image_url || null;
         return {
           id: o.id,
           status: o.status,
@@ -86,6 +90,7 @@ export function ActiveOrderStrip() {
           display_label: flow?.display_label || o.status.replace(/_/g, ' '),
           color: flow?.color || null,
           icon: flow?.icon || null,
+          first_product_image: firstImage,
         };
       });
     },
@@ -118,8 +123,13 @@ export function ActiveOrderStrip() {
             onClick={() => navigate(`/orders/${order.id}`)}
             className="rounded-2xl bg-primary/5 border border-primary/15 px-4 py-3 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-transform"
           >
-            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-              <Package size={18} className="text-primary" />
+            {/* Gap #11: Product thumbnail instead of generic icon */}
+            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0 overflow-hidden">
+              {order.first_product_image ? (
+                <img src={order.first_product_image} alt="" className="w-full h-full object-cover" loading="lazy" />
+              ) : (
+                <span className="text-lg">📦</span>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
