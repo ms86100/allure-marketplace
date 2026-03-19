@@ -1,87 +1,74 @@
+# Production-Hardened Live Tracking System
 
+## Status: ✅ IMPLEMENTED
 
-# Fix: Home Banner Persistence + Delivery Code After Completion
+## What Changed
 
-## Root Cause Analysis
+### 1. Background Location Tracking (Seller)
+- **Package:** Added `@transistorsoft/capacitor-background-geolocation`
+- **File:** `src/hooks/useBackgroundLocationTracking.ts` — Full rewrite
+  - Native: Transistorsoft plugin with motion-aware tracking, `stopOnTerminate: false`, `preventSuspend: true`
+  - Web: Falls back to `navigator.geolocation.watchPosition`
+  - 20s health watchdog detects stale tracking and attempts recovery via `getCurrentPosition()`
+  - Auto-restart on app resume if native plugin was killed by OS
+  - Permission level tracking (`always` / `when_in_use` / `denied`)
 
-### Issue 1: Home banner persists after delivery
-The `HomeNotificationBanner` shows the latest **unread** notification with an `action` payload. When the order completes, the "Delivery slightly delayed" notification is never auto-marked as read — it stays unread indefinitely, so the banner keeps appearing even though the order is done.
+### 2. Seller GPS Tracker UI
+- **File:** `src/components/delivery/SellerGPSTracker.tsx`
+  - "Keep screen open" warning only on web (native handles background natively)
+  - Permission upgrade banner when on `when_in_use` with link to Settings
+  - Tracking paused badge + alert when watchdog detects stale state
+  - Settings deep link via `capacitor-native-settings`
 
-**The system lacks a mechanism to auto-dismiss delivery-related notifications when the order reaches a terminal state.**
+### 3. Delta-Based Live Activity APNs Push
+- **File:** `supabase/functions/update-delivery-location/index.ts`
+  - After updating `delivery_assignments`, queries `live_activity_tokens`
+  - Compares deltas: distance > 50m OR ETA change ≥ 1 min
+  - 15s throttle floor to stay within Apple's APNs budget
+  - Stale retry: pushes if last push was >60s ago regardless of deltas
+  - Stores `last_pushed_eta`, `last_pushed_distance` on `live_activity_tokens`
+  - Timing instrumentation: logs `db=Xms total=Xms la_push=Xms`
 
-### Issue 2: Delivery code visible after delivery
-For the `seller_delivery` flow, the status `delivered` has `is_terminal = false` in `category_status_flows`. It's an intermediate step before `completed`. The OTP card uses `!isTerminalStatus(...)` to decide visibility, so it correctly (per data) shows for `delivered`. But from a **product perspective**, once the order is `delivered`, the delivery code has served its purpose and should no longer be shown.
+### 4. APNs Success Tracking
+- **File:** `supabase/functions/update-live-activity-apns/index.ts`
+  - Updates `live_activity_tokens.updated_at` on successful (non-terminal) pushes
+  - `dismissal-date` set to now+4s (Apple minimum) for terminal events
 
-This is a semantic gap: `delivered` means "delivery confirmed" but isn't terminal in the flow because `completed` is the final state (involving payment confirmation, etc.). The OTP card shouldn't care about terminal status — it should care about whether **the delivery act is done**.
+### 5. Database
+- **Migration:** Added `last_pushed_eta` (int) and `last_pushed_distance` (int) columns to `live_activity_tokens`
+- **Migration:** Updated `verify_delivery_otp_and_complete` RPC → sets `completed` directly, clears `needs_attention`
+- **Migration:** Added `at_gate` to `transit_statuses_la` system setting
 
-### Issue 3: Notification content is stale
-The "Delivery slightly delayed" banner says "Updated ETA: 1 min" from 11 hours ago. This is misleading post-delivery. Delivery-related notifications should be auto-cleared when the order reaches delivery completion.
+### 6. Auto-Complete on OTP Verification
+- **RPC:** `verify_delivery_otp_and_complete` now sets order status to `completed` (not `delivered`), clears `needs_attention` flags
+- **UI:** `BuyerDeliveryConfirmation` hidden for delivery orders (OTP = proof of delivery)
+- **UI:** Attention banner hidden on terminal statuses (`delivered`, `completed`, `cancelled`)
 
-## Plan
+### 7. Dynamic Stalled Delivery Alerts
+- **File:** `supabase/functions/monitor-stalled-deliveries/index.ts`
+  - Computes actual elapsed time from `last_location_at`
+  - Contextual messages: "a few minutes" → "X minutes" → "over X hours"
 
-### Fix 1: Auto-mark delivery notifications as read on order completion
+### 8. Dynamic Island Fixes
+- **File:** `src/services/liveActivitySync.ts` — End stale native activities on app resume
+  - After syncing active orders, queries `getActiveActivities()` and ends any whose order is no longer active
+- **File:** `src/hooks/useOrderDetail.ts` — Force refetch on app resume / visibility change
+  - Listens for `order-detail-refetch` event and `visibilitychange` to re-fetch order data
+- **File:** `src/hooks/useAppLifecycle.ts` — Dispatches `order-detail-refetch` event on resume
+- **File:** `src/services/liveActivityMapper.ts` — ETA-based progress during transit
+  - Uses `1 - (eta_minutes / 45)` clamped to [0.1, 0.95] when ETA available
+  - Falls back to distance-based progress
+  - `at_gate` included in transit statuses
 
-**Database migration** — Create a trigger on `orders` that marks all delivery-related notifications as read when the order transitions to `delivered` or `completed`:
+## iOS Build Requirements
+- `Info.plist`: `UIBackgroundModes` → `location`, `fetch`
+- `NSLocationAlwaysAndWhenInUseUsageDescription`
+- `NSLocationWhenInUseUsageDescription`
+- `NSMotionUsageDescription`
 
-```sql
-CREATE OR REPLACE FUNCTION auto_dismiss_delivery_notifications()
-RETURNS trigger AS $$
-BEGIN
-  IF NEW.status IN ('delivered', 'completed') 
-     AND OLD.status IS DISTINCT FROM NEW.status THEN
-    UPDATE user_notifications
-    SET is_read = true
-    WHERE user_id = NEW.buyer_id
-      AND is_read = false
-      AND type IN ('delivery_delayed', 'delivery_stalled', 
-                   'delivery_en_route', 'delivery_proximity',
-                   'delivery_proximity_imminent')
-      AND (payload->>'order_id' = NEW.id::text 
-           OR reference_path LIKE '%' || NEW.id || '%');
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-```
-
-This ensures the home banner disappears as soon as the order is delivered/completed.
-
-### Fix 2: Hide delivery code once delivery is done (not just terminal)
-
-**File: `src/pages/OrderDetailPage.tsx`**
-
-Change the OTP card condition from:
-```
-!isTerminalStatus(o.flow, order.status)
-```
-to:
-```
-!isTerminalStatus(o.flow, order.status) && !['delivered', 'completed'].includes(order.status)
-```
-
-This is a belt-and-suspenders approach: even if `delivered` isn't terminal in the flow, the delivery code is no longer relevant once the package has been handed over.
-
-### Fix 3: HomeNotificationBanner — filter out stale delivery notifications for completed orders
-
-**File: `src/hooks/queries/useNotifications.ts`**
-
-In `useLatestActionNotification`, add a secondary check: if the notification is delivery-related and the referenced order is now terminal, skip it. This is a lightweight client-side safety net in case the trigger hasn't fired yet.
-
-Alternatively (simpler): rely on the trigger from Fix 1 to mark them read, which already excludes them from the query (`is_read = false`).
-
-**Recommendation:** The trigger (Fix 1) is sufficient. No client-side change needed for the banner — the trigger handles it at the database level.
-
-## Summary of Changes
-
-| File | Change |
-|------|--------|
-| Database migration (new) | Trigger to auto-mark delivery notifications as read on order completion |
-| `src/pages/OrderDetailPage.tsx` | Hide OTP card when status is `delivered` or `completed` (regardless of terminal flag) |
-
-## Product Perspective
-
-These changes reflect empathetic design:
-- **No leftover artifacts** — once delivery is done, all in-progress UI elements (banner, OTP code) disappear
-- **No misleading information** — stale "delayed" alerts don't linger after successful delivery
-- **Clean state transitions** — the UI clearly communicates "this order is done" without residual noise
-
+## Latency Targets
+- Seller GPS → Edge Function: < 2s
+- Edge Function → DB: < 500ms
+- DB → Realtime → Buyer: < 1s
+- Edge Function → APNs → Dynamic Island: < 3s
+- **Total foreground: < 5s | Dynamic Island: < 8s**
