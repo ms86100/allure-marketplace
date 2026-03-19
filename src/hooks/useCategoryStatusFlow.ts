@@ -149,7 +149,7 @@ export function getNextStatusForActor(
  * Returns the display steps for the timeline (non-terminal, non-cancelled).
  */
 export function getTimelineSteps(flow: StatusFlowStep[]): StatusFlowStep[] {
-  return flow.filter(s => !s.is_terminal && s.status_key !== 'cancelled');
+  return flow.filter(s => !s.is_terminal);
 }
 
 /**
