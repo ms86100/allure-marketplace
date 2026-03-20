@@ -9125,6 +9125,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      service_complete_delivery: {
+        Args: { _assignment_id: string; _order_id: string }
+        Returns: undefined
+      }
       set_my_society_coordinates: {
         Args: { p_lat: number; p_lng: number }
         Returns: undefined
