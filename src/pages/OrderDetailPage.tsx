@@ -493,9 +493,19 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
+      {/* Seller Action Bar — loading state */}
+      {o.isSellerView && o.isFlowLoading && !isTerminalStatus(o.flow, order.status) && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
+          <div className="px-4 py-3 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground">
+            <Loader2 size={16} className="animate-spin" />
+            <span>Loading actions…</span>
+          </div>
+        </div>
+      )}
+
       {/* Seller Action Bar */}
       {/* Gap 2: Seller Action Bar — intercept "delivered" to require OTP for delivery orders */}
-      {o.isSellerView && !isTerminalStatus(o.flow, order.status) && (
+      {o.isSellerView && !o.isFlowLoading && o.flow.length > 0 && !isTerminalStatus(o.flow, order.status) && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
           <div className="px-4 py-3 flex gap-3">
             {o.canSellerReject && <Button variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground h-12" onClick={() => o.setIsRejectionDialogOpen(true)} disabled={o.isUpdating}><XCircle size={16} className="mr-1.5" />Reject</Button>}
