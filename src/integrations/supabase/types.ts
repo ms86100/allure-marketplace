@@ -8666,69 +8666,28 @@ export type Database = {
             }
             Returns: undefined
           }
-      create_multi_vendor_orders:
-        | {
-            Args: {
-              _buyer_id: string
-              _cart_total: number
-              _coupon_code?: string
-              _coupon_discount?: number
-              _coupon_id?: string
-              _delivery_address: string
-              _delivery_address_id?: string
-              _delivery_fee?: number
-              _delivery_lat?: number
-              _delivery_lng?: number
-              _fulfillment_type?: string
-              _has_urgent?: boolean
-              _notes: string
-              _payment_method: string
-              _payment_status: string
-              _seller_groups: Json
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _buyer_id: string
-              _cart_total: number
-              _coupon_code?: string
-              _coupon_discount?: number
-              _coupon_id?: string
-              _delivery_address: string
-              _delivery_address_id?: string
-              _delivery_fee?: number
-              _delivery_lat?: number
-              _delivery_lng?: number
-              _fulfillment_type?: string
-              _has_urgent?: boolean
-              _idempotency_key?: string
-              _notes: string
-              _payment_method: string
-              _payment_status: string
-              _seller_groups: Json
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _buyer_id: string
-              _coupon_discount?: number
-              _coupon_id?: string
-              _delivery_address?: string
-              _delivery_address_id?: string
-              _delivery_fee?: number
-              _delivery_lat?: number
-              _delivery_lng?: number
-              _fulfillment_type?: string
-              _idempotency_key?: string
-              _notes?: string
-              _payment_method: string
-              _payment_status: string
-              _seller_groups: Json
-            }
-            Returns: Json
-          }
+      create_multi_vendor_orders: {
+        Args: {
+          _buyer_id: string
+          _cart_total: number
+          _coupon_code?: string
+          _coupon_discount?: number
+          _coupon_id?: string
+          _delivery_address: string
+          _delivery_address_id?: string
+          _delivery_fee?: number
+          _delivery_lat?: number
+          _delivery_lng?: number
+          _fulfillment_type?: string
+          _has_urgent?: boolean
+          _idempotency_key?: string
+          _notes: string
+          _payment_method: string
+          _payment_status: string
+          _seller_groups: Json
+        }
+        Returns: Json
+      }
       disable_cron_job: { Args: { p_jobid: number }; Returns: undefined }
       enable_cron_job: { Args: { p_jobid: number }; Returns: undefined }
       generate_recurring_visitor_entries: { Args: never; Returns: undefined }
