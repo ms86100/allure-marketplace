@@ -25,6 +25,7 @@ export default function DeliveryPartnerDashboardPage() {
   const [activeTab, setActiveTab] = useState('active');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [activeTrackingId, setActiveTrackingId] = useState<string | null>(null);
+  const [otpOrderId, setOtpOrderId] = useState<string | null>(null);
 
   const { isTracking, startTracking, stopTracking, permissionDenied } = useBackgroundLocationTracking(activeTrackingId);
 
