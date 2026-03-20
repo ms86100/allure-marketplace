@@ -32,13 +32,25 @@ export async function notifySellerStatusChange(
     suspended: 'seller_suspended',
   };
 
+  const referencePathMap: Record<string, string> = {
+    approved: '/seller',
+    rejected: '/become-seller',
+    suspended: '/seller',
+  };
+
+  const actionMap: Record<string, string> = {
+    approved: 'STORE_APPROVED',
+    rejected: 'STORE_REJECTED',
+    suspended: 'STORE_SUSPENDED',
+  };
+
   const { error } = await supabase.from('notification_queue').insert({
     user_id: userId,
     title: titleMap[status],
     body: bodyMap[status],
     type: typeMap[status],
-    reference_path: '/seller/dashboard',
-    payload: { type: typeMap[status] },
+    reference_path: referencePathMap[status],
+    payload: { type: typeMap[status], action: actionMap[status] },
   });
   if (error) console.error('Failed to enqueue seller notification:', error);
 }
@@ -64,8 +76,8 @@ export async function notifyLicenseStatusChange(
     title,
     body,
     type,
-    reference_path: '/seller/licenses',
-    payload: { type },
+    reference_path: '/seller',
+    payload: { type, action: status === 'approved' ? 'LICENSE_APPROVED' : 'LICENSE_REJECTED' },
   });
   if (error) console.error('Failed to enqueue license notification:', error);
 }
@@ -126,8 +138,8 @@ export async function notifyProductStatusChange(
     title,
     body,
     type,
-    reference_path: '/seller/products',
-    payload: { type },
+    reference_path: '/seller',
+    payload: { type, action: status === 'approved' ? 'PRODUCT_APPROVED' : 'PRODUCT_REJECTED' },
   });
   if (error) console.error('Failed to enqueue product notification:', error);
 }

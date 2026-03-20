@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { resolveNotificationRoute } from '@/lib/notification-routes';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
@@ -17,10 +18,9 @@ export default function NotificationInboxPage() {
 
   const handleTap = (n: typeof notifications[0]) => {
     if (!n.is_read) markRead.mutate(n.id);
-    if (n.reference_path) {
-      if (n.reference_path.startsWith('/')) {
-        navigate(n.reference_path);
-      }
+    const path = n.reference_path || resolveNotificationRoute(n.type, (n as any).payload);
+    if (path && path.startsWith('/')) {
+      navigate(path);
     }
   };
 

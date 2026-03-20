@@ -13,6 +13,7 @@ import { DraftProductManager } from '@/components/seller/DraftProductManager';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
 import { CroppableImageUpload } from '@/components/ui/croppable-image-upload';
+import { ServiceAvailabilityManager } from '@/components/seller/ServiceAvailabilityManager';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -398,6 +399,10 @@ export default function BecomeSellerPage() {
               <p className="text-xs text-muted-foreground">Add a profile photo and cover image to make your store stand out</p>
               {user && <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Profile Photo</Label><CroppableImageUpload value={formData.profile_image_url} onChange={(url) => setFormData({ ...formData, profile_image_url: url })} folder="sellers" userId={user.id} aspectRatio="square" placeholder="Profile" cropAspect={1} beforePick={beforeImagePick} /></div><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Cover Image</Label><CroppableImageUpload value={formData.cover_image_url} onChange={(url) => setFormData({ ...formData, cover_image_url: url })} folder="sellers" userId={user.id} aspectRatio="video" placeholder="Cover" cropAspect={16 / 9} beforePick={beforeImagePick} /></div></div>}
             </div>
+            {/* Service Availability — only for service-type categories */}
+            {selectedGroupInfo?.layoutType === 'service' && draftSellerId && (
+              <ServiceAvailabilityManager sellerId={draftSellerId} />
+            )}
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Add at least one product or service to your catalog</p>
             <Button className="w-full" onClick={handleProceedToProducts} disabled={isLoading || formData.operating_days.length === 0}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Add Products<ChevronRight size={16} className="ml-1" /></Button>
           </div>
