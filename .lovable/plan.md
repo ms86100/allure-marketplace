@@ -1,28 +1,88 @@
 
 
-## Fix: Order Placement Fails (CRITICAL) + Multi-Seller Notice
+## Financial-Grade Idempotency Fix
 
-### Bug 1: Order placement always fails with "Something went wrong"
+### Current State & Gaps
 
-**Root cause:** The client sends 4 parameters (`_idempotency_key`, `_delivery_address_id`, `_delivery_lat`, `_delivery_lng`) to `create_multi_vendor_orders` that don't exist in the DB function signature. PostgREST returns a 404 because it can't find a matching function overload.
+The current system has five weaknesses identified in your audit:
 
-**Proof:** Console error: `PGRST202 ... Searched for the function public.create_multi_vendor_orders with parameters ... _idempotency_key ... but no matches were found`
+1. **No request-level guard** — idempotency is checked per-row (per seller), not per-request atomically
+2. **Client resets key on ALL errors** (line 213) — network failures after DB commit cause duplicate orders on retry with a new key
+3. **Race condition in loop** — two concurrent requests can each insert different seller rows before either hits a conflict
+4. **Unique index is global** — `UNIQUE(idempotency_key)` instead of scoped to buyer
+5. **No explicit locking** — parallel requests execute full logic concurrently
 
-**Fix:** Add the 4 missing parameters to the DB function via migration. The function will:
-- Accept `_delivery_address_id UUID`, `_delivery_lat NUMERIC`, `_delivery_lng NUMERIC`, `_idempotency_key TEXT`
-- Store `delivery_address_id`, `delivery_lat`, `delivery_lng` in the `orders` table insert
-- Use `_idempotency_key` for duplicate order prevention (check if an order with this key was recently created)
+### Fix Design
 
-### Bug 2: Multi-seller notice
+**A. Database: Advisory lock + ON CONFLICT + canonical response**
 
-The notice **does exist** at `CartPage.tsx` line 227: *"Your cart has items from X sellers. Separate orders will be created for each."* It renders when `sellerGroups.length > 1`. This should be visible with the current 2-seller cart. If it's not appearing, it may be scrolled off-screen. I'll verify it's not conditionally hidden, but no code change appears needed here.
+Rewrite `create_multi_vendor_orders` with three layers of protection:
 
-### Implementation
+1. **Advisory lock first**: `pg_advisory_xact_lock(hashtext(_idempotency_key))` at the top of the function. This serializes all requests with the same key — only one executes at a time, eliminating the race condition entirely.
 
-1. **Database migration**: `ALTER FUNCTION` to add 4 new parameters with defaults, update the INSERT to include address_id/lat/lng, add idempotency guard
-2. Verify the `orders` table has `delivery_address_id`, `delivery_lat`, `delivery_lng` columns (they may need to be added too)
+2. **Request-level check before loop**: Query orders matching the base key (existing logic), return immediately if found. This is the fast path for retries.
 
-### Technical Details
+3. **`INSERT ... ON CONFLICT DO NOTHING` per seller**: Replace the `exception when unique_violation` block. After each insert, check `FOUND` — if false, the row already exists (concurrent edge case that slipped past the advisory lock release window).
 
-The migration will `DROP` and recreate the function with the expanded signature. All new params have defaults so existing callers won't break. The idempotency check will look for orders created by the same buyer in the last 30 seconds with matching idempotency key and return the existing order IDs instead of creating duplicates.
+4. **Canonical response at end**: After the loop, always `SELECT array_agg(id) FROM orders WHERE buyer_id = X AND idempotency_key LIKE base_key || ':%'` to return the full, consistent set regardless of which path created them.
+
+5. **Replace unique index**: Drop `idx_orders_idempotency_key`, create `UNIQUE (buyer_id, idempotency_key) WHERE idempotency_key IS NOT NULL` — scopes to buyer.
+
+**B. Client: Never reset key until confirmed success**
+
+In `src/hooks/useCartPage.ts`:
+
+- **Generate key once** when user taps "Place Order" (line 195 — keep this)
+- **On RPC error (line 211-214)**: Do NOT reset the key. Keep `idempotencyKeyRef.current` intact so retry uses the same key and hits the DB dedup path
+- **On business errors** (store_closed, stock_validation, out_of_range): These are returned as `success: false` with no orders created, so reset is safe here (line 219 — keep this)
+- **On confirmed success** (non-deduplicated): Reset key (line 226 — keep this)
+- **On deduplicated success**: Keep key (already correct)
+
+This means: key is only reset when we have definitive proof from the DB that either (a) orders were created fresh, or (b) no orders exist (business rejection).
+
+**C. Quick-reorder edge function**
+
+Already generates unique keys per call (`reorder_${order_id}_${Date.now()}`). No changes needed — each reorder invocation is intentionally a new request.
+
+### Migration SQL (Pseudocode)
+
+```sql
+-- 1. Drop old global unique index
+DROP INDEX IF EXISTS idx_orders_idempotency_key;
+
+-- 2. Create buyer-scoped composite unique constraint  
+CREATE UNIQUE INDEX idx_orders_buyer_idempotency 
+  ON public.orders (buyer_id, idempotency_key) 
+  WHERE idempotency_key IS NOT NULL;
+
+-- 3. Recreate function with:
+--    - pg_advisory_xact_lock(hashtext(_idempotency_key)) at top
+--    - Request-level dedup check (existing logic, kept)
+--    - INSERT ... ON CONFLICT (buyer_id, idempotency_key) DO NOTHING
+--    - IF NOT FOUND → fetch existing order_id for that seller
+--    - Final canonical SELECT to build response
+```
+
+### Client Change (useCartPage.ts)
+
+```typescript
+// Line 211-214: ONLY reset on confirmed no-orders-created errors
+if (error) {
+  // Do NOT reset idempotencyKeyRef — retry must use same key
+  throw error;
+}
+```
+
+### Files Changed
+
+1. **Database migration** — New function + index swap
+2. **`src/hooks/useCartPage.ts`** — Remove key reset on RPC error (line 213)
+
+### Acceptance Criteria Met
+
+- Same request always produces same result (advisory lock + dedup check)
+- System recovers from any failure (key preserved, DB returns existing orders)
+- No duplicate orders ever created (lock + ON CONFLICT)
+- User never sees DB errors (all conflicts handled inside function)
+- Multi-seller orders remain consistent (canonical SELECT at end)
 
