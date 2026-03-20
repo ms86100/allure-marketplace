@@ -125,8 +125,9 @@ export function useOrderDetail(id: string | undefined) {
 
   const fetchOrder = async (cancelled = false) => {
     try {
-      const { data, error } = await supabase.from('orders').select(`*, seller:seller_profiles(id, business_name, user_id, primary_group, profile:profiles!seller_profiles_user_id_fkey(name, phone, block, flat_number)), buyer:profiles!orders_buyer_id_fkey(name, phone, block, flat_number), items:order_items(*)`).eq('id', id).single();
+      const { data, error } = await supabase.from('orders').select(`*, seller:seller_profiles(id, business_name, user_id, primary_group, profile:profiles!seller_profiles_user_id_fkey(name, phone, block, flat_number)), buyer:profiles!orders_buyer_id_fkey(name, phone, block, flat_number), items:order_items(*)`).eq('id', id).maybeSingle();
       if (error) throw error;
+      if (!data) { setOrder(null); return; }
       if (cancelled) return;
       setOrder(data as any);
       if (data?.status && isSuccessfulTerminal(flow, data.status)) {
