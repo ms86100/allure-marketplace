@@ -400,6 +400,22 @@ export default function DeliveryPartnerDashboardPage() {
         </Tabs>
       </div>
       </FeatureGate>
+
+      {/* OTP verification dialog — all delivery completions must go through this */}
+      {otpOrderId && (
+        <DeliveryCompletionOtpDialog
+          orderId={otpOrderId}
+          open={!!otpOrderId}
+          onOpenChange={(open) => { if (!open) setOtpOrderId(null); }}
+          onVerified={() => {
+            setOtpOrderId(null);
+            setActiveTrackingId(null);
+            stopTracking();
+            queryClient.invalidateQueries({ queryKey: ['my-deliveries'] });
+            queryClient.invalidateQueries({ queryKey: ['pending-deliveries'] });
+          }}
+        />
+      )}
     </AppLayout>
   );
 }
