@@ -384,9 +384,9 @@ export function useLiveActivityOrchestrator(): void {
     return () => clearInterval(intervalId);
   }, [userId]);
 
-  // ── Visibility change: immediate sync when user returns to tab/webview ──
+  // ── Visibility change: immediate sync when user returns to tab/webview (web + native) ──
   useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
+    if (!userId) return;
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && mountedRef.current) {
