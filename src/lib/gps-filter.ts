@@ -72,19 +72,26 @@ export function filterGPSPoint(
     };
   }
 
-  // Teleport rejection: compute implied speed
+  // Bug 4 fix: Reject out-of-order points (timeDiff <= 0)
   const timeDiffMs =
     new Date(point.recorded_at).getTime() -
     new Date(lastAccepted.recorded_at).getTime();
-  if (timeDiffMs > 0) {
-    const impliedSpeedKmh = (distMeters / 1000) / (timeDiffMs / 3600000);
-    if (impliedSpeedKmh > config.gps_max_speed_kmh) {
-      return {
-        accepted: false,
-        filtered: { ...point, latitude: smoothedLat, longitude: smoothedLng },
-        newState: state,
-      };
-    }
+  if (timeDiffMs <= 0) {
+    return {
+      accepted: false,
+      filtered: { ...point, latitude: smoothedLat, longitude: smoothedLng },
+      newState: state,
+    };
+  }
+
+  // Teleport rejection: compute implied speed
+  const impliedSpeedKmh = (distMeters / 1000) / (timeDiffMs / 3600000);
+  if (impliedSpeedKmh > config.gps_max_speed_kmh) {
+    return {
+      accepted: false,
+      filtered: { ...point, latitude: smoothedLat, longitude: smoothedLng },
+      newState: state,
+    };
   }
 
   // Exponential smoothing

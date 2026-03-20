@@ -78,6 +78,10 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
   const lastRealtimeAt = useRef<number>(0);
   // Track channel health
   const channelDegraded = useRef(false);
+  // Bug 15 fix: dedup guard for location timestamps
+  const seenLocationTimestamps = useRef(new Set<string>());
+  // Bug 10 fix: track current status for adaptive polling
+  const currentStatusRef = useRef<string | null>(null);
 
   // Pre-load config
   useEffect(() => {
