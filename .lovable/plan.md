@@ -1,35 +1,74 @@
 
 
-## Status: The fix IS now universally applied
+# Fix: Notifications, Live Activity Updates, Navigation & Rider Icon
 
-### Evidence from your own session
+## Problems Identified
 
-The network logs show the RPC call at **08:45:14** failed with the OTP error. This was the last request **before** the migration was deployed. Your session replay at **08:46:12** shows the exact same order completing successfully with the message "Delivery verified and completed" — proving the fix is now live and working.
+### 1. Premature Proximity Notifications
+**Evidence**: Notification queue for order `7f66fa5f` shows both "Almost there!" and "Driver arriving now!" fired at `08:58:04` — just 22 seconds after the order was placed (`08:57:42`), while the order was still at "Accepted" stage.
 
-### Why it happened one more time
+**Root cause**: The `update-delivery-location` edge function fires proximity notifications based solely on **assignment status** (`picked_up`, `on_the_way`, `at_gate`) without checking the **order's workflow stage**. For seller-delivery orders, the seller IS the delivery partner and is already physically close (171m in a housing society). The assignment auto-enters `picked_up` immediately, so the first GPS update triggers proximity alerts while the buyer just placed the order.
 
-The migration I deployed (`20260320084807`) replaced the `verify_delivery_otp_and_complete` function to set `app.otp_verified = 'true'` **before** updating tables. The 08:45:14 call hit the **old** function (before the migration propagated). The retry hit the **new** function and succeeded.
+**Additional bug**: Both the `<500m` and `<200m` proximity checks fire in the same function call because 171m satisfies both conditions simultaneously — causing duplicate notifications.
 
-### Current state of the system — all paths are locked down
+### 2. Live Activity Card Stuck
+**Root cause**: The `useLiveActivityOrchestrator` subscribes to `orders` table changes and calls `buildLiveActivityData`, which fetches `category_status_flows` entries filtered to `cart_purchase` and `seller_delivery`. The `liveActivitySync` also uses this filter. The issue is the `syncActiveOrders` function and the realtime handler both call `LiveActivityManager.push()` but the native bridge may be silently failing or the initial hydration on mount races with the realtime subscription setup. The `doSync` on mount only runs once, but `flowEntriesRef` may still be empty when the first realtime event arrives (race between `fetchFlowEntries` and the order update).
 
-1. **Trigger on `orders` table** (`enforce_delivery_otp_gate`): Blocks any direct `status → delivered` unless `app.otp_verified = 'true'` is set in the transaction
-2. **Trigger on `delivery_assignments` table** (`enforce_delivery_assignment_otp_gate`): Same guard for the assignment table
-3. **The RPC** (`verify_delivery_otp_and_complete`): Sets `app.otp_verified = 'true'` FIRST, then updates both tables atomically, then resets the flag
-4. **No sync trigger** exists from `delivery_assignments → orders` that could bypass the gate — only `orders → delivery_assignments` sync exists
+### 3. Navigation Trap on Order Detail
+**Root cause**: The back button uses `navigate('/orders')` which should work. However, looking at `AppLayout`, when `showNav` is false (which happens for seller view on non-terminal orders), AND if the user navigates to this page from a live activity deep link or external source, the navigation stack may not have `/orders` in history. The `navigate('/orders')` call should still work as an absolute navigation. Need to check if there's a conditional rendering issue blocking the back button or if an error boundary is trapping the page.
 
-### Can this error happen again?
+### 4. Rider Icon Clarity
+**Root cause**: The current SVG icon is a 48x48 custom illustration with tiny details (4px text for "Sociva", small scooter body, thin strokes) that become illegible at map zoom levels. The bag branding text is 4px font-size which is essentially invisible.
 
-**No**, for orders going through the normal OTP verification flow. Here's why:
+---
 
-- The only way to transition an order to `delivered` is through the RPC (triggers block all other paths)
-- The RPC sets the flag before the updates (verified in the live database)
-- The frontend's `OrderDetailPage` and `DeliveryPartnerDashboardPage` both route through the OTP dialog which calls the RPC
+## Implementation Plan
 
-**One remaining edge case**: The `manage-delivery` edge function's `handleComplete` action (used for platform/3PL deliveries) still directly updates `delivery_assignments.status = 'delivered'` and `orders.status = 'delivered'` **without** setting `app.otp_verified`. This path uses its own OTP verification but does NOT set the session flag, so it **will fail** against the new triggers.
+### Phase 1: Fix Proximity Notifications (Edge Function)
 
-### Plan: Fix the edge function path
+**File**: `supabase/functions/update-delivery-location/index.ts`
 
-Update `supabase/functions/manage-delivery/index.ts` `handleComplete` to call the RPC instead of doing direct updates, OR have the edge function use the service role to set the config flag before its updates. Since the edge function uses the service role client, the cleanest fix is to have it call the RPC or execute a raw SQL `SELECT set_config(...)` before its updates.
+- **Add order status guard**: Before sending proximity notifications, fetch the order's current status and only send if the order is in an actual transit stage (`on_the_way`, `at_gate`, or later delivery stages). This prevents notifications when the order is still at `accepted` or `preparing`.
+- **Make proximity tiers mutually exclusive**: If distance < 200m, send ONLY the "imminent" notification, skip the "nearby" one. Currently both fire because the code checks `<500` then independently checks `<200`.
+- **Add minimum order age guard**: Don't send proximity notifications if the order was placed less than 2 minutes ago (prevents false proximity for seller-delivery where seller is already near the buyer).
 
-This is the **last remaining unsafe path**. After fixing it, there will be zero ways to hit this error from any part of the system.
+### Phase 2: Fix Live Activity Not Updating
+
+**File**: `src/hooks/useLiveActivityOrchestrator.ts`
+
+- **Fix race condition**: Ensure `flowEntriesRef` is populated BEFORE subscribing to realtime channels. Currently `fetchFlowEntries()` is async but the subscription starts immediately without awaiting it.
+- **Add order-aware sync on status change**: When a realtime order update arrives, pass the full order status to `buildLiveActivityData`. The current code already does this, but the flow map may be empty. Add a fallback: if `flowEntriesRef.current` is empty when a realtime event fires, fetch entries inline before building the activity data.
+
+**File**: `src/services/liveActivitySync.ts`
+
+- **Force flow entry refresh on sync**: If `cachedFlowEntries` is null or empty, always fetch fresh data before building activity payloads. The current 10-minute cache expiry is too long for first-load scenarios.
+
+### Phase 3: Fix Navigation Trap
+
+**File**: `src/pages/OrderDetailPage.tsx`
+
+- **Change back button to use reliable navigation**: Replace `navigate('/orders')` with a fallback pattern: try `navigate(-1)` first, but if there's no history (e.g., deep link entry), fall back to `navigate('/orders', { replace: true })`. This ensures the user can always exit.
+- **Verify AppLayout showNav logic**: Ensure `showNav` is true for buyer view in all order states so the bottom nav remains accessible as an escape route.
+
+### Phase 4: Improve Rider Icon
+
+**File**: `src/components/delivery/DeliveryMapView.tsx`
+
+- **Redesign the SVG rider icon** to be clearer at small sizes:
+  - Larger, bolder scooter silhouette with thicker strokes
+  - Bigger, more visible delivery bag with "S" logo instead of full "Sociva" text (text at 4px is illegible)
+  - Higher contrast colors: solid primary fill for bag, white "S" letter
+  - Increase icon size to 56x56 for better visibility
+  - Add a subtle directional arrow/chevron to show heading more clearly
+  - Remove overly detailed elements (wheel hub caps, thin handlebars) that become visual noise at map scale
+
+### Summary of File Changes
+
+| File | Change |
+|------|--------|
+| `supabase/functions/update-delivery-location/index.ts` | Add order status guard for proximity notifications; make proximity tiers exclusive |
+| `src/hooks/useLiveActivityOrchestrator.ts` | Fix flow entries race condition; add inline fallback fetch |
+| `src/services/liveActivitySync.ts` | Force fresh flow entries on first sync |
+| `src/pages/OrderDetailPage.tsx` | Fix back button navigation reliability |
+| `src/components/delivery/DeliveryMapView.tsx` | Redesign rider icon SVG for clarity and branding |
 
