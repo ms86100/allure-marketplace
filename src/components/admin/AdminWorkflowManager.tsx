@@ -274,7 +274,7 @@ export function AdminWorkflowManager() {
 
                 <div className="space-y-2">
                   {editSteps.map((step, index) => (
-                    <div key={index} className="bg-muted/40 rounded-xl p-3 space-y-2 border border-border/50">
+                    <div key={index} className={cn("bg-muted/40 rounded-xl p-3 space-y-2 border border-border/50", (step as any).is_deprecated && "opacity-60 border-amber-300/50 bg-amber-50/30 dark:bg-amber-900/10")}>
                       <div className="flex items-center gap-2">
                         <div className="flex flex-col gap-0.5">
                           <button onClick={() => moveStep(index, 'up')} disabled={index === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30 text-xs">▲</button>
