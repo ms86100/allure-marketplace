@@ -150,7 +150,7 @@ export function useOrderDetail(id: string | undefined) {
       });
       if (error) throw error;
       setOrder({ ...order, status: newStatus });
-      toast.success(`Order ${getOrderStatus(newStatus).label.toLowerCase()}`, { id: `order-${order.id}-update` });
+      supabase.functions.invoke('process-notification-queue').catch(() => {});
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus });
     } catch (error: any) {
@@ -185,7 +185,7 @@ export function useOrderDetail(id: string | undefined) {
         return;
       }
       setOrder({ ...order, ...updateData });
-      toast.success(`Order ${getOrderStatus(newStatus).label.toLowerCase()}`, { id: `order-${order.id}-update` });
+      // Toast removed — status reflected in UI
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus, rejection_reason: rejectionReason });
     } catch (error: any) {
@@ -196,7 +196,7 @@ export function useOrderDetail(id: string | undefined) {
   };
 
   const handleReject = async (reason: string) => { await updateOrderStatus('cancelled', reason); };
-  const handleTimeout = () => { fetchOrder(); toast.error('Order was auto-cancelled due to timeout', { id: `order-${id}-timeout` }); };
+  const handleTimeout = () => { fetchOrder(); };
 
   const isBuyerView = order ? order.buyer_id === user?.id : false;
   const nextStatus = getNextStatus();

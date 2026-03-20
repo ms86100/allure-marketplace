@@ -59,12 +59,15 @@ export function useLiveActivityOrchestrator(): void {
 
   // ── Initial sync + diagnostics ──
   useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
+    if (!userId) return;
+    const isNative = Capacitor.isNativePlatform();
     mountedRef.current = true;
 
-    runLiveActivityDiagnostics(true).then((diag) => {
-      console.log(TAG, 'Diagnostics:', JSON.stringify(diag));
-    });
+    if (isNative) {
+      runLiveActivityDiagnostics(true).then((diag) => {
+        console.log(TAG, 'Diagnostics:', JSON.stringify(diag));
+      });
+    }
 
     // Ensure flow entries & terminal statuses are loaded BEFORE first sync
     Promise.all([
@@ -81,7 +84,8 @@ export function useLiveActivityOrchestrator(): void {
 
   // ── Realtime: order status changes (with auto-reconnect) ──
   useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
+    if (!userId) return;
+    const isNative = Capacitor.isNativePlatform();
 
     let retryCount = 0;
     let channelRef: ReturnType<typeof supabase.channel> | null = null;
@@ -96,7 +100,7 @@ export function useLiveActivityOrchestrator(): void {
 
       if (terminalStatusesCache.has(newStatus)) {
         activeOrderIdsRef.current.delete(orderId);
-        await LiveActivityManager.end(orderId);
+        if (isNative) await LiveActivityManager.end(orderId);
         return;
       }
 
@@ -144,7 +148,7 @@ export function useLiveActivityOrchestrator(): void {
         sellerLogoUrl,
         delivery?.eta_minutes ?? null,
       );
-      await LiveActivityManager.push(activityData);
+      if (isNative) await LiveActivityManager.push(activityData);
     };
 
     const subscribe = () => {
@@ -204,7 +208,8 @@ export function useLiveActivityOrchestrator(): void {
 
   // ── Realtime: delivery assignment INSERT + UPDATE (with order ID filtering) ──
   useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
+    if (!userId) return;
+    const isNative = Capacitor.isNativePlatform();
 
     let retryCount = 0;
     let channelRef: ReturnType<typeof supabase.channel> | null = null;
@@ -254,7 +259,7 @@ export function useLiveActivityOrchestrator(): void {
           rider_name: row?.rider_name,
           vehicle_type: null,
         }, sellerName, itemCountRes.count ?? null, flowEntriesRef.current, sellerLogoUrl, row?.eta_minutes ?? null);
-        await LiveActivityManager.push(data);
+        if (isNative) await LiveActivityManager.push(data);
       } catch { /* best-effort */ }
     };
 
@@ -318,9 +323,10 @@ export function useLiveActivityOrchestrator(): void {
     };
   }, [userId, doSync]);
 
-  // ── Polling heartbeat: safety net for dead realtime connections ──
+  // ── Polling heartbeat: safety net for dead realtime connections (web + native) ──
   useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
+    if (!userId) return;
+    const isNative = Capacitor.isNativePlatform();
 
     const POLL_INTERVAL_MS = 15_000; // 15 seconds — tighter safety net
     /** Last-known statuses to avoid redundant processing */
@@ -342,7 +348,7 @@ export function useLiveActivityOrchestrator(): void {
           // All orders are terminal — end any lingering Live Activities
           for (const [orderId] of lastKnownRef) {
             console.log(TAG, `Polling: order ${orderId} no longer active, ending LA`);
-            await LiveActivityManager.end(orderId);
+            if (isNative) await LiveActivityManager.end(orderId);
           }
           lastKnownRef.clear();
           return;
@@ -353,7 +359,7 @@ export function useLiveActivityOrchestrator(): void {
         for (const [orderId] of lastKnownRef) {
           if (!activeIds.has(orderId)) {
             console.log(TAG, `Polling: order ${orderId} became terminal, ending LA`);
-            await LiveActivityManager.end(orderId);
+            if (isNative) await LiveActivityManager.end(orderId);
             lastKnownRef.delete(orderId);
           }
         }
@@ -378,9 +384,9 @@ export function useLiveActivityOrchestrator(): void {
     return () => clearInterval(intervalId);
   }, [userId]);
 
-  // ── Visibility change: immediate sync when user returns to tab/webview ──
+  // ── Visibility change: immediate sync when user returns to tab/webview (web + native) ──
   useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
+    if (!userId) return;
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && mountedRef.current) {
@@ -395,13 +401,14 @@ export function useLiveActivityOrchestrator(): void {
 
   // ── Push-driven terminal sync: closes the Realtime-failure gap ──
   useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
+    if (!userId) return;
+    const isNative = Capacitor.isNativePlatform();
 
     const handler = async (e: Event) => {
       const { orderId, status } = (e as CustomEvent).detail;
       console.log(TAG, 'Push-driven terminal sync:', orderId, status);
       activeOrderIdsRef.current.delete(orderId);
-      await LiveActivityManager.end(orderId);
+      if (isNative) await LiveActivityManager.end(orderId);
       // Small delay to let DB settle, then sync
       setTimeout(() => doSync(), 300);
     };

@@ -105,9 +105,9 @@ export default function OrderDetailPage() {
           if (error) { console.warn('Assignment fetch error:', error.message); return; }
           if (data) setDeliveryAssignmentId(data.id);
           else {
-            // Retry up to 5 times with increasing delay when order is in delivery stages
-            if (assignmentRetryCount < 5) {
-              const delay = Math.min(2000 * (assignmentRetryCount + 1), 8000);
+            // Retry up to 10 times with increasing delay when order is in delivery stages
+            if (assignmentRetryCount < 10) {
+              const delay = Math.min(1500 * (assignmentRetryCount + 1), 15000);
               setTimeout(() => setAssignmentRetryCount(c => c + 1), delay);
             }
           }
@@ -185,7 +185,7 @@ export default function OrderDetailPage() {
       <div className="pb-28">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
-          <button onClick={() => { if (window.history.length > 1) { navigate(-1); } else { navigate('/orders', { replace: true }); } }} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></button>
+          <button onClick={() => navigate('/orders')} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></button>
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold">Order Summary</h1>
             <button onClick={o.copyOrderId} className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono">#{order.id.slice(0, 8)} <Copy size={10} /></button>
