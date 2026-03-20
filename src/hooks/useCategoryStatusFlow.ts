@@ -5,6 +5,7 @@ import { resolveTransactionType } from '@/lib/resolveTransactionType';
 export interface StatusFlowStep {
   status_key: string;
   sort_order: number;
+  is_deprecated?: boolean;
   actor: string;
   is_terminal: boolean;
   is_success: boolean;
