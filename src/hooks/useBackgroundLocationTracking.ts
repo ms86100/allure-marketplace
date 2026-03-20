@@ -55,9 +55,21 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
   // ─── Network layer ───────────────────────────────────────
 
   const postLocation = useCallback(async (payload: QueuedLocationPayload) => {
-    await supabase.functions.invoke('update-delivery-location', {
+    const { data, error } = await supabase.functions.invoke('update-delivery-location', {
       body: payload,
     });
+    // If the server says delivery is no longer active, stop tracking immediately
+    if (error) {
+      let errorBody: any = null;
+      try {
+        errorBody = typeof error === 'object' && error.context ? await error.context.json?.() : null;
+      } catch { /* ignore */ }
+      const msg = errorBody?.error || (typeof data === 'object' ? data?.error : '') || '';
+      if (msg === 'Delivery is no longer active') {
+        console.log('[LocationTracking] Delivery terminal — auto-stopping');
+        throw new Error('DELIVERY_TERMINAL');
+      }
+    }
   }, []);
 
   const flushQueue = useCallback(async () => {
