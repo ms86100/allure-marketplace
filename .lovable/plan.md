@@ -1,78 +1,51 @@
 
 
-# Audit: Notification & Live Activity Sync with Status Flow
+# Fix: Type Mismatch in Notification Trigger Crashing Order Updates
 
-## Current State
+## Root Cause
 
-### ✅ What IS properly synced with `category_status_flows`
+The database error log reveals the exact problem:
 
-| Component | Synced Field | How |
-|-----------|-------------|-----|
-| **Live Activity Card** (native) | `display_label`, `sort_order`, `buyer_hint` | `buildLiveActivityData` reads from `category_status_flows` |
-| **ActiveOrderStrip** (home page) | `display_label`, `color`, `icon` | Fetches flow data per status on each query |
-| **Silent push flag** | `silent_push` column | DB trigger reads `csf.silent_push` from flow table |
-| **Terminal detection** | `is_terminal` column | Used by orchestrator, strip, and trigger |
-
-### ❌ What is NOT synced — hardcoded in the DB trigger
-
-The `fn_enqueue_order_status_notification` trigger has a **hardcoded CASE statement** (lines 63–129) for notification titles and bodies:
-
-```sql
-CASE NEW.status
-  WHEN 'accepted' THEN v_title := '✅ Order Accepted!'; v_body := '...';
-  WHEN 'preparing' THEN v_title := '👨‍🍳 Being Prepared'; v_body := '...';
-  -- ... etc for every status
+```
+WARNING: fn_enqueue_order_status_notification failed for order f1d7cdc1-...:
+  operator does not exist: service_category = text
 ```
 
-Meanwhile, the `category_status_flows` table already has **configurable columns** that are populated but **completely ignored**:
-- `notification_title` — e.g. "✅ Order Accepted!"
-- `notification_body` — e.g. "{seller_name} has accepted your order."
-- `notify_buyer` — flag to control whether a notification fires at all
+The migration we just deployed (`20260320093032`) introduced a join in the notification trigger:
 
-This means: if you update notification text in the admin workflow editor, **nothing changes** in actual push notifications. The trigger ignores those columns.
+```sql
+JOIN public.category_config cc ON cc.category = p.category
+```
 
-### ❌ Edge function delivery notifications
+`category_config.category` is type `service_category` (enum), while `products.category` is type `text`. PostgreSQL cannot compare an enum to text without an explicit cast. This causes the trigger to fail on **every** order status update.
 
-The `update-delivery-location` edge function sends its own hardcoded notifications for:
-- `delivery_en_route` — "🛵 Your order is on the way!"
-- `delivery_proximity` — "📍 Almost there!"
-- `delivery_proximity_imminent` — "🏃 Driver arriving now!"
-- `delivery_delayed` — "🔄 Delivery slightly delayed"
-- `delivery_stalled` — "⏳ Delivery may be delayed"
+While the trigger has `EXCEPTION WHEN OTHERS THEN RETURN NEW` (so the UPDATE itself succeeds at the DB level), the `v_listing_type` variable remains NULL, which means `v_transaction_type` falls through to `'self_fulfillment'` instead of the correct type. This causes the flow lookup to find no matching `notification_title`, so the trigger exits early without enqueuing any notification and — critically — without cleaning up `live_activity_tokens` for terminal states.
 
-These are **not status-change notifications** — they're GPS-triggered supplementary alerts. They correctly have order status + age guards. These don't need to come from the flow table (they're delivery-specific, not workflow-specific).
+The order itself (`f1d7cdc1`) ended up `cancelled` by the 3-minute auto-cancel timer, confirming the seller likely tried to accept but the UI may not have reflected the update (no notification queued → no push → no live activity sync).
 
-## What Needs to Change
+## Fix
 
-**One fix**: Make the DB trigger use the flow table's `notify_buyer`, `notification_title`, and `notification_body` columns instead of the hardcoded CASE block. This makes the entire notification pipeline DB-driven and admin-editable.
+**One SQL migration** — cast `p.category` to `service_category` in the trigger's join:
 
-### Implementation
+**File**: New SQL migration
 
-**Migration**: Replace `fn_enqueue_order_status_notification`
+Change line 58 of the trigger function from:
+```sql
+JOIN public.category_config cc ON cc.category = p.category
+```
+to:
+```sql
+JOIN public.category_config cc ON cc.category = p.category::service_category
+```
 
-1. Remove the hardcoded CASE block (lines 63–129)
-2. Query `category_status_flows` for the matching status to get `notify_buyer`, `notification_title`, `notification_body`
-3. If `notify_buyer = false` or no matching row → skip buyer notification
-4. Replace `{seller_name}` placeholder in `notification_body` with `v_seller_name`
-5. Keep the existing seller notification logic for `completed` status
-6. Keep `silent_push`, terminal detection, and dedup logic unchanged
+This is a single-line fix that resolves the type mismatch and restores correct `transaction_type` resolution for all order status notifications.
 
-### Result After Fix
+## Impact
 
-| Signal | Source | DB-Driven? |
-|--------|--------|-----------|
-| Push notification title/body | `category_status_flows.notification_title/body` | ✅ |
-| Whether to notify buyer | `category_status_flows.notify_buyer` | ✅ |
-| Silent vs audible push | `category_status_flows.silent_push` | ✅ (already) |
-| Live Activity label/progress | `category_status_flows.display_label/sort_order` | ✅ (already) |
-| ActiveOrderStrip label/color | `category_status_flows.display_label/color/icon` | ✅ (already) |
-| GPS delivery alerts | Edge function (hardcoded, status-gated) | N/A (correct) |
-
-### Files Changed
-
-| File | Change |
-|------|--------|
-| New SQL migration | Replace `fn_enqueue_order_status_notification` to read from flow table |
-
-No frontend changes needed — the client-side components are already properly synced.
+| Before Fix | After Fix |
+|-----------|-----------|
+| Trigger fails silently on every status change | Trigger resolves transaction_type correctly |
+| No push notifications sent for any order | Push notifications sent per flow config |
+| live_activity_tokens not cleaned on terminal | Terminal cleanup works |
+| Seller/buyer don't get real-time push updates | Full notification pipeline restored |
 
