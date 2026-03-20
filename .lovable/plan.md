@@ -1,88 +1,108 @@
 
 
-## Critical Audit Results: Category ↔ Workflow Mapping (Phase 1.5)
+## Plan: Lean Category-Specific Workflows (with Guardrails)
 
-### Overall Verdict: MINOR ISSUES + 1 CRITICAL (pre-existing)
+### Live Order Safety Assessment
 
-Phase 1.5 itself is **clean and non-regressive**. However, the audit exposed a pre-existing critical bug that the new visibility layer now makes obvious.
+Current non-terminal orders in service/request flows:
+- 1 booking order in `confirmed` state — **SAFE** (kept in all new flows)
+- 1 enquiry order in `quoted` state — **SAFE** (kept in trimmed request_service)
 
----
+No orders exist in `preparing`, `ready`, `scheduled`, or `in_progress` for these flows, so trimming is safe today. But we still add a compatibility layer.
 
-### CRITICAL: `book_slot` transaction_type has ZERO flow rows
+### Strategy: Soft Deprecation, Not Hard Deletion
 
-**Severity:** CRITICAL (pre-existing, not caused by Phase 1.5)
+Old steps (`preparing`, `ready`, `scheduled`, `in_progress`, `rescheduled`) will NOT be deleted from default flows. Instead:
+1. Mark them `is_terminal = false` with a new `is_deprecated` flag (add column)
+2. Remove their outgoing transitions (so no NEW orders enter them)
+3. Add escape transitions FROM deprecated states → nearest valid state (so stuck orders can exit)
+4. New orders follow the lean path; old orders gracefully drain
 
-**Root cause:** `resolveTransactionType` returns `'book_slot'` for enquiry orders in `classes`/`events` parent groups (line 19). The DB trigger in `fn_enqueue_order_status_notification` also uses `'book_slot'` (migration line 88). But `category_status_flows` has **zero rows** where `transaction_type = 'book_slot'`. The only service workflow is `service_booking`.
+### Changes
 
-**Impact:**
-- Classes/events enquiry orders get **empty flow** — no status timeline, no valid transitions
-- Notification trigger silently fails to find the flow step → `v_silent` is null → notifications may fire incorrectly
-- Admin preview shows `service_booking` (correct via DB map), but runtime uses `book_slot` (broken) — **config ↔ reality drift**
+**1. DB Schema: Add `is_deprecated` column**
 
-**Fix (2 options, recommend Option A):**
-1. **Option A — Fix resolver:** Change `resolveTransactionType` line 19 from `return 'book_slot'` to `return 'service_booking'`. Update the DB trigger CASE similarly. This aligns runtime with DB map.
-2. **Option B — Add rows:** Insert `book_slot` flows into `category_status_flows` as copies of `service_booking`. Creates duplication.
+```sql
+ALTER TABLE category_status_flows ADD COLUMN is_deprecated BOOLEAN DEFAULT false;
+```
 
-Also update `TRANSACTION_TYPES` in `src/components/admin/workflow/types.ts` — it already lists `book_slot` as a valid type, but no flows exist for it.
+This lets the UI hide deprecated steps from new order timelines while keeping them valid for existing orders.
 
----
+**2. New `contact_enquiry` workflow (4 steps)**
 
-### HIGH: Edge functions use hardcoded transaction_type lists
+| Step | Actor | Terminal | Label |
+|------|-------|----------|-------|
+| contacted | buyer | no | Contacted |
+| responded | seller | no | Responded |
+| completed | system | yes | Completed |
+| cancelled | buyer | yes | Cancelled |
 
-**Severity:** HIGH
+Transitions: contacted→responded (seller), contacted→cancelled (buyer/seller), responded→completed (seller/buyer), responded→cancelled (buyer/seller).
 
-**Files:** `supabase/functions/update-live-activity-apns/index.ts` (line 108), `supabase/functions/update-delivery-location/index.ts` (line 61)
+**3. Trim default `service_booking` (keep 5 active, deprecate 3)**
 
-Both hardcode `.in('transaction_type', ['cart_purchase', 'seller_delivery'])` instead of querying all relevant types. If new workflow types are added, these functions silently miss them.
+Active path: requested → confirmed → completed / no_show / cancelled
 
-**Fix:** Either query all non-terminal statuses without filtering by transaction_type, or query `listing_type_workflow_map` to get the full set of workflow keys.
+Deprecated (kept but no inbound transitions for new orders):
+- `rescheduled` — escape: rescheduled→confirmed (seller)
+- `scheduled` — escape: scheduled→confirmed (seller)  
+- `in_progress` — escape: in_progress→completed (seller)
 
----
+New transitions: requested→confirmed (seller), confirmed→completed (seller/buyer), confirmed→no_show (seller), confirmed→cancelled (buyer/seller/admin), requested→cancelled (buyer/seller/admin).
 
-### MEDIUM: Static fallback map could drift from DB
+**4. Trim default `request_service` (keep 6 active, deprecate 2)**
 
-**Severity:** MEDIUM
+Active path: enquired → quoted → accepted → completed / cancelled / no_show
 
-`src/lib/listingTypeWorkflowMap.ts` has `LISTING_TYPE_TO_WORKFLOW_FALLBACK` which is used when DB map hasn't loaded yet. If an admin adds a new listing type to the DB table, the fallback won't have it.
+Deprecated (kept but no inbound transitions):
+- `preparing` — escape: preparing→completed (seller)
+- `ready` — escape: ready→completed (seller)
 
-**Current mitigation:** Fallback defaults to `'cart_purchase'` which is safe. Comments clearly mark it as fallback-only. **Acceptable risk** — no fix needed now, but worth noting.
+New transitions: accepted→completed (seller), accepted→cancelled (buyer/admin).
 
----
+**5. Frontend: Hide deprecated steps from new order UI**
 
-### MEDIUM: `FULFILLMENT_DEPENDENT_TYPES` set is unused
+Update `useCategoryStatusFlow` to filter `is_deprecated = true` steps from timeline display for NEW orders, but show them for orders currently IN those states.
 
-**Severity:** MEDIUM (dead code)
+**6. Full `contact_enquiry` system propagation**
 
-`FULFILLMENT_DEPENDENT_TYPES` in `listingTypeWorkflowMap.ts` is defined but never imported anywhere. The conditional logic in `CategoryWorkflowPreview` uses `is_conditional` from DB instead (correct).
+| System | Change |
+|--------|--------|
+| `resolveTransactionType.ts` | Add contact_only → `contact_enquiry` resolution |
+| `listing_type_workflow_map` (DB) | Update `contact_only` row: workflow_key = `contact_enquiry` |
+| `validate_transaction_type` trigger | Add `contact_enquiry` to allowed values |
+| `fn_enqueue_order_status_notification` | Add CASE for `contact_enquiry` |
+| `buyer_advance_order` RPC | Add `contact_enquiry` to allowed transaction types |
+| `statusFlowCache.ts` | Add `contact_enquiry` to `.in()` filter |
+| `src/components/admin/workflow/types.ts` | Add to TRANSACTION_TYPES |
+| `listingTypeWorkflowMap.ts` fallback | Update `contact_only` → `contact_enquiry` |
 
-**Fix:** Remove dead code.
+**7. Parent group override consistency**
 
----
+Parent group overrides (domestic_help, home_services, personal_care, etc.) remain UNTOUCHED — they have their own extended flows with on_the_way/arrived/in_progress which are genuinely needed.
 
-### Section-by-Section Confirmations
+The `CategoryWorkflowPreview` already shows override vs default via the determinism badge system from Phase 1.5, so admins have full visibility.
 
-| Section | Status | Notes |
-|---------|--------|-------|
-| 1. Source of Truth | **PASS** | DB table is canonical. Static map correctly marked fallback-only. No duplication in hooks/components. |
-| 2. Runtime Consistency | **FAIL** | `book_slot` divergence (see CRITICAL above) |
-| 3. Backward Compatibility | **PASS** | All existing flows (cart, buy_now, request, booking) unaffected. Phase 1.5 only added read-only admin visibility. |
-| 4. Silent Failures | **PASS with caveat** | Fallback to `'cart_purchase'` is safe. `book_slot` issue is pre-existing. Preview correctly shows "Fallback" badge when no workflow found. |
-| 5. WorkflowLinkage | **PASS** | `book_slot` → `service_booking`, `request_quote` → `request_service`, `schedule_visit` → `service_booking` all correctly resolved via DB map. |
-| 6. Preview Accuracy | **PASS** | Determinism badges work correctly. Conditional flag used for `cart_purchase`/`buy_now`. |
-| 7. Audit Trail | **PASS** | Query joins `orders` → `order_items` → `products.category` correctly. Shows `order_type` and `fulfillment_type`. |
-| 8. Performance | **PASS** | Single query cached 10min with jitter. No N+1. Preview uses per-category `useEffect` with proper deps. |
-| 9. Data Integrity | **PASS** | `listing_type` is PK (unique). `validate_transaction_type` trigger guards valid values. RLS allows authenticated read. |
-| 10. E2E Contract | **FAIL for book_slot only** | All other listing types have complete flow coverage. |
+### Files Changed
 
----
+| File | Change |
+|------|--------|
+| DB migration | Add `is_deprecated` column; insert `contact_enquiry` flow + transitions; mark deprecated steps; update escape transitions |
+| DB data (insert tool) | Update default service_booking + request_service transitions; update listing_type_workflow_map |
+| `src/lib/resolveTransactionType.ts` | Add contact_only → contact_enquiry |
+| `src/lib/listingTypeWorkflowMap.ts` | Update fallback map |
+| `src/components/admin/workflow/types.ts` | Add contact_enquiry |
+| `src/services/statusFlowCache.ts` | Add contact_enquiry to filter |
+| `src/hooks/useCategoryStatusFlow.ts` | Filter deprecated steps from timeline for new orders |
+| `src/components/admin/AdminWorkflowManager.tsx` | Show deprecated badge on deprecated steps |
 
-### Recommended Actions (Priority Order)
+### Validation Checklist
 
-1. **CRITICAL FIX:** Change `resolveTransactionType` to return `'service_booking'` instead of `'book_slot'` for classes/events enquiries. Update the DB trigger CASE expression to match. This eliminates the config ↔ runtime divergence.
-
-2. **HIGH FIX:** Update edge functions to not hardcode transaction_type lists, or at minimum add `service_booking` and `self_fulfillment` to the existing filters.
-
-3. **CLEANUP:** Remove `FULFILLMENT_DEPENDENT_TYPES` dead code.
-
-4. **OPTIONAL:** Add a DB constraint or trigger on `listing_type_workflow_map.workflow_key` to validate it exists in `category_status_flows`.
+- No steps are deleted — only deprecated
+- Every deprecated step has an escape transition to a valid state
+- Every active step has entry and exit paths
+- No dead ends or orphan states
+- contact_enquiry covered in all 8 system touchpoints
+- Existing 2 live orders unaffected (both in active states)
+- Parent group overrides unchanged
 
