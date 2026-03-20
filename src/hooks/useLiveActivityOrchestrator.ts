@@ -401,7 +401,8 @@ export function useLiveActivityOrchestrator(): void {
 
   // ── Push-driven terminal sync: closes the Realtime-failure gap ──
   useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
+    if (!userId) return;
+    const isNative = Capacitor.isNativePlatform();
 
     const handler = async (e: Event) => {
       const { orderId, status } = (e as CustomEvent).detail;
