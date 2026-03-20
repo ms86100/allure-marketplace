@@ -150,6 +150,7 @@ export function useOrderDetail(id: string | undefined) {
       });
       if (error) throw error;
       setOrder({ ...order, status: newStatus });
+      // Toast removed — status reflected in UI
       toast.success(`Order ${getOrderStatus(newStatus).label.toLowerCase()}`, { id: `order-${order.id}-update` });
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus });
