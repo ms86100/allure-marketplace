@@ -203,7 +203,7 @@ export function ServiceBookingFlow({
 
       if (itemErr) {
         // Bug 13 fix: Use buyer_cancel_order RPC instead of client-side delete (RLS blocks DELETE)
-        await supabase.rpc('buyer_cancel_order', { _order_id: order.id, _reason: 'booking_setup_failed' }).catch(() => {});
+        try { await supabase.rpc('buyer_cancel_order', { _order_id: order.id, _reason: 'booking_setup_failed' }); } catch {}
         throw itemErr;
       }
 
