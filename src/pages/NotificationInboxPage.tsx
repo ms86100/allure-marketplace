@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { resolveNotificationRoute } from '@/lib/notification-routes';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
