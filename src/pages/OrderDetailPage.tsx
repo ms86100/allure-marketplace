@@ -89,37 +89,48 @@ export default function OrderDetailPage() {
   }, [orderId, order?.status]);
 
   // Gap A: Fetch delivery OTP for buyer display
+  // Resilient assignment hydration: fetch + subscribe to INSERT & UPDATE + retry on missing
+  const [assignmentRetryCount, setAssignmentRetryCount] = useState(0);
 
   useEffect(() => {
-    if (isDeliveryOrder && orderId) {
-      const fetchAssignment = () => {
-        supabase
-          .from('delivery_assignments')
-          .select('id')
-          .eq('order_id', orderId)
-          .maybeSingle()
-          .then(({ data }) => {
-            if (data) setDeliveryAssignmentId(data.id);
-          });
-      };
-      fetchAssignment();
+    if (!isDeliveryOrder || !orderId) return;
 
-      // Re-check when order status changes (assignment may be created on picked_up)
-      const channel = supabase
-        .channel(`assignment-watch-${orderId}`)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'delivery_assignments',
-          filter: `order_id=eq.${orderId}`,
-        }, (payload) => {
-          if (payload.new?.id) setDeliveryAssignmentId(payload.new.id as string);
-        })
-        .subscribe();
+    const fetchAssignment = () => {
+      supabase
+        .from('delivery_assignments')
+        .select('id')
+        .eq('order_id', orderId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) { console.warn('Assignment fetch error:', error.message); return; }
+          if (data) setDeliveryAssignmentId(data.id);
+          else {
+            // Retry up to 5 times with increasing delay when order is in delivery stages
+            if (assignmentRetryCount < 5) {
+              const delay = Math.min(2000 * (assignmentRetryCount + 1), 8000);
+              setTimeout(() => setAssignmentRetryCount(c => c + 1), delay);
+            }
+          }
+        });
+    };
+    fetchAssignment();
 
-      return () => { supabase.removeChannel(channel); };
-    }
-  }, [orderId, isDeliveryOrder]);
+    // Subscribe to both INSERT and UPDATE on delivery_assignments for this order
+    const channel = supabase
+      .channel(`assignment-watch-${orderId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'delivery_assignments',
+        filter: `order_id=eq.${orderId}`,
+      }, (payload) => {
+        const newId = (payload.new as any)?.id;
+        if (newId) setDeliveryAssignmentId(newId as string);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [orderId, isDeliveryOrder, assignmentRetryCount]);
 
   // Gap A: Fetch delivery OTP for buyer + Gap 9: Subscribe to realtime updates
   useEffect(() => {
@@ -491,11 +502,21 @@ export default function OrderDetailPage() {
             {o.orderFulfillmentType === 'delivery' && o.flow.find(s => s.status_key === order.status)?.actor === 'system' && (order as any).delivery_handled_by === 'platform' ? (
               <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground"><Truck size={16} className="text-primary" /><span>Awaiting delivery pickup</span></div>
             ) : o.nextStatus ? (
-              (stepRequiresOtp(o.flow, o.nextStatus) || (o.nextStatus === 'delivered' && isDeliveryOrder)) && deliveryAssignmentId ? (
-                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
-                  {o.isUpdating ? 'Updating...' : 'Verify & Deliver'}
-                  <ChevronRight size={14} className="ml-1" />
-                </Button>
+              /* CRITICAL: For delivery orders transitioning to 'delivered', ALWAYS require OTP.
+                 Never fall back to direct updateOrderStatus for delivered status on delivery orders. */
+              (stepRequiresOtp(o.flow, o.nextStatus) || (o.nextStatus === 'delivered' && isDeliveryOrder)) ? (
+                deliveryAssignmentId ? (
+                  <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
+                    {o.isUpdating ? 'Updating...' : 'Verify & Deliver'}
+                    <ChevronRight size={14} className="ml-1" />
+                  </Button>
+                ) : (
+                  /* Assignment not yet loaded — block action, show loading instead of unsafe fallback */
+                  <Button className="flex-1 h-12" disabled>
+                    <Loader2 size={14} className="mr-1.5 animate-spin" />
+                    Preparing delivery verification…
+                  </Button>
+                )
               ) : (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.nextStatus!)} disabled={o.isUpdating}>{o.isUpdating ? 'Updating...' : `Mark ${o.getOrderStatus(o.nextStatus).label}`}<ChevronRight size={14} className="ml-1" /></Button>
               )

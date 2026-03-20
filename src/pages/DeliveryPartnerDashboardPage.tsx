@@ -10,10 +10,11 @@ import { FeatureGate } from '@/components/ui/FeatureGate';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Truck, Package, MapPin, Clock, CheckCircle2, Phone, Navigation, Loader2, Radio } from 'lucide-react';
+import { Truck, Package, MapPin, Clock, CheckCircle2, Phone, Navigation, Loader2, Radio, ShieldCheck } from 'lucide-react';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useBackgroundLocationTracking } from '@/hooks/useBackgroundLocationTracking';
+import { DeliveryCompletionOtpDialog } from '@/components/delivery/DeliveryCompletionOtpDialog';
 import { format } from 'date-fns';
 
 export default function DeliveryPartnerDashboardPage() {
@@ -24,6 +25,7 @@ export default function DeliveryPartnerDashboardPage() {
   const [activeTab, setActiveTab] = useState('active');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [activeTrackingId, setActiveTrackingId] = useState<string | null>(null);
+  const [otpOrderId, setOtpOrderId] = useState<string | null>(null);
 
   const { isTracking, startTracking, stopTracking, permissionDenied } = useBackgroundLocationTracking(activeTrackingId);
 
@@ -370,11 +372,11 @@ export default function DeliveryPartnerDashboardPage() {
                           <Button
                             size="sm"
                             className="flex-1"
-                            onClick={() => updateDeliveryStatus(delivery.id, 'delivered')}
+                            onClick={() => setOtpOrderId(delivery.order?.id || null)}
                             disabled={updatingId === delivery.id}
                           >
-                            {updatingId === delivery.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <CheckCircle2 size={14} className="mr-1" />}
-                            Delivered
+                            <ShieldCheck size={14} className="mr-1" />
+                            Verify & Deliver
                           </Button>
                         </div>
                       )}
@@ -382,11 +384,11 @@ export default function DeliveryPartnerDashboardPage() {
                         <Button
                           size="sm"
                           className="w-full"
-                          onClick={() => updateDeliveryStatus(delivery.id, 'delivered')}
+                          onClick={() => setOtpOrderId(delivery.order?.id || null)}
                           disabled={updatingId === delivery.id}
                         >
-                          {updatingId === delivery.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <CheckCircle2 size={14} className="mr-1" />}
-                          Mark Delivered
+                          <ShieldCheck size={14} className="mr-1" />
+                          Verify & Deliver
                         </Button>
                       )}
                     </CardContent>
@@ -398,6 +400,22 @@ export default function DeliveryPartnerDashboardPage() {
         </Tabs>
       </div>
       </FeatureGate>
+
+      {/* OTP verification dialog — all delivery completions must go through this */}
+      {otpOrderId && (
+        <DeliveryCompletionOtpDialog
+          orderId={otpOrderId}
+          open={!!otpOrderId}
+          onOpenChange={(open) => { if (!open) setOtpOrderId(null); }}
+          onVerified={() => {
+            setOtpOrderId(null);
+            setActiveTrackingId(null);
+            stopTracking();
+            queryClient.invalidateQueries({ queryKey: ['my-deliveries'] });
+            queryClient.invalidateQueries({ queryKey: ['pending-deliveries'] });
+          }}
+        />
+      )}
     </AppLayout>
   );
 }
