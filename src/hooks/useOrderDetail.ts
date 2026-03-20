@@ -28,17 +28,17 @@ export function useOrderDetail(id: string | undefined) {
   // Robust seller ownership: match order.seller_id against currentSellerId or any of the user's seller profiles
   // This avoids depending on the nested seller relation being fully hydrated
   const isSellerView = useMemo(() => {
-    if (!order || !isSeller || !user) return false;
+    if (!order || !user) return false;
     const orderSellerId = order.seller_id;
     if (!orderSellerId) return false;
     // Primary: match against current seller context
     if (currentSellerId && orderSellerId === currentSellerId) return true;
-    // Fallback: match against any of the user's seller profiles
+    // Fallback: match against any seller profile the current user owns
     if (sellerProfiles.some(sp => sp.id === orderSellerId)) return true;
     // Legacy fallback: nested relation check (kept for edge cases)
     if (seller?.user_id === user.id) return true;
     return false;
-  }, [order?.seller_id, isSeller, user?.id, currentSellerId, sellerProfiles, seller?.user_id]);
+  }, [order?.seller_id, user?.id, currentSellerId, sellerProfiles, seller?.user_id]);
 
   const isUrgentOrder = order?.auto_cancel_at && isSellerView;
 
