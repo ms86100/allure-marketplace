@@ -1,53 +1,56 @@
 
-Fix plan: restore seller ownership detection and remove the dead-end state on Order Detail.
 
-1. Confirmed root cause
-- The order and workflow are valid in the backend:
-  - Order `28333797-aa36-48ef-a9e3-87400daed188` is still `placed`
-  - It belongs to seller profile `602762b5-03fc-4097-82a6-ec23b60ab67a`
-  - That seller profile belongs to the logged-in user `ef690ff1-d82e-4b74-a0c1-6705f79fc1cd`
-  - The workflow has a valid seller transition: `placed -> accepted`
-- So this is not primarily a flow-table problem.
-- The break is most likely in the frontend seller gate: `isSellerView` depends on nested relation data (`seller?.user_id === user?.id`) instead of the order’s own `seller_id` / seller context. If that relation is missing, delayed, or partially hydrated, the seller action bar disappears even though the seller owns the order.
+# Root Cause: Missing `food_beverages/seller_delivery` Flow Data in DB
 
-2. Implement the actual fix
-- In `useOrderDetail.ts`, replace the fragile seller-view check with an ownership check based on seller context:
-  - Compare `order.seller_id` against `currentSellerId`
-  - Also allow fallback match against any of the user’s `sellerProfiles`
-- Keep the nested seller relation only for display data, not authorization/UI gating.
-- Use the same ownership logic for:
-  - `isSellerView`
-  - seller chat recipient selection
-  - seller action bar visibility
-  - seller update query guard
+## Evidence Chain
 
-3. Add a safe fallback so the page never becomes a dead end
-- If the order belongs to one of the user’s seller profiles but seller display data has not loaded yet:
-  - still show seller actions
-  - still allow `placed -> accepted`
-- If ownership cannot be resolved, show an explicit inline error state instead of silently rendering no actions.
+1. **Order data**: Order `96b8e227` has `fulfillment_type='delivery'`, `delivery_handled_by=null`, seller `primary_group='food_beverages'`
+2. **Transaction type resolution**: `resolveTransactionType('food_beverages', 'purchase', 'delivery', null)` → `'seller_delivery'`
+3. **DB query**: `category_status_flows WHERE parent_group='food_beverages' AND transaction_type='seller_delivery'` → **EMPTY** (confirmed in network logs)
+4. **DB query**: `category_status_transitions WHERE parent_group='food_beverages' AND transaction_type='seller_delivery'` → **EMPTY** (confirmed in network logs)
+5. **Fallback**: Code falls back to `default/seller_delivery` which exists (10 flow rows, 18 transitions) — but this introduces async latency and a window where `flow=[]` and `transitions=[]`
 
-4. Tighten the overlay flow
-- In `NewOrderAlertOverlay.tsx`, make navigation safer:
-  - navigate first, then dismiss only after navigation is triggered successfully
-  - if navigation fails, keep the alert visible or fall back clearly to `/orders`
-- This prevents the “popup disappears, nothing happens” experience even if routing fails.
+## Why Previous Fixes Failed
 
-5. Add targeted debugging guards
-- Add temporary logging around:
-  - resolved `isSellerView`
-  - `order.seller_id`
-  - `currentSellerId`
-  - matched seller profile IDs
-  - computed `nextStatus`
-- This will verify the seller gate and stop future regressions quickly.
+The `isSellerView` fix was correct but insufficient. The real blocker is that during the async fallback window:
+- `flow.length === 0` → `getNextStatus()` returns `null` → no Accept button renders
+- `transitions.length === 0` → `canSellerReject` is `false` → no Reject button renders
+- The action bar container renders (it only checks `isSellerView && !isTerminalStatus`) but is **completely empty** — no buttons inside
 
-Technical details
-- Files to update:
-  - `src/hooks/useOrderDetail.ts`
-  - `src/components/seller/NewOrderAlertOverlay.tsx`
-- Expected result after fix:
-  - Clicking “View Order” opens the order page reliably
-  - Seller is recognized correctly on that page
-  - Action bar appears for `placed`
-  - Seller can accept/reject and continue status updates normally
+The fallback should eventually load data and trigger a re-render with buttons, but the `useCategoryStatusFlow` hook does NOT reset `isLoading` to `true` when deps change, and the page does NOT gate the action bar on `isFlowLoading`. This creates a persistent empty-bar state if the fallback is slow or fails silently.
+
+## Fix (3 parts)
+
+### Part 1: Insert missing `food_beverages/seller_delivery` data (SQL migration)
+Copy the `default/seller_delivery` flow and transitions into `food_beverages/seller_delivery`. This eliminates the fallback entirely — the primary query returns data immediately.
+
+### Part 2: Gate the action bar on flow loading (`OrderDetailPage.tsx`)
+Change line 498 from:
+```
+{o.isSellerView && !isTerminalStatus(o.flow, order.status) && (
+```
+to:
+```
+{o.isSellerView && !o.isFlowLoading && o.flow.length > 0 && !isTerminalStatus(o.flow, order.status) && (
+```
+And show a loading indicator when `isFlowLoading` is true:
+```
+{o.isSellerView && (o.isFlowLoading || o.flow.length === 0) && !isTerminalStatus(o.flow, order.status) && (
+  <div>Loading actions...</div>
+)}
+```
+
+### Part 3: Reset loading state on dep change (`useCategoryStatusFlow.ts`)
+At the top of the useEffect, add `setIsLoading(true)` so downstream consumers know data is stale and don't render empty bars.
+
+## Files to Change
+- New SQL migration (insert `food_beverages/seller_delivery` rows)
+- `src/hooks/useCategoryStatusFlow.ts` — reset `isLoading` on dep change
+- `src/pages/OrderDetailPage.tsx` — gate action bar on `isFlowLoading` and `flow.length > 0`
+
+## Expected Result
+- Seller clicks "View Order" → navigates to order detail
+- Flow loads immediately (no fallback needed)
+- Action bar shows "Reject" and "Mark Accepted" buttons
+- Seller can accept and progress the order
+
