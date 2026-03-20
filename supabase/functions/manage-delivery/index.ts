@@ -278,7 +278,12 @@ async function handleUpdateStatus(req: Request, db: any, userId: string) {
     updateData.failed_reason = note || 'Delivery failed';
     updateData.attempt_count = (assignment as any).attempt_count + 1;
     updateData.failure_owner = body.failure_owner || null;
-    await db.from('orders').update({ status: 'returned' }).eq('id', assignment.order_id);
+    // Bug 18 fix: Don't resurrect cancelled/completed orders
+    await db.from('orders').update({ status: 'returned' })
+      .eq('id', assignment.order_id)
+      .neq('status', 'cancelled')
+      .neq('status', 'completed')
+      .neq('status', 'refunded');
   }
 
   if (status === 'at_gate') {
