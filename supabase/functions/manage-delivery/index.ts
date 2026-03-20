@@ -385,18 +385,14 @@ async function handleComplete(req: Request, db: any, userId: string) {
   const isValid = await verifyOTP(otp, assignment.otp_hash);
   if (!isValid) return jsonResponse({ error: 'Invalid OTP' }, 400);
 
-  const { error } = await db
-    .from('delivery_assignments')
-    .update({
-      status: 'delivered',
-      delivered_at: new Date().toISOString(),
-      otp_hash: null,
-    })
-    .eq('id', assignment_id);
+  // Use dedicated service-level RPC that sets app.otp_verified flag atomically
+  // then updates both delivery_assignments and orders in a single transaction
+  const { error: completeError } = await db.rpc('service_complete_delivery', {
+    _assignment_id: assignment_id,
+    _order_id: assignment.order_id,
+  });
 
-  if (error) return jsonResponse({ error: error.message }, 500);
-
-  await db.from('orders').update({ status: 'delivered' }).eq('id', assignment.order_id);
+  if (completeError) return jsonResponse({ error: completeError.message }, 500);
 
   await db.from('delivery_tracking_logs').insert({
     assignment_id,
