@@ -39,7 +39,6 @@ export const TRANSACTION_TYPES = [
   { value: 'self_fulfillment', label: 'Self Fulfillment' },
   { value: 'service_booking', label: 'Service Booking' },
   { value: 'request_service', label: 'Request Service' },
-  { value: 'book_slot', label: 'Book Slot' },
 ];
 
 export const formatName = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());

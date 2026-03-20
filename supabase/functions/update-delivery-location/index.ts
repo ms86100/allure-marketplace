@@ -55,10 +55,10 @@ function getProximity(distanceMeters: number, thresholds: typeof DEFAULT_PROXIMI
 async function loadTerminalStatuses(supabase: ReturnType<typeof createClient>): Promise<Set<string>> {
   const FALLBACK = new Set(['delivered', 'failed', 'cancelled']);
   try {
+    // AUDIT FIX: removed hardcoded transaction_type filter — include all workflow types
     const { data } = await supabase
       .from('category_status_flows')
       .select('status_key')
-      .in('transaction_type', ['cart_purchase', 'seller_delivery'])
       .eq('is_terminal', true);
     if (data && data.length > 0) {
       return new Set(data.map((r: { status_key: string }) => r.status_key));
