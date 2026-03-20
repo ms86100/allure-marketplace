@@ -196,10 +196,11 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
 
       const getInterval = () => {
         if (channelDegraded.current) return POLL_DEGRADED_MS;
-        // Check current status from state ref
+        // Bug 10 fix: use idle rate for non-transit statuses
         const transitStatuses = new Set(getTrackingConfigSync().transit_statuses);
-        // We read from the DOM-less closure, so we need a way to get current status
-        // We'll use a simple approach: always poll at transit rate, it's only 10s
+        if (currentStatusRef.current && !transitStatuses.has(currentStatusRef.current)) {
+          return POLL_IDLE_MS;
+        }
         return POLL_TRANSIT_MS;
       };
 
