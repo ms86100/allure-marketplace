@@ -1,53 +1,72 @@
 
 
-## Lean Category-Specific Workflows — IMPLEMENTED ✅
+## Investigation Findings
 
-### What Changed
+Three distinct root causes were identified:
 
-1. **New `contact_enquiry` workflow** (4 steps): enquired→confirmed→completed/cancelled
-   - For `contact_only` listing types (maid, cook, driver, rentals, etc.)
-   - Uses existing `order_status` enum values with custom display labels ("Contacted", "Responded")
+### Bug 1: `isInTransit` logic is broken — Map and Live Tracking never appear
 
-2. **Trimmed `service_booking` (default)**: 5 active + 3 deprecated
-   - Active: requested → confirmed → completed / no_show / cancelled
-   - Deprecated (with escape transitions): rescheduled, scheduled, in_progress
+**Root cause**: In `useOrderDetail.ts` (line 239-246), `isInTransit` only returns `true` when the flow step's `actor === 'delivery'`. However, for the seller_delivery workflow (which this order uses), the `on_the_way` and `picked_up` statuses have `actor: 'seller'`, not `'delivery'`. This means:
+- The DeliveryMapView (Google Maps tracking) never renders
+- The LiveDeliveryTracker never renders  
+- The SellerGPSTracker never renders (so no GPS data is written either)
+- The buyer sees the static DeliveryStatusCard instead
 
-3. **Trimmed `request_service` (default)**: 6 active + 2 deprecated
-   - Active: enquired → quoted → accepted → completed / cancelled / no_show
-   - Deprecated (with escape transitions): preparing, ready
+**Fix**: Change `isInTransit` to also check against the DB-backed `transit_statuses` system setting (which correctly includes `['picked_up', 'on_the_way', 'at_gate']`). This is already available via `useTrackingConfig` which is imported on the page.
 
-4. **Cart/delivery workflows unchanged** — cart_purchase, seller_delivery, self_fulfillment untouched
+**File**: `src/hooks/useOrderDetail.ts` lines 239-246
 
-5. **Parent group overrides unchanged** — domestic_help, home_services, personal_care, etc. keep their extended flows
+### Bug 2: ActiveOrderStrip has no realtime updates on web
 
-### Safety Guardrails
+**Root cause**: The strip uses React Query with `refetchInterval: 60_000` (60 seconds) and no Supabase Realtime subscription. The `orders` table IS published for realtime, but no channel is created. The `useLiveActivityOrchestrator` does have realtime, but it's gated by `Capacitor.isNativePlatform()` and only drives native Live Activities.
 
-- **Soft deprecation**: `is_deprecated` column added — old steps kept but hidden from new order timelines
-- **Escape transitions**: Every deprecated step has a path to a valid active state
-- **No enum changes**: contact_enquiry reuses existing enum values (enquired, confirmed, completed, cancelled)
-- **Backward compatible**: `resolveTransactionType` accepts optional `listingType` param — existing callers unaffected
+**Fix**: Add a Supabase Realtime channel to `ActiveOrderStrip` that listens for order updates and invalidates the query. Also reduce the polling interval from 60s to 15s as a safety net.
 
-### System Coverage for `contact_enquiry`
+**File**: `src/components/home/ActiveOrderStrip.tsx`
 
-| System | Status |
-|--------|--------|
-| `resolveTransactionType.ts` | ✅ listingType=contact_only → contact_enquiry |
-| `listing_type_workflow_map` (DB) | ✅ contact_only → contact_enquiry |
-| `fn_enqueue_order_status_notification` | ✅ Detects contact_only via category_config |
-| `buyer_advance_order` RPC | ✅ Detects contact_only via category_config |
-| `statusFlowCache.ts` | ✅ Added to .in() filter |
-| `workflow/types.ts` | ✅ Added to TRANSACTION_TYPES |
-| `listingTypeWorkflowMap.ts` | ✅ Fallback updated |
-| Admin WorkflowManager | ✅ Shows deprecated badges |
+### Bug 3: No GPS location data is being recorded
 
-### Files Changed
+**Root cause**: This is a consequence of Bug 1. Since `isInTransit` is false, the `SellerGPSTracker` component never renders for the seller, so the background location service never starts, and `delivery_locations` stays empty (`last_location_at` is null).
 
-- `src/lib/resolveTransactionType.ts` — Added optional `listingType` param, contact_enquiry resolution
-- `src/lib/listingTypeWorkflowMap.ts` — contact_only → contact_enquiry fallback
-- `src/components/admin/workflow/types.ts` — Added contact_enquiry to TRANSACTION_TYPES
-- `src/services/statusFlowCache.ts` — Added all transaction types to filter
-- `src/hooks/useCategoryStatusFlow.ts` — Added is_deprecated to interface + select; getTimelineSteps filters deprecated
-- `src/hooks/useOrderDetail.ts` — Passes currentStatus to getTimelineSteps
-- `src/components/admin/AdminWorkflowManager.tsx` — Deprecated badge, active step count display
-- DB migration: is_deprecated column, updated notification trigger + buyer_advance_order RPC
-- DB data: contact_enquiry flows + transitions, deprecated steps, escape transitions, lean transitions
+**Fix**: Automatically resolved by fixing Bug 1.
+
+---
+
+## Implementation Plan
+
+### Step 1: Fix `isInTransit` in useOrderDetail.ts
+- Replace the `actor === 'delivery'` check with a check against `transit_statuses` from system_settings
+- Import and use the synchronous tracking config getter
+- Also keep the actor check as a secondary signal for completeness
+
+### Step 2: Add Realtime subscription to ActiveOrderStrip  
+- Subscribe to `postgres_changes` on the `orders` table filtered by `buyer_id`
+- On any UPDATE event, invalidate the `active-orders-strip` query
+- Reduce `refetchInterval` from 60s to 15s as a fallback
+- Clean up channel on unmount
+
+### Technical Details
+
+**useOrderDetail.ts change** (the critical fix):
+```typescript
+// Before:
+const isInTransit = useMemo(() => {
+  if (!order) return false;
+  const transitStep = flow.find(s => s.status_key === order.status);
+  if (transitStep?.actor === 'delivery') return true;
+  return false;
+}, [order?.status, flow]);
+
+// After: check DB-backed transit_statuses from system_settings
+const isInTransit = useMemo(() => {
+  if (!order) return false;
+  const transitStatuses = getTrackingConfigSync().transit_statuses;
+  if (transitStatuses.includes(order.status)) return true;
+  const transitStep = flow.find(s => s.status_key === order.status);
+  if (transitStep?.actor === 'delivery') return true;
+  return false;
+}, [order?.status, flow]);
+```
+
+**ActiveOrderStrip.tsx change**: Add realtime channel that invalidates query on order updates, bringing web behavior closer to native.
+
