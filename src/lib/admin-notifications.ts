@@ -32,13 +32,25 @@ export async function notifySellerStatusChange(
     suspended: 'seller_suspended',
   };
 
+  const referencePathMap: Record<string, string> = {
+    approved: '/seller',
+    rejected: '/become-seller',
+    suspended: '/seller',
+  };
+
+  const actionMap: Record<string, string> = {
+    approved: 'STORE_APPROVED',
+    rejected: 'STORE_REJECTED',
+    suspended: 'STORE_SUSPENDED',
+  };
+
   const { error } = await supabase.from('notification_queue').insert({
     user_id: userId,
     title: titleMap[status],
     body: bodyMap[status],
     type: typeMap[status],
-    reference_path: '/seller/dashboard',
-    payload: { type: typeMap[status] },
+    reference_path: referencePathMap[status],
+    payload: { type: typeMap[status], action: actionMap[status] },
   });
   if (error) console.error('Failed to enqueue seller notification:', error);
 }
