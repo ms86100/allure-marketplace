@@ -87,14 +87,17 @@ serve(async (req) => {
         elapsedLabel = `Tracking has been inactive for over ${hours} hour${hours > 1 ? 's' : ''} during active delivery`;
       }
 
-      // Always update the reason to reflect current elapsed time
-      await supabase
-        .from('orders')
-        .update({
-          needs_attention: true,
-          needs_attention_reason: elapsedLabel,
-        } as any)
-        .eq('id', order.id);
+      // Bug 14 fix: Only update if reason text changed
+      const currentReason = order.needs_attention_reason ?? '';
+      if (!order.needs_attention || currentReason !== elapsedLabel) {
+        await supabase
+          .from('orders')
+          .update({
+            needs_attention: true,
+            needs_attention_reason: elapsedLabel,
+          } as any)
+          .eq('id', order.id);
+      }
 
       // Notify only once
       if (!assignment.stalled_notified) {

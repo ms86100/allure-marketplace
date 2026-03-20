@@ -204,12 +204,23 @@ serve(async (req) => {
       });
     }
 
-    // Insert location record
+    // Bug 19 fix: server-side rate limit — reject if last update was <2s ago
+    if (assignment.last_location_at) {
+      const lastAt = new Date(assignment.last_location_at).getTime();
+      if (Date.now() - lastAt < 2000) {
+        return new Response(JSON.stringify({ error: 'Rate limited', retry_after_ms: 2000 }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Insert location record (Bug 3 fix: use assignment.partner_id when available)
     const { error: locErr } = await supabase
       .from('delivery_locations')
       .insert({
         assignment_id,
-        partner_id: callerId,
+        partner_id: assignment.partner_id || callerId,
         latitude, longitude, speed_kmh, heading, accuracy_meters,
       });
 

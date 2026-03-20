@@ -310,6 +310,18 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
         lastRealtimeAt.current = Date.now();
         channelDegraded.current = false;
         const loc = payload.new as any;
+
+        // Bug 15 fix: dedup by recorded_at
+        const ts = loc.recorded_at;
+        if (ts && seenLocationTimestamps.current.has(ts)) return;
+        if (ts) {
+          seenLocationTimestamps.current.add(ts);
+          if (seenLocationTimestamps.current.size > 100) {
+            const entries = Array.from(seenLocationTimestamps.current);
+            seenLocationTimestamps.current = new Set(entries.slice(-50));
+          }
+        }
+
         const rawPoint: RiderLocation = {
           latitude: loc.latitude,
           longitude: loc.longitude,
