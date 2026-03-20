@@ -1,108 +1,53 @@
 
 
-## Plan: Lean Category-Specific Workflows (with Guardrails)
+## Lean Category-Specific Workflows — IMPLEMENTED ✅
 
-### Live Order Safety Assessment
+### What Changed
 
-Current non-terminal orders in service/request flows:
-- 1 booking order in `confirmed` state — **SAFE** (kept in all new flows)
-- 1 enquiry order in `quoted` state — **SAFE** (kept in trimmed request_service)
+1. **New `contact_enquiry` workflow** (4 steps): enquired→confirmed→completed/cancelled
+   - For `contact_only` listing types (maid, cook, driver, rentals, etc.)
+   - Uses existing `order_status` enum values with custom display labels ("Contacted", "Responded")
 
-No orders exist in `preparing`, `ready`, `scheduled`, or `in_progress` for these flows, so trimming is safe today. But we still add a compatibility layer.
+2. **Trimmed `service_booking` (default)**: 5 active + 3 deprecated
+   - Active: requested → confirmed → completed / no_show / cancelled
+   - Deprecated (with escape transitions): rescheduled, scheduled, in_progress
 
-### Strategy: Soft Deprecation, Not Hard Deletion
+3. **Trimmed `request_service` (default)**: 6 active + 2 deprecated
+   - Active: enquired → quoted → accepted → completed / cancelled / no_show
+   - Deprecated (with escape transitions): preparing, ready
 
-Old steps (`preparing`, `ready`, `scheduled`, `in_progress`, `rescheduled`) will NOT be deleted from default flows. Instead:
-1. Mark them `is_terminal = false` with a new `is_deprecated` flag (add column)
-2. Remove their outgoing transitions (so no NEW orders enter them)
-3. Add escape transitions FROM deprecated states → nearest valid state (so stuck orders can exit)
-4. New orders follow the lean path; old orders gracefully drain
+4. **Cart/delivery workflows unchanged** — cart_purchase, seller_delivery, self_fulfillment untouched
 
-### Changes
+5. **Parent group overrides unchanged** — domestic_help, home_services, personal_care, etc. keep their extended flows
 
-**1. DB Schema: Add `is_deprecated` column**
+### Safety Guardrails
 
-```sql
-ALTER TABLE category_status_flows ADD COLUMN is_deprecated BOOLEAN DEFAULT false;
-```
+- **Soft deprecation**: `is_deprecated` column added — old steps kept but hidden from new order timelines
+- **Escape transitions**: Every deprecated step has a path to a valid active state
+- **No enum changes**: contact_enquiry reuses existing enum values (enquired, confirmed, completed, cancelled)
+- **Backward compatible**: `resolveTransactionType` accepts optional `listingType` param — existing callers unaffected
 
-This lets the UI hide deprecated steps from new order timelines while keeping them valid for existing orders.
+### System Coverage for `contact_enquiry`
 
-**2. New `contact_enquiry` workflow (4 steps)**
-
-| Step | Actor | Terminal | Label |
-|------|-------|----------|-------|
-| contacted | buyer | no | Contacted |
-| responded | seller | no | Responded |
-| completed | system | yes | Completed |
-| cancelled | buyer | yes | Cancelled |
-
-Transitions: contacted→responded (seller), contacted→cancelled (buyer/seller), responded→completed (seller/buyer), responded→cancelled (buyer/seller).
-
-**3. Trim default `service_booking` (keep 5 active, deprecate 3)**
-
-Active path: requested → confirmed → completed / no_show / cancelled
-
-Deprecated (kept but no inbound transitions for new orders):
-- `rescheduled` — escape: rescheduled→confirmed (seller)
-- `scheduled` — escape: scheduled→confirmed (seller)  
-- `in_progress` — escape: in_progress→completed (seller)
-
-New transitions: requested→confirmed (seller), confirmed→completed (seller/buyer), confirmed→no_show (seller), confirmed→cancelled (buyer/seller/admin), requested→cancelled (buyer/seller/admin).
-
-**4. Trim default `request_service` (keep 6 active, deprecate 2)**
-
-Active path: enquired → quoted → accepted → completed / cancelled / no_show
-
-Deprecated (kept but no inbound transitions):
-- `preparing` — escape: preparing→completed (seller)
-- `ready` — escape: ready→completed (seller)
-
-New transitions: accepted→completed (seller), accepted→cancelled (buyer/admin).
-
-**5. Frontend: Hide deprecated steps from new order UI**
-
-Update `useCategoryStatusFlow` to filter `is_deprecated = true` steps from timeline display for NEW orders, but show them for orders currently IN those states.
-
-**6. Full `contact_enquiry` system propagation**
-
-| System | Change |
+| System | Status |
 |--------|--------|
-| `resolveTransactionType.ts` | Add contact_only → `contact_enquiry` resolution |
-| `listing_type_workflow_map` (DB) | Update `contact_only` row: workflow_key = `contact_enquiry` |
-| `validate_transaction_type` trigger | Add `contact_enquiry` to allowed values |
-| `fn_enqueue_order_status_notification` | Add CASE for `contact_enquiry` |
-| `buyer_advance_order` RPC | Add `contact_enquiry` to allowed transaction types |
-| `statusFlowCache.ts` | Add `contact_enquiry` to `.in()` filter |
-| `src/components/admin/workflow/types.ts` | Add to TRANSACTION_TYPES |
-| `listingTypeWorkflowMap.ts` fallback | Update `contact_only` → `contact_enquiry` |
-
-**7. Parent group override consistency**
-
-Parent group overrides (domestic_help, home_services, personal_care, etc.) remain UNTOUCHED — they have their own extended flows with on_the_way/arrived/in_progress which are genuinely needed.
-
-The `CategoryWorkflowPreview` already shows override vs default via the determinism badge system from Phase 1.5, so admins have full visibility.
+| `resolveTransactionType.ts` | ✅ listingType=contact_only → contact_enquiry |
+| `listing_type_workflow_map` (DB) | ✅ contact_only → contact_enquiry |
+| `fn_enqueue_order_status_notification` | ✅ Detects contact_only via category_config |
+| `buyer_advance_order` RPC | ✅ Detects contact_only via category_config |
+| `statusFlowCache.ts` | ✅ Added to .in() filter |
+| `workflow/types.ts` | ✅ Added to TRANSACTION_TYPES |
+| `listingTypeWorkflowMap.ts` | ✅ Fallback updated |
+| Admin WorkflowManager | ✅ Shows deprecated badges |
 
 ### Files Changed
 
-| File | Change |
-|------|--------|
-| DB migration | Add `is_deprecated` column; insert `contact_enquiry` flow + transitions; mark deprecated steps; update escape transitions |
-| DB data (insert tool) | Update default service_booking + request_service transitions; update listing_type_workflow_map |
-| `src/lib/resolveTransactionType.ts` | Add contact_only → contact_enquiry |
-| `src/lib/listingTypeWorkflowMap.ts` | Update fallback map |
-| `src/components/admin/workflow/types.ts` | Add contact_enquiry |
-| `src/services/statusFlowCache.ts` | Add contact_enquiry to filter |
-| `src/hooks/useCategoryStatusFlow.ts` | Filter deprecated steps from timeline for new orders |
-| `src/components/admin/AdminWorkflowManager.tsx` | Show deprecated badge on deprecated steps |
-
-### Validation Checklist
-
-- No steps are deleted — only deprecated
-- Every deprecated step has an escape transition to a valid state
-- Every active step has entry and exit paths
-- No dead ends or orphan states
-- contact_enquiry covered in all 8 system touchpoints
-- Existing 2 live orders unaffected (both in active states)
-- Parent group overrides unchanged
-
+- `src/lib/resolveTransactionType.ts` — Added optional `listingType` param, contact_enquiry resolution
+- `src/lib/listingTypeWorkflowMap.ts` — contact_only → contact_enquiry fallback
+- `src/components/admin/workflow/types.ts` — Added contact_enquiry to TRANSACTION_TYPES
+- `src/services/statusFlowCache.ts` — Added all transaction types to filter
+- `src/hooks/useCategoryStatusFlow.ts` — Added is_deprecated to interface + select; getTimelineSteps filters deprecated
+- `src/hooks/useOrderDetail.ts` — Passes currentStatus to getTimelineSteps
+- `src/components/admin/AdminWorkflowManager.tsx` — Deprecated badge, active step count display
+- DB migration: is_deprecated column, updated notification trigger + buyer_advance_order RPC
+- DB data: contact_enquiry flows + transitions, deprecated steps, escape transitions, lean transitions

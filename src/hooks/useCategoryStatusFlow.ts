@@ -5,6 +5,7 @@ import { resolveTransactionType } from '@/lib/resolveTransactionType';
 export interface StatusFlowStep {
   status_key: string;
   sort_order: number;
+  is_deprecated?: boolean;
   actor: string;
   is_terminal: boolean;
   is_success: boolean;
@@ -43,7 +44,7 @@ export function useCategoryStatusFlow(
       
       let { data, error } = await supabase
         .from('category_status_flows')
-        .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint')
+        .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint, is_deprecated')
         .eq('parent_group', parentGroup)
         .eq('transaction_type', transactionType)
         .order('sort_order', { ascending: true });
@@ -52,7 +53,7 @@ export function useCategoryStatusFlow(
       if (!error && (!data || data.length === 0) && parentGroup !== 'default') {
         const fallback = await supabase
           .from('category_status_flows')
-          .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint')
+          .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint, is_deprecated')
           .eq('parent_group', 'default')
           .eq('transaction_type', transactionType)
           .order('sort_order', { ascending: true });
@@ -127,8 +128,12 @@ export function getNextStatusForActor(
 /**
  * Returns the display steps for the timeline (non-terminal, non-cancelled).
  */
-export function getTimelineSteps(flow: StatusFlowStep[]): StatusFlowStep[] {
-  return flow.filter(s => !s.is_terminal);
+/**
+ * Returns the display steps for the timeline.
+ * Filters out deprecated steps unless the order is currently IN that state.
+ */
+export function getTimelineSteps(flow: StatusFlowStep[], currentStatus?: string): StatusFlowStep[] {
+  return flow.filter(s => !s.is_terminal && (!s.is_deprecated || s.status_key === currentStatus));
 }
 
 /**

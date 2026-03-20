@@ -40,7 +40,7 @@ export function AdminWorkflowManager() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('category_status_flows')
-      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint, seller_hint, id, notify_buyer, notification_title, notification_body, notification_action, notify_seller, seller_notification_title, seller_notification_body')
+      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint, seller_hint, id, notify_buyer, notification_title, notification_body, notification_action, notify_seller, seller_notification_title, seller_notification_body, is_deprecated')
       .order('parent_group')
       .order('transaction_type')
       .order('sort_order', { ascending: true });
@@ -217,7 +217,10 @@ export function AdminWorkflowManager() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-bold">{formatName(wf.parent_group)}</p>
-                  <p className="text-xs text-muted-foreground">{formatName(wf.transaction_type)} · {wf.step_count} steps</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatName(wf.transaction_type)} · {wf.steps.filter(s => !(s as any).is_deprecated).length} steps
+                    {wf.steps.some(s => (s as any).is_deprecated) && <span className="ml-1 text-amber-500">({wf.steps.filter(s => (s as any).is_deprecated).length} deprecated)</span>}
+                  </p>
                   <WorkflowLinkage parentGroup={wf.parent_group} transactionType={wf.transaction_type} />
                 </div>
               </div>
@@ -271,7 +274,7 @@ export function AdminWorkflowManager() {
 
                 <div className="space-y-2">
                   {editSteps.map((step, index) => (
-                    <div key={index} className="bg-muted/40 rounded-xl p-3 space-y-2 border border-border/50">
+                    <div key={index} className={cn("bg-muted/40 rounded-xl p-3 space-y-2 border border-border/50", (step as any).is_deprecated && "opacity-60 border-amber-300/50 bg-amber-50/30 dark:bg-amber-900/10")}>
                       <div className="flex items-center gap-2">
                         <div className="flex flex-col gap-0.5">
                           <button onClick={() => moveStep(index, 'up')} disabled={index === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30 text-xs">▲</button>
@@ -279,6 +282,7 @@ export function AdminWorkflowManager() {
                         </div>
                         <span className="text-[10px] font-mono text-muted-foreground w-5">{index + 1}</span>
                         <Input value={step.status_key} onChange={(e) => updateStep(index, 'status_key', e.target.value)} placeholder="status_key" className="h-8 text-xs font-mono flex-1 rounded-lg" />
+                        {(step as any).is_deprecated && <Badge variant="outline" className="text-[9px] bg-amber-100 text-amber-700 border-amber-300 shrink-0">Deprecated</Badge>}
                         <Select value={step.actor} onValueChange={(v) => updateStep(index, 'actor', v)}>
                           <SelectTrigger className="h-8 text-xs w-24 rounded-lg"><SelectValue /></SelectTrigger>
                           <SelectContent>{ACTORS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>

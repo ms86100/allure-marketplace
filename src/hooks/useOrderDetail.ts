@@ -57,7 +57,7 @@ export function useOrderDetail(id: string | undefined) {
   );
   const transitions = useStatusTransitions(effectiveParentGroup || 'default', resolvedTxnType);
 
-  const timelineSteps = useMemo(() => getTimelineSteps(flow), [flow]);
+  const timelineSteps = useMemo(() => getTimelineSteps(flow, order?.status), [flow, order?.status]);
 
   // Status order derived entirely from DB flow — no hardcoded fallbacks
   const statusOrder = useMemo(() => {
