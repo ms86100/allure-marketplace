@@ -151,6 +151,26 @@ async function handleAssign(req: Request, db: any, userId: string) {
   if (!assignment) return jsonResponse({ error: 'Assignment not found' }, 404);
   if (assignment.status !== 'pending') return jsonResponse({ error: 'Assignment not in pending status' }, 400);
 
+  // Bug 10 fix: Authorization — only the order's seller, a society admin, or platform admin can assign
+  const { data: order } = await db.from('orders').select('seller_id').eq('id', assignment.order_id).single();
+  if (!order) return jsonResponse({ error: 'Order not found' }, 404);
+
+  const { data: sellerProfile } = await db.from('seller_profiles').select('user_id').eq('id', order.seller_id).single();
+  const isSeller = sellerProfile?.user_id === userId;
+
+  let isSocietyAdmin = false;
+  if (assignment.society_id) {
+    const { data: adminRow } = await db.from('society_admins').select('id').eq('society_id', assignment.society_id).eq('user_id', userId).maybeSingle();
+    isSocietyAdmin = !!adminRow;
+  }
+
+  const { data: platformAdmin } = await db.from('user_roles').select('id').eq('user_id', userId).eq('role', 'admin').maybeSingle();
+  const isPlatformAdmin = !!platformAdmin;
+
+  if (!isSeller && !isSocietyAdmin && !isPlatformAdmin) {
+    return jsonResponse({ error: 'Not authorized to assign delivery for this order' }, 403);
+  }
+
   const { error } = await db
     .from('delivery_assignments')
     .update({
@@ -258,7 +278,12 @@ async function handleUpdateStatus(req: Request, db: any, userId: string) {
     updateData.failed_reason = note || 'Delivery failed';
     updateData.attempt_count = (assignment as any).attempt_count + 1;
     updateData.failure_owner = body.failure_owner || null;
-    await db.from('orders').update({ status: 'returned' }).eq('id', assignment.order_id);
+    // Bug 18 fix: Don't resurrect cancelled/completed orders
+    await db.from('orders').update({ status: 'returned' })
+      .eq('id', assignment.order_id)
+      .neq('status', 'cancelled')
+      .neq('status', 'completed')
+      .neq('status', 'refunded');
   }
 
   if (status === 'at_gate') {
@@ -312,13 +337,32 @@ async function handleComplete(req: Request, db: any, userId: string) {
 
   const { data: assignment } = await db
     .from('delivery_assignments')
-    .select('id, order_id, otp_hash, otp_expires_at, status, otp_attempt_count, max_otp_attempts')
+    .select('id, order_id, otp_hash, otp_expires_at, status, otp_attempt_count, max_otp_attempts, rider_id, partner_id')
     .eq('id', assignment_id)
     .single();
 
   if (!assignment) return jsonResponse({ error: 'Assignment not found' }, 404);
   if (!['picked_up', 'at_gate'].includes(assignment.status)) {
     return jsonResponse({ error: 'Assignment not in deliverable status' }, 400);
+  }
+
+  // Bug 11 fix: Authorization — only the assigned rider, seller, or buyer can complete
+  const { data: order } = await db.from('orders').select('seller_id, buyer_id').eq('id', assignment.order_id).single();
+  if (!order) return jsonResponse({ error: 'Order not found' }, 404);
+
+  const { data: sellerProfile } = await db.from('seller_profiles').select('user_id').eq('id', order.seller_id).single();
+  const isSeller = sellerProfile?.user_id === userId;
+  const isBuyer = order.buyer_id === userId;
+
+  // Check if caller is the assigned rider (via delivery_partner_pool.user_id)
+  let isAssignedRider = false;
+  if (assignment.rider_id) {
+    const { data: rider } = await db.from('delivery_partner_pool').select('user_id').eq('id', assignment.rider_id).maybeSingle();
+    isAssignedRider = rider?.user_id === userId;
+  }
+
+  if (!isSeller && !isBuyer && !isAssignedRider) {
+    return jsonResponse({ error: 'Not authorized to complete this delivery' }, 403);
   }
 
   // OTP lockout check
@@ -451,12 +495,13 @@ async function handleWebhook(req: Request, db: any) {
   if (rider_name) updateData.rider_name = rider_name;
   if (rider_phone) updateData.rider_phone = rider_phone;
 
+  // Bug 12 fix: Map 3PL 'delivered' to 'at_gate' — require OTP for final confirmation
   const statusMap: Record<string, string> = {
     'assigned': 'assigned',
     'picked_up': 'picked_up',
     'in_transit': 'picked_up',
     'arrived': 'at_gate',
-    'delivered': 'delivered',
+    'delivered': 'at_gate', // Intentionally mapped to at_gate — OTP still required
     'failed': 'failed',
     'cancelled': 'cancelled',
   };
@@ -465,7 +510,7 @@ async function handleWebhook(req: Request, db: any) {
   if (internalStatus) {
     updateData.status = internalStatus;
     if (internalStatus === 'picked_up') updateData.pickup_at = new Date().toISOString();
-    if (internalStatus === 'delivered') updateData.delivered_at = new Date().toISOString();
+    if (internalStatus === 'at_gate') updateData.at_gate_at = new Date().toISOString();
   }
 
   if (Object.keys(updateData).length > 0) {
@@ -485,6 +530,7 @@ async function handleWebhook(req: Request, db: any) {
 }
 
 // Calculate delivery fee based on society config
+// Bug 20 fix: Hide internal margin/payout from non-admin/non-seller users
 async function handleCalculateFee(req: Request, db: any, userId: string) {
   const url = new URL(req.url);
   const orderValue = parseFloat(url.searchParams.get('order_value') || '0');
@@ -502,13 +548,22 @@ async function handleCalculateFee(req: Request, db: any, userId: string) {
   const baseFee = parseInt(settingsMap.base_delivery_fee || '20', 10) || 20;
   const freeThreshold = parseInt(settingsMap.free_delivery_threshold || '500', 10) || 500;
 
+  // Check if caller is a seller or admin (allowed to see margins)
+  const { data: sellerRow } = await db.from('seller_profiles').select('id').eq('user_id', userId).maybeSingle();
+  const { data: adminRow } = await db.from('user_roles').select('id').eq('user_id', userId).eq('role', 'admin').maybeSingle();
+  const showInternals = !!sellerRow || !!adminRow;
+
   if (orderValue >= freeThreshold) {
-    return jsonResponse({ delivery_fee: 0, partner_payout: 0, platform_margin: 0, free_delivery: true });
+    const resp: Record<string, any> = { delivery_fee: 0, free_delivery: true };
+    if (showInternals) { resp.partner_payout = 0; resp.platform_margin = 0; }
+    return jsonResponse(resp);
   }
 
   const deliveryFee = baseFee;
   const partnerPayout = Math.round(deliveryFee * 0.7);
   const platformMargin = deliveryFee - partnerPayout;
 
-  return jsonResponse({ delivery_fee: deliveryFee, partner_payout: partnerPayout, platform_margin: platformMargin, free_delivery: false });
+  const resp: Record<string, any> = { delivery_fee: deliveryFee, free_delivery: false };
+  if (showInternals) { resp.partner_payout = partnerPayout; resp.platform_margin = platformMargin; }
+  return jsonResponse(resp);
 }

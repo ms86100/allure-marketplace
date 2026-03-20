@@ -44,34 +44,52 @@ Deno.serve(async (req) => {
       console.error("Error fetching old orders:", ordersFetchErr);
       results.orders = { error: ordersFetchErr.message };
     } else if (oldOrders && oldOrders.length > 0) {
-      // Insert into archive
-      const archiveRows = oldOrders.map((o: any) => ({
-        ...o,
-        archived_at: now,
-      }));
+      // Bug 5 fix: Filter out orders with pending/processing settlements before archiving
+      const orderIds = oldOrders.map((o: any) => o.id);
+      const { data: activeSettlements } = await supabase
+        .from("seller_settlements")
+        .select("order_id")
+        .in("order_id", orderIds)
+        .in("settlement_status", ["pending", "processing", "eligible"]);
 
-      const { error: archiveErr } = await supabase
-        .from("orders_archive")
-        .upsert(archiveRows, { onConflict: "id" });
+      const blockedOrderIds = new Set((activeSettlements || []).map((s: any) => s.order_id));
+      const safeOrders = oldOrders.filter((o: any) => !blockedOrderIds.has(o.id));
 
-      if (archiveErr) {
-        console.error("Error archiving orders:", archiveErr);
-        results.orders = { error: archiveErr.message };
+      if (blockedOrderIds.size > 0) {
+        console.log(`Skipping ${blockedOrderIds.size} orders with active settlements`);
+      }
+
+      if (safeOrders.length === 0) {
+        results.orders = { archived: 0, skipped_settlements: blockedOrderIds.size };
       } else {
-        // Delete from orders
-        const ids = oldOrders.map((o: any) => o.id);
-        // Delete order items first
-        for (const id of ids) {
-          await supabase.from("order_items").delete().eq("order_id", id);
-        }
-        const { error: deleteErr } = await supabase
-          .from("orders")
-          .delete()
-          .in("id", ids);
+        const archiveRows = safeOrders.map((o: any) => ({
+          ...o,
+          archived_at: now,
+        }));
 
-        results.orders = deleteErr
-          ? { error: deleteErr.message }
-          : { archived: oldOrders.length };
+        const { error: archiveErr } = await supabase
+          .from("orders_archive")
+          .upsert(archiveRows, { onConflict: "id" });
+
+        if (archiveErr) {
+          console.error("Error archiving orders:", archiveErr);
+          results.orders = { error: archiveErr.message };
+        } else {
+          const ids = safeOrders.map((o: any) => o.id);
+          // Delete related records first
+          for (const id of ids) {
+            await supabase.from("order_items").delete().eq("order_id", id);
+            await supabase.from("payment_records").delete().eq("order_id", id);
+          }
+          const { error: deleteErr } = await supabase
+            .from("orders")
+            .delete()
+            .in("id", ids);
+
+          results.orders = deleteErr
+            ? { error: deleteErr.message }
+            : { archived: safeOrders.length, skipped_settlements: blockedOrderIds.size };
+        }
       }
     } else {
       results.orders = { archived: 0 };

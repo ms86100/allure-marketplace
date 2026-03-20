@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
         _delivery_address_id: null,
         _delivery_lat: null,
         _delivery_lng: null,
-        _idempotency_key: `reorder_${order_id}_${Date.now()}`,
+        _idempotency_key: `reorder_${order_id}_${user.id}`,
       });
 
     if (createErr) {

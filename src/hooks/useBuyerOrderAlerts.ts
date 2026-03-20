@@ -26,10 +26,13 @@ const STATUS_MESSAGES: Record<string, { icon: string; title: string; description
   failed: { icon: '❌', title: 'Delivery Failed', description: 'Your delivery could not be completed.', haptic: 'error' },
 };
 
-/** In-memory cache for DB display labels (fetched once per session). */
+/** Bug 16 fix: In-memory cache with 5-minute TTL instead of forever. */
 let displayLabelCache: Record<string, string> | null = null;
+let displayLabelCacheExpiry = 0;
+const LABEL_CACHE_TTL_MS = 5 * 60 * 1000;
+
 async function getDisplayLabel(statusKey: string): Promise<string | null> {
-  if (!displayLabelCache) {
+  if (!displayLabelCache || Date.now() > displayLabelCacheExpiry) {
     const { data } = await supabase
       .from('category_status_flows')
       .select('status_key, display_label')
@@ -39,6 +42,7 @@ async function getDisplayLabel(statusKey: string): Promise<string | null> {
       for (const r of data) {
         if (r.display_label) displayLabelCache[r.status_key] = r.display_label;
       }
+      displayLabelCacheExpiry = Date.now() + LABEL_CACHE_TTL_MS;
     }
   }
   return displayLabelCache?.[statusKey] ?? null;

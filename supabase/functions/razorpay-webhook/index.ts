@@ -117,11 +117,12 @@ serve(async (req) => {
       const razorpayEventId = payload.event_id || null;
       const orderId = paymentEntity.notes?.order_id;
 
+      // Bug 7 fix: Return 200 for missing order_id to stop Razorpay retry storms
       if (!orderId) {
-        console.error('Order ID not found in payment notes');
+        console.error('Order ID not found in payment notes — acknowledging to stop retries');
         return new Response(
-          JSON.stringify({ error: 'Order ID not found' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ acknowledged: true, skipped: 'no_order_id' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 

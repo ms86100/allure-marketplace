@@ -298,28 +298,46 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [user, setOptimistic, cancelCartQueries, snapshot, rollback, queryClient, countKey]);
 
+  // Bug 3 fix: Snapshot cart before delete so we can restore on insert failure
   const replaceCart = useCallback(async (inserts: { product_id: string; quantity: number }[]) => {
     if (!user || inserts.length === 0) return;
     setPendingMutations(c => c + 1);
     await cancelCartQueries();
+    const snap = snapshot();
     const totalQty = inserts.reduce((s, i) => s + i.quantity, 0);
     queryClient.setQueryData(countKey(), totalQty);
 
     try {
+      // Snapshot existing cart items for rollback
+      const { data: existingItems } = await supabase
+        .from('cart_items')
+        .select('product_id, quantity')
+        .eq('user_id', user.id);
+
       await supabase.from('cart_items').delete().eq('user_id', user.id);
+
       const { error } = await supabase
         .from('cart_items')
         .insert(inserts.map(i => ({ user_id: user.id, product_id: i.product_id, quantity: i.quantity })));
-      if (error) throw error;
+
+      if (error) {
+        // Restore original cart items
+        if (existingItems && existingItems.length > 0) {
+          await supabase.from('cart_items').insert(
+            existingItems.map(i => ({ user_id: user.id, product_id: i.product_id, quantity: i.quantity }))
+          );
+        }
+        rollback(snap);
+        throw error;
+      }
       await reconcile();
     } catch (error) {
-      // Reconcile will fix state
       await reconcile();
       throw error;
     } finally {
       setPendingMutations(c => Math.max(0, c - 1));
     }
-  }, [user, queryClient, cancelCartQueries, countKey, reconcile]);
+  }, [user, queryClient, cancelCartQueries, countKey, reconcile, snapshot, rollback]);
 
   const hasHydrated = isFetched;
 

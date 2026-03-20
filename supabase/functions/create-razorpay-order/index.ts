@@ -75,17 +75,20 @@ serve(async (req) => {
 
     console.log('Creating Razorpay order:', { orderId, amount, sellerId });
 
+    // Bug 8 fix: Verify order is in valid status and not already paid/cancelled
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select('*')
       .eq('id', orderId)
       .eq('buyer_id', user.id)
+      .neq('status', 'cancelled')
+      .eq('payment_status', 'pending')
       .single();
 
     if (orderError || !order) {
-      console.error('Order not found or unauthorized:', orderError);
+      console.error('Order not found, unauthorized, or not in payable state:', orderError);
       return new Response(
-        JSON.stringify({ error: 'Order not found or you are not authorized' }),
+        JSON.stringify({ error: 'Order not found, already cancelled, or already paid' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

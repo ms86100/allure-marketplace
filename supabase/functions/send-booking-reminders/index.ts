@@ -34,16 +34,19 @@ Deno.serve(async (req) => {
     let totalReminded = 0;
 
     for (const window of REMINDER_WINDOWS) {
+      // Bug 17 fix: Use UTC consistently to avoid timezone drift in edge function runtime
       const fromTime = new Date(now.getTime() + window.fromMin * 60_000);
       const toTime = new Date(now.getTime() + window.toMin * 60_000);
+      const fromTimeStr = fromTime.toISOString().slice(11, 19);
+      const toTimeStr = toTime.toISOString().slice(11, 19);
 
       const { data: bookings, error } = await supabase
         .from("service_bookings")
         .select("id, buyer_id, seller_id, product_id, booking_date, start_time, end_time")
         .eq("booking_date", todayStr)
         .in("status", ["confirmed", "scheduled", "rescheduled", "requested"])
-        .gte("start_time", fromTime.toTimeString().slice(0, 8))
-        .lte("start_time", toTime.toTimeString().slice(0, 8));
+        .gte("start_time", fromTimeStr)
+        .lte("start_time", toTimeStr);
 
       if (error) {
         console.error(`Error fetching bookings for ${window.label}:`, error);

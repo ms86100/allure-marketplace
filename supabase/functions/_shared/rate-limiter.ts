@@ -87,7 +87,8 @@ export async function checkRateLimit(
 }
 
 /**
- * Retry path: re-read the current state after an optimistic lock failure
+ * Retry path: re-read and attempt atomic increment after an optimistic lock failure
+ * Bug 15 fix: Also increment on retry to prevent burst bypass
  */
 async function checkRateLimitRetry(
   supabase: any,
@@ -107,7 +108,23 @@ async function checkRateLimitRetry(
     return { allowed: false, remaining: 0 };
   }
 
-  return { allowed: true, remaining: maxRequests - data.count };
+  // Attempt atomic increment on retry too
+  const { data: updated, error } = await supabase
+    .from("rate_limits")
+    .update({ count: data.count + 1 })
+    .eq("key", key)
+    .eq("count", data.count)
+    .select("count")
+    .single();
+
+  if (error || !updated) {
+    // Second race — just check if still under limit
+    const { data: final } = await supabase.from("rate_limits").select("count").eq("key", key).single();
+    if (!final || final.count >= maxRequests) return { allowed: false, remaining: 0 };
+    return { allowed: true, remaining: maxRequests - final.count };
+  }
+
+  return { allowed: true, remaining: maxRequests - updated.count };
 }
 
 /**
