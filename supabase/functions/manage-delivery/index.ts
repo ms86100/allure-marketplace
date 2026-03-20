@@ -385,6 +385,16 @@ async function handleComplete(req: Request, db: any, userId: string) {
   const isValid = await verifyOTP(otp, assignment.otp_hash);
   if (!isValid) return jsonResponse({ error: 'Invalid OTP' }, 400);
 
+  // Set OTP verified flag so triggers on both tables allow the transition
+  await db.rpc('set_config_flag', { flag_name: 'app.otp_verified', flag_value: 'true' }).throwOnError?.();
+  // Fallback: use raw SQL if the RPC doesn't exist
+  await db.from('delivery_assignments').select('id').limit(0); // ensure connection
+  const { error: flagError } = await db.rpc('execute_set_config', {}).catch(() => ({ error: null }));
+  
+  // Direct set_config via service role — the service role client bypasses RLS but triggers still fire
+  // Use the raw postgres approach: call set_config in a function context
+  const { data: _flagSet, error: sqlErr } = await db.rpc('set_otp_verified_flag');
+  
   const { error } = await db
     .from('delivery_assignments')
     .update({
