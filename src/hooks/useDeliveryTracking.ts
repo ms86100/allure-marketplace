@@ -78,6 +78,10 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
   const lastRealtimeAt = useRef<number>(0);
   // Track channel health
   const channelDegraded = useRef(false);
+  // Bug 15 fix: dedup guard for location timestamps
+  const seenLocationTimestamps = useRef(new Set<string>());
+  // Bug 10 fix: track current status for adaptive polling
+  const currentStatusRef = useRef<string | null>(null);
 
   // Pre-load config
   useEffect(() => {
@@ -86,6 +90,7 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
 
   // Staleness checker
   useEffect(() => {
+    // Bug 7 fix: check staleness every 15s instead of 30s
     const interval = setInterval(() => {
       setState((prev) => {
         if (!prev.lastLocationAt) {
@@ -95,7 +100,7 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
         const stale = Date.now() - new Date(prev.lastLocationAt).getTime() > threshold;
         return stale !== prev.isLocationStale ? { ...prev, isLocationStale: stale } : prev;
       });
-    }, 30_000);
+    }, 15_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -104,6 +109,32 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
    * Returns true if state was updated.
    */
   const applyFetchedData = useCallback((data: any) => {
+    // Bug 15 fix: dedup by timestamp
+    const ts = data.last_location_at;
+    if (ts && seenLocationTimestamps.current.has(ts)) {
+      // Still update non-location fields
+      setState((prev) => ({
+        ...prev,
+        status: data.status ?? prev.status,
+        riderName: data.rider_name ?? prev.riderName,
+        riderPhone: data.rider_phone ?? prev.riderPhone,
+        riderPhotoUrl: data.rider_photo_url ?? prev.riderPhotoUrl,
+        eta: data.eta_minutes ?? prev.eta,
+        distance: data.distance_meters ?? prev.distance,
+        proximityStatus: data.proximity_status ?? prev.proximityStatus,
+        isLoading: false,
+      }));
+      return;
+    }
+    if (ts) {
+      seenLocationTimestamps.current.add(ts);
+      // Keep set bounded
+      if (seenLocationTimestamps.current.size > 100) {
+        const entries = Array.from(seenLocationTimestamps.current);
+        seenLocationTimestamps.current = new Set(entries.slice(-50));
+      }
+    }
+
     const loc = buildLocationFromData(data);
     if (loc) {
       const result = filterGPSPoint(loc, gpsFilterState.current);
@@ -112,8 +143,10 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
       loc.longitude = result.filtered.longitude;
     }
 
+    // Bug 10 fix: track current status
+    if (data.status) currentStatusRef.current = data.status;
+
     setState((prev) => {
-      // Only update location if incoming is newer
       const incomingAt = data.last_location_at;
       const currentAt = prev.lastLocationAt;
       const isNewer = !currentAt || (incomingAt && new Date(incomingAt).getTime() > new Date(currentAt).getTime());
@@ -163,10 +196,11 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
 
       const getInterval = () => {
         if (channelDegraded.current) return POLL_DEGRADED_MS;
-        // Check current status from state ref
+        // Bug 10 fix: use idle rate for non-transit statuses
         const transitStatuses = new Set(getTrackingConfigSync().transit_statuses);
-        // We read from the DOM-less closure, so we need a way to get current status
-        // We'll use a simple approach: always poll at transit rate, it's only 10s
+        if (currentStatusRef.current && !transitStatuses.has(currentStatusRef.current)) {
+          return POLL_IDLE_MS;
+        }
         return POLL_TRANSIT_MS;
       };
 
@@ -276,6 +310,18 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
         lastRealtimeAt.current = Date.now();
         channelDegraded.current = false;
         const loc = payload.new as any;
+
+        // Bug 15 fix: dedup by recorded_at
+        const ts = loc.recorded_at;
+        if (ts && seenLocationTimestamps.current.has(ts)) return;
+        if (ts) {
+          seenLocationTimestamps.current.add(ts);
+          if (seenLocationTimestamps.current.size > 100) {
+            const entries = Array.from(seenLocationTimestamps.current);
+            seenLocationTimestamps.current = new Set(entries.slice(-50));
+          }
+        }
+
         const rawPoint: RiderLocation = {
           latitude: loc.latitude,
           longitude: loc.longitude,

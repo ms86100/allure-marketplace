@@ -57,7 +57,7 @@ serve(async (req) => {
 
     const { data: stalledAssignments, error } = await supabase
       .from('delivery_assignments')
-      .select('id, order_id, rider_name, rider_phone, last_location_at, status, stalled_notified, orders:orders!delivery_assignments_order_id_fkey(id, buyer_id, seller_id, status, needs_attention)')
+      .select('id, order_id, rider_name, rider_phone, last_location_at, status, stalled_notified, orders:orders!delivery_assignments_order_id_fkey(id, buyer_id, seller_id, status, needs_attention, needs_attention_reason)')
       .in('status', transitStatuses)
       .not('last_location_at', 'is', null)
       .lt('last_location_at', softThresholdAgo);
@@ -87,14 +87,17 @@ serve(async (req) => {
         elapsedLabel = `Tracking has been inactive for over ${hours} hour${hours > 1 ? 's' : ''} during active delivery`;
       }
 
-      // Always update the reason to reflect current elapsed time
-      await supabase
-        .from('orders')
-        .update({
-          needs_attention: true,
-          needs_attention_reason: elapsedLabel,
-        } as any)
-        .eq('id', order.id);
+      // Bug 14 fix: Only update if reason text changed
+      const currentReason = order.needs_attention_reason ?? '';
+      if (!order.needs_attention || currentReason !== elapsedLabel) {
+        await supabase
+          .from('orders')
+          .update({
+            needs_attention: true,
+            needs_attention_reason: elapsedLabel,
+          } as any)
+          .eq('id', order.id);
+      }
 
       // Notify only once
       if (!assignment.stalled_notified) {
