@@ -502,11 +502,21 @@ export default function OrderDetailPage() {
             {o.orderFulfillmentType === 'delivery' && o.flow.find(s => s.status_key === order.status)?.actor === 'system' && (order as any).delivery_handled_by === 'platform' ? (
               <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground"><Truck size={16} className="text-primary" /><span>Awaiting delivery pickup</span></div>
             ) : o.nextStatus ? (
-              (stepRequiresOtp(o.flow, o.nextStatus) || (o.nextStatus === 'delivered' && isDeliveryOrder)) && deliveryAssignmentId ? (
-                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
-                  {o.isUpdating ? 'Updating...' : 'Verify & Deliver'}
-                  <ChevronRight size={14} className="ml-1" />
-                </Button>
+              /* CRITICAL: For delivery orders transitioning to 'delivered', ALWAYS require OTP.
+                 Never fall back to direct updateOrderStatus for delivered status on delivery orders. */
+              (stepRequiresOtp(o.flow, o.nextStatus) || (o.nextStatus === 'delivered' && isDeliveryOrder)) ? (
+                deliveryAssignmentId ? (
+                  <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
+                    {o.isUpdating ? 'Updating...' : 'Verify & Deliver'}
+                    <ChevronRight size={14} className="ml-1" />
+                  </Button>
+                ) : (
+                  /* Assignment not yet loaded — block action, show loading instead of unsafe fallback */
+                  <Button className="flex-1 h-12" disabled>
+                    <Loader2 size={14} className="mr-1.5 animate-spin" />
+                    Preparing delivery verification…
+                  </Button>
+                )
               ) : (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.nextStatus!)} disabled={o.isUpdating}>{o.isUpdating ? 'Updating...' : `Mark ${o.getOrderStatus(o.nextStatus).label}`}<ChevronRight size={14} className="ml-1" /></Button>
               )
