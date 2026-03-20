@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { getTrackingConfigSync } from '@/services/trackingConfig';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
