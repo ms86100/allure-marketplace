@@ -1,155 +1,150 @@
 
 
-## Part 1: Map Experience Redesign
+## Round 2: 20 Production Bugs & Hidden Issues
 
-### Problem
-The current map uses plain emoji icons (🛵, 📍), a flat OpenStreetMap tile layer, a 200px fixed height, and no visual cues for rider direction or branding. It feels like a prototype, not a production delivery tracker.
+### Bug 1: `auto-cancel-orders` cancels without status guard on the cancel UPDATE
+**What**: Line 119-126 — the cancel `UPDATE` uses `.eq("id", order.id)` but does NOT include `.eq("status", ...)` guard. If a seller accepts the order between the SELECT and UPDATE, the accepted order gets cancelled.
+**Why**: Race condition between seller acceptance and cron — customer loses a valid order.
+**Where**: `supabase/functions/auto-cancel-orders/index.ts` line 119
+**Fix**: Add `.in("status", cancellableStatuses)` to the cancel UPDATE, matching the same guard used for auto-complete (line 104).
 
-### Design
+### Bug 2: `delete-user-account` doesn't clean `orders`, `order_items`, or `chat_messages`
+**What**: The cleanup table list (lines 32-53) misses `orders`, `order_items`, `chat_messages`, `service_bookings`, `delivery_assignments`, `delivery_locations`, `payment_records`, `seller_settlements`. After auth user deletion, these become orphaned rows with dangling `buyer_id` references.
+**Why**: Foreign key violations on joins, orphaned financial data, and potential GDPR non-compliance.
+**Where**: `supabase/functions/delete-user-account/index.ts` lines 32-53
+**Fix**: Add anonymization for orders (set `buyer_id` fields to null or a sentinel) and delete chat messages, bookings, and other personal data before auth deletion.
 
-**Custom Rider Icon — Scooty with Sociva Bag**
-Replace the emoji `🛵` with a custom SVG `DivIcon` rendered inline. The SVG will depict a scooty silhouette carrying a delivery bag branded with "Sociva" text. The icon rotates based on heading. Uses CSS `filter: drop-shadow()` for depth.
+### Bug 3: `replaceCart` deletes then inserts without a transaction — partial failure leaves empty cart
+**What**: In `useCart.tsx` line 309, `replaceCart` first DELETEs all cart items, then INSERTs new ones. If the INSERT fails (network error, RLS), the user's cart is wiped with no rollback.
+**Why**: User loses their entire cart on a transient network blip during reorder.
+**Where**: `src/hooks/useCart.tsx` lines 308-318
+**Fix**: Wrap in an RPC or use upsert pattern. Short-term: snapshot the old cart and restore on INSERT failure.
 
-**Destination Icon**
-Replace `📍` emoji with a pulsing SVG pin with a subtle glow ring animation (CSS keyframes) to draw attention.
+### Bug 4: `quick-reorder` idempotency key uses `Date.now()` — never deduplicates
+**What**: Line 146: `_idempotency_key: \`reorder_${order_id}_${Date.now()}\``. Since `Date.now()` changes every millisecond, every retry generates a unique key, defeating the idempotency mechanism entirely.
+**Why**: Double-tap or network retry creates duplicate orders.
+**Where**: `supabase/functions/quick-reorder/index.ts` line 146
+**Fix**: Use a stable key like `reorder_${order_id}_${user.id}` or hash the items payload. Reset only after confirmed success.
 
-**Route Line**
-- Gradient polyline: primary color fading to a lighter shade toward the destination
-- Animated dashed "ant trail" effect using CSS `stroke-dashoffset` animation on the remaining route ahead of the rider
-- Completed route segment (behind rider) rendered in a muted/faded color
+### Bug 5: `archive-old-data` deletes orders without checking active payment records or settlements
+**What**: Lines 62-70 — orders in "completed" status older than 90 days are archived and deleted. But `payment_records` and `seller_settlements` reference `order_id`. If settlements are still "pending" or "processing", the FK reference breaks.
+**Why**: Financial records become orphaned; settlement processing fails silently.
+**Where**: `supabase/functions/archive-old-data/index.ts` lines 46-75
+**Fix**: Before archiving, verify no pending/processing settlements exist for those orders. Also archive `payment_records` alongside orders.
 
-**Map Tiles**
-Switch to a cleaner, more modern tile provider: CartoDB Voyager (`https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png`) for a polished, app-like feel.
+### Bug 6: `process-settlements` queries ALL terminal success statuses across ALL workflow types
+**What**: Lines 77-85 — the settlement function fetches `category_status_flows` where `is_terminal=true AND is_success=true` globally. This returns statuses from different workflow types (e.g., `quoted_accepted` from enquiry flows). An order could match a terminal status from a different workflow and settle prematurely.
+**Why**: Premature or incorrect settlement for orders whose workflow wasn't actually completed.
+**Where**: `supabase/functions/process-settlements/index.ts` lines 77-85
+**Fix**: Filter by the order's actual workflow key (join through `listing_type_workflow_map` or use the order's `order_type`/`fulfillment_type`).
 
-**Map Height & Interaction**
-- Increase map height from `h-[200px]` to `h-[260px]` for better spatial context
-- Add a "Re-center" floating button when user pans away
+### Bug 7: `razorpay-webhook` returns 400 for missing `order_id` in notes — Razorpay retries indefinitely
+**What**: Lines 120-126 — if `paymentEntity.notes?.order_id` is undefined, the function returns 400. Razorpay treats 4xx as retryable, so it will keep sending this webhook forever.
+**Why**: Webhook retry storm filling logs and burning edge function quota.
+**Where**: `supabase/functions/razorpay-webhook/index.ts` lines 120-126
+**Fix**: Return 200 with `{ acknowledged: true, skipped: 'no_order_id' }` — Razorpay stops retrying on 2xx.
 
-**Smooth Camera**
-- Instead of `fitBounds` snapping, smoothly `flyTo` the midpoint with animated zoom
-- Keep rider centered with slight offset toward destination
+### Bug 8: `create-razorpay-order` doesn't verify order status before creating payment
+**What**: Lines 78-91 — the function checks if the order exists and belongs to the buyer, but doesn't check if the order is still in a valid status (e.g., not already cancelled or paid). A buyer could create a Razorpay payment for a cancelled order.
+**Why**: Buyer pays for a cancelled order; refund required, money locked.
+**Where**: `supabase/functions/create-razorpay-order/index.ts` lines 78-91
+**Fix**: Add `.neq('status', 'cancelled').eq('payment_status', 'pending')` to the order query.
 
-**ETA Overlay Pill**
-- Redesign the top-right ETA badge with a frosted glass card showing: route ETA, distance in km, and a small progress bar
+### Bug 9: `useLoginThrottle` uses `localStorage` — trivially bypassed
+**What**: The entire login throttling mechanism (lines 12-25) stores attempt counts in `localStorage`. An attacker can simply clear storage or use incognito mode to bypass the lockout.
+**Why**: Brute-force protection is effectively non-existent; false sense of security.
+**Where**: `src/hooks/useLoginThrottle.ts`
+**Fix**: Move rate limiting to the server side (edge function or RPC) keyed by IP + phone/email. Keep client-side as UX-only feedback.
 
-### Files to Edit
-- `src/components/delivery/DeliveryMapView.tsx` — full rewrite of icons, tiles, polyline, camera, and overlay
+### Bug 10: `manage-delivery` `handleAssign` has no authorization check — any authenticated user can assign riders
+**What**: Lines 139-174 — `handleAssign` only checks that the assignment exists and is in 'pending' status. It doesn't verify the caller is the seller, an admin, or has any role related to the order.
+**Why**: Any authenticated user with a valid `assignment_id` can assign themselves as a rider, hijacking deliveries.
+**Where**: `supabase/functions/manage-delivery/index.ts` lines 139-174
+**Fix**: Verify `userId` is the order's seller (`user_id`), a society admin, or has delivery management permissions.
 
----
+### Bug 11: `manage-delivery` `handleComplete` has no authorization — any user can verify OTP and complete delivery
+**What**: Lines 307-364 — `handleComplete` only requires a valid `assignment_id` and OTP. No check that the caller is the delivery partner, seller, or buyer.
+**Why**: If OTP leaks (screenshot, accidental share), anyone can mark the delivery as complete.
+**Where**: `supabase/functions/manage-delivery/index.ts` lines 307-364
+**Fix**: Verify caller is the assigned `partner_id` or the seller's `user_id`.
 
-## Part 2: 20 Production Bug Investigation
+### Bug 12: `manage-delivery` webhook allows `delivered` status without OTP verification
+**What**: Lines 454-469 — the 3PL webhook handler maps `status: 'delivered'` directly to `delivered` status on `delivery_assignments` and updates the order, completely bypassing OTP verification.
+**Why**: A compromised 3PL webhook (or misconfigured integration) can mark orders as delivered without buyer confirmation, enabling fraud.
+**Where**: `supabase/functions/manage-delivery/index.ts` lines 454-472
+**Fix**: Map 3PL `delivered` to `at_gate` instead, requiring OTP completion for the final step. Or add a `delivery_confirmed_via` field to distinguish OTP vs webhook completions.
 
-### Bug 1: `delivery_locations` table has NO index on `assignment_id`
-**Why critical**: Every `INSERT` into `delivery_locations` (every 5s per active delivery) triggers RLS policy evaluation that JOINs `delivery_assignments` and `orders`. The SELECT policy on `delivery_locations` also scans by `assignment_id`. Without an index, this is a full table scan that will degrade as location history grows — causing timeouts during peak hours.
-**Where**: `delivery_locations` table schema
-**Fix**: Add index `CREATE INDEX idx_delivery_locations_assignment_id ON delivery_locations(assignment_id)`
+### Bug 13: `ServiceBookingFlow` deletes orders directly from client on rollback — bypasses RLS
+**What**: Lines 205, 228-229 — on booking failure, the frontend tries `supabase.from('orders').delete().eq('id', order.id)`. The RLS policy likely blocks buyer DELETE on orders, so this silently fails, leaving orphaned orders.
+**Why**: Orphaned `placed`/`requested` orders accumulate in the system with no cleanup path.
+**Where**: `src/components/booking/ServiceBookingFlow.tsx` lines 205, 228-229
+**Fix**: Use an RPC (`cancel_failed_booking`) that runs with SECURITY DEFINER and properly cleans up the order + items + booking atomically.
 
-### Bug 2: OSRM public demo server used in production
-**Why critical**: `router.project-osrm.org` is a demo server with no SLA, rate limits, and frequent downtime. Under load (multiple concurrent deliveries), requests will be throttled or blocked, causing the route polyline to disappear and ETA to go stale.
-**Where**: `DeliveryMapView.tsx` line 161
-**Fix**: Add fallback to straight-line distance ETA when OSRM fails (already partially done), but also add exponential backoff and consider a self-hosted or paid routing API. Short-term: increase retry count from 1 to 2, add jittered backoff.
+### Bug 14: `useSellerChat` has TOCTOU race on conversation creation
+**What**: Lines 23-47 — `getOrCreate` first SELECTs to check if conversation exists, then INSERTs if not. Two concurrent messages can both see "no conversation" and both try to INSERT, causing a unique constraint violation.
+**Why**: First message from buyer fails with a DB error; user sees "Could not create conversation."
+**Where**: `src/hooks/useSellerChat.ts` lines 23-47
+**Fix**: Use upsert with `onConflict` on `(buyer_id, seller_id, product_id)` or wrap in a DB function with conflict handling.
 
-### Bug 3: `partner_id` in `delivery_locations.insert` uses `callerId` instead of actual partner
-**Why critical**: When the seller (not a pool rider) delivers, `callerId` is the seller's `user_id`, but `partner_id` column semantically should reference the delivery partner. If analytics or auditing queries filter by `partner_id`, seller-delivered orders will have incorrect attribution.
-**Where**: `update-delivery-location/index.ts` line 213
-**Fix**: Use `assignment.partner_id || callerId` as the value.
+### Bug 15: `rate-limiter` retry path doesn't increment — allows burst bypass
+**What**: Lines 92-111 — `checkRateLimitRetry` only reads the current count and checks if it's over limit. It does NOT increment. So if two concurrent requests race, both hit the optimistic lock failure, both call retry, and both get `allowed: true` without incrementing.
+**Why**: Under concurrent load, the rate limiter can be bypassed, allowing 2x the intended limit.
+**Where**: `supabase/functions/_shared/rate-limiter.ts` lines 92-111
+**Fix**: The retry path should also attempt an atomic increment, not just read.
 
-### Bug 4: GPS filter `timeDiffMs` can be zero or negative with out-of-order realtime events
-**Why critical**: If two realtime events arrive out of order (common with WebSocket reconnection), `timeDiffMs` could be 0 or negative. When `timeDiffMs === 0`, the teleport check is skipped entirely (the `if (timeDiffMs > 0)` guard). When negative, it's also skipped. This means a genuine teleport (GPS spoofing or device error) passes through unfiltered.
-**Where**: `gps-filter.ts` lines 76-88
-**Fix**: Reject points where `timeDiffMs <= 0` (out-of-order) — return the smoothed position.
+### Bug 16: `useBuyerOrderAlerts` caches `displayLabelCache` in module scope — stale across sessions
+**What**: Line 30 — `displayLabelCache` is a module-level variable, not a React state or ref. Once populated, it never refreshes, even if the user logs out and back in, or if admin updates flow labels.
+**Why**: Buyer sees stale/wrong status labels until they do a hard refresh.
+**Where**: `src/hooks/useBuyerOrderAlerts.ts` line 30
+**Fix**: Add a TTL (e.g., 5 minutes) or invalidate on auth change.
 
-### Bug 5: Animation `prevPos` never updates on rejected points, causing jump on next accepted point
-**Why critical**: In `AnimatedRiderMarker`, `prevPos.current` only updates when animation completes (`t >= 1`). If multiple GPS updates arrive rapidly and the animation hasn't finished, the next animation starts from a stale `prevPos`, causing a visual jump/teleport on the map even though the GPS filter accepted the point.
-**Where**: `DeliveryMapView.tsx` line 96
-**Fix**: Update `prevPos` at animation start (capture the marker's current LatLng) rather than at animation end.
+### Bug 17: `send-booking-reminders` compares time strings across timezone boundaries
+**What**: Lines 45-46 — `fromTime.toTimeString().slice(0, 8)` uses the server's local timezone to generate time strings, but `start_time` in the DB is stored in the seller's configured timezone (or UTC). If the edge function runtime is in a different timezone, the comparison is wrong.
+**Why**: Reminders fire at wrong times — either too early (annoying) or too late (useless).
+**Where**: `supabase/functions/send-booking-reminders/index.ts` lines 37-46
+**Fix**: Use UTC consistently: `new Date().toISOString().slice(11, 19)` for time extraction, or store and compare as UTC timestamps.
 
-### Bug 6: `createRiderIcon` creates a new DivIcon on every render and heading change
-**Why critical**: Every time the `AnimatedRiderMarker` re-renders or heading changes, `createRiderIcon(heading)` creates a brand new `L.DivIcon` instance. This causes DOM thrashing (old icon removed, new one inserted), which can cause visible flicker and memory churn during rapid movement.
-**Where**: `DeliveryMapView.tsx` lines 17-25, 116, 123
-**Fix**: Memoize icon creation with a heading-rounded cache (round to nearest 15°).
+### Bug 18: `manage-delivery` `handleUpdateStatus` sets order to `returned` on delivery failure without checking current order status
+**What**: Line 261 — when delivery status is `failed`, the code blindly sets `orders.status = 'returned'` without checking what the current order status is. If the order was already cancelled or refunded, this resurrects it.
+**Why**: Cancelled/refunded orders get status overwritten to `returned`, confusing buyers and breaking financial reconciliation.
+**Where**: `supabase/functions/manage-delivery/index.ts` line 261
+**Fix**: Add `.neq('status', 'cancelled').neq('status', 'completed')` guard to the order UPDATE.
 
-### Bug 7: Staleness check interval (30s) can miss the 90s→120s transition window
-**Why critical**: The staleness checker in `useDeliveryTracking.ts` runs every 30 seconds. With `location_stale_threshold_ms` at 120s, there's a worst case where the stale flag is set 30s late (at 150s). The user sees "live" status for 30s longer than they should.
-**Where**: `useDeliveryTracking.ts` line 98
-**Fix**: Reduce interval to 15s or make it `threshold / 4`.
+### Bug 19: `useNewOrderAlert` `seenIdsRef` grows unboundedly
+**What**: Line 47 — `seenIdsRef` is a `Set` that accumulates order IDs forever during the session. For a busy seller receiving hundreds of orders per day, this set grows without bound, consuming memory.
+**Why**: Memory leak that degrades performance over long seller sessions.
+**Where**: `src/hooks/useNewOrderAlert.ts` line 47
+**Fix**: Cap the set size (e.g., 500 entries) or use an LRU structure. Prune oldest entries when size exceeds threshold.
 
-### Bug 8: `fetchRoute` in `useOSRMRoute` has stale closure over `degThreshold`
-**Why critical**: `degThreshold` is computed from `refetchThreshold / 111000`. This is only accurate at the equator. At higher latitudes (e.g., India at ~20°N), 1° longitude ≈ 104km not 111km. The threshold is ~6% too generous, meaning route refetches happen less often than intended.
-**Where**: `DeliveryMapView.tsx` line 144
-**Fix**: Use `refetchThreshold / (111000 * Math.cos(riderLat * Math.PI / 180))` for longitude comparison.
-
-### Bug 9: No cleanup of `delivery_locations` rows — unbounded table growth
-**Why critical**: Every 5 seconds per active delivery, a row is inserted into `delivery_locations`. A 30-minute delivery creates ~360 rows. With even modest volume (50 deliveries/day), this adds 18k rows/day with no pruning. Over months, this will degrade all queries touching this table.
-**Where**: `delivery_locations` table
-**Fix**: Add a scheduled job (pg_cron) to delete rows older than 7 days, or add a retention policy.
-
-### Bug 10: `useDeliveryTracking` polling never switches to idle rate
-**Why critical**: The `getInterval()` function (line 164-171) has a comment saying "We'll use a simple approach: always poll at transit rate" — meaning it polls every 10s even for `placed`, `accepted`, `preparing` statuses where nothing location-related changes. This wastes bandwidth and API calls.
-**Where**: `useDeliveryTracking.ts` lines 164-171
-**Fix**: Read current status from a ref and return `POLL_IDLE_MS` for non-transit statuses.
-
-### Bug 11: `onRoadEtaChange` causes infinite re-render loop risk
-**Why critical**: `useEffect` depends on `onRoadEtaChange` callback. If the parent doesn't memoize it with `useCallback`, every parent render creates a new function reference, triggering the effect, which calls `onRoadEtaChange`, which may cause parent state update, which re-renders parent... infinite loop.
-**Where**: `DeliveryMapView.tsx` lines 225-227
-**Fix**: Guard with a ref comparing previous vs current ETA value before calling.
-
-### Bug 12: Location channel listens on `delivery_locations` INSERT but RLS requires authenticated role
-**Why critical**: The Realtime subscription uses the anon key's connection. If the `delivery_locations` SELECT policy requires `authenticated` role (it does — `roles:{authenticated}`), the Realtime channel may silently fail to deliver events for unauthenticated or session-expired users.
-**Where**: `useDeliveryTracking.ts` line 268-309
-**Fix**: Ensure session refresh before subscribing; add error handling for `CHANNEL_ERROR` that prompts re-authentication.
-
-### Bug 13: `getClaims` API may not exist on all Supabase JS versions
-**Why critical**: `authClient.auth.getClaims(token)` is a relatively new API. If the edge function's `@supabase/supabase-js` version (`2.93.3`) doesn't include it, the function silently fails auth. The import uses a pinned version which may or may not have this method.
-**Where**: `update-delivery-location/index.ts` line 127
-**Fix**: Verify the method exists at runtime; fallback to `getUser(token)`.
-
-### Bug 14: `monitor-stalled-deliveries` updates `needs_attention` on EVERY cron run
-**Why critical**: Line 91-97 updates `needs_attention` and `needs_attention_reason` on every invocation (to update elapsed time text). If the cron runs every 60s, this creates constant write pressure on the `orders` table and generates unnecessary Realtime events for every stalled order every minute.
-**Where**: `monitor-stalled-deliveries/index.ts` lines 91-97
-**Fix**: Only update if the `needs_attention_reason` text has actually changed (compare before writing).
-
-### Bug 15: Race condition between realtime and polling in `applyFetchedData`
-**Why critical**: The `isNewer` check compares `last_location_at` timestamps. But polling and realtime can deliver the same update simultaneously. The `filterGPSPoint` is called twice for the same point (once from realtime, once from poll), corrupting the smoothing state by double-applying the exponential filter.
-**Where**: `useDeliveryTracking.ts` lines 106-136 and 275-299
-**Fix**: Add a dedup guard using a `Set` of seen `recorded_at` timestamps.
-
-### Bug 16: `speed_kmh` conversion applies `* 3.6` but native plugin may already report in km/h
-**Why critical**: `location.coords.speed` from the web Geolocation API is in m/s, so `* 3.6` is correct. But `@transistorsoft/capacitor-background-geolocation` also reports `coords.speed` in m/s. However, if future plugin versions or configurations change this, there's no unit validation. More critically: when `speed` is `null` (indoors), the code defaults to `0` and always uses `location_interval_idle_ms`, potentially throttling legitimate indoor movements.
-**Where**: `useBackgroundLocationTracking.ts` line 101
-**Fix**: Add explicit null handling and log the raw speed for debugging.
-
-### Bug 17: `proximity_nearby_distance_meters` key mismatch between edge function and frontend
-**Why critical**: The edge function loads `proximity_nearby_distance_meters` (line 33) but the frontend's `DEFAULT_PROXIMITY` uses `nearby.max_meters: 500`. The DB key is different from what the frontend expects. If only one is configured, they'll disagree on what "nearby" means, causing inconsistent proximity messages between push notifications and the UI.
-**Where**: `update-delivery-location/index.ts` line 33 vs `LiveDeliveryTracker.tsx` line 43
-**Fix**: Unify the key names across frontend and backend.
-
-### Bug 18: `MapContainer` center prop is ignored after initial render
-**Why critical**: React-Leaflet's `MapContainer` only uses `center` and `zoom` on initial mount. The computed `center` (midpoint) changes every location update but has zero effect. This isn't a visible bug because `MapBoundsUpdater` handles it, but it's misleading code that could cause confusion in future maintenance.
-**Where**: `DeliveryMapView.tsx` line 246
-**Fix**: Remove the dynamic center computation or document it as initial-only.
-
-### Bug 19: No rate limiting on `update-delivery-location` edge function
-**Why critical**: A compromised or buggy client could spam the endpoint, inserting thousands of location rows per second. There's no per-assignment or per-user rate limit. This could exhaust edge function quota, bloat the DB, and trigger excessive notifications.
-**Where**: `update-delivery-location/index.ts`
-**Fix**: Add server-side throttle: reject if `last_location_at` was updated less than 2s ago.
-
-### Bug 20: `clearTimeout(timeoutId)` not called on successful response in OSRM fetch
-**Why critical**: On line 163, `clearTimeout(timeoutId)` is called after `res` is received. But if `res.json()` or subsequent processing throws, the timeout continues running and will abort the already-completed request, triggering the catch block with `AbortError` and potentially corrupting the route state with a stale cache.
-**Where**: `DeliveryMapView.tsx` lines 158-197
-**Fix**: Move `clearTimeout` into a `finally` block or immediately after the fetch resolves.
+### Bug 20: `handleCalculateFee` doesn't authenticate delivery fee calculation — info leak + manipulation
+**What**: Lines 487-514 — `handleCalculateFee` is behind auth, but any authenticated user can query any `order_value` and learn the exact fee structure, thresholds, and margins (partner payout split, platform margin). This info should be seller/admin-only.
+**Why**: Competitive intelligence leak; malicious users can game the free delivery threshold.
+**Where**: `supabase/functions/manage-delivery/index.ts` lines 487-514
+**Fix**: Only return `delivery_fee` and `free_delivery` to buyers. Hide `partner_payout` and `platform_margin` unless the caller is an admin or seller.
 
 ---
 
-## Implementation Plan Summary
+## Implementation Plan
 
-| Priority | Items | Effort |
-|----------|-------|--------|
-| **P0 — Map redesign** | Custom SVG rider+bag icon, CartoDB tiles, animated route, pulsing destination, camera smoothing, ETA overlay | Medium |
-| **P0 — DB index** | Bug 1: Add `assignment_id` index on `delivery_locations` | Migration |
-| **P1 — GPS robustness** | Bugs 4, 5, 6, 15: Filter hardening, animation fix, icon cache, dedup | Small |
-| **P1 — OSRM resilience** | Bugs 2, 8, 20: Backoff, lat-correction, timeout fix | Small |
-| **P1 — Edge function** | Bugs 3, 13, 19: Partner ID, auth fallback, rate limit | Small |
-| **P2 — Performance** | Bugs 9, 10, 14: Retention policy, idle polling, stalled write guard | Small |
-| **P2 — Consistency** | Bugs 7, 11, 12, 16, 17, 18: Threshold fixes, callback guard, key unification | Small |
+| Priority | Bugs | Action |
+|----------|------|--------|
+| **P0 — Security** | 10, 11, 12 | Add authorization checks to `handleAssign`, `handleComplete`, and guard webhook `delivered` status |
+| **P0 — Data integrity** | 1, 8 | Add status guards to auto-cancel UPDATE and Razorpay order creation |
+| **P0 — Financial** | 5, 6, 7 | Fix archive FK, settlement workflow filter, webhook 200 response |
+| **P1 — Idempotency** | 4, 3 | Fix reorder idempotency key, add rollback to `replaceCart` |
+| **P1 — Auth/Security** | 9, 15, 20 | Server-side login throttle, fix rate limiter retry, hide fee margins |
+| **P1 — Data cleanup** | 2, 13 | Expand delete-user cleanup, replace client-side order DELETE with RPC |
+| **P2 — Robustness** | 14, 16, 17, 18, 19 | Chat upsert, cache TTL, timezone fix, status guard on `returned`, bounded Set |
+
+### Implementation order:
+1. **manage-delivery authorization** (Bugs 10, 11, 12) — single file edit, highest severity
+2. **auto-cancel status guard** (Bug 1) — one-line fix
+3. **Razorpay order status check** (Bug 8) — one-line fix
+4. **Razorpay webhook 200 response** (Bug 7) — one-line fix
+5. **reorder idempotency** (Bug 4) — one-line fix
+6. **archive FK safety** (Bug 5) — add settlement check before delete
+7. **settlement workflow filter** (Bug 6) — join order type into query
+8. **replaceCart rollback** (Bug 3) — add try/catch with restore
+9. **delete-user expansion** (Bug 2) — add missing tables
+10. **Remaining P1/P2 fixes** (Bugs 9, 13-20) — individual targeted edits
 
