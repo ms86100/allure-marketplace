@@ -87,7 +87,16 @@ export default function SearchPage() {
           <div className="px-4 pb-2">
             <ScrollArea>
               <div className="flex items-center gap-2 pb-1">
-                <SearchFilters filters={s.filters} onFiltersChange={s.handleFiltersChange} showPriceFilter />
+                <SearchFilters
+                  filters={s.filters}
+                  onFiltersChange={s.handleFiltersChange}
+                  showPriceFilter
+                  browseBeyond={s.browseBeyond}
+                  onBrowseBeyondChange={s.setBrowseBeyond}
+                  searchRadius={s.searchRadius}
+                  onSearchRadiusChange={s.setSearchRadiusLocal}
+                  onSearchRadiusCommit={s.setSearchRadius}
+                />
                 <button onClick={() => s.setFilters({ ...s.filters, isVeg: s.filters.isVeg === true ? null : true })} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors ${s.filters.isVeg === true ? 'border-accent bg-accent/10 text-accent' : 'border-border bg-background text-foreground'}`}>
                   <div className="w-3 h-3 border-[1.5px] border-accent rounded-sm flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-accent" /></div>Veg
                 </button>
@@ -101,25 +110,6 @@ export default function SearchPage() {
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </div>
-        </div>
-
-        <div className="px-4">
-          {/* Browse-beyond toggle */}
-          <div className="flex items-center justify-between mt-2 mb-2 px-1">
-            <button onClick={() => s.setBrowseBeyond(!s.browseBeyond)} className="flex items-center gap-2 text-sm">
-              <Globe size={14} className={s.browseBeyond ? 'text-primary' : 'text-muted-foreground'} />
-              <span className={s.browseBeyond ? 'text-primary font-medium' : 'text-muted-foreground'}>Nearby societies</span>
-            </button>
-            <Switch checked={s.browseBeyond} onCheckedChange={s.setBrowseBeyond} className="scale-90" />
-          </div>
-
-          {s.browseBeyond && (
-            <div className="flex items-center gap-3 px-1 mb-3">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Radius</span>
-              <Slider value={[s.searchRadius]} onValueChange={([v]) => s.setSearchRadiusLocal(v)} onValueCommit={([v]) => s.setSearchRadius(v)} min={1} max={10} step={1} className="flex-1" />
-              <span className="text-xs font-semibold text-primary w-10 text-right">{s.searchRadius} km</span>
-            </div>
-          )}
 
           {/* Community search suggestions */}
           {!s.isSearchActive && (
