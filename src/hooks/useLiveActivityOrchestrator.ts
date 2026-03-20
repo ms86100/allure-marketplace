@@ -323,9 +323,10 @@ export function useLiveActivityOrchestrator(): void {
     };
   }, [userId, doSync]);
 
-  // ── Polling heartbeat: safety net for dead realtime connections ──
+  // ── Polling heartbeat: safety net for dead realtime connections (web + native) ──
   useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
+    if (!userId) return;
+    const isNative = Capacitor.isNativePlatform();
 
     const POLL_INTERVAL_MS = 15_000; // 15 seconds — tighter safety net
     /** Last-known statuses to avoid redundant processing */
