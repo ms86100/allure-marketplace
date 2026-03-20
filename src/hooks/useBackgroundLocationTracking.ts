@@ -374,6 +374,18 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
     }
   }, [isNative, stopHealthCheck]);
 
+  // Keep stopTrackingRef in sync so sendLocation can call it without circular deps
+  useEffect(() => {
+    stopTrackingRef.current = stopTracking;
+  }, [stopTracking]);
+
+  // ─── Auto-stop when assignmentId becomes null ──────────
+  useEffect(() => {
+    if (!assignmentId && state.isTracking) {
+      stopTracking();
+    }
+  }, [assignmentId, state.isTracking, stopTracking]);
+
   // ─── Flush queue on reconnect ──────────────────────────
 
   useEffect(() => {
