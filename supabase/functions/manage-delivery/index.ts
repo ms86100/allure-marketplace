@@ -385,28 +385,14 @@ async function handleComplete(req: Request, db: any, userId: string) {
   const isValid = await verifyOTP(otp, assignment.otp_hash);
   if (!isValid) return jsonResponse({ error: 'Invalid OTP' }, 400);
 
-  // Set OTP verified flag so triggers on both tables allow the transition
-  await db.rpc('set_config_flag', { flag_name: 'app.otp_verified', flag_value: 'true' }).throwOnError?.();
-  // Fallback: use raw SQL if the RPC doesn't exist
-  await db.from('delivery_assignments').select('id').limit(0); // ensure connection
-  const { error: flagError } = await db.rpc('execute_set_config', {}).catch(() => ({ error: null }));
-  
-  // Direct set_config via service role — the service role client bypasses RLS but triggers still fire
-  // Use the raw postgres approach: call set_config in a function context
-  const { data: _flagSet, error: sqlErr } = await db.rpc('set_otp_verified_flag');
-  
-  const { error } = await db
-    .from('delivery_assignments')
-    .update({
-      status: 'delivered',
-      delivered_at: new Date().toISOString(),
-      otp_hash: null,
-    })
-    .eq('id', assignment_id);
+  // Use dedicated service-level RPC that sets app.otp_verified flag atomically
+  // then updates both delivery_assignments and orders in a single transaction
+  const { error: completeError } = await db.rpc('service_complete_delivery', {
+    _assignment_id: assignment_id,
+    _order_id: assignment.order_id,
+  });
 
-  if (error) return jsonResponse({ error: error.message }, 500);
-
-  await db.from('orders').update({ status: 'delivered' }).eq('id', assignment.order_id);
+  if (completeError) return jsonResponse({ error: completeError.message }, 500);
 
   await db.from('delivery_tracking_logs').insert({
     assignment_id,
