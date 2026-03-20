@@ -1,56 +1,37 @@
 
 
-# Root Cause: Missing `food_beverages/seller_delivery` Flow Data in DB
+# Root Cause: DeliveryArrivalOverlay Blocks Entire App Navigation
 
-## Evidence Chain
+## The Problem
 
-1. **Order data**: Order `96b8e227` has `fulfillment_type='delivery'`, `delivery_handled_by=null`, seller `primary_group='food_beverages'`
-2. **Transaction type resolution**: `resolveTransactionType('food_beverages', 'purchase', 'delivery', null)` → `'seller_delivery'`
-3. **DB query**: `category_status_flows WHERE parent_group='food_beverages' AND transaction_type='seller_delivery'` → **EMPTY** (confirmed in network logs)
-4. **DB query**: `category_status_transitions WHERE parent_group='food_beverages' AND transaction_type='seller_delivery'` → **EMPTY** (confirmed in network logs)
-5. **Fallback**: Code falls back to `default/seller_delivery` which exists (10 flow rows, 18 transitions) — but this introduces async latency and a window where `flow=[]` and `transitions=[]`
+The `DeliveryArrivalOverlay` component renders a **full-screen fixed overlay** (`fixed inset-0 z-[60]`) with a semi-transparent backdrop that captures ALL click events. Two compounding issues make this a navigation lock:
 
-## Why Previous Fixes Failed
+1. **`showArrivalOverlay` does NOT check terminal status**: Line 180 only checks `o.isBuyerView && deliveryTracking.distance < threshold`. After delivery completes, `deliveryTracking` retains stale distance/status data from its polling/subscription, so the overlay stays visible even on a completed order.
 
-The `isSellerView` fix was correct but insufficient. The real blocker is that during the async fallback window:
-- `flow.length === 0` → `getNextStatus()` returns `null` → no Accept button renders
-- `transitions.length === 0` → `canSellerReject` is `false` → no Reject button renders
-- The action bar container renders (it only checks `isSellerView && !isTerminalStatus`) but is **completely empty** — no buttons inside
+2. **`onDismiss` is a no-op**: Line 576 passes `onDismiss={() => {}}`. The overlay's internal dismiss resets `dismissed` to `false` whenever `isImminent` changes (line 52-54), so even if the user dismisses it, the next polling tick re-shows it. The full-screen backdrop (`bg-background/80 backdrop-blur-sm`) blocks all touch targets including BottomNav and the back button.
 
-The fallback should eventually load data and trigger a re-render with buttons, but the `useCategoryStatusFlow` hook does NOT reset `isLoading` to `true` when deps change, and the page does NOT gate the action bar on `isFlowLoading`. This creates a persistent empty-bar state if the fallback is slow or fails silently.
+3. **Stale `deliveryTracking` data**: The `useDeliveryTracking` hook continues polling/subscribing to the assignment even after the order is terminal, keeping `distance` and `status` populated with last-known values.
 
-## Fix (3 parts)
+## Fix (2 files)
 
-### Part 1: Insert missing `food_beverages/seller_delivery` data (SQL migration)
-Copy the `default/seller_delivery` flow and transitions into `food_beverages/seller_delivery`. This eliminates the fallback entirely — the primary query returns data immediately.
-
-### Part 2: Gate the action bar on flow loading (`OrderDetailPage.tsx`)
-Change line 498 from:
-```
-{o.isSellerView && !isTerminalStatus(o.flow, order.status) && (
-```
-to:
-```
-{o.isSellerView && !o.isFlowLoading && o.flow.length > 0 && !isTerminalStatus(o.flow, order.status) && (
-```
-And show a loading indicator when `isFlowLoading` is true:
-```
-{o.isSellerView && (o.isFlowLoading || o.flow.length === 0) && !isTerminalStatus(o.flow, order.status) && (
-  <div>Loading actions...</div>
-)}
+### 1. `src/pages/OrderDetailPage.tsx` — Gate overlay on non-terminal status
+Add terminal status check to `showArrivalOverlay`:
+```typescript
+const showArrivalOverlay = o.isBuyerView 
+  && !isTerminalStatus(o.flow, order.status) 
+  && deliveryAssignmentId 
+  && deliveryTracking.riderLocation 
+  && deliveryTracking.distance != null 
+  && deliveryTracking.distance < trackingConfig.arrival_overlay_distance_meters;
 ```
 
-### Part 3: Reset loading state on dep change (`useCategoryStatusFlow.ts`)
-At the top of the useEffect, add `setIsLoading(true)` so downstream consumers know data is stale and don't render empty bars.
-
-## Files to Change
-- New SQL migration (insert `food_beverages/seller_delivery` rows)
-- `src/hooks/useCategoryStatusFlow.ts` — reset `isLoading` on dep change
-- `src/pages/OrderDetailPage.tsx` — gate action bar on `isFlowLoading` and `flow.length > 0`
+### 2. `src/components/order/DeliveryArrivalOverlay.tsx` — Fix backdrop click-through and dismiss persistence
+- Make the backdrop area pass clicks through so navigation is never fully blocked
+- Use a dismiss flag that persists for the session (not reset on every `isImminent` flicker)
+- Add `pointer-events-none` to the backdrop wrapper, `pointer-events-auto` only on the card itself
 
 ## Expected Result
-- Seller clicks "View Order" → navigates to order detail
-- Flow loads immediately (no fallback needed)
-- Action bar shows "Reject" and "Mark Accepted" buttons
-- Seller can accept and progress the order
+- Overlay disappears immediately when order reaches terminal status (delivered/completed/cancelled)
+- Even while visible, tapping outside the card (e.g., nav buttons) works normally
+- Dismissing the overlay stays dismissed for that viewing session
 
