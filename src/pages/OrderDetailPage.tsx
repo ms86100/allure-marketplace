@@ -89,37 +89,48 @@ export default function OrderDetailPage() {
   }, [orderId, order?.status]);
 
   // Gap A: Fetch delivery OTP for buyer display
+  // Resilient assignment hydration: fetch + subscribe to INSERT & UPDATE + retry on missing
+  const [assignmentRetryCount, setAssignmentRetryCount] = useState(0);
 
   useEffect(() => {
-    if (isDeliveryOrder && orderId) {
-      const fetchAssignment = () => {
-        supabase
-          .from('delivery_assignments')
-          .select('id')
-          .eq('order_id', orderId)
-          .maybeSingle()
-          .then(({ data }) => {
-            if (data) setDeliveryAssignmentId(data.id);
-          });
-      };
-      fetchAssignment();
+    if (!isDeliveryOrder || !orderId) return;
 
-      // Re-check when order status changes (assignment may be created on picked_up)
-      const channel = supabase
-        .channel(`assignment-watch-${orderId}`)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'delivery_assignments',
-          filter: `order_id=eq.${orderId}`,
-        }, (payload) => {
-          if (payload.new?.id) setDeliveryAssignmentId(payload.new.id as string);
-        })
-        .subscribe();
+    const fetchAssignment = () => {
+      supabase
+        .from('delivery_assignments')
+        .select('id')
+        .eq('order_id', orderId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) { console.warn('Assignment fetch error:', error.message); return; }
+          if (data) setDeliveryAssignmentId(data.id);
+          else {
+            // Retry up to 5 times with increasing delay when order is in delivery stages
+            if (assignmentRetryCount < 5) {
+              const delay = Math.min(2000 * (assignmentRetryCount + 1), 8000);
+              setTimeout(() => setAssignmentRetryCount(c => c + 1), delay);
+            }
+          }
+        });
+    };
+    fetchAssignment();
 
-      return () => { supabase.removeChannel(channel); };
-    }
-  }, [orderId, isDeliveryOrder]);
+    // Subscribe to both INSERT and UPDATE on delivery_assignments for this order
+    const channel = supabase
+      .channel(`assignment-watch-${orderId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'delivery_assignments',
+        filter: `order_id=eq.${orderId}`,
+      }, (payload) => {
+        const newId = (payload.new as any)?.id;
+        if (newId) setDeliveryAssignmentId(newId as string);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [orderId, isDeliveryOrder, assignmentRetryCount]);
 
   // Gap A: Fetch delivery OTP for buyer + Gap 9: Subscribe to realtime updates
   useEffect(() => {
