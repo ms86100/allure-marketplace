@@ -391,8 +391,11 @@ export function usePushNotificationsInternal() {
         const data = event.notification?.data as Record<string, string> | undefined;
         pushLog('info', 'NOTIFICATION_TAP', { data });
 
-        if (data?.route) {
-          navigateRef.current(data.route);
+        const route = data?.route || resolveNotificationRoute(data?.type, data);
+        if (route && route !== '/notifications') {
+          // Store as pending deep link for retry after auth hydration (cold start safety)
+          setPendingDeepLink(route);
+          navigateRef.current(route);
         }
       });
       cleanupListeners.push(() => tapListener.remove());
