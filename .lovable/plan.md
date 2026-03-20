@@ -1,103 +1,101 @@
 
 
-## Implementation Plan: 3 Fixes (Slots in Onboarding, Past Time Filtering, Push Deep Links)
+## Plan: Unified Category ↔ Workflow Confidence Layer
 
-### Fix 1: Service Availability in Onboarding + Slot Enforcement
+### Problem Diagnosis
 
-**1A — Add `ServiceAvailabilityManager` to Step 4**
+The root issue is a **vocabulary mismatch** between two admin surfaces:
 
-In `BecomeSellerPage.tsx`, after the Store Images section (line ~400), add the `ServiceAvailabilityManager` component gated by `selectedGroupInfo?.layoutType === 'service'` and `draftSellerId` existence. Same pattern used in `SellerSettingsPage.tsx` line 313.
-
-**1B — Slot validation gate in `handleProceedToProducts`**
-
-In `useSellerApplication.ts` `handleProceedToProducts` (line 263), after `saveDraft()` succeeds and before `setStep(5)`, add a DB query for service sellers:
-
-```sql
-SELECT count(*) FROM service_slots 
-WHERE seller_id = :draftSellerId 
-  AND slot_date >= CURRENT_DATE 
-  AND is_blocked = false
+```text
+Category Config uses:        Workflow Engine uses:
+─────────────────────        ────────────────────
+cart_purchase                 cart_purchase        ✅ match
+buy_now                       (no workflow)        ❌ gap
+book_slot                     service_booking      ❌ mismatch
+request_service               request_service      ✅ match
+request_quote                 (no workflow)        ❌ gap
+contact_only                  (no workflow)        ❌ gap
+schedule_visit                (no workflow)        ❌ gap
 ```
 
-If the selected group's `layoutType === 'service'` and count is 0, show a toast "Please generate availability slots before continuing" and block step progression. This uses DB as source of truth and only counts active, future slots.
+A hidden runtime function (`resolveTransactionType`) maps category listing types to workflow keys at order time, but admins never see this mapping. The existing `WorkflowLinkage` component queries `category_config.transaction_type = workflow.transaction_type` directly — which only works for `cart_purchase` and `request_service`, missing everything else.
 
-Requires passing `parentGroupInfos` or `selectedGroupInfo` into the validation check — already available in the hook's scope.
+**Result:** Admins configure categories in one tab and workflows in another, with no visible connection between them and no confidence that the right workflow will fire.
 
-**Files:** `src/pages/BecomeSellerPage.tsx`, `src/hooks/useSellerApplication.ts`
+### Solution: Three Changes
 
----
+#### 1. Add a Listing Type → Workflow Key mapping table (visible to admin)
 
-### Fix 2: Past Time Slot Filtering in `TimeSlotPicker`
-
-In `TimeSlotPicker.tsx` lines 50-58, the `availableSlots` branch marks all slots `available: true`. Fix by adding time filtering for today:
+Create a static mapping that mirrors `resolveTransactionType` logic, making it visible in the admin UI:
 
 ```typescript
-if (daySlots) {
-  const now = new Date();
-  const isToday = isSameDay(selectedDate, today);
-  return daySlots.slots.map((time) => {
-    const [h, m] = time.split(':').map(Number);
-    const slotDate = setMinutes(setHours(selectedDate, h), m);
-    return {
-      time,
-      label: format(slotDate, 'h:mm a'),
-      available: !isToday || isAfter(slotDate, now),
-    };
-  });
-}
+// src/lib/listingTypeWorkflowMap.ts
+export const LISTING_TYPE_TO_WORKFLOW: Record<string, string> = {
+  cart_purchase: 'cart_purchase',     // resolves further by fulfillment type
+  buy_now: 'cart_purchase',
+  book_slot: 'service_booking',
+  request_service: 'request_service',
+  request_quote: 'request_service',
+  contact_only: 'request_service',
+  schedule_visit: 'service_booking',
+};
 ```
 
-Backend already validates via `book_service_slot` function — no server changes needed.
+This is the single source of truth for the admin-facing mapping. No DB change needed — it codifies the existing `resolveTransactionType` logic.
 
-**Files:** `src/components/booking/TimeSlotPicker.tsx`
+#### 2. Fix `WorkflowLinkage` to use the mapping
 
----
+Currently it does `category_config.transaction_type = workflow.transaction_type` which misses `book_slot` → `service_booking`, etc.
 
-### Fix 3: Push Notification Deep Links
+**Fix:** Load category configs for the parent group, then filter client-side using the mapping:
 
-**3A — Structured payloads in `admin-notifications.ts`**
+```typescript
+// Show categories whose RESOLVED workflow key matches this workflow's transaction_type
+const linked = allGroupCategories.filter(c => 
+  LISTING_TYPE_TO_WORKFLOW[c.transaction_type] === workflowTransactionType
+);
+```
 
-Update `notifySellerStatusChange`:
-- `approved` → `reference_path: '/seller'`, payload adds `action: 'STORE_APPROVED'`
-- `rejected` → `reference_path: '/become-seller'`, payload adds `action: 'STORE_REJECTED'`
-- `suspended` → `reference_path: '/seller'`, payload adds `action: 'STORE_SUSPENDED'`
+#### 3. Add Workflow Preview Panel inside Category Edit Dialog
 
-Update other notification functions similarly with contextual paths.
+This is the key UX fix. When an admin edits a category and selects a listing type (e.g., "Bookable Service"), show an inline read-only panel:
 
-**3B — New route resolver: `src/lib/notification-routes.ts`**
+```text
+┌─────────────────────────────────────────────┐
+│  Listing Type: [Bookable Service ▾]         │
+│                                             │
+│  🔗 Workflow: service_booking               │
+│  ┌─────────────────────────────────────┐    │
+│  │ requested → confirmed → completed   │    │
+│  │ 6 steps · home_services pipeline    │    │
+│  │ [Open Workflow Editor →]            │    │
+│  └─────────────────────────────────────┘    │
+│                                             │
+│  ⚠️ No workflow found for "events /         │
+│     service_booking" — will use default     │
+└─────────────────────────────────────────────┘
+```
 
-Maps notification `type` → route. Used as fallback when `reference_path` is missing:
-- `seller_approved` → `/seller`
-- `order_created`/`order_status` → `/orders/:orderId` (from payload)
-- `product_approved`/`product_rejected` → `/seller/products`
-- `license_*` → `/seller/licenses`
-- `moderation` → `/admin`
-- default → `/notifications`
+This gives admins instant confidence: "When I set this category to Bookable Service, HERE is the exact workflow that will run."
 
-**3C — Deferred navigation on push tap**
+### Files Changed
 
-In `usePushNotifications.ts` line 394, update tap handler:
-1. Resolve route via `data.route` or `resolveNotificationRoute(data.type, data)`
-2. Call `setPendingDeepLink(route)` before `navigate(route)` — ensures retry after auth hydration if app is cold-starting
-3. Import `setPendingDeepLink` from `useDeepLinks.ts`
+| File | Change |
+|------|--------|
+| `src/lib/listingTypeWorkflowMap.ts` | **New.** Static mapping from listing types to workflow keys |
+| `src/components/admin/workflow/WorkflowLinkage.tsx` | Use mapping instead of direct equality |
+| `src/components/admin/CategoryWorkflowPreview.tsx` | **New.** Inline preview showing resolved workflow for a category's listing type |
+| `src/components/admin/CategoryManager.tsx` | Add `CategoryWorkflowPreview` inside edit and add dialogs below the listing type selector |
+| `src/hooks/useCategoryManagerData.ts` | No change (listing type presets already defined) |
 
-**3D — Add `become-seller` to KNOWN_ROUTES**
+### What This Does NOT Change
 
-In `useDeepLinks.ts` line 11, add `'become-seller'` to the `KNOWN_ROUTES` set.
+- No DB schema changes. The workflow engine, `resolveTransactionType`, and `category_status_flows` tables remain untouched.
+- No runtime behavior changes. Order routing logic stays identical.
+- This is purely an **admin visibility improvement** — making the existing hidden mapping explicit and inspectable.
 
-**3E — Notification inbox fallback**
+### Edge Cases Handled
 
-In `NotificationInboxPage.tsx` line 20, add fallback: if `n.reference_path` is missing, use `resolveNotificationRoute(n.type, n.payload)`.
-
-**Files:** `src/lib/admin-notifications.ts`, `src/lib/notification-routes.ts` (new), `src/hooks/usePushNotifications.ts`, `src/hooks/useDeepLinks.ts`, `src/pages/NotificationInboxPage.tsx`
-
----
-
-### Summary
-
-| Fix | Files | DB Change |
-|-----|-------|-----------|
-| Slots in onboarding + enforcement | BecomeSellerPage, useSellerApplication | None |
-| Past time filtering | TimeSlotPicker | None |
-| Push deep links | admin-notifications, notification-routes (new), usePushNotifications, useDeepLinks, NotificationInboxPage | None |
+- **Missing workflow:** If no workflow exists for the resolved key + parent group, the preview shows a warning: "Will fall back to `default` pipeline" (matching the existing runtime fallback in `useCategoryStatusFlow`).
+- **Fulfillment variants:** For `cart_purchase`, the preview notes: "Final workflow depends on fulfillment type (seller delivery vs platform delivery vs self-pickup)" since that's resolved at order time, not category time.
 
