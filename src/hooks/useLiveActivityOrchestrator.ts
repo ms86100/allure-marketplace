@@ -148,7 +148,7 @@ export function useLiveActivityOrchestrator(): void {
         sellerLogoUrl,
         delivery?.eta_minutes ?? null,
       );
-      await LiveActivityManager.push(activityData);
+      if (isNative) await LiveActivityManager.push(activityData);
     };
 
     const subscribe = () => {
