@@ -50,6 +50,7 @@ export function useNewOrderAlert(sellerId: string | null) {
   const dismissedIdsRef = useRef<Set<string>>(new Set());
   const snoozedUntilRef = useRef<Record<string, number>>({});
 
+  const MAX_SEEN_IDS = 500;
   const handleNewOrder = useCallback((order: NewOrder) => {
     if (seenIdsRef.current.has(order.id)) return;
     if (dismissedIdsRef.current.has(order.id)) return;
@@ -57,6 +58,12 @@ export function useNewOrderAlert(sellerId: string | null) {
     const snoozedUntil = snoozedUntilRef.current[order.id];
     if (snoozedUntil && Date.now() < snoozedUntil) return;
     seenIdsRef.current.add(order.id);
+    seenIdsOrderRef.current.push(order.id);
+    // Prune oldest entries when exceeding limit
+    while (seenIdsRef.current.size > MAX_SEEN_IDS) {
+      const oldest = seenIdsOrderRef.current.shift();
+      if (oldest) seenIdsRef.current.delete(oldest);
+    }
     if (!lastSeenAtRef.current || order.created_at > lastSeenAtRef.current) {
       lastSeenAtRef.current = order.created_at;
     }

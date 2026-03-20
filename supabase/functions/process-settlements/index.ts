@@ -71,31 +71,38 @@ Deno.serve(async (req) => {
     let processed = 0;
     const errors: { id: string; error: string }[] = [];
 
+    // Bug 6 fix: Pre-fetch terminal statuses ONCE, filtered by workflow type per order
+    // Cache all terminal success flows grouped by transaction_type
+    const { data: allTerminalRows } = await supabase
+      .from("category_status_flows")
+      .select("status_key, transaction_type")
+      .eq("is_terminal", true)
+      .eq("is_success", true);
+
+    const terminalByWorkflow = new Map<string, Set<string>>();
+    const allTerminalStatuses = new Set<string>();
+    for (const r of (allTerminalRows || [])) {
+      allTerminalStatuses.add(r.status_key);
+      if (!terminalByWorkflow.has(r.transaction_type)) terminalByWorkflow.set(r.transaction_type, new Set());
+      terminalByWorkflow.get(r.transaction_type)!.add(r.status_key);
+    }
+
     for (const settlement of eligibleSettlements) {
-      // 3. Verify delivery/completion is confirmed
-      // Query DB for terminal success statuses instead of hardcoding
-      const { data: terminalSuccessRows } = await supabase
-        .from("category_status_flows")
-        .select("status_key")
-        .eq("is_terminal", true)
-        .eq("is_success", true);
-
-      const terminalSuccessStatuses = new Set(
-        (terminalSuccessRows || []).map((r: any) => r.status_key)
-      );
-
       const { data: orderData } = await supabase
         .from("orders")
-        .select("status, fulfillment_type, delivery_handled_by")
+        .select("status, fulfillment_type, delivery_handled_by, order_type")
         .eq("id", settlement.order_id)
         .single();
+
+      // Determine the correct terminal statuses for this order's workflow
+      const orderWorkflow = orderData?.order_type || 'standard';
+      const relevantTerminals = terminalByWorkflow.get(orderWorkflow) || allTerminalStatuses;
 
       const isNonPlatformDelivery = orderData?.fulfillment_type === 'self_pickup' ||
         (orderData?.delivery_handled_by !== 'platform');
 
       if (isNonPlatformDelivery) {
-        // For self-pickup / seller-delivery: order must be in a terminal success state
-        if (!orderData || !terminalSuccessStatuses.has(orderData.status)) {
+        if (!orderData || !relevantTerminals.has(orderData.status)) {
           errors.push({ id: settlement.id, error: "Order not completed" });
           continue;
         }

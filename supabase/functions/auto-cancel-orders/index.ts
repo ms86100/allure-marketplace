@@ -113,9 +113,10 @@ app.post("/", async (c) => {
     );
 
     // --- Cancel expired orders ---
+    // Bug 1 fix: Add status guard to prevent cancelling orders that were accepted between SELECT and UPDATE
     const cancelResults = await Promise.allSettled(
       (expiredOrders || []).map(async (order) => {
-        const { error: updateError } = await supabase
+        const { error: updateError, data: updated } = await supabase
           .from("orders")
           .update({
             status: "cancelled",
@@ -123,11 +124,17 @@ app.post("/", async (c) => {
             auto_cancel_at: null,
             updated_at: now,
           })
-          .eq("id", order.id);
+          .eq("id", order.id)
+          .in("status", cancellableStatuses)
+          .select("id");
 
         if (updateError) {
           console.error(`Error cancelling order ${order.id}:`, updateError);
           throw { id: order.id, error: updateError.message };
+        }
+        if (!updated || updated.length === 0) {
+          console.log(`Order ${order.id} already transitioned — skipping cancel`);
+          return { id: order.id, success: false, skipped: true };
         }
         console.log(`Order ${order.id} auto-cancelled`);
         return { id: order.id, success: true };

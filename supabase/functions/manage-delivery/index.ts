@@ -530,6 +530,7 @@ async function handleWebhook(req: Request, db: any) {
 }
 
 // Calculate delivery fee based on society config
+// Bug 20 fix: Hide internal margin/payout from non-admin/non-seller users
 async function handleCalculateFee(req: Request, db: any, userId: string) {
   const url = new URL(req.url);
   const orderValue = parseFloat(url.searchParams.get('order_value') || '0');
@@ -547,13 +548,22 @@ async function handleCalculateFee(req: Request, db: any, userId: string) {
   const baseFee = parseInt(settingsMap.base_delivery_fee || '20', 10) || 20;
   const freeThreshold = parseInt(settingsMap.free_delivery_threshold || '500', 10) || 500;
 
+  // Check if caller is a seller or admin (allowed to see margins)
+  const { data: sellerRow } = await db.from('seller_profiles').select('id').eq('user_id', userId).maybeSingle();
+  const { data: adminRow } = await db.from('user_roles').select('id').eq('user_id', userId).eq('role', 'admin').maybeSingle();
+  const showInternals = !!sellerRow || !!adminRow;
+
   if (orderValue >= freeThreshold) {
-    return jsonResponse({ delivery_fee: 0, partner_payout: 0, platform_margin: 0, free_delivery: true });
+    const resp: Record<string, any> = { delivery_fee: 0, free_delivery: true };
+    if (showInternals) { resp.partner_payout = 0; resp.platform_margin = 0; }
+    return jsonResponse(resp);
   }
 
   const deliveryFee = baseFee;
   const partnerPayout = Math.round(deliveryFee * 0.7);
   const platformMargin = deliveryFee - partnerPayout;
 
-  return jsonResponse({ delivery_fee: deliveryFee, partner_payout: partnerPayout, platform_margin: platformMargin, free_delivery: false });
+  const resp: Record<string, any> = { delivery_fee: deliveryFee, free_delivery: false };
+  if (showInternals) { resp.partner_payout = partnerPayout; resp.platform_margin = platformMargin; }
+  return jsonResponse(resp);
 }

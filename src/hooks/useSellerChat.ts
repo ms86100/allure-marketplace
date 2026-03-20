@@ -19,10 +19,11 @@ export function useSellerChat(buyerId: string | undefined, sellerId: string | un
   // Track last notification time per recipient to throttle
   const lastNotifRef = useRef<Record<string, number>>({});
 
-  // Get or create conversation
+  // Bug 14 fix: Use upsert to prevent TOCTOU race on conversation creation
   const getOrCreate = useCallback(async () => {
     if (!buyerId || !sellerId || !productId) return null;
 
+    // Try to find existing first (fast path)
     const { data: existing } = await supabase
       .from('seller_conversations')
       .select('id')
@@ -36,13 +37,31 @@ export function useSellerChat(buyerId: string | undefined, sellerId: string | un
       return existing.id;
     }
 
+    // Use upsert with onConflict to handle race condition
     const { data: created, error } = await supabase
       .from('seller_conversations')
-      .insert({ buyer_id: buyerId, seller_id: sellerId, product_id: productId })
+      .upsert(
+        { buyer_id: buyerId, seller_id: sellerId, product_id: productId },
+        { onConflict: 'buyer_id,seller_id,product_id', ignoreDuplicates: false }
+      )
       .select('id')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // If upsert fails (e.g., no unique constraint), fallback to select
+      const { data: fallback } = await supabase
+        .from('seller_conversations')
+        .select('id')
+        .eq('buyer_id', buyerId)
+        .eq('seller_id', sellerId)
+        .eq('product_id', productId)
+        .single();
+      if (fallback) {
+        setConversationId(fallback.id);
+        return fallback.id;
+      }
+      throw error;
+    }
     setConversationId(created.id);
     return created.id;
   }, [buyerId, sellerId, productId]);

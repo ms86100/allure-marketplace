@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Delete app data first
+    // Bug 2 fix: Expanded cleanup — delete personal data, anonymize financial records
     const cleanupTables = [
       { table: 'cart_items', column: 'user_id' },
       { table: 'device_tokens', column: 'user_id' },
@@ -50,11 +50,27 @@ Deno.serve(async (req) => {
       { table: 'skill_listings', column: 'user_id' },
       { table: 'society_admins', column: 'user_id' },
       { table: 'security_staff', column: 'user_id' },
+      // Bug 2: Previously missing tables
+      { table: 'chat_messages', column: 'sender_id' },
+      { table: 'chat_messages', column: 'receiver_id' },
+      { table: 'delivery_addresses', column: 'user_id' },
+      { table: 'delivery_locations', column: 'partner_id' },
+      { table: 'user_notifications', column: 'user_id' },
+      { table: 'collective_buy_participants', column: 'user_id' },
+      { table: 'authorized_persons', column: 'resident_id' },
+      { table: 'call_feedback', column: 'buyer_id' },
+      { table: 'seller_conversation_messages', column: 'sender_id' },
     ];
 
     for (const { table, column } of cleanupTables) {
       await supabaseAdmin.from(table).delete().eq(column, userId);
     }
+
+    // Anonymize orders (financial records must be retained) — nullify buyer personal data
+    await supabaseAdmin.from('orders').update({ delivery_address: null, notes: null }).eq('buyer_id', userId);
+
+    // Delete service bookings
+    await supabaseAdmin.from('service_bookings').delete().eq('buyer_id', userId);
 
     // Clean up seller data if exists
     const { data: sellerProfile } = await supabaseAdmin
