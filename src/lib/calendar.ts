@@ -10,13 +10,14 @@ interface CalendarEventData {
 
 /**
  * On native (iOS/Android), opens the system calendar prompt.
- * On web, downloads an .ics file.
+ * On mobile web, opens a data-URI .ics (works on iOS Safari + Android Chrome).
+ * On desktop web, downloads an .ics file.
  */
 export async function addToCalendar(data: CalendarEventData): Promise<void> {
   if (Capacitor.isNativePlatform()) {
     await addToNativeCalendar(data);
   } else {
-    downloadICS(data);
+    openICS(data);
   }
 }
 
@@ -25,7 +26,14 @@ async function addToNativeCalendar(data: CalendarEventData): Promise<void> {
     const { CapacitorCalendar } = await import('@ebarooni/capacitor-calendar');
 
     // Request write permission first
-    await CapacitorCalendar.requestWriteOnlyCalendarAccess();
+    const permResult = await CapacitorCalendar.requestWriteOnlyCalendarAccess();
+    
+    // Check if permission was granted
+    if (permResult?.result === 'denied') {
+      console.warn('Calendar permission denied, falling back to ICS');
+      openICS(data);
+      return;
+    }
 
     await CapacitorCalendar.createEventWithPrompt({
       title: data.title,
@@ -36,38 +44,79 @@ async function addToNativeCalendar(data: CalendarEventData): Promise<void> {
     });
   } catch (error) {
     console.warn('Native calendar failed, falling back to ICS:', error);
-    downloadICS(data);
+    openICS(data);
   }
 }
 
-function downloadICS(data: CalendarEventData): void {
-  const formatICS = (d: Date) =>
-    d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+function formatICSDate(d: Date): string {
+  return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+}
 
-  const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+function buildICSContent(data: CalendarEventData): string {
+  const now = formatICSDate(new Date());
+  const uid = `${Date.now()}-${Math.random().toString(36).slice(2)}@lovable.app`;
 
-  const lines = [
+  return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//Lovable//ServiceBooking//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
     'BEGIN:VEVENT',
-    `DTSTART:${formatICS(data.startDate)}`,
-    `DTEND:${formatICS(data.endDate)}`,
+    `UID:${uid}`,
+    `DTSTART:${formatICSDate(data.startDate)}`,
+    `DTEND:${formatICSDate(data.endDate)}`,
     `DTSTAMP:${now}`,
-    `SUMMARY:${data.title}`,
-    data.location ? `LOCATION:${data.location}` : '',
-    data.description ? `DESCRIPTION:${data.description.replace(/\n/g, '\\n')}` : '',
+    `SUMMARY:${escapeICS(data.title)}`,
+    data.location ? `LOCATION:${escapeICS(data.location)}` : '',
+    data.description ? `DESCRIPTION:${escapeICS(data.description)}` : '',
+    'STATUS:CONFIRMED',
     'END:VEVENT',
     'END:VCALENDAR',
   ].filter(Boolean).join('\r\n');
+}
 
-  const blob = new Blob([lines], { type: 'text/calendar;charset=utf-8' });
+function escapeICS(text: string): string {
+  return text.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+
+/**
+ * Opens an ICS file. On mobile browsers (iOS Safari, Android Chrome),
+ * using window.open with a data URI or blob URL triggers the native
+ * calendar app to handle the .ics file.
+ */
+function openICS(data: CalendarEventData): void {
+  const content = buildICSContent(data);
+  const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `appointment.ics`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+
+  // On iOS Safari, we need to use window.open for .ics to trigger calendar
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  
+  if (isMobile) {
+    // Use a temporary link with target to open in same context
+    // iOS Safari handles .ics blob URLs by opening the Calendar app
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'appointment.ics');
+    // For iOS, setting the type helps Safari recognize the file
+    link.type = 'text/calendar';
+    document.body.appendChild(link);
+    link.click();
+    
+    // Cleanup after a delay to ensure the download starts
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 1000);
+  } else {
+    // Desktop: standard download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'appointment.ics';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 }

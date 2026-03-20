@@ -46,26 +46,48 @@ export function CategoryWorkflowPreview({ listingType, parentGroup, category }: 
 
   const workflowLabel = TRANSACTION_TYPES.find(t => t.value === workflowKey)?.label ?? formatName(workflowKey);
 
-  // Fetch workflow steps
+  // Fetch workflow steps — try parent_group first, fallback to 'default'
   useEffect(() => {
     if (!parentGroup || !workflowKey) return;
     setLoading(true);
-    supabase
-      .from('category_status_flows')
-      .select('status_key, display_label, icon, color, sort_order, is_terminal, actor')
-      .eq('parent_group', parentGroup)
-      .eq('transaction_type', workflowKey)
-      .order('sort_order')
-      .then(({ data }) => {
-        if (!data || data.length === 0) {
-          setNotFound(true);
-          setSteps([]);
-        } else {
-          setNotFound(false);
-          setSteps(data);
-        }
+    
+    (async () => {
+      // Try specific parent_group
+      const { data } = await supabase
+        .from('category_status_flows')
+        .select('status_key, display_label, icon, color, sort_order, is_terminal, actor, is_deprecated')
+        .eq('parent_group', parentGroup)
+        .eq('transaction_type', workflowKey)
+        .order('sort_order');
+
+      if (data && data.length > 0) {
+        setNotFound(false);
+        setSteps(data.filter(s => !s.is_deprecated));
         setLoading(false);
-      });
+        return;
+      }
+
+      // Fallback to 'default' parent_group
+      if (parentGroup !== 'default') {
+        const fallback = await supabase
+          .from('category_status_flows')
+          .select('status_key, display_label, icon, color, sort_order, is_terminal, actor, is_deprecated')
+          .eq('parent_group', 'default')
+          .eq('transaction_type', workflowKey)
+          .order('sort_order');
+
+        if (fallback.data && fallback.data.length > 0) {
+          setNotFound(false);
+          setSteps(fallback.data.filter(s => !s.is_deprecated));
+          setLoading(false);
+          return;
+        }
+      }
+
+      setNotFound(true);
+      setSteps([]);
+      setLoading(false);
+    })();
   }, [parentGroup, workflowKey]);
 
   // Fetch recent orders audit trail
