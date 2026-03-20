@@ -372,11 +372,11 @@ export default function DeliveryPartnerDashboardPage() {
                           <Button
                             size="sm"
                             className="flex-1"
-                            onClick={() => updateDeliveryStatus(delivery.id, 'delivered')}
+                            onClick={() => setOtpOrderId(delivery.order?.id || null)}
                             disabled={updatingId === delivery.id}
                           >
-                            {updatingId === delivery.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <CheckCircle2 size={14} className="mr-1" />}
-                            Delivered
+                            <ShieldCheck size={14} className="mr-1" />
+                            Verify & Deliver
                           </Button>
                         </div>
                       )}
@@ -384,11 +384,11 @@ export default function DeliveryPartnerDashboardPage() {
                         <Button
                           size="sm"
                           className="w-full"
-                          onClick={() => updateDeliveryStatus(delivery.id, 'delivered')}
+                          onClick={() => setOtpOrderId(delivery.order?.id || null)}
                           disabled={updatingId === delivery.id}
                         >
-                          {updatingId === delivery.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <CheckCircle2 size={14} className="mr-1" />}
-                          Mark Delivered
+                          <ShieldCheck size={14} className="mr-1" />
+                          Verify & Deliver
                         </Button>
                       )}
                     </CardContent>
