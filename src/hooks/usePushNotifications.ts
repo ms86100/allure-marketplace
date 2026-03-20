@@ -8,6 +8,8 @@ import { hapticNotification } from '@/lib/haptics';
 import { pushLog, setLogUser, flushPushLogs } from '@/lib/pushLogger';
 import { LiveActivityManager } from '@/services/LiveActivityManager';
 import { getTerminalStatuses } from '@/services/statusFlowCache';
+import { resolveNotificationRoute } from '@/lib/notification-routes';
+import { setPendingDeepLink } from '@/hooks/useDeepLinks';
 
 /**
  * BUILD FINGERPRINT — bump on every push-related update.
