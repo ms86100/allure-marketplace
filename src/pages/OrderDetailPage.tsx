@@ -105,9 +105,9 @@ export default function OrderDetailPage() {
           if (error) { console.warn('Assignment fetch error:', error.message); return; }
           if (data) setDeliveryAssignmentId(data.id);
           else {
-            // Retry up to 5 times with increasing delay when order is in delivery stages
-            if (assignmentRetryCount < 5) {
-              const delay = Math.min(2000 * (assignmentRetryCount + 1), 8000);
+            // Retry up to 10 times with increasing delay when order is in delivery stages
+            if (assignmentRetryCount < 10) {
+              const delay = Math.min(1500 * (assignmentRetryCount + 1), 15000);
               setTimeout(() => setAssignmentRetryCount(c => c + 1), delay);
             }
           }
