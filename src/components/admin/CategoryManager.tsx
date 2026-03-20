@@ -62,7 +62,7 @@ function GenerateImageButton({ categoryName, categoryKey, parentGroup, imageUrl,
       if (uploadError) throw uploadError;
       const { data: urlData } = supabase.storage.from('category-images').getPublicUrl(filePath);
       const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-      await supabase.from('category_config').update({ image_url: publicUrl }).eq('category', categoryKey);
+      await supabase.from('category_config').update({ image_url: publicUrl }).eq('category', categoryKey as any);
       onImageGenerated(publicUrl);
       toast.success('Image uploaded!');
     } catch (err: any) { toast.error(err?.message || 'Upload failed'); } finally { setIsUploading(false); }
