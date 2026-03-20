@@ -227,7 +227,7 @@ export function ServiceBookingFlow({
       const result = bookResult as any;
       if (!result?.success) {
         // Bug 13 fix: Use RPC for cleanup instead of client-side delete
-        await supabase.rpc('buyer_cancel_order', { _order_id: order.id, _reason: 'slot_booking_failed' }).catch(() => {});
+        try { await supabase.rpc('buyer_cancel_order', { _order_id: order.id, _reason: 'slot_booking_failed' }); } catch {}
         toast.error(result?.error || 'Failed to book slot');
         refetchSlots();
         setIsLoading(false);
