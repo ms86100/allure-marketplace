@@ -57,7 +57,7 @@ serve(async (req) => {
 
     const { data: stalledAssignments, error } = await supabase
       .from('delivery_assignments')
-      .select('id, order_id, rider_name, rider_phone, last_location_at, status, stalled_notified, orders:orders!delivery_assignments_order_id_fkey(id, buyer_id, seller_id, status, needs_attention)')
+      .select('id, order_id, rider_name, rider_phone, last_location_at, status, stalled_notified, orders:orders!delivery_assignments_order_id_fkey(id, buyer_id, seller_id, status, needs_attention, needs_attention_reason)')
       .in('status', transitStatuses)
       .not('last_location_at', 'is', null)
       .lt('last_location_at', softThresholdAgo);
