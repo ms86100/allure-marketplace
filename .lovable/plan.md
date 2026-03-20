@@ -1,58 +1,45 @@
 
 
-## Fix: Store Approval Notifications Not Delivered
+## Fix: 3 Critical Notification Pipeline Blockers
 
-### Root Cause
+### Blocker 1: Stuck "processing" Recovery
 
-The investigation reveals a **race condition in the notification trigger** combined with a **missing cron safety net**:
+**Current `claim_notification_queue`** only claims `pending` items. If the edge function crashes mid-batch, items stay `processing` forever.
 
-1. When admin approves a store, `notifySellerStatusChange()` inserts into `notification_queue` — this part works correctly (confirmed: row `8ceb507c` was created at 05:57:43 with status `pending`).
-
-2. The `trg_process_notification_queue_realtime` trigger fires `pg_net.http_post` to invoke the `process-notification-queue` edge function. The edge function boots and calls `claim_notification_queue` RPC.
-
-3. **The race condition**: `pg_net.http_post` schedules the HTTP call, but the edge function can arrive and query the table *before the INSERT transaction commits*. The `claim_notification_queue` finds 0 pending items and returns. The row then commits and sits as `pending` forever.
-
-4. **No cron fallback exists**: There is no periodic cron job to sweep `notification_queue` for stuck `pending` items. Every other periodic task (bookings, reminders, stalled deliveries) has a cron, but notification queue processing does not. This means any item missed by the trigger is never retried.
-
-Evidence from the database:
-- The latest seller_approved notification (`8ceb507c`, created 05:57:43) is still `pending` with no `processed_at` — the trigger-invoked edge function missed it
-- Older notifications eventually got processed only because subsequent unrelated INSERT triggers happened to pick them up as a side effect
-- No `user_notifications` row exists for this latest approval
-
-### Fix Plan
-
-**Step 1: Add a cron job for notification queue processing**
-
-Create a migration to add a `pg_cron` job that invokes `process-notification-queue` every minute. This ensures any items missed by the trigger are processed within 60 seconds at most.
+**Fix:** Prepend a recovery sweep to `claim_notification_queue` that resets items stuck in `processing` for >3 minutes back to `pending`.
 
 ```sql
-SELECT cron.schedule(
-  'process-notification-queue-sweep',
-  '* * * * *',  -- every minute
-  $$ SELECT net.http_post(
-    url := 'https://ywhlqsgvbkvcvqlsniad.supabase.co/functions/v1/process-notification-queue',
-    headers := '{"Content-Type":"application/json","Authorization":"Bearer <anon_key>"}'::jsonb,
-    body := '{"trigger":"cron"}'::jsonb
-  ) $$
-);
+-- Add at start of claim_notification_queue
+UPDATE public.notification_queue
+SET status = 'pending', processed_at = NULL
+WHERE status = 'processing'
+  AND processed_at < now() - interval '3 minutes';
 ```
 
-**Step 2: Add a small delay in the trigger function**
+### Blocker 2: Remove `pg_sleep(0.5)` from Trigger
 
-Modify `trigger_process_notification_queue` to use `pg_sleep(0.5)` before the `pg_net.http_post` call, giving the INSERT transaction time to commit before the edge function queries. This improves the trigger's hit rate without relying solely on the cron.
+The sleep runs inside the transaction, delaying commit and adding latency without solving the race condition. `pg_net.http_post` already defers execution to after commit.
 
-**Step 3: Retry stuck items**
+**Fix:** Recreate `trigger_process_notification_queue` without the `pg_sleep(0.5)` line.
 
-Also add a cron (every 5 min) or extend the existing sweep to also handle items stuck in `processing` for >2 minutes (edge function crash recovery), resetting them to `pending`.
+### Blocker 3: Clean 78 Zombie "retrying" Items
 
-### Files Changed
+78 items are stuck in a legacy `retrying` state that no code path processes. These are old items (pre-inline-retry refactor).
 
-1. **Database migration** — Add cron job + update trigger function with delay
-2. No client-side changes needed — the enqueue logic and edge function are correct; the issue is purely the delivery pipeline timing
+**Fix:** Mark them as `failed` with a cleanup note (they're too old to retry meaningfully):
+```sql
+UPDATE notification_queue SET status = 'failed', last_error = 'legacy_retrying_cleanup'
+WHERE status = 'retrying';
+```
 
-### Why This Fixes It
+### Implementation
 
-- The cron job guarantees every `pending` item is processed within 60 seconds, regardless of trigger race conditions
-- The trigger delay improves instant delivery success rate
-- Together they provide the same reliability pattern used by order status notifications (which work because they're triggered by a different, more frequent flow)
+**One database migration** for blockers 1 and 2 (schema changes — function replacements):
+- Replace `claim_notification_queue` with stuck-processing recovery
+- Replace `trigger_process_notification_queue` without sleep
+
+**One data operation** (insert tool) for blocker 3:
+- Update 78 zombie rows from `retrying` to `failed`
+
+No edge function or client code changes needed.
 
