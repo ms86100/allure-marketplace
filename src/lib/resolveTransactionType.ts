@@ -13,8 +13,12 @@ export function resolveTransactionType(
   parentGroup: string,
   orderType: string | null | undefined,
   fulfillmentType?: string | null,
-  deliveryHandledBy?: string | null
+  deliveryHandledBy?: string | null,
+  listingType?: string | null
 ): string {
+  // Contact-only categories use the lean contact_enquiry workflow
+  if (listingType === 'contact_only') return 'contact_enquiry';
+
   if (orderType === 'enquiry') {
     // AUDIT FIX: was 'book_slot' — no flows exist for book_slot; service_booking is correct
     if (['classes', 'events'].includes(parentGroup)) return 'service_booking';

@@ -14,7 +14,7 @@ export const LISTING_TYPE_TO_WORKFLOW_FALLBACK: Record<string, string> = {
   book_slot: 'service_booking',
   request_service: 'request_service',
   request_quote: 'request_service',
-  contact_only: 'request_service',
+  contact_only: 'contact_enquiry',
   schedule_visit: 'service_booking',
 };
 
