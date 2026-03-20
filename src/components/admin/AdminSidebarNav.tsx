@@ -18,8 +18,13 @@ const NAV_GROUPS = [
       { value: 'sellers', label: 'Moderation', icon: Store },
       { value: 'payments', label: 'Payments', icon: CreditCard },
       { value: 'services', label: 'Services', icon: Wrench },
-      { value: 'catalog', label: 'Catalog', icon: LayoutGrid },
+    ],
+  },
+  {
+    label: 'Catalog',
+    items: [
       { value: 'workflows', label: 'Workflows', icon: GitBranch },
+      { value: 'catalog', label: 'Categories', icon: LayoutGrid },
       { value: 'featured', label: 'Featured', icon: Megaphone },
     ],
   },
