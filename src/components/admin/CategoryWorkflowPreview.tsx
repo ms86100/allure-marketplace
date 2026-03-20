@@ -70,13 +70,13 @@ export function CategoryWorkflowPreview({ listingType, parentGroup }: Props) {
       </div>
 
       {notFound ? (
-        <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50">
-          <AlertTriangle size={13} className="text-amber-500 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-2 p-2 rounded-lg bg-destructive/5 border border-destructive/20">
+          <AlertTriangle size={13} className="text-destructive shrink-0 mt-0.5" />
           <div>
-            <p className="text-[11px] font-medium text-amber-700 dark:text-amber-400">
+            <p className="text-[11px] font-medium text-destructive">
               No workflow found for "{formatName(parentGroup)} / {workflowLabel}"
             </p>
-            <p className="text-[10px] text-amber-600/80 dark:text-amber-500/80 mt-0.5">
+            <p className="text-[10px] text-muted-foreground mt-0.5">
               Orders will fall back to the default pipeline. Configure one in the Workflow tab.
             </p>
           </div>
