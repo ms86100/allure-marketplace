@@ -66,9 +66,13 @@ export function useLiveActivityOrchestrator(): void {
       console.log(TAG, 'Diagnostics:', JSON.stringify(diag));
     });
 
-    fetchFlowEntries();
-    getTerminalStatuses().then(s => { terminalStatusesCache = s; }).catch(() => {});
-    doSync();
+    // Ensure flow entries & terminal statuses are loaded BEFORE first sync
+    Promise.all([
+      fetchFlowEntries(),
+      getTerminalStatuses().then(s => { terminalStatusesCache = s; }).catch(() => {}),
+    ]).then(() => {
+      if (mountedRef.current) doSync();
+    });
 
     return () => {
       mountedRef.current = false;
@@ -123,12 +127,20 @@ export function useLiveActivityOrchestrator(): void {
         itemCount = itemCountRes.count ?? null;
       } catch { /* best-effort */ }
 
+      // Fallback: if flowEntries are empty (race condition), fetch inline before building
+      let flowEntries = flowEntriesRef.current;
+      if (!flowEntries || flowEntries.length === 0) {
+        console.warn(TAG, 'flowEntries empty on realtime event — fetching inline');
+        await fetchFlowEntries();
+        flowEntries = flowEntriesRef.current;
+      }
+
       const activityData = buildLiveActivityData(
         { id: orderId, status: newStatus },
         delivery,
         sellerName,
         itemCount,
-        flowEntriesRef.current,
+        flowEntries,
         sellerLogoUrl,
         delivery?.eta_minutes ?? null,
       );

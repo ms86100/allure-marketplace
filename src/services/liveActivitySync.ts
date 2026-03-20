@@ -17,7 +17,8 @@ let cachedFlowEntries: StatusFlowEntry[] | null = null;
 let cacheExpiry = 0;
 
 async function getStatusFlowEntries(): Promise<StatusFlowEntry[]> {
-  if (cachedFlowEntries && Date.now() < cacheExpiry) {
+  // Force fresh fetch if cache is empty (first-load) or expired
+  if (cachedFlowEntries && cachedFlowEntries.length > 0 && Date.now() < cacheExpiry) {
     return cachedFlowEntries;
   }
   const { data, error } = await supabase
@@ -26,7 +27,7 @@ async function getStatusFlowEntries(): Promise<StatusFlowEntry[]> {
     .in('transaction_type', ['cart_purchase', 'seller_delivery'])
     .order('sort_order');
 
-  if (error || !data) {
+  if (error || !data || data.length === 0) {
     console.warn(TAG, 'Failed to fetch status flows, using empty:', error?.message);
     return cachedFlowEntries ?? [];
   }

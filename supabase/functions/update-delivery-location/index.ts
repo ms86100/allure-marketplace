@@ -426,78 +426,96 @@ serve(async (req) => {
     }
 
     // ═══ Proximity notifications ═══
+    // Guard: Only send proximity alerts when the ORDER (not just assignment) is in an actual transit stage
+    // This prevents false alerts for seller-delivery where seller is already near the buyer at acceptance
+    const TRANSIT_ORDER_STATUSES = ['on_the_way', 'at_gate', 'picked_up'];
+    let orderStatusForProximity: string | null = null;
     if (distanceMeters !== null && buyerId && ['picked_up', 'on_the_way', 'at_gate'].includes(assignment.status)) {
-      let vehicleType: string | null = null;
-      if (assignment.rider_id) {
-        const { data: riderInfo } = await supabase
-          .from('delivery_partner_pool')
-          .select('vehicle_type')
-          .eq('id', assignment.rider_id)
-          .single();
-        vehicleType = riderInfo?.vehicle_type ?? null;
-      }
+      // Fetch the actual order status to gate proximity notifications
+      const { data: orderForStatus } = await supabase
+        .from('orders')
+        .select('status, created_at')
+        .eq('id', assignment.order_id)
+        .single();
+      orderStatusForProximity = orderForStatus?.status ?? null;
 
-      if (distanceMeters < 500) {
-        const thirtySecsAgo = new Date(Date.now() - 30_000).toISOString();
-        const { count } = await supabase
-          .from('notification_queue')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', buyerId)
-          .eq('type', 'delivery_proximity')
-          .eq('reference_path', `/orders/${assignment.order_id}`)
-          .gte('created_at', thirtySecsAgo);
+      // Only fire if the ORDER itself is in a transit stage AND order is at least 2 min old
+      const orderAgeMs = orderForStatus?.created_at ? Date.now() - new Date(orderForStatus.created_at).getTime() : Infinity;
+      const isOrderInTransit = orderStatusForProximity && TRANSIT_ORDER_STATUSES.includes(orderStatusForProximity);
+      const isOrderOldEnough = orderAgeMs > 2 * 60 * 1000;
 
-        if (!count || count === 0) {
-          await supabase.from('notification_queue').insert({
-            user_id: buyerId,
-            title: '📍 Almost there!',
-            body: 'Your delivery partner is nearby and arriving soon!',
-            type: 'delivery_proximity',
-            reference_path: `/orders/${assignment.order_id}`,
-            payload: {
-              type: 'delivery_proximity',
-              entity_type: 'order',
-              entity_id: assignment.order_id,
-              workflow_status: 'arriving',
-              action: 'View Tracking',
-              distance: distanceMeters,
-              eta: etaMinutes,
-              driver_name: assignment.rider_name ?? null,
-              vehicle_type: vehicleType,
-            },
-          });
+      if (isOrderInTransit && isOrderOldEnough) {
+        let vehicleType: string | null = null;
+        if (assignment.rider_id) {
+          const { data: riderInfo } = await supabase
+            .from('delivery_partner_pool')
+            .select('vehicle_type')
+            .eq('id', assignment.rider_id)
+            .single();
+          vehicleType = riderInfo?.vehicle_type ?? null;
         }
-      }
 
-      if (distanceMeters < 200) {
-        const thirtySecsAgoImm = new Date(Date.now() - 30_000).toISOString();
-        const { count: imminentCount } = await supabase
-          .from('notification_queue')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', buyerId)
-          .eq('type', 'delivery_proximity_imminent')
-          .eq('reference_path', `/orders/${assignment.order_id}`)
-          .gte('created_at', thirtySecsAgoImm);
+        // MUTUALLY EXCLUSIVE tiers: <200m = imminent ONLY, 200-500m = nearby ONLY
+        if (distanceMeters < 200) {
+          const thirtySecsAgoImm = new Date(Date.now() - 30_000).toISOString();
+          const { count: imminentCount } = await supabase
+            .from('notification_queue')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', buyerId)
+            .eq('type', 'delivery_proximity_imminent')
+            .eq('reference_path', `/orders/${assignment.order_id}`)
+            .gte('created_at', thirtySecsAgoImm);
 
-        if (!imminentCount || imminentCount === 0) {
-          await supabase.from('notification_queue').insert({
-            user_id: buyerId,
-            title: '🏃 Driver arriving now!',
-            body: 'Your delivery partner is almost at your doorstep. Please get ready to receive your order.',
-            type: 'delivery_proximity_imminent',
-            reference_path: `/orders/${assignment.order_id}`,
-            payload: {
+          if (!imminentCount || imminentCount === 0) {
+            await supabase.from('notification_queue').insert({
+              user_id: buyerId,
+              title: '🏃 Driver arriving now!',
+              body: 'Your delivery partner is almost at your doorstep. Please get ready to receive your order.',
               type: 'delivery_proximity_imminent',
-              entity_type: 'order',
-              entity_id: assignment.order_id,
-              workflow_status: 'at_doorstep',
-              action: 'View Tracking',
-              distance: distanceMeters,
-              eta: etaMinutes,
-              driver_name: assignment.rider_name ?? null,
-              vehicle_type: vehicleType,
-            },
-          });
+              reference_path: `/orders/${assignment.order_id}`,
+              payload: {
+                type: 'delivery_proximity_imminent',
+                entity_type: 'order',
+                entity_id: assignment.order_id,
+                workflow_status: 'at_doorstep',
+                action: 'View Tracking',
+                distance: distanceMeters,
+                eta: etaMinutes,
+                driver_name: assignment.rider_name ?? null,
+                vehicle_type: vehicleType,
+              },
+            });
+          }
+        } else if (distanceMeters < 500) {
+          const thirtySecsAgo = new Date(Date.now() - 30_000).toISOString();
+          const { count } = await supabase
+            .from('notification_queue')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', buyerId)
+            .eq('type', 'delivery_proximity')
+            .eq('reference_path', `/orders/${assignment.order_id}`)
+            .gte('created_at', thirtySecsAgo);
+
+          if (!count || count === 0) {
+            await supabase.from('notification_queue').insert({
+              user_id: buyerId,
+              title: '📍 Almost there!',
+              body: 'Your delivery partner is nearby and arriving soon!',
+              type: 'delivery_proximity',
+              reference_path: `/orders/${assignment.order_id}`,
+              payload: {
+                type: 'delivery_proximity',
+                entity_type: 'order',
+                entity_id: assignment.order_id,
+                workflow_status: 'arriving',
+                action: 'View Tracking',
+                distance: distanceMeters,
+                eta: etaMinutes,
+                driver_name: assignment.rider_name ?? null,
+                vehicle_type: vehicleType,
+              },
+            });
+          }
         }
       }
     }
