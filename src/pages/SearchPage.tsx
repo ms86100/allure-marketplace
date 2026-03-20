@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { MarketplaceConfig } from '@/hooks/useMarketplaceConfig';
 import { BadgeConfigRow } from '@/hooks/useBadgeConfig';
-import { ArrowLeft, Search as SearchIcon, X, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Search as SearchIcon, X, Globe, ShoppingBag } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
