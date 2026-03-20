@@ -208,7 +208,8 @@ export function useLiveActivityOrchestrator(): void {
 
   // ── Realtime: delivery assignment INSERT + UPDATE (with order ID filtering) ──
   useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
+    if (!userId) return;
+    const isNative = Capacitor.isNativePlatform();
 
     let retryCount = 0;
     let channelRef: ReturnType<typeof supabase.channel> | null = null;
