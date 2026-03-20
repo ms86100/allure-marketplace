@@ -259,7 +259,7 @@ export function useLiveActivityOrchestrator(): void {
           rider_name: row?.rider_name,
           vehicle_type: null,
         }, sellerName, itemCountRes.count ?? null, flowEntriesRef.current, sellerLogoUrl, row?.eta_minutes ?? null);
-        await LiveActivityManager.push(data);
+        if (isNative) await LiveActivityManager.push(data);
       } catch { /* best-effort */ }
     };
 
