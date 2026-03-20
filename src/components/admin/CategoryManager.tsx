@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Grid3X3, GripVertical, Edit2, Plus, Trash2, Sparkles, ImageIcon, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
+import { CategoryWorkflowPreview } from '@/components/admin/CategoryWorkflowPreview';
 import { DndContext, closestCenter } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -259,6 +260,12 @@ export function CategoryManager() {
               <p className="text-[11px] text-muted-foreground">
                 {LISTING_TYPE_PRESETS.find(p => p.value === cm.editForm.transaction_type)?.description}
               </p>
+              {cm.editingCategory && (
+                <CategoryWorkflowPreview
+                  listingType={cm.editForm.transaction_type}
+                  parentGroup={cm.editingCategory.parent_group}
+                />
+              )}
             </div>
             {cm.editingCategory && (
               <GenerateImageButton
@@ -393,6 +400,12 @@ export function CategoryManager() {
               <p className="text-[11px] text-muted-foreground">
                 {LISTING_TYPE_PRESETS.find(p => p.value === cm.addForm.transaction_type)?.description}
               </p>
+              {cm.addingToGroup && (
+                <CategoryWorkflowPreview
+                  listingType={cm.addForm.transaction_type}
+                  parentGroup={cm.addingToGroup}
+                />
+              )}
             </div>
             <div className="space-y-2">
               <Label className="text-xs font-semibold">Icon (Emoji)</Label>

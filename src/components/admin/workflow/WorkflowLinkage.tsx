@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Link2 } from 'lucide-react';
+import { getWorkflowKey } from '@/lib/listingTypeWorkflowMap';
 
 interface Props {
   parentGroup: string;
@@ -9,15 +10,21 @@ interface Props {
 }
 
 export function WorkflowLinkage({ parentGroup, transactionType }: Props) {
-  const [categories, setCategories] = useState<{ category: string; display_name: string }[]>([]);
+  const [categories, setCategories] = useState<{ category: string; display_name: string; transaction_type: string }[]>([]);
 
   useEffect(() => {
     supabase
       .from('category_config')
-      .select('category, display_name')
+      .select('category, display_name, transaction_type')
       .eq('parent_group', parentGroup)
-      .eq('transaction_type', transactionType)
-      .then(({ data }) => setCategories(data || []));
+      .then(({ data }) => {
+        // Filter client-side using the mapping: show categories whose
+        // RESOLVED workflow key matches this workflow's transaction_type
+        const linked = (data || []).filter(
+          c => getWorkflowKey(c.transaction_type || 'cart_purchase') === transactionType
+        );
+        setCategories(linked);
+      });
   }, [parentGroup, transactionType]);
 
   if (categories.length === 0) return null;
