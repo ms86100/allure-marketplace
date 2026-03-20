@@ -181,7 +181,7 @@ export default function OrderDetailPage() {
 
 
   return (
-    <AppLayout showHeader={false} showNav={!o.isChatOpen}>
+    <AppLayout showHeader={false} showNav={false}>
       <div className="pb-28">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
