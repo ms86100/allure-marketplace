@@ -86,6 +86,7 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
 
   // Staleness checker
   useEffect(() => {
+    // Bug 7 fix: check staleness every 15s instead of 30s
     const interval = setInterval(() => {
       setState((prev) => {
         if (!prev.lastLocationAt) {
@@ -95,7 +96,7 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
         const stale = Date.now() - new Date(prev.lastLocationAt).getTime() > threshold;
         return stale !== prev.isLocationStale ? { ...prev, isLocationStale: stale } : prev;
       });
-    }, 30_000);
+    }, 15_000);
     return () => clearInterval(interval);
   }, []);
 
