@@ -129,11 +129,21 @@ Deno.serve(async (req) => {
       .rpc("create_multi_vendor_orders", {
         _buyer_id: user.id,
         _seller_groups: sellerGroups,
+        _delivery_address: "",
+        _notes: "",
         _payment_method: "cod",
         _payment_status: "pending",
-        _fulfillment_type: originalOrder.fulfillment_type || "self_pickup",
-        _delivery_fee: 0,
+        _cart_total: totalAmount,
+        _coupon_id: "",
+        _coupon_code: "",
         _coupon_discount: 0,
+        _has_urgent: false,
+        _delivery_fee: 0,
+        _fulfillment_type: originalOrder.fulfillment_type || "self_pickup",
+        _delivery_address_id: null,
+        _delivery_lat: null,
+        _delivery_lng: null,
+        _idempotency_key: `reorder_${order_id}_${Date.now()}`,
       });
 
     if (createErr) {
