@@ -13,6 +13,7 @@ import { DraftProductManager } from '@/components/seller/DraftProductManager';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
 import { CroppableImageUpload } from '@/components/ui/croppable-image-upload';
+import { ServiceAvailabilityManager } from '@/components/seller/ServiceAvailabilityManager';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
