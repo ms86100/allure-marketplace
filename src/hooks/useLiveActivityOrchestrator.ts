@@ -84,7 +84,8 @@ export function useLiveActivityOrchestrator(): void {
 
   // ── Realtime: order status changes (with auto-reconnect) ──
   useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
+    if (!userId) return;
+    const isNative = Capacitor.isNativePlatform();
 
     let retryCount = 0;
     let channelRef: ReturnType<typeof supabase.channel> | null = null;
