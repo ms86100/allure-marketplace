@@ -337,13 +337,32 @@ async function handleComplete(req: Request, db: any, userId: string) {
 
   const { data: assignment } = await db
     .from('delivery_assignments')
-    .select('id, order_id, otp_hash, otp_expires_at, status, otp_attempt_count, max_otp_attempts')
+    .select('id, order_id, otp_hash, otp_expires_at, status, otp_attempt_count, max_otp_attempts, rider_id, partner_id')
     .eq('id', assignment_id)
     .single();
 
   if (!assignment) return jsonResponse({ error: 'Assignment not found' }, 404);
   if (!['picked_up', 'at_gate'].includes(assignment.status)) {
     return jsonResponse({ error: 'Assignment not in deliverable status' }, 400);
+  }
+
+  // Bug 11 fix: Authorization — only the assigned rider, seller, or buyer can complete
+  const { data: order } = await db.from('orders').select('seller_id, buyer_id').eq('id', assignment.order_id).single();
+  if (!order) return jsonResponse({ error: 'Order not found' }, 404);
+
+  const { data: sellerProfile } = await db.from('seller_profiles').select('user_id').eq('id', order.seller_id).single();
+  const isSeller = sellerProfile?.user_id === userId;
+  const isBuyer = order.buyer_id === userId;
+
+  // Check if caller is the assigned rider (via delivery_partner_pool.user_id)
+  let isAssignedRider = false;
+  if (assignment.rider_id) {
+    const { data: rider } = await db.from('delivery_partner_pool').select('user_id').eq('id', assignment.rider_id).maybeSingle();
+    isAssignedRider = rider?.user_id === userId;
+  }
+
+  if (!isSeller && !isBuyer && !isAssignedRider) {
+    return jsonResponse({ error: 'Not authorized to complete this delivery' }, 403);
   }
 
   // OTP lockout check
