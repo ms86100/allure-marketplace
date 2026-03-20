@@ -13,6 +13,7 @@ import { useAuthPage } from '@/hooks/useAuthPage';
 // ─── OTP Step with keyboard-aware scrolling ─────────────────────────────
 function OtpStep({ auth }: { auth: ReturnType<typeof useAuthPage> }) {
   const otpContainerRef = useRef<HTMLDivElement>(null);
+  const hasAutoSubmitted = useRef(false);
 
   useEffect(() => {
     const scrollOtpIntoView = () => {
@@ -28,13 +29,24 @@ function OtpStep({ auth }: { auth: ReturnType<typeof useAuthPage> }) {
     return () => clearTimeout(initialTimer);
   }, []);
 
+  // Auto-verify when all 4 digits are filled (handles autofill & manual entry)
+  useEffect(() => {
+    if (auth.otp.length === 4 && !auth.isLoading && !hasAutoSubmitted.current) {
+      hasAutoSubmitted.current = true;
+      auth.handleVerifyOtp();
+    }
+    if (auth.otp.length < 4) {
+      hasAutoSubmitted.current = false;
+    }
+  }, [auth.otp, auth.isLoading]);
+
   return (
-    <motion.div key="otp" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5">
+    <motion.div key="otp" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5 pb-72">
       <div className="text-center space-y-1">
         <p className="text-sm text-muted-foreground">OTP sent to</p>
         <p className="text-base font-semibold text-foreground">{auth.settings.defaultCountryCode} {auth.phone}</p>
       </div>
-      <div ref={otpContainerRef} className="flex justify-center" style={{ scrollMarginBottom: '200px' }}>
+      <div ref={otpContainerRef} className="flex justify-center" style={{ scrollMarginBottom: '280px' }}>
         <InputOTP maxLength={4} value={auth.otp} onChange={(value) => auth.setOtp(value)} autoFocus>
           <InputOTPGroup className="gap-3">
             <InputOTPSlot index={0} className="w-14 h-14 text-2xl font-semibold rounded-xl border-2" />
