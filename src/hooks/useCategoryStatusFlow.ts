@@ -44,7 +44,7 @@ export function useCategoryStatusFlow(
       
       let { data, error } = await supabase
         .from('category_status_flows')
-        .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint')
+        .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint, is_deprecated')
         .eq('parent_group', parentGroup)
         .eq('transaction_type', transactionType)
         .order('sort_order', { ascending: true });
