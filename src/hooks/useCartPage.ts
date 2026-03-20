@@ -209,8 +209,9 @@ export function useCartPage() {
       _idempotency_key: idempotencyKeyRef.current,
     } as any);
     if (error) {
-      // Reset idempotency key on any error so retries use a fresh key
-      idempotencyKeyRef.current = null;
+      // Do NOT reset idempotency key — retry must use the same key
+      // so the DB advisory lock + dedup check can detect the duplicate.
+      // Key is only reset on confirmed success or business-logic rejection.
       throw error;
     }
 
