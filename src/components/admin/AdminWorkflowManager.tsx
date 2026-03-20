@@ -217,7 +217,10 @@ export function AdminWorkflowManager() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-bold">{formatName(wf.parent_group)}</p>
-                  <p className="text-xs text-muted-foreground">{formatName(wf.transaction_type)} · {wf.step_count} steps</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatName(wf.transaction_type)} · {wf.steps.filter(s => !(s as any).is_deprecated).length} steps
+                    {wf.steps.some(s => (s as any).is_deprecated) && <span className="ml-1 text-amber-500">({wf.steps.filter(s => (s as any).is_deprecated).length} deprecated)</span>}
+                  </p>
                   <WorkflowLinkage parentGroup={wf.parent_group} transactionType={wf.transaction_type} />
                 </div>
               </div>
