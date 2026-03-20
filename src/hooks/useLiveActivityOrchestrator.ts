@@ -348,7 +348,7 @@ export function useLiveActivityOrchestrator(): void {
           // All orders are terminal — end any lingering Live Activities
           for (const [orderId] of lastKnownRef) {
             console.log(TAG, `Polling: order ${orderId} no longer active, ending LA`);
-            await LiveActivityManager.end(orderId);
+            if (isNative) await LiveActivityManager.end(orderId);
           }
           lastKnownRef.clear();
           return;
