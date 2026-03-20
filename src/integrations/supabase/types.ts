@@ -2967,6 +2967,30 @@ export type Database = {
           },
         ]
       }
+      listing_type_workflow_map: {
+        Row: {
+          condition_note: string | null
+          created_at: string
+          is_conditional: boolean
+          listing_type: string
+          workflow_key: string
+        }
+        Insert: {
+          condition_note?: string | null
+          created_at?: string
+          is_conditional?: boolean
+          listing_type: string
+          workflow_key: string
+        }
+        Update: {
+          condition_note?: string | null
+          created_at?: string
+          is_conditional?: boolean
+          listing_type?: string
+          workflow_key?: string
+        }
+        Relationships: []
+      }
       live_activity_tokens: {
         Row: {
           created_at: string

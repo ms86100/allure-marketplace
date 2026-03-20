@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Link2 } from 'lucide-react';
+import { useWorkflowMap, getWorkflowKeyFromMap } from '@/hooks/useWorkflowMap';
 import { getWorkflowKey } from '@/lib/listingTypeWorkflowMap';
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
 
 export function WorkflowLinkage({ parentGroup, transactionType }: Props) {
   const [categories, setCategories] = useState<{ category: string; display_name: string; transaction_type: string }[]>([]);
+  const { data: workflowMap } = useWorkflowMap();
 
   useEffect(() => {
     supabase
@@ -18,14 +20,15 @@ export function WorkflowLinkage({ parentGroup, transactionType }: Props) {
       .select('category, display_name, transaction_type')
       .eq('parent_group', parentGroup)
       .then(({ data }) => {
-        // Filter client-side using the mapping: show categories whose
-        // RESOLVED workflow key matches this workflow's transaction_type
-        const linked = (data || []).filter(
-          c => getWorkflowKey(c.transaction_type || 'cart_purchase') === transactionType
-        );
+        // Filter using DB-driven map, falling back to static map
+        const linked = (data || []).filter(c => {
+          const entry = getWorkflowKeyFromMap(workflowMap, c.transaction_type || 'cart_purchase');
+          const resolved = entry?.workflow_key ?? getWorkflowKey(c.transaction_type || 'cart_purchase');
+          return resolved === transactionType;
+        });
         setCategories(linked);
       });
-  }, [parentGroup, transactionType]);
+  }, [parentGroup, transactionType, workflowMap]);
 
   if (categories.length === 0) return null;
 
