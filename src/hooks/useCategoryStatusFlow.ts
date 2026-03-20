@@ -36,6 +36,7 @@ export function useCategoryStatusFlow(
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    setIsLoading(true);
     const transactionType = resolveTransactionType(sellerPrimaryGroup || 'default', orderType, fulfillmentType, deliveryHandledBy);
 
     (async () => {
