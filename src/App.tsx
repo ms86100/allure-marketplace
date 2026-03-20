@@ -344,8 +344,8 @@ function AppRoutes() {
         <Route path="/category/:category" element={<ProtectedRoute><CategoryGroupPage /></ProtectedRoute>} />
         <Route path="/seller/:id" element={<ProtectedRoute><SellerDetailPage /></ProtectedRoute>} />
         <Route path="/cart" element={<ProtectedRoute><RouteErrorBoundary sectionName="Cart"><CartPage /></RouteErrorBoundary></ProtectedRoute>} />
-        <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
-        <Route path="/orders/:id" element={<ProtectedRoute><OrderDetailPage /></ProtectedRoute>} />
+        <Route path="/orders" element={<ProtectedRoute><RouteErrorBoundary sectionName="Orders"><OrdersPage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/orders/:id" element={<ProtectedRoute><RouteErrorBoundary sectionName="Order Details"><OrderDetailPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         <Route path="/profile/edit" element={<ProtectedRoute><ProfileEditPage /></ProtectedRoute>} />
         <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />

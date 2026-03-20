@@ -167,11 +167,18 @@ struct LiveDeliveryWidget: Widget {
                     .padding(.top, 2)
                 }
             } compactLeading: {
-                Image("SocivaIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 20, height: 20)
-                    .clipShape(Circle())
+                // NOTE: Ensure SocivaIcon is added to the widget extension's
+                // Assets.xcassets in Xcode — it does NOT inherit from the main app target.
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.15))
+                        .frame(width: 24, height: 24)
+                    Image("SocivaIcon")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 20, height: 20)
+                        .clipShape(Circle())
+                }
             } compactTrailing: {
                 if let eta = context.state.etaMinutes {
                     Text("\(eta)m")
@@ -186,10 +193,15 @@ struct LiveDeliveryWidget: Widget {
                         .rotationEffect(.degrees(-90))
                 }
             } minimal: {
-                Image("SocivaIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .clipShape(Circle())
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.15))
+                    Image("SocivaIcon")
+                        .resizable()
+                        .scaledToFill()
+                        .clipShape(Circle())
+                        .padding(2)
+                }
             }
             .widgetURL(URL(string: "sociva://orders/\(context.attributes.entityId)"))
         }
