@@ -12,7 +12,7 @@ import { Order, OrderStatus } from '@/types/database';
 import { toast } from 'sonner';
 
 export function useOrderDetail(id: string | undefined) {
-  const { user, isSeller } = useAuth();
+  const { user, isSeller, sellerProfiles, currentSellerId } = useAuth();
   const { getOrderStatus, getPaymentStatus, getItemStatus } = useStatusLabels();
   const { formatPrice } = useCurrency();
   const [order, setOrder] = useState<Order | null>(null);
@@ -24,7 +24,22 @@ export function useOrderDetail(id: string | undefined) {
   const [isRejectionDialogOpen, setIsRejectionDialogOpen] = useState(false);
 
   const seller = (order as any)?.seller;
-  const isSellerView = isSeller && seller?.user_id === user?.id;
+
+  // Robust seller ownership: match order.seller_id against currentSellerId or any of the user's seller profiles
+  // This avoids depending on the nested seller relation being fully hydrated
+  const isSellerView = useMemo(() => {
+    if (!order || !isSeller || !user) return false;
+    const orderSellerId = order.seller_id;
+    if (!orderSellerId) return false;
+    // Primary: match against current seller context
+    if (currentSellerId && orderSellerId === currentSellerId) return true;
+    // Fallback: match against any of the user's seller profiles
+    if (sellerProfiles.some(sp => sp.id === orderSellerId)) return true;
+    // Legacy fallback: nested relation check (kept for edge cases)
+    if (seller?.user_id === user.id) return true;
+    return false;
+  }, [order?.seller_id, isSeller, user?.id, currentSellerId, sellerProfiles, seller?.user_id]);
+
   const isUrgentOrder = order?.auto_cancel_at && isSellerView;
 
   useUrgentOrderSound(!!isUrgentOrder);
@@ -174,7 +189,7 @@ export function useOrderDetail(id: string | undefined) {
       const updateData: any = { status: newStatus, auto_cancel_at: null };
       if (rejectionReason) updateData.rejection_reason = rejectionReason;
       let query = supabase.from('orders').update(updateData).eq('id', order.id).eq('status', order.status as any).select();
-      if (isSellerView) query = query.eq('seller_id', seller?.id);
+      if (isSellerView) query = query.eq('seller_id', order.seller_id);
       else query = query.eq('buyer_id', user.id);
       const { data: updatedRows, error } = await query;
       if (error) throw error;
