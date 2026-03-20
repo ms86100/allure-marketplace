@@ -109,6 +109,32 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
    * Returns true if state was updated.
    */
   const applyFetchedData = useCallback((data: any) => {
+    // Bug 15 fix: dedup by timestamp
+    const ts = data.last_location_at;
+    if (ts && seenLocationTimestamps.current.has(ts)) {
+      // Still update non-location fields
+      setState((prev) => ({
+        ...prev,
+        status: data.status ?? prev.status,
+        riderName: data.rider_name ?? prev.riderName,
+        riderPhone: data.rider_phone ?? prev.riderPhone,
+        riderPhotoUrl: data.rider_photo_url ?? prev.riderPhotoUrl,
+        eta: data.eta_minutes ?? prev.eta,
+        distance: data.distance_meters ?? prev.distance,
+        proximityStatus: data.proximity_status ?? prev.proximityStatus,
+        isLoading: false,
+      }));
+      return;
+    }
+    if (ts) {
+      seenLocationTimestamps.current.add(ts);
+      // Keep set bounded
+      if (seenLocationTimestamps.current.size > 100) {
+        const entries = Array.from(seenLocationTimestamps.current);
+        seenLocationTimestamps.current = new Set(entries.slice(-50));
+      }
+    }
+
     const loc = buildLocationFromData(data);
     if (loc) {
       const result = filterGPSPoint(loc, gpsFilterState.current);
@@ -117,8 +143,10 @@ export function useDeliveryTracking(assignmentId: string | null | undefined): De
       loc.longitude = result.filtered.longitude;
     }
 
+    // Bug 10 fix: track current status
+    if (data.status) currentStatusRef.current = data.status;
+
     setState((prev) => {
-      // Only update location if incoming is newer
       const incomingAt = data.last_location_at;
       const currentAt = prev.lastLocationAt;
       const isNewer = !currentAt || (incomingAt && new Date(incomingAt).getTime() > new Date(currentAt).getTime());
