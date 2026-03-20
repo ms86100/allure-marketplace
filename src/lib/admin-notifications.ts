@@ -76,8 +76,8 @@ export async function notifyLicenseStatusChange(
     title,
     body,
     type,
-    reference_path: '/seller/licenses',
-    payload: { type },
+    reference_path: '/seller',
+    payload: { type, action: status === 'approved' ? 'LICENSE_APPROVED' : 'LICENSE_REJECTED' },
   });
   if (error) console.error('Failed to enqueue license notification:', error);
 }
