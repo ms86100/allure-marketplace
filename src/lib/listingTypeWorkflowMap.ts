@@ -1,13 +1,14 @@
 /**
- * Static mapping from category listing types (transaction_type in category_config)
- * to workflow engine keys (transaction_type in category_status_flows / transitions).
+ * FALLBACK-ONLY mapping from category listing types to workflow engine keys.
  *
- * This codifies the hidden logic in `resolveTransactionType` so the admin UI
- * can show which workflow pipeline a listing type triggers.
+ * The canonical source of truth is the `listing_type_workflow_map` DB table.
+ * This static map is used only during loading / offline states.
  *
- * Keep in sync with src/lib/resolveTransactionType.ts
+ * Keep in sync with:
+ *   - DB table `listing_type_workflow_map`
+ *   - src/lib/resolveTransactionType.ts (runtime order resolution)
  */
-export const LISTING_TYPE_TO_WORKFLOW: Record<string, string> = {
+export const LISTING_TYPE_TO_WORKFLOW_FALLBACK: Record<string, string> = {
   cart_purchase: 'cart_purchase',
   buy_now: 'cart_purchase',
   book_slot: 'service_booking',
@@ -20,6 +21,10 @@ export const LISTING_TYPE_TO_WORKFLOW: Record<string, string> = {
 /** Listing types where the final workflow depends on fulfillment config at order time */
 export const FULFILLMENT_DEPENDENT_TYPES = new Set(['cart_purchase', 'buy_now']);
 
+/**
+ * Fallback lookup — only used when DB map is not yet loaded.
+ * Prefer `getWorkflowKeyFromMap()` from useWorkflowMap.ts for DB-driven resolution.
+ */
 export function getWorkflowKey(listingType: string): string {
-  return LISTING_TYPE_TO_WORKFLOW[listingType] ?? 'cart_purchase';
+  return LISTING_TYPE_TO_WORKFLOW_FALLBACK[listingType] ?? 'cart_purchase';
 }
