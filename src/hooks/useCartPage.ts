@@ -208,10 +208,15 @@ export function useCartPage() {
       _delivery_lng: selectedDeliveryAddress?.longitude || null,
       _idempotency_key: idempotencyKeyRef.current,
     } as any);
-    if (error) throw error;
+    if (error) {
+      // Reset idempotency key on any error so retries use a fresh key
+      idempotencyKeyRef.current = null;
+      throw error;
+    }
 
     const result = data as { success: boolean; order_ids?: string[]; order_count?: number; error?: string; unavailable_items?: string[]; closed_sellers?: string[]; out_of_range_sellers?: string[]; deduplicated?: boolean };
     if (!result?.success) {
+      idempotencyKeyRef.current = null;
       if (result?.error === 'stock_validation_failed' && result?.unavailable_items) throw new Error(`Some items are unavailable:\n• ${result.unavailable_items.join('\n• ')}`);
       if (result?.error === 'store_closed') { const sellers = result.closed_sellers?.join(', '); throw new Error(sellers ? `Store closed: ${sellers}` : 'Store is currently closed. Please try again later.'); }
       if (result?.error === 'delivery_out_of_range') { const sellers = result.out_of_range_sellers?.join('\n• '); throw new Error(sellers ? `Delivery not possible:\n• ${sellers}` : 'Delivery address is out of range for one or more sellers.'); }
