@@ -319,16 +319,16 @@ function AppRoutes() {
 
   // Consume pending deep link after auth hydration completes
   useEffect(() => {
-    if (!user) return;
+    if (!user || !profile) return; // Wait for full auth + profile hydration
     const timer = setTimeout(() => {
       const pendingPath = consumePendingDeepLink();
       if (pendingPath) {
         console.log('[AppRoutes] Navigating to deferred deep link:', pendingPath);
         deferredNavigate(pendingPath, { replace: true });
       }
-    }, 100);
+    }, 300); // Allow more time for context providers to initialize
     return () => clearTimeout(timer);
-  }, [user, deferredNavigate]);
+  }, [user, profile, deferredNavigate]);
 
   return (
     <Suspense fallback={<PageLoadingFallback />}>
