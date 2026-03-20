@@ -52,13 +52,20 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onSnooze }: NewOrderAl
   }, [order?.id, onDismiss]);
 
   const handleView = () => {
-    onDismiss();
+    const orderId = order?.id;
+    if (!orderId) {
+      onDismiss();
+      return;
+    }
+    // Navigate FIRST, then dismiss — prevents the "popup disappears, nothing happens" dead-end
     try {
-      navigate(`/orders/${order!.id}`);
+      navigate(`/orders/${orderId}`);
     } catch (e) {
       console.error('[OrderAlert] Navigation failed, falling back:', e);
       navigate('/orders');
     }
+    // Dismiss after navigation is triggered
+    onDismiss();
   };
 
   const handleSnooze = () => {
