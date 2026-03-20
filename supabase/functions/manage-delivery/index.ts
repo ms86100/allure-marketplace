@@ -495,12 +495,13 @@ async function handleWebhook(req: Request, db: any) {
   if (rider_name) updateData.rider_name = rider_name;
   if (rider_phone) updateData.rider_phone = rider_phone;
 
+  // Bug 12 fix: Map 3PL 'delivered' to 'at_gate' — require OTP for final confirmation
   const statusMap: Record<string, string> = {
     'assigned': 'assigned',
     'picked_up': 'picked_up',
     'in_transit': 'picked_up',
     'arrived': 'at_gate',
-    'delivered': 'delivered',
+    'delivered': 'at_gate', // Intentionally mapped to at_gate — OTP still required
     'failed': 'failed',
     'cancelled': 'cancelled',
   };
@@ -509,7 +510,7 @@ async function handleWebhook(req: Request, db: any) {
   if (internalStatus) {
     updateData.status = internalStatus;
     if (internalStatus === 'picked_up') updateData.pickup_at = new Date().toISOString();
-    if (internalStatus === 'delivered') updateData.delivered_at = new Date().toISOString();
+    if (internalStatus === 'at_gate') updateData.at_gate_at = new Date().toISOString();
   }
 
   if (Object.keys(updateData).length > 0) {
