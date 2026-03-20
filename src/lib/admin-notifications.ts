@@ -138,8 +138,8 @@ export async function notifyProductStatusChange(
     title,
     body,
     type,
-    reference_path: '/seller/products',
-    payload: { type },
+    reference_path: '/seller',
+    payload: { type, action: status === 'approved' ? 'PRODUCT_APPROVED' : 'PRODUCT_REJECTED' },
   });
   if (error) console.error('Failed to enqueue product notification:', error);
 }

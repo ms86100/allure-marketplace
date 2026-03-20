@@ -51,11 +51,17 @@ export function TimeSlotPicker({
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const daySlots = availableSlots.find((s) => s.date === dateStr);
       if (daySlots) {
-        return daySlots.slots.map((time) => ({
-          time,
-          label: time,
-          available: true,
-        }));
+        const now = new Date();
+        const isTodayDate = isSameDay(selectedDate, today);
+        return daySlots.slots.map((time) => {
+          const [h, m] = time.split(':').map(Number);
+          const slotDate = setMinutes(setHours(selectedDate, h), m);
+          return {
+            time,
+            label: format(slotDate, 'h:mm a'),
+            available: !isTodayDate || isAfter(slotDate, now),
+          };
+        });
       }
       return [];
     }

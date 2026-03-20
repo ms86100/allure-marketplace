@@ -11,6 +11,7 @@ const PENDING_DEEP_LINK_KEY = 'sociva_pending_deep_link';
 const KNOWN_ROUTES = new Set([
   'orders', 'order', 'home', 'profile', 'cart', 'shop',
   'seller', 'settings', 'notifications', 'tracking', 'la-debug',
+  'become-seller', 'admin',
 ]);
 
 /**
