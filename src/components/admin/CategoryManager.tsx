@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Grid3X3, GripVertical, Edit2, Plus, Trash2, Sparkles, ImageIcon, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
+import { CategoryWorkflowPreview } from '@/components/admin/CategoryWorkflowPreview';
 import { DndContext, closestCenter } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
