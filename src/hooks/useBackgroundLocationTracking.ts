@@ -42,6 +42,7 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
   const configRef = useRef<TrackingConfig | null>(null);
   const healthTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const bgGeoRef = useRef<any>(null);
+  const stopTrackingRef = useRef<(() => void) | null>(null);
   const isNative = Capacitor.isNativePlatform();
 
   useEffect(() => {
@@ -55,9 +56,21 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
   // ─── Network layer ───────────────────────────────────────
 
   const postLocation = useCallback(async (payload: QueuedLocationPayload) => {
-    await supabase.functions.invoke('update-delivery-location', {
+    const { data, error } = await supabase.functions.invoke('update-delivery-location', {
       body: payload,
     });
+    // If the server says delivery is no longer active, stop tracking immediately
+    if (error) {
+      let errorBody: any = null;
+      try {
+        errorBody = typeof error === 'object' && error.context ? await error.context.json?.() : null;
+      } catch { /* ignore */ }
+      const msg = errorBody?.error || (typeof data === 'object' ? data?.error : '') || '';
+      if (msg === 'Delivery is no longer active') {
+        console.log('[LocationTracking] Delivery terminal — auto-stopping');
+        throw new Error('DELIVERY_TERMINAL');
+      }
+    }
   }, []);
 
   const flushQueue = useCallback(async () => {
@@ -120,7 +133,12 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
       await postLocation(payload);
       lastSentRef.current = now;
       if (mountedRef.current) setState(s => ({ ...s, lastSentAt: now, trackingPaused: false }));
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.message === 'DELIVERY_TERMINAL') {
+        // Auto-stop: don't queue, don't retry
+        stopTrackingRef.current?.();
+        return;
+      }
       console.error('[LocationTracking] Send failed, queueing point:', err);
       enqueueLocation(payload);
     }
@@ -355,6 +373,18 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
       setState(s => ({ ...s, isTracking: false, trackingPaused: false }));
     }
   }, [isNative, stopHealthCheck]);
+
+  // Keep stopTrackingRef in sync so sendLocation can call it without circular deps
+  useEffect(() => {
+    stopTrackingRef.current = stopTracking;
+  }, [stopTracking]);
+
+  // ─── Auto-stop when assignmentId becomes null ──────────
+  useEffect(() => {
+    if (!assignmentId && state.isTracking) {
+      stopTracking();
+    }
+  }, [assignmentId, state.isTracking, stopTracking]);
 
   // ─── Flush queue on reconnect ──────────────────────────
 
