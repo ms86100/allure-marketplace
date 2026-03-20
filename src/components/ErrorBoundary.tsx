@@ -54,9 +54,11 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   private handleGoHome = () => {
-    // Navigate to auth page instead of / to avoid re-entering a crashing ProtectedRoute
-    window.location.hash = '#/auth';
-    window.location.reload();
+    // Reset error state first so the app can re-render normally
+    this.setState({ hasError: false, error: null });
+    window.location.hash = '#/';
+    // If state reset alone doesn't recover, force reload after a tick
+    setTimeout(() => window.location.reload(), 150);
   };
 
   private handleCopyError = () => {
