@@ -210,8 +210,12 @@ export function useOrderDetail(id: string | undefined) {
 
   // Display statuses derived entirely from DB flow
   const displayStatuses = useMemo(() => {
-    if (timelineSteps.length > 0) return timelineSteps.map(s => s.status_key);
-    return [];
+    if (timelineSteps.length === 0) return [];
+    const steps = timelineSteps.map(s => s.status_key);
+    if (steps.includes('delivered') && steps.includes('completed')) {
+      return steps.filter(s => s !== 'completed');
+    }
+    return steps;
   }, [timelineSteps]);
 
   // Helper: get label from flow step if available, else fall back to useStatusLabels

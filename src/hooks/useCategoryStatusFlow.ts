@@ -133,7 +133,11 @@ export function getNextStatusForActor(
  * Filters out deprecated steps unless the order is currently IN that state.
  */
 export function getTimelineSteps(flow: StatusFlowStep[], currentStatus?: string): StatusFlowStep[] {
-  return flow.filter(s => !s.is_terminal && (!s.is_deprecated || s.status_key === currentStatus));
+  return flow.filter(s => {
+    if (s.is_terminal && !s.is_success) return false;
+    if (s.is_deprecated && s.status_key !== currentStatus) return false;
+    return true;
+  });
 }
 
 /**
