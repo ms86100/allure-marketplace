@@ -1,51 +1,53 @@
 
+Fix plan: restore seller ownership detection and remove the dead-end state on Order Detail.
 
-# Fix: Type Mismatch in Notification Trigger Crashing Order Updates
+1. Confirmed root cause
+- The order and workflow are valid in the backend:
+  - Order `28333797-aa36-48ef-a9e3-87400daed188` is still `placed`
+  - It belongs to seller profile `602762b5-03fc-4097-82a6-ec23b60ab67a`
+  - That seller profile belongs to the logged-in user `ef690ff1-d82e-4b74-a0c1-6705f79fc1cd`
+  - The workflow has a valid seller transition: `placed -> accepted`
+- So this is not primarily a flow-table problem.
+- The break is most likely in the frontend seller gate: `isSellerView` depends on nested relation data (`seller?.user_id === user?.id`) instead of the order’s own `seller_id` / seller context. If that relation is missing, delayed, or partially hydrated, the seller action bar disappears even though the seller owns the order.
 
-## Root Cause
+2. Implement the actual fix
+- In `useOrderDetail.ts`, replace the fragile seller-view check with an ownership check based on seller context:
+  - Compare `order.seller_id` against `currentSellerId`
+  - Also allow fallback match against any of the user’s `sellerProfiles`
+- Keep the nested seller relation only for display data, not authorization/UI gating.
+- Use the same ownership logic for:
+  - `isSellerView`
+  - seller chat recipient selection
+  - seller action bar visibility
+  - seller update query guard
 
-The database error log reveals the exact problem:
+3. Add a safe fallback so the page never becomes a dead end
+- If the order belongs to one of the user’s seller profiles but seller display data has not loaded yet:
+  - still show seller actions
+  - still allow `placed -> accepted`
+- If ownership cannot be resolved, show an explicit inline error state instead of silently rendering no actions.
 
-```
-WARNING: fn_enqueue_order_status_notification failed for order f1d7cdc1-...:
-  operator does not exist: service_category = text
-```
+4. Tighten the overlay flow
+- In `NewOrderAlertOverlay.tsx`, make navigation safer:
+  - navigate first, then dismiss only after navigation is triggered successfully
+  - if navigation fails, keep the alert visible or fall back clearly to `/orders`
+- This prevents the “popup disappears, nothing happens” experience even if routing fails.
 
-The migration we just deployed (`20260320093032`) introduced a join in the notification trigger:
+5. Add targeted debugging guards
+- Add temporary logging around:
+  - resolved `isSellerView`
+  - `order.seller_id`
+  - `currentSellerId`
+  - matched seller profile IDs
+  - computed `nextStatus`
+- This will verify the seller gate and stop future regressions quickly.
 
-```sql
-JOIN public.category_config cc ON cc.category = p.category
-```
-
-`category_config.category` is type `service_category` (enum), while `products.category` is type `text`. PostgreSQL cannot compare an enum to text without an explicit cast. This causes the trigger to fail on **every** order status update.
-
-While the trigger has `EXCEPTION WHEN OTHERS THEN RETURN NEW` (so the UPDATE itself succeeds at the DB level), the `v_listing_type` variable remains NULL, which means `v_transaction_type` falls through to `'self_fulfillment'` instead of the correct type. This causes the flow lookup to find no matching `notification_title`, so the trigger exits early without enqueuing any notification and — critically — without cleaning up `live_activity_tokens` for terminal states.
-
-The order itself (`f1d7cdc1`) ended up `cancelled` by the 3-minute auto-cancel timer, confirming the seller likely tried to accept but the UI may not have reflected the update (no notification queued → no push → no live activity sync).
-
-## Fix
-
-**One SQL migration** — cast `p.category` to `service_category` in the trigger's join:
-
-**File**: New SQL migration
-
-Change line 58 of the trigger function from:
-```sql
-JOIN public.category_config cc ON cc.category = p.category
-```
-to:
-```sql
-JOIN public.category_config cc ON cc.category = p.category::service_category
-```
-
-This is a single-line fix that resolves the type mismatch and restores correct `transaction_type` resolution for all order status notifications.
-
-## Impact
-
-| Before Fix | After Fix |
-|-----------|-----------|
-| Trigger fails silently on every status change | Trigger resolves transaction_type correctly |
-| No push notifications sent for any order | Push notifications sent per flow config |
-| live_activity_tokens not cleaned on terminal | Terminal cleanup works |
-| Seller/buyer don't get real-time push updates | Full notification pipeline restored |
-
+Technical details
+- Files to update:
+  - `src/hooks/useOrderDetail.ts`
+  - `src/components/seller/NewOrderAlertOverlay.tsx`
+- Expected result after fix:
+  - Clicking “View Order” opens the order page reliably
+  - Seller is recognized correctly on that page
+  - Action bar appears for `placed`
+  - Seller can accept/reject and continue status updates normally
