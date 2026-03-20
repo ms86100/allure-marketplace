@@ -42,6 +42,7 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
   const configRef = useRef<TrackingConfig | null>(null);
   const healthTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const bgGeoRef = useRef<any>(null);
+  const stopTrackingRef = useRef<(() => void) | null>(null);
   const isNative = Capacitor.isNativePlatform();
 
   useEffect(() => {
