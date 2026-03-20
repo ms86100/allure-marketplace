@@ -59,7 +59,12 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
     const { data, error } = await supabase.functions.invoke('update-delivery-location', {
       body: payload,
     });
-    // If the server says delivery is no longer active, stop tracking immediately
+    // Check for terminal signal (server returns 200 with { terminal: true })
+    if (data && typeof data === 'object' && data.terminal) {
+      console.log('[LocationTracking] Delivery terminal — auto-stopping');
+      throw new Error('DELIVERY_TERMINAL');
+    }
+    // Legacy: also handle 400 error responses for backward compatibility
     if (error) {
       let errorBody: any = null;
       try {
