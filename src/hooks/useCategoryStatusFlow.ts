@@ -128,8 +128,12 @@ export function getNextStatusForActor(
 /**
  * Returns the display steps for the timeline (non-terminal, non-cancelled).
  */
-export function getTimelineSteps(flow: StatusFlowStep[]): StatusFlowStep[] {
-  return flow.filter(s => !s.is_terminal);
+/**
+ * Returns the display steps for the timeline.
+ * Filters out deprecated steps unless the order is currently IN that state.
+ */
+export function getTimelineSteps(flow: StatusFlowStep[], currentStatus?: string): StatusFlowStep[] {
+  return flow.filter(s => !s.is_terminal && (!s.is_deprecated || s.status_key === currentStatus));
 }
 
 /**
