@@ -400,6 +400,12 @@ export function CategoryManager() {
               <p className="text-[11px] text-muted-foreground">
                 {LISTING_TYPE_PRESETS.find(p => p.value === cm.addForm.transaction_type)?.description}
               </p>
+              {cm.addingToGroup && (
+                <CategoryWorkflowPreview
+                  listingType={cm.addForm.transaction_type}
+                  parentGroup={cm.addingToGroup}
+                />
+              )}
             </div>
             <div className="space-y-2">
               <Label className="text-xs font-semibold">Icon (Emoji)</Label>
