@@ -63,9 +63,11 @@ export function useLiveActivityOrchestrator(): void {
     const isNative = Capacitor.isNativePlatform();
     mountedRef.current = true;
 
-    runLiveActivityDiagnostics(true).then((diag) => {
-      console.log(TAG, 'Diagnostics:', JSON.stringify(diag));
-    });
+    if (isNative) {
+      runLiveActivityDiagnostics(true).then((diag) => {
+        console.log(TAG, 'Diagnostics:', JSON.stringify(diag));
+      });
+    }
 
     // Ensure flow entries & terminal statuses are loaded BEFORE first sync
     Promise.all([
