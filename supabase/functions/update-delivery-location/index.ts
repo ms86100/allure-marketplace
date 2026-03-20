@@ -123,15 +123,27 @@ serve(async (req) => {
     const authClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: authError } = await authClient.auth.getClaims(token);
-    if (authError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // Bug 13 fix: fallback to getUser if getClaims doesn't exist
+    let callerId: string;
+    if (typeof authClient.auth.getClaims === 'function') {
+      const { data: claimsData, error: authError } = await authClient.auth.getClaims(token);
+      if (authError || !claimsData?.claims) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      callerId = claimsData.claims.sub as string;
+    } else {
+      const { data: userData, error: authError } = await authClient.auth.getUser(token);
+      if (authError || !userData?.user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      callerId = userData.user.id;
     }
-    const callerId = claimsData.claims.sub as string;
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
