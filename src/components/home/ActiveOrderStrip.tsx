@@ -92,10 +92,27 @@ export function ActiveOrderStrip() {
       });
     },
     enabled: !!user?.id && !!terminalSet,
-    staleTime: jitteredStaleTime(30_000),
-    refetchInterval: 60_000,
+    staleTime: jitteredStaleTime(15_000),
+    refetchInterval: 15_000,
     refetchOnWindowFocus: true,
   });
+
+  // Realtime: subscribe to order updates for this buyer → instant query invalidation
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`active-strip:${user.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'orders',
+        filter: `buyer_id=eq.${user.id}`,
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['active-orders-strip'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, queryClient]);
 
   useEffect(() => {
     const handler = () => {
