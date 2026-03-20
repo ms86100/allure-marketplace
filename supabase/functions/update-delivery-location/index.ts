@@ -175,8 +175,10 @@ serve(async (req) => {
     }
 
     if (terminalStatuses.has(assignment.status)) {
-      return new Response(JSON.stringify({ error: 'Delivery is no longer active' }), {
-        status: 400,
+      // Return 200 with a terminal flag so the client stops gracefully
+      // without treating it as an error (prevents console errors for in-flight requests)
+      return new Response(JSON.stringify({ terminal: true, message: 'Delivery is no longer active' }), {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
