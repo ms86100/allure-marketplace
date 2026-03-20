@@ -260,6 +260,12 @@ export function CategoryManager() {
               <p className="text-[11px] text-muted-foreground">
                 {LISTING_TYPE_PRESETS.find(p => p.value === cm.editForm.transaction_type)?.description}
               </p>
+              {cm.editingCategory && (
+                <CategoryWorkflowPreview
+                  listingType={cm.editForm.transaction_type}
+                  parentGroup={cm.editingCategory.parent_group}
+                />
+              )}
             </div>
             {cm.editingCategory && (
               <GenerateImageButton
