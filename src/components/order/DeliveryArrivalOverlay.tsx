@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Phone, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,8 @@ export function DeliveryArrivalOverlay({
   doorstepDistanceMeters = 50,
 }: DeliveryArrivalOverlayProps) {
   const [dismissed, setDismissed] = useState(false);
+  // Session-persistent dismiss: once dismissed, stays dismissed until assignmentId/status fundamentally changes
+  const dismissedForStatus = useRef<string | null>(null);
 
   const transitSet = new Set(transitStatuses ?? ['picked_up', 'on_the_way', 'at_gate']);
 
@@ -47,14 +49,24 @@ export function DeliveryArrivalOverlay({
   const isImminent = distance !== null && distance < overlayDistanceMeters &&
     transitSet.has(status || '');
 
-  const visible = isImminent && !dismissed;
+  // If dismissed for this status, stay dismissed
+  const visible = isImminent && !dismissed && dismissedForStatus.current !== status;
 
+  // Only reset dismiss when status changes to a NEW transit status (not on every tick)
+  const prevStatus = useRef(status);
   useEffect(() => {
-    if (!isImminent) setDismissed(false);
-  }, [isImminent]);
+    if (status !== prevStatus.current) {
+      prevStatus.current = status;
+      // Only reset if moving to a different transit status
+      if (status && transitSet.has(status) && dismissedForStatus.current !== status) {
+        setDismissed(false);
+      }
+    }
+  }, [status]);
 
   const handleDismiss = () => {
     setDismissed(true);
+    dismissedForStatus.current = status;
     onDismiss();
   };
 
@@ -66,12 +78,12 @@ export function DeliveryArrivalOverlay({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 100 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="fixed inset-0 z-[60] flex items-end justify-center px-4 pb-24 pt-4 bg-background/80 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex items-end justify-center px-4 pb-24 pt-4 pointer-events-none"
         >
           <motion.div
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
-            className="w-full max-w-md bg-card border-2 border-primary/30 rounded-2xl shadow-2xl overflow-hidden"
+            className="w-full max-w-md bg-card border-2 border-primary/30 rounded-2xl shadow-2xl overflow-hidden pointer-events-auto"
           >
             {/* Pulsing header */}
             <div className="bg-primary/10 p-4 text-center relative">

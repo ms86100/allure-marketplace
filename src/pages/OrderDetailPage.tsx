@@ -176,8 +176,8 @@ export default function OrderDetailPage() {
   const displayStatuses = o.displayStatuses;
   const isInTransit = o.isInTransit;
 
-  // Gap G: Only show arrival overlay for BUYER when rider is close — uses DB-backed threshold
-  const showArrivalOverlay = o.isBuyerView && deliveryAssignmentId && deliveryTracking.riderLocation && deliveryTracking.distance != null && deliveryTracking.distance < trackingConfig.arrival_overlay_distance_meters;
+  // Gap G: Only show arrival overlay for BUYER when rider is close AND order is not terminal
+  const showArrivalOverlay = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && deliveryAssignmentId && deliveryTracking.riderLocation && deliveryTracking.distance != null && deliveryTracking.distance < trackingConfig.arrival_overlay_distance_meters;
 
 
   return (
