@@ -18,8 +18,7 @@ export const LISTING_TYPE_TO_WORKFLOW_FALLBACK: Record<string, string> = {
   schedule_visit: 'service_booking',
 };
 
-/** Listing types where the final workflow depends on fulfillment config at order time */
-export const FULFILLMENT_DEPENDENT_TYPES = new Set(['cart_purchase', 'buy_now']);
+// FULFILLMENT_DEPENDENT_TYPES removed — is_conditional flag in DB table is the source of truth
 
 /**
  * Fallback lookup — only used when DB map is not yet loaded.

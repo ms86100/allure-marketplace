@@ -16,7 +16,8 @@ export function resolveTransactionType(
   deliveryHandledBy?: string | null
 ): string {
   if (orderType === 'enquiry') {
-    if (['classes', 'events'].includes(parentGroup)) return 'book_slot';
+    // AUDIT FIX: was 'book_slot' — no flows exist for book_slot; service_booking is correct
+    if (['classes', 'events'].includes(parentGroup)) return 'service_booking';
     return 'request_service';
   }
   if (orderType === 'booking') return 'service_booking';
