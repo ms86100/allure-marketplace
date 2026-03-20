@@ -1,101 +1,82 @@
 
 
-## Plan: Unified Category ↔ Workflow Confidence Layer
+## Plan: Harden Category ↔ Workflow Confidence Layer (Phase 1.5)
 
-### Problem Diagnosis
+The current implementation uses a hardcoded frontend mapping (`listingTypeWorkflowMap.ts`) that duplicates `resolveTransactionType`. This plan moves the mapping to a DB table, eliminates duplication, and adds determinism indicators — while keeping the existing preview UI.
 
-The root issue is a **vocabulary mismatch** between two admin surfaces:
+### 1. Create `listing_type_workflow_map` DB table
 
-```text
-Category Config uses:        Workflow Engine uses:
-─────────────────────        ────────────────────
-cart_purchase                 cart_purchase        ✅ match
-buy_now                       (no workflow)        ❌ gap
-book_slot                     service_booking      ❌ mismatch
-request_service               request_service      ✅ match
-request_quote                 (no workflow)        ❌ gap
-contact_only                  (no workflow)        ❌ gap
-schedule_visit                (no workflow)        ❌ gap
-```
+New table to store the mapping as admin-visible, DB-driven configuration:
 
-A hidden runtime function (`resolveTransactionType`) maps category listing types to workflow keys at order time, but admins never see this mapping. The existing `WorkflowLinkage` component queries `category_config.transaction_type = workflow.transaction_type` directly — which only works for `cart_purchase` and `request_service`, missing everything else.
-
-**Result:** Admins configure categories in one tab and workflows in another, with no visible connection between them and no confidence that the right workflow will fire.
-
-### Solution: Three Changes
-
-#### 1. Add a Listing Type → Workflow Key mapping table (visible to admin)
-
-Create a static mapping that mirrors `resolveTransactionType` logic, making it visible in the admin UI:
-
-```typescript
-// src/lib/listingTypeWorkflowMap.ts
-export const LISTING_TYPE_TO_WORKFLOW: Record<string, string> = {
-  cart_purchase: 'cart_purchase',     // resolves further by fulfillment type
-  buy_now: 'cart_purchase',
-  book_slot: 'service_booking',
-  request_service: 'request_service',
-  request_quote: 'request_service',
-  contact_only: 'request_service',
-  schedule_visit: 'service_booking',
-};
-```
-
-This is the single source of truth for the admin-facing mapping. No DB change needed — it codifies the existing `resolveTransactionType` logic.
-
-#### 2. Fix `WorkflowLinkage` to use the mapping
-
-Currently it does `category_config.transaction_type = workflow.transaction_type` which misses `book_slot` → `service_booking`, etc.
-
-**Fix:** Load category configs for the parent group, then filter client-side using the mapping:
-
-```typescript
-// Show categories whose RESOLVED workflow key matches this workflow's transaction_type
-const linked = allGroupCategories.filter(c => 
-  LISTING_TYPE_TO_WORKFLOW[c.transaction_type] === workflowTransactionType
+```sql
+CREATE TABLE public.listing_type_workflow_map (
+  listing_type TEXT PRIMARY KEY,
+  workflow_key TEXT NOT NULL,
+  is_conditional BOOLEAN DEFAULT false,
+  condition_note TEXT
 );
+
+INSERT INTO listing_type_workflow_map VALUES
+  ('cart_purchase', 'cart_purchase', true, 'Final workflow varies by fulfillment type'),
+  ('buy_now', 'cart_purchase', true, 'Final workflow varies by fulfillment type'),
+  ('book_slot', 'service_booking', false, NULL),
+  ('request_service', 'request_service', false, NULL),
+  ('request_quote', 'request_service', false, NULL),
+  ('contact_only', 'request_service', false, NULL),
+  ('schedule_visit', 'service_booking', false, NULL);
 ```
 
-#### 3. Add Workflow Preview Panel inside Category Edit Dialog
+This becomes the **single source of truth** for the category → workflow mapping.
 
-This is the key UX fix. When an admin edits a category and selects a listing type (e.g., "Bookable Service"), show an inline read-only panel:
+### 2. Rewrite `listingTypeWorkflowMap.ts` to fetch from DB
 
-```text
-┌─────────────────────────────────────────────┐
-│  Listing Type: [Bookable Service ▾]         │
-│                                             │
-│  🔗 Workflow: service_booking               │
-│  ┌─────────────────────────────────────┐    │
-│  │ requested → confirmed → completed   │    │
-│  │ 6 steps · home_services pipeline    │    │
-│  │ [Open Workflow Editor →]            │    │
-│  └─────────────────────────────────────┘    │
-│                                             │
-│  ⚠️ No workflow found for "events /         │
-│     service_booking" — will use default     │
-└─────────────────────────────────────────────┘
+Replace the hardcoded `LISTING_TYPE_TO_WORKFLOW` object with a query-backed hook/utility:
+
+- Create `useWorkflowMap()` hook that queries `listing_type_workflow_map` (cached via react-query, 10 min stale time)
+- Export a `getWorkflowKeyFromMap(map, listingType)` pure function for consumers
+- Keep the static map as a **fallback only** (for offline / loading states), clearly marked as such
+
+### 3. Update `CategoryWorkflowPreview` with determinism indicators
+
+Use the `is_conditional` and `condition_note` fields from the DB table to show:
+
+- **Green badge**: "Deterministic" — when `is_conditional = false` AND a matching workflow exists in `category_status_flows`
+- **Amber badge**: "Conditional" — when `is_conditional = true` (e.g., cart_purchase depends on fulfillment type at order time)
+- **Red badge**: "Fallback" — when no matching workflow exists for the parent_group + workflow_key combo
+
+### 4. Update consumers to use DB-driven map
+
+Three consumers need updating:
+- `CategoryWorkflowPreview.tsx` — use `useWorkflowMap()` instead of static import
+- `WorkflowLinkage.tsx` — use `useWorkflowMap()` instead of static import
+- Keep `resolveTransactionType.ts` unchanged (runtime order resolution still needs fulfillment context) — but add a comment linking it to the DB table as the config source
+
+### 5. Add recent order workflow audit trail
+
+Add a small section at the bottom of `CategoryWorkflowPreview` showing last 5 orders for the category + parent group and which `transaction_type` was actually used at runtime. Query:
+
+```sql
+SELECT o.id, o.transaction_type, o.created_at 
+FROM orders o
+JOIN seller_profiles sp ON o.seller_id = sp.id
+WHERE sp.parent_group = :parentGroup
+  AND o.category = :category
+ORDER BY o.created_at DESC LIMIT 5
 ```
 
-This gives admins instant confidence: "When I set this category to Bookable Service, HERE is the exact workflow that will run."
+This closes the config → reality loop.
 
 ### Files Changed
 
 | File | Change |
 |------|--------|
-| `src/lib/listingTypeWorkflowMap.ts` | **New.** Static mapping from listing types to workflow keys |
-| `src/components/admin/workflow/WorkflowLinkage.tsx` | Use mapping instead of direct equality |
-| `src/components/admin/CategoryWorkflowPreview.tsx` | **New.** Inline preview showing resolved workflow for a category's listing type |
-| `src/components/admin/CategoryManager.tsx` | Add `CategoryWorkflowPreview` inside edit and add dialogs below the listing type selector |
-| `src/hooks/useCategoryManagerData.ts` | No change (listing type presets already defined) |
+| DB migration | Create `listing_type_workflow_map` table + seed data |
+| `src/hooks/useWorkflowMap.ts` | **New.** React-query hook to fetch mapping from DB |
+| `src/lib/listingTypeWorkflowMap.ts` | Downgrade to fallback-only, add DB-first `getWorkflowKeyFromMap` |
+| `src/components/admin/CategoryWorkflowPreview.tsx` | Use DB map, add determinism badges, add recent orders audit |
+| `src/components/admin/workflow/WorkflowLinkage.tsx` | Use `useWorkflowMap()` |
 
-### What This Does NOT Change
+### What This Sets Up for Phase 2
 
-- No DB schema changes. The workflow engine, `resolveTransactionType`, and `category_status_flows` tables remain untouched.
-- No runtime behavior changes. Order routing logic stays identical.
-- This is purely an **admin visibility improvement** — making the existing hidden mapping explicit and inspectable.
-
-### Edge Cases Handled
-
-- **Missing workflow:** If no workflow exists for the resolved key + parent group, the preview shows a warning: "Will fall back to `default` pipeline" (matching the existing runtime fallback in `useCategoryStatusFlow`).
-- **Fulfillment variants:** For `cart_purchase`, the preview notes: "Final workflow depends on fulfillment type (seller delivery vs platform delivery vs self-pickup)" since that's resolved at order time, not category time.
+The `listing_type_workflow_map` table is the stepping stone to explicit `category_config.workflow_id` binding. When Phase 2 arrives, the mapping table gets replaced by a direct FK on `category_config`, and the resolver becomes a simple lookup.
 
