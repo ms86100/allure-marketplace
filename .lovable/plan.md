@@ -1,74 +1,85 @@
 
 
-# Fix: Notifications, Live Activity Updates, Navigation & Rider Icon
+# Fix: Notifications, Real-Time Sync, Tracking, Toasts, Live Activity & Navigation
 
-## Problems Identified
+## Root Cause Analysis
 
 ### 1. Premature Proximity Notifications
-**Evidence**: Notification queue for order `7f66fa5f` shows both "Almost there!" and "Driver arriving now!" fired at `08:58:04` — just 22 seconds after the order was placed (`08:57:42`), while the order was still at "Accepted" stage.
+The `update-delivery-location` edge function has the order status guard (lines 430-523), but the **en_route notification** at line 327 fires on the very first GPS update when `assignment.status === 'picked_up'` with NO check on the **order** status. For seller-delivery, the assignment enters `picked_up` immediately at acceptance while the order is still at `accepted`. The 2-minute age guard on proximity only applies to the proximity block (line 447), not to the en_route block.
 
-**Root cause**: The `update-delivery-location` edge function fires proximity notifications based solely on **assignment status** (`picked_up`, `on_the_way`, `at_gate`) without checking the **order's workflow stage**. For seller-delivery orders, the seller IS the delivery partner and is already physically close (171m in a housing society). The assignment auto-enters `picked_up` immediately, so the first GPS update triggers proximity alerts while the buyer just placed the order.
+### 2. Real-Time Status Not Syncing (Web)
+The `useLiveActivityOrchestrator` is gated by `Capacitor.isNativePlatform()` (line 62, 84, 206, 323, 382, 397, 414). This means **zero** Live Activity orchestration runs on web. The `useOrderDetail` hook (line 121-125) subscribes to realtime on the specific order and calls `fetchOrder()` — this works. But the `ActiveOrderStrip` relies on query invalidation which does work via its own realtime subscription (line 101-115). The actual buyer order detail page has its own realtime subscription. The issue is that `useDeliveryTracking` only initializes when `deliveryAssignmentId` is set, and that depends on the assignment being created. For seller-delivery where the seller IS the rider, the assignment creation may lag behind the order status change.
 
-**Additional bug**: Both the `<500m` and `<200m` proximity checks fire in the same function call because 171m satisfies both conditions simultaneously — causing duplicate notifications.
+### 3. Live Tracking "Setting up" Stuck
+Line 387-394 in `OrderDetailPage.tsx`: Shows "Setting up live tracking..." when `isInTransit && !deliveryAssignmentId`. The `assignmentRetryCount` retry logic (line 109) only retries 5 times with max 8s delay. If the assignment hasn't been created by then, tracking never initializes. The user must close and reopen.
 
-### 2. Live Activity Card Stuck
-**Root cause**: The `useLiveActivityOrchestrator` subscribes to `orders` table changes and calls `buildLiveActivityData`, which fetches `category_status_flows` entries filtered to `cart_purchase` and `seller_delivery`. The `liveActivitySync` also uses this filter. The issue is the `syncActiveOrders` function and the realtime handler both call `LiveActivityManager.push()` but the native bridge may be silently failing or the initial hydration on mount races with the realtime subscription setup. The `doSync` on mount only runs once, but `flowEntriesRef` may still be empty when the first realtime event arrives (race between `fetchFlowEntries` and the order update).
+### 4. All Order Toasts
+`useBuyerOrderAlerts` (lines 99-113) fires toast for every order status change. `useOrderDetail` (lines 153, 188, 194, 199, 209) fires toasts on seller/buyer actions. These are noisy and redundant with the in-app UI.
 
-### 3. Navigation Trap on Order Detail
-**Root cause**: The back button uses `navigate('/orders')` which should work. However, looking at `AppLayout`, when `showNav` is false (which happens for seller view on non-terminal orders), AND if the user navigates to this page from a live activity deep link or external source, the navigation stack may not have `/orders` in history. The `navigate('/orders')` call should still work as an absolute navigation. Need to check if there's a conditional rendering issue blocking the back button or if an error boundary is trapping the page.
+### 5. Live Activity Card (ActiveOrderStrip) Static
+The `ActiveOrderStrip` does subscribe to realtime (line 101-115) and invalidates queries. It uses `refetchInterval: 15_000`. This should work. But the `display_label` is fetched from `category_status_flows` in a separate query (line 65-75) that may return stale data or miss the status if the flow entry doesn't exist for that status key.
 
-### 4. Rider Icon Clarity
-**Root cause**: The current SVG icon is a 48x48 custom illustration with tiny details (4px text for "Sociva", small scooter body, thin strokes) that become illegible at map zoom levels. The bag branding text is 4px font-size which is essentially invisible.
+### 6. Navigation Dead-End
+Line 184: `showNav={!o.isChatOpen}` — bottom nav is hidden when chat is open. Line 188: back button uses `navigate(-1)` with fallback to `/orders`. This was already fixed in a prior iteration. The issue may be that when the user arrives from the ActiveOrderStrip (home → order detail), `window.history.length > 1` is true but `navigate(-1)` may go to the wrong place or fail silently if there's a redirect chain.
 
 ---
 
 ## Implementation Plan
 
-### Phase 1: Fix Proximity Notifications (Edge Function)
+### Phase 1: Fix Premature Notifications (Edge Function)
 
 **File**: `supabase/functions/update-delivery-location/index.ts`
 
-- **Add order status guard**: Before sending proximity notifications, fetch the order's current status and only send if the order is in an actual transit stage (`on_the_way`, `at_gate`, or later delivery stages). This prevents notifications when the order is still at `accepted` or `preparing`.
-- **Make proximity tiers mutually exclusive**: If distance < 200m, send ONLY the "imminent" notification, skip the "nearby" one. Currently both fire because the code checks `<500` then independently checks `<200`.
-- **Add minimum order age guard**: Don't send proximity notifications if the order was placed less than 2 minutes ago (prevents false proximity for seller-delivery where seller is already near the buyer).
+- Add order status check to the **en_route notification** block (line 327). Before sending, fetch the order status and only send if it's in `['picked_up', 'on_the_way', 'at_gate']` AND order is at least 2 minutes old (reuse the same guard pattern from the proximity block).
+- This prevents "Your order is on the way!" from firing at `accepted` stage.
 
-### Phase 2: Fix Live Activity Not Updating
+### Phase 2: Remove All Order Toasts
+
+**File**: `src/hooks/useBuyerOrderAlerts.ts`
+- Remove all `toast()` calls. Keep the realtime subscription for `queryClient.invalidateQueries` (this is essential for data freshness) and `hapticNotification` for native. Remove the toast import and all toast logic.
+
+**File**: `src/hooks/useOrderDetail.ts`
+- Remove `toast.success` calls on status updates (lines 153, 188). Keep `toast.error` calls for actual failures (these are actionable user errors, not notifications).
+- Remove `toast.error` on timeout (line 199) — replace with in-page state.
+- Remove `toast.success` on copy (line 209) — keep as-is since it's user-initiated feedback, not a notification.
+
+### Phase 3: Fix Real-Time Sync for Web + Native
 
 **File**: `src/hooks/useLiveActivityOrchestrator.ts`
+- Remove `Capacitor.isNativePlatform()` gates from the **polling heartbeat** (line 323) and **visibility sync** (line 382) effects. These data reconciliation features benefit web too. Keep the native gate only for `LiveActivityManager.push/end` calls (which are native-only APIs).
+- This ensures the `activeOrderIdsRef` tracking and `doSync` logic works on web, enabling query invalidation for `ActiveOrderStrip`.
 
-- **Fix race condition**: Ensure `flowEntriesRef` is populated BEFORE subscribing to realtime channels. Currently `fetchFlowEntries()` is async but the subscription starts immediately without awaiting it.
-- **Add order-aware sync on status change**: When a realtime order update arrives, pass the full order status to `buildLiveActivityData`. The current code already does this, but the flow map may be empty. Add a fallback: if `flowEntriesRef.current` is empty when a realtime event fires, fetch entries inline before building the activity data.
+**File**: `src/hooks/useOrderDetail.ts`
+- The existing realtime subscription (line 121-125) already works for web. No change needed here.
 
-**File**: `src/services/liveActivitySync.ts`
-
-- **Force flow entry refresh on sync**: If `cachedFlowEntries` is null or empty, always fetch fresh data before building activity payloads. The current 10-minute cache expiry is too long for first-load scenarios.
-
-### Phase 3: Fix Navigation Trap
+### Phase 4: Fix Live Tracking Initialization
 
 **File**: `src/pages/OrderDetailPage.tsx`
+- Increase assignment retry from 5 to 10 attempts with up to 15s delay for the last retries. This handles the case where seller-delivery assignment creation lags.
+- Add a realtime subscription fallback: if after all retries the assignment isn't found, keep the realtime subscription (line 119-132) active — it already listens for INSERT events on `delivery_assignments`. This is already correct, but the retry counter stopping at 5 means the loading state persists even though the subscription would catch the INSERT. Fix: Don't show "Setting up live tracking..." after retries exhaust — show "Waiting for delivery assignment..." with a manual retry button.
 
-- **Change back button to use reliable navigation**: Replace `navigate('/orders')` with a fallback pattern: try `navigate(-1)` first, but if there's no history (e.g., deep link entry), fall back to `navigate('/orders', { replace: true })`. This ensures the user can always exit.
-- **Verify AppLayout showNav logic**: Ensure `showNav` is true for buyer view in all order states so the bottom nav remains accessible as an escape route.
+### Phase 5: Fix Navigation Dead-End
 
-### Phase 4: Improve Rider Icon
+**File**: `src/pages/OrderDetailPage.tsx`
+- Change back button from conditional `navigate(-1)` to always `navigate('/orders')`. The `-1` navigation is unreliable when arriving from deep links, push notifications, or the ActiveOrderStrip. Absolute navigation to `/orders` is always safe.
+- Ensure `showNav` is always true for buyers (currently `showNav={!o.isChatOpen}` which hides nav during chat — this is correct behavior, not a bug). The real issue is the back button, not the nav.
 
-**File**: `src/components/delivery/DeliveryMapView.tsx`
+### Phase 6: Fix ActiveOrderStrip Freshness
 
-- **Redesign the SVG rider icon** to be clearer at small sizes:
-  - Larger, bolder scooter silhouette with thicker strokes
-  - Bigger, more visible delivery bag with "S" logo instead of full "Sociva" text (text at 4px is illegible)
-  - Higher contrast colors: solid primary fill for bag, white "S" letter
-  - Increase icon size to 56x56 for better visibility
-  - Add a subtle directional arrow/chevron to show heading more clearly
-  - Remove overly detailed elements (wheel hub caps, thin handlebars) that become visual noise at map scale
+**File**: `src/components/home/ActiveOrderStrip.tsx`
+- Reduce `refetchInterval` from 15s to 10s for tighter sync.
+- The realtime subscription already invalidates queries on order UPDATE — this should work. The stale `display_label` issue: add the order status directly to the strip display as fallback.
 
-### Summary of File Changes
+---
+
+## Summary of Changes
 
 | File | Change |
 |------|--------|
-| `supabase/functions/update-delivery-location/index.ts` | Add order status guard for proximity notifications; make proximity tiers exclusive |
-| `src/hooks/useLiveActivityOrchestrator.ts` | Fix flow entries race condition; add inline fallback fetch |
-| `src/services/liveActivitySync.ts` | Force fresh flow entries on first sync |
-| `src/pages/OrderDetailPage.tsx` | Fix back button navigation reliability |
-| `src/components/delivery/DeliveryMapView.tsx` | Redesign rider icon SVG for clarity and branding |
+| `supabase/functions/update-delivery-location/index.ts` | Add order status + age guard to en_route notification block |
+| `src/hooks/useBuyerOrderAlerts.ts` | Remove all toast calls, keep query invalidation + haptics |
+| `src/hooks/useOrderDetail.ts` | Remove success toasts, keep error toasts |
+| `src/hooks/useLiveActivityOrchestrator.ts` | Remove native-only gate from polling/visibility sync |
+| `src/pages/OrderDetailPage.tsx` | Fix back button to always navigate `/orders`; improve assignment retry |
+| `src/components/home/ActiveOrderStrip.tsx` | Reduce refetch interval |
 
