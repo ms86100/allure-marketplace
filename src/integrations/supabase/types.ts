@@ -1055,6 +1055,7 @@ export type Database = {
           display_label: string | null
           icon: string | null
           id: string
+          is_deprecated: boolean
           is_success: boolean
           is_terminal: boolean | null
           notification_action: string | null
@@ -1082,6 +1083,7 @@ export type Database = {
           display_label?: string | null
           icon?: string | null
           id?: string
+          is_deprecated?: boolean
           is_success?: boolean
           is_terminal?: boolean | null
           notification_action?: string | null
@@ -1109,6 +1111,7 @@ export type Database = {
           display_label?: string | null
           icon?: string | null
           id?: string
+          is_deprecated?: boolean
           is_success?: boolean
           is_terminal?: boolean | null
           notification_action?: string | null
