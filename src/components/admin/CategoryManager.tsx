@@ -13,7 +13,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Grid3X3, GripVertical, Edit2, Plus, Trash2, Sparkles, ImageIcon, Package } from 'lucide-react';
+import { Loader2, Grid3X3, GripVertical, Edit2, Plus, Trash2, Sparkles, ImageIcon, Package, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { CategoryWorkflowPreview } from '@/components/admin/CategoryWorkflowPreview';
@@ -38,6 +38,8 @@ const EMOJI_PRESETS = ['🍲', '🍕', '🍰', '🥗', '🧁', '☕', '🥤', '�
 
 function GenerateImageButton({ categoryName, categoryKey, parentGroup, imageUrl, onImageGenerated }: { categoryName: string; categoryKey: string; parentGroup: string; imageUrl?: string | null; onImageGenerated: (url: string) => void; }) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
   const handleGenerate = async () => {
     if (!categoryName.trim()) { toast.error('Enter a category name first'); return; }
     setIsGenerating(true);
@@ -46,24 +48,60 @@ function GenerateImageButton({ categoryName, categoryKey, parentGroup, imageUrl,
       if (!error && data?.image_url) { onImageGenerated(data.image_url); toast.success('Image generated successfully!'); }
     } catch { toast.error('Generation failed'); } finally { setIsGenerating(false); }
   };
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return; }
+    setIsUploading(true);
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const filePath = `${categoryKey}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from('category-images').upload(filePath, file, { contentType: file.type, upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from('category-images').getPublicUrl(filePath);
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+      await supabase.from('category_config').update({ image_url: publicUrl }).eq('category', categoryKey as any);
+      onImageGenerated(publicUrl);
+      toast.success('Image uploaded!');
+    } catch (err: any) { toast.error(err?.message || 'Upload failed'); } finally { setIsUploading(false); }
+  };
+
+  const busy = isGenerating || isUploading;
+
   return (
     <div className="space-y-2">
       <Label className="flex items-center gap-1.5 text-xs font-semibold"><ImageIcon size={14} />Category Image</Label>
       {imageUrl ? (
         <div className="relative rounded-xl overflow-hidden border border-border aspect-square w-32">
           <img src={imageUrl} alt={categoryName} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Button type="button" size="sm" variant="secondary" onClick={handleGenerate} disabled={isGenerating} className="rounded-xl">
+          <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5">
+            <Button type="button" size="sm" variant="secondary" onClick={handleGenerate} disabled={busy} className="rounded-xl text-xs">
               {isGenerating ? <Loader2 className="animate-spin mr-1" size={14} /> : <Sparkles size={14} className="mr-1" />}Regenerate
             </Button>
+            <label>
+              <input type="file" accept="image/*" onChange={handleUpload} className="hidden" disabled={busy} />
+              <Button type="button" size="sm" variant="secondary" asChild disabled={busy} className="rounded-xl text-xs cursor-pointer">
+                <span>{isUploading ? <Loader2 className="animate-spin mr-1" size={14} /> : <Upload size={14} className="mr-1" />}Upload</span>
+              </Button>
+            </label>
           </div>
         </div>
       ) : (
-        <Button type="button" variant="outline" onClick={handleGenerate} disabled={isGenerating || !categoryName.trim()} className="w-full gap-2 rounded-xl h-10">
-          {isGenerating ? <><Loader2 className="animate-spin" size={16} />Generating AI Image...</> : <><Sparkles size={16} />Generate AI Image</>}
-        </Button>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={handleGenerate} disabled={busy || !categoryName.trim()} className="flex-1 gap-2 rounded-xl h-10">
+            {isGenerating ? <><Loader2 className="animate-spin" size={16} />Generating...</> : <><Sparkles size={16} />AI Generate</>}
+          </Button>
+          <label>
+            <input type="file" accept="image/*" onChange={handleUpload} className="hidden" disabled={busy} />
+            <Button type="button" variant="outline" asChild disabled={busy} className="gap-2 rounded-xl h-10 cursor-pointer">
+              <span>{isUploading ? <Loader2 className="animate-spin" size={16} /> : <Upload size={16} />}Upload</span>
+            </Button>
+          </label>
+        </div>
       )}
-      {isGenerating && <p className="text-xs text-muted-foreground">This may take 10-15 seconds...</p>}
+      {busy && <p className="text-xs text-muted-foreground">{isGenerating ? 'Generating AI image (10-15s)...' : 'Uploading...'}</p>}
     </div>
   );
 }
