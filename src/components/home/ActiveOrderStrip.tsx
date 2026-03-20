@@ -97,6 +97,23 @@ export function ActiveOrderStrip() {
     refetchOnWindowFocus: true,
   });
 
+  // Realtime: subscribe to order updates for this buyer → instant query invalidation
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`active-strip:${user.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'orders',
+        filter: `buyer_id=eq.${user.id}`,
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['active-orders-strip'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, queryClient]);
+
   useEffect(() => {
     const handler = () => {
       queryClient.invalidateQueries({ queryKey: ['active-orders-strip'] });

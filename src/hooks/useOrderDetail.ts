@@ -239,10 +239,12 @@ export function useOrderDetail(id: string | undefined) {
   // For robustness, check if status actor is 'delivery' or if it matches known transit keys from flow.
   const isInTransit = useMemo(() => {
     if (!order) return false;
-    // Use flow data: a status is in-transit if it has actor='delivery' or is explicitly a delivery-phase step
+    // Primary: check DB-backed transit_statuses from system_settings
+    const transitStatuses = getTrackingConfigSync().transit_statuses;
+    if (transitStatuses.includes(order.status)) return true;
+    // Secondary: check if flow step actor is 'delivery'
     const transitStep = flow.find(s => s.status_key === order.status);
     if (transitStep?.actor === 'delivery') return true;
-    // No hardcoded fallback — if flow and tracking config are unavailable, do not assume transit
     return false;
   }, [order?.status, flow]);
 
