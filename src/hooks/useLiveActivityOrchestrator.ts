@@ -59,7 +59,8 @@ export function useLiveActivityOrchestrator(): void {
 
   // ── Initial sync + diagnostics ──
   useEffect(() => {
-    if (!userId || !Capacitor.isNativePlatform()) return;
+    if (!userId) return;
+    const isNative = Capacitor.isNativePlatform();
     mountedRef.current = true;
 
     runLiveActivityDiagnostics(true).then((diag) => {
