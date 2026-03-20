@@ -151,6 +151,26 @@ async function handleAssign(req: Request, db: any, userId: string) {
   if (!assignment) return jsonResponse({ error: 'Assignment not found' }, 404);
   if (assignment.status !== 'pending') return jsonResponse({ error: 'Assignment not in pending status' }, 400);
 
+  // Bug 10 fix: Authorization — only the order's seller, a society admin, or platform admin can assign
+  const { data: order } = await db.from('orders').select('seller_id').eq('id', assignment.order_id).single();
+  if (!order) return jsonResponse({ error: 'Order not found' }, 404);
+
+  const { data: sellerProfile } = await db.from('seller_profiles').select('user_id').eq('id', order.seller_id).single();
+  const isSeller = sellerProfile?.user_id === userId;
+
+  let isSocietyAdmin = false;
+  if (assignment.society_id) {
+    const { data: adminRow } = await db.from('society_admins').select('id').eq('society_id', assignment.society_id).eq('user_id', userId).maybeSingle();
+    isSocietyAdmin = !!adminRow;
+  }
+
+  const { data: platformAdmin } = await db.from('user_roles').select('id').eq('user_id', userId).eq('role', 'admin').maybeSingle();
+  const isPlatformAdmin = !!platformAdmin;
+
+  if (!isSeller && !isSocietyAdmin && !isPlatformAdmin) {
+    return jsonResponse({ error: 'Not authorized to assign delivery for this order' }, 403);
+  }
+
   const { error } = await db
     .from('delivery_assignments')
     .update({
