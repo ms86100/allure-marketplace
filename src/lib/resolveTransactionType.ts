@@ -2,7 +2,12 @@
  * Shared utility: resolves the transaction_type key used to look up
  * category_status_flows / category_status_transitions.
  *
- * Must stay in sync with the server-side logic in buyer_advance_order RPC.
+ * Must stay in sync with:
+ *   - Server-side logic in buyer_advance_order RPC
+ *   - DB table `listing_type_workflow_map` (admin-visible mapping source of truth)
+ *
+ * The DB table defines the *static* listing_type → workflow_key mapping visible to admins.
+ * This function handles the *runtime* resolution which also considers fulfillment context.
  */
 export function resolveTransactionType(
   parentGroup: string,
