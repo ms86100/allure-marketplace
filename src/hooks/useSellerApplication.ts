@@ -263,6 +263,22 @@ export function useSellerApplication() {
   const handleProceedToProducts = async () => {
     const id = await saveDraft();
     if (id) {
+      // Service sellers must generate availability slots before proceeding
+      const groupInfo = parentGroupInfos.find(g => g.value === selectedGroup);
+      if (groupInfo?.layoutType === 'service') {
+        const { count } = await (supabase
+          .from('service_slots') as any)
+          .select('id', { count: 'exact', head: true })
+          .eq('seller_id', id)
+          .gte('slot_date', new Date().toISOString().split('T')[0])
+          .eq('is_blocked', false);
+
+        if (!count || count === 0) {
+          toast.error('Please generate availability slots before continuing', { id: 'seller-app-validation' });
+          return;
+        }
+      }
+
       // Always reload products from DB when entering step 5
       await reloadProducts(id);
       setStep(5);
