@@ -324,29 +324,45 @@ serve(async (req) => {
     const dbMs = Date.now() - dbStartMs;
 
     // ═══ PHASE A: First GPS update after picked_up → en_route notification ═══
+    // Guard: Only send when the ORDER (not just assignment) is in a transit stage AND is at least 2 min old.
+    // This prevents false "on the way" alerts for seller-delivery where seller IS the rider and is already nearby.
     if (assignment.status === 'picked_up' && !assignment.last_location_at && buyerId) {
-      const { count } = await supabase
-        .from('notification_queue')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', buyerId)
-        .eq('type', 'delivery_en_route')
-        .eq('reference_path', `/orders/${assignment.order_id}`);
+      const EN_ROUTE_ORDER_STATUSES = ['picked_up', 'on_the_way', 'at_gate'];
+      const { data: orderForEnRoute } = await supabase
+        .from('orders')
+        .select('status, created_at')
+        .eq('id', assignment.order_id)
+        .single();
 
-      if (!count || count === 0) {
-        await supabase.from('notification_queue').insert({
-          user_id: buyerId,
-          title: '🛵 Your order is on the way!',
-          body: 'Your delivery partner has picked up your order and is heading to you.',
-          type: 'delivery_en_route',
-          reference_path: `/orders/${assignment.order_id}`,
-          payload: {
+      const enRouteOrderStatus = orderForEnRoute?.status ?? null;
+      const enRouteOrderAgeMs = orderForEnRoute?.created_at ? Date.now() - new Date(orderForEnRoute.created_at).getTime() : 0;
+      const isEnRouteOrderInTransit = enRouteOrderStatus && EN_ROUTE_ORDER_STATUSES.includes(enRouteOrderStatus);
+      const isEnRouteOrderOldEnough = enRouteOrderAgeMs > 2 * 60 * 1000;
+
+      if (isEnRouteOrderInTransit && isEnRouteOrderOldEnough) {
+        const { count } = await supabase
+          .from('notification_queue')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', buyerId)
+          .eq('type', 'delivery_en_route')
+          .eq('reference_path', `/orders/${assignment.order_id}`);
+
+        if (!count || count === 0) {
+          await supabase.from('notification_queue').insert({
+            user_id: buyerId,
+            title: '🛵 Your order is on the way!',
+            body: 'Your delivery partner has picked up your order and is heading to you.',
             type: 'delivery_en_route',
-            entity_type: 'order',
-            entity_id: assignment.order_id,
-            workflow_status: 'picked_up',
-            action: 'View Tracking',
-          },
-        });
+            reference_path: `/orders/${assignment.order_id}`,
+            payload: {
+              type: 'delivery_en_route',
+              entity_type: 'order',
+              entity_id: assignment.order_id,
+              workflow_status: 'picked_up',
+              action: 'View Tracking',
+            },
+          });
+        }
       }
     }
 

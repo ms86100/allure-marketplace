@@ -408,7 +408,7 @@ export function useLiveActivityOrchestrator(): void {
       const { orderId, status } = (e as CustomEvent).detail;
       console.log(TAG, 'Push-driven terminal sync:', orderId, status);
       activeOrderIdsRef.current.delete(orderId);
-      await LiveActivityManager.end(orderId);
+      if (isNative) await LiveActivityManager.end(orderId);
       // Small delay to let DB settle, then sync
       setTimeout(() => doSync(), 300);
     };
