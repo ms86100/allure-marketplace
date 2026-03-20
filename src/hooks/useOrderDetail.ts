@@ -12,7 +12,7 @@ import { Order, OrderStatus } from '@/types/database';
 import { toast } from 'sonner';
 
 export function useOrderDetail(id: string | undefined) {
-  const { user, isSeller } = useAuth();
+  const { user, isSeller, sellerProfiles, currentSellerId } = useAuth();
   const { getOrderStatus, getPaymentStatus, getItemStatus } = useStatusLabels();
   const { formatPrice } = useCurrency();
   const [order, setOrder] = useState<Order | null>(null);
