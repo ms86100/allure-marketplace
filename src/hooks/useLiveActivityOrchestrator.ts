@@ -66,9 +66,13 @@ export function useLiveActivityOrchestrator(): void {
       console.log(TAG, 'Diagnostics:', JSON.stringify(diag));
     });
 
-    fetchFlowEntries();
-    getTerminalStatuses().then(s => { terminalStatusesCache = s; }).catch(() => {});
-    doSync();
+    // Ensure flow entries & terminal statuses are loaded BEFORE first sync
+    Promise.all([
+      fetchFlowEntries(),
+      getTerminalStatuses().then(s => { terminalStatusesCache = s; }).catch(() => {}),
+    ]).then(() => {
+      if (mountedRef.current) doSync();
+    });
 
     return () => {
       mountedRef.current = false;
