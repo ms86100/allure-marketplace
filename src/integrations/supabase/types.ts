@@ -3465,6 +3465,7 @@ export type Database = {
           buyer_society_id: string | null
           coupon_id: string | null
           created_at: string | null
+          delivered_at: string | null
           delivery_address: string | null
           delivery_address_id: string | null
           delivery_fee: number
@@ -3513,6 +3514,7 @@ export type Database = {
           buyer_society_id?: string | null
           coupon_id?: string | null
           created_at?: string | null
+          delivered_at?: string | null
           delivery_address?: string | null
           delivery_address_id?: string | null
           delivery_fee?: number
@@ -3561,6 +3563,7 @@ export type Database = {
           buyer_society_id?: string | null
           coupon_id?: string | null
           created_at?: string | null
+          delivered_at?: string | null
           delivery_address?: string | null
           delivery_address_id?: string | null
           delivery_fee?: number
@@ -8496,6 +8499,7 @@ export type Database = {
           buyer_society_id: string | null
           coupon_id: string | null
           created_at: string | null
+          delivered_at: string | null
           delivery_address: string | null
           delivery_address_id: string | null
           delivery_fee: number
@@ -8561,6 +8565,7 @@ export type Database = {
           buyer_society_id: string | null
           coupon_id: string | null
           created_at: string | null
+          delivered_at: string | null
           delivery_address: string | null
           delivery_address_id: string | null
           delivery_fee: number
@@ -9141,6 +9146,7 @@ export type Database = {
           buyer_society_id: string | null
           coupon_id: string | null
           created_at: string | null
+          delivered_at: string | null
           delivery_address: string | null
           delivery_address_id: string | null
           delivery_fee: number
