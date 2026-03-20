@@ -44,7 +44,9 @@ export function useNewOrderAlert(sellerId: string | null) {
   const pollDelayRef = useRef(MIN_POLL_MS);
   const mountedAtRef = useRef(new Date().toISOString());
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Bug 19 fix: Bounded Set to prevent unbounded memory growth
   const seenIdsRef = useRef<Set<string>>(new Set());
+  const seenIdsOrderRef = useRef<string[]>([]);
   const dismissedIdsRef = useRef<Set<string>>(new Set());
   const snoozedUntilRef = useRef<Record<string, number>>({});
 
