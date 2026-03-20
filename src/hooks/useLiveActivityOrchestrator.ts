@@ -359,7 +359,7 @@ export function useLiveActivityOrchestrator(): void {
         for (const [orderId] of lastKnownRef) {
           if (!activeIds.has(orderId)) {
             console.log(TAG, `Polling: order ${orderId} became terminal, ending LA`);
-            await LiveActivityManager.end(orderId);
+            if (isNative) await LiveActivityManager.end(orderId);
             lastKnownRef.delete(orderId);
           }
         }
