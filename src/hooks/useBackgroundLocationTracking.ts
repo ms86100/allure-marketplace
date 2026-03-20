@@ -132,7 +132,12 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
       await postLocation(payload);
       lastSentRef.current = now;
       if (mountedRef.current) setState(s => ({ ...s, lastSentAt: now, trackingPaused: false }));
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.message === 'DELIVERY_TERMINAL') {
+        // Auto-stop: don't queue, don't retry
+        stopTrackingRef.current?.();
+        return;
+      }
       console.error('[LocationTracking] Send failed, queueing point:', err);
       enqueueLocation(payload);
     }
