@@ -181,7 +181,7 @@ export default function OrderDetailPage() {
 
 
   return (
-    <AppLayout showHeader={false} showNav={(!o.isSellerView || isTerminalStatus(o.flow, order.status)) && !o.isChatOpen}>
+    <AppLayout showHeader={false} showNav={!o.isChatOpen}>
       <div className="pb-28">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
