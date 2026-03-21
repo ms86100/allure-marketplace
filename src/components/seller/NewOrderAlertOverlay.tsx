@@ -33,6 +33,20 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze
   const order = orders.length > 0 ? orders[0] : null;
   const queueCount = orders.length;
 
+  const handleBackgroundDismiss = useCallback(() => {
+    if (onSnooze) onSnooze();
+    else onDismiss();
+  }, [onSnooze, onDismiss]);
+
+  // Android back button handler
+  useEffect(() => {
+    if (!order) return;
+    const onPopState = () => handleBackgroundDismiss();
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [order?.id, handleBackgroundDismiss]);
+
   // Auto-dismiss countdown
   useEffect(() => {
     if (!order) {
