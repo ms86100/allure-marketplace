@@ -153,7 +153,7 @@ export default function BuilderInspectionsPage() {
 
       {/* Detail Sheet */}
       <Drawer open={!!selectedChecklist} onOpenChange={(open) => { if (!open) setSelectedChecklist(null); }}>
-        <DrawerContent className="h-[85vh] overflow-y-auto">
+        <DrawerContent className="max-h-[85vh] overflow-y-auto">
           <DrawerHeader>
             <DrawerTitle>Inspection – Flat {selectedChecklist?.flat_number}</DrawerTitle>
           </DrawerHeader>

@@ -292,7 +292,7 @@ export default function PaymentMilestonesPage() {
 
       {/* Create/Edit Sheet */}
       <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
-        <DrawerContent className="h-[70vh] overflow-y-auto">
+        <DrawerContent className="max-h-[70vh] overflow-y-auto">
           <DrawerHeader>
             <DrawerTitle>{editing ? 'Edit Milestone' : 'New Payment Milestone'}</DrawerTitle>
           </DrawerHeader>

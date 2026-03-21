@@ -62,7 +62,7 @@ export default function CartPage() {
 
   return (
     <AppLayout showHeader={false} showNav={false} showCart={false}>
-      <div className="pb-80">
+      <div className="pb-[22rem]">
         {/* Sticky Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></button>
@@ -71,7 +71,7 @@ export default function CartPage() {
             <p className="text-xs text-muted-foreground">Shipment of {c.itemCount} item{c.itemCount !== 1 ? 's' : ''}</p>
           </div>
           <AlertDialog>
-            <AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="text-destructive text-xs h-7 px-2">Clear</Button></AlertDialogTrigger>
+            <AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="text-destructive text-xs h-8 min-w-[44px] px-2">Clear</Button></AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader><AlertDialogTitle>Clear cart?</AlertDialogTitle><AlertDialogDescription>This will remove all items from your cart. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
               <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { c.setAppliedCoupon(null); c.clearCart(); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Clear All</AlertDialogAction></AlertDialogFooter>

@@ -322,7 +322,7 @@ export function AdminAttributeBlockManager() {
 
       {/* Create / Edit Sheet */}
       <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
-        <DrawerContent className="h-[90vh]">
+        <DrawerContent className="max-h-[90vh]">
           <DrawerHeader>
             <DrawerTitle>{editingBlock ? 'Edit Block' : 'Create Attribute Block'}</DrawerTitle>
           </DrawerHeader>

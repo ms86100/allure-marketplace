@@ -344,7 +344,7 @@ export function ServiceBookingFlow({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-[85vh]">
+      <DrawerContent className="max-h-[85vh]">
         <DrawerHeader className="pb-4">
           <DrawerTitle className="flex items-center gap-2">
             {step === 'review' && (
