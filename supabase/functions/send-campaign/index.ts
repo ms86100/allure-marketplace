@@ -372,13 +372,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Deduplicate iOS tokens: same apns_token = same physical device
-    const seenApns = new Set<string>();
+    // Deduplicate iOS tokens: keep only the most recently updated iOS entry per user
+    allTokens.sort((a: any, b: any) =>
+      new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    );
+    const seenIosUsers = new Set<string>();
     allTokens = allTokens.filter((t: any) => {
-      if (t.platform === "ios" && t.apns_token) {
-        const key = `${t.user_id}:${t.apns_token}`;
-        if (seenApns.has(key)) return false;
-        seenApns.add(key);
+      if (t.platform === "ios") {
+        if (seenIosUsers.has(t.user_id)) return false;
+        seenIosUsers.add(t.user_id);
       }
       return true;
     });
