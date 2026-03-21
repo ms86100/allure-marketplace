@@ -358,9 +358,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [hasHydrated, user, itemCount, queryClient]);
 
   const contextValue = useMemo<CartContextType>(() => ({
-    items, itemCount, totalAmount, sellerGroups, isLoading, hasHydrated, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart,
+    items, itemCount, totalAmount, sellerGroups, isLoading, isFetching, hasHydrated, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart,
     refresh: async () => { if (user) await reconcile(); },
-  }), [items, itemCount, totalAmount, sellerGroups, isLoading, hasHydrated, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart, user, reconcile]);
+  }), [items, itemCount, totalAmount, sellerGroups, isLoading, isFetching, hasHydrated, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart, user, reconcile]);
 
   return <CartContext.Provider value={contextValue}>{children}</CartContext.Provider>;
 }
