@@ -4,6 +4,7 @@ import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { useNearbyProducts, mergeProducts } from './useNearbyProducts';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Popular products discovered via coordinate-based search.
