@@ -1,5 +1,3 @@
-import { toast } from 'sonner';
-
 /**
  * Escapes special characters in user input before using in ILIKE queries.
  * Prevents pattern injection via % and _ characters.
@@ -11,7 +9,11 @@ export function escapeIlike(input: string): string {
 /**
  * Centralized API error handler.
  * Extracts a human-readable message from various error shapes
- * (Supabase PostgrestError, Error, string, unknown) and shows a toast.
+ * (Supabase PostgrestError, Error, string, unknown).
+ * 
+ * NOTE: This function intentionally does NOT show a toast.
+ * Callers are responsible for displaying the message if needed.
+ * This avoids duplicate toasts when multiple error handlers fire.
  * 
  * @param error - The caught error
  * @param fallbackMessage - Message to show if error cannot be parsed
@@ -33,7 +35,6 @@ export function handleApiError(
     message = error;
   }
 
-  toast.error(message);
   return message;
 }
 

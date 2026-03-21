@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { notifySocietyAdmins } from '@/lib/society-notifications';
@@ -36,7 +36,7 @@ export function CreateDisputeSheet({ open, onOpenChange, onCreated }: Props) {
     const validation = validateForm(disputeSchema, { category, description, is_anonymous: isAnonymous });
     if (!validation.success) {
       const firstError = Object.values((validation as { success: false; errors: Record<string, string> }).errors)[0];
-      toast({ title: 'Validation error', description: firstError as string, variant: 'destructive' });
+      toast.error(firstError as string);
       return;
     }
 
@@ -60,14 +60,14 @@ export function CreateDisputeSheet({ open, onOpenChange, onCreated }: Props) {
         );
       }
 
-      toast({ title: 'Concern submitted', description: ml.label('label_dispute_sla_notice') });
+      toast.success('Concern submitted — ' + ml.label('label_dispute_sla_notice'));
       setDescription('');
       setCategory(categories[0]?.value || 'other');
       setIsAnonymous(false);
       onOpenChange(false);
       onCreated();
     } catch (err: any) {
-      toast({ title: 'Failed', description: friendlyError(err), variant: 'destructive' });
+      toast.error(friendlyError(err));
     } finally {
       setSaving(false);
     }

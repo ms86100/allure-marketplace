@@ -163,7 +163,7 @@ export function useAuthState() {
         } else if (event === 'SIGNED_OUT') {
           profileFetchedFor.current = null;
           if (!isExplicitSignOut.current) {
-            toast.error('Your session has expired. Please log in again.');
+            // Session-expired toast is handled centrally by App.tsx handleAuthError()
             window.location.hash = '#/auth';
           }
           isExplicitSignOut.current = false;

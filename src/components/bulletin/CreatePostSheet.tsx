@@ -9,7 +9,7 @@ import { CATEGORY_CONFIG, type BulletinCategory } from './CategoryFilter';
 import { cn, friendlyError } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Loader2, Plus, X, ImagePlus } from 'lucide-react';
 
 interface CreatePostSheetProps {
@@ -53,7 +53,7 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
   const handleAttachmentPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (attachments.length + files.length > 4) {
-      toast({ title: 'Max 4 images allowed', variant: 'destructive' });
+      toast.error('Max 4 images allowed');
       return;
     }
     setAttachments(prev => [...prev, ...files]);
@@ -74,17 +74,17 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
 
   const handleSubmit = async () => {
     if (!title.trim()) {
-      toast({ title: 'Title is required', variant: 'destructive' });
+      toast.error('Title is required');
       return;
     }
     if (!profile?.society_id) {
-      toast({ title: 'You must belong to a society', variant: 'destructive' });
+      toast.error('You must belong to a society');
       return;
     }
     if (category === 'poll') {
       const validOptions = pollOptions.filter(o => o.trim());
       if (validOptions.length < 2) {
-        toast({ title: 'At least 2 poll options required', variant: 'destructive' });
+        toast.error('At least 2 poll options required');
         return;
       }
     }
@@ -126,12 +126,12 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
       const { error } = await supabase.from('bulletin_posts').insert(postData);
       if (error) throw error;
 
-      toast({ title: 'Post created!' });
+      toast.success('Post created!');
       resetForm();
       onOpenChange(false);
       onCreated();
     } catch (err: any) {
-      toast({ title: 'Failed to create post', description: friendlyError(err), variant: 'destructive' });
+      toast.error('Failed to create post: ' + friendlyError(err));
     } finally {
       setLoading(false);
     }
