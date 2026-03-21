@@ -1,101 +1,52 @@
 
 
-## Plan: Fix Search Engine — Critical Bugs & 10 Key Improvements
+## Plan: Fix Auto-Cancel Rejection Reason & Razorpay UPI Intent Flow
 
-### Root Cause Analysis
+---
 
-The network logs reveal the smoking gun:
+### Problem 1: Incorrect "Cancelled by buyer" Message
 
+**Root Cause (DB-level):** The `buyer_cancel_pending_orders` RPC (called when Razorpay/UPI payment fails) hardcodes:
+```sql
+rejection_reason = 'Cancelled by buyer: Payment was not completed'
 ```
-GET /seller_profiles?is_approved=eq.true → 400
-"column seller_profiles.is_approved does not exist"
-```
+This is misleading — the buyer didn't deliberately cancel; the system auto-cancelled because payment wasn't completed. Every failed-payment cancellation in the DB carries the wrong "Cancelled by buyer:" prefix.
 
-**Bug 1 (P0 — Stores never appear in search):** `SearchAutocomplete.tsx` line 82 queries `seller_profiles` with `.eq('is_approved', true)`, but the column is `verification_status` (enum: `approved`). Every seller search silently fails with a 400 error, returning empty results. This is why "Fresh Mart Express" returns nothing.
+**Evidence:** All 9 recent cancelled orders in the DB have `rejection_reason = 'Cancelled by buyer: Payment was not completed'` — none went through the auto-cancel edge function (which would write `"Order automatically cancelled — ..."`).
 
-**Bug 2 (P1 — Product search misses approval filter):** `SearchAutocomplete.tsx` line 62-67 queries products without filtering by `approval_status = 'approved'`, potentially showing unapproved/draft products.
+**Fix:** Database migration to alter the `buyer_cancel_pending_orders` RPC:
 
-**Bug 3 (P1 — Product search doesn't search tags/bullet_features):** The `products` table has `tags` and `bullet_features` columns, but the OR conditions only search `name`, `description`, `brand`, `ingredients`. Seller-defined attributes are invisible to search.
+- Change rejection_reason from `'Cancelled by buyer: Payment was not completed'` to `'Order automatically cancelled — payment was not completed'`
+- This aligns with the auto-cancel edge function's wording and the existing UI strip logic on OrderDetailPage line 275
 
-**Bug 4 (P2 — CategoryGroupPage search is local-only):** The search bar on category pages (line 145-149) only does client-side `name`/`description` filtering on already-loaded products. It cannot find stores or products not in the current dataset.
-
-### Surgical Fix Plan
-
----
-
-#### Fix 1: Repair seller search query (P0 — CRITICAL)
-
-**File:** `src/components/search/SearchAutocomplete.tsx`
-
-**Change:** Line 82 — replace `.eq('is_approved', true)` with `.eq('verification_status', 'approved')`
-
-**Impact:** Stores will immediately appear in autocomplete results. No other files affected — this is the only place `is_approved` is used on `seller_profiles`.
-
-**Risks:**
-- Risk 1: If `verification_status` has other valid values (e.g., `verified`), some sellers may still be excluded → Mitigated: DB confirms only `approved` sellers should be searchable
-- Risk 2: Suddenly showing sellers that were silently hidden could expose incomplete seller profiles → Mitigated: The query already selects only display-safe fields
+Additionally, update the display logic on `OrderDetailPage.tsx` to show a contextual banner title:
+- If rejection_reason contains "auto" → show "Auto-Cancelled" instead of generic "Order Cancelled"
+- This makes the distinction clear to both buyers and sellers
 
 ---
 
-#### Fix 2: Add approval_status filter to product search (P1)
+### Problem 2: Razorpay UPI Intent Flow Not Working
 
-**File:** `src/components/search/SearchAutocomplete.tsx`
+**Root Cause:** The `config.display.blocks` feature in Razorpay Standard Checkout is a **gated feature** — it requires explicit activation on the merchant's Razorpay dashboard. If not activated, the configuration is silently ignored and Razorpay falls back to its default layout (cards/netbanking first, UPI via manual VPA entry).
 
-**Change:** Add `.eq('approval_status', 'approved')` to the product query chain (after `.eq('is_available', true)`)
+The code in `useRazorpay.ts` lines 147-164 is syntactically correct but has no effect without merchant-level enablement.
 
-**Impact:** Prevents unapproved/draft products from leaking into search results.
+**Fix:** Since we cannot control the Razorpay dashboard configuration from code, the fix is two-fold:
 
-**Risks:**
-- Risk 1: Products without `approval_status` set could disappear → Mitigated: check DB for null values first
-- Risk 2: None significant
+1. **`useRazorpay.ts`:** Simplify the `config` block to use Razorpay's `method.upi` preferred order approach instead of the gated `blocks` API. Set `method: { upi: true }` at the top level and use `config.display.preferences.show_default_blocks: true` to ensure UPI appears prominently without requiring the gated blocks feature.
 
----
-
-#### Fix 3: Expand product search to include tags & bullet_features (P1)
-
-**File:** `src/components/search/SearchAutocomplete.tsx`
-
-**Change:** Extend the `orConditions` string to include `tags::text.ilike.%${trimmed}%,bullet_features::text.ilike.%${trimmed}%`
-
-**Impact:** Users can now find products by seller-defined attributes (portion size, dietary tags, etc.). This makes search attribute-aware.
-
-**Risks:**
-- Risk 1: `tags` and `bullet_features` are array/jsonb types — need `::text` cast for ilike → Confirmed approach works with PostgREST
-- Risk 2: Slightly broader results could feel noisy → Mitigated: limit remains at 8
+2. **`RazorpayCheckout.tsx`:** Update the description text from "UPI · Cards · Wallets · Netbanking" to accurately reflect the payment methods available via the standard Razorpay modal (no false promise about UPI app intent buttons).
 
 ---
 
-#### Fix 4: Remove hardcoded 'Seller' fallback in product onSelect (P2)
+### Summary
 
-**File:** `src/components/search/SearchAutocomplete.tsx`
-
-**Change:** Line 188 — change `seller_name: 'Seller'` to `seller_name: ''` (per no-dummy-data policy)
-
----
-
-#### Fix 5: Make CategoryGroupPage search query-aware with autocomplete (P2)
-
-**File:** `src/pages/CategoryGroupPage.tsx`
-
-**Change:** Import and add `SearchAutocomplete` below the search input (line 228), wrapping the input in a `relative` div. This gives category pages the same store/product/category discovery as the main search page.
-
-**Impact:** Searching "Fresh Mart Express" on the Food & Beverages page will now show the store in autocomplete, rather than just client-filtering products.
-
-**Risks:**
-- Risk 1: Autocomplete z-index could conflict with sticky header → Mitigated: autocomplete already uses `z-50`
-- Risk 2: Two search behaviors (autocomplete + local filter) could confuse users → Mitigated: autocomplete shows on type, local filter applies to grid below — complementary behaviors
-
----
-
-### Summary of Changes
-
-| File | Change | Severity |
+| File | Change | Type |
 |---|---|---|
-| `SearchAutocomplete.tsx` | Fix `is_approved` → `verification_status = approved` | P0 |
-| `SearchAutocomplete.tsx` | Add `approval_status = approved` to product query | P1 |
-| `SearchAutocomplete.tsx` | Add `tags::text`, `bullet_features::text` to OR conditions | P1 |
-| `SearchAutocomplete.tsx` | Remove hardcoded 'Seller' fallback | P2 |
-| `CategoryGroupPage.tsx` | Add `SearchAutocomplete` to category search bar | P2 |
+| DB Migration | Fix `buyer_cancel_pending_orders` rejection_reason wording | SQL |
+| `OrderDetailPage.tsx` line 274 | Show "Auto-Cancelled" when rejection_reason contains "auto" | UI |
+| `useRazorpay.ts` lines 147-164 | Replace gated `blocks` config with standard `method` preferences | Config |
+| `RazorpayCheckout.tsx` line 143 | Update payment method description text | UI |
 
-All fixes are surgical — no new features, no refactoring, no schema changes. Total: ~15 lines changed across 2 files.
+Total: ~15 lines changed across 3 files + 1 DB migration.
 
