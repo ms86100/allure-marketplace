@@ -36,9 +36,23 @@ export function useServiceSlots(productId: string | undefined, daysAhead = 14) {
       if (error) throw error;
 
       // Filter to available slots (booked_count < max_capacity)
-      return (data || []).filter(
+      // Also verify the product is approved before exposing slots to buyers
+      const availableSlots = (data || []).filter(
         (slot: any) => slot.booked_count < slot.max_capacity
       ) as ServiceSlot[];
+
+      if (availableSlots.length === 0) return [];
+
+      // Check that products behind these slots are approved
+      const productIds = [...new Set(availableSlots.map(s => s.product_id))];
+      const { data: approvedProducts } = await supabase
+        .from('products')
+        .select('id')
+        .in('id', productIds)
+        .eq('approval_status', 'approved');
+
+      const approvedIds = new Set((approvedProducts || []).map((p: any) => p.id));
+      return availableSlots.filter(s => approvedIds.has(s.product_id));
     },
     enabled: !!productId,
     staleTime: 15 * 1000, // [BUG FIX #M3] Reduce staleTime from 30s to 15s for fresher slot data

@@ -214,7 +214,7 @@ export function useSellerHealth(sellerId: string | null) {
       if (profile.operating_days && profile.operating_days.length > 0) {
         checks.push({ key: 'operating_days', label: 'Operating days set', status: 'pass', message: `${profile.operating_days.length} days/week`, group: 'quality' });
       } else {
-        checks.push({ key: 'operating_days', label: 'Operating days not set', status: 'warn', message: 'Set which days you operate so buyers can plan ahead.', actionLabel: 'Set Days', actionRoute: '/seller/settings', group: 'quality' });
+        checks.push({ key: 'operating_days', label: 'No operating days set', status: 'fail', message: 'Your store appears closed — no operating days selected. Buyers cannot see you.', actionLabel: 'Set Days', actionRoute: '/seller/settings', group: 'quality' });
       }
 
       // ═══════════════════════════════════════

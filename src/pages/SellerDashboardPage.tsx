@@ -29,6 +29,7 @@ import { DemandInsights } from '@/components/seller/DemandInsights';
 
 import { ServiceBookingStats } from '@/components/seller/ServiceBookingStats';
 import { SellerDayAgenda } from '@/components/seller/SellerDayAgenda';
+import { useSellerServiceBookings } from '@/hooks/useServiceBookings';
 import { AvailabilityPromptBanner } from '@/components/seller/AvailabilityPromptBanner';
 import { MissingLocationBanner } from '@/components/seller/MissingLocationBanner';
 import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCounts } from '@/hooks/queries/useSellerOrders';
@@ -297,23 +298,7 @@ export default function SellerDashboardPage() {
           <TabsContent value="schedule" className="space-y-4 mt-4">
             <ServiceBookingStats sellerId={sellerProfile.id} />
             <SellerDayAgenda sellerId={sellerProfile.id} />
-
-            {/* Empty-state fallback rendered by SellerDayAgenda & ServiceBookingStats
-                when they have data. This covers the case where seller has zero
-                service bookings ever — both components return null/minimal UI,
-                so we add a top-level empty state. */}
-            <div className="text-center py-10 bg-muted rounded-xl" id="schedule-empty-hint">
-              <CalendarDays className="mx-auto text-muted-foreground mb-2" size={32} />
-              <p className="text-sm font-medium text-foreground">No bookings yet</p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-[260px] mx-auto">
-                When customers book your services, their appointments will show up here
-              </p>
-              <Link to="/seller/products">
-                <Button variant="outline" size="sm" className="mt-3 text-xs">
-                  Manage Services
-                </Button>
-              </Link>
-            </div>
+            <ScheduleEmptyState sellerId={sellerProfile.id} />
           </TabsContent>
 
           {/* ── Tools Tab ── */}
@@ -391,5 +376,25 @@ export default function SellerDashboardPage() {
         </Tabs>
       </div>
     </AppLayout>
+  );
+}
+
+/** Schedule tab empty state — only renders when seller has zero bookings */
+function ScheduleEmptyState({ sellerId }: { sellerId: string }) {
+  const { data: bookings = [] } = useSellerServiceBookings(sellerId);
+  if (bookings.length > 0) return null;
+  return (
+    <div className="text-center py-10 bg-muted rounded-xl" id="schedule-empty-hint">
+      <CalendarDays className="mx-auto text-muted-foreground mb-2" size={32} />
+      <p className="text-sm font-medium text-foreground">No bookings yet</p>
+      <p className="text-xs text-muted-foreground mt-1 max-w-[260px] mx-auto">
+        When customers book your services, their appointments will show up here
+      </p>
+      <Link to="/seller/products">
+        <Button variant="outline" size="sm" className="mt-3 text-xs">
+          Manage Services
+        </Button>
+      </Link>
+    </div>
   );
 }

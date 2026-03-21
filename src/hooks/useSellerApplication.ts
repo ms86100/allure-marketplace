@@ -199,7 +199,7 @@ export function useSellerApplication() {
           user_id: user.id, business_name: formData.business_name.trim(), description: formData.description.trim() || null,
           categories: formData.categories, primary_group: selectedGroup, availability_start: formData.availability_start,
           availability_end: formData.availability_end, accepts_cod: formData.accepts_cod,
-          sell_beyond_community: formData.sell_beyond_community, delivery_radius_km: formData.delivery_radius_km,
+          sell_beyond_community: formData.sell_beyond_community, delivery_radius_km: formData.sell_beyond_community ? formData.delivery_radius_km : 5,
           society_id: profile?.society_id || null, verification_status: 'draft' as any,
         } as any).select('id').single();
         if (!error && data) setDraftSellerId(data.id);
@@ -232,7 +232,7 @@ export function useSellerApplication() {
         categories: formData.categories, primary_group: selectedGroup,
         availability_start: formData.availability_start, availability_end: formData.availability_end,
         accepts_cod: formData.accepts_cod, sell_beyond_community: formData.sell_beyond_community,
-        delivery_radius_km: formData.delivery_radius_km, fulfillment_mode: formData.fulfillment_mode,
+        delivery_radius_km: formData.sell_beyond_community ? formData.delivery_radius_km : 5, fulfillment_mode: formData.fulfillment_mode,
         delivery_note: formData.delivery_note.trim() || null, accepts_upi: formData.accepts_upi,
         upi_id: formData.accepts_upi ? formData.upi_id.trim() || null : null,
         operating_days: formData.operating_days, profile_image_url: formData.profile_image_url,
@@ -330,7 +330,7 @@ export function useSellerApplication() {
         description: formData.description.trim() || null, categories: formData.categories,
         availability_start: formData.availability_start, availability_end: formData.availability_end,
         accepts_cod: formData.accepts_cod, sell_beyond_community: formData.sell_beyond_community,
-        delivery_radius_km: formData.delivery_radius_km, fulfillment_mode: formData.fulfillment_mode,
+        delivery_radius_km: formData.sell_beyond_community ? formData.delivery_radius_km : 5, fulfillment_mode: formData.fulfillment_mode,
         delivery_note: formData.delivery_note.trim() || null, accepts_upi: formData.accepts_upi,
         upi_id: formData.accepts_upi ? formData.upi_id.trim() || null : null,
         operating_days: formData.operating_days, profile_image_url: formData.profile_image_url,
