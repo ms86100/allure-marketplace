@@ -30,6 +30,7 @@ interface AppliedCouponData {
   discount_type?: string;
   discount_value?: number;
   max_discount_amount?: number | null;
+  min_order_amount?: number | null;
 }
 
 interface CouponInputProps {
