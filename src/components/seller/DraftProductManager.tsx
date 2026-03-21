@@ -203,10 +203,13 @@ export function DraftProductManager({
         category: newProduct.category,
         is_veg: newProduct.is_veg,
         image_url: newProduct.image_url.trim() || null,
-        is_available: true,
+        is_available: false,
         approval_status: 'draft',
         prep_time_minutes: newProduct.prep_time_minutes || null,
         specifications: attributeBlocks.length > 0 ? { blocks: attributeBlocks } : null,
+        stock_quantity: newProduct.stock_quantity && newProduct.stock_quantity > 0 ? newProduct.stock_quantity : null,
+        low_stock_threshold: newProduct.low_stock_threshold && newProduct.low_stock_threshold > 0 ? newProduct.low_stock_threshold : null,
+        action_type: newProduct.action_type || 'add_to_cart',
       };
 
       let savedProductId: string;

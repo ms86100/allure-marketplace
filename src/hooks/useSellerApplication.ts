@@ -285,11 +285,22 @@ export function useSellerApplication() {
     }
   };
 
-  // Navigate back with auto-save when a draft exists
+  // Navigate back with auto-save when a draft exists (Bug 2: always save before step change)
   const handleStepBack = async (targetStep: number) => {
     // Auto-save draft if going back from steps where data may have changed
     if (draftSellerId && step >= 3) {
-      await saveDraft();
+      const savedId = await saveDraft();
+      // Bug 2: After saving, reload form data from DB to ensure consistency on re-mount
+      if (savedId) {
+        try {
+          const { data: freshProfile } = await supabase
+            .from('seller_profiles')
+            .select('*')
+            .eq('id', savedId)
+            .single();
+          if (freshProfile) loadSellerDataIntoForm(freshProfile);
+        } catch { /* non-critical */ }
+      }
     }
     setStep(targetStep);
   };

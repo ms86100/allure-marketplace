@@ -60,15 +60,19 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze
       onDismiss();
       return;
     }
-    // Navigate FIRST, then dismiss — prevents the "popup disappears, nothing happens" dead-end
+    // Navigate FIRST, then dismiss ALL — prevents the multi-store buzzer trap (Bug 5)
     try {
       navigate(`/orders/${orderId}`);
     } catch (e) {
       console.error('[OrderAlert] Navigation failed, falling back:', e);
       navigate('/orders');
     }
-    // Dismiss after navigation is triggered
-    onDismiss();
+    // Dismiss ALL pending alerts since the seller is actively engaging
+    if (onDismissAll) {
+      onDismissAll();
+    } else {
+      onDismiss();
+    }
   };
 
   const handleSnooze = () => {

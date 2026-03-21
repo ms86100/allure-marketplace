@@ -275,7 +275,7 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
         }
       }
 
-      toast.success(`Schedule saved! ${slotsToInsert.length} slots generated.`);
+      toast.success(`Schedule saved! ${actualInserted > 0 ? actualInserted : slotsToInsert.length} slots generated.`);
       await loadSlotSummary();
     } catch (err: any) {
       console.error('Failed to save/generate:', err);
