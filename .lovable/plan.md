@@ -1,203 +1,141 @@
 
 
-# Sociva Production Stabilization Plan
+# 20 Bugs in Bookable Service E2E Flow
 
-This plan transforms Sociva from its current feature-complete state into a production-grade, long-term stable system. No new features — only hardening, testing, documentation, and observability.
-
----
-
-## Current State Assessment
-
-**What exists:**
-- 75+ pages, 45+ edge functions, complex multi-domain app (marketplace, society, builder, workforce)
-- Behavioral engines (feedback, ETA, visibility), multi-tier error recovery, chunk retry, session health checks
-- Existing test suite (20+ test files in `src/test/`) with a custom Supabase reporter
-- 1 unit test (`store-availability.test.ts`) in `src/lib/__tests__/`
-- DB linter: 15 warnings (8 permissive RLS policies, 4 mutable search paths, 1 RLS-no-policy, 1 extension-in-public, 1 leaked password protection disabled)
-- Console warnings: `VegBadge` and `BannerContent` receiving refs without `forwardRef`
-- Heavy `as any` casting across hooks (~788 matches) — type safety gaps
-
-**What's missing:**
-- Zero component-level unit tests
-- No E2E automation (Playwright/Cypress)
-- No structured error tracking (Sentry or equivalent)
-- No performance monitoring
-- No API contract documentation
-- No formal runbook or incident response plan
+Across buyer, seller, and admin perspectives — all verified by code inspection.
 
 ---
 
-## Phase 1: Critical Bug Fixes (Day 1-2)
+## Critical Data Bugs
 
-### 1.1 Fix React ref warnings
-- **VegBadge** (`src/components/ui/veg-badge.tsx`): Wrap with `React.forwardRef` — this is being passed as a ref target in `ProductMini` and `FeaturedBanners`
-- **BannerContent** (`src/components/home/FeaturedBanners.tsx`): Same `forwardRef` treatment
+### Bug 1: Addon prices always show as `undefined` / NaN
+**File**: `src/hooks/useServiceBookings.ts` line 88
+**Problem**: `useBookingAddons` reads `row.price_at_booking` but the DB column is `addon_price`. The column `price_at_booking` does not exist. Every booking addon displays as `undefined` or `NaN` in `BookingAddonsSummary`.
+**Fix**: Change `row.price_at_booking` → `row.addon_price`.
 
-### 1.2 Database security hardening
-- **Fix 4 functions with mutable search_path**: Add `SET search_path = public` to each. Identify which functions via `supabase--read_query` on `pg_proc`
-- **Audit 8 permissive RLS policies**: Identify which tables have `USING (true)` for INSERT/UPDATE/DELETE. Tighten to proper `auth.uid()` checks where needed
-- **Fix RLS-enabled-no-policy table**: Add appropriate policies
-- **Enable leaked password protection** via auth config
+### Bug 2: `location_type` never passed to ServiceBookingFlow
+**File**: `src/components/product/ProductDetailSheet.tsx` line 238
+**Problem**: `locationType={(product as any).location_type}` — but `location_type` lives on the `service_listings` table, NOT `products`. The products table has no such column. Result: `locationType` is always `undefined`, so home-visit address field never appears and all bookings default to `at_seller`.
+**Fix**: Join `service_listings` in the product query to get `location_type`, or fetch it separately in `ServiceBookingFlow`.
 
-### 1.3 Fix console errors
-- Audit all `catch {}` blocks (empty catches that swallow errors silently) — add at minimum `console.warn` for observability
+### Bug 3: Wrong duration passed to ServiceBookingFlow
+**File**: `src/components/product/ProductDetailSheet.tsx` line 238
+**Problem**: `durationMinutes={product.prep_time_minutes}` — but `prep_time_minutes` is food preparation time. The actual service duration is `duration_minutes` on `service_listings`. Buyers see "30 min session" (food prep) instead of the real service duration (e.g., 60 min).
+**Fix**: Source `duration_minutes` from `service_listings` join, not `prep_time_minutes`.
 
----
-
-## Phase 2: Type Safety & Code Hardening (Day 3-5)
-
-### 2.1 Eliminate critical `as any` casts
-- Priority files: `useOrderDetail.ts`, `useCartPage.ts`, `useStoreDiscovery.ts`, `useCategoryManagerData.ts`
-- Create proper TypeScript interfaces for all RPC return types
-- Replace `as any` with typed responses using the generated Supabase types
-
-### 2.2 Defensive coding audit
-- All `supabase.rpc()` calls: ensure every one checks `error` before using `data`
-- All `supabase.from().select()` calls: ensure null-safe access on `data`
-- Verify every `toast.error()` in catch blocks provides user-friendly messages (not raw error objects)
-
-### 2.3 Race condition audit
-- `useAuthState.ts`: verify the `profileFetchedFor` ref guard handles rapid login/logout cycles
-- Cart mutations: verify `pendingMutationCount` barrier prevents stale overwrites under rapid add/remove
-- Realtime channels: ensure `removeChannel` cleanup in all useEffect returns
+### Bug 4: Buyer bookings cache not invalidated after new booking
+**File**: `src/components/booking/ServiceBookingFlow.tsx` lines 287-288
+**Problem**: After successful booking, only `service-slots` and `seller-service-bookings` query keys are invalidated. The `buyer-service-bookings` key (used by `BuyerBookingsCalendar`) is NOT invalidated. New booking won't show in buyer's calendar until page refresh.
+**Fix**: Add `queryClient.invalidateQueries({ queryKey: ['buyer-service-bookings'] })`.
 
 ---
 
-## Phase 3: Testing Strategy (Day 5-14)
+## Seller View Bugs
 
-### 3.1 Unit tests — pure logic libraries
-Create tests in `src/lib/__tests__/` for:
-- `etaEngine.ts` — all mood states, edge cases (null dates, past dates)
-- `feedbackEngine.ts` — all action types, failure paths
-- `visibilityEngine.ts` — route-based rules for every known route
-- `format-price.ts` — edge cases (0, negative, large numbers, decimals)
-- `validation-schemas.ts` — all validation rules
-- `listingTypeWorkflowMap.ts` — mapping correctness
-- `store-availability.ts` — expand existing tests for boundary cases (midnight crossover, timezone edge cases)
-- `gps-filter.ts` — coordinate validation, distance calculations
+### Bug 5: Slot regeneration deletes booked slots with `booked_count = 0` after cancellation
+**File**: `src/components/seller/ServiceAvailabilityManager.tsx` lines 227-232
+**Problem**: When regenerating slots, `DELETE ... WHERE booked_count = 0` removes slots that had bookings that were later cancelled (booked_count decremented back to 0). If a cancellation happens, then seller regenerates, the freed-up slot is deleted and replaced with a new row — but any references from `service_bookings.slot_id` now point to a deleted row.
+**Fix**: Add `AND id NOT IN (SELECT slot_id FROM service_bookings WHERE status NOT IN ('cancelled','no_show'))` to the delete.
 
-### 3.2 Component tests — critical UI
-Create tests alongside components for:
-- `ErrorBoundary.tsx` — verify fallback renders, reload behavior, crash-loop detection
-- `BuyerCancelBooking.tsx` — policy check flow, terminal status hiding
-- `ProtectedRoute` / `AdminRoute` — auth gating works correctly
-- Cart components — optimistic update, badge count sync
+### Bug 6: No validation that `start_time < end_time` in availability schedule
+**File**: `src/components/seller/ServiceAvailabilityManager.tsx` lines 192-195
+**Problem**: If a seller sets `end_time` before `start_time` (e.g., start=18:00, end=09:00), `endMinutes < startMinutes`, the while loop never executes, generating 0 slots — silently. No error shown.
+**Fix**: Add validation before slot generation: if `endMinutes <= startMinutes`, show toast error and skip that day.
 
-### 3.3 Integration tests — critical flows
-Expand `src/test/` suite for:
-- Order lifecycle: create → accept → prepare → ready → deliver → complete
-- Cancellation: buyer cancel, seller reject, auto-cancel timeout
-- Payment: COD flow, UPI flow, idempotency key dedup
-- Service booking: slot lock → confirm → complete/no-show
-- Auth: login → profile hydration → role detection → route access
+### Bug 7: SellerDayAgenda doesn't show `requested` bookings
+**File**: `src/components/seller/SellerDayAgenda.tsx` line 33
+**Problem**: Filter excludes `cancelled` and `no_show` but `requested` bookings (pending acceptance) are shown in the agenda without any visual distinction from confirmed ones. Seller may think these are confirmed when they're not yet accepted.
+**Fix**: Add visual indicator or separate section for `requested` vs `confirmed/scheduled` bookings.
 
-### 3.4 Edge function tests
-Create `*_test.ts` files for critical functions:
-- `process-notification-queue` — delivery pipeline, retry logic
-- `create-razorpay-order` — amount validation, idempotency
-- `auto-cancel-orders` — timeout detection, state transition
-- `manage-delivery` — assignment, location updates
-
-### 3.5 Test automation
-- Configure CI to run `vitest` on every commit (already have vitest.config.ts + reporter)
-- Add a pre-publish validation step that blocks deployment if tests fail
+### Bug 8: ServiceBookingStats counts bookings from past 7 days, not future
+**File**: `src/hooks/useServiceBookings.ts` lines 36-37
+**Problem**: `useSellerServiceBookings` fetches bookings with `booking_date >= (now - 7 days)`. This means the "Pending" and "Upcoming" counts in `ServiceBookingStats` include past bookings too. The "Today" count is correct but "Upcoming confirmed" may include yesterday's confirmed booking that wasn't completed.
+**Fix**: For stats, filter `upcomingConfirmed` to only `booking_date >= todayStr` (already done on line 21 but using `>=` which is correct). However, the underlying query includes past-week data which inflates total counts.
 
 ---
 
-## Phase 4: Monitoring & Observability (Day 10-14)
+## Buyer View Bugs
 
-### 4.1 Structured error logging edge function
-Create `supabase/functions/log-client-error/index.ts`:
-- Accepts client-side errors with context (route, user_id, device, stack trace)
-- Stores in `client_error_log` table with severity levels
-- Rate-limited per user to prevent flood
+### Bug 9: No reschedule UI exists despite DB function
+**Files**: Entire `src/components/booking/` directory
+**Problem**: `reschedule_service_booking()` RPC exists in the DB, documentation references it, status flow includes `rescheduled` state — but there is ZERO UI for buyers or sellers to trigger a reschedule. The feature is documented but completely unimplemented in the frontend.
+**Fix**: Add a "Reschedule" button to the order detail page for bookings in `confirmed`/`scheduled` status.
 
-### 4.2 Health check dashboard
-Create `supabase/functions/system-health/index.ts`:
-- Checks: DB connectivity, edge function latency, notification queue depth, stalled delivery count
-- Returns structured JSON for external monitoring integration
-- Existing `health` function may already cover some — extend it
+### Bug 10: UpcomingAppointmentBanner uses incorrect status filter syntax
+**File**: `src/components/home/UpcomingAppointmentBanner.tsx` line 49
+**Problem**: `.not('status', 'in', '("cancelled","completed","no_show")')` — the double quotes inside the string may cause Supabase PostgREST parsing issues. Standard format uses parentheses without internal quotes: `'(cancelled,completed,no_show)'`. If this silently fails, ALL bookings appear.
+**Fix**: Change to `.not('status', 'in', '(cancelled,completed,no_show)')` to match the pattern used elsewhere.
 
-### 4.3 Frontend error capture
-Add a global `window.onerror` / `window.onunhandledrejection` handler in `main.tsx` that:
-- Captures error + stack + current route + user ID
-- Posts to `log-client-error` edge function
-- Throttled (max 5 per minute per session)
-- This replaces the need for Sentry in the short term
+### Bug 11: BuyerBookingsCalendar doesn't include `requested` in "Next Appointment"
+**File**: `src/components/booking/BuyerBookingsCalendar.tsx` line 68
+**Problem**: `nextBooking` only considers `confirmed`, `scheduled`, `rescheduled` — but newly created bookings start as `requested`. A buyer who just booked won't see their booking highlighted as "Next Appointment" until the seller confirms.
+**Fix**: Add `'requested'` to the status filter array.
 
-### 4.4 Database monitoring queries
-Create scheduled health checks via existing `check-trigger-health` and `check-notification-queue-health` functions:
-- Alert on: orders stuck in non-terminal states > 24h
-- Alert on: notification_queue items in `processing` > 5 min
-- Alert on: delivery assignments with no location update > 10 min
+### Bug 12: CalendarExportButton constructs invalid Date for times without seconds
+**File**: `src/components/booking/CalendarExportButton.tsx` line 18-19
+**Problem**: `new Date('2025-03-21T09:00')` — time strings from DB are in `HH:MM:SS` format but may be passed as `HH:MM` (after `.slice(0,5)`). On some browsers, `new Date('YYYY-MM-DDT09:00')` without seconds is valid; on others it returns `Invalid Date`. Safari is particularly strict.
+**Fix**: Ensure time always has seconds: `${props.startTime.length === 5 ? props.startTime + ':00' : props.startTime}`.
 
 ---
 
-## Phase 5: Documentation (Day 12-16)
+## Admin View Bugs
 
-### 5.1 Technical documentation
-Create `docs/` directory with:
-- `ARCHITECTURE.md` — domain separation, engine layer, data flow diagrams
-- `DATABASE.md` — table relationships, RLS policy matrix, RPC function catalog
-- `EDGE_FUNCTIONS.md` — each function's purpose, inputs/outputs, cron schedule
-- `STATUS_FLOWS.md` — all workflow states, transitions, terminal conditions
-- `SECURITY.md` — auth model, RLS strategy, rate limiting, input validation
+### Bug 13: Admin bookings page has no date filter
+**File**: `src/pages/AdminServiceBookingsPage.tsx`
+**Problem**: Admin can only filter by status and search by name. There's no date range filter. With 200+ bookings, finding bookings for a specific day requires scrolling. The `ORDER BY booking_date DESC` helps but large datasets make this impractical.
+**Fix**: Add a date picker or at minimum "Today / This Week / This Month / All" quick filters.
 
-### 5.2 Runbook
-`docs/RUNBOOK.md`:
-- Common incident scenarios and resolution steps
-- How to manually cancel stuck orders
-- How to re-process failed notifications
-- How to diagnose push notification delivery failures
-- Database backup/restore procedures
+### Bug 14: Admin bookings page doesn't link to order detail
+**File**: `src/pages/AdminServiceBookingsPage.tsx` lines 117-137
+**Problem**: Booking cards are not clickable. Admin sees booking info but cannot navigate to the order detail page to take action. The `order_id` is fetched but never used for navigation.
+**Fix**: Wrap each card in a `Link` to `/orders/${booking.order_id}`.
 
-### 5.3 Code standards
-`docs/STANDARDS.md`:
-- No `as any` — all types must be explicit
-- Every `catch` must log or handle (no empty catches)
-- Every `supabase` call must check error before data
-- Every user-facing action must have feedback (toast/haptic)
-- All new functions must have `SET search_path = public`
+### Bug 15: Admin bookings page doesn't show buyer address for home visits
+**File**: `src/pages/AdminServiceBookingsPage.tsx` line 36
+**Problem**: The query selects `location_type` but doesn't fetch `buyer_address`. For home-visit bookings, admin can't see where the service is happening.
+**Fix**: Add `buyer_address` to the select and display it for home visit bookings.
 
 ---
 
-## Phase 6: Release Freeze & Validation (Day 14-16)
+## Cross-Cutting Bugs
 
-### 6.1 Pre-release validation checklist
-- [ ] All vitest tests pass (unit + integration)
-- [ ] Edge function tests pass
-- [ ] DB linter returns 0 warnings
-- [ ] Console shows 0 errors/warnings in all major flows
-- [ ] All RLS policies audited and documented
-- [ ] Performance profile: no page > 3s load, no JS heap > 100MB
-- [ ] All 75+ pages render without crash
-- [ ] Auth flow: signup, login, logout, session refresh, password reset
-- [ ] Order flow: place, accept, prepare, deliver, complete, review
-- [ ] Payment flow: COD, UPI, Razorpay
-- [ ] Service booking: book, confirm, complete, cancel
-- [ ] Push notifications: register, receive, tap-to-navigate
+### Bug 16: NewOrderAlertOverlay triggers ref warning (active console error)
+**File**: `src/components/seller/NewOrderAlertOverlay.tsx` + framer-motion AnimatePresence
+**Problem**: Console logs show: `ref is not a prop` error from `PopChild` inside `AnimatePresence`. The inner `motion.div` component receives a ref from `AnimatePresence` but the pattern triggers React's ref warning. This is a live production console error visible on every seller view.
+**Fix**: Wrap the inner content in `forwardRef` or use `motion.div` with explicit ref handling.
 
-### 6.2 Version freeze protocol
-- Tag current commit as `v1.0.0-stable`
-- Create `stable` branch — only critical bug fixes merge here
-- All future changes require: (1) test coverage, (2) peer review, (3) staging validation
-- No schema migrations without explicit approval and Live data check
+### Bug 17: Booking reminders use UTC times but bookings store local times
+**File**: `supabase/functions/send-booking-reminders/index.ts` lines 38-41
+**Problem**: `fromTime.toISOString().slice(11, 19)` produces UTC time strings, but `service_bookings.start_time` stores local times (Indian Standard Time). A booking at 10:00 AM IST would be matched against 10:00 UTC (which is 3:30 PM IST), causing reminders to fire 5.5 hours late.
+**Fix**: Apply timezone offset to the comparison, or convert booking times to UTC before matching.
 
-### 6.3 Rollback plan
-- Lovable version history serves as rollback mechanism
-- Document the exact commit hash and DB migration state for v1.0.0
-- Keep a "last known good" snapshot of the database schema
+### Bug 18: Recurring booking config saves but never auto-generates future bookings
+**File**: `src/components/booking/ServiceBookingFlow.tsx` lines 255-272
+**Problem**: The recurring config is saved to `service_recurring_configs` table, but there is no cron job or edge function that reads this config and auto-generates future bookings. The "Appointments will be auto-booked" promise (in `RecurringBookingSelector`) is a lie — the config just sits in the DB doing nothing.
+**Fix**: Either build the cron function to process recurring configs, or disable the feature and remove the misleading copy.
+
+### Bug 19: `BuyerCancelBooking` bypasses the workflow engine
+**File**: `src/components/booking/BuyerCancelBooking.tsx` lines 96-114
+**Problem**: Cancellation directly updates `service_bookings.status` and `orders.status` via client-side `.update()` calls, completely bypassing the `validate_order_status_transition` trigger. This means invalid transitions are possible — a buyer could cancel a booking that's `in_progress` if the terminal status check (line 36-37) has stale data.
+**Fix**: Use the `buyer_cancel_order` RPC (which respects transition validation) or a dedicated `cancel_service_booking` RPC.
+
+### Bug 20: `subcategoryId` passed but product query doesn't join subcategory data
+**File**: `src/components/product/ProductDetailSheet.tsx` line 238
+**Problem**: `subcategoryId={(product as any).subcategory_id}` — while `products.subcategory_id` exists, the subcategory's `supports_addons` and `supports_recurring` flags are fetched inside `ServiceBookingFlow` via a separate `useSubcategories` hook that queries by `category_config_id`, not by subcategory ID directly. If the category config isn't loaded, addon and recurring features silently fail to appear even when configured.
+**Fix**: Pass the subcategory data directly or ensure the config→subcategory chain resolves correctly.
 
 ---
 
-## Implementation Order
+## Summary by Severity
 
-| Week | Focus | Deliverables |
-|------|-------|-------------|
-| Week 1 | Phase 1 + 2 | Bug fixes, ref warnings, RLS hardening, type safety |
-| Week 2 | Phase 3 | Unit tests for all libs, component tests, integration tests |
-| Week 3 | Phase 4 + 5 | Error logging, health checks, documentation |
-| Week 4 | Phase 6 | Validation checklist execution, version freeze |
+| Severity | Bugs | Impact |
+|----------|------|--------|
+| **Data corruption / wrong values** | #1, #2, #3, #5, #17 | Users see wrong prices, wrong location, wrong times |
+| **Feature completely broken** | #9, #18 | Reschedule & recurring advertised but non-functional |
+| **Silent failures** | #4, #6, #10, #11, #20 | Data not refreshed, slots not generated, bookings missing |
+| **UX gaps** | #7, #8, #12, #13, #14, #15 | Missing admin tools, confusing displays |
+| **Console errors** | #16 | Production error visible in DevTools |
+| **Security / integrity** | #19 | Workflow bypass could cause invalid states |
 
-Shall I begin with Phase 1 (critical bug fixes — React ref warnings, DB security, empty catch blocks)?
+Recommended fix order: #1, #2, #3 (data correctness), then #17, #19 (integrity), then #4, #10, #11 (silent failures), then remaining items.
 
