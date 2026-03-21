@@ -1,151 +1,101 @@
 
 
-# Round 29: Five Critical Bugs — Detective Audit
+# Round 30: Full Trigger Chain Audit — Order Accept Flow
 
-## Root Cause Analysis
+## What happens when a seller clicks "Mark Accepted"
 
-The **single deadliest bug** is in the `fn_enqueue_order_status_notification` trigger. It references **three sets of non-existent columns**, causing **every order status transition** in the system to fail with a hard rollback. This is why sellers can't accept orders and buyers can't cancel.
+The frontend PATCH sets `status = 'accepted'` on the order. This fires **17 triggers** in sequence. Here is the exact chain and every hidden issue.
 
----
+## Trigger Execution Chain (placed → accepted)
 
-## Bug 1 (P0-BLOCKER): Notification trigger references non-existent `order_number` column
+```text
+BEFORE UPDATE triggers (execute in alphabetical order):
+  1. trg_compute_delivery_eta        — computes ETA on accept for delivery orders
+  2. trg_enforce_delivery_otp        — skip (only fires on → delivered)
+  3. trg_set_auto_complete_at        — skip (only fires on → delivered/completed/cancelled)
+  4. trg_update_updated_at_orders    — sets updated_at = now()
+  5. trg_validate_order_status_transition — validates placed→accepted is legal
+  6. update_orders_updated_at        — DUPLICATE of #4, sets updated_at again (harmless)
 
-**Error:** `record "new" has no field "order_number"`
-
-**What happens:** The `fn_enqueue_order_status_notification` AFTER UPDATE trigger on `orders` executes line 37: `v_order_number := COALESCE(NEW.order_number, LEFT(NEW.id::text, 8))`. The `orders` table has no `order_number` column. PostgreSQL raises an error, the entire transaction rolls back, and the status update never persists.
-
-**Why critical:** This blocks ALL order lifecycle transitions — accept, prepare, ready, deliver, cancel, complete. The marketplace is effectively frozen. Every seller sees "Failed to update order" and every buyer sees "Failed to cancel order."
-
-**Affected modules:** Order detail page (seller actions), buyer cancel flow, auto-cancel cron, delivery flow, auto-complete, payment confirmation — literally every status change.
-
-**Fix:** Replace `COALESCE(NEW.order_number, LEFT(NEW.id::text, 8))` with `LEFT(NEW.id::text, 8)`.
-
-**Risk:** None — `order_number` never existed, so the fallback was always the intended behavior.
-
----
-
-## Bug 2 (P0-BLOCKER): Same trigger references non-existent `requires_delivery` column
-
-**Where:** Lines 67-68, 72, 81 in the trigger use `NEW.requires_delivery`. The `orders` table uses `fulfillment_type` and `delivery_handled_by` instead.
-
-**What happens:** Even if Bug 1 is fixed, the trigger would crash at the `CASE` statement with the same class of error. The transaction type resolution is completely broken.
-
-**Why critical:** Same blast radius as Bug 1 — all transitions blocked.
-
-**Affected modules:** Same as Bug 1.
-
-**Fix:** Replace the `requires_delivery`-based CASE with logic matching `validate_order_status_transition` (which works correctly):
-```sql
-IF NEW.order_type = 'enquiry' THEN
-  IF COALESCE(v_parent_group, 'default') IN ('classes', 'events') THEN
-    v_transaction_type := 'book_slot';
-  ELSE v_transaction_type := 'request_service'; END IF;
-ELSIF NEW.order_type = 'booking' THEN v_transaction_type := 'service_booking';
-ELSIF NEW.fulfillment_type = 'self_pickup' THEN v_transaction_type := 'self_fulfillment';
-ELSIF NEW.fulfillment_type = 'delivery' AND COALESCE(NEW.delivery_handled_by, 'seller') = 'seller' THEN v_transaction_type := 'seller_delivery';
-ELSIF NEW.fulfillment_type = 'seller_delivery' THEN v_transaction_type := 'seller_delivery';
-ELSIF NEW.fulfillment_type = 'delivery' AND NEW.delivery_handled_by = 'platform' THEN v_transaction_type := 'cart_purchase';
-ELSE v_transaction_type := 'self_fulfillment';
-END IF;
+AFTER UPDATE triggers:
+  7. trg_auto_dismiss_delivery_notifications — FIRES on every terminal, but scans ALL unread notifs (see Bug 3)
+  8. trg_create_seller_delivery_assignment — skip (only on → picked_up)
+  9. trg_create_settlement_on_delivery — skip (only on → delivered/completed)
+ 10. trg_enqueue_order_status_notification — enqueues buyer/seller push notifications
+ 11. trg_generate_delivery_code      — skip (only on → ready/picked_up)
+ 12. trg_log_order_activity          — logs to society_activity (if society_id set)
+ 13. trg_recompute_seller_stats      — skip (only on → completed/cancelled/delivered)
+ 14. trg_restore_stock_on_order_cancel — FIXED last round (only on → cancelled)
+ 15. trg_sync_booking_status         — skip (only for booking orders)
+ 16. trg_sync_order_to_delivery_assignment — skip (only on → on_the_way/delivered)
 ```
 
-Also fix the cart-based multi-item block (line 80-83) which uses `NEW.requires_delivery`:
-```sql
-IF ... THEN
-  v_transaction_type := CASE
-    WHEN NEW.fulfillment_type IN ('delivery', 'seller_delivery') THEN 'cart_purchase'
-    ELSE 'self_fulfillment'
-  END;
-END IF;
-```
+## Five Issues Found
 
-**Risk:** Must exactly match `validate_order_status_transition` logic or notifications will target wrong workflow configs. I'll copy the proven logic from that trigger verbatim.
+### Bug 1 (P1): `food_beverages/seller_delivery` has ALL notification fields NULL
 
----
+**Evidence:** The query shows `notification_title = NULL, notify_buyer = false, notify_seller = false` for EVERY status in the `food_beverages/seller_delivery` flow. This means the seller's test order (which is `food_beverages` + `delivery` + `delivery_handled_by = null` = resolves to `seller_delivery`) will **never generate any push notification** for any status change — accept, preparing, ready, delivered, completed, cancelled. The buyer gets zero updates.
 
-## Bug 3 (P0): Trigger references `profiles.full_name` and `profiles.username` — columns don't exist
+The `default/seller_delivery` row does have `notification_title = '✅ Order Accepted!'` but the trigger looks up `parent_group = food_beverages` first and finds the NULL row, so it stops there. The fallback to `default` only happens in `validate_order_status_transition`, NOT in `fn_enqueue_order_status_notification`.
 
-**Where:** Line 46: `SELECT COALESCE(p.full_name, p.username, 'Customer')`. The `profiles` table only has a `name` column (confirmed via schema check).
+**Fix:** Seed notification titles/bodies for all `food_beverages/seller_delivery` flow entries, OR add fallback-to-default logic in the notification trigger (matching how the validation trigger works).
 
-**What happens:** Even with Bugs 1 & 2 fixed, this would crash the trigger with `column "full_name" does not exist`.
+**Risk:** Minimal — just data seeding. Choosing fallback logic is safer long-term but more code.
 
-**Why critical:** Third sequential blocker preventing any order transition.
+### Bug 2 (P2): Duplicate `update_updated_at` triggers
 
-**Fix:** Change to `SELECT COALESCE(p.name, 'Customer')`.
+Two triggers do the same thing: `trg_update_updated_at_orders` and `update_orders_updated_at`. Both call `update_updated_at()`. This is harmless (sets `updated_at` twice to `now()`) but wasteful and confusing. One should be dropped.
 
-**Risk:** None.
+**Fix:** Drop `update_orders_updated_at` trigger.
 
----
+**Risk:** None — purely redundant.
 
-## Bug 4 (P1): Buyer phone number exposed to all authenticated users via notification payloads
+### Bug 3 (P2): `auto_dismiss_delivery_notifications` fires on EVERY order update to terminal status and does an unscoped table scan
 
-**Where:** The `BuyerCancelBooking` component (line 108-118) fetches `seller_profiles.user_id` and inserts into `notification_queue` with the order path. More critically, the order detail query (visible in network requests) returns full buyer profile including `phone: "+919535115316"` to any authenticated user who can access the order. The `profiles` table RLS likely allows read access to all authenticated users.
+The trigger body runs: `UPDATE user_notifications SET is_read = true WHERE is_read = false AND type IN (...) AND created_at < now() - interval '2 hours'`. This has NO `WHERE` scoping to the current order or user — it marks ALL old delivery notifications for ALL users as read whenever ANY order hits a terminal state. At scale this is both a performance bomb and a correctness bug (dismisses notifications for unrelated orders).
 
-**What happens:** Any authenticated user could query `profiles` and see phone numbers, violating privacy.
+**Fix:** Scope to `WHERE user_id = NEW.buyer_id AND payload->>'order_id' = NEW.id::text`, or better yet, move this to a cron job.
 
-**Why critical:** PII exposure — phone numbers are sensitive personal data. This violates trust and potentially DPDP Act compliance.
+**Risk:** Need to verify `user_notifications` schema has `user_id` and `payload` columns.
 
-**Affected modules:** Order detail page, notification payloads, profile queries.
+### Bug 4 (P1): `fn_enqueue_order_status_notification` has no fallback to `default` parent_group
 
-**Fix:** Audit `profiles` RLS — ensure phone is not exposed in general SELECT policies. Consider a view that excludes phone for non-order-party queries. This is a larger fix and should be planned separately, but flagged as P1.
+The validation trigger (`validate_order_status_transition`) has a two-pass lookup: first tries `parent_group = specific`, then falls back to `parent_group = 'default'`. But the notification trigger only does ONE lookup with `parent_group = COALESCE(v_parent_group, 'default')`. If `v_parent_group` is `food_beverages` but the flow row has NULL notification fields, it doesn't fall back to `default`. This is the root cause of Bug 1 and will affect any new parent_group added in the future.
 
-**Risk:** Restricting profile access could break seller/buyer name display. Need surgical RLS that allows name but restricts phone to order participants only.
+**Fix:** Add fallback logic: if `v_title IS NULL` after the first lookup, retry with `parent_group = 'default'`.
 
----
+**Risk:** Minimal — just an additional SELECT if the first one yields NULL.
 
-## Bug 5 (P1): Home page renders empty skeleton cards (screenshot 3)
+### Bug 5 (P2): `trg_compute_delivery_eta` silently skips when `estimated_delivery_at` is already set
 
-**Where:** Screenshot 3 shows the home page with two large empty gray rectangles and bottom nav. This suggests the home page's main content (seller cards, product listings, or banner carousels) failed to load or rendered without data.
+The trigger has: `IF NEW.estimated_delivery_at IS NOT NULL THEN RETURN NEW; END IF;`. This means if an order somehow already has an ETA (e.g., set during creation or a retry), it will never recompute. Currently the frontend doesn't set this field, so it works, but if order creation logic ever pre-populates it, ETA would be stale.
 
-**What happens:** On a fresh registration or when the user's location/society data isn't set, the home page may render skeleton placeholders that never resolve — either because queries return empty results and the loading state isn't properly cleared, or because the content depends on society assignment which may not have occurred yet.
+**Fix:** Change condition to only skip if `OLD.estimated_delivery_at IS NOT NULL` (i.e., don't recompute on re-acceptance, but do compute on first acceptance).
 
-**Why critical:** First impression for new users is a blank page with mysterious gray boxes. This is a trust-killer for a marketplace app.
-
-**Affected modules:** Home page, seller discovery, onboarding flow.
-
-**Fix:** Need to investigate the home page component to determine if this is a data issue (no sellers in the user's area) or a rendering bug (loading state stuck). The fix would be either proper empty states or ensuring the loading skeleton transitions to content/empty-state correctly.
-
-**Risk:** Low — this is a UI state management fix.
+**Risk:** Low.
 
 ---
 
-## Impact Analysis: What Gets Unblocked by Fixing Bugs 1-3
+## Verdict: Will accept work 200% reliably?
 
-Fixing the notification trigger (Bugs 1-3 together, single migration) unblocks:
-- Seller accepting/rejecting orders
-- Seller advancing orders through all workflow stages
-- Buyer cancelling orders
-- Auto-cancel cron job
-- Auto-complete logic
-- Delivery flow (picked up, on the way, delivered)
-- Service booking lifecycle
-- Payment confirmation flows
-- All in-app notifications for order status changes
+**The PATCH itself succeeds** — we confirmed this from the network traces (status 200, order moved to `accepted` then `preparing` then `ready`). The `restore_stock_on_order_cancel` fix from last round and the `fn_enqueue_order_status_notification` fix from Round 29 have unblocked the flow.
 
-**Cascading risk from the fix:** The notification trigger now fires correctly, which means `notification_queue` will start receiving entries. The `process-notification-queue` edge function and the cron sweep will begin processing them. If there's a backlog of failed operations that users retry, there could be a burst of notifications. This is acceptable — users will finally get the status updates they've been missing.
+**What's silently broken:** Notifications are not being sent for `food_beverages/seller_delivery` orders (Bug 1 + Bug 4). The buyer will never receive "Order Accepted", "Preparing", "Ready", etc. push notifications for this specific flow. This is a silent failure — no errors, no crashes, just missing notifications.
 
 ---
 
 ## Implementation Plan
 
-### Migration 1: Fix `fn_enqueue_order_status_notification` (Bugs 1, 2, 3)
+### Migration: Fix notification fallback + seed data + cleanup
 
-Single `CREATE OR REPLACE FUNCTION` that:
-1. Replaces `NEW.order_number` with `LEFT(NEW.id::text, 8)`
-2. Replaces `p.full_name, p.username` with `p.name`
-3. Replaces all `NEW.requires_delivery` logic with the proven `validate_order_status_transition` pattern using `NEW.fulfillment_type` and `NEW.delivery_handled_by`
+1. **Seed `food_beverages/seller_delivery` notification fields** — UPDATE all rows to have proper titles/bodies matching the `default/seller_delivery` pattern
+2. **Add fallback to `default` in `fn_enqueue_order_status_notification`** — if first lookup returns NULL title, retry with `parent_group = 'default'`
+3. **Drop duplicate trigger** `update_orders_updated_at`
+4. **Scope `auto_dismiss_delivery_notifications`** to the specific order's buyer
 
-### Bug 4: Profile privacy (separate follow-up)
-Requires RLS policy audit and potentially a view — plan separately.
-
-### Bug 5: Home page empty state (requires investigation)
-Need to inspect the home page component to determine root cause before proposing a fix.
-
----
-
-## Files to Edit
+### Files to Edit
 
 | Artifact | Change |
 |----------|--------|
-| New SQL migration | Rewrite `fn_enqueue_order_status_notification` fixing all 3 column reference bugs |
+| New SQL migration | Seed notification data + update notification trigger + drop duplicate trigger + scope dismiss trigger |
 
