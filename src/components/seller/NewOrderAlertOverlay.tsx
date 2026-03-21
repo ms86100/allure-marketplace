@@ -11,6 +11,7 @@ const AUTO_DISMISS_SECONDS = 30;
 interface NewOrderAlertOverlayProps {
   orders: NewOrder[];
   onDismiss: () => void;
+  onDismissAll?: () => void;
   onSnooze?: () => void;
 }
 
