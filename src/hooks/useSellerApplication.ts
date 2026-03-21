@@ -285,11 +285,22 @@ export function useSellerApplication() {
     }
   };
 
-  // Navigate back with auto-save when a draft exists
+  // Navigate back with auto-save when a draft exists (Bug 2: always save before step change)
   const handleStepBack = async (targetStep: number) => {
     // Auto-save draft if going back from steps where data may have changed
     if (draftSellerId && step >= 3) {
-      await saveDraft();
+      const savedId = await saveDraft();
+      // Bug 2: After saving, reload form data from DB to ensure consistency on re-mount
+      if (savedId) {
+        try {
+          const { data: freshProfile } = await supabase
+            .from('seller_profiles')
+            .select('*')
+            .eq('id', savedId)
+            .single();
+          if (freshProfile) loadSellerDataIntoForm(freshProfile);
+        } catch { /* non-critical */ }
+      }
     }
     setStep(targetStep);
   };
@@ -353,9 +364,25 @@ export function useSellerApplication() {
     } finally { setIsLoading(false); }
   };
 
-  // Safe group selection: only clear categories when changing to a different group
-  const handleGroupSelect = (group: string) => {
+  // Safe group selection: warn if products exist before changing group (Bug 10)
+  const handleGroupSelect = async (group: string) => {
     if (group !== selectedGroup) {
+      // Bug 10: If draft products exist from the old group, clean them up
+      if (draftSellerId && draftProducts.length > 0) {
+        const confirmed = window.confirm(
+          `Changing your store type will remove your ${draftProducts.length} existing draft product(s). Continue?`
+        );
+        if (!confirmed) return;
+        // Delete orphaned products from DB
+        try {
+          await supabase.from('products').delete().eq('seller_id', draftSellerId).eq('approval_status', 'draft');
+          setDraftProducts([]);
+        } catch (err) {
+          console.error('Failed to delete orphaned draft products:', err);
+          toast.error('Failed to remove old products. Please try again.');
+          return;
+        }
+      }
       setSelectedGroup(group);
       setFormData(f => ({ ...f, categories: [] }));
     }

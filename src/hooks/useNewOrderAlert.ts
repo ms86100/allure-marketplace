@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { hapticVibrate, hapticNotification } from '@/lib/haptics';
 
 const ACTIONABLE_STATUSES = ['placed', 'enquired', 'quoted'] as const;
+const ACTIONABLE_STATUSES_INSERT = ['placed', 'enquired', 'quoted', 'confirmed'] as const;
 
 function createAlarmSound(audioContext: AudioContext) {
   const now = audioContext.currentTime;
@@ -135,6 +136,15 @@ export function useNewOrderAlert(sellerIds: string[]) {
     });
   }, [stopBuzzing]);
 
+  // Bug 5: Dismiss ALL pending alerts at once (used when seller taps "View Order")
+  const dismissAll = useCallback(() => {
+    setPendingAlerts(prev => {
+      prev.forEach(o => dismissedIdsRef.current.add(o.id));
+      stopBuzzing();
+      return [];
+    });
+  }, [stopBuzzing]);
+
   const snooze = useCallback(() => {
     setPendingAlerts(prev => {
       if (prev.length === 0) return prev;
@@ -164,6 +174,8 @@ export function useNewOrderAlert(sellerIds: string[]) {
         (payload) => {
           const n = payload.new as any;
           if (!sellerIdsRef.current.has(n.seller_id)) return;
+          // Bug 8: Include 'confirmed' for INSERT events (service bookings)
+          if (!ACTIONABLE_STATUSES_INSERT.includes(n.status)) return;
           handleNewOrder({
             id: n.id,
             status: n.status,
@@ -277,5 +289,5 @@ export function useNewOrderAlert(sellerIds: string[]) {
     };
   }, [stopBuzzing]);
 
-  return { pendingAlerts, dismiss, snooze };
+  return { pendingAlerts, dismiss, dismissAll, snooze };
 }
