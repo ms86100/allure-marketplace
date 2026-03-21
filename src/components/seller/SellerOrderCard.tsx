@@ -67,9 +67,11 @@ export function SellerOrderCard({ order }: SellerOrderCardProps) {
               </div>
               <div className="min-w-0">
                 <p className="font-medium text-sm truncate">{buyer?.name || 'Customer'}</p>
-                <p className="text-[10px] text-muted-foreground">
-                  {buyer?.block}-{buyer?.flat_number}
-                </p>
+                {['delivery', 'seller_delivery'].includes(order.fulfillment_type || '') && buyer?.block && (
+                  <p className="text-[10px] text-muted-foreground">
+                    {buyer.block}-{buyer.flat_number}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex flex-col items-end gap-1">

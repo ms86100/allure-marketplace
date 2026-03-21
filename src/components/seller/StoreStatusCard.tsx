@@ -1,7 +1,7 @@
 import { Switch } from '@/components/ui/switch';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
 import { SellerProfile } from '@/types/database';
-import { Clock, Store, CheckCircle2 } from 'lucide-react';
+import { Clock, Store, CheckCircle2, XCircle, FileEdit } from 'lucide-react';
 
 interface StoreStatusCardProps {
   sellerProfile: SellerProfile;
@@ -10,9 +10,10 @@ interface StoreStatusCardProps {
 }
 
 export function StoreStatusCard({ sellerProfile, sellerProfiles, onToggleAvailability }: StoreStatusCardProps) {
-  const isPending = sellerProfile.verification_status === 'pending';
+  const status = sellerProfile.verification_status;
 
-  if (isPending) {
+  // Pending
+  if (status === 'pending') {
     return (
       <div className="bg-warning/10 border border-warning/20 rounded-xl p-4">
         <div className="flex items-center gap-3">
@@ -31,6 +32,67 @@ export function StoreStatusCard({ sellerProfile, sellerProfiles, onToggleAvailab
     );
   }
 
+  // Rejected
+  if (status === 'rejected') {
+    return (
+      <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4">
+        <div className="flex items-center gap-3">
+          <XCircle className="text-destructive" size={24} />
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-destructive">Store Rejected</h3>
+              {sellerProfiles.length > 1 && <SellerSwitcher />}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {sellerProfile.business_name} was not approved. Please update and resubmit.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Draft
+  if (status === 'draft') {
+    return (
+      <div className="bg-muted border border-border rounded-xl p-4">
+        <div className="flex items-center gap-3">
+          <FileEdit className="text-muted-foreground" size={24} />
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Store Draft</h3>
+              {sellerProfiles.length > 1 && <SellerSwitcher />}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {sellerProfile.business_name} is still in draft. Complete setup and submit for review.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Suspended
+  if (status === 'suspended') {
+    return (
+      <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4">
+        <div className="flex items-center gap-3">
+          <XCircle className="text-destructive" size={24} />
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-destructive">Store Suspended</h3>
+              {sellerProfiles.length > 1 && <SellerSwitcher />}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {sellerProfile.business_name} has been suspended. Contact support for details.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Approved — show live card with toggle
   return (
     <div className="bg-card rounded-xl p-4 shadow-sm border">
       <div className="flex items-center justify-between gap-3">

@@ -80,7 +80,8 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
   const calculateDiscount = (coupon: CouponData) => {
     let discount = 0;
     if (coupon.discount_type === 'percentage') {
-      discount = (totalAmount * coupon.discount_value) / 100;
+      const clampedPct = Math.min(coupon.discount_value, 100);
+      discount = (totalAmount * clampedPct) / 100;
       if (coupon.max_discount_amount) discount = Math.min(discount, coupon.max_discount_amount);
     } else { discount = Math.min(coupon.discount_value, totalAmount); }
     return Math.round(discount * 100) / 100;

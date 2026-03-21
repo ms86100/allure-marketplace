@@ -82,9 +82,20 @@ export function useSellerOrderStats(sellerId: string | null) {
             enquiryOrders++;
             break;
           case 'cancelled':
+          case 'refunded':
+          case 'returned':
+            // Terminal non-earning statuses — exclude from counts
+            break;
+          case 'out_for_delivery':
+          case 'on_the_way':
+          case 'at_gate':
+          case 'in_progress':
+          case 'picked_up':
+          case 'assigned':
+            // In-transit / active delivery — not "pending" from seller's perspective
             break;
           default:
-            // placed, accepted, etc. = pending
+            // placed, accepted, confirmed, requested, scheduled, etc. = pending seller action
             pendingOrders++;
             break;
         }
