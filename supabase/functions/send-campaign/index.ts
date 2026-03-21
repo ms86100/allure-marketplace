@@ -342,7 +342,7 @@ Deno.serve(async (req) => {
     while (true) {
       let query = adminClient
         .from("device_tokens")
-        .select("id, token, platform, apns_token, user_id")
+        .select("id, token, platform, apns_token, user_id, updated_at")
         .range(from, from + pageSize - 1);
 
       if (platform === "ios") query = query.eq("platform", "ios");
