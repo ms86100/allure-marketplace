@@ -265,7 +265,7 @@ export default function OrdersPage() {
         <div className="px-4 pt-3">
           {isSeller ? (
             <Tabs defaultValue="buying" className="w-full">
-              <TabsList className="w-full mb-3 h-9">
+              <TabsList className="w-full mb-3 h-10">
                 <TabsTrigger value="buying" className="flex-1 text-xs">My Orders</TabsTrigger>
                 <TabsTrigger value="selling" className="flex-1 text-xs">Received</TabsTrigger>
               </TabsList>
