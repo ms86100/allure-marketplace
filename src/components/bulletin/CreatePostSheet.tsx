@@ -53,7 +53,7 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
   const handleAttachmentPick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (attachments.length + files.length > 4) {
-      toast({ title: 'Max 4 images allowed', variant: 'destructive' });
+      toast.error('Max 4 images allowed');
       return;
     }
     setAttachments(prev => [...prev, ...files]);
