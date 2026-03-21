@@ -98,12 +98,12 @@ export function useDeepLinks() {
           // after auth is ready. Also attempt immediate navigation for
           // cases where auth is already hydrated.
           setPendingDeepLink(path);
-          navigate(path);
+          navigate(path, { replace: true });
         }
       } catch (error) {
         console.error('Error parsing deep link:', error);
         setPendingDeepLink('/orders');
-        navigate('/orders');
+        navigate('/orders', { replace: true });
       }
     };
 
