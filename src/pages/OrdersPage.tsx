@@ -127,10 +127,12 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [buyerFilter, setBuyerFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
 
-  const fetchOrders = useCallback(async (cursor?: string) => {
+  const fetchOrders = useCallback(async (cursor?: string, filter?: 'all' | 'active' | 'completed' | 'cancelled') => {
     const isInitial = !cursor;
     if (isInitial) setIsLoading(true);
     else setIsLoadingMore(true);
+
+    const activeFilter = filter ?? buyerFilter;
 
     try {
       let query;
@@ -141,7 +143,17 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
           .eq('buyer_id', userId)
           .order('created_at', { ascending: false })
           .limit(PAGE_SIZE);
-        // payment_method is included via * select
+
+        // Apply server-side filter so pagination is consistent
+        if (activeFilter === 'active' && terminalSet.size > 0) {
+          const terminalArr = [...terminalSet];
+          query = query.not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`);
+        } else if (activeFilter === 'completed' && successSet.size > 0) {
+          query = query.in('status', [...successSet] as any);
+        } else if (activeFilter === 'cancelled' && terminalSet.size > 0 && successSet.size > 0) {
+          const cancelledStatuses = [...terminalSet].filter(s => !successSet.has(s));
+          if (cancelledStatuses.length > 0) query = query.in('status', cancelledStatuses as any);
+        }
       } else {
         query = supabase
           .from('orders')
@@ -167,44 +179,39 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [type, userId, sellerId]);
+  }, [type, userId, sellerId, buyerFilter, terminalSet, successSet]);
 
   const location = useLocation();
   const prevKeyRef = useRef(location.key);
 
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(undefined, buyerFilter);
     prevKeyRef.current = location.key;
-  }, [type, userId, sellerId, location.key]);
+  }, [type, userId, sellerId, location.key, buyerFilter]);
 
   // Refresh order list when tab becomes visible or after status-change alerts
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') fetchOrders();
+      if (document.visibilityState === 'visible') fetchOrders(undefined, buyerFilter);
     };
-    const handleRefetchEvent = () => fetchOrders();
+    const handleRefetchEvent = () => fetchOrders(undefined, buyerFilter);
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('order-detail-refetch', handleRefetchEvent);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('order-detail-refetch', handleRefetchEvent);
     };
-  }, [fetchOrders]);
+  }, [fetchOrders, buyerFilter]);
 
   const loadMore = () => {
     if (orders.length > 0 && hasMore) {
       const lastOrder = orders[orders.length - 1];
-      fetchOrders(lastOrder.created_at);
+      fetchOrders(lastOrder.created_at, buyerFilter);
     }
   };
 
-  const filteredOrders = type === 'buyer' ? orders.filter(order => {
-    if (buyerFilter === 'all') return true;
-    if (buyerFilter === 'cancelled') return terminalSet.has(order.status) && !successSet.has(order.status);
-    if (buyerFilter === 'completed') return successSet.has(order.status);
-    if (buyerFilter === 'active') return !terminalSet.has(order.status);
-    return true;
-  }) : orders;
+  // With server-side filtering, we can pass orders directly
+  const filteredOrders = orders;
 
   if (isLoading) {
     return (
@@ -221,7 +228,7 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
   return (
     <div>
       {/* Buyer filter chips */}
-      {type === 'buyer' && orders.length > 3 && (
+      {type === 'buyer' && (
         <div className="flex gap-2 mb-3 overflow-x-auto scrollbar-hide">
           {(['all', 'active', 'completed', 'cancelled'] as const).map(f => (
             <button
