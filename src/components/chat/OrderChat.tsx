@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Send, MessageCircle, X, Check, CheckCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Json } from '@/integrations/supabase/types';
 import { useChatViewport } from '@/hooks/useChatViewport';
 
 interface OrderChatProps {
