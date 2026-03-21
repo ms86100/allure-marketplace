@@ -183,8 +183,11 @@ export default function OrderDetailPage() {
   const showArrivalOverlay = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && deliveryAssignmentId && deliveryTracking.riderLocation && deliveryTracking.distance != null && deliveryTracking.distance < trackingConfig.arrival_overlay_distance_meters;
 
 
+  const hasSellerActionBar = o.isSellerView && !o.isFlowLoading && o.flow.length > 0 && !isTerminalStatus(o.flow, order.status);
+  const hasBuyerActionBar = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel || order.status === 'placed');
+
   return (
-    <AppLayout showHeader={false} showNav={isTerminalStatus(o.flow, order.status) || (o.isBuyerView && isFirstFlowStep(o.flow, order.status))}>
+    <AppLayout showHeader={false} showNav={!hasSellerActionBar && !hasBuyerActionBar && (isTerminalStatus(o.flow, order.status) || (o.isBuyerView && isFirstFlowStep(o.flow, order.status)))}>
       <div className="pb-44">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
