@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { useUrgentOrderSound } from '@/hooks/useUrgentOrderSound';
 import { useCurrency } from '@/hooks/useCurrency';
-import { useCategoryStatusFlow, getNextStatusForActor, getTimelineSteps, isTerminalStatus, isSuccessfulTerminal, canActorCancel, useStatusTransitions } from '@/hooks/useCategoryStatusFlow';
+import { useCategoryStatusFlow, getNextStatusForActor, getTimelineSteps, isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, canActorCancel, useStatusTransitions } from '@/hooks/useCategoryStatusFlow';
 import { logAudit } from '@/lib/audit';
 import { resolveTransactionType } from '@/lib/resolveTransactionType';
 import { Order, OrderStatus } from '@/types/database';
@@ -40,9 +40,7 @@ export function useOrderDetail(id: string | undefined) {
     return false;
   }, [order?.seller_id, user?.id, currentSellerId, sellerProfiles, seller?.user_id]);
 
-  const isUrgentOrder = order?.auto_cancel_at && isSellerView;
-
-  useUrgentOrderSound(!!isUrgentOrder);
+  const hasAutoCancelAt = !!order?.auto_cancel_at;
 
   const sellerPrimaryGroup = seller?.primary_group;
   const orderType = (order as any)?.order_type;
@@ -65,6 +63,12 @@ export function useOrderDetail(id: string | undefined) {
   const orderFulfillmentType = (order as any)?.fulfillment_type || 'self_pickup';
   const deliveryHandledBy = (order as any)?.delivery_handled_by || null;
   const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy);
+
+  const isUrgentOrder = hasAutoCancelAt && !!order?.status && isFirstFlowStep(flow, order.status);
+  const isUrgentSellerView = isUrgentOrder && isSellerView;
+  const isUrgentBuyerView = isUrgentOrder && !isSellerView;
+
+  useUrgentOrderSound(!!isUrgentSellerView);
 
   // Load transitions for accurate next-status and cancellation checks
   const resolvedTxnType = useMemo(
@@ -283,7 +287,7 @@ export function useOrderDetail(id: string | undefined) {
     order, setOrder, isLoading, isUpdating, hasReview, setHasReview,
     isChatOpen, setIsChatOpen, unreadMessages, fetchUnreadCount,
     isRejectionDialogOpen, setIsRejectionDialogOpen,
-    seller, isSellerView, isUrgentOrder, isBuyerView, isEnquiryOrder,
+    seller, isSellerView, isUrgentOrder, isUrgentSellerView, isUrgentBuyerView, isBuyerView, isEnquiryOrder,
     nextStatus, buyerNextStatus, canReview, canChat, canReorder,
     canSellerReject, canBuyerCancel, isInTransit, isFlowLoading,
     chatRecipientId, chatRecipientName,

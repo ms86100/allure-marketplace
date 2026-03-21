@@ -223,7 +223,12 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* #5: Seller response time expectation for buyers */}
+          {/* Buyer-side urgent countdown timer */}
+          {o.isUrgentBuyerView && order.auto_cancel_at && (
+            <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} variant="buyer" />
+          )}
+
+          {/* #5: Seller response time expectation for buyers — only when NOT urgent */}
           {o.isBuyerView && isFirstFlowStep(o.flow, order.status) && !o.isUrgentOrder && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50">
               <Loader2 size={14} className="animate-spin text-primary" />
@@ -237,7 +242,8 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {o.isUrgentOrder && order.auto_cancel_at && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} />}
+          {/* Seller-side urgent timer */}
+          {o.isUrgentSellerView && order.auto_cancel_at && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} variant="seller" />}
 
           {/* Gap 8: Needs attention banner for buyer — hide on terminal statuses */}
           {o.isBuyerView && (order as any).needs_attention && !isTerminalStatus(o.flow, order.status) && (

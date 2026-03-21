@@ -1,20 +1,44 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statusFlowCache';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { compactETA } from '@/lib/etaEngine';
 import { getTransitStatuses } from '@/lib/visibilityEngine';
+
+function CompactCountdown({ autoCancelAt }: { autoCancelAt: string }) {
+  const calc = useCallback(() => {
+    const diff = new Date(autoCancelAt).getTime() - Date.now();
+    return Math.max(0, Math.floor(diff / 1000));
+  }, [autoCancelAt]);
+  const [secs, setSecs] = useState(calc);
+  useEffect(() => {
+    setSecs(calc());
+    const t = setInterval(() => setSecs(calc()), 1000);
+    return () => clearInterval(t);
+  }, [calc]);
+  if (secs <= 0) return <span className="text-[10px] font-bold text-destructive whitespace-nowrap">Expired</span>;
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  const isLow = secs <= 60;
+  return (
+    <span className={`text-[10px] font-bold font-mono whitespace-nowrap flex items-center gap-0.5 ${isLow ? 'text-destructive' : 'text-warning'}`}>
+      <Clock size={10} />
+      {m}:{s.toString().padStart(2, '0')}
+    </span>
+  );
+}
 
 interface ActiveOrder {
   id: string;
   status: string;
   created_at: string;
   estimated_delivery_at: string | null;
+  auto_cancel_at: string | null;
   seller_name: string;
   item_count: number;
   display_label: string | null;
@@ -43,7 +67,7 @@ export function ActiveOrderStrip() {
       const { data, error } = await supabase
         .from('orders')
         .select(`
-          id, status, created_at, estimated_delivery_at,
+          id, status, created_at, estimated_delivery_at, auto_cancel_at,
           seller:seller_profiles!orders_seller_id_fkey(business_name),
           order_items(id, product:products(image_url))
         `)
@@ -83,6 +107,7 @@ export function ActiveOrderStrip() {
           status: o.status,
           created_at: o.created_at,
           estimated_delivery_at: o.estimated_delivery_at,
+          auto_cancel_at: o.auto_cancel_at || null,
           seller_name: o.seller?.business_name || '',
           item_count: o.order_items?.length || 0,
           display_label: flow?.display_label || o.status.replace(/_/g, ' '),
@@ -175,9 +200,11 @@ export function ActiveOrderStrip() {
                   )}
                 </div>
 
-                {/* ETA or count */}
+                {/* ETA / countdown / count */}
                 <div className="shrink-0 flex items-center gap-1">
-                  {etaText ? (
+                  {order.auto_cancel_at && order.status === 'placed' ? (
+                    <CompactCountdown autoCancelAt={order.auto_cancel_at} />
+                  ) : etaText ? (
                     <span className="text-[10px] font-bold text-primary whitespace-nowrap">
                       {etaText}
                     </span>
