@@ -50,6 +50,9 @@ export default function SellerDashboardPage() {
   }, [user, sellerProfiles, activeSellerId, currentSellerId]);
 
   useEffect(() => {
+    // Reset profile immediately on store switch to prevent data mismatch
+    setSellerProfile(null);
+    setIsLoadingProfile(true);
     if (user && activeSellerId) {
       fetchSellerProfile(activeSellerId);
     } else {

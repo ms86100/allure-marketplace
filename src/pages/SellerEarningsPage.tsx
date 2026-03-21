@@ -29,6 +29,10 @@ export default function SellerEarningsPage() {
   const activeSellerId = currentSellerId || (sellerProfiles.length > 0 ? sellerProfiles[0].id : null);
 
   useEffect(() => {
+    // Reset state immediately on store switch to prevent stale data mismatch
+    setPayments([]);
+    setStats({ today: 0, thisWeek: 0, thisMonth: 0, allTime: 0, pendingPayout: 0 });
+    setIsLoading(true);
     if (user && activeSellerId) {
       fetchEarnings(activeSellerId);
     } else {

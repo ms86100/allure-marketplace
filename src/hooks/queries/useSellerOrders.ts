@@ -162,7 +162,7 @@ export function useSellerOrdersInfinite(sellerId: string | null, filter: string 
           query = query.eq('status', 'ready');
           break;
         case 'completed':
-          query = query.eq('status', 'completed');
+          query = query.in('status', ['completed', 'delivered']);
           break;
       }
 

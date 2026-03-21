@@ -294,8 +294,11 @@ function GlobalSellerAlert() {
   const identity = React.useContext(IdentityCtx);
   const seller = React.useContext(SellerCtx);
   const isSeller = seller?.isSeller ?? false;
-  const currentSellerId = seller?.currentSellerId ?? null;
-  const { pendingAlerts, dismiss, snooze } = useNewOrderAlert(isSeller ? currentSellerId : null);
+  const sellerIds = React.useMemo(
+    () => (isSeller && seller?.sellerProfiles ? seller.sellerProfiles.map(p => p.id) : []),
+    [isSeller, seller?.sellerProfiles]
+  );
+  const { pendingAlerts, dismiss, snooze } = useNewOrderAlert(sellerIds);
   if (!identity) return null;
   return <NewOrderAlertOverlay orders={pendingAlerts} onDismiss={dismiss} onSnooze={snooze} />;
 }

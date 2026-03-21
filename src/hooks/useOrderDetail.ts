@@ -202,8 +202,8 @@ export function useOrderDetail(id: string | undefined) {
         toast.error('Order status has changed. Refreshing...', { id: `order-${order.id}-conflict` });
         return;
       }
-      setOrder({ ...order, ...updateData });
-      // Toast removed — status reflected in UI
+      // Re-fetch full order to sync server-side computed fields (ready_at, status_updated_at, etc.)
+      fetchOrder();
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus, rejection_reason: rejectionReason });
     } catch (error: any) {
