@@ -84,6 +84,7 @@ export function ActiveOrderStrip() {
           status: o.status,
           created_at: o.created_at,
           estimated_delivery_at: o.estimated_delivery_at,
+          auto_cancel_at: o.auto_cancel_at || null,
           seller_name: o.seller?.business_name || '',
           item_count: o.order_items?.length || 0,
           display_label: flow?.display_label || o.status.replace(/_/g, ' '),

@@ -285,7 +285,7 @@ export function useOrderDetail(id: string | undefined) {
     order, setOrder, isLoading, isUpdating, hasReview, setHasReview,
     isChatOpen, setIsChatOpen, unreadMessages, fetchUnreadCount,
     isRejectionDialogOpen, setIsRejectionDialogOpen,
-    seller, isSellerView, isUrgentOrder, isBuyerView, isEnquiryOrder,
+    seller, isSellerView, isUrgentOrder, isUrgentSellerView, isUrgentBuyerView, isBuyerView, isEnquiryOrder,
     nextStatus, buyerNextStatus, canReview, canChat, canReorder,
     canSellerReject, canBuyerCancel, isInTransit, isFlowLoading,
     chatRecipientId, chatRecipientName,
