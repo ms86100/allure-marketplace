@@ -116,6 +116,17 @@ export default function CartPage() {
           );
         })}
 
+        {/* #5: Multi-seller cart explanation — prominent */}
+        {c.sellerGroups.length > 1 && (
+          <div className="mx-4 mt-3 flex items-start gap-3 bg-muted border border-border rounded-xl p-3">
+            <AlertCircle size={16} className="text-muted-foreground shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">Your cart has items from {c.sellerGroups.length} sellers</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Separate orders will be created for each. Each seller will receive and fulfill their order independently.</p>
+            </div>
+          </div>
+        )}
+
         {/* Cart Items by Seller */}
         <div className="mt-4 space-y-3 px-4">
           {c.sellerGroups.map((group) => (
@@ -123,6 +134,8 @@ export default function CartPage() {
               <div className="px-3 py-2.5 border-b border-border flex items-center gap-2">
                 <Store size={14} className="text-primary" />
                 <span className="text-sm font-semibold flex-1 truncate">{group.sellerName}</span>
+                {/* #6: Seller contact shortcut */}
+                <Link to={`/seller/${group.sellerId}`} className="text-[10px] text-primary font-medium shrink-0">View Store</Link>
                 <span className="text-xs text-muted-foreground">{group.items.length} item{group.items.length > 1 ? 's' : ''}</span>
               </div>
               {c.profile?.society_id && (group.items[0]?.product?.seller as any)?.society_id && (group.items[0]?.product?.seller as any)?.society_id !== c.profile.society_id && (
