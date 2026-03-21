@@ -85,18 +85,20 @@ function parseTopProducts(raw: any): TopProduct[] {
  */
 export function useLocalSellers() {
   const { browsingLocation } = useBrowsingLocation();
+  const { profile, effectiveSocietyId } = useAuth();
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
+  const radiusKm = Math.min(profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM, MARKETPLACE_RADIUS_KM);
 
   return useQuery({
-    queryKey: ['store-discovery', 'local', lat, lng],
+    queryKey: ['store-discovery', 'local', lat, lng, radiusKm, effectiveSocietyId],
     queryFn: async () => {
       if (!lat || !lng) return {};
 
       const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: MARKETPLACE_RADIUS_KM,
+        _radius_km: radiusKm,
       });
 
       if (error) {
