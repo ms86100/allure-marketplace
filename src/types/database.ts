@@ -33,7 +33,7 @@ export interface BuilderMember {
   deactivated_at: string | null;
   created_at: string;
 }
-export type VerificationStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+export type VerificationStatus = 'pending' | 'approved' | 'rejected' | 'suspended' | 'draft';
 export type OrderStatus = 'placed' | 'accepted' | 'preparing' | 'ready' | 'picked_up' | 'delivered' | 'completed' | 'cancelled' | 'enquired' | 'quoted' | 'scheduled' | 'in_progress' | 'returned' | 'on_the_way' | 'arrived' | 'assigned' | 'requested' | 'confirmed' | 'rescheduled' | 'no_show' | 'at_gate';
 // ProductCategory is now an alias to ServiceCategory for backward compatibility
 export type ProductCategory = ServiceCategory;

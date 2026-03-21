@@ -18,11 +18,20 @@ export function AvailabilityPromptBanner({ sellerId }: AvailabilityPromptBannerP
   const { data: needsSetup } = useQuery({
     queryKey: ['availability-prompt', sellerId],
     queryFn: async () => {
-      // Check if seller has any service listings via products join
-      const { count: listingCount } = await supabase
-        .from('service_listings')
-        .select('id, product:products!inner(seller_id)', { count: 'exact', head: true })
-        .eq('product.seller_id' as any, sellerId);
+      // Check if seller has any service listings via products
+      const { data: products } = await supabase
+        .from('products')
+        .select('id')
+        .eq('seller_id', sellerId)
+        .limit(1);
+
+      if (!products || products.length === 0) return false;
+
+      // Check if any of these products have service listings
+      const { count: listingCount } = await (supabase
+        .from('service_listings') as any)
+        .select('id', { count: 'exact', head: true })
+        .in('product_id', products.map(p => p.id));
 
       if (!listingCount || listingCount === 0) return false;
 
