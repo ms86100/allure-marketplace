@@ -319,7 +319,7 @@ export function ServiceBookingFlow({
     }
   };
 
-  const resolvedLocationType = locationType || 'at_seller';
+  const resolvedLocationType = resolvedLocation || 'at_seller';
   const locationLabel = resolvedLocationType === 'home_visit' || resolvedLocationType === 'at_buyer'
     ? 'Home Visit'
     : resolvedLocationType === 'online'
