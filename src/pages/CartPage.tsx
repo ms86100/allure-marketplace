@@ -71,7 +71,7 @@ export default function CartPage() {
             <p className="text-xs text-muted-foreground">Shipment of {c.itemCount} item{c.itemCount !== 1 ? 's' : ''}</p>
           </div>
           <AlertDialog>
-            <AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="text-destructive text-xs h-7 px-2">Clear</Button></AlertDialogTrigger>
+            <AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="text-destructive text-xs h-8 min-w-[44px] px-2">Clear</Button></AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader><AlertDialogTitle>Clear cart?</AlertDialogTitle><AlertDialogDescription>This will remove all items from your cart. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
               <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { c.setAppliedCoupon(null); c.clearCart(); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Clear All</AlertDialogAction></AlertDialogFooter>

@@ -123,7 +123,7 @@ export function DisputeDetailSheet({ ticket, open, onOpenChange, onUpdated, isAd
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-[85vh] flex flex-col">
+      <DrawerContent className="max-h-[85vh] flex flex-col">
         <DrawerHeader>
           <DrawerTitle className="text-left">{ml.label('label_neighborhood_guarantee')}</DrawerTitle>
           <p className="text-xs text-muted-foreground">{ml.label('label_neighborhood_guarantee_desc')}</p>
