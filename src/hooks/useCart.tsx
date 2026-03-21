@@ -139,6 +139,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const freshItems = await fetchCartItems(user.id);
       // Only apply if no newer mutation has started
       if (mutationSeqRef.current === seq) {
+        // Guard: don't replace non-empty cache with empty result (likely transient failure)
+        const currentItems = queryClient.getQueryData(cartKey()) as any[] | undefined;
+        if (freshItems.length === 0 && currentItems && currentItems.length > 0) {
+          queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY, exact: false });
+          return;
+        }
         queryClient.setQueryData(cartKey(), freshItems);
         queryClient.setQueryData(countKey(), freshItems.reduce((s, i) => s + i.quantity, 0));
       }
