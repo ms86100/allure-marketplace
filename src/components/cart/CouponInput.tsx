@@ -121,7 +121,7 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
         if (coupon.max_discount_amount) discountAmount = Math.min(discountAmount, coupon.max_discount_amount);
       } else { discountAmount = Math.min(coupon.discount_value, totalAmount); }
       discountAmount = Math.round(discountAmount * 100) / 100;
-      onApply({ id: coupon.id, code: coupon.code, discountAmount, discount_type: coupon.discount_type, discount_value: coupon.discount_value, max_discount_amount: coupon.max_discount_amount });
+      onApply({ id: coupon.id, code: coupon.code, discountAmount, discount_type: coupon.discount_type, discount_value: coupon.discount_value, max_discount_amount: coupon.max_discount_amount, min_order_amount: coupon.min_order_amount });
       feedbackCouponApplied(formatPrice(discountAmount));
     } catch { feedbackCouponFailed('Failed to validate coupon'); }
     finally { setIsValidating(false); }
