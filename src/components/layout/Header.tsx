@@ -22,8 +22,9 @@ interface HeaderProps {
   className?: string;
 }
 
-function getGreeting(name?: string | null): string {
-  const hour = new Date().getHours();
+function getGreeting(name?: string | null, _hourKey?: number): string {
+  // Use IST for greeting regardless of device timezone
+  const hour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours();
   const firstName = name?.split(' ')[0] || '';
   const prefix = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   return firstName ? `${prefix}, ${firstName}` : prefix;
@@ -85,7 +86,9 @@ function HeaderInner({
     ? profile.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : '?';
 
-  const greeting = useMemo(() => getGreeting(profile?.name), [profile?.name]);
+  // Include hour key so greeting updates when the hour changes (on re-render/navigation)
+  const hourKey = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours();
+  const greeting = useMemo(() => getGreeting(profile?.name, hourKey), [profile?.name, hourKey]);
 
   return (
     <>

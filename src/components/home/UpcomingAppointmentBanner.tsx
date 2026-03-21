@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, isToday, isTomorrow, differenceInHours } from 'date-fns';
+import { format, differenceInHours } from 'date-fns';
 import { Calendar, Clock, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -39,8 +39,9 @@ export function UpcomingAppointmentBanner() {
     let cancelled = false;
 
     (async () => {
-      const now = new Date();
-      const today = format(now, 'yyyy-MM-dd');
+      // Use IST for date/time comparisons — booking dates are stored as IST dates
+      const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      const today = format(nowIST, 'yyyy-MM-dd');
       const { data } = await supabase
         .from('service_bookings')
         .select('id, order_id, booking_date, start_time, end_time, status, product:products!service_bookings_product_id_fkey(name, seller_id)')
@@ -56,8 +57,8 @@ export function UpcomingAppointmentBanner() {
         return;
       }
 
-      const nowMinutes = now.getHours() * 60 + now.getMinutes();
-      const todayStr = format(now, 'yyyy-MM-dd');
+      const nowMinutes = nowIST.getHours() * 60 + nowIST.getMinutes();
+      const todayStr = today;
       const validBooking = data.find((b: any) => {
         if (b.booking_date === todayStr && timeToMinutes(b.start_time || '00:00') < nowMinutes) return false;
         return true;
@@ -98,14 +99,20 @@ export function UpcomingAppointmentBanner() {
   if (!booking) return null;
 
   const [bH, bM] = (booking.start_time || '00:00').split(':').map(Number);
-  const appointmentDate = new Date(booking.booking_date + 'T00:00:00');
-  appointmentDate.setHours(bH, bM, 0, 0);
+  // Parse appointment time as IST (+05:30) for accurate countdown
+  const appointmentDate = new Date(`${booking.booking_date}T${String(bH).padStart(2,'0')}:${String(bM).padStart(2,'0')}:00+05:30`);
   const hoursAway = differenceInHours(appointmentDate, new Date());
-  const dateLabel = isToday(new Date(booking.booking_date + 'T00:00'))
+  // Compare date strings in IST to determine Today/Tomorrow label
+  const nowISTForLabel = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const todayStrForLabel = format(nowISTForLabel, 'yyyy-MM-dd');
+  const tomorrowIST = new Date(nowISTForLabel);
+  tomorrowIST.setDate(tomorrowIST.getDate() + 1);
+  const tomorrowStr = format(tomorrowIST, 'yyyy-MM-dd');
+  const dateLabel = booking.booking_date === todayStrForLabel
     ? 'Today'
-    : isTomorrow(new Date(booking.booking_date + 'T00:00'))
+    : booking.booking_date === tomorrowStr
     ? 'Tomorrow'
-    : format(new Date(booking.booking_date + 'T00:00'), 'MMM d');
+    : format(new Date(booking.booking_date + 'T00:00:00+05:30'), 'MMM d');
 
   const isUrgent = hoursAway <= 2 && hoursAway >= 0;
 
