@@ -229,7 +229,10 @@ export default function CartPage() {
         {/* Refund Promise */}
         <div className="mx-4 mt-4 flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-xl p-3">
           <ShieldCheck size={18} className="text-primary shrink-0" />
-          <p className="text-xs text-muted-foreground leading-relaxed">{c.settings.refundPromiseText}</p>
+          <div>
+            <p className="text-xs text-muted-foreground leading-relaxed">{c.settings.refundPromiseText}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">You can cancel for free before the seller accepts. UPI refunds process within 24 hours.</p>
+          </div>
         </div>
 
         {/* Neighborhood Guarantee */}

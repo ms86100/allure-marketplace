@@ -190,12 +190,16 @@ export default function OrderDetailPage() {
             <h1 className="text-base font-bold">Order Summary</h1>
             <button onClick={o.copyOrderId} className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono">#{order.id.slice(0, 8)} <Copy size={10} /></button>
           </div>
-          {o.canChat && o.chatRecipientId && (
+          {o.canChat && o.chatRecipientId ? (
             <button onClick={() => o.setIsChatOpen(true)} className="relative inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted">
               <MessageCircle size={16} />
               {o.unreadMessages > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">{o.unreadMessages}</span>}
             </button>
-          )}
+          ) : isTerminalStatus(o.flow, order.status) ? (
+            <Link to="/help" className="relative inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted opacity-50" title="Chat closed — order complete. Need help?">
+              <MessageCircle size={16} className="text-muted-foreground" />
+            </Link>
+          ) : null}
         </div>
 
         <div className="px-4 pt-3 space-y-3">
