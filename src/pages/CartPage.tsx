@@ -148,6 +148,13 @@ export default function CartPage() {
                   </div>
                 ))}
               </div>
+              {/* #12: Add more from this seller */}
+              <Link
+                to={`/seller/${group.sellerId}`}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 border-t border-border text-xs font-semibold text-primary hover:bg-primary/5 transition-colors"
+              >
+                <Plus size={12} /> Add more from {group.sellerName}
+              </Link>
             </div>
           ))}
         </div>

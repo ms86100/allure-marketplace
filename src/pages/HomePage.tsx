@@ -105,7 +105,7 @@ export default function HomePage() {
           if (!profile.block) missing.push('block/tower');
           if (missing.length === 0) return null;
           const pct = Math.round(((3 - missing.length) / 3) * 100);
-          const hint = `Add your ${missing[0]} to continue`;
+          const hint = `Complete your profile so sellers can deliver to the right door`;
           return (
             <motion.div
               initial={{ opacity: 0, y: -8 }}
