@@ -354,7 +354,7 @@ export function useCartPage() {
     finally { setIsPlacingOrder(false); }
   };
 
-  const handlePlaceOrder = useSubmitGuard(handlePlaceOrderInner, 3000, 5000);
+  const handlePlaceOrder = useSubmitGuard(handlePlaceOrderInner, 3000, 0);
 
   const handleRazorpaySuccess = async (_paymentId: string) => {
     setShowRazorpayCheckout(false);
