@@ -216,6 +216,20 @@ export default function OrderDetailPage() {
             </div>
           )}
 
+          {/* #5: Seller response time expectation for buyers */}
+          {o.isBuyerView && isFirstFlowStep(o.flow, order.status) && !o.isUrgentOrder && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50">
+              <Loader2 size={14} className="animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground">
+                Waiting for {seller?.business_name || 'seller'} to confirm…
+                {(seller as any)?.avg_response_minutes > 0
+                  ? <span className="font-medium text-foreground"> Usually responds in ~{(seller as any).avg_response_minutes} min</span>
+                  : <span className="font-medium text-foreground"> Sellers typically respond within a few minutes</span>
+                }
+              </p>
+            </div>
+          )
+
           {o.isUrgentOrder && order.auto_cancel_at && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} />}
 
           {/* Gap 8: Needs attention banner for buyer — hide on terminal statuses */}
