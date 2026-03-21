@@ -101,15 +101,25 @@ export function useRazorpay() {
         handler: function (response: any) {
           console.log('Payment successful:', response);
           document.body.classList.remove('razorpay-active');
+          // Restore scroll position
+          document.body.style.removeProperty('top');
+          window.scrollTo(0, parseInt(document.body.dataset.scrollY || '0', 10));
+          delete document.body.dataset.scrollY;
           options.onSuccess(response.razorpay_payment_id, response.razorpay_order_id);
         },
         modal: {
           ondismiss: function () {
             console.log('Payment modal closed');
             document.body.classList.remove('razorpay-active');
+            document.body.style.removeProperty('top');
+            window.scrollTo(0, parseInt(document.body.dataset.scrollY || '0', 10));
+            delete document.body.dataset.scrollY;
             setIsLoading(false);
             options.onDismiss?.();
           },
+          escape: true,        // Allow escape key to close
+          backdropclose: false, // Prevent accidental backdrop taps
+          confirm_close: true,  // Ask user before closing mid-payment
         },
       };
 
@@ -118,9 +128,14 @@ export function useRazorpay() {
       razorpay.on('payment.failed', function (response: any) {
         console.error('Payment failed:', response.error);
         document.body.classList.remove('razorpay-active');
+        document.body.style.removeProperty('top');
+        window.scrollTo(0, parseInt(document.body.dataset.scrollY || '0', 10));
+        delete document.body.dataset.scrollY;
         options.onFailure(response.error);
       });
 
+      // Save scroll position before locking body
+      document.body.dataset.scrollY = String(window.scrollY);
       document.body.classList.add('razorpay-active');
       razorpay.open();
     } catch (error: any) {
