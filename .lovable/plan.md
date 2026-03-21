@@ -1,41 +1,53 @@
 
 
-# Remaining Gaps to Fix
+# Final Gap Analysis & Production Fix
 
-## Bug 1: Double "Cancelled by buyer:" Prefix (Critical — Visible in Production)
+## Gaps Found
 
-**Evidence from network logs:** The `rejection_reason` stored in DB is:
-`"Cancelled by buyer: Cancelled by buyer: Taking too long to accept"`
+### Gap 1: `BuyerCancelBooking` — Double Prefix Bug (Critical)
+**File:** `src/components/booking/BuyerCancelBooking.tsx` line 86
 
-**Root cause:** Two layers both prepend the same prefix:
-- **Client** (`OrderCancellation.tsx` line 79): sends `_reason: "Cancelled by buyer: Taking too long to accept"`
-- **DB function** (`buyer_cancel_order` RPC): concatenates `'Cancelled by buyer: ' || _clean_reason`
+The fallback reason is `'Cancelled by buyer'`, which gets sent to `buyer_cancel_order` RPC. The RPC prepends `'Cancelled by buyer: '`, resulting in:
+`"Cancelled by buyer: Cancelled by buyer"` in the database.
 
-**Fix:** Remove the prefix from the client. The DB function already adds it, so the client should send just the raw reason (e.g., `"Taking too long to accept"`).
+**Fix:** Change the fallback from `'Cancelled by buyer'` to `'No reason provided'`.
 
-**File:** `src/components/order/OrderCancellation.tsx` — change line 79 from:
+### Gap 2: `buyer_cancel_pending_orders` RPC — Hardcoded Double Prefix (Critical)
+**File:** `supabase/migrations/…` — The `buyer_cancel_pending_orders` function hardcodes:
+```sql
+rejection_reason = 'Cancelled by buyer: Payment was not completed'
 ```
-_reason: `Cancelled by buyer: ${finalReason}`,
-```
-to:
-```
-_reason: finalReason,
-```
+This is fine on its own (no double prefix), BUT the UI strip logic on `OrderDetailPage.tsx` strips `"Cancelled by buyer: "`, leaving just `"Payment was not completed"` — which is correct. No fix needed here, just confirming consistency.
 
-## Bug 2: UI Shows Raw Prefix in Cancellation Banner
+### Gap 3: Auto-Cancel Missing Notification Trigger (Medium)
+**File:** `supabase/functions/auto-cancel-orders/index.ts`
 
-**Current:** The cancellation banner on OrderDetailPage displays the full `rejection_reason` string like `"Cancelled by buyer: Changed my mind"` below a header that already says "Order Cancelled". This is redundant and exposes internal prefixes to users.
+After cancelling orders, the edge function does NOT invoke `process-notification-queue`. Both buyer and seller receive no push notification when an order is auto-cancelled. Every other status change in the codebase triggers this.
 
-**Fix:** Strip the `"Cancelled by buyer: "` / `"Order automatically cancelled — "` prefixes before displaying, showing only the human-readable reason.
+**Fix:** After the cancel loop completes, invoke `process-notification-queue` via a fetch call to the edge function URL.
 
-**File:** `src/pages/OrderDetailPage.tsx` — add a small helper to clean the displayed reason text, stripping known prefixes so the UI shows e.g. "Changed my mind" or "Seller did not respond in time" instead of the raw DB string.
+### Gap 4: Test File Has Stale Assertion (Low)
+**File:** `src/test/orders-payments.test.ts` line 413
 
-## Summary
+The test asserts `rejection_reason: 'Cancelled by buyer: Changed my mind'` which matches the DB RPC output. But line 415 asserts `toContain('Cancelled by buyer')` — this is still correct post-fix. No action needed.
+
+## Implementation Plan
+
+### 1. Fix BuyerCancelBooking fallback reason
+**File:** `src/components/booking/BuyerCancelBooking.tsx`
+- Line 86: Change `|| 'Cancelled by buyer'` → `|| 'No reason provided'`
+- Line 97: Same change for the booking table update fallback
+
+### 2. Add notification trigger to auto-cancel edge function
+**File:** `supabase/functions/auto-cancel-orders/index.ts`
+- After the cancel + auto-complete loops, if any orders were affected, call `process-notification-queue` using the Supabase URL + service role key (same pattern used elsewhere in edge functions).
+
+### Summary
 
 | # | Issue | Severity | File |
 |---|-------|----------|------|
-| 1 | Double "Cancelled by buyer:" prefix | Critical | `OrderCancellation.tsx` |
-| 2 | Raw internal prefix shown to users | Minor/UX | `OrderDetailPage.tsx` |
+| 1 | BuyerCancelBooking double-prefix fallback | Critical | `BuyerCancelBooking.tsx` |
+| 2 | Auto-cancel missing push notifications | Medium | `auto-cancel-orders/index.ts` |
 
-Two small, surgical edits. No database migration needed.
+Two surgical edits. No database migration needed.
 
