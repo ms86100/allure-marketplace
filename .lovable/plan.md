@@ -1,42 +1,72 @@
 
 
-# Fix Plan: Buyer Cancel Order Failure + Navigation Lock
+# Fix Dynamic Island Compact Leading: SocivaIcon Visibility
 
-## Issue 1: Buyer Cancel Order — Root Cause Found
+## Problem
 
-The `buyer_cancel_order` RPC function accepts exactly 3 parameters:
-- `_order_id` (uuid)
-- `_reason` (text)
-- `_expected_status` (order_status enum, optional)
+In the Dynamic Island compact view, the "SV" logo circle has two issues:
+1. The "S" letter is invisible — it's likely a dark color (dark green or black) on the dark `Color.white.opacity(0.15)` background, making it blend in
+2. The circle background is too dark/transparent to create proper contrast
 
-**But the frontend is passing `_buyer_id` instead of `_reason`**, which is not a valid parameter name. This causes the RPC call to fail immediately.
+The "V" appears green and visible because it happens to be a brighter shade, but the overall circle needs better contrast.
 
-**Affected files:**
-1. `src/components/order/OrderCancellation.tsx` (line 77-81) — passes `{ _order_id, _buyer_id, _reason }`. The `_buyer_id` param doesn't exist in the RPC. The RPC uses `auth.uid()` internally.
-2. `src/components/booking/BuyerCancelBooking.tsx` (line 84-86) — same bug: passes `_buyer_id` instead of just `_order_id` and `_reason`.
+## Root Cause
 
-**Fix:** Remove `_buyer_id` from both call sites. The correct call signature is:
-```typescript
-supabase.rpc('buyer_cancel_order', {
-  _order_id: orderId,
-  _reason: `Cancelled by buyer: ${finalReason}`,
-})
+The `compactLeading` view (lines 169-181) uses:
+- `Circle().fill(Color.white.opacity(0.15))` — nearly invisible dark circle on the Dynamic Island's black background
+- The `SocivaIcon` asset likely has dark-colored letters that don't contrast against this
+
+## Fix
+
+Replace the low-opacity circle with a more visible background that matches the brand. Two changes:
+
+1. **Increase circle background opacity** from `0.15` to `0.25` to make the circle itself more visible
+2. **Add a subtle border stroke** using the phase accent color so the circle "pops" on the black Dynamic Island surface
+
+Apply the same fix to the `minimal` view (lines 196-203) for consistency.
+
+### File: `native/ios/LiveDeliveryWidget.swift`
+
+**compactLeading (lines 169-181):** Replace the ZStack with:
+```swift
+compactLeading: {
+    let phase = OrderPhase.from(context.state.workflowStatus)
+    ZStack {
+        Circle()
+            .fill(Color.white.opacity(0.25))
+            .overlay(
+                Circle()
+                    .stroke(phase.accentColor.opacity(0.6), lineWidth: 1)
+            )
+            .frame(width: 24, height: 24)
+        Image("SocivaIcon")
+            .resizable()
+            .scaledToFill()
+            .frame(width: 20, height: 20)
+            .clipShape(Circle())
+    }
+}
 ```
 
-## Issue 2: Navigation Lock on Order Summary Page
+**minimal (lines 195-204):** Same treatment:
+```swift
+minimal: {
+    let phase = OrderPhase.from(context.state.workflowStatus)
+    ZStack {
+        Circle()
+            .fill(Color.white.opacity(0.25))
+            .overlay(
+                Circle()
+                    .stroke(phase.accentColor.opacity(0.6), lineWidth: 1)
+            )
+        Image("SocivaIcon")
+            .resizable()
+            .scaledToFill()
+            .clipShape(Circle())
+            .padding(2)
+    }
+}
+```
 
-The OrderDetailPage back button (`navigate('/orders')`) uses an absolute path which should always work. However, two problems compound on mobile:
-
-1. **Bottom nav is hidden** (`showNav={false}`) for all non-terminal orders, removing the only other navigation escape.
-2. **The buyer action bar** (fixed at bottom, z-40) overlaps the bottom of the page. If the back arrow at the top is scrolled under a sticky header collision or the page errors silently, the user has zero escape routes.
-
-**Fix:** Change the back button to navigate to the previous page when history exists, or fallback to home (`/`), not `/orders`. When the user comes from the home ActiveOrderStrip, pressing back should return them to home. Add a secondary escape: make the order header's back arrow go to `/` (home) when `referrer` was the home page, and always show bottom nav when the order is in a "placed" (waiting) status since there's no seller action bar to conflict with.
-
-### Files to Edit
-
-| File | Change |
-|------|--------|
-| `src/components/order/OrderCancellation.tsx` | Remove `_buyer_id` param from RPC call |
-| `src/components/booking/BuyerCancelBooking.tsx` | Remove `_buyer_id` param from RPC call |
-| `src/pages/OrderDetailPage.tsx` | Fix back navigation: use `navigate(-1)` with fallback to `navigate('/')` when no history; always show bottom nav for buyer on "placed" status |
+> **Note to user:** If the "S" is still hard to see after this change, the root issue is in the `SocivaIcon` asset itself in the widget extension's `Assets.xcassets`. You may need a variant of the icon with lighter/brighter letters specifically for the Dynamic Island's dark context (e.g., white "S" + green "V" on transparent background).
 
