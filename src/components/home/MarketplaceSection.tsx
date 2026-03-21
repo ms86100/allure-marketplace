@@ -22,7 +22,6 @@ import { useMarketplaceConfig } from '@/hooks/useMarketplaceConfig';
 import { useBadgeConfig } from '@/hooks/useBadgeConfig';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { cn } from '@/lib/utils';
-import { cn } from '@/lib/utils';
 
 /* ── Section spacer ── */
 function SectionDivider() {
