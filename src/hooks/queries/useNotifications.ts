@@ -84,7 +84,7 @@ export function useLatestActionNotification(userId: string | undefined) {
     queryFn: async () => {
       const { data } = await supabase
         .from('user_notifications')
-        .select('*')
+        .select('id, title, body, type, reference_path, is_read, created_at, payload')
         .eq('user_id', userId!)
         .eq('is_read', false)
         .not('payload', 'is', null)
