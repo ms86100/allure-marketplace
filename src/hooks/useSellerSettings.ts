@@ -121,6 +121,7 @@ export function useSellerSettings() {
     if (!formData.business_name.trim()) { toast.error('Please enter a business name', { id: 'settings-validation' }); return; }
     if (formData.categories.length === 0) { toast.error('Please select at least one category', { id: 'settings-validation' }); return; }
     if (formData.accepts_upi && !formData.upi_id.trim()) { toast.error('Please enter your UPI ID', { id: 'settings-validation' }); return; }
+    if (formData.operating_days.length === 0) { toast.warning('No operating days selected — your store may appear closed to buyers', { id: 'settings-days-warn' }); }
 
     setIsSaving(true);
     try {
@@ -137,7 +138,8 @@ export function useSellerSettings() {
         bank_account_number: formData.bank_account_number.trim() || null,
         bank_ifsc_code: formData.bank_ifsc_code.trim() || null,
         bank_account_holder: formData.bank_account_holder.trim() || null,
-        sell_beyond_community: formData.sell_beyond_community, delivery_radius_km: formData.delivery_radius_km,
+        sell_beyond_community: formData.sell_beyond_community,
+        delivery_radius_km: formData.sell_beyond_community ? formData.delivery_radius_km : 5,
         fulfillment_mode: formData.fulfillment_mode, delivery_note: formData.delivery_note.trim() || null,
         minimum_order_amount: (minOrder !== null && !isNaN(minOrder) && minOrder > 0) ? minOrder : null,
         daily_order_limit: (dailyLimit !== null && !isNaN(dailyLimit) && dailyLimit > 0) ? dailyLimit : null,

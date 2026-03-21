@@ -156,10 +156,11 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
         .from('products')
         .select('id, category')
         .eq('seller_id', sellerId)
-        .eq('is_available', true);
+        .eq('is_available', true)
+        .eq('approval_status', 'approved');
 
       if (!products || products.length === 0) {
-        toast.success('Schedule saved. Add a service product to generate slots.');
+        toast.success('Schedule saved. Slots will be generated once your services are approved.');
         setIsSaving(false);
         return;
       }
