@@ -121,11 +121,18 @@ app.post("/", async (c) => {
     // Bug 1 fix: Add status guard to prevent cancelling orders that were accepted between SELECT and UPDATE
     const cancelResults = await Promise.allSettled(
       (expiredOrders || []).map(async (order) => {
+        // Dynamic rejection reason based on WHY the order is being cancelled
+        const reason = urgentIds.has(order.id) && !orphanIds.has(order.id)
+          ? "Order automatically cancelled — seller did not respond in time"
+          : orphanIds.has(order.id) && !urgentIds.has(order.id)
+          ? "Order automatically cancelled — payment was not completed within the allowed time"
+          : "Order automatically cancelled — seller did not respond in time";
+
         const { error: updateError, data: updated } = await supabase
           .from("orders")
           .update({
             status: "cancelled",
-            rejection_reason: "Order automatically cancelled - seller did not respond within the time limit",
+            rejection_reason: reason,
             auto_cancel_at: null,
             updated_at: now,
           })
@@ -141,7 +148,7 @@ app.post("/", async (c) => {
           console.log(`Order ${order.id} already transitioned — skipping cancel`);
           return { id: order.id, success: false, skipped: true };
         }
-        console.log(`Order ${order.id} auto-cancelled`);
+        console.log(`Order ${order.id} auto-cancelled: ${reason}`);
         return { id: order.id, success: true };
       })
     );
