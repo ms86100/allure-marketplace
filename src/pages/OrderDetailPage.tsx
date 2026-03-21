@@ -364,7 +364,8 @@ export default function OrderDetailPage() {
           )}
 
           {/* Gap 8: Buyer delivery confirmation — only for non-delivery orders (delivery orders use OTP as proof) */}
-          {o.isBuyerView && isSuccessfulTerminal(o.flow, order.status) && !isDeliveryOrder && (
+          {/* Show delivery confirmation only when buyer still has an action to advance (not already at final terminal) */}
+          {o.isBuyerView && !isDeliveryOrder && o.buyerNextStatus && !isTerminalStatus(o.flow, order.status) && (
             <BuyerDeliveryConfirmation
               orderId={order.id}
               sellerName={seller?.business_name}
