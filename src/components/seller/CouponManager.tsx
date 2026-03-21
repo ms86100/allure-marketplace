@@ -75,6 +75,15 @@ export function CouponManager() {
       toast.error('Code and discount value are required');
       return;
     }
+    const discountVal = Number(formData.discount_value);
+    if (discountVal <= 0) {
+      toast.error('Discount value must be greater than 0');
+      return;
+    }
+    if (formData.discount_type === 'percentage' && discountVal > 100) {
+      toast.error('Percentage discount cannot exceed 100%');
+      return;
+    }
 
     const { error } = await supabase.from('coupons').insert({
       seller_id: currentSellerId,
