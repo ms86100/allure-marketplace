@@ -98,10 +98,24 @@ export function useRazorpay() {
         theme: {
           color: '#2D4A3E',
         },
+        // Enable UPI intent flow — shows installed UPI apps (GPay, PhonePe, Paytm)
+        // instead of requiring manual VPA entry
+        config: {
+          display: {
+            preferences: {
+              show_default_blocks: true,
+            },
+          },
+        },
+        method: {
+          upi: true,
+          card: true,
+          netbanking: true,
+          wallet: true,
+        },
         handler: function (response: any) {
           console.log('Payment successful:', response);
           document.body.classList.remove('razorpay-active');
-          // Restore scroll position
           document.body.style.removeProperty('top');
           window.scrollTo(0, parseInt(document.body.dataset.scrollY || '0', 10));
           delete document.body.dataset.scrollY;
@@ -117,9 +131,9 @@ export function useRazorpay() {
             setIsLoading(false);
             options.onDismiss?.();
           },
-          escape: true,        // Allow escape key to close
-          backdropclose: false, // Prevent accidental backdrop taps
-          confirm_close: true,  // Ask user before closing mid-payment
+          escape: true,
+          backdropclose: false,
+          confirm_close: true,
         },
       };
 
