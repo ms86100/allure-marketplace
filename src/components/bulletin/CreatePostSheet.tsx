@@ -84,7 +84,7 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
     if (category === 'poll') {
       const validOptions = pollOptions.filter(o => o.trim());
       if (validOptions.length < 2) {
-        toast({ title: 'At least 2 poll options required', variant: 'destructive' });
+        toast.error('At least 2 poll options required');
         return;
       }
     }
