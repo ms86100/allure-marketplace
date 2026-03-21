@@ -4,6 +4,7 @@ import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { useNearbyProducts, mergeProducts } from './useNearbyProducts';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Popular products discovered via coordinate-based search.
@@ -12,19 +13,21 @@ import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 export function usePopularProducts(limit = 12) {
   const { browsingLocation } = useBrowsingLocation();
   const { data: nearbyProducts } = useNearbyProducts();
+  const { profile, effectiveSocietyId } = useAuth();
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
+  const radiusKm = profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM;
 
   const localQuery = useQuery({
-    queryKey: ['popular-products', lat, lng, limit],
+    queryKey: ['popular-products', lat, lng, limit, radiusKm, effectiveSocietyId],
     queryFn: async (): Promise<ProductWithSeller[]> => {
       if (!lat || !lng) return [];
 
-      // Use coordinate-based RPC to find sellers, then extract products
       const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: MARKETPLACE_RADIUS_KM,
+        _radius_km: radiusKm,
+        _exclude_society_id: effectiveSocietyId || undefined,
       });
 
       if (error) throw error;
@@ -82,11 +85,13 @@ export function usePopularProducts(limit = 12) {
 export function useCategoryProducts(parentGroup: string | null) {
   const { data: nearbyProducts } = useNearbyProducts();
   const { browsingLocation } = useBrowsingLocation();
+  const { profile, effectiveSocietyId } = useAuth();
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
+  const radiusKm = profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM;
 
   const localQuery = useQuery({
-    queryKey: ['category-products', parentGroup, lat, lng],
+    queryKey: ['category-products', parentGroup, lat, lng, radiusKm, effectiveSocietyId],
     queryFn: async (): Promise<ProductWithSeller[]> => {
       if (!lat || !lng) return [];
 
@@ -99,13 +104,11 @@ export function useCategoryProducts(parentGroup: string | null) {
       const categoryList = (catConfigs || []).map((c: any) => c.category);
       if (categoryList.length === 0) return [];
 
-      // Use coordinate-based RPC with category filter
-      // We call once per category since the RPC accepts a single _category
-      // For efficiency, call without category filter and filter client-side
       const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: MARKETPLACE_RADIUS_KM,
+        _radius_km: radiusKm,
+        _exclude_society_id: effectiveSocietyId || undefined,
       });
 
       if (error) throw error;

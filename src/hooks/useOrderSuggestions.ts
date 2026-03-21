@@ -15,7 +15,7 @@ interface OrderSuggestion {
   dismissed: boolean;
   acted_on: boolean;
   created_at: string;
-  product?: { name: string; image_urls: string[] | null; price: number };
+  product?: { name: string; image_url: string | null; price: number };
   seller?: { business_name: string };
 }
 
@@ -48,7 +48,7 @@ export function useOrderSuggestions() {
 
       const [productsRes, sellersRes] = await Promise.all([
         productIds.length > 0
-          ? supabase.from('products').select('id, name, image_urls, price').in('id', productIds)
+          ? supabase.from('products').select('id, name, image_url, price').in('id', productIds)
           : { data: [] },
         sellerIds.length > 0
           ? supabase.from('seller_profiles').select('id, business_name').in('id', sellerIds)

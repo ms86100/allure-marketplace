@@ -4,6 +4,7 @@ import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Coordinate-based discovery hook. Always uses search_sellers_by_location
@@ -11,19 +12,22 @@ import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
  */
 export function useNearbyProducts() {
   const { browsingLocation } = useBrowsingLocation();
+  const { profile, effectiveSocietyId } = useAuth();
 
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
+  const radiusKm = profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM;
 
   return useQuery({
-    queryKey: ['store-discovery', 'nearby-products', lat, lng, MARKETPLACE_RADIUS_KM],
+    queryKey: ['store-discovery', 'nearby-products', lat, lng, radiusKm, effectiveSocietyId],
     queryFn: async (): Promise<ProductWithSeller[]> => {
       if (!lat || !lng) return [];
 
       const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: MARKETPLACE_RADIUS_KM,
+        _radius_km: radiusKm,
+        _exclude_society_id: effectiveSocietyId || undefined,
       });
 
       if (error) throw error;
