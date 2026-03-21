@@ -107,11 +107,12 @@ export function OrderChat({
 
     setIsSending(true);
     try {
+      const trimmed = newMessage.trim();
       const { error } = await supabase.from('chat_messages').insert({
         order_id: orderId,
         sender_id: user.id,
         receiver_id: otherUserId,
-        message_text: newMessage.trim(),
+        message_text: trimmed,
       });
 
       if (error) throw error;
@@ -119,7 +120,19 @@ export function OrderChat({
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
-      // Trigger push notification processing so the recipient gets notified
+
+      // Enqueue a chat notification for the recipient, then process
+      const senderName = user.user_metadata?.name || 'Someone';
+      const preview = trimmed.length > 80 ? trimmed.slice(0, 77) + '...' : trimmed;
+      await supabase.from('notification_queue').insert({
+        user_id: otherUserId,
+        title: `💬 New message from ${senderName}`,
+        body: preview,
+        type: 'chat',
+        reference_path: `/orders/${orderId}`,
+        payload: { orderId, type: 'chat', senderId: user.id } as unknown as Json,
+      });
+
       supabase.functions.invoke('process-notification-queue').catch(() => {});
     } catch (error) {
       console.error('Error sending message:', error);
