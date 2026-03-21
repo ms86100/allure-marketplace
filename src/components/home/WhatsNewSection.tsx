@@ -78,7 +78,6 @@ export function WhatsNewSection() {
               )}
             </div>
             <p className="text-xs font-medium mt-1 truncate text-foreground">{s.business_name}</p>
-            <p className="text-[10px] text-muted-foreground capitalize">{s.category?.replace(/_/g, ' ')}</p>
           </Link>
         ))}
       </div>
