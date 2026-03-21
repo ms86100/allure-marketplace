@@ -226,8 +226,12 @@ export function useOrderDetail(id: string | undefined) {
   const displayStatuses = useMemo(() => {
     if (timelineSteps.length === 0) return [];
     const steps = timelineSteps.map(s => s.status_key);
+    // Only hide 'completed' when 'delivered' is itself a terminal step (i.e. they are redundant)
     if (steps.includes('delivered') && steps.includes('completed')) {
-      return steps.filter(s => s !== 'completed');
+      const deliveredStep = timelineSteps.find(s => s.status_key === 'delivered');
+      if (deliveredStep?.is_terminal) {
+        return steps.filter(s => s !== 'completed');
+      }
     }
     return steps;
   }, [timelineSteps]);

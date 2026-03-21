@@ -460,6 +460,6 @@ export function useCartPage() {
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed,
     handleUpiDeepLinkSuccess, handleUpiDeepLinkFailed,
     hasActivePaymentSession, sessionSellerUpiId, sessionSellerName, sessionAmount,
-    cancelPlacingOrder: () => setIsPlacingOrder(false),
+    cancelPlacingOrder: () => { setIsPlacingOrder(false); setOrderStep('validating'); },
   };
 }
