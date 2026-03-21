@@ -61,10 +61,9 @@ function OrderCard({ order, type, successTerminals }: { order: Order; type: 'buy
               <span className={`text-[11px] px-1.5 py-0.5 rounded ${statusInfo.color}`}>
                 {statusInfo.label}
               </span>
-              {/* Plan #17: Payment method badge */}
-              {(order as any).payment_method && (
+              {(order as any).payment_type && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
-                  {(order as any).payment_method === 'cod' ? 'COD' : 'UPI ✓'}
+                  {(order as any).payment_type === 'cod' ? 'COD' : (order as any).payment_type === 'card' ? 'Online ✓' : 'UPI ✓'}
                 </span>
               )}
               <span className="text-[11px] text-muted-foreground">

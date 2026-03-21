@@ -318,7 +318,7 @@ export default function OrderDetailPage() {
           {/* Payment */}
           <div className="bg-card border border-border rounded-xl px-4 py-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5"><CreditCard size={16} className="text-muted-foreground" /><p className="text-sm font-medium">{((order as any).payment_method || (order as any).payment_type) === 'cod' ? 'Cash on Delivery' : 'UPI Payment'}</p></div>
+              <div className="flex items-center gap-2.5"><CreditCard size={16} className="text-muted-foreground" /><p className="text-sm font-medium">{(() => { const pt = (order as any).payment_type || (order as any).payment_method; if (pt === 'cod') return 'Cash on Delivery'; if (pt === 'card') return 'Online Payment'; return 'UPI Payment'; })()}</p></div>
               <span className={`text-[11px] px-2 py-0.5 rounded-full ${paymentStatusInfo.color}`}>{paymentStatusInfo.label}</span>
             </div>
             {(order as any).upi_transaction_ref && (
