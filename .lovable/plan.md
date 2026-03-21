@@ -1,126 +1,203 @@
 
 
-# Deep UX Audit — Round 2: Remaining Invisible Gaps
+# Sociva Production Stabilization Plan
 
-After the previous 19 improvements, this audit focuses on gaps that still remain. Every item below closes a connection between existing features — no new features.
-
----
-
-## Phase 1: Seller Detail Page — The Trust Decision Point
-
-This is the most critical page for conversion. Buyers decide here whether to order.
-
-### 1. No "store currently closed" banner at the top of SellerDetailPage
-**File**: `src/pages/SellerDetailPage.tsx` (~line 318, inside seller info card)
-**Problem**: If a seller has `is_available === false`, the buyer can still browse the full page and even try to add items — only to be blocked at the ProductCard or ProductDetailSheet level with small "Closed" labels. There's no prominent banner at the top saying "This store is currently closed."
-**Fix**: After the seller info card (line ~320), check `seller.is_available === false` and render a prominent amber banner: "This store is currently closed. Browse the menu and order when they reopen." This matches how the ProductCard already handles it but at page level.
-
-### 2. No "when does this seller reopen?" info
-**File**: `src/pages/SellerDetailPage.tsx` (~line 392-400)
-**Problem**: Operating hours are shown as start-end times, and operating days are shown as badges — but if you visit a closed seller, there's no "Opens tomorrow at 9:00 AM" or "Opens Mon at 10:00 AM" message. The `store-availability.ts` lib already computes `nextOpenAt` — it's just not used here.
-**Fix**: When `seller.is_available === false` or outside hours, use `computeStoreStatus()` and show the `formatStoreClosedMessage()` result in the banner from #1.
-
-### 3. SellerDetailPage — no products state is confusing
-**File**: `src/pages/SellerDetailPage.tsx` (line 580-584)
-**Problem**: When a seller has no available products, the empty state just says "No products available" — but the seller might be in the process of adding products, or all products might be temporarily unavailable. The message doesn't distinguish.
-**Fix**: Change to: "No items listed yet. Check back later or browse other sellers in your community." with a link to `/search`.
+This plan transforms Sociva from its current feature-complete state into a production-grade, long-term stable system. No new features — only hardening, testing, documentation, and observability.
 
 ---
 
-## Phase 2: Order Flow Anxiety Points
+## Current State Assessment
 
-### 4. No estimated delivery/pickup time shown BEFORE placing order
-**File**: `src/pages/CartPage.tsx` (line 83-88)
-**Problem**: The prep time banner ("Ready in ~X minutes") only shows for self_pickup context. For delivery orders, buyers have zero time expectations before committing. The `estimated_delivery_at` field only exists after order creation.
-**Fix**: For delivery orders, show: "Estimated delivery: ~{prepTime + deliveryEstimate} minutes" using prep time + a configurable delivery buffer. Even an approximate range reduces anxiety.
+**What exists:**
+- 75+ pages, 45+ edge functions, complex multi-domain app (marketplace, society, builder, workforce)
+- Behavioral engines (feedback, ETA, visibility), multi-tier error recovery, chunk retry, session health checks
+- Existing test suite (20+ test files in `src/test/`) with a custom Supabase reporter
+- 1 unit test (`store-availability.test.ts`) in `src/lib/__tests__/`
+- DB linter: 15 warnings (8 permissive RLS policies, 4 mutable search paths, 1 RLS-no-policy, 1 extension-in-public, 1 leaked password protection disabled)
+- Console warnings: `VegBadge` and `BannerContent` receiving refs without `forwardRef`
+- Heavy `as any` casting across hooks (~788 matches) — type safety gaps
 
-### 5. Multi-seller cart — no visual separation of "what happens"
-**File**: `src/pages/CartPage.tsx` (line 234)
-**Problem**: The single line "Your cart has items from X sellers. Separate orders will be created for each." is easy to miss. Users don't realize they'll get separate order confirmations, separate payments, and separate tracking.
-**Fix**: Make this more prominent — move it above the seller groups (not below), wrap in a card with an info icon, and add: "Each seller will receive and fulfill their order independently."
-
-### 6. No seller phone/contact visible on CartPage or during checkout
-**File**: `src/pages/CartPage.tsx`
-**Problem**: If a buyer wants to clarify something with the seller before ordering (e.g., "Do you have X in stock?"), there's no way to contact them from the cart page. They'd have to go back to the seller page.
-**Fix**: Add a small "Message seller" or phone icon next to each seller group header in the cart, linking to the seller detail page or phone.
-
----
-
-## Phase 3: Search & Discovery Gaps
-
-### 7. Search returns no results — no guidance
-**File**: `src/pages/SearchPage.tsx` (need to check empty state)
-**Problem**: When search returns zero results, what does the user see? If it's just an empty space or "No results", that's a dead end. The session replay shows the user searching for "Fitness", "Electrician", "Plumber", "Carpenter" — these are service categories that might not have sellers yet.
-**Fix**: Show: "No results for '[query]'. Try browsing by category, or become the first to offer this service." with a link to category browse and `/become-seller`.
-
-### 8. TypewriterPlaceholder creates false expectations
-**File**: `src/components/search/TypewriterPlaceholder.tsx`
-**Problem**: The typewriter cycles through example searches. If it shows "Electrician" but no electricians exist in the community, the user searches, gets nothing, and feels disappointed. The placeholder creates an implicit promise.
-**Fix**: Either (a) filter placeholder examples to only show categories that have active sellers, or (b) add a disclaimer in the empty results: "Some services may not be available in your community yet."
+**What's missing:**
+- Zero component-level unit tests
+- No E2E automation (Playwright/Cypress)
+- No structured error tracking (Sentry or equivalent)
+- No performance monitoring
+- No API contract documentation
+- No formal runbook or incident response plan
 
 ---
 
-## Phase 4: Returning User Micro-Gaps
+## Phase 1: Critical Bug Fixes (Day 1-2)
 
-### 9. Order confirmation dialog doesn't show delivery address summary
-**File**: `src/pages/CartPage.tsx` (line 294-310)
-**Problem**: The confirm dialog shows items count, payment method, and total — but for delivery orders, it shows the address label in a cramped row. If the address is wrong, this is the last chance to catch it. The address should be more prominent.
-**Fix**: Give the delivery address its own visual block in the confirm dialog with the full address line (flat, block, building), not just the label.
+### 1.1 Fix React ref warnings
+- **VegBadge** (`src/components/ui/veg-badge.tsx`): Wrap with `React.forwardRef` — this is being passed as a ref target in `ProductMini` and `FeaturedBanners`
+- **BannerContent** (`src/components/home/FeaturedBanners.tsx`): Same `forwardRef` treatment
 
-### 10. Profile page has "Order Again" quick action that goes to /orders — not reorder
-**File**: `src/pages/ProfilePage.tsx` (line 99)
-**Problem**: The "Order Again" quick action navigates to `/orders` — the same destination as "Orders". It doesn't actually trigger a reorder flow. It's a duplicate link disguised as a different action.
-**Fix**: Either (a) remove "Order Again" since it duplicates "Orders", or (b) link it to the last completed order's detail page where the actual ReorderButton lives, or (c) link to `/search` with a "reorder" hint.
+### 1.2 Database security hardening
+- **Fix 4 functions with mutable search_path**: Add `SET search_path = public` to each. Identify which functions via `supabase--read_query` on `pg_proc`
+- **Audit 8 permissive RLS policies**: Identify which tables have `USING (true)` for INSERT/UPDATE/DELETE. Tighten to proper `auth.uid()` checks where needed
+- **Fix RLS-enabled-no-policy table**: Add appropriate policies
+- **Enable leaked password protection** via auth config
 
-### 11. Favorites page shows no rating or category for sellers
-**File**: `src/pages/FavoritesPage.tsx` (line 107-157)
-**Problem**: The `FavoriteSellerCard` shows only the seller image, name, and owner name. No rating, no category, no operating hours. When a user has 10+ favorites, they can't distinguish between sellers without tapping each one.
-**Fix**: Add the seller's rating (star icon + number) and primary category below the name. This is already available in the `seller_profiles` data being fetched.
-
-### 12. No "last ordered" indicator on seller cards in marketplace
-**File**: `src/components/home/ShopByStoreDiscovery.tsx` or marketplace seller cards
-**Problem**: When browsing the marketplace, returning users see all sellers equally. There's no indicator of "You ordered from here 3 days ago" to reinforce familiarity and habit.
-**Fix**: Cross-reference the user's order history and show a small "Ordered recently" badge on seller cards they've ordered from in the last 30 days. This builds habit loops.
+### 1.3 Fix console errors
+- Audit all `catch {}` blocks (empty catches that swallow errors silently) — add at minimum `console.warn` for observability
 
 ---
 
-## Phase 5: Emotional Safety Net
+## Phase 2: Type Safety & Code Hardening (Day 3-5)
 
-### 13. Report seller confirmation — no reassurance
-**File**: `src/pages/SellerDetailPage.tsx` (line 196)
-**Problem**: After submitting a seller report, a simple toast says "Report submitted. Our team will review it shortly." — but there's no indication of what happens next, how long it takes, or whether the reporter will be notified.
-**Fix**: Change to: "Report submitted. Our moderation team will review within 24 hours. You'll be notified of any action taken. Your identity is kept confidential."
+### 2.1 Eliminate critical `as any` casts
+- Priority files: `useOrderDetail.ts`, `useCartPage.ts`, `useStoreDiscovery.ts`, `useCategoryManagerData.ts`
+- Create proper TypeScript interfaces for all RPC return types
+- Replace `as any` with typed responses using the generated Supabase types
 
-### 14. Delivery code (OTP) card has no explanation of consequences
-**File**: `src/pages/OrderDetailPage.tsx` (line 424-431)
-**Problem**: The delivery OTP card says "Share this code with the delivery person to confirm delivery" — but doesn't explain what happens if they share it prematurely or if the wrong person asks for it.
-**Fix**: Add a subtle warning: "Only share when you've received your items. This code confirms delivery is complete." This prevents social engineering.
+### 2.2 Defensive coding audit
+- All `supabase.rpc()` calls: ensure every one checks `error` before using `data`
+- All `supabase.from().select()` calls: ensure null-safe access on `data`
+- Verify every `toast.error()` in catch blocks provides user-friendly messages (not raw error objects)
 
-### 15. Review form has no context about privacy
-**File**: ReviewForm component (used in OrderDetailPage)
-**Problem**: When asked to "Rate this order", buyers may hesitate if they think the seller will see who gave a low rating. There's no indication of whether reviews are anonymous or attributed.
-**Fix**: Add a small note near the review form: "Your review will be shown with your first name. Sellers cannot see your contact details."
+### 2.3 Race condition audit
+- `useAuthState.ts`: verify the `profileFetchedFor` ref guard handles rapid login/logout cycles
+- Cart mutations: verify `pendingMutationCount` barrier prevents stale overwrites under rapid add/remove
+- Realtime channels: ensure `removeChannel` cleanup in all useEffect returns
 
 ---
 
-## Summary Priority
+## Phase 3: Testing Strategy (Day 5-14)
 
-| # | Gap | Impact | Effort |
-|---|-----|--------|--------|
-| 1-2 | Closed store banner + reopen time | High | Low |
-| 7 | Search empty state guidance | High | Low |
-| 5 | Multi-seller cart explanation | Medium | Low |
-| 14 | Delivery OTP safety warning | High | Trivial |
-| 11 | Favorites — show rating/category | Medium | Low |
-| 10 | Remove duplicate "Order Again" | Medium | Trivial |
-| 4 | Pre-order delivery time estimate | High | Medium |
-| 9 | Confirm dialog address prominence | Medium | Low |
-| 13 | Report confirmation reassurance | Medium | Trivial |
-| 3 | Seller no-products empty state | Low | Trivial |
-| 6 | Cart seller contact shortcut | Medium | Low |
-| 8 | TypewriterPlaceholder false promises | Low | Medium |
-| 12 | "Ordered recently" badge | Medium | Medium |
-| 15 | Review privacy note | Medium | Trivial |
+### 3.1 Unit tests — pure logic libraries
+Create tests in `src/lib/__tests__/` for:
+- `etaEngine.ts` — all mood states, edge cases (null dates, past dates)
+- `feedbackEngine.ts` — all action types, failure paths
+- `visibilityEngine.ts` — route-based rules for every known route
+- `format-price.ts` — edge cases (0, negative, large numbers, decimals)
+- `validation-schemas.ts` — all validation rules
+- `listingTypeWorkflowMap.ts` — mapping correctness
+- `store-availability.ts` — expand existing tests for boundary cases (midnight crossover, timezone edge cases)
+- `gps-filter.ts` — coordinate validation, distance calculations
 
-15 improvements across ~10 files. All close gaps between existing features.
+### 3.2 Component tests — critical UI
+Create tests alongside components for:
+- `ErrorBoundary.tsx` — verify fallback renders, reload behavior, crash-loop detection
+- `BuyerCancelBooking.tsx` — policy check flow, terminal status hiding
+- `ProtectedRoute` / `AdminRoute` — auth gating works correctly
+- Cart components — optimistic update, badge count sync
+
+### 3.3 Integration tests — critical flows
+Expand `src/test/` suite for:
+- Order lifecycle: create → accept → prepare → ready → deliver → complete
+- Cancellation: buyer cancel, seller reject, auto-cancel timeout
+- Payment: COD flow, UPI flow, idempotency key dedup
+- Service booking: slot lock → confirm → complete/no-show
+- Auth: login → profile hydration → role detection → route access
+
+### 3.4 Edge function tests
+Create `*_test.ts` files for critical functions:
+- `process-notification-queue` — delivery pipeline, retry logic
+- `create-razorpay-order` — amount validation, idempotency
+- `auto-cancel-orders` — timeout detection, state transition
+- `manage-delivery` — assignment, location updates
+
+### 3.5 Test automation
+- Configure CI to run `vitest` on every commit (already have vitest.config.ts + reporter)
+- Add a pre-publish validation step that blocks deployment if tests fail
+
+---
+
+## Phase 4: Monitoring & Observability (Day 10-14)
+
+### 4.1 Structured error logging edge function
+Create `supabase/functions/log-client-error/index.ts`:
+- Accepts client-side errors with context (route, user_id, device, stack trace)
+- Stores in `client_error_log` table with severity levels
+- Rate-limited per user to prevent flood
+
+### 4.2 Health check dashboard
+Create `supabase/functions/system-health/index.ts`:
+- Checks: DB connectivity, edge function latency, notification queue depth, stalled delivery count
+- Returns structured JSON for external monitoring integration
+- Existing `health` function may already cover some — extend it
+
+### 4.3 Frontend error capture
+Add a global `window.onerror` / `window.onunhandledrejection` handler in `main.tsx` that:
+- Captures error + stack + current route + user ID
+- Posts to `log-client-error` edge function
+- Throttled (max 5 per minute per session)
+- This replaces the need for Sentry in the short term
+
+### 4.4 Database monitoring queries
+Create scheduled health checks via existing `check-trigger-health` and `check-notification-queue-health` functions:
+- Alert on: orders stuck in non-terminal states > 24h
+- Alert on: notification_queue items in `processing` > 5 min
+- Alert on: delivery assignments with no location update > 10 min
+
+---
+
+## Phase 5: Documentation (Day 12-16)
+
+### 5.1 Technical documentation
+Create `docs/` directory with:
+- `ARCHITECTURE.md` — domain separation, engine layer, data flow diagrams
+- `DATABASE.md` — table relationships, RLS policy matrix, RPC function catalog
+- `EDGE_FUNCTIONS.md` — each function's purpose, inputs/outputs, cron schedule
+- `STATUS_FLOWS.md` — all workflow states, transitions, terminal conditions
+- `SECURITY.md` — auth model, RLS strategy, rate limiting, input validation
+
+### 5.2 Runbook
+`docs/RUNBOOK.md`:
+- Common incident scenarios and resolution steps
+- How to manually cancel stuck orders
+- How to re-process failed notifications
+- How to diagnose push notification delivery failures
+- Database backup/restore procedures
+
+### 5.3 Code standards
+`docs/STANDARDS.md`:
+- No `as any` — all types must be explicit
+- Every `catch` must log or handle (no empty catches)
+- Every `supabase` call must check error before data
+- Every user-facing action must have feedback (toast/haptic)
+- All new functions must have `SET search_path = public`
+
+---
+
+## Phase 6: Release Freeze & Validation (Day 14-16)
+
+### 6.1 Pre-release validation checklist
+- [ ] All vitest tests pass (unit + integration)
+- [ ] Edge function tests pass
+- [ ] DB linter returns 0 warnings
+- [ ] Console shows 0 errors/warnings in all major flows
+- [ ] All RLS policies audited and documented
+- [ ] Performance profile: no page > 3s load, no JS heap > 100MB
+- [ ] All 75+ pages render without crash
+- [ ] Auth flow: signup, login, logout, session refresh, password reset
+- [ ] Order flow: place, accept, prepare, deliver, complete, review
+- [ ] Payment flow: COD, UPI, Razorpay
+- [ ] Service booking: book, confirm, complete, cancel
+- [ ] Push notifications: register, receive, tap-to-navigate
+
+### 6.2 Version freeze protocol
+- Tag current commit as `v1.0.0-stable`
+- Create `stable` branch — only critical bug fixes merge here
+- All future changes require: (1) test coverage, (2) peer review, (3) staging validation
+- No schema migrations without explicit approval and Live data check
+
+### 6.3 Rollback plan
+- Lovable version history serves as rollback mechanism
+- Document the exact commit hash and DB migration state for v1.0.0
+- Keep a "last known good" snapshot of the database schema
+
+---
+
+## Implementation Order
+
+| Week | Focus | Deliverables |
+|------|-------|-------------|
+| Week 1 | Phase 1 + 2 | Bug fixes, ref warnings, RLS hardening, type safety |
+| Week 2 | Phase 3 | Unit tests for all libs, component tests, integration tests |
+| Week 3 | Phase 4 + 5 | Error logging, health checks, documentation |
+| Week 4 | Phase 6 | Validation checklist execution, version freeze |
+
+Shall I begin with Phase 1 (critical bug fixes — React ref warnings, DB security, empty catch blocks)?
 
