@@ -143,6 +143,8 @@ export function useRazorpay() {
         theme: {
           color: '#2D4A3E',
         },
+        // CRITICAL: Enable UPI intent inside Capacitor WebView
+        webview_intent: true,
         method: {
           upi: true,
           card: true,
@@ -155,9 +157,10 @@ export function useRazorpay() {
               upi: {
                 name: 'Pay via UPI',
                 instruments: [
-                  { method: 'upi', flows: ['intent'], apps: ['google_pay'] },
+                  { method: 'upi', flows: ['intent'], apps: ['gpay'] },
                   { method: 'upi', flows: ['intent'], apps: ['phonepe'] },
                   { method: 'upi', flows: ['intent'], apps: ['paytm'] },
+                  { method: 'upi', flows: ['intent'], apps: ['any'] },
                 ],
               },
             },

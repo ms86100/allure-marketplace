@@ -89,6 +89,8 @@ const config: CapacitorConfig = {
     allowMixedContent: !isProduction,
     captureInput: true,
     webContentsDebuggingEnabled: !isProduction,
+    // Allow UPI intent:// and upi:// deep links from Razorpay
+    allowIntentUrls: true,
   },
 };
 
