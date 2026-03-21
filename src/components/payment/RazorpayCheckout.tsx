@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Drawer,
@@ -7,7 +7,7 @@ import {
   DrawerTitle,
   DrawerDescription,
 } from '@/components/ui/drawer';
-import { Loader2, CreditCard, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Loader2, CreditCard, CheckCircle, XCircle, RefreshCw, WifiOff } from 'lucide-react';
 import { useRazorpay } from '@/hooks/useRazorpay';
 import { useCurrency } from '@/hooks/useCurrency';
 
@@ -42,18 +42,27 @@ export function RazorpayCheckout({
   onPaymentFailed,
   onDismiss,
 }: RazorpayCheckoutProps) {
-  const { createOrder, isLoading, isScriptLoaded } = useRazorpay();
+  const { createOrder, isLoading, isScriptLoaded, scriptError, retryLoadScript } = useRazorpay();
   const { formatPrice } = useCurrency();
   const [status, setStatus] = useState<'pending' | 'processing' | 'success' | 'failed'>('pending');
+  const processingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     if (isOpen) {
       setStatus('pending');
     }
+    return () => {
+      if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
+    };
   }, [isOpen]);
 
   const handlePayment = async () => {
     setStatus('processing');
+
+    // Safety timeout: if Razorpay popup doesn't open within 15s, reset to pending
+    processingTimeoutRef.current = setTimeout(() => {
+      setStatus((prev) => (prev === 'processing' ? 'pending' : prev));
+    }, 15000);
 
     await createOrder({
       orderId,
@@ -65,6 +74,7 @@ export function RazorpayCheckout({
       customerPhone,
       businessName: sellerName,
       onSuccess: (paymentId, razorpayOrderId) => {
+        if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
         setStatus('success');
         if (razorpayOrderId) {
           console.log('[Payment] Razorpay order_id for reconciliation:', razorpayOrderId);
@@ -72,9 +82,11 @@ export function RazorpayCheckout({
         setTimeout(() => onPaymentSuccess(paymentId), 1500);
       },
       onFailure: () => {
+        if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
         setStatus('failed');
       },
       onDismiss: () => {
+        if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
         // Razorpay popup closed without completing — let user retry
         setStatus('pending');
       },
@@ -85,8 +97,8 @@ export function RazorpayCheckout({
     setStatus('pending');
   };
 
-  // Bug 4 fix: Differentiate between user cancel (pending) and actual failure
   const handleClose = () => {
+    if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
     if (status === 'success') {
       // Success — do nothing extra
     } else if (status === 'pending') {
@@ -128,22 +140,41 @@ export function RazorpayCheckout({
                 </p>
                 <div className="flex items-center justify-center gap-2 mt-3">
                   <img src="https://razorpay.com/assets/razorpay-glyph.svg" alt="Razorpay" className="h-4" />
-                  <span className="text-xs text-muted-foreground">Secure UPI payment</span>
+                  <span className="text-xs text-muted-foreground">UPI · Cards · Wallets · Netbanking</span>
                 </div>
               </div>
+
+              {/* Script load error state */}
+              {scriptError && !isScriptLoaded && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 flex items-center gap-3">
+                  <WifiOff size={18} className="text-destructive shrink-0" />
+                  <div className="text-left flex-1 min-w-0">
+                    <p className="text-xs font-medium text-destructive">Payment service unavailable</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Check your internet connection</p>
+                  </div>
+                  <Button variant="outline" size="sm" className="shrink-0 h-8 text-xs" onClick={retryLoadScript}>
+                    Retry
+                  </Button>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-4">
-                <Button variant="outline" className="flex-1" onClick={handleClose}>
+                <Button
+                  variant="outline"
+                  className="flex-1 min-h-[48px]"
+                  onClick={handleClose}
+                >
                   Cancel
                 </Button>
-                <Button 
-                  className="flex-1" 
+                <Button
+                  className="flex-1 min-h-[48px]"
                   onClick={handlePayment}
                   disabled={isLoading || !isScriptLoaded}
                 >
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 animate-spin" size={16} />
-                      Processing...
+                      Processing…
                     </>
                   ) : (
                     'Pay Now'
@@ -191,10 +222,10 @@ export function RazorpayCheckout({
                 </p>
               </div>
               <div className="flex gap-3 pt-4">
-                <Button variant="outline" className="flex-1" onClick={handleClose}>
+                <Button variant="outline" className="flex-1 min-h-[48px]" onClick={handleClose}>
                   Cancel
                 </Button>
-                <Button className="flex-1" onClick={handleRetry}>
+                <Button className="flex-1 min-h-[48px]" onClick={handleRetry}>
                   <RefreshCw size={16} className="mr-2" />
                   Retry
                 </Button>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
@@ -23,35 +23,81 @@ interface RazorpayOptions {
   onDismiss?: () => void;
 }
 
+/** Restore body scroll position and remove the lock class */
+function unlockBodyScroll() {
+  document.body.classList.remove('razorpay-active');
+  document.body.style.removeProperty('top');
+  const savedY = parseInt(document.body.dataset.scrollY || '0', 10);
+  window.scrollTo(0, savedY);
+  delete document.body.dataset.scrollY;
+}
+
+const SCRIPT_URL = 'https://checkout.razorpay.com/v1/checkout.js';
+
 export function useRazorpay() {
   const [isLoading, setIsLoading] = useState(false);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
+  const [scriptError, setScriptError] = useState(false);
+  const retryCountRef = useRef(0);
 
-  // Load Razorpay script
-  useEffect(() => {
+  // Load Razorpay script with retry
+  const loadScript = useCallback(() => {
     if (window.Razorpay) {
       setIsScriptLoaded(true);
+      setScriptError(false);
       return;
     }
 
+    // Remove any previous failed script tag
+    const existing = document.querySelector(`script[src="${SCRIPT_URL}"]`);
+    if (existing) existing.remove();
+
     const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.src = SCRIPT_URL;
     script.async = true;
-    script.onload = () => setIsScriptLoaded(true);
+    script.onload = () => {
+      setIsScriptLoaded(true);
+      setScriptError(false);
+      retryCountRef.current = 0;
+    };
     script.onerror = () => {
       console.error('Failed to load Razorpay script');
-      toast.error('Payment service unavailable');
+      setScriptError(true);
+      // Auto-retry up to 3 times with exponential backoff
+      if (retryCountRef.current < 3) {
+        retryCountRef.current += 1;
+        const delay = Math.pow(2, retryCountRef.current) * 1000;
+        setTimeout(loadScript, delay);
+      } else {
+        toast.error('Payment service unavailable. Please check your network.');
+      }
     };
     document.body.appendChild(script);
+  }, []);
 
+  useEffect(() => {
+    loadScript();
+  }, [loadScript]);
+
+  // Cleanup: ensure body scroll lock is released if hook unmounts mid-payment
+  useEffect(() => {
     return () => {
-      // Don't remove script on unmount to avoid reloading
+      if (document.body.classList.contains('razorpay-active')) {
+        unlockBodyScroll();
+      }
     };
   }, []);
 
   const createOrder = useCallback(async (options: RazorpayOptions) => {
     if (!isScriptLoaded) {
-      toast.error('Payment service is loading. Please try again.');
+      if (scriptError) {
+        // Retry loading script
+        retryCountRef.current = 0;
+        loadScript();
+        toast.error('Payment service is loading. Please try again in a moment.');
+      } else {
+        toast.error('Payment service is loading. Please try again.');
+      }
       return;
     }
 
@@ -65,7 +111,6 @@ export function useRazorpay() {
         return;
       }
 
-      // Bug 1 fix: Send orderIds array for multi-vendor support
       const { data, error } = await supabase.functions.invoke('create-razorpay-order', {
         body: {
           orderId: options.orderId,
@@ -120,19 +165,13 @@ export function useRazorpay() {
         },
         handler: function (response: any) {
           console.log('Payment successful:', response);
-          document.body.classList.remove('razorpay-active');
-          document.body.style.removeProperty('top');
-          window.scrollTo(0, parseInt(document.body.dataset.scrollY || '0', 10));
-          delete document.body.dataset.scrollY;
+          unlockBodyScroll();
           options.onSuccess(response.razorpay_payment_id, response.razorpay_order_id);
         },
         modal: {
           ondismiss: function () {
             console.log('Payment modal closed');
-            document.body.classList.remove('razorpay-active');
-            document.body.style.removeProperty('top');
-            window.scrollTo(0, parseInt(document.body.dataset.scrollY || '0', 10));
-            delete document.body.dataset.scrollY;
+            unlockBodyScroll();
             setIsLoading(false);
             options.onDismiss?.();
           },
@@ -146,10 +185,7 @@ export function useRazorpay() {
       
       razorpay.on('payment.failed', function (response: any) {
         console.error('Payment failed:', response.error);
-        document.body.classList.remove('razorpay-active');
-        document.body.style.removeProperty('top');
-        window.scrollTo(0, parseInt(document.body.dataset.scrollY || '0', 10));
-        delete document.body.dataset.scrollY;
+        unlockBodyScroll();
         options.onFailure(response.error);
       });
 
@@ -166,11 +202,13 @@ export function useRazorpay() {
     } finally {
       setIsLoading(false);
     }
-  }, [isScriptLoaded]);
+  }, [isScriptLoaded, scriptError, loadScript]);
 
   return {
     createOrder,
     isLoading,
     isScriptLoaded,
+    scriptError,
+    retryLoadScript: loadScript,
   };
 }
