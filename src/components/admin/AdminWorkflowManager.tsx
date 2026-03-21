@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 import { type FlowStep, type Transition, type WorkflowGroup, ACTORS, FULFILLMENT_VARIANTS, formatName } from './workflow/types';
 import { CreateWorkflowDialog } from './workflow/CreateWorkflowDialog';
+import { TransitionRulesEditor } from './workflow/TransitionRulesEditor';
 import { CloneWorkflowDialog } from './workflow/CloneWorkflowDialog';
 import { DeleteWorkflowDialog } from './workflow/DeleteWorkflowDialog';
 import { WorkflowLinkage } from './workflow/WorkflowLinkage';
@@ -407,53 +408,12 @@ export function AdminWorkflowManager() {
               </div>
 
               {/* Transitions */}
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-3">Transition Rules</p>
-                <p className="text-[11px] text-muted-foreground mb-3">For each status, define which actors can transition to which next statuses.</p>
-
-                <div className="space-y-3">
-                  {editSteps.filter(s => !s.is_terminal).map(fromStep => {
-                    const possibleTargets = editSteps.filter(s => s.status_key !== fromStep.status_key);
-                    return (
-                      <div key={fromStep.status_key} className="bg-muted/30 rounded-xl p-3 border border-border/40">
-                        <p className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-                          <Badge variant="outline" className="text-[10px] font-mono">{fromStep.status_key || '(unnamed)'}</Badge>
-                          <ArrowRight size={12} className="text-muted-foreground" />
-                        </p>
-                        {fromStep.status_key && (
-                          <div className="space-y-1.5">
-                            {possibleTargets.map(toStep => {
-                              if (!toStep.status_key) return null;
-                              const hasAny = ACTORS.some(a => hasTransition(fromStep.status_key, toStep.status_key, a));
-                              return (
-                                <div key={toStep.status_key} className={cn("flex items-center gap-2 px-2 py-1.5 rounded-lg", hasAny ? "bg-primary/5" : "bg-transparent")}>
-                                  <span className="text-[11px] font-mono text-muted-foreground w-24 truncate">{toStep.status_key}</span>
-                                  <div className="flex gap-1.5 flex-wrap">
-                                    {ACTORS.map(actor => (
-                                      <button
-                                        key={actor}
-                                        onClick={() => toggleTransition(fromStep.status_key, toStep.status_key, actor)}
-                                        className={cn(
-                                          "text-[10px] px-1.5 py-0.5 rounded-md border transition-all",
-                                          hasTransition(fromStep.status_key, toStep.status_key, actor)
-                                            ? "bg-primary text-primary-foreground border-primary"
-                                            : "bg-background text-muted-foreground border-border hover:border-primary/50"
-                                        )}
-                                      >
-                                        {actor}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <TransitionRulesEditor
+                editSteps={editSteps}
+                transitions={transitions}
+                hasTransition={hasTransition}
+                toggleTransition={toggleTransition}
+              />
             </div>
           </ScrollArea>
 
