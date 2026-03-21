@@ -103,6 +103,15 @@ export function useCartPage() {
     }
   }, []); // Only on mount
 
+  // Bug 2 fix: Auto-remove coupon when cart drops below min_order_amount
+  useEffect(() => {
+    if (!appliedCoupon || !appliedCoupon.min_order_amount) return;
+    if (totalAmount < appliedCoupon.min_order_amount) {
+      setAppliedCoupon(null);
+      toast.info(`Coupon "${appliedCoupon.code}" removed — minimum order of ${formatPrice(appliedCoupon.min_order_amount)} not met.`, { id: 'coupon-below-min' });
+    }
+  }, [totalAmount, appliedCoupon?.min_order_amount]);
+
   const effectiveCouponDiscount = (() => {
     if (!appliedCoupon) return 0;
     if (appliedCoupon.discount_type === 'percentage' && appliedCoupon.discount_value) {
@@ -110,7 +119,9 @@ export function useCartPage() {
       if (appliedCoupon.max_discount_amount) d = Math.min(d, appliedCoupon.max_discount_amount);
       return Math.round(d * 100) / 100;
     }
-    return appliedCoupon.discountAmount;
+    // Bug 5 fix: Recalculate fixed-amount coupons dynamically (never exceed cart total)
+    const fixedValue = appliedCoupon.discount_value ?? appliedCoupon.discountAmount;
+    return Math.min(fixedValue, totalAmount);
   })();
 
   const effectiveDeliveryFee = fulfillmentType === 'delivery' ? (totalAmount >= settings.freeDeliveryThreshold ? 0 : settings.baseDeliveryFee) : 0;
