@@ -63,8 +63,11 @@ export function OrderChat({
         .subscribe();
 
       return () => {
+        document.body.style.overflow = '';
         supabase.removeChannel(channel);
       };
+    } else {
+      document.body.style.overflow = '';
     }
   }, [isOpen, orderId]);
 
