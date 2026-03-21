@@ -29,6 +29,7 @@ import { DemandInsights } from '@/components/seller/DemandInsights';
 
 import { ServiceBookingStats } from '@/components/seller/ServiceBookingStats';
 import { SellerDayAgenda } from '@/components/seller/SellerDayAgenda';
+import { useSellerServiceBookings } from '@/hooks/useServiceBookings';
 import { AvailabilityPromptBanner } from '@/components/seller/AvailabilityPromptBanner';
 import { MissingLocationBanner } from '@/components/seller/MissingLocationBanner';
 import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCounts } from '@/hooks/queries/useSellerOrders';
