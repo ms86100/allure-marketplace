@@ -106,7 +106,7 @@ export function ServiceBookingFlow({
 
   const supportsAddons = activeSubcategory?.supports_addons ?? config?.supportsAddons ?? false;
   const supportsRecurring = activeSubcategory?.supports_recurring ?? config?.supportsRecurring ?? false;
-  const needsAddress = locationType === 'home_visit' || locationType === 'at_buyer';
+  const needsAddress = resolvedLocation === 'home_visit' || resolvedLocation === 'at_buyer';
 
   const addonTotal = selectedAddons.reduce((s, a) => s + a.price, 0);
   const totalAmount = price + addonTotal;
