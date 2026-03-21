@@ -3,7 +3,7 @@ import { resolveNotificationRoute } from '@/lib/notification-routes';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
-import { Bell, CheckCheck, Inbox, RefreshCw } from 'lucide-react';
+import { Bell, CheckCheck, Inbox, RefreshCw, Package, Users, Truck, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '@/hooks/queries/useNotifications';
