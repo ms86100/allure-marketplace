@@ -52,6 +52,23 @@ export function ServiceBookingFlow({
 
   const isSubmittingRef = useRef(false);
 
+  // Bug #2/#3: Fetch service_listings to get correct location_type and duration_minutes
+  const { data: serviceListing } = useQuery({
+    queryKey: ['service-listing', productId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('service_listings')
+        .select('location_type, duration_minutes')
+        .eq('product_id', productId)
+        .maybeSingle();
+      return data;
+    },
+    enabled: open && !!productId,
+  });
+
+  const resolvedDuration = serviceListing?.duration_minutes ?? durationMinutes;
+  const resolvedLocation = serviceListing?.location_type ?? locationType;
+
   const { data: serviceSlots = [], refetch: refetchSlots } = useServiceSlots(open ? productId : undefined);
   const availableSlots = useMemo(
     () => slotsToPickerFormat(serviceSlots),
