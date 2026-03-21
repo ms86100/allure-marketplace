@@ -64,8 +64,9 @@ export function ActiveOrderStrip() {
       const statusKeys = [...new Set(data.map((o: any) => o.status))];
       const { data: flowData } = await supabase
         .from('category_status_flows')
-        .select('status_key, display_label, color, icon')
-        .in('status_key', statusKeys);
+        .select('status_key, display_label, color, icon, transaction_type')
+        .in('status_key', statusKeys)
+        .in('transaction_type', ['cart_purchase', 'self_fulfillment', 'seller_delivery']);
 
       const flowMap = new Map<string, { display_label: string | null; color: string | null; icon: string | null }>();
       for (const f of (flowData || []) as any[]) {
@@ -92,8 +93,8 @@ export function ActiveOrderStrip() {
       });
     },
     enabled: !!user?.id && !!terminalSet,
-    staleTime: jitteredStaleTime(10_000),
-    refetchInterval: 10_000,
+    staleTime: jitteredStaleTime(15_000),
+    refetchInterval: 30_000,
     refetchOnWindowFocus: true,
   });
 

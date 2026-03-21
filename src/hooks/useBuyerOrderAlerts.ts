@@ -44,11 +44,15 @@ export function useBuyerOrderAlerts() {
         (payload) => {
           const newStatus = (payload.new as any)?.status;
           const oldStatus = (payload.old as any)?.status;
-          // Only react to actual status changes, not internal field updates
-          if (!newStatus || newStatus === 'pending' || newStatus === oldStatus) return;
+          const newPayment = (payload.new as any)?.payment_status;
+          const oldPayment = (payload.old as any)?.payment_status;
+          const statusChanged = newStatus && newStatus !== 'pending' && newStatus !== oldStatus;
+          const paymentChanged = newPayment && newPayment !== oldPayment;
+          // Only react to actual status or payment_status changes
+          if (!statusChanged && !paymentChanged) return;
 
           // Native haptic feedback
-          const hapticType = HAPTIC_MAP[newStatus] ?? 'success';
+          const hapticType = statusChanged ? (HAPTIC_MAP[newStatus] ?? 'success') : 'success';
           hapticNotification(hapticType);
 
           // Keep all queries fresh
