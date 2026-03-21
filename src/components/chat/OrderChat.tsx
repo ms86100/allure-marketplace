@@ -118,6 +118,8 @@ export function OrderChat({
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
+      // Trigger push notification processing so the recipient gets notified
+      supabase.functions.invoke('process-notification-queue').catch(() => {});
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
