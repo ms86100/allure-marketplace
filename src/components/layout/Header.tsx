@@ -22,8 +22,9 @@ interface HeaderProps {
   className?: string;
 }
 
-function getGreeting(name?: string | null): string {
-  const hour = new Date().getHours();
+function getGreeting(name?: string | null, _hourKey?: number): string {
+  // Use IST for greeting regardless of device timezone
+  const hour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours();
   const firstName = name?.split(' ')[0] || '';
   const prefix = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   return firstName ? `${prefix}, ${firstName}` : prefix;
