@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface TopProduct {
   id: string;
