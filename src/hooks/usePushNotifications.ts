@@ -48,6 +48,20 @@ export function usePushNotificationsInternal() {
   const listenersReadyPromiseRef = useRef<Promise<void> | null>(null);
   // terminalStatusesRef removed — dynamic resolution via getTerminalStatuses() at event time
   const listenersResolveRef = useRef<(() => void) | null>(null);
+  const soundsEnabledRef = useRef(true);
+
+  // Fetch sounds preference on mount and when user changes
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('notification_preferences')
+      .select('sounds')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        soundsEnabledRef.current = data?.sounds !== false;
+      });
+  }, [user?.id]);
 
   // ── Set log user ──
   useEffect(() => {
