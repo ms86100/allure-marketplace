@@ -134,8 +134,10 @@ export function useRazorpay() {
         options.onFailure(response.error);
       });
 
-      // Save scroll position before locking body
-      document.body.dataset.scrollY = String(window.scrollY);
+      // Save scroll position and lock body in place
+      const scrollY = window.scrollY;
+      document.body.dataset.scrollY = String(scrollY);
+      document.body.style.top = `-${scrollY}px`;
       document.body.classList.add('razorpay-active');
       razorpay.open();
     } catch (error: any) {
