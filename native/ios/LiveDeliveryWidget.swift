@@ -196,9 +196,14 @@ struct LiveDeliveryWidget: Widget {
                         .rotationEffect(.degrees(-90))
                 }
             } minimal: {
+                let phase = OrderPhase.from(context.state.workflowStatus)
                 ZStack {
                     Circle()
-                        .fill(Color.white.opacity(0.15))
+                        .fill(Color.white.opacity(0.25))
+                        .overlay(
+                            Circle()
+                                .stroke(phase.accentColor.opacity(0.6), lineWidth: 1)
+                        )
                     Image("SocivaIcon")
                         .resizable()
                         .scaledToFill()
