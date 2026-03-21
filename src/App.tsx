@@ -298,9 +298,9 @@ function GlobalSellerAlert() {
     () => (isSeller && seller?.sellerProfiles ? seller.sellerProfiles.map(p => p.id) : []),
     [isSeller, seller?.sellerProfiles]
   );
-  const { pendingAlerts, dismiss, snooze } = useNewOrderAlert(sellerIds);
+  const { pendingAlerts, dismiss, dismissAll, snooze } = useNewOrderAlert(sellerIds);
   if (!identity) return null;
-  return <NewOrderAlertOverlay orders={pendingAlerts} onDismiss={dismiss} onSnooze={snooze} />;
+  return <NewOrderAlertOverlay orders={pendingAlerts} onDismiss={dismiss} onDismissAll={dismissAll} onSnooze={snooze} />;
 }
 
 class SafeSellerAlert extends React.Component<
