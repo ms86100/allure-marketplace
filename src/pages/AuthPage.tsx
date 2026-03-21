@@ -84,7 +84,7 @@ export default function AuthPage() {
   return (
     <div className="min-h-[100dvh] bg-gradient-to-b from-background to-secondary/20 overflow-y-auto">
       {/* Hero Banner */}
-      <div className="relative h-40 sm:h-56 overflow-hidden">
+      <div className="relative h-28 sm:h-40 md:h-56 overflow-hidden">
         <img src={authHero} alt="Community marketplace" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-background" />
         <div className="absolute bottom-6 left-5 right-5">

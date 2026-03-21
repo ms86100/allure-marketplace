@@ -683,3 +683,21 @@ body.razorpay-active > div[style*="z-index"] {
 .scroll-hint-arrow {
   animation: scrollHint 2s ease-in-out infinite;
 }
+
+/* P1-7: Global keyboard-aware scroll for form inputs */
+@supports (height: 100dvh) {
+  input:focus,
+  textarea:focus,
+  select:focus {
+    scroll-margin-bottom: 12rem;
+  }
+}
+
+/* Scrollbar-hide utility for horizontal tab scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

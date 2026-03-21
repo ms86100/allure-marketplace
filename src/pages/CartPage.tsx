@@ -62,7 +62,7 @@ export default function CartPage() {
 
   return (
     <AppLayout showHeader={false} showNav={false} showCart={false}>
-      <div className="pb-[22rem]">
+      <div className="pb-[26rem]">
         {/* Sticky Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></button>
@@ -303,9 +303,14 @@ export default function CartPage() {
           )
         )}
         <p className="text-[10px] text-muted-foreground text-center pt-1 px-4">Payments are processed by third-party providers and are not covered by Apple. <Link to="/terms" className="underline">Refund & Cancellation Policy</Link></p>
-        <div className="px-4 py-3 flex items-center gap-3">
-          <div className="flex-1"><p className="text-xs text-muted-foreground">Total</p><p className="text-lg font-bold tabular-nums">{c.formatPrice(c.finalAmount)}</p></div>
-          <Button className="px-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold" size="lg" onClick={() => c.setShowConfirmDialog(true)} disabled={c.isPlacingOrder || c.hasBelowMinimumOrder || c.noPaymentMethodAvailable || c.hasFulfillmentConflict || (c.fulfillmentType === 'delivery' && !c.selectedDeliveryAddress)}>{c.isPlacingOrder ? 'Placing...' : 'Place Order'}<ChevronRight size={18} className="ml-1" /></Button>
+        <div className="px-4 py-3">
+          {c.fulfillmentType === 'delivery' && !c.selectedDeliveryAddress && (
+            <p className="text-xs text-destructive font-medium text-center mb-2">Please select a delivery address above</p>
+          )}
+          <div className="flex items-center gap-3">
+            <div className="flex-1"><p className="text-xs text-muted-foreground">Total</p><p className="text-lg font-bold tabular-nums">{c.formatPrice(c.finalAmount)}</p></div>
+            <Button className="px-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold" size="lg" onClick={() => c.setShowConfirmDialog(true)} disabled={c.isPlacingOrder || c.hasBelowMinimumOrder || c.noPaymentMethodAvailable || c.hasFulfillmentConflict || (c.fulfillmentType === 'delivery' && !c.selectedDeliveryAddress)}>{c.isPlacingOrder ? 'Placing...' : 'Place Order'}<ChevronRight size={18} className="ml-1" /></Button>
+          </div>
         </div>
       </div>
 
