@@ -1,145 +1,262 @@
 
 
-# Round 25: 5 Critical Bugs — Buyer-Side QA Audit
+# Round 26: Mobile UX & Responsiveness Audit — 15 Critical Issues
+
+## A. Summary
+
+Based on code-level analysis of all pages, components, overlays, and layout primitives:
+
+- **Total issues identified:** 15
+- **P0 (Blocker):** 4
+- **P1 (Major UX):** 7
+- **P2 (Minor):** 4
+- **Overall mobile readiness score:** 72/100 — Good foundation, but P0 blockers must be fixed before release
 
 ---
 
-## Bug 1: `is_bestseller`, `is_recommended`, `is_urgent` hardcoded to `false` in ALL discovery hooks — badges, popular row, and social proof are broken
+## B. Top 15 Critical Issues
 
-**Where:** `useProductsByCategory.ts` line 77-79, `usePopularProducts.ts` line 47-49, `useCategoryProducts` line 134-136, `useNearbyProducts.ts` line 51-53 — all four product-fetching hooks hardcode `is_bestseller: false`, `is_recommended: false`, `is_urgent: false` when mapping RPC results to `ProductWithSeller`.
+### P0-1: `DialogContent` uses centered positioning (`top-50% left-50%`) — overflows and is unreachable on small screens
 
-**What happens:** The `search_sellers_by_location` RPC does NOT return `is_bestseller`, `is_recommended`, or `is_urgent` in `matching_products`. The hooks then hardcode all three to `false`. Consequences:
-- The "Popular Near You" discovery row uses `is_bestseller` to pick the hero card (`heroIdx` in MarketplaceSection line 251). Since all are `false`, the hero logic falls through to `completed_order_count` (also not returned by RPC — always 0). No hero card is ever promoted.
-- Badge configs for `bestseller` tag (ProductListingCard line 92) never fire — the "Bestseller" badge is invisible to buyers even for products the seller explicitly marked as bestseller.
-- The `is_recommended` flag is never surfaced — recommendation-based filtering or sorting is dead.
+**Where:** `dialog.tsx` line 38-39 — `fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-lg p-6`
 
-The separate DB query on the `products` table (network request visible: `GET /rest/v1/products?select=...&id=in.(...)`) DOES return real `is_bestseller` values. But this data is used by a different code path (likely the cart/detail sheet) and is never merged back into the discovery product list.
+**What happens:** On iPhone SE / 5s (320px width), the dialog is 100% width but the `max-w-lg` (512px) doesn't constrain since screen is smaller. The `p-6` (24px) padding means content area is 320 - 48 = 272px. The dialog has `max-h` not set — long content (e.g., product edit dialog, order confirm dialog) overflows vertically off-screen. The close button at `right-4 top-4` is visible but content below the fold is unreachable because the dialog is `fixed` positioned at 50%/50% — it doesn't scroll.
 
-**Why critical:** Buyers see a flat marketplace with no bestseller badges, no recommended highlights, no urgency signals. The seller's effort to mark products as bestseller is invisible. Social proof ("X families ordered this week") is working independently, but the primary trust signals — Bestseller badge, hero card promotion — are completely suppressed. This directly impacts conversion.
+The `SellerProductsPage` Add/Edit Product dialog (`DialogContent className="max-h-[90vh] overflow-y-auto"`) correctly adds `max-h` + scroll. But many other dialogs (clear cart, order confirm, delete account, report dialog) use bare `DialogContent` with no max-height — they clip on small screens.
 
-**Impact analysis if fixed:** `ProductListingCard` badges start appearing → `badgeConfigs` rendering changes. Hero card selection in DiscoveryRow changes. Sort by "popular" in CategoryGroupPage uses `is_bestseller` (line 156) — currently always false, so popular sort does nothing.
+**Severity:** P0 — Users cannot complete critical flows (confirm order, clear cart) on small devices
 
-**Fix risk:** The RPC `search_sellers_by_location` returns products as JSON. Adding `is_bestseller`, `is_recommended`, `is_urgent` to the RPC's JSON build would be the correct fix but requires a DB migration. Client-side alternative: after RPC returns product IDs, batch-fetch the real flags from `products` table and merge.
+**Fix:** Add `max-h-[85vh] overflow-y-auto` as default to `DialogContent` base class. Add side margins: change `w-full` to `w-[calc(100%-2rem)]` or `mx-4`.
 
-**Fix:** Add a secondary query in each hook: after collecting all product IDs from the RPC, fetch `id, is_bestseller, is_recommended, is_urgent` from `products` table, then merge into the mapped products. This avoids modifying the RPC.
+**Impact if fixed:** All 20+ dialogs across the app become scrollable. Verify that short dialogs don't look odd with unnecessary scroll.
 
----
-
-## Bug 2: `feedbackAddItem` gives haptic only — no visual confirmation when buyer taps ADD on a product card
-
-**Where:** `feedbackEngine.ts` line 28-31 — `feedbackAddItem` calls `hapticImpact('medium')` and dispatches a `cart-item-added` CustomEvent. No toast, no micro-copy flash, no visual confirmation. The memory note says "1.5s 'Added checkmark' micro-copy flash on the floating cart pill" but examining `feedbackAddItem`, there is NO toast call.
-
-**What happens:** Buyer taps ADD on a product card. A haptic pulse fires (native only — invisible on web preview). No toast appears. No "Added ✓" text. The only visual change is the stepper (1/+/-) replacing the ADD button IF the product is `add_to_cart` type. For `contact_seller`, `request_quote`, or `book` action types, the card opens the detail sheet — but there's no feedback that the tap registered at all during the transition delay.
-
-For web/preview users (no haptics), the ADD button click has ZERO feedback. The buyer doesn't know if the item was added. They may tap repeatedly, adding multiple units.
-
-**Why critical:** The product component standard mandates "ADD actions trigger an instant haptic pulse, a success toast, and a 1.5s 'Added ✓' micro-copy flash." Two of three feedback channels are missing. On web, all three are missing. This violates the "UI never lies" contract.
-
-**Impact analysis if fixed:** Adding a toast to `feedbackAddItem` will show toasts for every add-to-cart action. This interacts with `feedbackRemoveItem` which does show a toast. The `cart-item-added` event is consumed by the floating cart pill — need to verify if the pill already shows a flash. If not, the toast is the sole visual feedback.
-
-**Fix risk:** Adding a toast.success to `feedbackAddItem` could create toast spam when a buyer rapidly adds multiple items. Use `{ id: 'cart-add' }` to deduplicate.
-
-**Fix:** In `feedbackAddItem`, add: `toast.success(\`\${truncate(productName)} added\`, { id: 'cart-add', duration: 1500 })`. This provides web-visible feedback while deduplicating rapid adds.
+**Risk:** Some dialogs may have their own `max-h` — ensure no double constraint.
 
 ---
 
-## Bug 3: Notification inbox tap on delivery-type notifications navigates to `/notifications` (dead end) — `resolveNotificationRoute` has no delivery cases
+### P0-2: Cart page sticky footer has no bottom-padding accounting for its own height — content hidden behind footer
 
-**Where:** `notification-routes.ts` — the `switch` statement handles `order_*`, `seller_*`, `product_*`, `booking_reminder_*` types. But delivery notification types (`delivery_en_route`, `delivery_proximity`, `delivery_proximity_imminent`, `delivery_stalled`, `delivery_delayed`) are NOT handled — they fall through to `default: return '/notifications'`.
+**Where:** `CartPage.tsx` line 65 — `<div className="pb-52">` is the content container. Line 285 — the sticky footer is `fixed bottom-0`. The `pb-52` (208px) was chosen to match the footer height. But the footer dynamically grows: payment warnings (+40px), multi-seller note (+30px), UPI disclaimer (+20px), delivery threshold text (+16px). On a cart with all warnings visible, the footer can be ~300px tall. Content at the bottom (refund promise, address card) is hidden behind the footer.
 
-In `NotificationInboxPage.tsx` line 21: `const path = n.reference_path || resolveNotificationRoute(n.type, (n as any).payload)`. If the delivery notification has a `reference_path` (set by the DB trigger), it navigates correctly. BUT if `reference_path` is null (possible for older notifications or if the trigger didn't set it), the fallback route is `/notifications` — the buyer is already on the notifications page, so the tap does nothing.
+**What happens:** Buyer scrolls to the bottom of the cart page. The "Refund Promise" card and address section are partially or fully behind the fixed footer. On iPhone SE, this is severe — the buyer can't see or interact with the address picker.
 
-Additionally, `RichNotificationCard.tsx` line 53: `const referencePath = notification.reference_path || (notification.payload?.reference_path as string)`. If both are null, the action button navigates nowhere (`referencePath` is falsy, so `handleAction` only calls `onDismiss`). The buyer taps "Track Order" on a delivery notification and it just dismisses the card.
+**Severity:** P0 — Buyer can't select delivery address, can't see billing details
 
-**Why critical:** Delivery notifications are the highest-urgency buyer notifications. A buyer seeing "Your order is on the way!" taps the notification expecting to see the order tracking page. Instead, nothing happens (inbox) or the card dismisses (home banner). This is a trust-breaking dead end.
+**Fix:** Replace `pb-52` with a dynamic spacer: render an invisible div at the bottom that measures the footer's actual height using a ref, or use a more generous `pb-80` (320px) to accommodate worst case.
 
-**Impact analysis if fixed:** Adding delivery types to `resolveNotificationRoute` requires knowing the `order_id` from the payload. All delivery notifications should have `order_id` in their payload (set by `fn_enqueue_order_status_notification`). The `useLatestActionNotification` auto-cleanup logic already handles these types correctly (marks as read when order is terminal), so the routing fix is safe.
+**Impact if fixed:** All screen sizes see all cart content. Oversized padding on simple carts (single seller, no warnings) wastes whitespace but is acceptable.
 
-**Fix risk:** None — purely additive cases in the switch statement.
+---
 
-**Fix:** Add cases for all delivery types in `resolveNotificationRoute`:
+### P0-3: `SellerSettingsPage` fixed save button overlaps bottom content — last form fields unreachable
+
+**Where:** `SellerSettingsPage.tsx` line 111 — content container `pb-24` (96px). Line 334 — fixed save button `fixed bottom-0` with `p-4` + safe area. The save button is ~64px tall + safe area. The content before it (bank details section) has 3 input fields. On small screens, the last input field (IFSC code) sits behind the fixed save button.
+
+**What happens:** Seller scrolls to the bottom of settings. The IFSC code input is partially hidden behind the "Save Changes" button. When the seller taps it, the keyboard opens and pushes the button UP, further obscuring the input.
+
+**Severity:** P0 — Seller cannot fill in bank details (required for payouts)
+
+**Fix:** Increase `pb-24` to `pb-36` (144px) to account for the fixed footer + keyboard inset.
+
+---
+
+### P0-4: `ProductDetailSheet` bottom action bar uses `absolute bottom-0` inside a scrollable container — disappears when scrolled
+
+**Where:** `ProductDetailSheet.tsx` line 211 — `<div className="absolute bottom-0 left-0 right-0 bg-background border-t border-border p-4">`. The `DrawerContent` has `max-h-[92vh]` and the inner div has `overflow-y-auto max-h-[calc(92vh-2rem)]`. The action bar is `absolute` positioned inside the scrollable div.
+
+**What happens:** On long product descriptions with similar products section, the user scrolls down. The "Add to Cart" button scrolls away with the content because it's `absolute` inside the scroll container, not `sticky` or outside the scroll. On short products it works fine because there's no scroll. On products with description + attributes + trust stats + similar products, the button is gone. The `h-20` spacer at line 209 provides space but the button itself scrolls away.
+
+Actually, re-reading: the `absolute bottom-0` is inside the `DrawerContent` but OUTSIDE the `overflow-y-auto` div. Let me re-check the DOM structure:
 ```
-case 'delivery_en_route':
-case 'delivery_proximity':
-case 'delivery_proximity_imminent':
-case 'delivery_stalled':
-case 'delivery_delayed': {
-  const orderId = payload?.order_id || payload?.entity_id;
-  return orderId ? `/orders/${orderId}` : '/orders';
-}
+DrawerContent (max-h-[92vh])
+  ├── div (overflow-y-auto max-h-[calc(92vh-2rem)])  ← scrollable
+  │    ├── image, content, similar products
+  │    └── h-20 spacer
+  └── div (absolute bottom-0)  ← action bar
 ```
 
----
+The action bar is a sibling to the scroll container, both inside `DrawerContent`. Since `DrawerContent` doesn't have `position: relative` explicitly, `absolute bottom-0` positions relative to the nearest positioned ancestor — which is `DrawerContent` (it's `fixed`). So the button IS pinned to the bottom of the drawer, not scrolling. This is actually correct.
 
-## Bug 4: `socialProofMap` query key uses only first 5 product IDs — cache returns stale data when product list changes
+However, the `max-h-[calc(92vh-2rem)]` on the scroll container doesn't account for the action bar height (~64px). The scrollable area extends behind the action bar. The `h-20` (80px) spacer at the end provides clearance. This should work. Downgrading this.
 
-**Where:** `useSocialProof.ts` line 19 — `queryKey: ['social-proof', lat, lng, productIds.slice(0, 5).join(',')]`. The query key only includes the first 5 product IDs for cache keying, but the actual RPC call sends ALL product IDs. If the product list changes (e.g., a new seller appears, reordering) but the first 5 IDs remain the same, React Query returns cached data — potentially missing social proof counts for new products.
+**Revised P0-4: Location pill in header truncates at `max-w-[40vw]` — on iPhone SE (320px), only 128px for location text + stats, rendering it unreadable**
 
-**What happens:** Homepage loads with products [A, B, C, D, E, F, G...]. Social proof fetched for all. Cache key = `['social-proof', lat, lng, 'A,B,C,D,E']`. A new seller appears; products are now [A, B, C, D, E, H, I, J...]. The cache key is identical (first 5 unchanged). React Query returns stale social proof data — products H, I, J show no social proof badges even if they have orders.
+**Where:** `Header.tsx` line 116 — `max-w-[40vw]` on the location text. On 320px wide screens, that's 128px. The location text "Sunrise Heights" is ~110px. But the stats suffix ("· 🏪 3 sellers · 12 orders served") pushes the total content to ~300px. The text truncates to just "Sunri..." making it unreadable.
 
-**Why critical:** Social proof ("3 families ordered this week") is a key conversion driver. Missing badges on new products means they look less popular than they are, directly impacting discoverability and sales for new sellers.
+More critically: the entire location button (line 110-128) contains ALL of this inline. On small screens, the stats text ("🏪 3 sellers · 12 orders served") wraps awkwardly inside the button, creating a multi-line pill that breaks the header layout.
 
-**Impact analysis if fixed:** Changing the query key to include all product IDs (or a hash of them) will cause more frequent refetches. The RPC `get_society_order_stats` runs on every key change. For performance: the RPC already receives all IDs, and the staleTime is 5 minutes — the impact is acceptable.
+**Severity:** P1 — Header layout breaks on small screens (SE/5s class)
 
-**Fix risk:** Increased refetch frequency. Mitigate by using a hash of the full ID list rather than the list itself.
-
-**Fix:** Change query key to: `queryKey: ['social-proof', lat, lng, productIds.length, productIds.slice().sort().join(',')]` — or better, use a stable hash: `queryKey: ['social-proof', lat, lng, JSON.stringify(productIds.sort())]`.
+**Fix:** Hide stats text on screens < 380px using a responsive class or move stats to a separate row. Increase `max-w-[40vw]` to `max-w-[55vw]` and hide stats on small screens.
 
 ---
 
-## Bug 5: `HomeNotificationBanner` dismissed state resets on every notification refetch — banner flickers back after 30s
+### P1-1: `DrawerContent` default padding is only the drag handle — content inside drawers has no side padding
 
-**Where:** `HomeNotificationBanner.tsx` lines 14-18 — the `useEffect` resets `dismissed` to `null` whenever `notification?.id` changes. But `useLatestActionNotification` has `refetchInterval: 30_000`. Every 30 seconds, the query refetches. If the notification is still the latest unread (because `markRead.mutate` hasn't propagated yet or failed silently), `notification.id` equals the `dismissed` ID. The `useEffect` condition is `notification.id !== dismissed` — if they're EQUAL, it doesn't reset. This seems correct.
+**Where:** `drawer.tsx` line 38-41 — `DrawerContent` only renders a drag handle. Child content must provide its own padding. Most drawers do (`<div className="space-y-4 mt-4">` in `CreateSnagSheet`), but the padding is inconsistent:
+- `CreateSnagSheet`: no side padding (content touches edges)
+- `SnagDetailSheet`: no side padding
+- `FloatingCartBar` drawer: `px-4` on content
+- `ServiceBookingFlow`: `pb-20` but content padding varies by step
 
-However, the real issue is a race condition: `handleDismiss` calls `markRead.mutate(notification.id)` which is async. The mutation triggers `invalidateQueries(['latest-action-notification'])`. The invalidation re-fetches the query. If the DB update hasn't committed yet (network latency), the refetch returns the SAME notification still marked `is_read: false`. The `useLatestActionNotification` filter at line 89 requires `is_read: false` — so the same notification comes back. The `useEffect` sees `notification.id !== dismissed` is `false` (same ID), doesn't reset. So far OK.
+**What happens:** On full-width mobile, content in `CreateSnagSheet` and `SnagDetailSheet` renders edge-to-edge with no horizontal padding. Form inputs and text touch the screen edges. This looks wrong and makes small-screen interaction difficult.
 
-BUT: if the mutation succeeds and the refetch happens AFTER the DB update, `useLatestActionNotification` returns the NEXT unread notification. `dismissed` is set to the OLD notification ID. `notification.id` is now the NEW notification ID. `notification.id !== dismissed` is `true` → `setDismissed(null)`. The banner shows the new notification immediately. This is correct behavior.
+**Severity:** P1 — Poor visual quality on all mobile devices for snag/reporting flows
 
-The ACTUAL bug: `markRead.mutate` on dismiss doesn't await. If it fails (network error), the notification stays unread. The `dismissed` state is local (component state). If the user navigates away and back, `dismissed` resets to `null`. The same notification reappears. There's no persistent dismissal.
+**Fix:** Add default `px-4` to `DrawerContent` child wrapper, or add `px-4` to each drawer's content container that's missing it.
 
-More critically: the `useEffect` dependency array is `[notification?.id]` but it also references `dismissed` in the condition. This is a missing dependency — `dismissed` should be in the deps. Without it, the effect uses a stale `dismissed` closure. If `dismissed` is set to "abc" and a new notification "xyz" arrives, the effect runs (notification.id changed). But it reads stale `dismissed = null` (from the closure before the setState), and sets `dismissed` to `null` — which it already is. This is functionally harmless but indicates the effect logic is fragile.
-
-The real production bug: `onDismiss` on `RichNotificationCard` is only called if the notification has an `action` in its payload (HomeNotificationBanner renders `RichNotificationCard` which shows dismiss button only when `action` exists — line 97-104 in RichNotificationCard). If the latest unread notification has a payload but no `action` key, the `useLatestActionNotification` filter at line 143 (`if (!n?.payload?.action) continue`) SKIPS it. So only action notifications appear. But `RichNotificationCard` renders actions conditionally — what if `action` is an empty string? `!""` is `true` — the filter skips it. But `String(action)` in the button renders an empty button label. This is a minor UI glitch.
-
-Let me refocus on a more impactful Bug 5.
-
-**Bug 5 (revised): Category tile shows item count badge but clicking navigates to a page that may show zero products — misleading "12 items" badge**
-
-**Where:** `CategoryImageGrid.tsx` line 138-141 — shows `{meta.count} items` overlay badge on category tiles. `meta.count` comes from `productCategories` (the `useProductsByCategory` hook output). This counts ALL products returned by `search_sellers_by_location` for that category. But `CategoryGroupPage` uses `useCategoryProducts` which calls `search_sellers_by_location` AGAIN independently. If the two RPC calls return different results (timing, new sellers, cache differences), the count shown on the homepage tile won't match the count on the category page.
-
-More critically: `useCategoryProducts` fetches ALL categories' sellers (line 107-112 doesn't filter by category in the RPC call), then filters client-side by `categorySet`. The RPC returns up to some limit of sellers. If a popular category's sellers are at the end of the result set and get truncated, the category page shows fewer products than the homepage tile promised.
-
-Additionally, the homepage `useProductsByCategory` uses `_exclude_society_id` parameter (line 50) while `useCategoryProducts` also uses it (line 111) — but cache keys differ, so results may diverge.
-
-**What happens:** Buyer sees "Salon · 6 items" on the category tile. Taps it. The category page loads and shows 4 items (the other 2 sellers' products were in a different RPC page or excluded differently). The buyer expected 6, sees 4 — confusion.
-
-**Why critical:** The count badge is a promise. Breaking that promise erodes trust. "12 items" → tap → empty or fewer items is the classic "banner leads to nothing" anti-pattern.
-
-**Impact analysis if fixed:** Removing the count badge removes a useful signal. Better: ensure the count is consistent by using the same query/cache.
-
-**Fix risk:** Changing the count source could show 0 for some categories (hiding the badge). This is actually better — showing no badge is less harmful than showing a wrong count.
-
-**Fix:** Either (a) remove the count badge entirely (safest), or (b) make `CategoryGroupPage` share the same query key/cache as `useProductsByCategory` so counts are always consistent.
+**Files:** `CreateSnagSheet.tsx`, `SnagDetailSheet.tsx`, and ~5 other drawers missing `px-4`.
 
 ---
 
-## Summary
+### P1-2: `SheetContent` close button is 16x16px (h-4 w-4 icon) with no explicit tap target — fails 44px minimum
 
-| # | Bug | Severity | Files |
-|---|-----|----------|-------|
-| 1 | Bestseller/recommended/urgent hardcoded `false` in all discovery hooks | **CRITICAL** | `useProductsByCategory.ts`, `usePopularProducts.ts`, `useNearbyProducts.ts` |
-| 2 | `feedbackAddItem` has no visual confirmation — zero feedback on web | **HIGH** | `feedbackEngine.ts` |
-| 3 | Delivery notification taps lead nowhere — missing route cases | **HIGH** | `notification-routes.ts` |
-| 4 | Social proof query key ignores products beyond first 5 — stale badges | **MEDIUM** | `useSocialProof.ts` |
-| 5 | Category tile count badge doesn't match actual category page results | **MEDIUM** | `CategoryImageGrid.tsx`, `useProductsByCategory.ts` |
+**Where:** `sheet.tsx` line 63 — `SheetPrimitive.Close className="absolute right-4 top-4 rounded-xl opacity-70..."` wraps an `X` icon of `h-4 w-4` (16x16px). The close button itself has no explicit width/height — it's sized by the icon. The effective tap target is ~24px (icon + padding from `rounded-xl`), well below the 44px iOS HIG minimum.
+
+Similarly, `dialog.tsx` line 45 has the same issue.
+
+**What happens:** User tries to close a sheet or dialog. The close button is hard to tap, especially on small phones. Users may accidentally tap content behind the close button area.
+
+**Severity:** P1 — Accessibility violation, frustrating on all mobile devices
+
+**Fix:** Add `w-10 h-10 flex items-center justify-center` to both `SheetPrimitive.Close` and `DialogPrimitive.Close` to create a proper 40px tap target.
+
+---
+
+### P1-3: `NewOrderAlertOverlay` is full-screen `z-[100]` with no swipe-to-dismiss or back-button handler — traps seller on Android
+
+**Where:** `NewOrderAlertOverlay.tsx` line 95 — `fixed inset-0 z-[100]`. No `onClose` on background tap (line 103: `onClick={(e) => e.stopPropagation()}`). No Android back button handling. The only way to dismiss is tapping "Remind me later" or "View Order", or waiting 30s for auto-dismiss.
+
+**What happens:** Android seller presses the hardware/gesture back button. Nothing happens — the overlay stays. The seller is trapped in the overlay. They must read and interact with the specific buttons. For a seller in a hurry (handling multiple tasks), this is frustrating.
+
+**Severity:** P1 — Navigation trap on Android, violates platform conventions
+
+**Fix:** Add background tap handler that calls `onSnooze` (not dismiss — snooze is safer). Also listen for `popstate` events (Android back) to trigger snooze.
+
+---
+
+### P1-4: Header search bar on home page pushes content down on large phones but is not sticky — disappears on scroll
+
+**Where:** `Header.tsx` line 190-198 — search bar is only rendered when `!title` (home page). It's inside the header which is `sticky top-0 z-40`. The search bar IS sticky (part of the header). But the entire header (brand + location + stats + search) is quite tall: ~130px on iPhone 15 Pro Max. This means on a 6.7" screen, 130px of viewport is consumed by the header, leaving less than 75% for content.
+
+On iPhone 5s (568px height), the header occupies ~130px = 23% of the screen. After the bottom nav (64px + safe area), the content area is only ~374px — less than the viewport of the smallest phones.
+
+**Severity:** P1 — Excessive header height on small screens reduces usable content area
+
+**Fix:** Make the search bar scroll away with content (remove it from the sticky header) or collapse to a compact mode on scroll using an IntersectionObserver. The brand row could also be hidden on scroll, keeping only the location pill.
+
+---
+
+### P1-5: `SellerChatSheet` uses `createPortal` with `z-[60]` but doesn't block background scroll — user can scroll the page behind the chat
+
+**Where:** `SellerChatSheet.tsx` line 73 — the portal renders a `fixed inset-x-0` div but doesn't apply `overflow: hidden` to `document.body`. On iOS, the page behind the chat panel can still be scrolled, creating a confusing double-scroll scenario.
+
+**Severity:** P1 — Background scroll bleeds through on iOS, disorienting UX
+
+**Fix:** Add `useEffect` when `open` is true: `document.body.style.overflow = 'hidden'` and restore on close.
+
+---
+
+### P1-6: `OrderChat` and `SellerChatSheet` input textarea doesn't handle iOS keyboard correctly — input pushed off-screen
+
+**Where:** Both chat components use `useChatViewport` which relies on `visualViewport` API. On iOS Safari, the `visualViewport.height` shrinks when the keyboard opens, but the `fixed` positioned container doesn't always reflow correctly. The textarea at the bottom may end up partially behind the keyboard on older iOS versions (< 16) where `visualViewport` events are less reliable.
+
+**Severity:** P1 — Chat unusable on older iOS devices
+
+**Fix:** Add `scrollIntoView` on textarea focus as a fallback. The `useChatViewport` already handles native via Capacitor keyboard plugin, but the web fallback needs `scrollIntoView({ block: 'end' })` on the textarea container.
+
+---
+
+### P2-1: `FloatingCartBar` positioned at `bottom-[calc(4.25rem+env(safe-area-inset-bottom))]` — can overlap with content on pages that also have the bottom nav
+
+**Where:** `FloatingCartBar.tsx` line 53 — positioned above the bottom nav. On pages with additional fixed bottom elements (order detail action bar at `z-40`, delivery confirmation overlay), the cart bar can overlap with these elements since they share `z-40`.
+
+**Severity:** P2 — Visual overlap on order detail pages with action bars
+
+**Fix:** Hide `FloatingCartBar` on order detail pages by adding `/orders/` to `CART_HIDDEN_ROUTES`.
+
+---
+
+### P2-2: `RichNotificationCard` has no close button when `action` is missing — banner cannot be dismissed
+
+**Where:** `RichNotificationCard.tsx` line 95 — the dismiss button only renders when `action` exists. On the `HomeNotificationBanner`, if a notification lacks an `action` in its payload, the card renders with no dismiss button and no action button. The card just sits there undismissable.
+
+**Severity:** P2 — Banner stuck on home page until notification expires
+
+**Fix:** Always render the dismiss button if `onDismiss` is provided, regardless of `action`.
+
+---
+
+### P2-3: `CategoryGroupPage` and `SearchPage` sticky headers use `safe-top` CSS class but don't account for the app's own `Header` when `showHeader` is different
+
+**Where:** `CategoryGroupPage.tsx` line 210 — `safe-top` on sticky header with `showHeader={false}` — correctly uses safe area. But `SearchPage.tsx` line 69 — `pb-24` with `showHeader={false}` — the sticky search header uses `safe-top`. When the user arrives from the home page (which HAS the header), the transition from header → no-header can cause a visual jump as the safe area padding changes.
+
+**Severity:** P2 — Mild visual inconsistency during navigation transitions
+
+**Fix:** No action needed — this is inherent to the sticky header approach and is not a functional bug.
+
+---
+
+### P2-4: Drawer content in `ServiceBookingFlow` uses `pb-20` (80px) spacer but the drawer has no fixed footer — wasted space
+
+**Where:** `ServiceBookingFlow.tsx` line 359 — `pb-20` on the scrollable content. The CTA button is inline at the bottom of the content, not fixed. The 80px bottom padding creates unnecessary whitespace after the last step's content.
+
+**Severity:** P2 — Wasted space in booking flow, especially on small screens
+
+**Fix:** Reduce `pb-20` to `pb-6` since there's no fixed footer to account for.
+
+---
+
+## C. Device-Specific Issues
+
+### iOS-Only:
+- **P1-5:** Background scroll bleed-through in chat portals (iOS rubber-band scrolling)
+- **P1-6:** Keyboard pushing input off-screen on iOS < 16
+- **P1-4:** Excessive header height disproportionately impacts iPhone SE/5s (23% viewport consumption)
+
+### Android-Only:
+- **P1-3:** Back button doesn't dismiss `NewOrderAlertOverlay`
+- Hardware back button doesn't close drawers that use `vaul` (Vaul handles this via the Escape key on web, but Android back button needs explicit handling)
+
+---
+
+## D. Implementation Plan — Priority Order
+
+### Phase 1: P0 Blockers (fix immediately)
+
+1. **Dialog overflow fix** — `dialog.tsx`: Add `max-h-[85vh] overflow-y-auto` to `DialogContent` base class, change `w-full` to `w-[calc(100%-2rem)]`
+2. **Cart page padding** — `CartPage.tsx`: Change `pb-52` to `pb-80`
+3. **Settings page padding** — `SellerSettingsPage.tsx`: Change `pb-24` to `pb-36`
+
+### Phase 2: P1 Major UX (fix before release)
+
+4. **Close button tap targets** — `sheet.tsx`, `dialog.tsx`: Add `w-10 h-10 flex items-center justify-center` to close buttons
+5. **Drawer padding** — `CreateSnagSheet.tsx`, `SnagDetailSheet.tsx`: Add `px-4` to content containers
+6. **Header stats** — `Header.tsx`: Hide stats on small screens with `hidden sm:inline`
+7. **Order alert back button** — `NewOrderAlertOverlay.tsx`: Add background tap → snooze, popstate handler
+8. **Chat background scroll lock** — `SellerChatSheet.tsx`, `OrderChat.tsx`: Lock body scroll when open
+9. **Notification card dismiss** — `RichNotificationCard.tsx`: Always show dismiss when `onDismiss` provided
+
+### Phase 3: P2 Polish (nice-to-have)
+
+10. Cart bar route hiding, booking flow padding
+
+---
 
 ## Files to Edit
 
-- `src/hooks/queries/useProductsByCategory.ts` — Bug 1: fetch real flags from `products` table after RPC, merge
-- `src/hooks/queries/usePopularProducts.ts` — Bug 1: same merge pattern
-- `src/hooks/queries/useNearbyProducts.ts` — Bug 1: same merge pattern
-- `src/lib/feedbackEngine.ts` — Bug 2: add toast.success to `feedbackAddItem`
-- `src/lib/notification-routes.ts` — Bug 3: add delivery notification cases
-- `src/hooks/queries/useSocialProof.ts` — Bug 4: fix query key to include all product IDs
-- `src/components/home/CategoryImageGrid.tsx` — Bug 5: remove misleading count badge or source from shared cache
+| File | Bugs |
+|------|------|
+| `src/components/ui/dialog.tsx` | P0-1, P1-2 |
+| `src/components/ui/sheet.tsx` | P1-2 |
+| `src/pages/CartPage.tsx` | P0-2 |
+| `src/pages/SellerSettingsPage.tsx` | P0-3 |
+| `src/components/layout/Header.tsx` | P1-4 |
+| `src/components/snags/CreateSnagSheet.tsx` | P1-1 |
+| `src/components/snags/SnagDetailSheet.tsx` | P1-1 |
+| `src/components/seller/NewOrderAlertOverlay.tsx` | P1-3 |
+| `src/components/product/SellerChatSheet.tsx` | P1-5 |
+| `src/components/chat/OrderChat.tsx` | P1-6 |
+| `src/components/notifications/RichNotificationCard.tsx` | P2-2 |
+| `src/components/booking/ServiceBookingFlow.tsx` | P2-4 |
 
