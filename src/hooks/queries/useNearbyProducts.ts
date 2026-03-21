@@ -52,7 +52,7 @@ export function useNearbyProducts() {
             contact_phone: p.contact_phone || null,
             mrp: p.mrp || null,
             discount_percentage: p.discount_percentage || null,
-            seller_name: seller.business_name || 'Seller',
+            seller_name: seller.business_name || '',
             seller_rating: seller.rating || 0,
             fulfillment_mode: null,
             delivery_note: null,
