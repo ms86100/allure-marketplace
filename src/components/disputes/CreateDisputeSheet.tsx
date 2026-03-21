@@ -36,7 +36,7 @@ export function CreateDisputeSheet({ open, onOpenChange, onCreated }: Props) {
     const validation = validateForm(disputeSchema, { category, description, is_anonymous: isAnonymous });
     if (!validation.success) {
       const firstError = Object.values((validation as { success: false; errors: Record<string, string> }).errors)[0];
-      toast({ title: 'Validation error', description: firstError as string, variant: 'destructive' });
+      toast.error(firstError as string);
       return;
     }
 
