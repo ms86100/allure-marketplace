@@ -78,7 +78,7 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
       return;
     }
     if (!profile?.society_id) {
-      toast({ title: 'You must belong to a society', variant: 'destructive' });
+      toast.error('You must belong to a society');
       return;
     }
     if (category === 'poll') {
