@@ -38,6 +38,26 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Bug 5 fix: Recover stuck notifications — reset items stuck in 'processing' for > 3 min
+    // or stuck in 'pending' for > 5 min (missed by both real-time trigger and cron)
+    try {
+      const { data: unstuck, error: unstuckErr } = await supabase
+        .from("notification_queue")
+        .update({ status: "pending" })
+        .eq("status", "processing")
+        .lt("created_at", new Date(Date.now() - 3 * 60 * 1000).toISOString())
+        .select("id");
+
+      if (unstuck && unstuck.length > 0) {
+        console.log(`[PNQ] Recovered ${unstuck.length} stuck 'processing' notifications`);
+      }
+      if (unstuckErr) {
+        console.warn(`[PNQ] Stuck recovery error: ${unstuckErr.message}`);
+      }
+    } catch (e) {
+      console.warn(`[PNQ] Stuck recovery exception: ${e}`);
+    }
+
     // Atomically claim pending notifications (prevents duplicate processing)
     const { data: pending, error: fetchError } = await supabase
       .rpc("claim_notification_queue", { batch_size: 50 });
@@ -51,7 +71,7 @@ Deno.serve(async (req) => {
     }
 
     if (!pending || pending.length === 0) {
-      return new Response(JSON.stringify({ processed: 0, retried: 0, dead_lettered: 0 }), {
+      return new Response(JSON.stringify({ processed: 0, retried: 0, dead_lettered: 0, recovered: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
