@@ -374,15 +374,29 @@ export function useCartPage() {
 
   const handlePlaceOrder = useSubmitGuard(handlePlaceOrderInner, 3000, 0);
 
-  const handleRazorpaySuccess = async (_paymentId: string) => {
+  const handleRazorpaySuccess = async (paymentId: string) => {
     setShowRazorpayCheckout(false);
     const targetOrderId = pendingOrderIds[0];
+
+    // Bug 5 fix: Immediately store payment ID server-side before polling
+    if (targetOrderId && user?.id) {
+      try {
+        for (const oid of pendingOrderIds) {
+          await supabase.from('orders')
+            .update({ razorpay_payment_id: paymentId } as any)
+            .eq('id', oid)
+            .eq('buyer_id', user.id)
+            .eq('payment_status', 'pending');
+        }
+      } catch (err) { console.error('Failed to store payment ID client-side:', err); }
+    }
+
     if (targetOrderId) {
       let confirmed = false;
       for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1500)); const { data } = await supabase.from('orders').select('payment_status').eq('id', targetOrderId).single(); if (data?.payment_status === 'paid') { confirmed = true; break; } }
       if (!confirmed) {
         toast.info('Payment is being verified. Your order will update shortly.', { id: 'razorpay-verifying' });
-        // Do NOT clear cart — payment unconfirmed. Navigate to order detail so buyer can track status.
+        // Do NOT clear cart — payment unconfirmed. Navigate so buyer can track status.
         clearPaymentSession();
         navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
         setPendingOrderIds([]);
