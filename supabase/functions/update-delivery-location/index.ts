@@ -482,7 +482,7 @@ serve(async (req) => {
             .eq('user_id', buyerId)
             .eq('type', 'delivery_proximity_imminent')
             .eq('reference_path', `/orders/${assignment.order_id}`)
-            .gte('created_at', thirtySecsAgoImm);
+            .gte('created_at', threeMinAgoImm);
 
           if (!imminentCount || imminentCount === 0) {
             await supabase.from('notification_queue').insert({
