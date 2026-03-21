@@ -140,7 +140,7 @@ export function RazorpayCheckout({
                 </p>
                 <div className="flex items-center justify-center gap-2 mt-3">
                   <img src="https://razorpay.com/assets/razorpay-glyph.svg" alt="Razorpay" className="h-4" />
-                  <span className="text-xs text-muted-foreground">UPI · Cards · Wallets · Netbanking</span>
+                  <span className="text-xs text-muted-foreground">UPI · Cards · Netbanking · Wallets</span>
                 </div>
               </div>
 
