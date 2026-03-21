@@ -66,7 +66,7 @@ export function usePopularProducts(limit = 12) {
       }
 
       // Sort: bestsellers first, then by name; limit
-      return products.slice(0, limit);
+      return mergeProductFlags(products.slice(0, limit));
     },
     enabled: !!(lat && lng),
     staleTime: 5 * 60 * 1000,
