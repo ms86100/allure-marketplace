@@ -151,10 +151,20 @@ export function useRazorpay() {
         },
         config: {
           display: {
+            blocks: {
+              upi: {
+                name: 'Pay via UPI',
+                instruments: [
+                  { method: 'upi', flows: ['intent'], apps: ['google_pay'] },
+                  { method: 'upi', flows: ['intent'], apps: ['phonepe'] },
+                  { method: 'upi', flows: ['intent'], apps: ['paytm'] },
+                ],
+              },
+            },
+            sequence: ['block.upi'],
             preferences: {
               show_default_blocks: true,
             },
-            sequence: ['block.upi', 'block.card', 'block.nb', 'block.wallet'],
           },
         },
         handler: function (response: any) {
