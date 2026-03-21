@@ -228,7 +228,7 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
   return (
     <div>
       {/* Buyer filter chips */}
-      {type === 'buyer' && orders.length > 3 && (
+      {type === 'buyer' && (
         <div className="flex gap-2 mb-3 overflow-x-auto scrollbar-hide">
           {(['all', 'active', 'completed', 'cancelled'] as const).map(f => (
             <button
