@@ -437,6 +437,12 @@ export function useCartPage() {
     toast.error('Payment was not completed. Your order has been cancelled. You can try again.', { id: 'razorpay-failed' });
   };
 
+  // Bug 4 fix: Dismiss handler — closes UI without cancelling orders
+  const handleRazorpayDismiss = () => {
+    setShowRazorpayCheckout(false);
+    // Orders stay pending — user can retry by tapping Place Order again
+  };
+
   // ── UPI completion guard: only ONE of success/failed can execute per session ──
   const upiCompletionRef = useRef(false);
 
