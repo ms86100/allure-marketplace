@@ -181,7 +181,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (!user) { toast.error('Please sign in to add items to cart', { id: 'cart-sign-in' }); return; }
     if (addItemLocksRef.current.has(product.id)) return;
     addItemLocksRef.current.add(product.id);
-    setPendingMutations(c => c + 1);
 
     try {
       const pActionType = (product as any).action_type;
@@ -196,6 +195,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         availability = computeStoreStatus(sellerSnapshot.availability_start, sellerSnapshot.availability_end, sellerSnapshot.operating_days, sellerSnapshot.is_available ?? true);
       }
       if (availability.status !== 'open') { const msg = formatStoreClosedMessage(availability); toast.error(msg || 'This store is currently closed. Please try again later.', { id: 'cart-store-closed' }); return; }
+
+      // Committed to mutation — track it
+      setPendingMutations(c => c + 1);
 
       // Cancel + snapshot + optimistic
       await cancelCartQueries();
