@@ -82,7 +82,16 @@ export function BrowsingLocationProvider({ children }: { children: React.ReactNo
   const [pendingLocationChange, setPendingLocationChange] = useState<BrowsingLocation | null>(null);
   const previousLocationRef = useRef<BrowsingLocation | null>(null);
 
-  const invalidateDiscovery = useCallback(() => {
+  // Bug 4 fix: Clear stale GPS override when user changes (shared device)
+  useEffect(() => {
+    if (!user?.id) return;
+    const storedUserId = loadStoredUserId();
+    if (storedUserId && storedUserId !== user.id) {
+      setOverride(null);
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [user?.id]);
+
     queryClient.invalidateQueries({ queryKey: ['store-discovery'] });
     queryClient.invalidateQueries({ queryKey: ['trending-products'] });
     queryClient.invalidateQueries({ queryKey: ['popular-products'] });
