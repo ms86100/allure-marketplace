@@ -20,6 +20,39 @@ function getCategoryConfig(slug: string, categories: CategoryConfig[]): Category
   return categories.find(c => c.category === slug);
 }
 
+/** RFC 4180-aware CSV line parser — handles quoted fields with commas and escaped quotes */
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
 export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfig[], onSuccess: () => void, onClose: () => void) {
   const [rows, setRows] = useState<BulkRow[]>([{ ...EMPTY_ROW, category: allowedCategories[0]?.category || '' }]);
   const [isSaving, setIsSaving] = useState(false);
