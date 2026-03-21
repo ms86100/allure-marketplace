@@ -1,35 +1,64 @@
 
 
-# Clean Up Workflow Manager to Match Supported Workflows
+# Restructure Workflow Manager — Group by 4 Workflow Types
 
 ## Problem
-The workflow manager shows 6 transaction types (`cart_purchase`, `seller_delivery`, `self_fulfillment`, `service_booking`, `request_service`, `contact_enquiry`), but the system only supports 4 primary workflows mapped from UI buttons:
+The workflow manager currently shows a flat list of every `parent_group × transaction_type` combination (14+ rows). The user expects to see only the 4 supported workflow types, with parent-group-specific overrides nested underneath.
 
-| UI Button | Workflow |
-|---|---|
-| Schedule Visit / Bookable Service | **Service Booking** |
-| Contact Only | **Contact Inquiry** |
-| Request Call / Request Service | **Request Service** |
-| Buy Now / Add to Cart | **Cart Purchase** |
+## Current state (from screenshots)
+- Default / Cart Purchase
+- Default / Contact Enquiry
+- Default / Request Service
+- Default / Service Booking
+- Domestic Help / Service Booking
+- Education Learning / Request Service
+- Education Learning / Service Booking
+- Events / Service Booking
+- Home Services / Service Booking
+- Personal Care / Service Booking
+- Pets / Service Booking
+- Professional / Service Booking
 
-`seller_delivery` and `self_fulfillment` are fulfillment sub-variants of Cart Purchase that `resolveTransactionType()` routes to at runtime. They should not appear as standalone workflows in the admin UI.
+## Proposed UI
 
-## Changes
+```text
+┌─────────────────────────────────────────────┐
+│ 🔀 Cart Purchase          10 steps          │
+│    Default                                   │
+├─────────────────────────────────────────────┤
+│ 🔀 Contact Enquiry        4 steps           │
+│    Default                                   │
+├─────────────────────────────────────────────┤
+│ 🔀 Request Service        6 steps           │
+│    Default · Education Learning (8 steps)    │
+├─────────────────────────────────────────────┤
+│ 🔀 Service Booking        5 steps           │
+│    Default · Domestic Help · Education       │
+│    Learning · Events · Home Services ·       │
+│    Personal Care · Pets · Professional       │
+│    (7 overrides)                             │
+└─────────────────────────────────────────────┘
+```
 
-### 1. `src/components/admin/workflow/types.ts`
-Remove `seller_delivery` and `self_fulfillment` from `TRANSACTION_TYPES`. This hides them from Create and Clone dialogs.
+Each card is **one of the 4 workflow types**, grouped by `transaction_type`. The `default` parent_group is the primary entry. Parent-group overrides are shown as compact badges/chips below. Clicking the card opens the default workflow; clicking an override chip opens that specific variant.
 
-### 2. `src/components/admin/AdminWorkflowManager.tsx`
-Filter the workflow list to only show the 4 supported transaction types. Add an info note explaining that fulfillment sub-variants (seller_delivery, self_fulfillment) are auto-derived from Cart Purchase at runtime.
+## Changes — 1 file
 
-### 3. DB cleanup (migration)
-Delete orphan `seller_delivery` and `self_fulfillment` flows from `category_status_flows` **if** they are identical to `cart_purchase` flows (just with extra steps). Or keep them in DB but hidden from admin UI — need to verify first.
+### `src/components/admin/AdminWorkflowManager.tsx`
 
-### Pre-check needed
-Before deleting DB rows, verify whether `seller_delivery` and `self_fulfillment` flows have meaningfully different steps from `cart_purchase`. If they do, they must stay in DB (the runtime routing depends on them) — we just hide them from the admin workflow manager list.
+1. **Group workflows by `transaction_type`** instead of rendering a flat list. Create a map: `transaction_type → WorkflowGroup[]`, with `default` sorted first.
 
-## Impact
-- Admin workflow manager only shows 4 clean workflow types
-- Create/Clone dialogs only offer the 4 supported types
-- Runtime routing via `resolveTransactionType()` continues to work unchanged (DB rows stay if needed)
+2. **Render 4 cards** (one per transaction_type). Each card shows:
+   - Transaction type as the primary title (e.g., "Cart Purchase")
+   - Default workflow step count
+   - Override chips for non-default parent_groups (e.g., "Domestic Help · 10 steps")
+   
+3. **Click behavior**:
+   - Clicking the card body → opens the `default` parent_group editor
+   - Clicking an override chip → opens that specific parent_group editor
+   - Clone/New buttons remain as-is
+
+4. **"+ New Workflow" dialog** stays the same — it creates a new parent_group override for one of the 4 types.
+
+No database changes needed.
 
