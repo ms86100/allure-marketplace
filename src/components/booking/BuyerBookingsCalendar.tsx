@@ -28,7 +28,8 @@ const LOCATION_ICONS: Record<string, typeof MapPin> = {
 
 function getCountdownText(booking: BuyerBooking): string | null {
   if (!booking.booking_date || !booking.start_time) return null;
-  const appointmentTime = new Date(`${booking.booking_date}T${booking.start_time}`);
+  // Parse as IST (+05:30) since booking dates/times are stored in IST
+  const appointmentTime = new Date(`${booking.booking_date}T${booking.start_time}+05:30`);
   if (isPast(appointmentTime)) return null;
 
   const hoursUntil = differenceInHours(appointmentTime, new Date());
