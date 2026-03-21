@@ -43,7 +43,9 @@ export function useBuyerOrderAlerts() {
         },
         (payload) => {
           const newStatus = (payload.new as any)?.status;
-          if (!newStatus || newStatus === 'pending') return;
+          const oldStatus = (payload.old as any)?.status;
+          // Only react to actual status changes, not internal field updates
+          if (!newStatus || newStatus === 'pending' || newStatus === oldStatus) return;
 
           // Native haptic feedback
           const hapticType = HAPTIC_MAP[newStatus] ?? 'success';

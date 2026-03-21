@@ -17,6 +17,8 @@ export function useAppLifecycle() {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['active-orders-strip'] });
       queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
       queryClient.invalidateQueries({ queryKey: ['seller-orders'] });
       queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['cart-items'] });

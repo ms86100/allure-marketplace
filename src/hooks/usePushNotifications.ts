@@ -311,6 +311,9 @@ export function usePushNotificationsInternal() {
       cleanupListeners.push(() => errListener.remove());
 
       // Listen for foreground notifications
+      // Dedup map: orderId-status → timestamp, prevents double haptic from realtime + push
+      const recentHaptics = new Map<string, number>();
+
       const fgListener = await PushNotifications.addListener('pushNotificationReceived', (notification: any) => {
         if (instanceId !== activeInstanceId) return;
         pushLog('info', 'FOREGROUND_NOTIFICATION', {
@@ -323,11 +326,8 @@ export function usePushNotificationsInternal() {
         const orderId = data?.orderId ?? data?.order_id ?? data?.entity_id;
 
         // CRITICAL: Dispatch terminal sync BEFORE suppression check
-        // Terminal pushes must always trigger state reconciliation even if LA is tracking
-        // DB-driven: use is_terminal flag from push payload, or check cached terminal set
         const pushStatus = data?.status;
         const isTerminalPush = data?.is_terminal === 'true';
-        // Dynamic resolution: call getTerminalStatuses() at event time (returns from cache in <1ms when warm)
         let isTerminal = isTerminalPush;
         if (!isTerminal && pushStatus) {
           getTerminalStatuses().then(terminalSet => {
@@ -346,18 +346,47 @@ export function usePushNotificationsInternal() {
           }));
         }
 
-        // Suppress duplicate alert if Live Activity is already tracking this order
+        // Suppress if Live Activity is tracking
         if (orderId && LiveActivityManager.isTracking(orderId)) {
           pushLog('info', 'FOREGROUND_SUPPRESSED_LA_ACTIVE', { orderId });
           return;
         }
 
+        // Suppress self-action: if buyer is viewing this order page, skip sound/toast
+        const currentPath = window.location.hash || window.location.pathname;
+        if (orderId && currentPath.includes(`/orders/${orderId}`)) {
+          pushLog('info', 'FOREGROUND_SUPPRESSED_SELF_ACTION', { orderId });
+          return;
+        }
+
+        // Deduplicate haptics: skip if realtime already triggered within 3s
+        const dedupKey = orderId && pushStatus ? `${orderId}-${pushStatus}` : '';
+        const now = Date.now();
+        if (dedupKey) {
+          const lastHaptic = recentHaptics.get(dedupKey);
+          if (lastHaptic && now - lastHaptic < 3000) {
+            pushLog('info', 'HAPTIC_DEDUP_SKIP', { dedupKey });
+            // Still show toast but skip haptic + sound
+            const toastOpts: Record<string, any> = { description: notification?.body };
+            if (orderId && pushStatus) toastOpts.id = `order-${orderId}-${pushStatus}`;
+            toast(notification?.title ?? 'New Notification', toastOpts);
+            return;
+          }
+          recentHaptics.set(dedupKey, now);
+          // Cleanup old entries
+          if (recentHaptics.size > 20) {
+            for (const [k, v] of recentHaptics) {
+              if (now - v > 10000) recentHaptics.delete(k);
+            }
+          }
+        }
+
         hapticNotification('success');
 
-        // Play a short alert beep via Web Audio API (no media session / no playback controls)
+        // Play a short alert beep via Web Audio API
         try {
           const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-          const now = ctx.currentTime;
+          const audioNow = ctx.currentTime;
           for (let i = 0; i < 3; i++) {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
@@ -365,17 +394,15 @@ export function usePushNotificationsInternal() {
             gain.connect(ctx.destination);
             osc.frequency.value = i % 2 === 0 ? 880 : 660;
             osc.type = 'sine';
-            const t = now + i * 0.15;
+            const t = audioNow + i * 0.15;
             gain.gain.setValueAtTime(0.18, t);
             gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
             osc.start(t);
             osc.stop(t + 0.15);
           }
-          // Auto-close context after sound finishes
           setTimeout(() => ctx.close().catch(() => {}), 600);
         } catch {}
 
-        // Build a unique toast ID for order-related notifications to deduplicate with realtime alerts
         const toastOptions: Record<string, any> = {
           description: notification?.body,
         };
