@@ -121,7 +121,10 @@ export function useCartPage() {
   const acceptsCod = sellerGroups.length > 1
     ? sellerGroups.every(g => g.items[0]?.product?.seller?.accepts_cod ?? true)
     : (firstSeller?.accepts_cod ?? true);
-  const acceptsUpi = sellerGroups.length <= 1 && !!(firstSeller as any)?.accepts_upi && !!(firstSeller as any)?.upi_id;
+  // When Razorpay is enabled, online payment is always available (not dependent on seller UPI config)
+  const acceptsUpi = paymentMode.isRazorpay
+    ? true
+    : (sellerGroups.length <= 1 && !!(firstSeller as any)?.accepts_upi && !!(firstSeller as any)?.upi_id);
   const hasFulfillmentConflict = sellerGroups.length > 1 && sellerGroups.some(g => {
     const mode = (g.items[0]?.product?.seller as any)?.fulfillment_mode;
     return mode && mode !== 'self_pickup' && !mode.startsWith('pickup_and_') && mode !== fulfillmentType;
