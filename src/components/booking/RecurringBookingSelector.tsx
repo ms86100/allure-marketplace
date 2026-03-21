@@ -87,7 +87,7 @@ export function RecurringBookingSelector({ config, onChange }: RecurringBookingS
           </div>
 
           <p className="text-[10px] text-muted-foreground">
-            Appointments will be auto-booked at the same time. You can cancel anytime.
+            Your recurring preference will be saved. The seller may confirm future slots manually.
           </p>
         </div>
       )}

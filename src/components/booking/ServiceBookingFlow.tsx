@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, isBefore, startOfToday } from 'date-fns';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,23 @@ export function ServiceBookingFlow({
 
   const isSubmittingRef = useRef(false);
 
+  // Bug #2/#3: Fetch service_listings to get correct location_type and duration_minutes
+  const { data: serviceListing } = useQuery({
+    queryKey: ['service-listing', productId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('service_listings')
+        .select('location_type, duration_minutes')
+        .eq('product_id', productId)
+        .maybeSingle();
+      return data;
+    },
+    enabled: open && !!productId,
+  });
+
+  const resolvedDuration = serviceListing?.duration_minutes ?? durationMinutes;
+  const resolvedLocation = serviceListing?.location_type ?? locationType;
+
   const { data: serviceSlots = [], refetch: refetchSlots } = useServiceSlots(open ? productId : undefined);
   const availableSlots = useMemo(
     () => slotsToPickerFormat(serviceSlots),
@@ -86,9 +103,26 @@ export function ServiceBookingFlow({
     return subcategories.find(s => s.id === subcategoryId) || null;
   }, [subcategoryId, subcategories]);
 
-  const supportsAddons = activeSubcategory?.supports_addons ?? config?.supportsAddons ?? false;
-  const supportsRecurring = activeSubcategory?.supports_recurring ?? config?.supportsRecurring ?? false;
-  const needsAddress = locationType === 'home_visit' || locationType === 'at_buyer';
+  // Bug #20 fix: If subcategory not found via category config chain, fetch directly
+  const { data: directSubcategory } = useQuery({
+    queryKey: ['subcategory-direct', subcategoryId],
+    queryFn: async () => {
+      if (!subcategoryId) return null;
+      const { data } = await supabase
+        .from('subcategories')
+        .select('supports_addons, supports_recurring, supports_staff_assignment')
+        .eq('id', subcategoryId)
+        .eq('is_active', true)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!subcategoryId && !activeSubcategory,
+  });
+
+  const resolvedSubcategory = activeSubcategory || directSubcategory;
+  const supportsAddons = resolvedSubcategory?.supports_addons ?? config?.supportsAddons ?? false;
+  const supportsRecurring = resolvedSubcategory?.supports_recurring ?? config?.supportsRecurring ?? false;
+  const needsAddress = resolvedLocation === 'home_visit' || resolvedLocation === 'at_buyer';
 
   const addonTotal = selectedAddons.reduce((s, a) => s + a.price, 0);
   const totalAmount = price + addonTotal;
@@ -286,6 +320,7 @@ export function ServiceBookingFlow({
 
       queryClient.invalidateQueries({ queryKey: ['service-slots', productId] });
       queryClient.invalidateQueries({ queryKey: ['seller-service-bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['buyer-service-bookings'] });
       window.dispatchEvent(new Event('booking-changed'));
 
       toast.success('Booking request sent!');
@@ -300,7 +335,7 @@ export function ServiceBookingFlow({
     }
   };
 
-  const resolvedLocationType = locationType || 'at_seller';
+  const resolvedLocationType = resolvedLocation || 'at_seller';
   const locationLabel = resolvedLocationType === 'home_visit' || resolvedLocationType === 'at_buyer'
     ? 'Home Visit'
     : resolvedLocationType === 'online'
@@ -333,9 +368,9 @@ export function ServiceBookingFlow({
                   <h4 className="font-medium">{productName}</h4>
                   <p className="text-xs text-muted-foreground">{sellerName}</p>
                   <p className="text-lg font-bold text-primary tabular-nums">{formatPrice(price)}</p>
-                  {durationMinutes && (
+                  {resolvedDuration && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock size={10} />{durationMinutes} min session
+                      <Clock size={10} />{resolvedDuration} min session
                     </p>
                   )}
                 </div>
@@ -347,7 +382,7 @@ export function ServiceBookingFlow({
                 selectedTime={selectedTime}
                 onDateSelect={handleDateSelect}
                 onTimeSelect={setSelectedTime}
-                serviceDuration={durationMinutes}
+                serviceDuration={resolvedDuration}
                 availableSlots={availableSlots}
               />
 
@@ -427,8 +462,8 @@ export function ServiceBookingFlow({
                 <div className="flex items-center gap-2 text-sm">
                   <Clock size={14} className="text-primary" />
                   <span>{selectedTime?.slice(0, 5)}</span>
-                  {durationMinutes && (
-                    <span className="text-muted-foreground">· {durationMinutes} min</span>
+                  {resolvedDuration && (
+                    <span className="text-muted-foreground">· {resolvedDuration} min</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-sm">

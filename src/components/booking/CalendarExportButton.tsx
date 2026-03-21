@@ -15,8 +15,9 @@ interface CalendarExportButtonProps {
 export function CalendarExportButton(props: CalendarExportButtonProps) {
   const handleExport = async () => {
     try {
-      const start = new Date(`${props.date}T${props.startTime}`);
-      const end = new Date(`${props.date}T${props.endTime}`);
+      const ensureSeconds = (t: string) => t.length === 5 ? t + ':00' : t;
+      const start = new Date(`${props.date}T${ensureSeconds(props.startTime)}`);
+      const end = new Date(`${props.date}T${ensureSeconds(props.endTime)}`);
       await addToCalendar({
         title: props.title,
         startDate: start,

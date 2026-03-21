@@ -71,12 +71,14 @@ export function SellerDayAgenda({ sellerId }: SellerDayAgendaProps) {
           {todayBookings.map((booking, i) => {
             const isLast = i === todayBookings.length - 1;
             const isActive = booking.status === 'in_progress';
+            const isPending = booking.status === 'requested';
             return (
-              <div key={booking.id} className="flex gap-3">
+              <div key={booking.id} className={cn('flex gap-3', isPending && 'opacity-75')}>
                 <div className="flex flex-col items-center">
                   <div className={cn(
                     'w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 z-10',
                     isActive ? 'bg-primary ring-2 ring-primary/30' :
+                    isPending ? 'bg-blue-400 ring-2 ring-blue-200 animate-pulse' :
                     booking.status === 'completed' ? 'bg-muted-foreground' : 'bg-primary/50'
                   )} />
                   {!isLast && <div className="w-px flex-1 bg-border min-h-[40px]" />}

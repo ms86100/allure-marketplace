@@ -83,9 +83,9 @@ export function useBookingAddons(bookingId: string | undefined) {
       if (error) throw error;
       return (data || []).map((row: any) => ({
         id: row.id,
-        name: row.addon?.name || 'Add-on',
+        name: row.addon?.name || row.addon_name || 'Add-on',
         description: row.addon?.description || null,
-        price: row.price_at_booking,
+        price: row.addon_price ?? 0,
       }));
     },
     enabled: !!bookingId,

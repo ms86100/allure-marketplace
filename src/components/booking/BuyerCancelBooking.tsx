@@ -80,20 +80,16 @@ export function BuyerCancelBooking({ bookingId, orderId, slotId, status }: Buyer
     if (!user || isCancelling) return;
     setIsCancelling(true);
     try {
-      const { data: bookingData } = await supabase
-        .from('service_bookings')
-        .select('seller_id, booking_date, start_time, product_id')
-        .eq('id', bookingId)
-        .eq('buyer_id', user.id)
-        .maybeSingle();
+      // Bug #19 fix: Use buyer_cancel_order RPC to respect workflow transitions
+      const { error: rpcError } = await supabase.rpc('buyer_cancel_order', {
+        _order_id: orderId,
+        _buyer_id: user.id,
+      });
 
-      if (!bookingData) {
-        toast.error('Booking not found or you are not authorized');
-        setIsCancelling(false);
-        return;
-      }
+      if (rpcError) throw rpcError;
 
-      const { error: bookingErr } = await supabase
+      // Update booking status (the order is already cancelled by the RPC)
+      await supabase
         .from('service_bookings')
         .update({
           status: 'cancelled',
@@ -103,21 +99,19 @@ export function BuyerCancelBooking({ bookingId, orderId, slotId, status }: Buyer
         .eq('id', bookingId)
         .eq('buyer_id', user.id);
 
-      if (bookingErr) throw bookingErr;
-
-      const { error: orderErr } = await supabase
-        .from('orders')
-        .update({ status: 'cancelled', rejection_reason: reason.trim().slice(0, 500) || 'Cancelled by buyer' })
-        .eq('id', orderId)
-        .eq('buyer_id', user.id);
-
-      if (orderErr) throw orderErr;
-
+      // Release the slot
       if (slotId) {
         await supabase.rpc('release_service_slot', { _slot_id: slotId });
       }
 
-      if (bookingData.seller_id) {
+      // Send notification to seller
+      const { data: bookingData } = await supabase
+        .from('service_bookings')
+        .select('seller_id, booking_date, start_time, product_id')
+        .eq('id', bookingId)
+        .maybeSingle();
+
+      if (bookingData?.seller_id) {
         const { data: sellerProfile } = await supabase
           .from('seller_profiles')
           .select('user_id')

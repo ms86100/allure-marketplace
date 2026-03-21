@@ -194,6 +194,11 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
         const startMinutes = startH * 60 + startM;
         const endMinutes = endH * 60 + endM;
 
+        if (endMinutes <= startMinutes) {
+          toast.error(`${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dayOfWeek]}: end time must be after start time`);
+          continue;
+        }
+
         for (const listing of listings) {
           const duration = listing.duration_minutes || 60;
           const buffer = listing.buffer_minutes || 0;
@@ -222,14 +227,35 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
       }
 
       if (slotsToInsert.length > 0) {
-        // Delete future unbooked slots first
+        // Delete future unbooked slots that have no active booking references
         const todayStr = format(today, 'yyyy-MM-dd');
-        await (supabase
+        const { data: referencedSlotIds } = await supabase
+          .from('service_bookings')
+          .select('slot_id')
+          .not('status', 'in', '(cancelled,no_show)');
+        const safeSlotIds = new Set((referencedSlotIds || []).map((r: any) => r.slot_id));
+
+        // First get candidate slots, then filter out referenced ones
+        const { data: candidateSlots } = await (supabase
           .from('service_slots') as any)
-          .delete()
+          .select('id')
           .eq('seller_id', sellerId)
           .gte('slot_date', todayStr)
           .eq('booked_count', 0);
+
+        const idsToDelete = (candidateSlots || [])
+          .filter((s: any) => !safeSlotIds.has(s.id))
+          .map((s: any) => s.id);
+
+        if (idsToDelete.length > 0) {
+          // Delete in batches to avoid query size limits
+          const batchSize = 200;
+          for (let i = 0; i < idsToDelete.length; i += batchSize) {
+            await (supabase.from('service_slots') as any)
+              .delete()
+              .in('id', idsToDelete.slice(i, i + batchSize));
+          }
+        }
 
         // Insert new slots in batches
         const batchSize = 500;

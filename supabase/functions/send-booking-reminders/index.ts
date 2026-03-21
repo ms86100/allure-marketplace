@@ -30,13 +30,17 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
+    // Bug #17 fix: Bookings store local times (IST = UTC+5:30).
+    // Offset the current UTC time to IST for comparison.
+    const IST_OFFSET_MS = 5.5 * 60 * 60_000;
+    const nowIST = new Date(now.getTime() + IST_OFFSET_MS);
+    const todayStr = nowIST.toISOString().split("T")[0];
     let totalReminded = 0;
 
     for (const window of REMINDER_WINDOWS) {
-      // Bug 17 fix: Use UTC consistently to avoid timezone drift in edge function runtime
-      const fromTime = new Date(now.getTime() + window.fromMin * 60_000);
-      const toTime = new Date(now.getTime() + window.toMin * 60_000);
+      const fromTime = new Date(nowIST.getTime() + window.fromMin * 60_000);
+      const toTime = new Date(nowIST.getTime() + window.toMin * 60_000);
+      // Extract HH:MM:SS in IST-adjusted time
       const fromTimeStr = fromTime.toISOString().slice(11, 19);
       const toTimeStr = toTime.toISOString().slice(11, 19);
 
