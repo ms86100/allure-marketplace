@@ -51,7 +51,7 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onSnooze }: NewOrderAl
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [order?.id, onDismiss]);
+  }, [order?.id, onDismiss, onSnooze]);
 
   const handleView = () => {
     const orderId = order?.id;
