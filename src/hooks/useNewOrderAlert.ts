@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { hapticVibrate, hapticNotification } from '@/lib/haptics';
 
 const ACTIONABLE_STATUSES = ['placed', 'enquired', 'quoted'] as const;
+const ACTIONABLE_STATUSES_INSERT = ['placed', 'enquired', 'quoted', 'confirmed'] as const;
 
 function createAlarmSound(audioContext: AudioContext) {
   const now = audioContext.currentTime;
