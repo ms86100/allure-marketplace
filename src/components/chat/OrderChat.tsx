@@ -38,6 +38,7 @@ export function OrderChat({
 
   useEffect(() => {
     if (isOpen && orderId) {
+      document.body.style.overflow = 'hidden';
       fetchMessages();
       markMessagesAsRead();
 
