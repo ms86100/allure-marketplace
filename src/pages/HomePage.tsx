@@ -139,6 +139,11 @@ export default function HomePage() {
           <RecentlyViewedRow />
         </div>
 
+        {/* Plan #18: Dormant user re-engagement */}
+        <div className="reveal-on-scroll">
+          <WhatsNewSection />
+        </div>
+
         {/* Society links */}
         <div className="reveal-on-scroll">
           <SocietyQuickLinks />
