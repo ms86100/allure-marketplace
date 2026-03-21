@@ -1,55 +1,41 @@
 
 
-# Fix Razorpay UPI Intent Flow — Show All UPI Apps
+# Remaining Gaps to Fix
 
-## Problem
-The current Razorpay checkout only shows PayTM as a "Recommended" UPI option and uses a QR code / VPA-entry flow. It does not show installed UPI apps (Google Pay, PhonePe, BHIM, etc.) as tap-to-pay buttons. This is because the current config lacks the proper UPI intent display blocks.
+## Bug 1: Double "Cancelled by buyer:" Prefix (Critical — Visible in Production)
 
-## What Changes
+**Evidence from network logs:** The `rejection_reason` stored in DB is:
+`"Cancelled by buyer: Cancelled by buyer: Taking too long to accept"`
 
-**Single file: `src/hooks/useRazorpay.ts`** — Update the Razorpay options `config.display` block to:
+**Root cause:** Two layers both prepend the same prefix:
+- **Client** (`OrderCancellation.tsx` line 79): sends `_reason: "Cancelled by buyer: Taking too long to accept"`
+- **DB function** (`buyer_cancel_order` RPC): concatenates `'Cancelled by buyer: ' || _clean_reason`
 
-1. **Define a custom UPI intent block** that lists all major apps (`gpay`, `phonepe`, `paytm`, `any`) as clickable buttons
-2. **Set UPI intent as the preferred/first block** so users see app buttons prominently before QR/VPA
-3. **Hide the default Razorpay "Recommended" block** that currently only shows PayTM, replacing it with our explicit app list
-4. **Keep all other methods** (Cards, Netbanking, Wallets) available as secondary options
+**Fix:** Remove the prefix from the client. The DB function already adds it, so the client should send just the raw reason (e.g., `"Taking too long to accept"`).
 
-### Razorpay Config Change
-
-Replace the current `config` and `method` objects with:
-
-```js
-config: {
-  display: {
-    blocks: {
-      banks: {
-        name: "Pay using UPI Apps",
-        instruments: [
-          { method: "upi", flows: ["intent"], apps: ["gpay"] },
-          { method: "upi", flows: ["intent"], apps: ["phonepe"] },
-          { method: "upi", flows: ["intent"], apps: ["paytm"] },
-          { method: "upi", flows: ["intent"], apps: ["any"] },  // catches other installed apps
-        ],
-      },
-    },
-    sequence: ["block.banks"],
-    preferences: {
-      show_default_blocks: true, // keep cards, netbanking, wallets below
-    },
-  },
-},
+**File:** `src/components/order/OrderCancellation.tsx` — change line 79 from:
+```
+_reason: `Cancelled by buyer: ${finalReason}`,
+```
+to:
+```
+_reason: finalReason,
 ```
 
-This tells Razorpay to:
-- Show GPay, PhonePe, Paytm as distinct tap-to-open buttons at the top
-- Include an "any" catch-all for other installed UPI apps
-- Use the `intent` flow (opens the app directly on mobile) instead of collect/QR
-- Still show all other payment methods below
+## Bug 2: UI Shows Raw Prefix in Cancellation Banner
 
-## How It Works for the User
-1. Buyer taps "Pay Now" → Razorpay popup opens
-2. Top section shows "Pay using UPI Apps" with GPay, PhonePe, Paytm icons
-3. Buyer taps their preferred app → app opens directly on their phone
-4. They approve payment in the app → return to your site → payment confirmed
-5. On desktop, QR code and VPA entry remain available as fallback
+**Current:** The cancellation banner on OrderDetailPage displays the full `rejection_reason` string like `"Cancelled by buyer: Changed my mind"` below a header that already says "Order Cancelled". This is redundant and exposes internal prefixes to users.
+
+**Fix:** Strip the `"Cancelled by buyer: "` / `"Order automatically cancelled — "` prefixes before displaying, showing only the human-readable reason.
+
+**File:** `src/pages/OrderDetailPage.tsx` — add a small helper to clean the displayed reason text, stripping known prefixes so the UI shows e.g. "Changed my mind" or "Seller did not respond in time" instead of the raw DB string.
+
+## Summary
+
+| # | Issue | Severity | File |
+|---|-------|----------|------|
+| 1 | Double "Cancelled by buyer:" prefix | Critical | `OrderCancellation.tsx` |
+| 2 | Raw internal prefix shown to users | Minor/UX | `OrderDetailPage.tsx` |
+
+Two small, surgical edits. No database migration needed.
 
