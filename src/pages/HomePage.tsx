@@ -12,6 +12,8 @@ import { ActiveOrderStrip } from '@/components/home/ActiveOrderStrip';
 import { ForYouSection } from '@/components/home/ForYouSection';
 import { SocietyLeaderboard } from '@/components/home/SocietyLeaderboard';
 import { RecentlyViewedRow } from '@/components/home/RecentlyViewedRow';
+import { WelcomeBackStrip } from '@/components/home/WelcomeBackStrip';
+import { WhatsNewSection } from '@/components/home/WhatsNewSection';
 
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -90,6 +92,9 @@ export default function HomePage() {
         {/* Active order tracking */}
         <ActiveOrderStrip />
 
+        {/* Plan #15: Welcome back context when no active orders */}
+        <WelcomeBackStrip />
+
         {/* Notification banner */}
         <HomeNotificationBanner />
 
@@ -132,6 +137,11 @@ export default function HomePage() {
         {/* Recently viewed */}
         <div className="reveal-on-scroll">
           <RecentlyViewedRow />
+        </div>
+
+        {/* Plan #18: Dormant user re-engagement */}
+        <div className="reveal-on-scroll">
+          <WhatsNewSection />
         </div>
 
         {/* Society links */}
