@@ -1,119 +1,121 @@
 
 
-# Round 17: 5 Critical Bugs — Buyer Browsing & Location-Based Discovery
+# Round 18: 5 Critical Bugs — Cross-Society Discovery & Buyer Browsing
 
-## Bug 1: `operating_days` missing from `search_sellers_by_location` RPC — stores appear open on their off-days
+## Bug 1: `useOrderSuggestions` queries non-existent column `image_urls` — 400 error on every home page load
 
-**Where:** `search_sellers_by_location` SQL function (returns `availability_start`, `availability_end` but NOT `operating_days`), consumed by every discovery hook (`useNearbyProducts`, `useTrendingProducts`, `usePopularProducts`, `useProductsByCategory`)
+**Where:** `src/hooks/useOrderSuggestions.ts` line 51, `src/components/home/SmartSuggestionBanner.tsx` line 96
 
-**What happens:** All discovery hooks map `seller.operating_days` to `seller_operating_days` on the product object. But the RPC never returns `operating_days` — so `seller.operating_days` is always `undefined`, which becomes `null`. The `computeStoreStatus` function receives `null` for `operatingDays` and skips the day-of-week check entirely (line 28 of `store-availability.ts`). A bakery that only operates Mon-Fri appears "Open" on Saturday and Sunday. The buyer can add items to cart and attempt checkout, only to be blocked by the server-side `create_multi_vendor_orders` RPC which does check operating days.
+**What happens:** The query selects `'id, name, image_urls, price'` from `products` table. The actual column is `image_url` (singular). This returns a 400 error (`column products.image_urls does not exist`) on every home page load for any logged-in user. The suggestion banner silently falls back to the ShoppingBag icon, but the network error pollutes logs and wastes a request. The TypeScript interface at line 18 also defines `image_urls: string[] | null` instead of `image_url: string | null`.
 
-**Why critical:** A buyer sees an "Open" store, adds items, reaches checkout, and gets rejected. This is a trust-breaking dead end. The store should show "Closed today" with a grey overlay on the product card.
+**Why critical:** Every single home page load triggers a visible 400 error in network logs. The suggestion banner never shows product images — it always falls back to a generic icon. This is a data fetch failure masquerading as a cosmetic issue.
 
-**Impact analysis:**
-- `search_sellers_by_location` RPC: add `sp.operating_days` to SELECT + RETURNS TABLE
-- No client code changes needed — hooks already map `seller.operating_days`
-- Risk 1: Altering the RPC return type is a schema change; the `types.ts` auto-gen must pick it up. Since we use `as any` casts, this is safe.
-- Risk 2: Stores with no operating_days set (null) will continue to show as "open" — this is correct (no restriction = always open).
+**Impact:** `useOrderSuggestions.ts` (fix column name + interface), `SmartSuggestionBanner.tsx` (fix property access from `image_urls?.[0]` to `image_url`).
 
-**Fix:** Add `operating_days text[]` to the RETURNS TABLE and `sp.operating_days` to the SELECT in the RPC.
+**Risks:** (1) None — pure column name typo fix. (2) Products without images will still show the fallback icon, which is correct.
 
 ---
 
-## Bug 2: `seller_name` falls back to hardcoded `'Seller'` — violates no-dummy-data policy
+## Bug 2: Home page discovery hooks ignore user's `search_radius_km` preference — sees fewer sellers than search page
 
-**Where:** `useNearbyProducts.ts` line 55, `useTrendingProducts.ts` line 41, `usePopularProducts.ts` lines 41/128, `useProductsByCategory.ts` line 70
+**Where:** `useNearbyProducts.ts`, `useTrendingProducts.ts`, `usePopularProducts.ts`, `useProductsByCategory.ts` — all hardcode `MARKETPLACE_RADIUS_KM` (5km)
 
-**What happens:** All discovery hooks use `seller.business_name || 'Seller'` as fallback. Per the project's strict "no dummy data" policy (see memory), hardcoded fallbacks like 'Seller' or 'Local Seller' are prohibited. If a seller has no `business_name` (e.g., draft data, migration gap), the product card shows "Seller" — which looks generic and fake. The `useSearchPage.ts` hook correctly uses `|| ''` (line 67), but the four discovery hooks don't follow this pattern.
+**What happens:** The search page (`useSearchPage.ts` line 109) respects `profile?.search_radius_km` (default 5, user-configurable up to 10). The categories page and store discovery also use the profile preference. But ALL four home page discovery hooks pass `MARKETPLACE_RADIUS_KM = 5` to the RPC. A buyer who set their radius to 10km sees more sellers when searching but fewer on the home page. A seller with `delivery_radius_km = 8` is invisible on the home screen but appears in search.
 
-**Why critical:** Showing "Seller" as a store name on a product card in a real marketplace feels like test data leaked into production. It undermines the trust and professionalism of the entire marketplace.
+**Why critical:** The home page is the primary discovery surface. If a buyer explicitly expanded their radius to 10km, they expect the home feed to reflect that. Seeing different results between home and search breaks the "single truth" principle.
 
-**Impact analysis:**
-- 4 discovery hooks modified (string change only)
-- Risk 1: Empty `seller_name` may cause the `<Store>` icon + name row in `ProductGridCard` to render an empty line. But line 98 of `ProductGridCard` already guards: `{product.seller_name && (...)}` — so empty string hides the row correctly.
-- Risk 2: None.
+**Impact:** 4 discovery hooks need to read `profile?.search_radius_km` from auth context (or accept it as parameter). The `BrowsingLocationContext.invalidateDiscovery` already covers their query keys.
 
-**Fix:** Change `|| 'Seller'` to `|| ''` in all 4 hooks, matching `useSearchPage.ts`.
+**Risks:** (1) Hooks are used outside authenticated context — need fallback to `MARKETPLACE_RADIUS_KM`. (2) Increasing radius increases RPC payload — acceptable for small marketplace.
 
 ---
 
-## Bug 3: `is_available: true` hardcoded on all discovery products — unavailable products appear orderable
+## Bug 3: `invalidateDiscovery` misses `location-stats` query — stale seller count after location switch
 
-**Where:** `useNearbyProducts.ts` line 46, `useTrendingProducts.ts` line 39, `usePopularProducts.ts` lines 43/130, `useProductsByCategory.ts` line 72
+**Where:** `src/contexts/BrowsingLocationContext.tsx` lines 95-102
 
-**What happens:** Every discovery hook hardcodes `is_available: true` when mapping RPC results to `ProductWithSeller`. The RPC already filters for `p.is_available = true` in the `matching_products` subquery, so this *appears* safe. BUT the RPC also returns products from the JSON subquery which was computed at query time. If a seller marks a product unavailable between the discovery fetch (cached for 5-10 minutes via staleTime) and when the buyer taps it, the cached product still has `is_available: true`.
+**What happens:** When a buyer switches browsing location (GPS, address, society), `invalidateDiscovery` invalidates 6 query key families: `store-discovery`, `trending-products`, `popular-products`, `products-by-category`, `category-products`, `search-popular-products`. But it does NOT invalidate `location-stats`. The `useLocationStats` hook (used in store discovery) caches stats for 5 minutes. After switching from Society A to Society B, the buyer still sees "3 sellers nearby" from the old location until cache expires.
 
-More critically, the `matching_products` JSON doesn't include `is_available` at all — so even if we wanted to read the real value, it's not there. The product detail sheet then fetches fresh data, but the listing card shows it as available.
+**Why critical:** The location stats banner is a trust signal — "X sellers nearby" tells the buyer the app is aware of their context. Stale stats after an explicit location switch makes the app feel unresponsive.
 
-**Why critical:** A buyer sees an available product, taps "Add", and the cart's `addItem` does a fresh seller availability check but NOT a product availability check. The product gets added to cart. At checkout, the pre-validation catches it (line 311 of `useCartPage.ts`), but this is a late, jarring rejection.
+**Impact:** Add `queryClient.invalidateQueries({ queryKey: ['location-stats'] })` to `invalidateDiscovery`.
 
-**Impact analysis:**
-- `search_sellers_by_location` RPC: add `'is_available', p.is_available` to the `json_build_object` in matching_products
-- Discovery hooks: change `is_available: true` to `is_available: p.is_available ?? true`
-- Risk 1: Including `is_available` in JSON increases payload size negligibly.
-- Risk 2: Products marked unavailable between RPC call and render will still show briefly due to staleTime. This is inherent to caching and acceptable — the fix just ensures the initial state is accurate.
-
-**Fix:** Add `is_available` to the RPC's product JSON, then use the real value in hooks.
+**Risks:** (1) Extra RPC call on location switch — negligible. (2) None.
 
 ---
 
-## Bug 4: Browsing location persists across sessions for logged-out users — stale location shows wrong sellers
+## Bug 4: `sell_beyond_community = false` sellers are still visible to cross-society buyers
 
-**Where:** `BrowsingLocationContext.tsx` line 43, `loadFromStorage()`
+**Where:** `search_sellers_by_location` RPC (latest migration `20260321083551`) line 101
 
-**What happens:** When a user sets a GPS-based browsing location, it's saved to `localStorage` under `sociva_browsing_location`. This persists indefinitely. If the user logs out, the override remains. If a different user logs in on the same device (shared family phone — common in India), they see sellers from the previous user's GPS location, not their own society or saved addresses. The fallback chain (line 135-161) checks override first, so the stale GPS location takes priority over the new user's address/society.
+**What happens:** The RPC filter is:
+```sql
+AND (_exclude_society_id IS NULL OR sp.society_id IS NULL OR sp.society_id != _exclude_society_id)
+```
+This only excludes the buyer's OWN society (to avoid duplicates). But there's NO check for `sell_beyond_community`. A society-resident seller who explicitly set `sell_beyond_community = false` (meaning "I only want to sell within my community") is still visible to buyers from other societies who are within radius.
 
-The `loadFromStorage` at line 38-46 checks for `lat`, `lng`, and `label` but doesn't check for a `user_id` or session match.
+The earlier RPC versions (migration `20260312174505`) had:
+```sql
+AND (sp.sell_beyond_community = true OR sp.society_id = (...buyer's society...))
+```
+But this guard was removed during the coordinate-first refactor. The `_exclude_society_id` parameter is never even passed by any frontend hook — all hooks call with only `_lat`, `_lng`, `_radius_km`.
 
-**Why critical:** On shared devices (common in Indian households), a buyer opens the app and sees "Browsing near [previous user's location]" with sellers 10km away. They don't understand why they can't find their local bakery. This is a silent, confusing failure.
+**Why critical:** This is a seller trust violation. A home cook who only wants to serve their own apartment complex is now visible to the entire 5km radius. They get orders from strangers they can't deliver to.
 
-**Impact analysis:**
-- `BrowsingLocationContext.tsx`: Clear override on user change
-- Risk 1: Legitimate returning users lose their GPS override on app restart if we over-aggressively clear. The fix should only clear on user ID change, not on every mount.
-- Risk 2: None — the fallback chain correctly resolves to address/society after override is cleared.
+**Impact:** Update the RPC WHERE clause to re-add the `sell_beyond_community` gate for society-resident sellers. Commercial sellers (`seller_type = 'commercial'`) should bypass this check per the architecture memory.
 
-**Fix:** Add a `useEffect` that watches `user?.id` and clears the override if the stored location was set by a different user. Store `user_id` alongside the location in localStorage.
+**Risks:** (1) Some sellers currently visible will disappear — this is correct behavior. (2) Need to ensure `seller_type` column is checked; commercial sellers must always be visible within radius regardless of `sell_beyond_community`.
 
 ---
 
-## Bug 5: Checkout delivery distance validation is missing — buyer can order from an out-of-range seller
+## Bug 5: Discovery hooks don't pass `_exclude_society_id` — duplicate sellers shown when viewing own-society products alongside nearby
 
-**Where:** `useCartPage.ts` lines 298-323 (pre-checkout validation)
+**Where:** All discovery hooks call `search_sellers_by_location` without passing `_exclude_society_id`
 
-**What happens:** The pre-checkout validation checks: product availability (line 308-312), store closed status (lines 314-322), minimum order (lines 298-301), and payment method (lines 325-333). But it does NOT validate whether the buyer's delivery address is within the seller's `delivery_radius_km`. 
+**What happens:** The RPC accepts `_exclude_society_id` to prevent showing own-society sellers in the "nearby" results (since they're already shown in local/society sections). But no frontend hook passes this parameter. The `useNearbyProducts` hook, `useTrendingProducts`, etc. all call with only `{ _lat, _lng, _radius_km }`. This means own-society sellers appear in BOTH the "Your Society" section AND the "Nearby" section, creating duplicate product cards on the home page.
 
-The `search_sellers_by_location` RPC uses `LEAST(_radius_km, COALESCE(sp.delivery_radius_km, _radius_km))` to filter sellers during discovery. But this uses the *browsing location*, not the *delivery address*. A buyer may browse near their office (location override) but order for delivery to their home (selected delivery address). If home is outside the seller's delivery radius, the RPC discovery was valid but the delivery is not.
+With the `mergeProducts` deduplication in `usePopularProducts` (line 59), this is partially mitigated at the product level. But at the seller level (e.g., `ShopByStoreDiscovery`), the same store appears twice.
 
-The `create_multi_vendor_orders` RPC may have server-side range validation (it returns `delivery_out_of_range` error), but the client doesn't pre-validate this, so the buyer fills out the entire checkout form only to get rejected at the final step.
+**Why critical:** Seeing the same store twice — once in "Your Community" and once in "Nearby" — makes the marketplace feel broken. It wastes screen real estate and confuses the buyer about where the store actually belongs.
 
-**Why critical:** A buyer selects "Delivery", picks their home address 6km away, fills in notes, selects payment method, and taps "Place Order" — only to get "Delivery address is out of range." This is a frustrating, late-stage rejection that could have been caught immediately when they selected the address.
+**Impact:** Pass `effectiveSocietyId` as `_exclude_society_id` in discovery hooks that are meant for "nearby/cross-society" results. The `useNearbyProducts` hook should accept the society ID and forward it.
 
-**Impact analysis:**
-- `useCartPage.ts`: Add delivery distance check in the pre-validation section (lines 298-323)
-- Risk 1: Requires knowing each seller's latitude/longitude and `delivery_radius_km`. The cart items have `product.seller` with full seller profile data (fetched in `useCart.tsx` line 84: `seller:seller_profiles(*)`), which includes these fields.
-- Risk 2: Haversine calculation on client is an approximation — could differ slightly from server. Use a small buffer (e.g., +0.5km) to avoid false rejections.
-
-**Fix:** After the closed-sellers check, iterate `sellerGroups` and compare haversine distance between `selectedDeliveryAddress` and seller lat/lng against `seller.delivery_radius_km`. Show a specific error per seller if out of range.
+**Risks:** (1) Non-society users (no `effectiveSocietyId`) must pass `null` — the RPC already handles this correctly with `_exclude_society_id IS NULL`. (2) If society data is stale, a recently-moved user might miss their old society's sellers temporarily.
 
 ---
 
 ## Summary
 
-| # | Bug | Severity | Location |
+| # | Bug | Severity | File(s) |
 |---|-----|----------|---------|
-| 1 | `operating_days` missing from RPC — closed-day stores appear open | **CRITICAL** | `search_sellers_by_location` RPC |
-| 2 | Hardcoded `'Seller'` fallback violates no-dummy-data policy | **MEDIUM** | 4 discovery hooks |
-| 3 | `is_available: true` hardcoded — unavailable products appear live | **HIGH** | 4 discovery hooks + RPC |
-| 4 | Stale GPS location persists across user sessions on shared devices | **HIGH** | `BrowsingLocationContext.tsx` |
-| 5 | No client-side delivery distance pre-validation at checkout | **HIGH** | `useCartPage.ts` |
+| 1 | `image_urls` typo — 400 error on every home load | **HIGH** | `useOrderSuggestions.ts`, `SmartSuggestionBanner.tsx` |
+| 2 | Home discovery ignores user radius preference | **HIGH** | 4 discovery hooks |
+| 3 | Location stats not invalidated on location switch | **MEDIUM** | `BrowsingLocationContext.tsx` |
+| 4 | `sell_beyond_community=false` sellers leak to cross-society buyers | **CRITICAL** | `search_sellers_by_location` RPC (migration) |
+| 5 | Own-society sellers duplicated in nearby results | **MEDIUM** | 4 discovery hooks (pass `_exclude_society_id`) |
 
-## Files to Edit
+## Technical Details
 
-- **DB Migration** (Bugs 1 + 3): Update `search_sellers_by_location` to return `operating_days` and include `is_available` in product JSON
-- `src/hooks/queries/useNearbyProducts.ts` (Bugs 2 + 3)
-- `src/hooks/queries/useTrendingProducts.ts` (Bugs 2 + 3)
-- `src/hooks/queries/usePopularProducts.ts` (Bugs 2 + 3)
-- `src/hooks/queries/useProductsByCategory.ts` (Bugs 2 + 3)
-- `src/contexts/BrowsingLocationContext.tsx` (Bug 4)
-- `src/hooks/useCartPage.ts` (Bug 5)
+### Files to edit:
+- `src/hooks/useOrderSuggestions.ts` — Fix `image_urls` → `image_url` in select + interface (Bug 1)
+- `src/components/home/SmartSuggestionBanner.tsx` — Fix `image_urls?.[0]` → `image_url` (Bug 1)
+- `src/hooks/queries/useNearbyProducts.ts` — Accept radius param, pass `_exclude_society_id` (Bugs 2, 5)
+- `src/hooks/queries/useTrendingProducts.ts` — Same (Bugs 2, 5)
+- `src/hooks/queries/usePopularProducts.ts` — Same (Bugs 2, 5)
+- `src/hooks/queries/useProductsByCategory.ts` — Same (Bugs 2, 5)
+- `src/contexts/BrowsingLocationContext.tsx` — Add `location-stats` to invalidation list (Bug 3)
+- **DB Migration** — Update `search_sellers_by_location` to re-add `sell_beyond_community` gate (Bug 4)
+
+### RPC fix (Bug 4) — add after the existing WHERE conditions:
+```sql
+AND (
+  sp.seller_type = 'commercial'
+  OR sp.sell_beyond_community = true
+  OR sp.society_id IS NULL
+  OR sp.society_id = (
+    SELECT pr.society_id FROM public.profiles pr WHERE pr.id = auth.uid()
+  )
+)
+```
+This ensures: commercial sellers always visible, opted-in society sellers visible, no-society sellers visible, and same-society sellers visible. Only society-resident sellers with `sell_beyond_community = false` are hidden from cross-society buyers.
 
