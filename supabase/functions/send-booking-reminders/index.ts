@@ -96,13 +96,14 @@ Deno.serve(async (req) => {
         const action = window.urgency === 'imminent' ? 'Open Now' :
                        window.urgency === 'soon' ? 'Get Ready' : 'View Details';
 
-        // Notify buyer
+        // Notify buyer — deep link to specific order when available
+        const buyerPath = booking.order_id ? `/orders/${booking.order_id}` : '/orders';
         await supabase.from("notification_queue").insert({
           user_id: booking.buyer_id,
           title: `${window.titleEmoji} Appointment in ${timeLabel}`,
           body: `Your appointment for ${productName} is at ${timeStr} today.`,
           type: reminderType,
-          reference_path: `/orders`,
+          reference_path: buyerPath,
           payload: {
             type: reminderType,
             entity_type: 'booking',
@@ -110,6 +111,7 @@ Deno.serve(async (req) => {
             workflow_status: 'reminder',
             action,
             bookingId: booking.id,
+            orderId: booking.order_id,
           },
         });
 

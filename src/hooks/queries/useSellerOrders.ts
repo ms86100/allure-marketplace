@@ -24,14 +24,15 @@ export function useSellerOrderStats(sellerId: string | null) {
   return useQuery({
     queryKey: ['seller-dashboard-stats', sellerId],
     queryFn: async (): Promise<SellerDashboardStats> => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayISO = today.toISOString();
+      // Use IST boundaries — orders store created_at in UTC, so compute IST midnight as UTC
+      const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      const istDateStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}-${String(nowIST.getDate()).padStart(2, '0')}`;
+      const todayISO = new Date(`${istDateStr}T00:00:00+05:30`).toISOString();
 
-      const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-      weekStart.setHours(0, 0, 0, 0);
-      const weekISO = weekStart.toISOString();
+      const weekStartIST = new Date(nowIST);
+      weekStartIST.setDate(weekStartIST.getDate() - weekStartIST.getDay());
+      const weekDateStr = `${weekStartIST.getFullYear()}-${String(weekStartIST.getMonth() + 1).padStart(2, '0')}-${String(weekStartIST.getDate()).padStart(2, '0')}`;
+      const weekISO = new Date(`${weekDateStr}T00:00:00+05:30`).toISOString();
 
       // Single query: fetch status + total_amount + created_at for all seller orders
       // With 1-2 users this is tiny; even at scale the seller's own orders are bounded

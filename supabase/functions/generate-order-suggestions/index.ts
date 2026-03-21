@@ -70,8 +70,9 @@ Deno.serve(async (req) => {
         if (!order) continue;
 
         const orderDate = new Date(order.created_at);
-        const day = orderDate.getDay();
-        const hour = orderDate.getHours();
+        const orderIST = new Date(orderDate.getTime() + IST_OFFSET_MS);
+        const day = orderIST.getUTCDay();
+        const hour = orderIST.getUTCHours();
         const key = `${item.product_id}:${order.seller_id}:${day}:${hour}`;
 
         const existing = patternMap.get(key);

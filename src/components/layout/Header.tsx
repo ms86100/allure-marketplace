@@ -86,7 +86,9 @@ function HeaderInner({
     ? profile.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
     : '?';
 
-  const greeting = useMemo(() => getGreeting(profile?.name), [profile?.name]);
+  // Include hour key so greeting updates when the hour changes (on re-render/navigation)
+  const hourKey = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours();
+  const greeting = useMemo(() => getGreeting(profile?.name, hourKey), [profile?.name, hourKey]);
 
   return (
     <>

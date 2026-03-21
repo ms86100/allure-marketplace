@@ -67,7 +67,8 @@ export function BuyerBookingsCalendar() {
     const now = new Date();
     return bookings.find((b) => {
       if (!['requested', 'confirmed', 'scheduled', 'rescheduled'].includes(b.status)) return false;
-      const apptTime = new Date(`${b.booking_date}T${b.start_time}`);
+      // Parse as IST since booking times are stored in IST
+      const apptTime = new Date(`${b.booking_date}T${b.start_time}+05:30`);
       return apptTime > now;
     }) || null;
   }, [bookings]);

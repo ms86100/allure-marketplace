@@ -99,14 +99,20 @@ export function UpcomingAppointmentBanner() {
   if (!booking) return null;
 
   const [bH, bM] = (booking.start_time || '00:00').split(':').map(Number);
-  const appointmentDate = new Date(booking.booking_date + 'T00:00:00');
-  appointmentDate.setHours(bH, bM, 0, 0);
+  // Parse appointment time as IST (+05:30) for accurate countdown
+  const appointmentDate = new Date(`${booking.booking_date}T${String(bH).padStart(2,'0')}:${String(bM).padStart(2,'0')}:00+05:30`);
   const hoursAway = differenceInHours(appointmentDate, new Date());
-  const dateLabel = isToday(new Date(booking.booking_date + 'T00:00'))
+  // Compare date strings in IST to determine Today/Tomorrow label
+  const nowISTForLabel = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const todayStrForLabel = format(nowISTForLabel, 'yyyy-MM-dd');
+  const tomorrowIST = new Date(nowISTForLabel);
+  tomorrowIST.setDate(tomorrowIST.getDate() + 1);
+  const tomorrowStr = format(tomorrowIST, 'yyyy-MM-dd');
+  const dateLabel = booking.booking_date === todayStrForLabel
     ? 'Today'
-    : isTomorrow(new Date(booking.booking_date + 'T00:00'))
+    : booking.booking_date === tomorrowStr
     ? 'Tomorrow'
-    : format(new Date(booking.booking_date + 'T00:00'), 'MMM d');
+    : format(new Date(booking.booking_date + 'T00:00:00+05:30'), 'MMM d');
 
   const isUrgent = hoursAway <= 2 && hoursAway >= 0;
 
