@@ -44,22 +44,32 @@ export default function SellerEarningsPage() {
     if (!user) return;
 
     try {
-      // Fetch payment records for the active seller
-      const { data, error } = await supabase
-        .from('payment_records')
-        .select(`
-          *,
-          order:orders(id, status, created_at, buyer:profiles!orders_buyer_id_fkey(name))
-        `)
-        .eq('seller_id', sellerId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      // Bug 8: Paginate to fetch ALL payment records (bypass 1000 row default)
+      let allData: any[] = [];
+      let from = 0;
+      const PAGE_SIZE = 1000;
+      while (true) {
+        const { data: page, error: pageErr } = await supabase
+          .from('payment_records')
+          .select(`
+            *,
+            order:orders(id, status, created_at, buyer:profiles!orders_buyer_id_fkey(name))
+          `)
+          .eq('seller_id', sellerId)
+          .order('created_at', { ascending: false })
+          .range(from, from + PAGE_SIZE - 1);
+        if (pageErr) throw pageErr;
+        if (!page || page.length === 0) break;
+        allData = allData.concat(page);
+        if (page.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
       
-      const paymentList = (data as any) || [];
+      const paymentList = allData;
       setPayments(paymentList);
 
-      // Calculate stats
+      // Calculate stats — Bug 3: fall back to amount when net_amount is null/0
+      const getAmount = (p: PaymentRecord) => Number((p as any).net_amount || p.amount) || 0;
       const today = startOfDay(new Date());
       const weekStart = startOfWeek(new Date());
       const monthStart = startOfMonth(new Date());
@@ -77,11 +87,11 @@ export default function SellerEarningsPage() {
       const pendingPayments = paymentList.filter((p: PaymentRecord) => p.payment_status === 'pending');
 
       setStats({
-        today: todayPayments.reduce((sum: number, p: PaymentRecord) => sum + Number(p.net_amount), 0),
-        thisWeek: weekPayments.reduce((sum: number, p: PaymentRecord) => sum + Number(p.net_amount), 0),
-        thisMonth: monthPayments.reduce((sum: number, p: PaymentRecord) => sum + Number(p.net_amount), 0),
-        allTime: paidPayments.reduce((sum: number, p: PaymentRecord) => sum + Number(p.net_amount), 0),
-        pendingPayout: pendingPayments.reduce((sum: number, p: PaymentRecord) => sum + Number(p.net_amount), 0),
+        today: todayPayments.reduce((sum: number, p: PaymentRecord) => sum + getAmount(p), 0),
+        thisWeek: weekPayments.reduce((sum: number, p: PaymentRecord) => sum + getAmount(p), 0),
+        thisMonth: monthPayments.reduce((sum: number, p: PaymentRecord) => sum + getAmount(p), 0),
+        allTime: paidPayments.reduce((sum: number, p: PaymentRecord) => sum + getAmount(p), 0),
+        pendingPayout: pendingPayments.reduce((sum: number, p: PaymentRecord) => sum + getAmount(p), 0),
       });
     } catch (error) {
       console.error('Error fetching earnings:', error);

@@ -151,6 +151,8 @@ export function useSellerSettings() {
       } as any).eq('id', sellerProfile.id);
       if (error) throw error;
       toast.success('Settings saved successfully', { id: 'settings-saved' });
+      // Bug 1: re-fetch profile after save to prevent stale state
+      await fetchProfileById(sellerProfile.id);
       if ((sellerProfile as any).society_id) logAudit('seller_settings_updated', 'seller_profile', sellerProfile.id, (sellerProfile as any).society_id, { business_name: formData.business_name, categories: formData.categories });
     } catch (error: any) { console.error('Error saving:', error); toast.error(friendlyError(error), { id: 'settings-save-error' }); }
     finally { setIsSaving(false); }

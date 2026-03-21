@@ -162,7 +162,7 @@ export function DraftProductManager({
     is_recommended: false,
     is_urgent: false,
     image_url: newProduct.image_url || null,
-    action_type: 'add_to_cart' as const,
+    action_type: (newProduct.action_type || 'add_to_cart') as any,
     contact_phone: '',
     stock_quantity: '',
     low_stock_threshold: '5',

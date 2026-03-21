@@ -80,9 +80,13 @@ export function SellerOrderCard({ order }: SellerOrderCardProps) {
                 {statusInfo.label}
               </span>
               <div className="flex items-center gap-1">
-                {['delivery', 'seller_delivery'].includes(order.fulfillment_type) ? (
+                {['delivery', 'seller_delivery'].includes(order.fulfillment_type || '') ? (
                   <Badge variant="outline" className="text-[10px] border-primary/40 text-primary gap-0.5">
                     <Truck size={10} /> Delivery
+                  </Badge>
+                ) : order.order_type === 'booking' ? (
+                  <Badge variant="outline" className="text-[10px] border-info/40 text-info gap-0.5">
+                    <CalendarDays size={10} /> Service
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-[10px] border-muted-foreground/40 text-muted-foreground gap-0.5">
