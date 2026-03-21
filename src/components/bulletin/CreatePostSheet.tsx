@@ -126,7 +126,7 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
       const { error } = await supabase.from('bulletin_posts').insert(postData);
       if (error) throw error;
 
-      toast({ title: 'Post created!' });
+      toast.success('Post created!');
       resetForm();
       onOpenChange(false);
       onCreated();
