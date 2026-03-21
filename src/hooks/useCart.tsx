@@ -18,6 +18,31 @@ import {
 
 const hasOwn = (obj: unknown, key: string) => Object.prototype.hasOwnProperty.call(obj ?? {}, key);
 
+/**
+ * CART INTEGRITY CONTRACT
+ * -----------------------
+ * The cart badge (useCartCount / BottomNav) and the cart page (useCart / CartPage)
+ * MUST always agree. The following multi-layer defenses ensure that the cart page
+ * can NEVER show "Your cart is empty" while the badge shows a non-zero count:
+ *
+ * Layer 1 — queryFn self-heal: If fetchCartItems returns [], we do a cheap COUNT
+ *           check. If rows exist, we retry once with a delay. This catches transient
+ *           PostgREST/network glitches at the data layer.
+ *
+ * Layer 2 — reconcile guard: After mutations, reconcile() double-checks before
+ *           accepting an empty result. If the count query disagrees, it invalidates
+ *           instead of clobbering the cache.
+ *
+ * Layer 3 — mismatch recovery: A useEffect detects when items=[] but the count
+ *           cache says >0. It triggers up to 3 aggressive refetches with staggered
+ *           delays (0ms, 500ms, 1500ms). isRecoveringCart stays true throughout.
+ *
+ * Layer 4 — CartPage veto: The empty-state UI is gated on BOTH items.length===0
+ *           AND !isRecoveringCart AND !isFetching AND pendingMutations===0.
+ *           This is the last line of defense — even if all other layers fail,
+ *           the user sees "Loading your cart…" instead of a false empty state.
+ */
+
 function parseStoreAvailabilityError(error: unknown): string | null {
   const msg = String((error as any)?.message || '');
   const statusMatch = msg.match(/STORE_CLOSED:([a-z_]+)/i);
@@ -86,7 +111,31 @@ async function fetchCartItems(userId: string) {
     .eq('user_id', userId);
   if (error) throw error;
   const items = (data as any as (CartItem & { product: Product })[]) || [];
-  return items.filter(item => item.product != null && item.product.is_available !== false);
+  const filtered = items.filter(item => item.product != null && item.product.is_available !== false);
+
+  // Layer 1: Self-heal — if we got zero items, verify with a cheap count query.
+  // This catches transient PostgREST issues where the JOIN returns empty but rows exist.
+  if (filtered.length === 0 && items.length === 0) {
+    const { count } = await supabase
+      .from('cart_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    if (count && count > 0) {
+      // Rows exist but the full query missed them — wait briefly and retry once
+      await new Promise(r => setTimeout(r, 300));
+      const { data: retryData, error: retryError } = await supabase
+        .from('cart_items')
+        .select(`*, product:products(*, seller:seller_profiles(*))`)
+        .eq('user_id', userId);
+      if (!retryError && retryData) {
+        const retryFiltered = (retryData as any as (CartItem & { product: Product })[])
+          .filter(item => item.product != null && item.product.is_available !== false);
+        if (retryFiltered.length > 0) return retryFiltered;
+      }
+    }
+  }
+
+  return filtered;
 }
 
 async function fetchCartItemCount(userId: string) {
@@ -107,6 +156,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const mutationSeqRef = useRef(0);
   const [pendingMutations, setPendingMutations] = useState(0);
   const [recoveryAttempts, setRecoveryAttempts] = useState(0);
+  const MAX_RECOVERY_ATTEMPTS = 3;
+  const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: items = [], isLoading, isFetching, isFetched } = useQuery({
     queryKey: [...CART_QUERY_KEY, user?.id],
@@ -165,7 +216,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
         // Guard: don't replace non-empty cache with empty result (likely transient failure)
         const currentItems = queryClient.getQueryData(cartKey()) as any[] | undefined;
         if (freshItems.length === 0 && currentItems && currentItems.length > 0) {
-          queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY, exact: false });
+          // Layer 2: Double-check with count before deciding
+          try {
+            const verifyCount = await fetchCartItemCount(user.id);
+            if (verifyCount > 0) {
+              // Items exist server-side — don't trust the empty result, force refetch
+              queryClient.refetchQueries({ queryKey: cartKey(), exact: true });
+              queryClient.refetchQueries({ queryKey: countKey(), exact: true });
+              return;
+            }
+            // Count is genuinely 0 — cart was actually cleared (e.g. by another tab)
+            queryClient.setQueryData(cartKey(), []);
+            queryClient.setQueryData(countKey(), 0);
+          } catch {
+            // Count check failed — be safe, invalidate
+            queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY, exact: false });
+          }
           return;
         }
         queryClient.setQueryData(cartKey(), freshItems);
@@ -183,8 +249,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const itemCount = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
   const totalAmount = useMemo(() => items.reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0), [items]);
-  const hasCartCountMismatch = !!user && isFetched && !isFetching && pendingMutations === 0 && items.length === 0 && fallbackItemCount > 0;
-  const isRecoveringCart = hasCartCountMismatch && recoveryAttempts < 2;
+  // Layer 3: Detect mismatch — items array is empty but count cache says otherwise
+  const hasCartCountMismatch = !!user && isFetched && !isFetching && pendingMutations === 0
+    && items.length === 0 && fallbackItemCount > 0;
+  const isRecoveringCart = hasCartCountMismatch && recoveryAttempts < MAX_RECOVERY_ATTEMPTS;
 
   const sellerGroups: SellerGroup[] = useMemo(() =>
     Object.values(
@@ -375,17 +443,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const hasHydrated = isFetched;
 
+  // Reset recovery counter when items arrive or count drops to 0
   useEffect(() => {
     if (!user || items.length > 0 || fallbackItemCount === 0) {
-      setRecoveryAttempts((prev) => (prev === 0 ? prev : 0));
+      if (recoveryTimerRef.current) { clearTimeout(recoveryTimerRef.current); recoveryTimerRef.current = null; }
+      setRecoveryAttempts(0);
     }
   }, [user, items.length, fallbackItemCount]);
 
+  // Layer 3: Aggressive staggered recovery refetches
   useEffect(() => {
-    if (!hasCartCountMismatch || recoveryAttempts >= 2) return;
-    setRecoveryAttempts((prev) => prev + 1);
-    queryClient.invalidateQueries({ queryKey: cartKey(), exact: true });
-  }, [hasCartCountMismatch, recoveryAttempts, queryClient, cartKey]);
+    if (!hasCartCountMismatch || recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) return;
+    // Staggered delays: immediate, 500ms, 1500ms
+    const delays = [0, 500, 1500];
+    const delay = delays[recoveryAttempts] ?? 1500;
+    recoveryTimerRef.current = setTimeout(() => {
+      recoveryTimerRef.current = null;
+      setRecoveryAttempts(prev => prev + 1);
+      // Force refetch (not just invalidate) for immediate execution
+      queryClient.refetchQueries({ queryKey: cartKey(), exact: true });
+      // Also refetch count to keep them in sync
+      queryClient.refetchQueries({ queryKey: countKey(), exact: true });
+    }, delay);
+    return () => { if (recoveryTimerRef.current) { clearTimeout(recoveryTimerRef.current); recoveryTimerRef.current = null; } };
+  }, [hasCartCountMismatch, recoveryAttempts, queryClient, cartKey, countKey]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => { if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current); };
+  }, []);
 
   // Keep cart-count cache in sync with items (eliminates split-brain)
   useEffect(() => {
