@@ -15,7 +15,7 @@ interface OrderSuggestion {
   dismissed: boolean;
   acted_on: boolean;
   created_at: string;
-  product?: { name: string; image_urls: string[] | null; price: number };
+  product?: { name: string; image_url: string | null; price: number };
   seller?: { business_name: string };
 }
 
