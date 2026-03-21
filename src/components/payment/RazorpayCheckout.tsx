@@ -107,15 +107,15 @@ export function RazorpayCheckout({
 
   return (
     <Drawer open={isOpen} onOpenChange={handleClose}>
-      <DrawerContent>
+      <DrawerContent className="max-h-[85vh]">
         <DrawerHeader className="text-center pb-4">
-          <DrawerTitle>Pay with UPI</DrawerTitle>
+          <DrawerTitle>Pay Online</DrawerTitle>
           <DrawerDescription>
             Pay {formatPrice(amount)} to {sellerName}
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="py-6 px-4">
+        <div className="py-6 px-4 overflow-y-auto" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
           {status === 'pending' && (
             <div className="text-center space-y-6">
               <div className="w-20 h-20 mx-auto rounded-full bg-primary/10 flex items-center justify-center">

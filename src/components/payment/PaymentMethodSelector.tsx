@@ -83,7 +83,7 @@ export function PaymentMethodSelector({
               <div className={cn('w-12 h-12 rounded-full flex items-center justify-center', bgColor)}>
                 <Icon className={color} size={24} />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <p className="font-semibold">{label}</p>
                 <p className="text-sm text-muted-foreground">{description}</p>
                 {!enabled && (
