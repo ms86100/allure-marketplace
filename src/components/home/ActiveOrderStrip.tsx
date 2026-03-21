@@ -44,7 +44,7 @@ export function ActiveOrderStrip() {
       const { data, error } = await supabase
         .from('orders')
         .select(`
-          id, status, created_at, estimated_delivery_at,
+          id, status, created_at, estimated_delivery_at, auto_cancel_at,
           seller:seller_profiles!orders_seller_id_fkey(business_name),
           order_items(id, product:products(image_url))
         `)
