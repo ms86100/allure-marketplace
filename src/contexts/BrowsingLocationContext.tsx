@@ -217,8 +217,21 @@ export function BrowsingLocationProvider({ children }: { children: React.ReactNo
   );
 }
 
-export function useBrowsingLocation() {
+export function useBrowsingLocation(): BrowsingLocationContextType {
   const ctx = useContext(BrowsingLocationContext);
-  if (!ctx) throw new Error('useBrowsingLocation must be used within BrowsingLocationProvider');
+  if (!ctx) {
+    // Defensive fallback: return safe no-op defaults so components
+    // never crash even if rendered outside the provider tree
+    // (e.g. during error recovery, Suspense fallback, or testing).
+    return {
+      browsingLocation: null,
+      setBrowsingLocation: () => {},
+      clearOverride: () => {},
+      hasOverride: false,
+      pendingLocationChange: null,
+      confirmLocationChange: () => {},
+      cancelLocationChange: () => {},
+    };
+  }
   return ctx;
 }
