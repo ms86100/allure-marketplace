@@ -84,7 +84,7 @@ export function UrgentOrderTimer({
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground">Waiting for seller to respond</p>
           <p className="text-xs text-muted-foreground">
-            {isCritical ? 'Order will auto-cancel soon if seller doesn't respond' : 'Order will be auto-cancelled if seller doesn't respond'}
+            {isCritical ? "Order will auto-cancel soon if seller doesn\u2019t respond" : "Order will be auto-cancelled if seller doesn\u2019t respond"}
           </p>
         </div>
 
