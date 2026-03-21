@@ -1,133 +1,132 @@
 
 
-# Round 5 (Revised): 5 Critical Notification Bugs — Going to Production
+# Round 6: 5 Critical Notification Bugs — Client-Side Type Gaps & Sync Holes
 
-## Bug 1: ORDER STATUS TRIGGER IS COMPLETELY BROKEN — Zero buyer notifications for order lifecycle
-
-**Severity: CATASTROPHIC — the entire notification system's core is non-functional**
-
-**What happens:** The `fn_enqueue_order_status_notification()` trigger fires on every `orders.status` change. It builds the correct title/body from `category_status_flows`, then attempts to INSERT into `notification_queue` using columns that **do not exist on the table**:
-
-```sql
--- Trigger inserts into these columns:
-INSERT INTO notification_queue (user_id, title, body, type, reference_id, reference_type, priority, data, silent)
-```
-
-**Actual table columns:** `id, user_id, title, body, type, reference_path, payload, status, created_at, processed_at, next_retry_at, retry_count, last_error`
-
-**Missing columns:** `reference_id`, `reference_type`, `priority`, `data`, `silent` — none of these exist. The INSERT fails every time. The `EXCEPTION WHEN OTHERS THEN RETURN NEW` handler silently swallows the error, so the order update succeeds but **no notification is ever enqueued**.
-
-**Proof from production data:**
-- `notification_queue` has **zero** rows with `type = 'order_update'` in the last 7 days
-- `user_notifications` has **zero** entries titled "Order Accepted", "Being Prepared", "Order Ready", "On The Way", or "Order Delivered" — ever
-- The only notifications that work are client-side inserts (booking reminders, delivery proximity, settlements, seller approvals)
-
-**Who is affected:**
-- **Every buyer** — never receives push notifications for: accepted, preparing, ready, picked_up, on_the_way, delivered, completed, cancelled
-- **Every seller** — never receives push notification for new orders placed via the trigger (only works because `useCartPage.ts` calls `process-notification-queue` after order creation, but that just processes existing queue items — of which there are none from the trigger)
-
-Wait — sellers DO get "New Order Received!" (101 count in DB). That's because the client-side code in `useCartPage.ts` invokes `process-notification-queue` after placing an order, and the `placed` status change fires the trigger... but the trigger FAILS. So how are sellers getting notified?
-
-Looking more carefully: the seller "New Order Received!" notifications come from **other client-side paths** (ServiceBookingFlow, ProductEnquirySheet) that insert directly into `notification_queue` with correct column names — not from the trigger.
-
-**Fix (DB migration):** Rewrite the INSERT statements in `fn_enqueue_order_status_notification` to use the correct column names:
-- `reference_id` → store in `payload` jsonb as `orderId` (already there via the `data` field)
-- `reference_type` → drop (not needed)  
-- `data` → `payload`
-- `silent` → store in `payload` as `silent_push`
-- `priority` → drop (not a column)
-- Add `reference_path` with the correct order URL (`/orders/` + order_id)
-- Also fix the dedup query which uses `reference_id` (nonexistent) — use `payload->>'orderId'` or just `title` + `user_id` + time window
-
-This is a single SQL migration that rewrites the function body.
+The Round 5 DB migration fixed the trigger's INSERT columns correctly. But the client code was written when all notifications used `type: 'order'`. The trigger now inserts `type: 'order_update'` — a value that **no client-side code recognizes**. The moment a real order status change fires in production, these bugs will all surface simultaneously.
 
 ---
 
-## Bug 2: Chat messages never create a notification_queue entry — invoking process-notification-queue does nothing
+## Bug 1: `RichNotificationCard` icon shows generic Bell for all order status notifications
 
-**What happens:** In `OrderChat.tsx` line 122, after a successful message insert:
+**Where:** `src/components/notifications/RichNotificationCard.tsx` lines 11-13
+
+**What happens:** The `getIcon()` switch matches `case 'order':` and `case 'order_status':` — but the DB trigger inserts with `type: 'order_update'`. Every order lifecycle notification (Accepted, Preparing, Ready, Delivered, Completed, Cancelled) falls through to `default: <Bell>`.
+
+**The buyer sees:** Their inbox has a generic grey bell icon next to "✅ Order Accepted!" instead of the branded Package icon. Every order notification looks identical to a system announcement. The inbox feels like a dump of generic alerts rather than a curated order timeline.
+
+**Why this breaks trust:** The buyer subconsciously uses icons to scan their inbox. Package = order. Calendar = booking. Truck = delivery. When all order notifications show Bell, the buyer can't distinguish order updates from system noise at a glance. The inbox feels unfinished.
+
+**Fix:** Add `case 'order_update':` to the `getIcon()` switch, falling through to the same `<Package>` icon. One line.
+
+---
+
+## Bug 2: `resolveNotificationRoute` sends `order_update` taps to `/notifications` instead of the order page
+
+**Where:** `src/lib/notification-routes.ts` lines 21-25
+
+**What happens:** The fallback route resolver handles `case 'order_created':` and `case 'order_status':` — extracting `orderId` from payload and routing to `/orders/{id}`. But `order_update` hits `default:` → returns `/notifications`.
+
+**When this fires:** Push notification tap when the app is closed. The `pushNotificationActionPerformed` handler tries `data?.route` first (which should be set by `process-notification-queue`). But if `route` is missing from the push data for any reason (FCM data field truncation, edge case), the fallback resolver kicks in and routes to `/notifications` instead of the specific order.
+
+**Also fires:** In `NotificationInboxPage` line 21 — if `reference_path` is null on a `user_notifications` row (e.g., edge case from a migration), the fallback resolver routes `order_update` to `/notifications`.
+
+**The buyer sees:** Taps "Order Delivered!" notification → lands on generic notification list instead of their order. They have to manually find and tap their order. The deep-link promise is broken.
+
+**Why this breaks trust:** Push notification taps are a **moment of intent**. The buyer wants to see their order. Landing on the wrong page creates friction at the highest-engagement moment.
+
+**Fix:** Add `case 'order_update':` to the switch, falling through to the same `order_created`/`order_status` handler. One line.
+
+---
+
+## Bug 3: Realtime status change triggers haptic but badge count stays stale for 30 seconds
+
+**Where:** `src/hooks/useBuyerOrderAlerts.ts` line 55
+
+**What happens:** When a realtime `postgres_changes` event arrives for a buyer's order:
+1. Haptic fires immediately ✅
+2. `['orders']` query invalidated ✅
+3. Badge count (`['unread-notifications']`) NOT invalidated ❌
+4. Inbox (`['notifications']`) NOT invalidated ❌
+
+Meanwhile, the DB trigger has already enqueued + processed the notification → `user_notifications` has a new unread row. But the client won't know for up to 30 seconds (the polling interval).
+
+**The buyer sees:** Phone vibrates → they glance at the app → badge still shows "3" (not "4") → they open inbox → still 3 notifications → 20 seconds later it jumps to 4. "Did I imagine that vibration?"
+
+**Why this breaks trust:** Haptic feedback creates an expectation of new content. When the visual doesn't match the tactile signal, the buyer doubts the system's reliability. Every haptic-without-badge-update erodes confidence.
+
+**Fix:** Add three query invalidations to `useBuyerOrderAlerts.ts` after the haptic:
 ```typescript
-supabase.functions.invoke('process-notification-queue').catch(() => {});
-```
-
-This invokes the edge function, which calls `claim_notification_queue(batch_size: 50)` — atomically claims pending items. But **no code anywhere inserts a chat notification into `notification_queue`**. There is no trigger on `chat_messages`. The invoke just processes whatever happens to be pending (usually nothing chat-related).
-
-**Who is confused:**
-- **Buyer** sends "I'm running late" → seller never gets a push notification
-- **Seller** replies "No problem" → buyer never gets a push notification
-- Both parties believe the chat system notifies the other person. It doesn't.
-
-**Fix:** Before invoking `process-notification-queue` in `OrderChat.tsx`, insert a row into `notification_queue` with the correct columns (`user_id: otherUserId`, `title: "New message from {senderName}"`, `body: message preview`, `type: 'chat'`, `reference_path: /orders/{orderId}`, `payload: { orderId, type: 'chat' }`). Then the existing invoke will pick it up and deliver it.
-
----
-
-## Bug 3: "Sounds" preference toggle has no effect — beeps always play regardless of setting
-
-**What happens:** The NotificationsPage renders a "Notification Sounds" toggle that saves `sounds: true/false` to `notification_preferences`. But `usePushNotifications.ts` never reads this preference. The Web Audio API beep at lines 387-404 fires unconditionally for every foreground push notification. Similarly, `useBuyerOrderAlerts.ts` calls `hapticNotification()` without checking the sounds preference.
-
-**Who is confused:**
-- **Buyer** toggles "Notification Sounds" OFF → still hears beeps on every foreground push → thinks the toggle is broken → loses trust in all preference controls ("If sounds doesn't work, do the other toggles work either?")
-
-**Fix:** In `usePushNotifications.ts`, before playing the Web Audio beep, query the user's `notification_preferences.sounds` setting (can be cached in a ref, refreshed on mount/resume). Skip the `AudioContext` block if `sounds === false`. Haptic feedback should remain (it's tactile, not audio) — only the audible beep should be gated.
-
----
-
-## Bug 4: App resume doesn't refresh notification inbox or home banner — stale data until next 30s poll
-
-**What happens:** The `useAppLifecycle` `appStateChange` handler invalidates many query keys but is **missing** `['notifications']` and `['latest-action-notification']`. When a buyer backgrounds the app, receives push notifications, then returns:
-
-- Badge count refreshes (✅ `unread-notifications` is invalidated)
-- Order list refreshes (✅ `orders` is invalidated)
-- Notification inbox does NOT refresh (❌ `notifications` missing)
-- Home action banner does NOT refresh (❌ `latest-action-notification` missing)
-
-The inbox and banner only update on the next 30-second poll cycle.
-
-**Who is confused:**
-- **Buyer** opens app after getting a push → badge shows "5" → opens inbox → sees 3 old notifications → waits 30 seconds → list jumps to 5. Same mismatch as Round 3 Bug 2, but triggered by app resume instead of staying on the page.
-
-**Fix:** Add two lines to the `appStateChange` handler in `useAppLifecycle.ts`:
-```typescript
+queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
 queryClient.invalidateQueries({ queryKey: ['notifications'] });
-queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
+queryClient.invalidateQueries({ queryKey: ['active-orders-strip'] });
 ```
 
 ---
 
-## Bug 5: `process-notification-queue` preference check uses wrong type keys — never matches order notifications
+## Bug 4: Chat notification says "New message from Someone" — sender name not resolved from profile
 
-**What happens:** The edge function at lines 80-85:
+**Where:** `src/components/chat/OrderChat.tsx` line 125
+
+**What happens:** 
 ```typescript
-const notifType = item.type || item.payload?.type || "order";
-if ((notifType === "order" || notifType === "order_status") && userPrefs.orders === false) prefAllowed = false;
+const senderName = user.user_metadata?.name || 'Someone';
+```
+The `user.user_metadata` object comes from Supabase Auth. Most users signed up with email/password — their `user_metadata.name` is undefined. The fallback is the literal string `"Someone"`.
+
+Meanwhile, the `profiles` table has `full_name` and `username` for every user, populated during onboarding.
+
+**The seller sees:** Push notification: "💬 New message from Someone". They think: "Who is this? Is this spam? Which order is this about?" They have to open the chat to find out.
+
+**The buyer sees (when seller replies):** Same problem — "New message from Someone" instead of the business name.
+
+**Why this breaks trust:** Notifications are the system's voice. When it says "Someone" instead of "Ravi" or "Fresh Bakes", it feels anonymous and impersonal. The seller can't prioritize messages because they all look the same. Chat notifications become noise rather than signal.
+
+**Fix:** Before building the notification, query the sender's profile:
+```typescript
+const { data: senderProfile } = await supabase
+  .from('profiles')
+  .select('full_name, username')
+  .eq('id', user.id)
+  .maybeSingle();
+const senderName = senderProfile?.full_name || senderProfile?.username || 'Someone';
 ```
 
-The trigger (once fixed) will insert with `type: 'order_update'`. Client-side inserts use `type: 'order'`. The preference check matches `"order"` and `"order_status"` but NOT `"order_update"`. So even when the trigger is fixed, if a buyer turns off order notifications, `order_update` type items will **bypass the preference check** and still deliver push notifications.
+---
 
-Similarly, the `type` field across the system is inconsistent:
-- Trigger uses: `'order_update'`
-- Client inserts use: `'order'`, `'settlement'`, `'chat'`, `'general'`
-- Preference check matches: `'order'`, `'order_status'` (not `'order_update'`)
+## Bug 5: `is_terminal` stored as JSON boolean in payload but checked as string `'true'` in push handler
 
-**Who is confused:**
-- **Buyer** turns off "Order Updates" → still gets order status push notifications → "What's the point of these toggles?"
+**Where:** 
+- DB trigger (`fn_enqueue_order_status_notification`) line 145: `'is_terminal', v_is_terminal` — inserts a **boolean** into JSONB
+- `process-notification-queue` line 154: `const pushData = { ...(item.payload || {}) }` — spreads JSONB payload into push data object
+- FCM/APNs delivery: FCM `data` field only accepts **string** values — all values are stringified
+- Client handler (`usePushNotifications.ts`) line 344: `data?.is_terminal === 'true'` — compares against string
 
-**Fix:** In `process-notification-queue`, expand the order type match to include `'order_update'`:
+**What happens:** The trigger stores `is_terminal: true` (boolean) in JSONB. When `process-notification-queue` spreads it into `pushData`, it becomes `is_terminal: true` (JS boolean). FCM's `data` field auto-coerces to `"true"` (string). So on Android/FCM path, the comparison `=== 'true'` works by accident.
+
+But on the **direct APNs path** (iOS), `sendApnsDirectNotification` puts `data` directly into the APNs payload JSON — NOT as FCM data strings. The APNs payload preserves the original JS boolean. So on iOS, `data?.is_terminal` is `true` (boolean), and `=== 'true'` (string comparison) returns **false**.
+
+**The buyer on iOS sees:** Terminal order push (delivered/completed/cancelled) arrives → the `isTerminalPush` flag is `false` → the async fallback path (`getTerminalStatuses().then(...)`) fires instead of the synchronous dispatch. This means the `order-terminal-push` event dispatches **asynchronously** — after a DB round-trip to fetch terminal statuses. During that delay, the foreground suppression check and LA check run with stale state.
+
+Worse: if `getTerminalStatuses()` cache is cold (first terminal push after app launch), there's a visible flash — the foreground toast fires, THEN the terminal sync fires, causing a double UI update (toast appears → order list refreshes → active strip disappears → toast is stale).
+
+**Why this breaks trust:** The "order delivered" moment should feel instant and clean on iOS. Instead, there's a visible stutter — toast appears, then a beat later the UI reshuffles. It's subtle but makes the app feel laggy at the most emotionally significant moment (delivery confirmation).
+
+**Fix:** In `usePushNotifications.ts`, change the terminal check to handle both types:
 ```typescript
-if ((notifType === "order" || notifType === "order_status" || notifType === "order_update") && userPrefs.orders === false) prefAllowed = false;
+const isTerminalPush = data?.is_terminal === 'true' || data?.is_terminal === true;
 ```
 
 ---
 
 ## Summary
 
-| # | Bug | Impact | Scope |
-|---|-----|--------|-------|
-| 1 | **Trigger uses nonexistent columns** — zero order status notifications ever delivered | Every buyer/seller since trigger was last updated | DB migration |
-| 2 | **Chat has no queue entry** — invoke processes empty queue | Every chat message between buyer/seller | Client-side |
-| 3 | **Sounds toggle ignored** — beeps always play | Every buyer who disabled sounds | Client-side |
-| 4 | **App resume skips inbox/banner refresh** | Every buyer returning from background | Client-side |
-| 5 | **Preference type mismatch** — `order_update` bypasses opt-out | Every buyer who disabled order notifications | Edge function |
+| # | Bug | Who sees it | When it surfaces |
+|---|-----|------------|-----------------|
+| 1 | Generic Bell icon for all order notifications | Every buyer checking inbox | First order status change post-fix |
+| 2 | Push tap routes to `/notifications` instead of order | Buyer tapping order push | When `route` field missing from FCM data |
+| 3 | Badge/inbox 30s stale after realtime haptic | Every buyer on every status change | Immediately — gap between haptic and badge |
+| 4 | Chat notification says "from Someone" | Every seller/buyer in chat | Every chat message sent |
+| 5 | iOS terminal push sync delayed by type mismatch | Every iOS buyer on delivery | Every terminal status push on iOS |
 
-**Bug 1 is the single most critical issue in the entire system.** It means the core value proposition of the notification system — "we'll tell you when your order status changes" — has never worked via the DB trigger path. All fixes are surgical: 1 DB migration, 1 edge function update, 2 client-side changes.
+All fixes are surgical: 4 client-side file edits, 0 migrations, 0 edge function changes.
 
