@@ -64,6 +64,12 @@ export function useOrderDetail(id: string | undefined) {
   const deliveryHandledBy = (order as any)?.delivery_handled_by || null;
   const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy);
 
+  const isUrgentOrder = hasAutoCancelAt && !!order?.status && isFirstFlowStep(flow, order.status);
+  const isUrgentSellerView = isUrgentOrder && isSellerView;
+  const isUrgentBuyerView = isUrgentOrder && !isSellerView;
+
+  useUrgentOrderSound(!!isUrgentSellerView);
+
   // Load transitions for accurate next-status and cancellation checks
   const resolvedTxnType = useMemo(
     () => resolveTransactionType(effectiveParentGroup || 'default', orderType, orderFulfillmentType, deliveryHandledBy),
