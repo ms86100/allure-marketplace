@@ -351,7 +351,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const hasHydrated = isFetched;
 
   // Keep cart-count cache in sync with items (eliminates split-brain)
-  useMemo(() => {
+  useEffect(() => {
     if (hasHydrated && user) {
       queryClient.setQueryData(['cart-count', user.id], itemCount);
     }
