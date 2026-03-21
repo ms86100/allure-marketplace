@@ -33,13 +33,15 @@ export interface WorkflowGroup {
 
 export const ACTORS = ['buyer', 'seller', 'delivery', 'system', 'admin'];
 
+/** Primary workflow types shown in admin UI (mapped from UI buttons) */
 export const TRANSACTION_TYPES = [
   { value: 'cart_purchase', label: 'Cart Purchase' },
-  { value: 'seller_delivery', label: 'Seller Delivery' },
-  { value: 'self_fulfillment', label: 'Self Fulfillment' },
   { value: 'service_booking', label: 'Service Booking' },
   { value: 'request_service', label: 'Request Service' },
   { value: 'contact_enquiry', label: 'Contact Enquiry' },
 ];
+
+/** Fulfillment sub-variants auto-derived at runtime — hidden from admin UI */
+export const FULFILLMENT_VARIANTS = ['seller_delivery', 'self_fulfillment'];
 
 export const formatName = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
