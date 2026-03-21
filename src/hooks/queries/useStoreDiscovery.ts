@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface TopProduct {
   id: string;
@@ -84,18 +85,20 @@ function parseTopProducts(raw: any): TopProduct[] {
  */
 export function useLocalSellers() {
   const { browsingLocation } = useBrowsingLocation();
+  const { profile, effectiveSocietyId } = useAuth();
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
+  const radiusKm = Math.min(profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM, MARKETPLACE_RADIUS_KM);
 
   return useQuery({
-    queryKey: ['store-discovery', 'local', lat, lng],
+    queryKey: ['store-discovery', 'local', lat, lng, radiusKm, effectiveSocietyId],
     queryFn: async () => {
       if (!lat || !lng) return {};
 
       const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: MARKETPLACE_RADIUS_KM,
+        _radius_km: radiusKm,
       });
 
       if (error) {
@@ -133,19 +136,26 @@ export function useLocalSellers() {
  */
 export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM, enabled: boolean = true) {
   const { browsingLocation } = useBrowsingLocation();
+  const { effectiveSocietyId, effectiveSociety } = useAuth();
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
+  const hasSociety = !!effectiveSociety;
 
   return useQuery({
-    queryKey: ['store-discovery', 'nearby', lat, lng, radiusKm],
+    queryKey: ['store-discovery', 'nearby', lat, lng, radiusKm, effectiveSocietyId],
     queryFn: async () => {
       if (!lat || !lng) return [];
 
-      const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
+      const rpcParams: any = {
         _lat: lat,
         _lng: lng,
         _radius_km: radiusKm,
-      });
+      };
+      if (effectiveSocietyId) {
+        rpcParams._exclude_society_id = effectiveSocietyId;
+      }
+
+      const { data, error } = await supabase.rpc('search_sellers_by_location' as any, rpcParams);
 
       if (error) {
         console.error('Nearby sellers error:', error);
@@ -182,7 +192,7 @@ export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM
 
         const societyMap: Record<string, { distanceKm: number; sellers: NearbySeller[] }> = {};
         for (const s of bandSellers) {
-          const key = s.society_name || (s.distance_km <= 2 ? 'Near Your Society' : 'Independent Stores');
+          const key = s.society_name || (hasSociety ? 'Near Your Society' : 'Nearby Stores');
           if (!societyMap[key]) {
             societyMap[key] = { distanceKm: s.distance_km, sellers: [] };
           }
