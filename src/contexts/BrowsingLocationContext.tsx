@@ -93,9 +93,9 @@ export function BrowsingLocationProvider({ children }: { children: React.ReactNo
 
   const applyLocation = useCallback((loc: BrowsingLocation | null) => {
     setOverride(loc);
-    saveToStorage(loc);
+    saveToStorage(loc, user?.id);
     invalidateDiscovery();
-  }, [invalidateDiscovery]);
+  }, [invalidateDiscovery, user?.id]);
 
   const setBrowsingLocation = useCallback((loc: BrowsingLocation | null) => {
     const current = previousLocationRef.current;
