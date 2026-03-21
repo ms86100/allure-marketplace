@@ -1,159 +1,119 @@
 
 
-# Round 16: 5 Critical Bugs — Timezone, Notifications & Live Scheduling
+# Round 17: 5 Critical Bugs — Buyer Browsing & Location-Based Discovery
 
-## Bug 1: Booking reminder notification links to `/orders` (list) instead of the specific order
+## Bug 1: `operating_days` missing from `search_sellers_by_location` RPC — stores appear open on their off-days
 
-**Where:** `supabase/functions/send-booking-reminders/index.ts` line 105
+**Where:** `search_sellers_by_location` SQL function (returns `availability_start`, `availability_end` but NOT `operating_days`), consumed by every discovery hook (`useNearbyProducts`, `useTrendingProducts`, `usePopularProducts`, `useProductsByCategory`)
 
-**What happens:** The buyer reminder notification has `reference_path: '/orders'` — a generic orders list. When a buyer taps the "⏰ Appointment in 1 hour" notification (in-app or push), they land on the orders list page, not on the specific order detail with the appointment card. The payload contains `bookingId` and `entity_id` but NOT `order_id`. The `resolveNotificationRoute` fallback doesn't handle `booking_reminder_*` types (falls to `/notifications`).
+**What happens:** All discovery hooks map `seller.operating_days` to `seller_operating_days` on the product object. But the RPC never returns `operating_days` — so `seller.operating_days` is always `undefined`, which becomes `null`. The `computeStoreStatus` function receives `null` for `operatingDays` and skips the day-of-week check entirely (line 28 of `store-availability.ts`). A bakery that only operates Mon-Fri appears "Open" on Saturday and Sunday. The buyer can add items to cart and attempt checkout, only to be blocked by the server-side `create_multi_vendor_orders` RPC which does check operating days.
 
-Meanwhile, the seller reminder at line 138 has `reference_path: '/seller/orders'` — also generic.
-
-The `RichNotificationCard` action button calls `navigate(referencePath)` — so it goes to `/orders`.
-
-**Why critical:** The buyer gets a time-sensitive "Appointment in 10 minutes" alert with a "Open Now" action button, taps it, and lands on the orders list. They must scroll/search to find the right order. For an imminent appointment, this is a trust-breaking dead end.
-
-**Fix:** The edge function needs the `order_id` from the `service_bookings` table (which it already fetches but doesn't select). Change the query at line 49 to include `order_id`, then set `reference_path: '/orders/${booking.order_id}'` for buyer, and `reference_path: '/seller/orders'` for seller (seller order detail uses a different route pattern but `/seller/orders` is acceptable).
+**Why critical:** A buyer sees an "Open" store, adds items, reaches checkout, and gets rejected. This is a trust-breaking dead end. The store should show "Closed today" with a grey overlay on the product card.
 
 **Impact analysis:**
-- Only `supabase/functions/send-booking-reminders/index.ts` modified + deploy
-- Risk 1: If `order_id` is null for some bookings, the path becomes `/orders/null`. Add a fallback to `/orders` when `order_id` is missing.
-- Risk 2: None — existing notifications already in the queue keep their old paths; only new reminders get the fix.
+- `search_sellers_by_location` RPC: add `sp.operating_days` to SELECT + RETURNS TABLE
+- No client code changes needed — hooks already map `seller.operating_days`
+- Risk 1: Altering the RPC return type is a schema change; the `types.ts` auto-gen must pick it up. Since we use `as any` casts, this is safe.
+- Risk 2: Stores with no operating_days set (null) will continue to show as "open" — this is correct (no restriction = always open).
+
+**Fix:** Add `operating_days text[]` to the RETURNS TABLE and `sp.operating_days` to the SELECT in the RPC.
 
 ---
 
-## Bug 2: `generate-order-suggestions` uses UTC time — suggestions misfire for IST users
+## Bug 2: `seller_name` falls back to hardcoded `'Seller'` — violates no-dummy-data policy
 
-**Where:** `supabase/functions/generate-order-suggestions/index.ts` lines 18-20
+**Where:** `useNearbyProducts.ts` line 55, `useTrendingProducts.ts` line 41, `usePopularProducts.ts` lines 41/128, `useProductsByCategory.ts` line 70
 
-**What happens:** The function uses `now.getDay()` and `now.getHours()` on a raw `new Date()` — which runs in UTC on Deno edge functions. At IST 8 AM (breakfast time), the function thinks it's 2:30 AM UTC and matches "early morning" patterns. At IST 8 PM (dinner time), it sees 2:30 PM UTC and matches "afternoon" patterns.
+**What happens:** All discovery hooks use `seller.business_name || 'Seller'` as fallback. Per the project's strict "no dummy data" policy (see memory), hardcoded fallbacks like 'Seller' or 'Local Seller' are prohibited. If a seller has no `business_name` (e.g., draft data, migration gap), the product card shows "Seller" — which looks generic and fake. The `useSearchPage.ts` hook correctly uses `|| ''` (line 67), but the four discovery hooks don't follow this pattern.
 
-The scoring at line 71 compares `orderDate.getDay()` and `orderDate.getHours()` — also in UTC — against the current UTC time. While the relative comparison is internally consistent (both sides UTC), the actual suggestion timing is wrong: a buyer opening the app at dinner time in India gets lunch-time suggestions.
-
-**Why critical:** Smart suggestions are meant to feel personalized and contextual. Wrong time-of-day matching makes them feel random, undermining the "the app knows me" trust factor.
-
-**Fix:** Apply the same IST offset pattern used in `send-booking-reminders`:
-```typescript
-const IST_OFFSET_MS = 5.5 * 60 * 60_000;
-const nowIST = new Date(now.getTime() + IST_OFFSET_MS);
-const currentDay = nowIST.getUTCDay();
-const currentHour = nowIST.getUTCHours();
-```
-And apply the same offset when extracting `day` and `hour` from `orderDate` at line 70-71.
+**Why critical:** Showing "Seller" as a store name on a product card in a real marketplace feels like test data leaked into production. It undermines the trust and professionalism of the entire marketplace.
 
 **Impact analysis:**
-- Only `supabase/functions/generate-order-suggestions/index.ts` modified + deploy
-- Risk 1: If the marketplace expands beyond India, this hardcoded offset breaks. But per memory, the platform is India-based, so IST is correct.
-- Risk 2: Existing cached suggestions will be stale until the next cron run regenerates them. This is self-healing.
+- 4 discovery hooks modified (string change only)
+- Risk 1: Empty `seller_name` may cause the `<Store>` icon + name row in `ProductGridCard` to render an empty line. But line 98 of `ProductGridCard` already guards: `{product.seller_name && (...)}` — so empty string hides the row correctly.
+- Risk 2: None.
+
+**Fix:** Change `|| 'Seller'` to `|| ''` in all 4 hooks, matching `useSearchPage.ts`.
 
 ---
 
-## Bug 3: `UpcomingAppointmentBanner` uses device timezone — shows wrong "Today" label for travelers
+## Bug 3: `is_available: true` hardcoded on all discovery products — unavailable products appear orderable
 
-**Where:** `src/components/home/UpcomingAppointmentBanner.tsx` lines 42-43, 59, 100-108
+**Where:** `useNearbyProducts.ts` line 46, `useTrendingProducts.ts` line 39, `usePopularProducts.ts` lines 43/130, `useProductsByCategory.ts` line 72
 
-**What happens:** The banner computes `today` using `format(now, 'yyyy-MM-dd')` from `date-fns`, which uses the device's local timezone. Booking dates in the DB are stored as IST dates (plain `YYYY-MM-DD`). If a buyer's device is in a different timezone (e.g., traveling to Dubai, UTC+4), `format(now, 'yyyy-MM-dd')` produces a different date than IST at the boundary hours (10:30 PM Dubai = 12:00 AM IST next day).
+**What happens:** Every discovery hook hardcodes `is_available: true` when mapping RPC results to `ProductWithSeller`. The RPC already filters for `p.is_available = true` in the `matching_products` subquery, so this *appears* safe. BUT the RPC also returns products from the JSON subquery which was computed at query time. If a seller marks a product unavailable between the discovery fetch (cached for 5-10 minutes via staleTime) and when the buyer taps it, the cached product still has `is_available: true`.
 
-The `nowMinutes` calculation at line 59 also uses device time (`now.getHours()`), which could filter out a valid upcoming appointment (e.g., at IST midnight, the buyer's Dubai device says 10:30 PM — the booking at IST 00:30 would be filtered as "past" because 22*60+30 > 0*60+30).
+More critically, the `matching_products` JSON doesn't include `is_available` at all — so even if we wanted to read the real value, it's not there. The product detail sheet then fetches fresh data, but the listing card shows it as available.
 
-Same issue in `BuyerBookingsCalendar.tsx` line 31: `new Date(`${booking.booking_date}T${booking.start_time}`)` parses as local timezone, not IST.
-
-**Why critical:** The home banner is the primary touchpoint for upcoming appointments. Showing "No upcoming appointments" when one exists (or showing tomorrow's as today's) directly undermines scheduling trust.
-
-**Fix:** In `UpcomingAppointmentBanner.tsx`, compute `today` and `nowMinutes` using IST, matching the pattern in `store-availability.ts`:
-```typescript
-const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-const today = format(nowIST, 'yyyy-MM-dd');
-const nowMinutes = nowIST.getHours() * 60 + nowIST.getMinutes();
-```
-And for the dateLabel computation (lines 100-108), parse booking dates as IST for `isToday`/`isTomorrow` checks.
-
-Same fix for `BuyerBookingsCalendar.tsx` — use IST for countdown calculations.
+**Why critical:** A buyer sees an available product, taps "Add", and the cart's `addItem` does a fresh seller availability check but NOT a product availability check. The product gets added to cart. At checkout, the pre-validation catches it (line 311 of `useCartPage.ts`), but this is a late, jarring rejection.
 
 **Impact analysis:**
-- `UpcomingAppointmentBanner.tsx` and `BuyerBookingsCalendar.tsx` modified
-- Risk 1: `toLocaleString` with timezone is slower than raw `new Date()`. For a single call per render, this is negligible.
-- Risk 2: If `date-fns` `isToday`/`isTomorrow` are still compared against device time internally, we need to use manual IST date comparison instead. The fix should avoid `isToday()` and instead compare formatted date strings.
+- `search_sellers_by_location` RPC: add `'is_available', p.is_available` to the `json_build_object` in matching_products
+- Discovery hooks: change `is_available: true` to `is_available: p.is_available ?? true`
+- Risk 1: Including `is_available` in JSON increases payload size negligibly.
+- Risk 2: Products marked unavailable between RPC call and render will still show briefly due to staleTime. This is inherent to caching and acceptable — the fix just ensures the initial state is accurate.
+
+**Fix:** Add `is_available` to the RPC's product JSON, then use the real value in hooks.
 
 ---
 
-## Bug 4: Seller dashboard stats use device timezone for "today" and "this week" boundaries
+## Bug 4: Browsing location persists across sessions for logged-out users — stale location shows wrong sellers
 
-**Where:** `src/hooks/queries/useSellerOrders.ts` lines 27-34
+**Where:** `BrowsingLocationContext.tsx` line 43, `loadFromStorage()`
 
-**What happens:** The stats query computes `today` and `weekStart` using `new Date()` with `setHours(0, 0, 0, 0)` — device local time. The `created_at` field in orders is UTC. For an IST-based seller:
-- At IST 1 AM (UTC 7:30 PM previous day), `todayISO = "2026-03-20T19:30:00Z"` — this misses orders placed between UTC 00:00 and 19:30, i.e., orders from IST 5:30 AM to 1:00 AM are excluded from "today's" count.
-- The "this week" boundary uses `.getDay()` on device time, which could shift the week boundary by a day.
+**What happens:** When a user sets a GPS-based browsing location, it's saved to `localStorage` under `sociva_browsing_location`. This persists indefinitely. If the user logs out, the override remains. If a different user logs in on the same device (shared family phone — common in India), they see sellers from the previous user's GPS location, not their own society or saved addresses. The fallback chain (line 135-161) checks override first, so the stale GPS location takes priority over the new user's address/society.
 
-**Why critical:** A food seller checking "Today's Orders" at 11 PM IST sees correct data. But at 1 AM IST (still "today" for late-night orders), the counter resets to 0 because the device's midnight already passed. Late-night sellers (bakeries, fast food) see incorrect daily revenue.
+The `loadFromStorage` at line 38-46 checks for `lat`, `lng`, and `label` but doesn't check for a `user_id` or session match.
 
-**Fix:** Use IST-aware date computation:
-```typescript
-const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-nowIST.setHours(0, 0, 0, 0);
-const todayISO = nowIST.toISOString();
-```
+**Why critical:** On shared devices (common in Indian households), a buyer opens the app and sees "Browsing near [previous user's location]" with sellers 10km away. They don't understand why they can't find their local bakery. This is a silent, confusing failure.
 
 **Impact analysis:**
-- Only `useSellerOrders.ts` modified (lines 27-34)
-- Risk 1: `toLocaleString` timezone conversion creates a Date that JS treats as local device timezone. The `.toISOString()` output will be different than expected. Need to compute the IST midnight as UTC: `new Date('2026-03-21T00:00:00+05:30').toISOString()` → `"2026-03-20T18:30:00.000Z"`.
-- Risk 2: None — query is read-only.
+- `BrowsingLocationContext.tsx`: Clear override on user change
+- Risk 1: Legitimate returning users lose their GPS override on app restart if we over-aggressively clear. The fix should only clear on user ID change, not on every mount.
+- Risk 2: None — the fallback chain correctly resolves to address/society after override is cleared.
+
+**Fix:** Add a `useEffect` that watches `user?.id` and clears the override if the stored location was set by a different user. Store `user_id` alongside the location in localStorage.
 
 ---
 
-## Bug 5: `Header.tsx` greeting uses device timezone — says "Good morning" at midnight IST if device is in different TZ
+## Bug 5: Checkout delivery distance validation is missing — buyer can order from an out-of-range seller
 
-**Where:** `src/components/layout/Header.tsx` line 26
+**Where:** `useCartPage.ts` lines 298-323 (pre-checkout validation)
 
-**What happens:** `new Date().getHours()` uses device local time. A buyer in IST sees correct greetings. But a buyer traveling abroad (or with a misconfigured device timezone) sees "Good morning" at IST evening or vice versa. This is a minor cosmetic issue on its own, BUT combined with Bug 3 (banner timezone) it creates a compound trust gap: the app says "Good evening" while showing "Tomorrow" for a booking that's actually today in IST.
+**What happens:** The pre-checkout validation checks: product availability (line 308-312), store closed status (lines 314-322), minimum order (lines 298-301), and payment method (lines 325-333). But it does NOT validate whether the buyer's delivery address is within the seller's `delivery_radius_km`. 
 
-More practically: the `getGreeting` is memoized by `profile?.name` only (line 88) — it doesn't re-compute when the hour changes. A buyer who opens the app at 11:55 AM and keeps it open past noon still sees "Good morning" indefinitely until re-render.
+The `search_sellers_by_location` RPC uses `LEAST(_radius_km, COALESCE(sp.delivery_radius_km, _radius_km))` to filter sellers during discovery. But this uses the *browsing location*, not the *delivery address*. A buyer may browse near their office (location override) but order for delivery to their home (selected delivery address). If home is outside the seller's delivery radius, the RPC discovery was valid but the delivery is not.
 
-**Why critical:** The greeting is the first thing a buyer sees on the home screen. While individually minor, a stale or wrong greeting alongside timezone-misaligned booking data creates a cumulative "something's off" feeling.
+The `create_multi_vendor_orders` RPC may have server-side range validation (it returns `delivery_out_of_range` error), but the client doesn't pre-validate this, so the buyer fills out the entire checkout form only to get rejected at the final step.
 
-**Fix:** Use IST for the greeting and add the hour to the memo dependency:
-```typescript
-function getGreeting(name?: string | null): string {
-  const hour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getHours();
-  // ... rest same
-}
-// Update memo to include a coarse time key
-const hourKey = new Date().getHours(); // re-renders on navigation anyway
-const greeting = useMemo(() => getGreeting(profile?.name), [profile?.name, hourKey]);
-```
+**Why critical:** A buyer selects "Delivery", picks their home address 6km away, fills in notes, selects payment method, and taps "Place Order" — only to get "Delivery address is out of range." This is a frustrating, late-stage rejection that could have been caught immediately when they selected the address.
 
 **Impact analysis:**
-- Only `src/components/layout/Header.tsx` modified (2 lines)
-- Risk 1: Adding `hourKey` to useMemo deps causes re-computation on every render (since `new Date().getHours()` is called fresh). But `getGreeting` is trivial — no perf concern.
-- Risk 2: None — purely cosmetic.
+- `useCartPage.ts`: Add delivery distance check in the pre-validation section (lines 298-323)
+- Risk 1: Requires knowing each seller's latitude/longitude and `delivery_radius_km`. The cart items have `product.seller` with full seller profile data (fetched in `useCart.tsx` line 84: `seller:seller_profiles(*)`), which includes these fields.
+- Risk 2: Haversine calculation on client is an approximation — could differ slightly from server. Use a small buffer (e.g., +0.5km) to avoid false rejections.
+
+**Fix:** After the closed-sellers check, iterate `sellerGroups` and compare haversine distance between `selectedDeliveryAddress` and seller lat/lng against `seller.delivery_radius_km`. Show a specific error per seller if out of range.
 
 ---
 
 ## Summary
 
-| # | Bug | Severity | File(s) |
+| # | Bug | Severity | Location |
 |---|-----|----------|---------|
-| 1 | Booking reminders link to generic `/orders` instead of specific order | **HIGH** — dead-end on urgent tap | `send-booking-reminders/index.ts` |
-| 2 | Order suggestions use UTC — wrong time-of-day matching | **MEDIUM** — irrelevant suggestions | `generate-order-suggestions/index.ts` |
-| 3 | Upcoming appointment banner uses device TZ — wrong "Today" label | **HIGH** — missed appointments | `UpcomingAppointmentBanner.tsx`, `BuyerBookingsCalendar.tsx` |
-| 4 | Seller dashboard stats use device TZ — wrong daily counts | **HIGH** — wrong revenue/order counts | `useSellerOrders.ts` |
-| 5 | Header greeting uses device TZ and is stale | **LOW** — cosmetic but compounds trust gap | `Header.tsx` |
+| 1 | `operating_days` missing from RPC — closed-day stores appear open | **CRITICAL** | `search_sellers_by_location` RPC |
+| 2 | Hardcoded `'Seller'` fallback violates no-dummy-data policy | **MEDIUM** | 4 discovery hooks |
+| 3 | `is_available: true` hardcoded — unavailable products appear live | **HIGH** | 4 discovery hooks + RPC |
+| 4 | Stale GPS location persists across user sessions on shared devices | **HIGH** | `BrowsingLocationContext.tsx` |
+| 5 | No client-side delivery distance pre-validation at checkout | **HIGH** | `useCartPage.ts` |
 
 ## Files to Edit
 
-- `supabase/functions/send-booking-reminders/index.ts` — Bug 1 (add `order_id` to query, fix `reference_path`)
-- `supabase/functions/generate-order-suggestions/index.ts` — Bug 2 (IST offset for time matching)
-- `src/components/home/UpcomingAppointmentBanner.tsx` — Bug 3 (IST-aware date/time)
-- `src/components/booking/BuyerBookingsCalendar.tsx` — Bug 3 (IST-aware countdown)
-- `src/hooks/queries/useSellerOrders.ts` — Bug 4 (IST-aware today/week boundaries)
-- `src/components/layout/Header.tsx` — Bug 5 (IST greeting + memo fix)
-
-## Cross-Impact Analysis
-
-- Bug 1: Edge function only — no client code changes. Existing notifications unaffected.
-- Bug 2: Edge function only — suggestions regenerate on next cron run.
-- Bug 3: Two client components — no shared state affected. The IST helper pattern already exists in `store-availability.ts`.
-- Bug 4: Query boundary change — only affects stat display, not order data.
-- Bug 5: Cosmetic only — no downstream dependencies.
+- **DB Migration** (Bugs 1 + 3): Update `search_sellers_by_location` to return `operating_days` and include `is_available` in product JSON
+- `src/hooks/queries/useNearbyProducts.ts` (Bugs 2 + 3)
+- `src/hooks/queries/useTrendingProducts.ts` (Bugs 2 + 3)
+- `src/hooks/queries/usePopularProducts.ts` (Bugs 2 + 3)
+- `src/hooks/queries/useProductsByCategory.ts` (Bugs 2 + 3)
+- `src/contexts/BrowsingLocationContext.tsx` (Bug 4)
+- `src/hooks/useCartPage.ts` (Bug 5)
 
