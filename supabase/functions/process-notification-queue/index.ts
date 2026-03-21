@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
         const notifType = item.type || item.payload?.type || "order";
         let prefAllowed = true;
         if (userPrefs) {
-          if ((notifType === "order" || notifType === "order_status") && userPrefs.orders === false) prefAllowed = false;
+          if ((notifType === "order" || notifType === "order_status" || notifType === "order_update") && userPrefs.orders === false) prefAllowed = false;
           if (notifType === "chat" && userPrefs.chat === false) prefAllowed = false;
           if (notifType === "promotion" && userPrefs.promotions === false) prefAllowed = false;
         }

@@ -48,6 +48,20 @@ export function usePushNotificationsInternal() {
   const listenersReadyPromiseRef = useRef<Promise<void> | null>(null);
   // terminalStatusesRef removed — dynamic resolution via getTerminalStatuses() at event time
   const listenersResolveRef = useRef<(() => void) | null>(null);
+  const soundsEnabledRef = useRef(true);
+
+  // Fetch sounds preference on mount and when user changes
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('notification_preferences')
+      .select('sounds')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        soundsEnabledRef.current = data?.sounds !== false;
+      });
+  }, [user?.id]);
 
   // ── Set log user ──
   useEffect(() => {
@@ -383,25 +397,27 @@ export function usePushNotificationsInternal() {
 
         hapticNotification('success');
 
-        // Play a short alert beep via Web Audio API
-        try {
-          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-          const audioNow = ctx.currentTime;
-          for (let i = 0; i < 3; i++) {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.frequency.value = i % 2 === 0 ? 880 : 660;
-            osc.type = 'sine';
-            const t = audioNow + i * 0.15;
-            gain.gain.setValueAtTime(0.18, t);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
-            osc.start(t);
-            osc.stop(t + 0.15);
-          }
-          setTimeout(() => ctx.close().catch(() => {}), 600);
-        } catch {}
+        // Play a short alert beep via Web Audio API (respect sounds preference)
+        if (soundsEnabledRef.current) {
+          try {
+            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const audioNow = ctx.currentTime;
+            for (let i = 0; i < 3; i++) {
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.frequency.value = i % 2 === 0 ? 880 : 660;
+              osc.type = 'sine';
+              const t = audioNow + i * 0.15;
+              gain.gain.setValueAtTime(0.18, t);
+              gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+              osc.start(t);
+              osc.stop(t + 0.15);
+            }
+            setTimeout(() => ctx.close().catch(() => {}), 600);
+          } catch {}
+        }
 
         const toastOptions: Record<string, any> = {
           description: notification?.body,
