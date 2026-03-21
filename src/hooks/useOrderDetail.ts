@@ -42,8 +42,6 @@ export function useOrderDetail(id: string | undefined) {
 
   const hasAutoCancelAt = !!order?.auto_cancel_at;
 
-  useUrgentOrderSound(!!isUrgentOrder);
-
   const sellerPrimaryGroup = seller?.primary_group;
   const orderType = (order as any)?.order_type;
   const [derivedParentGroup, setDerivedParentGroup] = useState<string | null>(null);
