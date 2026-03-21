@@ -166,7 +166,6 @@ export function useOrderDetail(id: string | undefined) {
       if (error) throw error;
       setOrder({ ...order, status: newStatus });
       supabase.functions.invoke('process-notification-queue').catch(() => {});
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus });
     } catch (error: any) {
       console.error('Buyer advance order failed:', error);
