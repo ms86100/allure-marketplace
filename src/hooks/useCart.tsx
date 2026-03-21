@@ -96,7 +96,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const mutationSeqRef = useRef(0);
   const [pendingMutations, setPendingMutations] = useState(0);
 
-  const { data: items = [], isLoading, isFetched } = useQuery({
+  const { data: items = [], isLoading, isFetching, isFetched } = useQuery({
     queryKey: [...CART_QUERY_KEY, user?.id],
     queryFn: async () => {
       if (!user) return [];
