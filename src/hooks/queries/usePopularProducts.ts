@@ -40,7 +40,7 @@ export function usePopularProducts(limit = 12) {
             seller_id: seller.seller_id,
              seller_name: seller.business_name || '',
             seller_rating: seller.rating || 0,
-            is_available: true,
+             is_available: p.is_available ?? true,
             is_bestseller: false,
             is_recommended: false,
             is_urgent: false,
