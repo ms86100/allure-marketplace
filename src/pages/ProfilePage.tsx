@@ -96,7 +96,7 @@ export default function ProfilePage() {
   const quickActions = [
     { icon: Package, label: 'Orders', to: '/orders', key: 'orders' },
     { icon: Heart, label: 'Favorites', to: '/favorites', key: 'favorites' },
-    { icon: Repeat, label: 'Order Again', to: '/orders', key: 'reorder' },
+    { icon: Repeat, label: 'Reorder', to: '/search', key: 'reorder' },
     ...(isSeller ? [{ icon: Store, label: 'My Store', to: '/seller', key: 'seller' }] : []),
   ];
 

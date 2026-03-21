@@ -79,11 +79,17 @@ export default function CartPage() {
           </AlertDialog>
         </div>
 
-        {/* Delivery Time */}
+        {/* Delivery Time — #4: show estimate for all fulfillment types */}
         {c.maxPrepTime > 0 && (
           <div className="mx-4 mt-3 flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-xl p-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0"><Clock size={18} className="text-primary" /></div>
-            <div><p className="text-sm font-semibold">Ready in ~{c.maxPrepTime} minutes</p><p className="text-xs text-muted-foreground">Estimated preparation time</p></div>
+            <div>
+              {c.fulfillmentType === 'delivery' ? (
+                <><p className="text-sm font-semibold">Estimated delivery: ~{c.maxPrepTime + 15} minutes</p><p className="text-xs text-muted-foreground">Includes preparation + delivery time</p></>
+              ) : (
+                <><p className="text-sm font-semibold">Ready in ~{c.maxPrepTime} minutes</p><p className="text-xs text-muted-foreground">Estimated preparation time</p></>
+              )}
+            </div>
           </div>
         )}
 
@@ -110,6 +116,17 @@ export default function CartPage() {
           );
         })}
 
+        {/* #5: Multi-seller cart explanation — prominent */}
+        {c.sellerGroups.length > 1 && (
+          <div className="mx-4 mt-3 flex items-start gap-3 bg-muted border border-border rounded-xl p-3">
+            <AlertCircle size={16} className="text-muted-foreground shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">Your cart has items from {c.sellerGroups.length} sellers</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Separate orders will be created for each. Each seller will receive and fulfill their order independently.</p>
+            </div>
+          </div>
+        )}
+
         {/* Cart Items by Seller */}
         <div className="mt-4 space-y-3 px-4">
           {c.sellerGroups.map((group) => (
@@ -117,6 +134,8 @@ export default function CartPage() {
               <div className="px-3 py-2.5 border-b border-border flex items-center gap-2">
                 <Store size={14} className="text-primary" />
                 <span className="text-sm font-semibold flex-1 truncate">{group.sellerName}</span>
+                {/* #6: Seller contact shortcut */}
+                <Link to={`/seller/${group.sellerId}`} className="text-[10px] text-primary font-medium shrink-0">View Store</Link>
                 <span className="text-xs text-muted-foreground">{group.items.length} item{group.items.length > 1 ? 's' : ''}</span>
               </div>
               {c.profile?.society_id && (group.items[0]?.product?.seller as any)?.society_id && (group.items[0]?.product?.seller as any)?.society_id !== c.profile.society_id && (
@@ -231,7 +250,7 @@ export default function CartPage() {
           )}
         </div>
 
-        {c.sellerGroups.length > 1 && (<p className="text-xs text-muted-foreground text-center mt-4 px-4">Your cart has items from {c.sellerGroups.length} sellers. Separate orders will be created for each.</p>)}
+        {/* Multi-seller note moved to top — see #5 above */}
 
         {/* Refund Promise */}
         <div className="mx-4 mt-4 flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-xl p-3">
@@ -299,7 +318,18 @@ export default function CartPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Items</span><span className="font-medium">{c.itemCount} item{c.itemCount !== 1 ? 's' : ''}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span className="font-medium">{c.paymentMethod === 'cod' ? 'Cash on Delivery' : 'UPI'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">{c.fulfillmentType === 'self_pickup' ? 'Pickup from' : 'Deliver to'}</span><span className="font-medium text-right">{c.fulfillmentType === 'self_pickup' ? c.sellerGroups[0]?.sellerName || 'Seller' : c.selectedDeliveryAddress?.label || 'Not set'}</span></div>
+                {/* #9: Prominent delivery address in confirm dialog */}
+                {c.fulfillmentType === 'self_pickup' ? (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Pickup from</span><span className="font-medium text-right">{c.sellerGroups[0]?.sellerName || 'Seller'}</span></div>
+                ) : c.selectedDeliveryAddress ? (
+                  <div className="bg-muted rounded-lg p-2.5">
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">Deliver to</p>
+                    <p className="font-medium">{c.selectedDeliveryAddress.label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{[c.selectedDeliveryAddress.flat_number && `Flat ${c.selectedDeliveryAddress.flat_number}`, c.selectedDeliveryAddress.block && `Block ${c.selectedDeliveryAddress.block}`, c.selectedDeliveryAddress.building_name].filter(Boolean).join(', ')}</p>
+                  </div>
+                ) : (
+                  <div className="flex justify-between"><span className="text-muted-foreground">Deliver to</span><span className="font-medium text-right text-warning">Not set</span></div>
+                )}
                 {c.sellerGroups.length > 1 && <p className="text-xs text-muted-foreground">{c.sellerGroups.length} separate orders will be created.</p>}
                 <div className="flex justify-between border-t border-border pt-2 font-bold"><span>Total</span><span>{c.formatPrice(c.finalAmount)}</span></div>
               </div>

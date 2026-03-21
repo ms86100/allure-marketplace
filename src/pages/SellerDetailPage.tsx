@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { computeStoreStatus, formatStoreClosedMessage } from '@/lib/store-availability';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ProductCard } from '@/components/product/ProductCard';
@@ -31,7 +32,7 @@ import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile, Product, DAYS_OF_WEEK } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
-import { ArrowLeft, Clock, MapPin, Phone, Search, ShoppingCart, Star, Calendar, Flag, X, Zap, Users, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, Phone, Search, ShoppingCart, Star, Calendar, Flag, X, Zap, Users, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -193,7 +194,7 @@ export default function SellerDetailPage() {
 
       if (error) throw error;
 
-      toast.success('Report submitted. Our team will review it shortly.');
+      toast.success('Report submitted. Our moderation team will review within 24 hours. You\'ll be notified of any action taken. Your identity is kept confidential.');
       setIsReportOpen(false);
       setReportType('');
       setReportDescription('');
@@ -314,6 +315,28 @@ export default function SellerDetailPage() {
         </div>
 
       </div>
+
+      {/* #1 + #2: Store closed banner with reopen time */}
+      {(() => {
+        const storeStatus = computeStoreStatus(
+          seller.availability_start,
+          seller.availability_end,
+          (seller as any).operating_days,
+          seller.is_available !== false
+        );
+        if (storeStatus.status === 'open') return null;
+        const closedMsg = formatStoreClosedMessage(storeStatus);
+        return (
+          <div className="mx-4 mt-3 flex items-start gap-3 bg-warning/10 border border-warning/30 rounded-xl p-3">
+            <AlertCircle size={18} className="text-warning shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-warning-foreground">This store is currently closed</p>
+              {closedMsg && <p className="text-xs text-muted-foreground mt-0.5">{closedMsg}</p>}
+              <p className="text-xs text-muted-foreground mt-0.5">Browse the menu and order when they reopen.</p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Seller Info */}
       <div className="px-4 -mt-8 relative z-10">
@@ -578,8 +601,9 @@ export default function SellerDetailPage() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No products available</p>
+              <div className="text-center py-8 space-y-2">
+                <p className="text-muted-foreground">No items listed yet</p>
+                <p className="text-xs text-muted-foreground">Check back later or <Link to="/search" className="text-primary font-semibold hover:underline">browse other sellers</Link> in your community.</p>
               </div>
             )}
           </TabsContent>

@@ -427,6 +427,7 @@ export default function OrderDetailPage() {
               <p className="text-xs text-muted-foreground mb-1">Your Delivery Code</p>
               <p className="text-3xl font-bold tracking-[0.3em] text-primary">{buyerOtp}</p>
               <p className="text-[11px] text-muted-foreground mt-1.5">Share this code with the delivery person to confirm delivery</p>
+              <p className="text-[10px] text-warning mt-1.5">⚠️ Only share when you've received your items. This code confirms delivery is complete.</p>
             </div>
           )}
           {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}
