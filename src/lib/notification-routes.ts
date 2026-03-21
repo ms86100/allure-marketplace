@@ -40,6 +40,14 @@ export function resolveNotificationRoute(
     case 'new_store_application':
       return '/admin';
 
+    // Booking reminders
+    case 'booking_reminder_1_hour':
+    case 'booking_reminder_30_min':
+    case 'booking_reminder_10_min': {
+      const orderId = payload?.orderId || payload?.order_id;
+      return orderId ? `/orders/${orderId}` : '/orders';
+    }
+
     default:
       return '/notifications';
   }

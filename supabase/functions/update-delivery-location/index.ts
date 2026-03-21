@@ -475,14 +475,14 @@ serve(async (req) => {
 
         // MUTUALLY EXCLUSIVE tiers: <200m = imminent ONLY, 200-500m = nearby ONLY
         if (distanceMeters < 200) {
-          const thirtySecsAgoImm = new Date(Date.now() - 30_000).toISOString();
+          const threeMinAgoImm = new Date(Date.now() - 3 * 60_000).toISOString();
           const { count: imminentCount } = await supabase
             .from('notification_queue')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', buyerId)
             .eq('type', 'delivery_proximity_imminent')
             .eq('reference_path', `/orders/${assignment.order_id}`)
-            .gte('created_at', thirtySecsAgoImm);
+            .gte('created_at', threeMinAgoImm);
 
           if (!imminentCount || imminentCount === 0) {
             await supabase.from('notification_queue').insert({
@@ -505,14 +505,14 @@ serve(async (req) => {
             });
           }
         } else if (distanceMeters < 500) {
-          const thirtySecsAgo = new Date(Date.now() - 30_000).toISOString();
+          const threeMinAgo = new Date(Date.now() - 3 * 60_000).toISOString();
           const { count } = await supabase
             .from('notification_queue')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', buyerId)
             .eq('type', 'delivery_proximity')
             .eq('reference_path', `/orders/${assignment.order_id}`)
-            .gte('created_at', thirtySecsAgo);
+            .gte('created_at', threeMinAgo);
 
           if (!count || count === 0) {
             await supabase.from('notification_queue').insert({

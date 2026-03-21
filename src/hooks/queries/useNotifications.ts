@@ -25,11 +25,52 @@ export function useNotifications(userId: string | undefined) {
     queryFn: async () => {
       const { data } = await supabase
         .from('user_notifications')
-        .select('*')
+        .select('id, title, body, type, reference_path, is_read, created_at, payload')
         .eq('user_id', userId!)
         .order('created_at', { ascending: false })
         .limit(50);
-      return (data as unknown as UserNotification[]) || [];
+
+      const notifications = (data as unknown as UserNotification[]) || [];
+
+      // Auto-cleanup: mark delivery notifications for terminal orders as read
+      const deliveryTypes = new Set(['delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent']);
+      const unreadDeliveryNotifs: UserNotification[] = [];
+      const orderIds = new Set<string>();
+      for (const n of notifications) {
+        if (!n.is_read && deliveryTypes.has(n.type)) {
+          const oid = (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
+          if (oid) {
+            orderIds.add(oid);
+            unreadDeliveryNotifs.push(n);
+          }
+        }
+      }
+
+      if (orderIds.size > 0) {
+        const { data: terminalOrders } = await supabase
+          .from('orders')
+          .select('id')
+          .in('id', [...orderIds])
+          .in('status', ['delivered', 'completed', 'cancelled', 'no_show']);
+        if (terminalOrders && terminalOrders.length > 0) {
+          const terminalSet = new Set(terminalOrders.map((o: any) => o.id));
+          const staleIds = unreadDeliveryNotifs
+            .filter(n => {
+              const oid = (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
+              return oid && terminalSet.has(oid);
+            })
+            .map(n => n.id);
+          if (staleIds.length > 0) {
+            await supabase.from('user_notifications').update({ is_read: true }).in('id', staleIds);
+            // Mark locally so UI reflects immediately
+            for (const n of notifications) {
+              if (staleIds.includes(n.id)) n.is_read = true;
+            }
+          }
+        }
+      }
+
+      return notifications;
     },
     enabled: !!userId,
     staleTime: 0,
@@ -43,7 +84,7 @@ export function useLatestActionNotification(userId: string | undefined) {
     queryFn: async () => {
       const { data } = await supabase
         .from('user_notifications')
-        .select('*')
+        .select('id, title, body, type, reference_path, is_read, created_at, payload')
         .eq('user_id', userId!)
         .eq('is_read', false)
         .not('payload', 'is', null)
