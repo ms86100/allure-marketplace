@@ -123,8 +123,8 @@ const FULFILLMENT_OPTIONS = [
   { value: 'self_pickup', label: 'Self Pickup Only', description: 'Customers pick up from your location', icon: Store, disabled: false },
   { value: 'seller_delivery', label: 'I Deliver', description: 'You deliver to customers', icon: Truck, disabled: false },
   { value: 'pickup_and_seller_delivery', label: 'Pickup + I Deliver', description: 'Buyer can choose pickup or you deliver', icon: Truck, disabled: false },
-  { value: 'platform_delivery', label: 'Delivery Partner', description: 'Platform delivery partner delivers (coming soon)', icon: Truck, disabled: true },
-  { value: 'pickup_and_platform_delivery', label: 'Pickup + Delivery Partner', description: 'Buyer can choose pickup or delivery partner (coming soon)', icon: Truck, disabled: true },
+  { value: 'platform_delivery', label: 'Delivery Partner', description: 'Platform delivery partner delivers — available in future plans', icon: Truck, disabled: true },
+  { value: 'pickup_and_platform_delivery', label: 'Pickup + Delivery Partner', description: 'Buyer can choose pickup or delivery partner — available in future plans', icon: Truck, disabled: true },
 ];
 
 // ─── Main Page ──────────────────────────────────────────────────────────────

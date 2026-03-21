@@ -443,10 +443,17 @@ export default function SellerDetailPage() {
                 </Badge>
               )}
               {(seller as any).cancellation_rate !== undefined && (seller as any).cancellation_rate === 0 && (seller as any).completed_order_count > 2 && (
-                <Badge variant="secondary" className="text-[10px] bg-success/10 text-success border-0">
-                  <ShieldCheck size={10} className="mr-1" />
-                  0% cancellation
-                </Badge>
+                <button
+                  onClick={() => toast.info('Verified Seller', {
+                    description: `${seller.business_name} is a verified resident of your community, confirmed by society admins. They have completed ${(seller as any).completed_order_count} orders with 0% cancellation rate.`,
+                  })}
+                  className="cursor-pointer"
+                >
+                  <Badge variant="secondary" className="text-[10px] bg-success/10 text-success border-0">
+                    <ShieldCheck size={10} className="mr-1" />
+                    0% cancellation
+                  </Badge>
+                </button>
               )}
             </div>
           )}

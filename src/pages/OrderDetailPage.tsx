@@ -181,7 +181,7 @@ export default function OrderDetailPage() {
 
 
   return (
-    <AppLayout showHeader={false} showNav={false}>
+    <AppLayout showHeader={false} showNav={isTerminalStatus(o.flow, order.status)}>
       <div className="pb-28">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
@@ -190,12 +190,16 @@ export default function OrderDetailPage() {
             <h1 className="text-base font-bold">Order Summary</h1>
             <button onClick={o.copyOrderId} className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono">#{order.id.slice(0, 8)} <Copy size={10} /></button>
           </div>
-          {o.canChat && o.chatRecipientId && (
+          {o.canChat && o.chatRecipientId ? (
             <button onClick={() => o.setIsChatOpen(true)} className="relative inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted">
               <MessageCircle size={16} />
               {o.unreadMessages > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">{o.unreadMessages}</span>}
             </button>
-          )}
+          ) : isTerminalStatus(o.flow, order.status) ? (
+            <Link to="/help" className="relative inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted opacity-50" title="Chat closed — order complete. Need help?">
+              <MessageCircle size={16} className="text-muted-foreground" />
+            </Link>
+          ) : null}
         </div>
 
         <div className="px-4 pt-3 space-y-3">
@@ -213,6 +217,20 @@ export default function OrderDetailPage() {
                   Estimated delivery: {format(new Date((order as any).estimated_delivery_at), 'h:mm a')}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* #5: Seller response time expectation for buyers */}
+          {o.isBuyerView && isFirstFlowStep(o.flow, order.status) && !o.isUrgentOrder && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50">
+              <Loader2 size={14} className="animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground">
+                Waiting for {seller?.business_name || 'seller'} to confirm…
+                {(seller as any)?.avg_response_minutes > 0
+                  ? <span className="font-medium text-foreground"> Usually responds in ~{(seller as any).avg_response_minutes} min</span>
+                  : <span className="font-medium text-foreground"> Sellers typically respond within a few minutes</span>
+                }
+              </p>
             </div>
           )}
 
@@ -236,10 +254,16 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {order.rejection_reason && isTerminalStatus(o.flow, order.status) && !isSuccessfulTerminal(o.flow, order.status) && o.isBuyerView && (
+          {order.rejection_reason && isTerminalStatus(o.flow, order.status) && !isSuccessfulTerminal(o.flow, order.status) && (
             <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 flex items-start gap-2.5">
               <XCircle className="text-destructive shrink-0 mt-0.5" size={16} />
-              <div><p className="text-sm font-semibold text-destructive">Order Cancelled</p><p className="text-xs text-muted-foreground mt-0.5">{order.rejection_reason}</p></div>
+              <div>
+                <p className="text-sm font-semibold text-destructive">Order Cancelled</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{order.rejection_reason}</p>
+                {o.isSellerView && order.rejection_reason?.toLowerCase().includes('auto') && (
+                  <p className="text-[11px] text-primary mt-1.5 font-medium">💡 Tip: Respond within 3 minutes to avoid auto-cancellation</p>
+                )}
+              </div>
             </div>
           )}
 

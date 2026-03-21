@@ -115,11 +115,12 @@ function EmptyState({ message, type }: { message: string; type?: 'buyer' | 'sell
 }
 
 function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userId: string; sellerId?: string }) {
-  const { successSet } = useTerminalStatuses();
+  const { successSet, terminalSet } = useTerminalStatuses();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [buyerFilter, setBuyerFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
 
   const fetchOrders = useCallback(async (cursor?: string) => {
     const isInitial = !cursor;
@@ -177,6 +178,14 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
     }
   };
 
+  const filteredOrders = type === 'buyer' ? orders.filter(order => {
+    if (buyerFilter === 'all') return true;
+    if (buyerFilter === 'cancelled') return order.status === 'cancelled';
+    if (buyerFilter === 'completed') return successSet.has(order.status);
+    if (buyerFilter === 'active') return !terminalSet.has(order.status);
+    return true;
+  }) : orders;
+
   if (isLoading) {
     return (
       <div className="space-y-2.5">
@@ -191,7 +200,29 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
 
   return (
     <div>
-      {orders.map(order => <OrderCard key={order.id} order={order} type={type} successTerminals={successSet} />)}
+      {/* Buyer filter chips */}
+      {type === 'buyer' && orders.length > 3 && (
+        <div className="flex gap-2 mb-3 overflow-x-auto scrollbar-hide">
+          {(['all', 'active', 'completed', 'cancelled'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setBuyerFilter(f)}
+              className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${
+                buyerFilter === f
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
+            >
+              {f === 'all' ? 'All' : f === 'active' ? 'Active' : f === 'completed' ? 'Completed' : 'Cancelled'}
+            </button>
+          ))}
+        </div>
+      )}
+      {filteredOrders.length === 0 ? (
+        <div className="text-center py-8 text-sm text-muted-foreground">No {buyerFilter} orders</div>
+      ) : (
+        filteredOrders.map(order => <OrderCard key={order.id} order={order} type={type} successTerminals={successSet} />)
+      )}
       {hasMore && (
         <div className="flex justify-center py-4">
           <Button variant="secondary" size="default" className="w-full" onClick={loadMore} disabled={isLoadingMore}>

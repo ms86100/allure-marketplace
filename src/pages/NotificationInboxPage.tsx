@@ -3,7 +3,7 @@ import { resolveNotificationRoute } from '@/lib/notification-routes';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
-import { Bell, CheckCheck, Inbox, RefreshCw } from 'lucide-react';
+import { Bell, CheckCheck, Inbox, RefreshCw, Package, Users, Truck, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '@/hooks/queries/useNotifications';
@@ -75,7 +75,14 @@ export default function NotificationInboxPage() {
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                       n.is_read ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'
                     }`}>
-                      <Bell size={14} />
+                      {(() => {
+                        const t = n.type || '';
+                        if (t.includes('order') || t.includes('payment')) return <Package size={14} />;
+                        if (t.includes('delivery') || t.includes('rider')) return <Truck size={14} />;
+                        if (t.includes('community') || t.includes('bulletin')) return <Users size={14} />;
+                        if (t.includes('chat') || t.includes('message')) return <MessageCircle size={14} />;
+                        return <Bell size={14} />;
+                      })()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm leading-tight ${!n.is_read ? 'font-semibold' : 'font-medium'}`}>

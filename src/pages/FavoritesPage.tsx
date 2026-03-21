@@ -41,7 +41,7 @@ export default function FavoritesPage() {
       
       const sellers = data
         ?.map((f: any) => f.seller)
-        .filter((s: any) => s && s.verification_status === 'approved' && s.is_available !== false) || [];
+        .filter((s: any) => s && s.verification_status === 'approved') || [];
       
       setFavorites(sellers);
     } catch (error) {
@@ -105,9 +105,11 @@ export default function FavoritesPage() {
 }
 
 function FavoriteSellerCard({ seller, onRemoved }: { seller: any; onRemoved: () => void }) {
+  const isClosed = seller.is_available === false;
+
   return (
     <Link to={`/seller/${seller.id}`} className="block">
-      <div className="relative rounded-xl border border-border bg-card overflow-hidden">
+      <div className={`relative rounded-xl border border-border bg-card overflow-hidden ${isClosed ? 'opacity-60' : ''}`}>
         {/* Image */}
         <div className="aspect-square bg-muted flex items-center justify-center relative">
           {seller.profile_image_url || seller.cover_image_url ? (
@@ -118,6 +120,13 @@ function FavoriteSellerCard({ seller, onRemoved }: { seller: any; onRemoved: () 
             />
           ) : (
             <Store size={28} className="text-muted-foreground" />
+          )}
+
+          {/* Closed overlay */}
+          {isClosed && (
+            <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
+              <span className="text-[10px] font-semibold text-muted-foreground bg-background/80 px-2 py-0.5 rounded-full">Closed</span>
+            </div>
           )}
 
           {/* Heart overlay top-right */}
