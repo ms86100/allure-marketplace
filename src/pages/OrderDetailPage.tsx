@@ -223,8 +223,9 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* Buyer-side urgent countdown timer */}
-          {o.isUrgentBuyerView && order.auto_cancel_at && (
+          {/* Buyer-side urgent countdown timer — BULLETPROOF: show whenever auto_cancel_at is set
+              and buyer is viewing a non-terminal order. Does NOT depend on flow loading. */}
+          {o.isBuyerView && order.auto_cancel_at && !isTerminalStatus(o.flow, order.status) && (
             <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} variant="buyer" />
           )}
 
@@ -242,8 +243,8 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* Seller-side urgent timer */}
-          {o.isUrgentSellerView && order.auto_cancel_at && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} variant="seller" />}
+          {/* Seller-side urgent timer — BULLETPROOF: show whenever auto_cancel_at is set */}
+          {o.isSellerView && order.auto_cancel_at && !isTerminalStatus(o.flow, order.status) && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} variant="seller" />}
 
           {/* Gap 8: Needs attention banner for buyer — hide on terminal statuses */}
           {o.isBuyerView && (order as any).needs_attention && !isTerminalStatus(o.flow, order.status) && (
@@ -568,12 +569,15 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* Buyer Action Bar — DB-driven: renders when buyer has a forward action OR can cancel */}
-      {o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel) && (
+      {/* Buyer Action Bar — BULLETPROOF: Always show for placed/non-terminal orders.
+          Uses DB transitions when loaded, but ALWAYS shows cancel for placed status as hardened fallback.
+          This ensures the cancel button never disappears due to async transition loading. */}
+      {o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel || order.status === 'placed') && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
           <div className="px-4 py-3 flex gap-3">
-            {o.canBuyerCancel && (
-              <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => o.fetchOrder()} canCancel={o.canBuyerCancel} />
+            {/* Cancel button: show from DB transitions OR hardened fallback for placed status */}
+            {(o.canBuyerCancel || order.status === 'placed') && (
+              <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => o.fetchOrder()} canCancel={true} />
             )}
             {o.buyerNextStatus && (
               <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.buyerAdvanceOrder(o.buyerNextStatus!)} disabled={o.isUpdating}>
