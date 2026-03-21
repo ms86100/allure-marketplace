@@ -360,7 +360,7 @@ Deno.serve(async (req) => {
     // Fetch device tokens for user
     const { data: tokens, error: tokensError } = await supabase
       .from("device_tokens")
-      .select("id, token, platform, apns_token")
+      .select("id, token, platform, apns_token, updated_at")
       .eq("user_id", userId);
 
     if (tokensError) {
