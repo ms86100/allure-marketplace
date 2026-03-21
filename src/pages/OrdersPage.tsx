@@ -142,6 +142,7 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
           .eq('buyer_id', userId)
           .order('created_at', { ascending: false })
           .limit(PAGE_SIZE);
+        // payment_method is included via * select
       } else {
         query = supabase
           .from('orders')

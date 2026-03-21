@@ -362,6 +362,31 @@ function ProductListings({
           <Clock size={15} />
           <span>{ml.label('label_empty_marketplace_hint')}</span>
         </motion.div>
+
+        {/* Plan #16: Actionable CTAs for empty marketplace */}
+        <motion.div
+          initial={{ y: 12, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.6, duration: 0.4 }}
+          className="mt-4 flex flex-col gap-2 w-full max-w-xs"
+        >
+          <button
+            onClick={() => navigate('/become-seller')}
+            className="w-full px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold active:scale-[0.98] transition-transform"
+          >
+            🛍️ Become the first seller
+          </button>
+          <button
+            onClick={() => {
+              if (navigator.share) {
+                navigator.share({ title: 'Join our community marketplace', url: window.location.origin });
+              }
+            }}
+            className="w-full px-4 py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium active:scale-[0.98] transition-transform"
+          >
+            📨 Invite neighbors
+          </button>
+        </motion.div>
       </div>
     );
   }
