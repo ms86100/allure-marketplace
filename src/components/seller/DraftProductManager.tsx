@@ -371,6 +371,9 @@ export function DraftProductManager({
       is_veg: true,
       image_url: '',
       prep_time_minutes: null,
+      stock_quantity: null,
+      low_stock_threshold: null,
+      action_type: 'add_to_cart',
     });
     setIsAdding(false);
     setEditingIndex(null);
