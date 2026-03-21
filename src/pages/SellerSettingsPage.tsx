@@ -331,7 +331,7 @@ export default function SellerSettingsPage() {
       </div>
 
       {/* Save Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-card border-t border-border pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-card border-t border-border pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <Button className="w-full h-12" onClick={handleSave} disabled={isSaving}>
           {isSaving ? <Loader2 className="animate-spin mr-2" size={18} /> : null} Save Changes
         </Button>

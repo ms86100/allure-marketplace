@@ -142,7 +142,7 @@ function HeaderInner({
             </div>
 
             <div className="flex items-center gap-0.5">
-              <ThemeToggle />
+              <span className="hidden min-[375px]:inline-flex"><ThemeToggle /></span>
               {isBuilderMember && (
                 <Link to="/builder">
                   <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
