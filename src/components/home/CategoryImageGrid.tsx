@@ -134,12 +134,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                     />
                   </div>
                 )}
-                {/* Glassmorphic overlay label */}
-                {meta.count > 0 && (
-                  <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 bg-background/40 backdrop-blur-lg backdrop-saturate-150 border border-foreground/[0.08] rounded-full px-2 py-0.5">
-                    <span className="text-[8px] font-bold text-foreground/90 whitespace-nowrap">{meta.count} {ml.label('label_item_count')}</span>
-                  </div>
-                )}
+                {/* Count badge removed — was misleading when category page results diverged */}
               </div>
 
               {/* Label below card */}

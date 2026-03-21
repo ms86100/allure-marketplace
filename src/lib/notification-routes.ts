@@ -40,6 +40,16 @@ export function resolveNotificationRoute(
     case 'new_store_application':
       return '/admin';
 
+    // Delivery lifecycle
+    case 'delivery_en_route':
+    case 'delivery_proximity':
+    case 'delivery_proximity_imminent':
+    case 'delivery_stalled':
+    case 'delivery_delayed': {
+      const oid = payload?.order_id || payload?.orderId || payload?.entity_id;
+      return oid ? `/orders/${oid}` : '/orders';
+    }
+
     // Booking reminders
     case 'booking_reminder_1_hour':
     case 'booking_reminder_30_min':
