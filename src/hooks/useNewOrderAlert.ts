@@ -213,7 +213,7 @@ export function useNewOrderAlert(sellerIds: string[]) {
           .from('orders')
           .select('id, status, total_amount, created_at, seller_id')
           .in('seller_id', sellerIds)
-          .in('status', ACTIONABLE_STATUSES as unknown as string[])
+          .in('status', [...ACTIONABLE_STATUSES])
           .order('created_at', { ascending: true });
 
         if (lastSeenAtRef.current) {
