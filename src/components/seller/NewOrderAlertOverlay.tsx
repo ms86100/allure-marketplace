@@ -42,7 +42,9 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onSnooze }: NewOrderAl
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          onDismiss();
+          // Auto-dismiss should snooze (re-alert after 60s), not permanently dismiss
+          if (onSnooze) onSnooze();
+          else onDismiss();
           return 0;
         }
         return prev - 1;
