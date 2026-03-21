@@ -200,9 +200,11 @@ export function ActiveOrderStrip() {
                   )}
                 </div>
 
-                {/* ETA or count */}
+                {/* ETA / countdown / count */}
                 <div className="shrink-0 flex items-center gap-1">
-                  {etaText ? (
+                  {order.auto_cancel_at && order.status === 'placed' ? (
+                    <CompactCountdown autoCancelAt={order.auto_cancel_at} />
+                  ) : etaText ? (
                     <span className="text-[10px] font-bold text-primary whitespace-nowrap">
                       {etaText}
                     </span>
