@@ -352,9 +352,9 @@ export function ServiceBookingFlow({
                   <h4 className="font-medium">{productName}</h4>
                   <p className="text-xs text-muted-foreground">{sellerName}</p>
                   <p className="text-lg font-bold text-primary tabular-nums">{formatPrice(price)}</p>
-                  {durationMinutes && (
+                  {resolvedDuration && (
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock size={10} />{durationMinutes} min session
+                      <Clock size={10} />{resolvedDuration} min session
                     </p>
                   )}
                 </div>
