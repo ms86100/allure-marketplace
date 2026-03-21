@@ -366,7 +366,7 @@ export function ServiceBookingFlow({
                 selectedTime={selectedTime}
                 onDateSelect={handleDateSelect}
                 onTimeSelect={setSelectedTime}
-                serviceDuration={durationMinutes}
+                serviceDuration={resolvedDuration}
                 availableSlots={availableSlots}
               />
 
