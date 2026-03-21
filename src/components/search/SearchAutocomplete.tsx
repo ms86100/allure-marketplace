@@ -54,7 +54,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
         .map(c => c.category);
 
       // Build OR conditions for deep search
-      let orConditions = `name.ilike.%${trimmed}%,description.ilike.%${trimmed}%,brand.ilike.%${trimmed}%,ingredients.ilike.%${trimmed}%,tags::text.ilike.%${trimmed}%,bullet_features::text.ilike.%${trimmed}%`;
+      let orConditions = `name.ilike.%${trimmed}%,description.ilike.%${trimmed}%,brand.ilike.%${trimmed}%,ingredients.ilike.%${trimmed}%`;
       if (matchingSlugs.length > 0) {
         orConditions += `,category.in.(${matchingSlugs.join(',')})`;
       }
