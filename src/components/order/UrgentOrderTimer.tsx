@@ -55,7 +55,7 @@ export function UrgentOrderTimer({
       <div className={cn('flex items-center gap-2 text-destructive', className)}>
         <AlertTriangle size={18} />
         <span className="font-medium">
-          {isBuyer ? 'Seller didn't respond — order auto-cancelled' : 'Time expired - Order auto-cancelled'}
+          {isBuyer ? "Seller didn\u2019t respond \u2014 order auto-cancelled" : 'Time expired - Order auto-cancelled'}
         </span>
       </div>
     );
