@@ -235,20 +235,17 @@ function ProductGridByCategory({ products, categoryMap, categoryConfigs, marketp
 
 // ── Empty States ──
 function EmptyState({ browseBeyond, onEnableBrowseBeyond }: { browseBeyond?: boolean; onEnableBrowseBeyond?: () => void }) {
-  const navigate = useNavigate();
-  const suggestedCategories: { slug: string; label: string }[] = [];
   return (
     <div className="text-center py-12 space-y-4">
       <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center"><SearchIcon size={28} className="text-muted-foreground" /></div>
-      <div><p className="font-semibold">No results found</p><p className="text-sm text-muted-foreground mt-1">Try different keywords or browse categories</p></div>
+      <div>
+        <p className="font-semibold">No results found</p>
+        <p className="text-sm text-muted-foreground mt-1">Some services may not be available in your community yet.</p>
+        <p className="text-sm text-muted-foreground mt-1">Try browsing by category, or <Link to="/become-seller" className="text-primary font-semibold hover:underline">become the first to offer this service</Link>.</p>
+      </div>
       {!browseBeyond && onEnableBrowseBeyond && (
         <button onClick={onEnableBrowseBeyond} className="text-sm text-primary font-medium hover:underline flex items-center gap-1 mx-auto"><Globe size={14} /> Search nearby societies too</button>
       )}
-      <div className="flex flex-wrap justify-center gap-2 mt-4">
-        {suggestedCategories.map(({ slug, label }) => (
-          <button key={slug} onClick={() => navigate(`/category/${slug}`)} className="px-4 py-2 bg-muted rounded-xl text-sm hover:bg-muted/80 transition-colors">{label}</button>
-        ))}
-      </div>
     </div>
   );
 }

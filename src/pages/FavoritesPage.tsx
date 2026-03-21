@@ -145,11 +145,15 @@ function FavoriteSellerCard({ seller, onRemoved }: { seller: any; onRemoved: () 
           <p className="text-xs font-medium text-foreground truncate leading-tight">
             {seller.business_name}
           </p>
-          {seller.profile?.name && (
-            <p className="text-[10px] text-muted-foreground truncate">
-              {seller.profile.name}
-            </p>
-          )}
+          {/* #11: Show rating and category */}
+          <div className="flex items-center gap-1 mt-0.5">
+            {seller.rating > 0 && (
+              <span className="text-[10px] text-warning font-medium flex items-center gap-0.5">★ {seller.rating.toFixed(1)}</span>
+            )}
+            {seller.category && (
+              <span className="text-[10px] text-muted-foreground truncate">{seller.category}</span>
+            )}
+          </div>
         </div>
       </div>
     </Link>

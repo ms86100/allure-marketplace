@@ -601,8 +601,9 @@ export default function SellerDetailPage() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">No products available</p>
+              <div className="text-center py-8 space-y-2">
+                <p className="text-muted-foreground">No items listed yet</p>
+                <p className="text-xs text-muted-foreground">Check back later or <Link to="/search" className="text-primary font-semibold hover:underline">browse other sellers</Link> in your community.</p>
               </div>
             )}
           </TabsContent>

@@ -175,9 +175,10 @@ export function ReviewForm({ orderId, sellerId, sellerName, category, onSuccess,
               rows={3}
               maxLength={500}
             />
-            <p className="text-xs text-muted-foreground text-right mt-1">
-              {comment.length}/500
-            </p>
+            <div className="flex justify-between mt-1">
+              <p className="text-[10px] text-muted-foreground">Your review will be shown with your first name. Sellers cannot see your contact details.</p>
+              <p className="text-xs text-muted-foreground shrink-0 ml-2">{comment.length}/500</p>
+            </div>
           </div>
 
           <Button
