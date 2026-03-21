@@ -512,7 +512,7 @@ serve(async (req) => {
             .eq('user_id', buyerId)
             .eq('type', 'delivery_proximity')
             .eq('reference_path', `/orders/${assignment.order_id}`)
-            .gte('created_at', thirtySecsAgo);
+            .gte('created_at', threeMinAgo);
 
           if (!count || count === 0) {
             await supabase.from('notification_queue').insert({
