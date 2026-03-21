@@ -11,6 +11,7 @@ function getIcon(type: string) {
   switch (type) {
     case 'order':
     case 'order_status':
+    case 'order_update':
       return <Package className="text-primary" size={28} />;
     case 'review':
       return <Star className="text-accent-foreground" size={28} />;

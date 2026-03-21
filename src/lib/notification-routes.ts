@@ -19,7 +19,8 @@ export function resolveNotificationRoute(
 
     // Order lifecycle
     case 'order_created':
-    case 'order_status': {
+    case 'order_status':
+    case 'order_update': {
       const orderId = payload?.orderId || payload?.order_id || payload?.entity_id;
       return orderId ? `/orders/${orderId}` : '/orders';
     }
