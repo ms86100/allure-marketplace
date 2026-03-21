@@ -60,7 +60,7 @@ app.post("/", async (c) => {
       .in("status", cancellableStatuses)
       .eq("payment_status", "pending")
       .neq("payment_type", "cod")
-      .lt("created_at", fifteenMinAgo);
+      .lt("created_at", thirtyMinAgo);
 
     const fetchError = urgentErr || orphanErr;
     const expiredOrders = [
