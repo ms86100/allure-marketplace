@@ -53,7 +53,7 @@ export default function NotificationInboxPage() {
         ) : (
           <div className="space-y-2">
             {notifications.map(n => {
-              const hasAction = n.payload?.action;
+              const hasAction = n.payload?.action && !n.is_read;
 
               if (hasAction) {
                 return (
