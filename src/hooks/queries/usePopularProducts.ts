@@ -13,19 +13,21 @@ import { useAuth } from '@/contexts/AuthContext';
 export function usePopularProducts(limit = 12) {
   const { browsingLocation } = useBrowsingLocation();
   const { data: nearbyProducts } = useNearbyProducts();
+  const { profile, effectiveSocietyId } = useAuth();
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
+  const radiusKm = profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM;
 
   const localQuery = useQuery({
-    queryKey: ['popular-products', lat, lng, limit],
+    queryKey: ['popular-products', lat, lng, limit, radiusKm, effectiveSocietyId],
     queryFn: async (): Promise<ProductWithSeller[]> => {
       if (!lat || !lng) return [];
 
-      // Use coordinate-based RPC to find sellers, then extract products
       const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: MARKETPLACE_RADIUS_KM,
+        _radius_km: radiusKm,
+        _exclude_society_id: effectiveSocietyId || undefined,
       });
 
       if (error) throw error;

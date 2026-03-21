@@ -93,8 +93,8 @@ export function SmartSuggestionBanner() {
           className="bg-card border border-border rounded-xl p-3 flex items-center gap-3"
         >
           <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
-            {suggestion.product?.image_urls?.[0] ? (
-              <img src={suggestion.product.image_urls[0]} alt="" className="w-full h-full object-cover" />
+            {suggestion.product?.image_url ? (
+              <img src={suggestion.product.image_url} alt="" className="w-full h-full object-cover" />
             ) : (
               <ShoppingBag size={20} className="text-muted-foreground" />
             )}

@@ -99,6 +99,7 @@ export function BrowsingLocationProvider({ children }: { children: React.ReactNo
     queryClient.invalidateQueries({ queryKey: ['products-by-category'] });
     queryClient.invalidateQueries({ queryKey: ['category-products'] });
     queryClient.invalidateQueries({ queryKey: ['search-popular-products'] });
+    queryClient.invalidateQueries({ queryKey: ['location-stats'] });
   }, [queryClient]);
 
   const applyLocation = useCallback((loc: BrowsingLocation | null) => {

@@ -4,6 +4,7 @@ import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Fetches trending products based on coordinate-based discovery.
@@ -11,18 +12,21 @@ import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
  */
 export function useTrendingProducts(limit = 10) {
   const { browsingLocation } = useBrowsingLocation();
+  const { profile, effectiveSocietyId } = useAuth();
 
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
+  const radiusKm = profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM;
   const hasCoords = !!(lat && lng);
 
   return useQuery({
-    queryKey: ['trending-products', lat, lng, limit],
+    queryKey: ['trending-products', lat, lng, limit, radiusKm, effectiveSocietyId],
     queryFn: async (): Promise<ProductWithSeller[]> => {
       if (!hasCoords) return [];
 
       const { data, error } = await supabase.rpc('search_sellers_by_location', {
-        _lat: lat!, _lng: lng!, _radius_km: MARKETPLACE_RADIUS_KM,
+        _lat: lat!, _lng: lng!, _radius_km: radiusKm,
+        _exclude_society_id: effectiveSocietyId || undefined,
       });
       if (error || !data) return [];
 
