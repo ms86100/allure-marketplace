@@ -131,7 +131,7 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
       onOpenChange(false);
       onCreated();
     } catch (err: any) {
-      toast({ title: 'Failed to create post', description: friendlyError(err), variant: 'destructive' });
+      toast.error('Failed to create post: ' + friendlyError(err));
     } finally {
       setLoading(false);
     }

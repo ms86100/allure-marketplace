@@ -67,7 +67,7 @@ export function CreateDisputeSheet({ open, onOpenChange, onCreated }: Props) {
       onOpenChange(false);
       onCreated();
     } catch (err: any) {
-      toast({ title: 'Failed', description: friendlyError(err), variant: 'destructive' });
+      toast.error(friendlyError(err));
     } finally {
       setSaving(false);
     }
