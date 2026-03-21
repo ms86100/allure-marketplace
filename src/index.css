@@ -487,7 +487,22 @@ html.large-font a {
   right: 0 !important;
 }
 
-/* Razorpay safe area fix — ensure back button is tappable on all devices */
+/* Razorpay safe area fix — status bar backdrop + full-viewport iframe */
+
+/* Solid backdrop behind the iOS status bar so text stays readable over Razorpay */
+body.razorpay-active::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: #2D4A3E;
+  z-index: 2147483647;
+  pointer-events: none;
+}
+
+/* Generic selectors — push iframe below the status bar backdrop */
 .razorpay-container,
 .razorpay-checkout-frame,
 body.razorpay-active .razorpay-container,
@@ -496,7 +511,8 @@ body.razorpay-active iframe[src*="checkout.razorpay"],
 body.razorpay-active iframe[src*="api.razorpay"],
 body.razorpay-active .razorpay-backdrop {
   top: env(safe-area-inset-top, 0px) !important;
-  height: calc(100% - env(safe-area-inset-top, 0px)) !important;
+  bottom: 0 !important;
+  height: auto !important;
   padding-top: 0 !important;
   z-index: 2147483647 !important;
   touch-action: auto !important;
@@ -516,16 +532,17 @@ body.razorpay-active .razorpay-container {
   box-sizing: border-box !important;
 }
 
-/* Fix for Capacitor webview: ensure iframe fills correctly below status bar */
+/* Fix for Capacitor webview: inset positioning avoids calc() fragility */
 body.razorpay-active iframe[src*="razorpay"],
 body.razorpay-active iframe[src*="api.razorpay"],
 body.razorpay-active iframe[src*="checkout.razorpay"] {
   position: fixed !important;
   top: env(safe-area-inset-top, 0px) !important;
   left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
   width: 100vw !important;
-  height: calc(100vh - env(safe-area-inset-top, 0px)) !important;
-  height: calc(100dvh - env(safe-area-inset-top, 0px)) !important;
+  height: auto !important;
   max-width: 100vw !important;
   border: none !important;
   touch-action: auto !important;

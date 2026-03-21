@@ -149,6 +149,14 @@ export function useRazorpay() {
           netbanking: true,
           wallet: true,
         },
+        config: {
+          display: {
+            preferences: {
+              show_default_blocks: true,
+            },
+            sequence: ['block.upi', 'block.card', 'block.nb', 'block.wallet'],
+          },
+        },
         handler: function (response: any) {
           console.log('Payment successful:', response);
           unlockBodyScroll();
