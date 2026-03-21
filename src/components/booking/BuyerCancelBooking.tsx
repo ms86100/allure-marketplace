@@ -83,7 +83,7 @@ export function BuyerCancelBooking({ bookingId, orderId, slotId, status }: Buyer
       // Bug #19 fix: Use buyer_cancel_order RPC to respect workflow transitions
       const { error: rpcError } = await supabase.rpc('buyer_cancel_order', {
         _order_id: orderId,
-        _buyer_id: user.id,
+        _reason: reason.trim().slice(0, 500) || 'Cancelled by buyer',
       });
 
       if (rpcError) throw rpcError;
