@@ -184,7 +184,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
                   category: product.category,
                   description: product.description,
                   seller_id: product.seller_id,
-                  seller_name: 'Seller',
+                  seller_name: '',
                   seller_rating: 0,
                   seller_reviews: 0,
                   society_name: null,

@@ -233,6 +233,14 @@ export default function CategoryGroupPage() {
                 <X size={14} />
               </button>
             )}
+            <SearchAutocomplete
+              query={searchQuery}
+              onSelect={(product) => {
+                setSelectedProduct(product);
+                setDetailOpen(true);
+                setSearchQuery('');
+              }}
+            />
           </div>
 
           {subCategories.length > 0 && (
