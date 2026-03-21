@@ -505,7 +505,7 @@ serve(async (req) => {
             });
           }
         } else if (distanceMeters < 500) {
-          const thirtySecsAgo = new Date(Date.now() - 30_000).toISOString();
+          const threeMinAgo = new Date(Date.now() - 3 * 60_000).toISOString();
           const { count } = await supabase
             .from('notification_queue')
             .select('id', { count: 'exact', head: true })
