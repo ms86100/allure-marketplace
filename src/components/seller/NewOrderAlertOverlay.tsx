@@ -24,7 +24,7 @@ function statusLabel(status: string): string {
   }
 }
 
-export function NewOrderAlertOverlay({ orders, onDismiss, onSnooze }: NewOrderAlertOverlayProps) {
+export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze }: NewOrderAlertOverlayProps) {
   const navigate = useNavigate();
   const { formatPrice } = useCurrency();
   const [countdown, setCountdown] = useState(AUTO_DISMISS_SECONDS);
