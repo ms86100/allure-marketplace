@@ -72,7 +72,7 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
       if (nameIdx === -1 || priceIdx === -1) { toast.error('CSV must have "name" and "price" columns'); return; }
 
       const parsed: BulkRow[] = lines.slice(1).map(line => {
-        const cols = line.split(',').map(c => c.trim());
+        const cols = parseCSVLine(line);
         const cat = cols[categoryIdx] || allowedCategories[0]?.category || '';
         const config = getCategoryConfig(cat, allowedCategories);
         return {
