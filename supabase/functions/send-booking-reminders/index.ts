@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
 
       const { data: bookings, error } = await supabase
         .from("service_bookings")
-        .select("id, buyer_id, seller_id, product_id, booking_date, start_time, end_time")
+        .select("id, order_id, buyer_id, seller_id, product_id, booking_date, start_time, end_time")
         .eq("booking_date", todayStr)
         .in("status", ["confirmed", "scheduled", "rescheduled", "requested"])
         .gte("start_time", fromTimeStr)
