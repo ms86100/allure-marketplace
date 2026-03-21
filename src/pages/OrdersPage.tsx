@@ -51,7 +51,7 @@ function OrderCard({ order, type, successTerminals }: { order: Order; type: 'buy
               <ChevronRight size={16} className="text-muted-foreground shrink-0" />
             </div>
 
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {isCompleted && <CheckCircle size={12} className="text-accent shrink-0" />}
               {['delivery', 'seller_delivery'].includes((order as any).fulfillment_type) && (
                 <span className="text-[11px] px-1.5 py-0.5 rounded bg-accent/15 text-accent flex items-center gap-0.5">
@@ -61,6 +61,12 @@ function OrderCard({ order, type, successTerminals }: { order: Order; type: 'buy
               <span className={`text-[11px] px-1.5 py-0.5 rounded ${statusInfo.color}`}>
                 {statusInfo.label}
               </span>
+              {/* Plan #17: Payment method badge */}
+              {(order as any).payment_method && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                  {(order as any).payment_method === 'cod' ? 'COD' : 'UPI ✓'}
+                </span>
+              )}
               <span className="text-[11px] text-muted-foreground">
                 {format(new Date(order.created_at), 'MMM d')}
               </span>
