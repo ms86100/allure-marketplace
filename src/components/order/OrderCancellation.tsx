@@ -84,6 +84,8 @@ export function OrderCancellation({ orderId, orderStatus, onCancelled, canCancel
       setIsOpen(false);
 
       toast.success('Order cancelled');
+      // Trigger push notification to seller
+      supabase.functions.invoke('process-notification-queue').catch(() => {});
 
       onCancelled();
     } catch (error: any) {
