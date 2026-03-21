@@ -136,6 +136,15 @@ export function useNewOrderAlert(sellerIds: string[]) {
     });
   }, [stopBuzzing]);
 
+  // Bug 5: Dismiss ALL pending alerts at once (used when seller taps "View Order")
+  const dismissAll = useCallback(() => {
+    setPendingAlerts(prev => {
+      prev.forEach(o => dismissedIdsRef.current.add(o.id));
+      stopBuzzing();
+      return [];
+    });
+  }, [stopBuzzing]);
+
   const snooze = useCallback(() => {
     setPendingAlerts(prev => {
       if (prev.length === 0) return prev;
