@@ -245,7 +245,7 @@ export function useStatusTransitions(
       if ((!data || data.length === 0) && parentGroup !== 'default') {
         const fallback = await supabase
           .from('category_status_transitions')
-          .select('from_status, to_status, allowed_actor')
+          .select('from_status, to_status, allowed_actor, is_side_action')
           .eq('parent_group', 'default')
           .eq('transaction_type', transactionType);
 
