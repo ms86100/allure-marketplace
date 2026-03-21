@@ -1,76 +1,55 @@
 
 
-# Razorpay Checkout Responsiveness & Mobile UX Audit
+# Fix Razorpay UPI Intent Flow — Show All UPI Apps
 
-## Understanding the Problem
+## Problem
+The current Razorpay checkout only shows PayTM as a "Recommended" UPI option and uses a QR code / VPA-entry flow. It does not show installed UPI apps (Google Pay, PhonePe, BHIM, etc.) as tap-to-pay buttons. This is because the current config lacks the proper UPI intent display blocks.
 
-The screenshot shows Razorpay's **native checkout popup** (Payment Options: UPI, Cards, Netbanking, Wallet). This is a **third-party iframe** hosted by Razorpay — we cannot directly style its internal content. However, we control:
+## What Changes
 
-1. **How the iframe is sized and positioned** (CSS in `index.css`)
-2. **Our pre-checkout drawer** (`RazorpayCheckout.tsx`) that shows before the Razorpay popup opens
-3. **Body scroll locking** during the popup (`useRazorpay.ts`)
+**Single file: `src/hooks/useRazorpay.ts`** — Update the Razorpay options `config.display` block to:
 
-The "not responsive" issue likely means the Razorpay popup doesn't properly fill the screen or has interaction issues on certain devices.
+1. **Define a custom UPI intent block** that lists all major apps (`gpay`, `phonepe`, `paytm`, `any`) as clickable buttons
+2. **Set UPI intent as the preferred/first block** so users see app buttons prominently before QR/VPA
+3. **Hide the default Razorpay "Recommended" block** that currently only shows PayTM, replacing it with our explicit app list
+4. **Keep all other methods** (Cards, Netbanking, Wallets) available as secondary options
 
----
+### Razorpay Config Change
 
-## Findings from Code Audit
+Replace the current `config` and `method` objects with:
 
-### A. Razorpay Iframe CSS Issues (index.css lines 490-527)
+```js
+config: {
+  display: {
+    blocks: {
+      banks: {
+        name: "Pay using UPI Apps",
+        instruments: [
+          { method: "upi", flows: ["intent"], apps: ["gpay"] },
+          { method: "upi", flows: ["intent"], apps: ["phonepe"] },
+          { method: "upi", flows: ["intent"], apps: ["paytm"] },
+          { method: "upi", flows: ["intent"], apps: ["any"] },  // catches other installed apps
+        ],
+      },
+    },
+    sequence: ["block.banks"],
+    preferences: {
+      show_default_blocks: true, // keep cards, netbanking, wallets below
+    },
+  },
+},
+```
 
-**Problem 1:** The CSS targets `iframe[src*="razorpay"]` and `iframe[src*="api.razorpay"]`, but Razorpay also creates iframes from `checkout.razorpay.com` — the selector may miss some.
+This tells Razorpay to:
+- Show GPay, PhonePe, Paytm as distinct tap-to-open buttons at the top
+- Include an "any" catch-all for other installed UPI apps
+- Use the `intent` flow (opens the app directly on mobile) instead of collect/QR
+- Still show all other payment methods below
 
-**Problem 2:** The `.razorpay-container` class is assumed to exist on Razorpay's DOM, but Razorpay's actual wrapper classes change across SDK versions. The CSS should target Razorpay's actual DOM structure more broadly.
-
-**Problem 3:** No `max-width` constraint — on tablets/desktop, the Razorpay popup stretches edge-to-edge which looks broken.
-
-### B. RazorpayCheckout.tsx (Our Pre-Checkout Drawer)
-
-**Problem 4:** The drawer doesn't use `max-h-[85vh]` (the standard from memory notes), so on small screens the drawer content could overflow.
-
-**Problem 5:** The drawer has no safe-area bottom padding — buttons could be hidden behind the gesture bar on iPhone X+ models.
-
-**Problem 6:** DrawerTitle says "Pay with UPI" even when Razorpay supports Cards, Wallets, Netbanking — misleading.
-
-### C. useRazorpay.ts Body Lock
-
-**Problem 7:** The `position: fixed` body lock doesn't set `top` to the negative scroll position, causing the page to jump to top when the popup opens. The code saves `scrollY` to `dataset` but never applies `-top` to body.
-
-### D. PaymentMethodSelector.tsx
-
-**Problem 8:** Card touch targets are fine (full-width buttons), but the disabled state text "Not available for this seller" could wrap poorly on narrow screens.
-
----
-
-## Plan
-
-### 1. Fix Razorpay iframe CSS (index.css)
-- Broaden iframe selectors to catch all Razorpay-sourced iframes: `iframe[src*="checkout.razorpay"]`, `iframe[src*="api.razorpay"]`, `iframe[src*="razorpay.com"]`
-- Add a catch-all for Razorpay's backdrop/overlay divs using attribute selectors
-- Ensure the iframe uses `100dvh` on mobile and is properly centered with max-width on larger screens
-- Add `touch-action: auto` to prevent gesture conflicts inside the iframe
-
-### 2. Fix body scroll lock in useRazorpay.ts
-- Apply `top: -${scrollY}px` to body when adding `razorpay-active` class, so the page doesn't visually jump
-- This is already partially implemented (saves scrollY) but the `top` style is never set before `razorpay.open()`
-
-### 3. Improve RazorpayCheckout.tsx drawer
-- Add `max-h-[85vh]` and `overflow-y-auto` to drawer content
-- Add safe-area bottom padding: `pb-[env(safe-area-inset-bottom)]`
-- Fix misleading "Pay with UPI" title → "Pay Online" when Razorpay mode is active
-- Add minimum touch target sizes (already fine — buttons use shadcn defaults)
-
-### 4. Fix PaymentMethodSelector text wrapping
-- Add `min-w-0` to text container to prevent overflow on narrow screens
-
----
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/index.css` | Broaden Razorpay iframe selectors, add touch-action, fix max-width for tablets |
-| `src/hooks/useRazorpay.ts` | Fix body scroll lock to set `top: -scrollY` before opening popup |
-| `src/components/payment/RazorpayCheckout.tsx` | Add safe-area padding, max-height, fix "Pay with UPI" title, responsive adjustments |
-| `src/components/payment/PaymentMethodSelector.tsx` | Add `min-w-0` for text truncation safety |
+## How It Works for the User
+1. Buyer taps "Pay Now" → Razorpay popup opens
+2. Top section shows "Pay using UPI Apps" with GPay, PhonePe, Paytm icons
+3. Buyer taps their preferred app → app opens directly on their phone
+4. They approve payment in the app → return to your site → payment confirmed
+5. On desktop, QR code and VPA entry remain available as fallback
 
