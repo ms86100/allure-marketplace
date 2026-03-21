@@ -128,9 +128,14 @@ export function useRazorpay() {
       razorpay.on('payment.failed', function (response: any) {
         console.error('Payment failed:', response.error);
         document.body.classList.remove('razorpay-active');
+        document.body.style.removeProperty('top');
+        window.scrollTo(0, parseInt(document.body.dataset.scrollY || '0', 10));
+        delete document.body.dataset.scrollY;
         options.onFailure(response.error);
       });
 
+      // Save scroll position before locking body
+      document.body.dataset.scrollY = String(window.scrollY);
       document.body.classList.add('razorpay-active');
       razorpay.open();
     } catch (error: any) {
