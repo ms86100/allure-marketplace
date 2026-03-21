@@ -54,7 +54,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
         .map(c => c.category);
 
       // Build OR conditions for deep search
-      let orConditions = `name.ilike.%${trimmed}%,description.ilike.%${trimmed}%,brand.ilike.%${trimmed}%,ingredients.ilike.%${trimmed}%`;
+      let orConditions = `name.ilike.%${trimmed}%,description.ilike.%${trimmed}%,brand.ilike.%${trimmed}%,ingredients.ilike.%${trimmed}%,tags::text.ilike.%${trimmed}%,bullet_features::text.ilike.%${trimmed}%`;
       if (matchingSlugs.length > 0) {
         orConditions += `,category.in.(${matchingSlugs.join(',')})`;
       }
@@ -63,6 +63,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
         .from('products')
         .select('id, name, price, image_url, seller_id, category, is_veg, description')
         .eq('is_available', true)
+        .eq('approval_status', 'approved')
         .or(orConditions)
         .limit(8) as { data: any[] | null };
       return data || [];
@@ -75,11 +76,10 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
   const { data: sellerSuggestions = [] } = useQuery({
     queryKey: ['search-autocomplete-sellers', trimmed],
     queryFn: async (): Promise<SellerSuggestion[]> => {
-      const client: any = supabase;
-      const { data } = await client
+      const { data } = await supabase
         .from('seller_profiles')
         .select('id, business_name, description, profile_image_url, categories')
-        .eq('is_approved', true)
+        .eq('verification_status', 'approved')
         .or(`business_name.ilike.%${trimmed}%,description.ilike.%${trimmed}%,categories.cs.{${lower}}`)
         .limit(3);
       return (data || []).map((d: any) => ({
@@ -184,7 +184,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
                   category: product.category,
                   description: product.description,
                   seller_id: product.seller_id,
-                  seller_name: 'Seller',
+                  seller_name: '',
                   seller_rating: 0,
                   seller_reviews: 0,
                   society_name: null,
