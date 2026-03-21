@@ -53,7 +53,7 @@ app.post("/", async (c) => {
       .lt("auto_cancel_at", now)
       .not("payment_status", "in", "(buyer_confirmed,paid)");
 
-    // Query 2: Orphaned UPI/online orders — payment_status=pending, non-COD, older than 15 min
+    // Query 2: Orphaned UPI/online orders — payment_status=pending, non-COD, older than 30 min
     const { data: orphanedUpi, error: orphanErr } = await supabase
       .from("orders")
       .select("id, buyer_id, seller_id, total_amount")
@@ -63,6 +63,11 @@ app.post("/", async (c) => {
       .lt("created_at", thirtyMinAgo);
 
     const fetchError = urgentErr || orphanErr;
+
+    // Tag each order with its cancel reason so we write the correct rejection_reason
+    const urgentIds = new Set((urgentExpired || []).map(o => o.id));
+    const orphanIds = new Set((orphanedUpi || []).map(o => o.id));
+
     const expiredOrders = [
       ...(urgentExpired || []),
       ...(orphanedUpi || []),
