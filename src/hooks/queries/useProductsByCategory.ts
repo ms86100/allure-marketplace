@@ -4,6 +4,7 @@ import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CategoryGroup {
   category: string;
@@ -20,11 +21,13 @@ interface CategoryGroup {
 export function useProductsByCategory(limit = 50) {
   const { browsingLocation } = useBrowsingLocation();
   const queryClient = useQueryClient();
+  const { profile, effectiveSocietyId } = useAuth();
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
+  const radiusKm = profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM;
 
   const localQuery = useQuery({
-    queryKey: ['products-by-category', lat, lng, limit],
+    queryKey: ['products-by-category', lat, lng, limit, radiusKm, effectiveSocietyId],
     queryFn: async (): Promise<CategoryGroup[]> => {
       if (!lat || !lng) return [];
 
@@ -43,7 +46,8 @@ export function useProductsByCategory(limit = 50) {
       const rpcPromise = supabase.rpc('search_sellers_by_location' as any, {
         _lat: lat,
         _lng: lng,
-        _radius_km: MARKETPLACE_RADIUS_KM,
+        _radius_km: radiusKm,
+        _exclude_society_id: effectiveSocietyId || undefined,
       });
 
       const [resolvedConfigs, rpcResult] = await Promise.all([configPromise, rpcPromise]);
