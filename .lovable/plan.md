@@ -1,56 +1,77 @@
 
 
-# Duplicate Toast Analysis
+# Fix Plan: Live Activity Icon, Status Mismatch, and Deep Link Navigation Trap
 
-## The Specific Bug in the Screenshot
+## Issue 1: SocivaIcon Invisible in Dynamic Island and Lock Screen Card
 
-The "Your session has expired" toast appears **twice** because the same session expiry event triggers **two independent handlers**:
+**Root cause:** The `SocivaIcon` image asset in the widget extension has a dark "S" that's invisible against the Dynamic Island's black surface and the dark card background. Previous styling fixes (opacity, border) weren't enough because the asset itself has poor contrast.
 
-1. **`src/App.tsx` (line 148)** — The React Query `QueryCache.onError` / `MutationCache.onError` detects auth errors (JWT expired, 401, etc.) and calls `handleAuthError()` which fires `toast.error('Your session has expired...')`
-2. **`src/contexts/auth/useAuthState.ts` (line 166)** — The `onAuthStateChange` listener fires on `SIGNED_OUT` event and independently calls `toast.error('Your session has expired...')`
+**Fix:** Generate a new high-contrast SV badge image using AI image generation (white "S" + green "V" on transparent/dark background, optimized for small sizes). Then:
+- Create a new edge function to generate the badge programmatically and save it
+- OR more practically: generate the image via AI, save it as a project asset, and update the Swift widget to use a programmatically drawn `Text`-based fallback instead of relying on the image asset
 
-When a session expires: a query fails (triggering handler #1, which calls `signOut`), and then the sign-out event fires (triggering handler #2). Both fire within milliseconds, producing duplicate toasts.
+**Recommended approach — Programmatic SV badge in Swift:**
+Replace all `Image("SocivaIcon")` references in `LiveDeliveryWidget.swift` with a custom SwiftUI view `SocivaBadge` that draws "S" in white and "V" in green on a dark circular background. This eliminates the asset dependency entirely and guarantees visibility at all sizes.
 
-## Fix for This Specific Issue
+### File: `native/ios/LiveDeliveryWidget.swift`
+- Add a `SocivaBadge` SwiftUI view that renders "S" in `.white` and "V" in `.green` with a dark circle background
+- Replace all 4 `Image("SocivaIcon")` usages with `SocivaBadge(size:)` 
+- Remove the `Circle().fill(Color.white.opacity(0.25))` wrapper since the badge has its own background
 
-**Remove the toast from `useAuthState.ts` (line 166)** — let the App.tsx centralized handler be the single source of truth for session-expired toasts. The `useAuthState` handler should only do the redirect, not show a toast, since `handleAuthError` in App.tsx already covers it.
+---
 
-### File: `src/contexts/auth/useAuthState.ts`
-- Line 166: Remove `toast.error('Your session has expired...')` from the `SIGNED_OUT` branch
-- Keep the `window.location.hash = '#/auth'` redirect (though App.tsx also does this, it's a harmless safety net)
+## Issue 2: Incorrect Status Label on Live Activity Card
 
-## Broader Duplicate Toast Patterns Found Across the Codebase
+**Root cause:** The Swift `OrderPhase.title` property uses **hardcoded** labels like "Ready for Pickup" for the `ready` status. But the DB `display_label` for `ready` is simply **"Ready"**. The phrase "for Pickup" misleads the buyer into thinking pickup already happened.
 
-### Pattern A: `friendlyError` + QueryCache double-fire
-When a query's `onError` callback calls `toast.error(friendlyError(err))` AND the error is an auth error, `friendlyError` returns "Your session has expired..." while the QueryCache `onError` in App.tsx ALSO fires `handleAuthError()` → another toast. This affects **every component** that uses `toast.error(friendlyError(error))` in a React Query `onError`:
+Additionally, the `progress_stage` field from `buildLiveActivityData` contains the DB-backed `display_label` (e.g., "Ready"), but the widget **ignores it** for the main title — it only uses `progressStage` in the `contextualSubtitle` for the `.preparing` phase.
 
-- `src/pages/WorkerJobsPage.tsx`
-- `src/pages/WorkerMyJobsPage.tsx`  
-- `src/pages/BuilderInspectionsPage.tsx`
-- `src/components/ui/image-upload.tsx`
-- `src/components/ui/croppable-image-upload.tsx`
-- `src/pages/SellerDashboardPage.tsx`
-- `src/hooks/useVisitorManagement.ts`
-- `src/components/admin/BuilderManagementSheet.tsx`
-- ...and ~30+ more files
+**Fix:** Make the widget prefer the `progressStage` field (which carries the DB `display_label`) over the hardcoded `phase.title` when available. This ensures the lock screen card shows the same label as the web app.
 
-### Pattern B: `handleApiError` in `query-utils.ts` also fires toast
-`handleApiError()` calls `toast.error(message)` internally. If a caller also shows a toast, it doubles. Any component using both `handleApiError` and its own toast on the same error path gets duplicates.
+### File: `native/ios/LiveDeliveryWidget.swift`
+- In the lock screen view (Row 2, line 261): Replace `Text(phase.title)` with `Text(context.state.progressStage ?? phase.title)`
+- In the Dynamic Island expanded leading (line 135): Same change — prefer `progressStage` over `phase.title`
+- Update `OrderPhase.title` for `.ready` from "Ready for Pickup" to just "Ready" as a safe fallback
 
-### Pattern C: Mixed toast libraries
-`src/components/disputes/CreateDisputeSheet.tsx` and `src/components/bulletin/CreatePostSheet.tsx` use `toast()` from `@/hooks/use-toast` (shadcn toast), while most of the app uses `toast` from `sonner`. Both render independently, so an error could show in both toast systems.
+Also in `src/services/liveActivityMapper.ts`: The `mapProgressStage` function only returns DB `display_label` when the status is NOT a transit status. For `ready`, it correctly returns the DB label. But verify it's actually being passed through — the `progress_stage` field should carry "Ready" for the `ready` status. ✅ Confirmed: `mapProgressStage("ready", flowMap)` returns `entry.display_label` = "Ready" from the DB.
 
-## Recommended Fixes
+---
 
-| Change | File(s) | Description |
-|--------|---------|-------------|
-| Remove duplicate session toast | `useAuthState.ts` line 166 | Delete the `toast.error(...)` call; App.tsx handles it |
-| Guard `friendlyError` auth errors | `App.tsx` QueryCache `onError` | If `handleAuthError()` fires, don't let individual query `onError` callbacks also toast. Add a flag or return early pattern |
-| Remove toast from `handleApiError` | `src/lib/query-utils.ts` | Make it return the message only; let callers decide whether to toast (prevents silent double-toasts) |
-| Standardize on sonner | `CreateDisputeSheet.tsx`, `CreatePostSheet.tsx` | Replace `@/hooks/use-toast` usage with `sonner` to avoid dual toast systems |
+## Issue 3: Navigation Trap When Entering via Live Activity Card (Critical)
 
-### Implementation Priority
-1. **Fix the session-expired double toast** (useAuthState.ts) — immediate, 1-line change
-2. **Remove auto-toast from `handleApiError`** — make it return-only, audit callers
-3. **Standardize toast library** — migrate remaining shadcn toast usages to sonner
+**Root cause:** When the user taps the Live Activity card, iOS opens the app via the deep link URL `sociva://orders/{id}`. The deep link handler in `useDeepLinks.ts` calls `navigate(path)` which **pushes** `/orders/{id}` onto the router. However, on a **cold start** (app was killed), the router has no prior history — so `window.history.length` is 1 or 2.
+
+The back button logic on `OrderDetailPage.tsx` line 191:
+```tsx
+if (window.history.length > 1) { navigate(-1); } else { navigate('/'); }
+```
+
+On cold start from a deep link, `window.history.length` is 2 (initial page + deep link navigation), so `navigate(-1)` fires. But `-1` goes back to the **blank initial route** or the same deep link URL, causing a reload loop.
+
+**Fix:** Instead of checking `window.history.length > 1`, use a more reliable detection: check if there's a meaningful previous route. The cleanest fix is:
+
+1. **In `OrderDetailPage.tsx`**: Always navigate to a known safe route (`/orders` or `/`) when the back button is pressed from a deep-linked entry. Detect deep-link entry by checking if `window.history.state?.idx <= 1` (React Router stores the history index).
+
+2. **Alternative (simpler)**: Change the back button to always go to `/orders` (the orders list) as a safe destination, since `navigate(-1)` is unreliable when entering via deep links. This aligns with the memory note about post-payment integrity preferring explicit routes.
+
+### File: `src/pages/OrderDetailPage.tsx`
+- Line 191: Replace `if (window.history.length > 1) { navigate(-1); } else { navigate('/'); }` with:
+  ```tsx
+  const historyIdx = (window.history.state as any)?.idx;
+  if (typeof historyIdx === 'number' && historyIdx > 0) {
+    navigate(-1);
+  } else {
+    navigate('/orders', { replace: true });
+  }
+  ```
+  React Router's `history.state.idx` is `0` for the first entry and increments. If `idx` is 0 or undefined (cold start / deep link), we go to `/orders` instead of `-1`.
+
+---
+
+## Summary of Changes
+
+| File | Change |
+|------|--------|
+| `native/ios/LiveDeliveryWidget.swift` | Replace `Image("SocivaIcon")` with programmatic `SocivaBadge` view; prefer `progressStage` over hardcoded `phase.title`; fix `.ready` fallback label to "Ready" |
+| `src/pages/OrderDetailPage.tsx` | Fix back navigation to use `history.state.idx` instead of `history.length` for reliable deep-link detection |
 
