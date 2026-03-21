@@ -194,7 +194,7 @@ export default function SellerDetailPage() {
 
       if (error) throw error;
 
-      toast.success('Report submitted. Our team will review it shortly.');
+      toast.success('Report submitted. Our moderation team will review within 24 hours. You\'ll be notified of any action taken. Your identity is kept confidential.');
       setIsReportOpen(false);
       setReportType('');
       setReportDescription('');
