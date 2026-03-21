@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback, useMemo, useRef, ReactNode, useState } from 'react';
+import { createContext, useContext, useCallback, useEffect, useMemo, useRef, ReactNode, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -61,6 +61,7 @@ interface CartContextType {
   totalAmount: number;
   sellerGroups: SellerGroup[];
   isLoading: boolean;
+  isFetching: boolean;
   hasHydrated: boolean;
   /** Number of cart mutations currently in-flight */
   pendingMutations: number;
@@ -95,7 +96,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const mutationSeqRef = useRef(0);
   const [pendingMutations, setPendingMutations] = useState(0);
 
-  const { data: items = [], isLoading, isFetched } = useQuery({
+  const { data: items = [], isLoading, isFetching, isFetched } = useQuery({
     queryKey: [...CART_QUERY_KEY, user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -138,6 +139,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const freshItems = await fetchCartItems(user.id);
       // Only apply if no newer mutation has started
       if (mutationSeqRef.current === seq) {
+        // Guard: don't replace non-empty cache with empty result (likely transient failure)
+        const currentItems = queryClient.getQueryData(cartKey()) as any[] | undefined;
+        if (freshItems.length === 0 && currentItems && currentItems.length > 0) {
+          queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY, exact: false });
+          return;
+        }
         queryClient.setQueryData(cartKey(), freshItems);
         queryClient.setQueryData(countKey(), freshItems.reduce((s, i) => s + i.quantity, 0));
       }
@@ -174,7 +181,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (!user) { toast.error('Please sign in to add items to cart', { id: 'cart-sign-in' }); return; }
     if (addItemLocksRef.current.has(product.id)) return;
     addItemLocksRef.current.add(product.id);
-    setPendingMutations(c => c + 1);
 
     try {
       const pActionType = (product as any).action_type;
@@ -189,6 +195,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         availability = computeStoreStatus(sellerSnapshot.availability_start, sellerSnapshot.availability_end, sellerSnapshot.operating_days, sellerSnapshot.is_available ?? true);
       }
       if (availability.status !== 'open') { const msg = formatStoreClosedMessage(availability); toast.error(msg || 'This store is currently closed. Please try again later.', { id: 'cart-store-closed' }); return; }
+
+      // Committed to mutation — track it
+      setPendingMutations(c => c + 1);
 
       // Cancel + snapshot + optimistic
       await cancelCartQueries();
@@ -342,16 +351,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const hasHydrated = isFetched;
 
   // Keep cart-count cache in sync with items (eliminates split-brain)
-  useMemo(() => {
+  useEffect(() => {
     if (hasHydrated && user) {
       queryClient.setQueryData(['cart-count', user.id], itemCount);
     }
   }, [hasHydrated, user, itemCount, queryClient]);
 
   const contextValue = useMemo<CartContextType>(() => ({
-    items, itemCount, totalAmount, sellerGroups, isLoading, hasHydrated, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart,
+    items, itemCount, totalAmount, sellerGroups, isLoading, isFetching, hasHydrated, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart,
     refresh: async () => { if (user) await reconcile(); },
-  }), [items, itemCount, totalAmount, sellerGroups, isLoading, hasHydrated, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart, user, reconcile]);
+  }), [items, itemCount, totalAmount, sellerGroups, isLoading, isFetching, hasHydrated, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart, user, reconcile]);
 
   return <CartContext.Provider value={contextValue}>{children}</CartContext.Provider>;
 }

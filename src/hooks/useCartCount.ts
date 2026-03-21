@@ -25,7 +25,8 @@ export function useCartCount() {
       return (data || []).reduce((sum, row) => sum + (row.quantity || 0), 0);
     },
     enabled: isSessionRestored && !!user,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 1000,
+    refetchOnWindowFocus: true,
   });
 
   return itemCount;
