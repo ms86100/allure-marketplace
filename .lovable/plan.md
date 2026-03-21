@@ -1,108 +1,150 @@
 
+# Round 21: 5 Critical Bugs — Seller Store Configuration, Listings & Slots
 
-# Round 20: 5 Critical Bugs — In-App Notification System
+## Bug 1: `service_bookings.status` never syncs with `orders.status` — seller sees stale booking status
 
-## Bug 1: Proximity notifications spam the inbox — 30-second dedup window is too short for repeated location updates
+**Where:** `src/hooks/useOrderDetail.ts` line 194 — updates `orders.status` only; no trigger or code syncs to `service_bookings.status`
 
-**Where:** `supabase/functions/update-delivery-location/index.ts` lines 478-536
+**What happens:** When a seller confirms an order (order status moves from `requested` → `confirmed`), the linked `service_bookings` row stays at `requested`. DB confirms: order `9f0dfe9b` is `confirmed` but its booking `a6d06b13` is still `requested`. The `SellerDayAgenda` reads booking status directly, so it shows "requested" badges on confirmed appointments. The `ServiceBookingStats` counts "Pending" bookings that are actually confirmed at the order level. The buyer sees "Confirmed" on their order, but the seller's schedule tab shows "requested" — contradictory.
 
-**What happens:** The proximity dedup checks `notification_queue` for the same type within the last 30 seconds. But the `update-delivery-location` function is called every 5 seconds during active delivery. If the driver oscillates around the 200m boundary (common in congested Indian neighborhoods), the dedup window lets through a new "Driver arriving now!" every 31 seconds. Real data confirms: order `863f01f5` has **3** `delivery_proximity_imminent` AND **3** `delivery_proximity` notifications. Order `8085b506` has 3 of each too. The inbox becomes a wall of identical red "Driver arriving now!" cards (visible in screenshots).
+**Why critical:** The seller's entire Schedule tab is built on `service_bookings.status`. If it's permanently stuck at `requested`, the day agenda, stats, and booking reminders all operate on wrong data. The `send-booking-reminders` edge function also reads `service_bookings.status` to decide which reminders to send.
 
-**Why critical:** The buyer's inbox is flooded with identical urgent notifications. The red cards with "View Tracking" buttons create alarm fatigue. A buyer scrolling through 6 identical "Driver arriving now!" cards loses trust in the system's intelligence.
+**Impact:** `SellerDayAgenda`, `ServiceBookingStats`, `send-booking-reminders` edge function, `useServiceBookings` hook, `SellerDashboardPage` Schedule tab
 
-**Impact:** `update-delivery-location` edge function (dedup window), `NotificationInboxPage` (display)
-**Risks:** (1) Increasing the dedup window too much (e.g., 10 min) means a genuinely new approach after a failed attempt won't notify. Safe window: 2-3 minutes per order per type. (2) Also need to deduplicate at display level in case historical spam already exists.
+**Risks:** (1) Adding a DB trigger on `orders` to sync `service_bookings.status` must handle the different enum types between the two tables (orders uses `order_status`, bookings uses its own status enum). (2) Historical data — existing bookings stuck at `requested` need a one-time migration to sync.
 
-**Fix:**
-- Edge function: Change dedup window from 30s to **3 minutes** for proximity notifications
-- Inbox page: Collapse consecutive notifications of the same type+order into a single card showing the latest one
+**Fix:** Create a DB trigger `sync_booking_status_on_order_update` on the `orders` table that, on status change, updates the matching `service_bookings.status` to the new order status (with appropriate enum mapping). Also run a one-time data fix migration.
 
 ---
 
-## Bug 2: Booking reminder `reference_path` is `/orders` (generic) instead of `/orders/{orderId}` — action buttons lead nowhere useful
+## Bug 2: Slot generation includes unapproved products — ghost slots created for pending/draft services
 
-**Where:** `supabase/functions/send-booking-reminders/index.ts` line 100, `RichNotificationCard.tsx` line 55
+**Where:** `ServiceAvailabilityManager.tsx` line 155-159 — queries `products` with only `.eq('is_available', true)`, no `approval_status` filter
 
-**What happens:** The booking reminder code at line 100 does: `const buyerPath = booking.order_id ? '/orders/${booking.order_id}' : '/orders'`. Looking at the DB data, ALL booking reminders have `reference_path: /orders` (not `/orders/{uuid}`). This means `booking.order_id` is null/undefined for these bookings. The "Get Ready", "Open Now", and "View Details" buttons all navigate to the generic orders list — not the specific booking/order. The buyer taps "Open Now" expecting to see their appointment details but lands on a generic order history page.
+**What happens:** When a seller saves their schedule and clicks "Generate Slots," the code fetches all `is_available = true` products to determine service durations. But new products default to `approval_status: 'pending'` (line 232 in `useSellerProducts.ts`). These unapproved products get slots generated. A buyer could see and book time slots for a service that hasn't been approved by admin yet. The `useServiceSlots` hook (buyer-facing) has no `approval_status` filter either — it just checks `product_id` and `is_blocked`.
 
-**Why critical:** The most urgent notification type (10-minute reminder with red card) has a broken CTA. "Open Now" implies immediate relevance but drops the user on a generic list. This breaks the trust contract between urgency and action.
+**Why critical:** This bypasses the entire product approval lifecycle. An unapproved or rejected service still has bookable slots visible to buyers, violating the admin review gate.
 
-**Impact:** `send-booking-reminders` edge function, `RichNotificationCard` navigation
-**Risks:** (1) If `order_id` is genuinely null on the booking record, we need a fallback route like `/bookings/{bookingId}`. (2) Need to check if a `/bookings/:id` route even exists.
+**Impact:** `ServiceAvailabilityManager`, `useServiceSlots`, buyer booking flow, admin approval process
 
-**Fix:**
-- In `send-booking-reminders`: Use `booking.id` (the booking UUID) as fallback: `const buyerPath = booking.order_id ? '/orders/${booking.order_id}' : '/orders'` — but also include `bookingId` in the reference_path as a query param so the order page can scroll to it
-- In `resolveNotificationRoute`: Add cases for `booking_reminder_*` types that resolve to `/orders/{orderId}` using `payload.orderId`
+**Risks:** (1) Adding `approval_status = 'approved'` filter to slot generation means newly onboarded sellers (whose products start as pending) will see "no slots generated" until admin approves — this is correct behavior but needs a clear message. (2) Existing slots for unapproved products need cleanup.
 
----
-
-## Bug 3: `payload` exposes internal system data to the client — `driver_name`, `distance`, `eta`, `vehicle_type`, `workflow_status`
-
-**Where:** `useNotifications.ts` line 28: `select('*')` returns the full `payload` JSONB column, which is rendered in the inbox and accessible via browser dev tools
-
-**What happens:** The `payload` column contains operational metadata never intended for buyer display: `driver_name: "Fresh Mart Express"`, `distance: 182`, `eta: 1`, `vehicle_type: null`, `workflow_status: "at_doorstep"`, `bookingId: UUID`, `entity_id: UUID`. The `select('*')` query returns everything. While the UI doesn't explicitly render these fields, they're in the React Query cache and visible in browser DevTools → Network tab. The `driver_name` field is the seller's business name (used as rider name in self-delivery), leaking seller identity context.
-
-**Why critical:** Information exposure. Internal UUIDs (`entity_id`, `bookingId`), operational distances, and rider identity are accessible to any authenticated user via their browser. This is a data hygiene issue for production.
-
-**Impact:** `useNotifications.ts` query, `useLatestActionNotification` query
-**Risks:** (1) Changing `select('*')` to explicit columns may break components that read from payload (e.g., `RichNotificationCard` reads `payload.action`, `payload.reference_path`). Must include `payload` but can't strip internal fields without a DB view or RPC. (2) Simpler approach: only select needed fields from payload on the client.
-
-**Fix:**
-- Change `select('*')` to `select('id, title, body, type, reference_path, is_read, created_at, payload')` — this is equivalent but explicit (no `society_id`, `queue_item_id`, `reference_id` leakage)
-- For payload sanitization: Create a DB view `user_notifications_safe` that strips internal fields from payload, or accept the current exposure as low-risk for MVP
+**Fix:** Add `.eq('approval_status', 'approved')` to the product query in `ServiceAvailabilityManager` (line 157). Update the "no products" toast to mention approval. In `useServiceSlots`, add a join or filter to only return slots for approved products.
 
 ---
 
-## Bug 4: "Dismiss" on `RichNotificationCard` only marks as read — notification stays visible in inbox with action buttons
+## Bug 3: "No bookings yet" empty state always visible on Schedule tab — even when bookings exist
 
-**Where:** `RichNotificationCard.tsx` line 61-64, `NotificationInboxPage.tsx` line 60
+**Where:** `SellerDashboardPage.tsx` lines 305-316
 
-**What happens:** The "Dismiss" button calls `markRead.mutate(notification.id)` and `onDismiss?.()`. In the inbox page (line 60), `RichNotificationCard` is rendered **without** passing `onDismiss`. So `onDismiss` is undefined. The "Dismiss" button only marks the notification as read. But the card stays in the list because `useNotifications` returns ALL notifications (read + unread). The card loses its unread styling but the prominent green/red action buttons ("View Tracking", "Get Ready", "Open Now") remain fully visible and clickable. For completed orders, "View Tracking" buttons on proximity notifications lead to a delivered order detail page with no active tracking — confusing.
+**What happens:** The "No bookings yet" card with a `CalendarDays` icon is always rendered after `ServiceBookingStats` and `SellerDayAgenda`. It's not wrapped in any conditional. A seller with active bookings sees: (1) booking stats cards, (2) today's schedule timeline, (3) "No bookings yet" — all stacked on the same screen. The comment on line 301 says "This covers the case where seller has zero service bookings ever" but the condition is never actually checked.
 
-**Why critical:** A buyer taps "Dismiss" expecting the card to disappear. It doesn't. The action button remains. For completed orders, stale "View Tracking" CTAs on red urgency cards create a broken, zombie-like feel in the inbox.
+**Why critical:** The seller dashboard Schedule tab is the primary booking management surface. An always-visible "No bookings yet" message underneath real booking data makes the entire tab feel broken. It undermines the seller's confidence that the system is tracking their appointments.
 
-**Impact:** `RichNotificationCard`, `NotificationInboxPage`
-**Risks:** (1) Adding true dismissal (hiding) requires local state or a `dismissed_at` column. Simpler: hide action buttons when `is_read = true`. (2) Alternatively, filter out read rich notifications from the rich card rendering path — show them as plain cards instead.
+**Impact:** `SellerDashboardPage` Schedule tab
 
-**Fix:**
-- In `NotificationInboxPage`: When rendering `RichNotificationCard`, check `n.is_read` — if read, render as a plain card (no action buttons) instead of a rich card
-- This is a 1-line condition change: `if (hasAction && !n.is_read)` instead of `if (hasAction)`
+**Risks:** (1) Need to check both `ServiceBookingStats` (returns null when empty) and `SellerDayAgenda` (returns a card with "Nothing scheduled" when empty today). The empty state should only show when the seller has truly zero service bookings. (2) The `useSellerServiceBookings` hook returns all bookings — can reuse it.
+
+**Fix:** Import `useSellerServiceBookings` in `SellerDashboardPage` and conditionally render the empty state only when `bookings.length === 0`.
 
 ---
 
-## Bug 5: Delivery proximity notifications for completed orders still show as urgent rich cards — stale red alerts in inbox
+## Bug 4: `delivery_radius_km` persists at stale value when `sell_beyond_community` is toggled OFF — RPC still uses it
 
-**Where:** `NotificationInboxPage.tsx` lines 55-61, `useLatestActionNotification` lines 55-96
+**Where:** `useSellerSettings.ts` line 140 — always saves `delivery_radius_km: formData.delivery_radius_km` regardless of `sell_beyond_community` state
 
-**What happens:** The `useLatestActionNotification` hook correctly auto-marks stale delivery notifications as read when the order reaches a terminal status. But this only runs for the HOME BANNER. The INBOX PAGE (`useNotifications`) has no such cleanup. Delivery proximity notifications for completed orders retain `payload.action = "View Tracking"` so they render as `RichNotificationCard` with red urgency styling and "View Tracking" buttons — even though the order was completed hours/days ago. The DB confirms: order `863f01f5` is `completed` but has 6 proximity notifications, all with action buttons.
+**What happens:** A seller sets `sell_beyond_community = true` with `delivery_radius_km = 10`, saves. Then toggles `sell_beyond_community` back to `false` and saves again. The DB still stores `delivery_radius_km = 10`. The `search_sellers_by_location` RPC (Round 18 fix) now checks `sell_beyond_community` to gate cross-society visibility, but the `delivery_radius_km` value persists. If the seller later re-enables cross-society sales, the old 10km radius is silently active. More critically, the UI hides the radius slider when the toggle is off (line 302-308), so the seller never sees the stale value.
 
-**Why critical:** The inbox is dominated by stale urgent-looking red and green cards for orders that finished long ago. This makes the notification inbox feel unreliable and noisy — the opposite of trustworthy.
+The real risk is more subtle: the `search_sellers_by_location` RPC uses `delivery_radius_km` in distance calculations for ALL sellers (even society-resident ones), regardless of `sell_beyond_community`. A society seller with `sell_beyond_community = false` but `delivery_radius_km = 10` could still appear in edge cases.
 
-**Impact:** `NotificationInboxPage`, potentially a DB trigger or batch cleanup
-**Risks:** (1) Adding order-status awareness to the inbox query increases complexity. (2) Simpler: use the same terminal-order cleanup logic from `useLatestActionNotification` but run it once when the inbox loads.
+**Why critical:** Silent data inconsistency. The seller's intent ("I don't want cross-society sales") doesn't match the stored radius. The RPC should ideally ignore `delivery_radius_km` when `sell_beyond_community` is false, but defensive coding requires resetting it.
 
-**Fix:**
-- Extract the terminal-order cleanup logic from `useLatestActionNotification` into a shared utility
-- Call it in `useNotifications` on initial fetch: batch-check delivery notification order IDs against terminal statuses, auto-mark stale ones as read
-- OR simpler: in `NotificationInboxPage`, filter delivery types for completed orders out of the rich card rendering (combine with Bug 4 fix: `if (hasAction && !n.is_read)`)
+**Impact:** `useSellerSettings.ts`, `SellerSettingsPage`, `search_sellers_by_location` RPC
+
+**Risks:** (1) Resetting to 5km when toggling off means the seller loses their custom radius if they toggle back on — minor UX friction. (2) The onboarding flow in `useSellerApplication` has the same issue.
+
+**Fix:** In `useSellerSettings.ts` `handleSave`, when `sell_beyond_community` is false, set `delivery_radius_km` to the default (5). Same fix in `useSellerApplication.ts`.
+
+---
+
+## Bug 5: Seller settings save doesn't reset `operating_days` correctly — empty array saves as empty and auto-closes store permanently
+
+**Where:** `useSellerSettings.ts` line 132 — saves `operating_days: formData.operating_days` which can be `[]`
+
+**What happens:** In `SellerSettingsPage`, the operating days are toggle-based (line 217-224). A seller can deselect ALL days. When saved, `operating_days = []` is written to DB. The `computeStoreStatus` function (line 29 in `store-availability.ts`) checks: `if (operatingDays && operatingDays.length > 0 && !operatingDays.includes(currentDay))` — with an empty array, `operatingDays.length > 0` is false, so it skips the day check entirely. The store appears "open" at the client level. BUT the `search_sellers_by_location` RPC and the `compute_store_status` DB function (referenced in discovery) may have their own day check that returns `closed_today` for empty arrays, causing a disconnect between what the seller sees ("store is open") and what buyers see (store not appearing).
+
+More practically: there's no validation preventing saving with zero operating days. A seller who accidentally deselects all days has no warning and gets silently invisible (or inconsistently visible depending on which code path evaluates the schedule).
+
+**Why critical:** Zero operating days is an invalid configuration that should be blocked. The lack of validation means a seller can silently make themselves invisible to all buyers with no feedback about what went wrong.
+
+**Impact:** `useSellerSettings.ts`, `SellerSettingsPage`, `computeStoreStatus`, `useSellerHealth` (doesn't check for zero days, only checks "operating days set")
+
+**Risks:** (1) Adding validation could block a save if the seller is trying to update something else (e.g., description) while days happen to be empty. Should be a non-blocking warning rather than a hard block. (2) The `useSellerHealth` check at line 214 says `operating_days.length > 0` is "pass" — it should be "fail" when empty.
+
+**Fix:** Add validation in `handleSave` that warns (toast) if `operating_days` is empty but still allows save. Update `useSellerHealth` to mark zero operating days as `fail` instead of skipping.
 
 ---
 
 ## Summary
 
-| # | Bug | Severity | Root Cause |
-|---|-----|----------|-----------|
-| 1 | Proximity notification spam (3+ per order per type) | **CRITICAL** | 30s dedup window too short |
-| 2 | Booking reminder CTAs lead to generic `/orders` | **HIGH** | `order_id` null on bookings |
-| 3 | Payload exposes internal data (`driver_name`, distances, UUIDs) | **MEDIUM** | `select('*')` on notifications |
-| 4 | "Dismiss" doesn't hide card — action buttons persist | **HIGH** | No `onDismiss` + no read-state gate |
-| 5 | Stale red urgency cards for completed orders | **HIGH** | No terminal-order cleanup in inbox |
+| # | Bug | Severity | File(s) |
+|---|-----|----------|---------|
+| 1 | `service_bookings.status` never syncs with `orders.status` | **CRITICAL** | DB migration (new trigger), one-time data fix |
+| 2 | Slot generation for unapproved products | **HIGH** | `ServiceAvailabilityManager.tsx`, `useServiceSlots.ts` |
+| 3 | "No bookings yet" always shown on Schedule tab | **MEDIUM** | `SellerDashboardPage.tsx` |
+| 4 | `delivery_radius_km` persists when `sell_beyond_community` OFF | **MEDIUM** | `useSellerSettings.ts`, `useSellerApplication.ts` |
+| 5 | Zero operating days saves without warning | **MEDIUM** | `useSellerSettings.ts`, `useSellerHealth.ts` |
 
-## Files to Edit
+## Technical Details
 
-- `supabase/functions/update-delivery-location/index.ts` — Bug 1: increase proximity dedup window from 30s to 3min
-- `supabase/functions/send-booking-reminders/index.ts` — Bug 2: improve reference_path resolution for bookings
-- `src/lib/notification-routes.ts` — Bug 2: add `booking_reminder_*` route resolution
-- `src/hooks/queries/useNotifications.ts` — Bug 3: explicit column select; Bug 5: add terminal-order cleanup to inbox query
-- `src/pages/NotificationInboxPage.tsx` — Bugs 4+5: gate rich card rendering on `!n.is_read`, collapse duplicate proximity notifications
+### Bug 1 — DB trigger + data fix migration:
+```sql
+-- Trigger: sync service_bookings.status when orders.status changes
+CREATE OR REPLACE FUNCTION sync_booking_status_on_order_update()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NEW.status IS DISTINCT FROM OLD.status AND NEW.order_type = 'booking' THEN
+    UPDATE service_bookings SET status = NEW.status::text
+    WHERE order_id = NEW.id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
 
+-- One-time fix for existing out-of-sync bookings
+UPDATE service_bookings sb
+SET status = o.status::text
+FROM orders o
+WHERE sb.order_id = o.id AND sb.status::text != o.status::text;
+```
+
+### Bug 2 — Add approval filter:
+In `ServiceAvailabilityManager.tsx` line 155-159, change:
+```typescript
+.eq('is_available', true)
+```
+to:
+```typescript
+.eq('is_available', true)
+.eq('approval_status', 'approved')
+```
+
+### Bug 3 — Conditional empty state:
+Wrap the empty-state div in `SellerDashboardPage.tsx` with a check using the same `useSellerServiceBookings` hook data.
+
+### Bug 4 — Reset radius on toggle-off:
+In `useSellerSettings.ts` `handleSave`, change line 140:
+```typescript
+delivery_radius_km: formData.sell_beyond_community ? formData.delivery_radius_km : 5,
+```
+
+### Bug 5 — Validation + health check:
+In `handleSave`, add a warning toast if `operating_days` is empty. In `useSellerHealth.ts` line 214-218, mark zero days as `warn` status.
+
+### Files to edit:
+- **DB Migration** — Bug 1: sync trigger + data fix
+- `src/components/seller/ServiceAvailabilityManager.tsx` — Bug 2: add `approval_status` filter
+- `src/pages/SellerDashboardPage.tsx` — Bug 3: conditional empty state
+- `src/hooks/useSellerSettings.ts` — Bugs 4, 5: reset radius, validate days
+- `src/hooks/useSellerApplication.ts` — Bug 4: reset radius on toggle-off
+- `src/hooks/queries/useSellerHealth.ts` — Bug 5: zero days = warn
