@@ -167,11 +167,14 @@ struct LiveDeliveryWidget: Widget {
                     .padding(.top, 2)
                 }
             } compactLeading: {
-                // NOTE: Ensure SocivaIcon is added to the widget extension's
-                // Assets.xcassets in Xcode — it does NOT inherit from the main app target.
+                let phase = OrderPhase.from(context.state.workflowStatus)
                 ZStack {
                     Circle()
-                        .fill(Color.white.opacity(0.15))
+                        .fill(Color.white.opacity(0.25))
+                        .overlay(
+                            Circle()
+                                .stroke(phase.accentColor.opacity(0.6), lineWidth: 1)
+                        )
                         .frame(width: 24, height: 24)
                     Image("SocivaIcon")
                         .resizable()
@@ -193,9 +196,14 @@ struct LiveDeliveryWidget: Widget {
                         .rotationEffect(.degrees(-90))
                 }
             } minimal: {
+                let phase = OrderPhase.from(context.state.workflowStatus)
                 ZStack {
                     Circle()
-                        .fill(Color.white.opacity(0.15))
+                        .fill(Color.white.opacity(0.25))
+                        .overlay(
+                            Circle()
+                                .stroke(phase.accentColor.opacity(0.6), lineWidth: 1)
+                        )
                     Image("SocivaIcon")
                         .resizable()
                         .scaledToFill()
