@@ -11,6 +11,7 @@ declare global {
 
 interface RazorpayOptions {
   orderId: string;
+  orderIds?: string[];
   amount: number;
   sellerId: string;
   customerName: string;
@@ -64,10 +65,11 @@ export function useRazorpay() {
         return;
       }
 
-      // Call edge function to create Razorpay order
+      // Bug 1 fix: Send orderIds array for multi-vendor support
       const { data, error } = await supabase.functions.invoke('create-razorpay-order', {
         body: {
           orderId: options.orderId,
+          orderIds: options.orderIds || [options.orderId],
           amount: options.amount,
           sellerId: options.sellerId,
           customerName: options.customerName,

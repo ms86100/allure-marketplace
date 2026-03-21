@@ -8,7 +8,6 @@ const corsHeaders = {
 };
 
 async function getRazorpaySecret(supabase: any): Promise<string | null> {
-  // First try to get from admin_settings table
   const { data: setting } = await supabase
     .from('admin_settings')
     .select('value, is_active')
@@ -19,7 +18,6 @@ async function getRazorpaySecret(supabase: any): Promise<string | null> {
     return setting.value;
   }
 
-  // Fallback to environment variable
   return Deno.env.get('RAZORPAY_KEY_SECRET') || null;
 }
 
@@ -42,7 +40,6 @@ async function verifySignature(body: string, signature: string, secret: string):
     
     const expectedBytes = new Uint8Array(signatureBuffer);
     
-    // Convert incoming hex signature to Uint8Array for constant-time comparison
     const sigBytes = new Uint8Array(signature.length / 2);
     for (let i = 0; i < signature.length; i += 2) {
       sigBytes[i / 2] = parseInt(signature.substring(i, i + 2), 16);
@@ -50,7 +47,6 @@ async function verifySignature(body: string, signature: string, secret: string):
     
     if (expectedBytes.length !== sigBytes.length) return false;
     
-    // Constant-time comparison to prevent timing attacks
     let diff = 0;
     for (let i = 0; i < expectedBytes.length; i++) {
       diff |= expectedBytes[i] ^ sigBytes[i];
@@ -62,8 +58,19 @@ async function verifySignature(body: string, signature: string, secret: string):
   }
 }
 
+/** Parse order IDs from payment notes — supports multi-vendor (order_ids) and single (order_id) */
+function resolveOrderIds(notes: any): string[] {
+  if (notes?.order_ids) {
+    try {
+      const parsed = JSON.parse(notes.order_ids);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch { /* fall through */ }
+  }
+  if (notes?.order_id) return [notes.order_id];
+  return [];
+}
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -76,7 +83,6 @@ serve(async (req) => {
     const body = await req.text();
     const signature = req.headers.get('x-razorpay-signature');
 
-    // Get Razorpay secret
     const razorpaySecret = await getRazorpaySecret(supabase);
     if (!razorpaySecret) {
       console.error('Razorpay secret not configured');
@@ -86,7 +92,6 @@ serve(async (req) => {
       );
     }
 
-    // Verify webhook signature — MANDATORY
     if (!signature) {
       console.error('Missing x-razorpay-signature header');
       return new Response(
@@ -112,76 +117,68 @@ serve(async (req) => {
     console.log('Payment entity:', paymentEntity);
 
     if (event === 'payment.captured') {
-      const razorpayOrderId = paymentEntity.order_id;
       const razorpayPaymentId = paymentEntity.id;
-      const razorpayEventId = payload.event_id || null;
-      const orderId = paymentEntity.notes?.order_id;
+      const allOrderIds = resolveOrderIds(paymentEntity.notes);
 
-      // Bug 7 fix: Return 200 for missing order_id to stop Razorpay retry storms
-      if (!orderId) {
-        console.error('Order ID not found in payment notes — acknowledging to stop retries');
+      if (allOrderIds.length === 0) {
+        console.error('No order IDs found in payment notes — acknowledging to stop retries');
         return new Response(
           JSON.stringify({ acknowledged: true, skipped: 'no_order_id' }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // C5: Atomic duplicate guard — claim the payment record in a single UPDATE
-      // Only succeeds if razorpay_payment_id is still NULL (first webhook wins)
-      const { data: claimedRows, error: claimError } = await supabase
-        .from('payment_records')
-        .update({
-          payment_status: 'paid',
-          transaction_reference: razorpayPaymentId,
-          razorpay_payment_id: razorpayPaymentId,
-        })
-        .eq('order_id', orderId)
-        .is('razorpay_payment_id', null)
-        .select('id');
+      console.log(`Payment captured for ${allOrderIds.length} order(s):`, allOrderIds);
 
-      if (claimError) {
-        console.error('Error claiming payment record:', claimError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to update payment record' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      // Process each order — atomic duplicate guard per order
+      for (const orderId of allOrderIds) {
+        // C5: Atomic duplicate guard — claim the payment record in a single UPDATE
+        const { data: claimedRows, error: claimError } = await supabase
+          .from('payment_records')
+          .update({
+            payment_status: 'paid',
+            transaction_reference: razorpayPaymentId,
+            razorpay_payment_id: razorpayPaymentId,
+          })
+          .eq('order_id', orderId)
+          .is('razorpay_payment_id', null)
+          .select('id');
+
+        if (claimError) {
+          console.error(`Error claiming payment record for order ${orderId}:`, claimError);
+          continue; // Don't fail entire webhook — process remaining orders
+        }
+
+        if (!claimedRows || claimedRows.length === 0) {
+          console.log(`Duplicate webhook for payment ${razorpayPaymentId} on order ${orderId}, skipping`);
+          continue;
+        }
+
+        // Update order status — C1: never resurrect a cancelled order as paid
+        const { error: orderError, data: updatedOrder } = await supabase
+          .from('orders')
+          .update({
+            payment_status: 'paid',
+            razorpay_payment_id: razorpayPaymentId,
+          })
+          .eq('id', orderId)
+          .neq('status', 'cancelled')
+          .select('id');
+
+        if (!updatedOrder || updatedOrder.length === 0) {
+          console.warn(`Order ${orderId} is cancelled — skipping payment.captured update`);
+        }
+
+        if (orderError) {
+          console.error(`Error updating order ${orderId}:`, orderError);
+        }
+
+        console.log(`Order ${orderId} marked as paid`);
       }
-
-      if (!claimedRows || claimedRows.length === 0) {
-        console.log(`Duplicate webhook for payment ${razorpayPaymentId}, skipping`);
-        return new Response(
-          JSON.stringify({ already_processed: true }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      console.log(`Payment captured for order ${orderId}`);
-
-      // Update order status — C1: never resurrect a cancelled order as paid
-      const { error: orderError, data: updatedOrder } = await supabase
-        .from('orders')
-        .update({
-          payment_status: 'paid',
-          razorpay_payment_id: razorpayPaymentId,
-        })
-        .eq('id', orderId)
-        .neq('status', 'cancelled')
-        .select('id');
-
-      if (!updatedOrder || updatedOrder.length === 0) {
-        console.warn(`Order ${orderId} is cancelled — skipping payment.captured update`);
-      }
-
-      if (orderError) {
-        console.error('Error updating order:', orderError);
-      }
-
-
-      console.log(`Order ${orderId} marked as paid`);
     } else if (event === 'payment.failed') {
-      const orderId = paymentEntity.notes?.order_id;
+      const allOrderIds = resolveOrderIds(paymentEntity.notes);
 
-      if (orderId) {
+      for (const orderId of allOrderIds) {
         console.log(`Payment failed for order ${orderId}`);
         
         // C1: Guard — never overwrite a 'paid' status with 'failed'
@@ -198,9 +195,9 @@ serve(async (req) => {
           .neq('payment_status', 'paid');
       }
     } else if (event === 'refund.created') {
-      const orderId = paymentEntity.notes?.order_id;
+      const allOrderIds = resolveOrderIds(paymentEntity.notes);
 
-      if (orderId) {
+      for (const orderId of allOrderIds) {
         console.log(`Refund created for order ${orderId}`);
         
         // C1: Guard — only refund orders that were actually paid

@@ -8,7 +8,8 @@ const corsHeaders = {
 };
 
 interface CreateOrderRequest {
-  orderId: string;
+  orderId?: string;
+  orderIds?: string[];
   amount: number;
   sellerId: string;
   customerName: string;
@@ -71,24 +72,34 @@ serve(async (req) => {
     if (!allowed) return rateLimitResponse(corsHeaders);
 
     const body: CreateOrderRequest = await req.json();
-    const { orderId, amount, sellerId, customerName, customerEmail, customerPhone } = body;
+    const { amount, sellerId, customerName, customerEmail, customerPhone } = body;
 
-    console.log('Creating Razorpay order:', { orderId, amount, sellerId });
+    // Bug 1 fix: Support array of orderIds for multi-vendor carts
+    const allOrderIds: string[] = body.orderIds?.length ? body.orderIds : (body.orderId ? [body.orderId] : []);
+    if (allOrderIds.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'No order IDs provided' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Bug 8 fix: Verify order is in valid status and not already paid/cancelled
-    const { data: order, error: orderError } = await supabase
+    console.log('Creating Razorpay order for orders:', allOrderIds, 'amount:', amount, 'sellerId:', sellerId);
+
+    // Validate ALL orders belong to buyer, are not cancelled, and have payment_status: 'pending'
+    const { data: orders, error: orderError } = await supabase
       .from('orders')
-      .select('*')
-      .eq('id', orderId)
+      .select('id, buyer_id, status, payment_status')
+      .in('id', allOrderIds)
       .eq('buyer_id', user.id)
       .neq('status', 'cancelled')
-      .eq('payment_status', 'pending')
-      .single();
+      .eq('payment_status', 'pending');
 
-    if (orderError || !order) {
-      console.error('Order not found, unauthorized, or not in payable state:', orderError);
+    if (orderError || !orders || orders.length !== allOrderIds.length) {
+      const foundIds = orders?.map((o: any) => o.id) || [];
+      const missing = allOrderIds.filter(id => !foundIds.includes(id));
+      console.error('Order validation failed. Expected:', allOrderIds.length, 'Found:', orders?.length, 'Missing:', missing);
       return new Response(
-        JSON.stringify({ error: 'Order not found, already cancelled, or already paid' }),
+        JSON.stringify({ error: 'One or more orders not found, already cancelled, or already paid' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -104,21 +115,23 @@ serve(async (req) => {
     const orderPayload: any = {
       amount: Math.round(amount * 100),
       currency: 'INR',
-      receipt: orderId,
+      receipt: allOrderIds[0], // Razorpay limits receipt to 40 chars
       notes: {
-        order_id: orderId,
+        order_id: allOrderIds[0], // backward compat
+        order_ids: JSON.stringify(allOrderIds), // multi-vendor support
         seller_id: sellerId,
         buyer_id: user.id,
       },
     };
 
-    if (seller?.razorpay_account_id) {
+    // Only add transfers for single-order, single-seller payments with razorpay_account_id
+    if (allOrderIds.length === 1 && seller?.razorpay_account_id) {
       orderPayload.transfers = [
         {
           account: seller.razorpay_account_id,
           amount: Math.round(amount * 100),
           currency: 'INR',
-          notes: { order_id: orderId, type: 'seller_payout' },
+          notes: { order_id: allOrderIds[0], type: 'seller_payout' },
           on_hold: 0,
         },
       ];
@@ -145,12 +158,15 @@ serve(async (req) => {
     }
 
     const razorpayOrder = await razorpayResponse.json();
-    console.log('Razorpay order created:', razorpayOrder.id);
+    console.log('Razorpay order created:', razorpayOrder.id, 'for', allOrderIds.length, 'orders');
 
-    await supabase
-      .from('orders')
-      .update({ razorpay_order_id: razorpayOrder.id })
-      .eq('id', orderId);
+    // Update ALL orders with the razorpay_order_id
+    for (const oid of allOrderIds) {
+      await supabase
+        .from('orders')
+        .update({ razorpay_order_id: razorpayOrder.id })
+        .eq('id', oid);
+    }
 
     return new Response(
       JSON.stringify({

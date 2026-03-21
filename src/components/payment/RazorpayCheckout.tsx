@@ -15,6 +15,7 @@ interface RazorpayCheckoutProps {
   isOpen: boolean;
   onClose: () => void;
   orderId: string;
+  orderIds?: string[];
   amount: number;
   sellerId: string;
   sellerName: string;
@@ -23,12 +24,14 @@ interface RazorpayCheckoutProps {
   customerPhone: string;
   onPaymentSuccess: (paymentId: string) => void;
   onPaymentFailed: () => void;
+  onDismiss?: () => void;
 }
 
 export function RazorpayCheckout({
   isOpen,
   onClose,
   orderId,
+  orderIds,
   amount,
   sellerId,
   sellerName,
@@ -37,6 +40,7 @@ export function RazorpayCheckout({
   customerPhone,
   onPaymentSuccess,
   onPaymentFailed,
+  onDismiss,
 }: RazorpayCheckoutProps) {
   const { createOrder, isLoading, isScriptLoaded } = useRazorpay();
   const { formatPrice } = useCurrency();
@@ -53,6 +57,7 @@ export function RazorpayCheckout({
 
     await createOrder({
       orderId,
+      orderIds: orderIds || [orderId],
       amount,
       sellerId,
       customerName,
@@ -80,9 +85,20 @@ export function RazorpayCheckout({
     setStatus('pending');
   };
 
+  // Bug 4 fix: Differentiate between user cancel (pending) and actual failure
   const handleClose = () => {
-    // Any close that isn't a success means payment wasn't completed
-    if (status !== 'success') {
+    if (status === 'success') {
+      // Success — do nothing extra
+    } else if (status === 'pending') {
+      // User never attempted payment — just dismiss, don't cancel orders
+      if (onDismiss) {
+        onDismiss();
+        setStatus('pending');
+        onClose();
+        return;
+      }
+    } else {
+      // Failed status — actual payment failure
       onPaymentFailed();
     }
     setStatus('pending');

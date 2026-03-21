@@ -100,6 +100,10 @@ export function useCartPage() {
       setPaymentMethod('upi');
       // Small delay to allow component to mount with pendingOrderIds
       setTimeout(() => setShowUpiDeepLink(true), 100);
+    } else if (session.paymentMethod === 'razorpay') {
+      // Bug 3 fix: Restore Razorpay checkout on app resume
+      setPaymentMethod('upi'); // internal state for online payment
+      setTimeout(() => setShowRazorpayCheckout(true), 100);
     }
   }, []); // Only on mount
 
@@ -212,9 +216,11 @@ export function useCartPage() {
       idempotencyKeyRef.current = `${user.id}_${Date.now()}_${simpleHash(cartHash)}`;
     }
 
+    // Bug 2 fix: Use 'card' for Razorpay payments instead of misleading 'upi'
+    const effectivePaymentMethod = paymentMode.isRazorpay && paymentMethod === 'upi' ? 'card' : paymentMethod;
     const { data, error } = await supabase.rpc('create_multi_vendor_orders', {
       _buyer_id: user.id, _delivery_address: deliveryAddressText,
-      _notes: notes || null, _payment_method: paymentMethod, _payment_status: paymentStatus,
+      _notes: notes || null, _payment_method: effectivePaymentMethod, _payment_status: paymentStatus,
       _coupon_id: appliedCoupon?.id || null, _coupon_code: appliedCoupon?.code || null,
       _coupon_discount: effectiveCouponDiscount, _cart_total: totalAmount, _has_urgent: hasUrgentItem,
       _seller_groups: sellerGroupsPayload, _fulfillment_type: fulfillmentType, _delivery_fee: effectiveDeliveryFee,
@@ -329,10 +335,11 @@ export function useCartPage() {
         if (orderIds.length === 0) throw new Error('Failed to create orders');
         setPendingOrderIds(orderIds);
         // CRITICAL: Persist payment session so it survives app-switch
+        // Bug 3 fix: Save correct payment method for session restore
         const sellerForSession = sellerGroups[0]?.items[0]?.product?.seller as any;
         savePaymentSession({
           orderIds,
-          paymentMethod: 'upi',
+          paymentMethod: paymentMode.isRazorpay ? 'razorpay' : 'upi',
           amount: finalAmount,
           createdAt: Date.now(),
           sellerUpiId: sellerForSession?.upi_id || undefined,
@@ -367,15 +374,29 @@ export function useCartPage() {
 
   const handlePlaceOrder = useSubmitGuard(handlePlaceOrderInner, 3000, 0);
 
-  const handleRazorpaySuccess = async (_paymentId: string) => {
+  const handleRazorpaySuccess = async (paymentId: string) => {
     setShowRazorpayCheckout(false);
     const targetOrderId = pendingOrderIds[0];
+
+    // Bug 5 fix: Immediately store payment ID server-side before polling
+    if (targetOrderId && user?.id) {
+      try {
+        for (const oid of pendingOrderIds) {
+          await supabase.from('orders')
+            .update({ razorpay_payment_id: paymentId } as any)
+            .eq('id', oid)
+            .eq('buyer_id', user.id)
+            .eq('payment_status', 'pending');
+        }
+      } catch (err) { console.error('Failed to store payment ID client-side:', err); }
+    }
+
     if (targetOrderId) {
       let confirmed = false;
       for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1500)); const { data } = await supabase.from('orders').select('payment_status').eq('id', targetOrderId).single(); if (data?.payment_status === 'paid') { confirmed = true; break; } }
       if (!confirmed) {
         toast.info('Payment is being verified. Your order will update shortly.', { id: 'razorpay-verifying' });
-        // Do NOT clear cart — payment unconfirmed. Navigate to order detail so buyer can track status.
+        // Do NOT clear cart — payment unconfirmed. Navigate so buyer can track status.
         clearPaymentSession();
         navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
         setPendingOrderIds([]);
@@ -414,6 +435,12 @@ export function useCartPage() {
     clearPaymentSession();
     // Do NOT clear cart on payment failure — user can retry
     toast.error('Payment was not completed. Your order has been cancelled. You can try again.', { id: 'razorpay-failed' });
+  };
+
+  // Bug 4 fix: Dismiss handler — closes UI without cancelling orders
+  const handleRazorpayDismiss = () => {
+    setShowRazorpayCheckout(false);
+    // Orders stay pending — user can retry by tapping Place Order again
   };
 
   // ── UPI completion guard: only ONE of success/failed can execute per session ──
@@ -475,7 +502,7 @@ export function useCartPage() {
     effectiveCouponDiscount, firstSellerFulfillmentMode,
     hasFulfillmentConflict, hasBelowMinimumOrder, noPaymentMethodAvailable,
     selectedDeliveryAddress, setSelectedDeliveryAddress, addresses, addressesLoading,
-    handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed,
+    handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed, handleRazorpayDismiss,
     handleUpiDeepLinkSuccess, handleUpiDeepLinkFailed,
     hasActivePaymentSession, sessionSellerUpiId, sessionSellerName, sessionAmount,
     cancelPlacingOrder: () => { setIsPlacingOrder(false); setOrderStep('validating'); },
