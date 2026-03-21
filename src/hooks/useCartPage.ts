@@ -335,10 +335,11 @@ export function useCartPage() {
         if (orderIds.length === 0) throw new Error('Failed to create orders');
         setPendingOrderIds(orderIds);
         // CRITICAL: Persist payment session so it survives app-switch
+        // Bug 3 fix: Save correct payment method for session restore
         const sellerForSession = sellerGroups[0]?.items[0]?.product?.seller as any;
         savePaymentSession({
           orderIds,
-          paymentMethod: 'upi',
+          paymentMethod: paymentMode.isRazorpay ? 'razorpay' : 'upi',
           amount: finalAmount,
           createdAt: Date.now(),
           sellerUpiId: sellerForSession?.upi_id || undefined,
