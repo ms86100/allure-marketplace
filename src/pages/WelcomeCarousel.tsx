@@ -331,7 +331,7 @@ export default function WelcomeCarousel() {
       </div>
 
       {/* Dot Indicators — fixed position with safe spacing */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-[calc(env(safe-area-inset-bottom,0px)+20px)] pt-3 pointer-events-none">
+      <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+64px)] left-0 right-0 z-50 flex justify-center pt-3 pointer-events-none">
         <div className="flex gap-2 bg-card/90 backdrop-blur-md px-5 py-3 rounded-full border border-border shadow-lg pointer-events-auto">
           {slides.map((_, i) => (
             <button

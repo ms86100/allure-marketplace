@@ -41,7 +41,7 @@ function OtpStep({ auth }: { auth: ReturnType<typeof useAuthPage> }) {
   }, [auth.otp, auth.isLoading]);
 
   return (
-    <motion.div key="otp" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5 pb-72">
+    <motion.div key="otp" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5 pb-48">
       <div className="text-center space-y-1">
         <p className="text-sm text-muted-foreground">OTP sent to</p>
         <p className="text-base font-semibold text-foreground">{auth.settings.defaultCountryCode} {auth.phone}</p>

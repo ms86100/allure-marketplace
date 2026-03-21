@@ -23,7 +23,9 @@ function toProductWithSeller(p: ProductSearchResult): ProductWithSeller {
   return {
     id: p.product_id, seller_id: p.seller_id, name: p.product_name, price: p.price,
     image_url: p.image_url, is_veg: p.is_veg ?? true, is_available: true,
-    is_bestseller: false, is_recommended: false, is_urgent: false,
+    is_bestseller: (p as any).is_bestseller ?? false,
+    is_recommended: (p as any).is_recommended ?? false,
+    is_urgent: (p as any).is_urgent ?? false,
     category: p.category || '', description: p.description || null,
     mrp: p.mrp || null, discount_percentage: p.discount_percentage || null,
     distance_km: p.distance_km || null, society_name: p.society_name || null,

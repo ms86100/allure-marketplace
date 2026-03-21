@@ -185,7 +185,7 @@ export default function OrderDetailPage() {
 
   return (
     <AppLayout showHeader={false} showNav={isTerminalStatus(o.flow, order.status)}>
-      <div className="pb-28">
+      <div className="pb-36">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
           <button onClick={() => navigate('/orders')} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></button>

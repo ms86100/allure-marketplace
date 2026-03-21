@@ -91,9 +91,9 @@ export function DeliveryArrivalOverlay({
             <div className="bg-primary/10 p-4 text-center relative">
               <button
                 onClick={handleDismiss}
-                className="absolute top-3 right-3 w-7 h-7 rounded-full bg-muted flex items-center justify-center"
+                className="absolute top-3 right-3 w-10 h-10 rounded-full bg-muted flex items-center justify-center"
               >
-                <X size={14} className="text-muted-foreground" />
+                <X size={16} className="text-muted-foreground" />
               </button>
               <motion.div
                 animate={{ scale: [1, 1.15, 1] }}
