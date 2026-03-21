@@ -470,7 +470,7 @@ export function useCartPage() {
         setPendingOrderIds([]);
         return;
       }
-      try { await supabase.from('orders').update({ status: 'cancelled' } as any).in('id', pendingOrderIds).eq('payment_status', 'pending').eq('buyer_id', user.id); } catch (err) { console.error('Failed to cancel unpaid orders:', err); }
+      try { await supabase.rpc('buyer_cancel_pending_orders', { _order_ids: pendingOrderIds }); } catch (err) { console.error('Failed to cancel unpaid orders:', err); }
     }
     setPendingOrderIds([]);
     clearPaymentSession();
