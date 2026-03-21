@@ -43,7 +43,7 @@ export function useNearbyProducts() {
             image_url: p.image_url,
             category: p.category,
             is_veg: p.is_veg ?? true,
-            is_available: true,
+            is_available: p.is_available ?? true,
             is_bestseller: false,
             is_recommended: false,
             is_urgent: false,
