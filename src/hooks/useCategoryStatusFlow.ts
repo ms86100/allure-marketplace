@@ -20,6 +20,7 @@ export interface StatusTransition {
   from_status: string;
   to_status: string;
   allowed_actor: string;
+  is_side_action: boolean;
 }
 
 /**
