@@ -165,6 +165,8 @@ export function useNewOrderAlert(sellerIds: string[]) {
         (payload) => {
           const n = payload.new as any;
           if (!sellerIdsRef.current.has(n.seller_id)) return;
+          // Bug 8: Include 'confirmed' for INSERT events (service bookings)
+          if (!ACTIONABLE_STATUSES_INSERT.includes(n.status)) return;
           handleNewOrder({
             id: n.id,
             status: n.status,
