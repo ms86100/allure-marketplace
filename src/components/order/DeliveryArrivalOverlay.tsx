@@ -85,6 +85,7 @@ export function DeliveryArrivalOverlay({
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
             className="w-full max-w-md bg-card border-2 border-primary/30 rounded-2xl shadow-2xl overflow-hidden pointer-events-auto"
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Pulsing header */}
             <div className="bg-primary/10 p-4 text-center relative">
