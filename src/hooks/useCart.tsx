@@ -61,6 +61,7 @@ interface CartContextType {
   totalAmount: number;
   sellerGroups: SellerGroup[];
   isLoading: boolean;
+  isFetching: boolean;
   hasHydrated: boolean;
   /** Number of cart mutations currently in-flight */
   pendingMutations: number;
