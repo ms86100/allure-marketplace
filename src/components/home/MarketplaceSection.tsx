@@ -114,12 +114,9 @@ export function MarketplaceSection() {
 
   return (
     <div className="pb-2 section-reveal">
-      {/* ── Hero: Featured Banners OR Auto-Highlights ── */}
-      {bannerCount > 0 ? (
-        <FeaturedBanners />
-      ) : (
-        <AutoHighlightStrip />
-      )}
+      {/* ── Hero: Featured Banners (self-hides when empty) + Auto-Highlights as supplement ── */}
+      <FeaturedBanners />
+      <AutoHighlightStrip />
 
       {/* ── Icon-forward Category Tabs ── */}
       <div className="pt-4 pb-5">
