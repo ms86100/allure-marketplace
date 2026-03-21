@@ -124,10 +124,10 @@ export function OrderChat({
       // Enqueue a chat notification for the recipient, then process
       const { data: senderProfile } = await supabase
         .from('profiles')
-        .select('full_name, username')
+        .select('name')
         .eq('id', user.id)
         .maybeSingle();
-      const senderName = senderProfile?.full_name || senderProfile?.username || user.user_metadata?.name || 'Someone';
+      const senderName = senderProfile?.name || user.user_metadata?.name || 'Someone';
       const preview = trimmed.length > 80 ? trimmed.slice(0, 77) + '...' : trimmed;
       await supabase.from('notification_queue').insert({
         user_id: otherUserId,

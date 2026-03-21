@@ -341,7 +341,7 @@ export function usePushNotificationsInternal() {
 
         // CRITICAL: Dispatch terminal sync BEFORE suppression check
         const pushStatus = data?.status;
-        const isTerminalPush = data?.is_terminal === 'true' || data?.is_terminal === true;
+        const isTerminalPush = data?.is_terminal === 'true' || (data as any)?.is_terminal === true;
         let isTerminal = isTerminalPush;
         if (!isTerminal && pushStatus) {
           getTerminalStatuses().then(terminalSet => {
