@@ -232,7 +232,7 @@ export default function OrderDetailPage() {
                 }
               </p>
             </div>
-          )
+          )}
 
           {o.isUrgentOrder && order.auto_cancel_at && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} />}
 
