@@ -575,8 +575,8 @@ export default function OrderDetailPage() {
       {/* Buyer Action Bar — BULLETPROOF: Always show for placed/non-terminal orders.
           Uses DB transitions when loaded, but ALWAYS shows cancel for placed status as hardened fallback.
           This ensures the cancel button never disappears due to async transition loading. */}
-      {o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel || order.status === 'placed') && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
+      {hasBuyerActionBar && (
+        <div className="fixed bottom-0 left-0 right-0 z-[60] bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
           <div className="px-4 py-3 flex gap-3">
             {/* Cancel button: show from DB transitions OR hardened fallback for placed status */}
             {(o.canBuyerCancel || order.status === 'placed') && (
