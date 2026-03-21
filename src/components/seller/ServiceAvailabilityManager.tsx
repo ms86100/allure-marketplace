@@ -194,6 +194,11 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
         const startMinutes = startH * 60 + startM;
         const endMinutes = endH * 60 + endM;
 
+        if (endMinutes <= startMinutes) {
+          toast.error(`${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dayOfWeek]}: end time must be after start time`);
+          continue;
+        }
+
         for (const listing of listings) {
           const duration = listing.duration_minutes || 60;
           const buffer = listing.buffer_minutes || 0;
