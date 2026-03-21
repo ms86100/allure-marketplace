@@ -39,8 +39,9 @@ export function UpcomingAppointmentBanner() {
     let cancelled = false;
 
     (async () => {
-      const now = new Date();
-      const today = format(now, 'yyyy-MM-dd');
+      // Use IST for date/time comparisons — booking dates are stored as IST dates
+      const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      const today = format(nowIST, 'yyyy-MM-dd');
       const { data } = await supabase
         .from('service_bookings')
         .select('id, order_id, booking_date, start_time, end_time, status, product:products!service_bookings_product_id_fkey(name, seller_id)')
@@ -56,8 +57,8 @@ export function UpcomingAppointmentBanner() {
         return;
       }
 
-      const nowMinutes = now.getHours() * 60 + now.getMinutes();
-      const todayStr = format(now, 'yyyy-MM-dd');
+      const nowMinutes = nowIST.getHours() * 60 + nowIST.getMinutes();
+      const todayStr = today;
       const validBooking = data.find((b: any) => {
         if (b.booking_date === todayStr && timeToMinutes(b.start_time || '00:00') < nowMinutes) return false;
         return true;
