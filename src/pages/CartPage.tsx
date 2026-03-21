@@ -250,7 +250,7 @@ export default function CartPage() {
           )}
         </div>
 
-        {c.sellerGroups.length > 1 && (<p className="text-xs text-muted-foreground text-center mt-4 px-4">Your cart has items from {c.sellerGroups.length} sellers. Separate orders will be created for each.</p>)}
+        {/* Multi-seller note moved to top — see #5 above */}
 
         {/* Refund Promise */}
         <div className="mx-4 mt-4 flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-xl p-3">
