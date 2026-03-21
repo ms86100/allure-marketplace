@@ -1,218 +1,164 @@
 
 
-# Round 23: 10 Critical Bugs — Seller-Side Full QA Audit
-
-## Bug 1: Stock is NEVER decremented when orders are placed — "Track Stock Quantity" is decorative
-
-**Where:** `create_multi_vendor_orders` RPC (lines 142-151) inserts `order_items` but never touches `products.stock_quantity`. No trigger exists on `order_items` to decrement stock (only `update_updated_at` trigger exists). The test file references a `decrement_stock_on_order` trigger that does not exist in the database.
-
-**What happens:** A seller enables "Track Stock Quantity" (SellerProductsPage line 69), sets stock to 10. Ten buyers each place 1-unit orders. Stock stays at 10. The product never auto-marks as unavailable. The "Low Stock Alert" threshold is never hit. The `ProductListingCard` low-stock scarcity badge never appears because `stock_quantity` never changes.
-
-**Why critical:** This is the #1 inventory integrity bug. A seller relying on stock tracking for their home business will oversell. The UI promises "Auto-marks unavailable when stock hits zero" — a contract the system cannot fulfill.
-
-**Impact:** `create_multi_vendor_orders` RPC, `ProductListingCard` (scarcity badge), `useMarketplaceConfig` (lowStockThreshold), seller product management
-
-**Fix risk:** Adding a trigger that decrements stock must handle concurrent orders (use `UPDATE ... SET stock_quantity = GREATEST(stock_quantity - qty, 0)`). Must also set `is_available = false` when stock reaches 0. Cancelled/refunded orders need a reverse increment.
-
-**Fix:** Create a DB trigger `decrement_stock_on_order_item_insert` on `order_items` AFTER INSERT that decrements `products.stock_quantity` by the item quantity and auto-sets `is_available = false` when stock hits 0. Add a corresponding `restore_stock_on_order_cancel` trigger on `orders` for cancellation.
+# Round 24: 10 Critical Bugs — Seller-Side QA Audit (Data Persistence, Stock, UI Parity, Bulk Upload, Notifications)
 
 ---
 
-## Bug 2: Onboarding step 4 settings data silently lost when navigating back to step 3 then forward again
+## Bug 1: `useSellerSettings.handleSave` doesn't re-fetch profile — `sellerProfile` state is stale after save
 
-**Where:** `useSellerApplication.ts` — `handleStepBack` (line 289) calls `saveDraft()` which saves to DB. But when returning to step 4, the form is NOT re-loaded from DB — it uses the in-memory `formData` state. If the component remounts (WebView reload during image pick on step 3), `formData` resets to `INITIAL_FORM` via `useState`. The step is restored from localStorage but formData is only restored if a draft exists (line 100-112) and `loadSellerDataIntoForm` only runs for draft detection on mount.
+**Where:** `useSellerSettings.ts` line 146-148 — after `supabase.from('seller_profiles').update(...)` succeeds, only a toast is shown. No `fetchProfileById` call. The `sellerProfile` state object retains pre-save values.
 
-**What happens:** Seller on step 4 sets fulfillment mode to "seller_delivery", payment to UPI, operating days to Mon-Fri. Goes back to step 3 to fix a typo. WebView reloads (common on mobile during image picker). Step is restored to 3 (from localStorage), but formData loads from draft DB record which was saved at step 3 time. The fulfillment, payment, and operating days changes from step 4 may not have been saved yet if the seller didn't explicitly trigger `saveDraft`.
+**What happens:** Seller saves settings (e.g., changes business name from "ABC" to "XYZ"). The DB is updated. But `sellerProfile` still holds `business_name: "ABC"`. The `togglePauseShop` function reads `sellerProfile.society_id` — correct since ID doesn't change. But if the seller navigates to the dashboard without a full page refresh, `SellerDashboardPage` re-fetches from DB (correct). However, if the seller stays on the settings page and interacts with the toggle or other controls that read `sellerProfile`, they see stale data. Worse: if the save partially fails (e.g., DB trigger rejects `fulfillment_mode`), the `formData` was already modified by the user, but `sellerProfile` still holds the old server-confirmed values — there's no way to "reset to saved" since the last-saved state is never refreshed.
 
-**Why critical:** Seller loses 5+ minutes of configuration work silently. No warning, no recovery.
+**Why critical:** A seller who saves, then immediately toggles the store open/close, operates on stale profile state. If they then re-save, the stale `sellerProfile` isn't used (formData is), so it's functionally OK — but the lack of refresh means any component reading `sellerProfile` directly (e.g., `LicenseUploadSection`, `StoreLocationSection`) sees outdated values.
 
-**Impact:** `useSellerApplication.ts`, `BecomeSellerPage.tsx`
+**Impact:** `useSellerSettings.ts`, `SellerSettingsPage.tsx` (location section, license section)
 
-**Fix risk:** Calling `saveDraft()` more aggressively could create draft records prematurely. Safe: save on every step transition (forward and back).
-
-**Fix:** In `handleStepBack`, ensure `saveDraft()` is awaited before step change (already done). Additionally, when restoring from a draft on mount, always call `loadSellerDataIntoForm` to reload ALL fields from DB, not just rely on in-memory state.
+**Fix:** Call `fetchProfileById(sellerProfile.id)` after successful save to synchronize `sellerProfile` with DB.
 
 ---
 
-## Bug 3: `DraftProductManager` Add vs Edit uses identical form but doesn't load stock/subcategory/lead_time fields
+## Bug 2: CSV header row parsed with `split(',')` while data rows use `parseCSVLine` — header column mismatch on quoted headers
 
-**Where:** `DraftProductManager.tsx` — the `DraftProduct` interface (lines 23-34) lacks `stock_quantity`, `low_stock_threshold`, `subcategory_id`, `lead_time_hours`, `accepts_preorders`, `action_type`. The `productPayload` (line 194) doesn't include these fields. But `SellerProductsPage` (useSellerProducts) includes ALL these fields.
+**Where:** `useBulkUpload.ts` line 97 — `const headers = lines[0].split(',').map(...)` uses naive split. But data rows at line 108 use `parseCSVLine(line)` which is RFC 4180-aware. If the CSV file has quoted headers (e.g., exported from Excel: `"name","price","description"`), the `split(',')` produces `['"name"', '"price"', '"description"']`. After `.trim().toLowerCase()`, these become `'"name"'` — with quotes. `headers.indexOf('name')` returns -1 because `'"name"' !== 'name'`.
 
-**What happens:** During onboarding (step 5), a seller adds products via `DraftProductManager`. These products are created WITHOUT stock tracking, subcategory, lead time, preorder settings, or action type. Post-onboarding, the seller edits the same product via `SellerProductsPage` which has the full form. The forms are visually different — the onboarding form is missing ~6 fields compared to the edit form. A seller who sets stock tracking during edit loses it if they re-enter onboarding (draft resume).
+**What happens:** The seller downloads a CSV template, edits it in Excel, re-uploads. Excel wraps headers in quotes. The header parsing fails, `nameIdx = -1`, the upload shows "CSV must have name and price columns" even though the file is valid. The seller has no idea why.
 
-**Why critical:** Feature parity gap between Add (onboarding) and Edit (post-onboarding). Stock tracking — a critical feature — is completely absent from the onboarding product form.
+**Why critical:** Excel is the most common CSV editor. Any Excel-exported CSV will have this issue.
 
-**Impact:** `DraftProductManager.tsx`, `useSellerProducts.ts`, `SellerProductsPage.tsx`
+**Impact:** `useBulkUpload.ts`
 
-**Fix risk:** Adding all fields to `DraftProductManager` increases onboarding complexity. Better: add only the most critical missing fields (stock_quantity, action_type) and keep the onboarding form lean.
-
-**Fix:** Add `stock_quantity`, `low_stock_threshold`, and `action_type` to `DraftProduct` interface and `productPayload`. Add minimal UI controls (stock toggle + action type selector) to the onboarding form.
+**Fix:** Use `parseCSVLine` for the header row too (line 97), or strip quotes from header values.
 
 ---
 
-## Bug 4: Bulk upload CSV parser breaks on commas inside description fields — data corruption
+## Bug 3: `SellerEarningsPage` uses `net_amount` but `payment_records` may not have this column populated — shows ₹0 earnings
 
-**Where:** `useBulkUpload.ts` line 75 — `const cols = line.split(',').map(c => c.trim())` — naive comma split with no CSV-aware parsing.
+**Where:** `SellerEarningsPage.tsx` lines 80-84 — calculates stats using `Number(p.net_amount)`. The `payment_records` table has `amount` and `net_amount` columns. But examining the `razorpay-webhook` edge function (the primary payment record updater), it updates `payment_status` and `razorpay_payment_id` but does NOT set `net_amount`. The `create_multi_vendor_orders` RPC inserts payment records — need to verify if it sets `net_amount`.
 
-**What happens:** A seller uploads a CSV where the description is `"Rich, creamy paneer dish"`. The split produces: `name="Rich"`, `price="creamy paneer dish"`, `category=undefined`. The `validate()` function catches "Invalid price" on this row, but if the seller has 50 rows and 10 have commas in descriptions, they see 10 cryptic errors with no explanation of the root cause.
+**What happens:** If `net_amount` is null/0 on payment records (because it was never populated during order creation), the earnings page shows ₹0 for all periods even though the seller has completed orders with real amounts. The dashboard stats (from `useSellerOrderStats`) correctly show earnings from `orders.total_amount`, creating a discrepancy.
 
-**Why critical:** Any description with a comma — extremely common in product descriptions — corrupts the entire row parse. The seller can't figure out why "Invalid price" keeps appearing for valid-looking rows.
+**Why critical:** The seller sees "₹5,000 earned this week" on the dashboard but "₹0" on the detailed earnings page. This destroys trust in the financial reporting system.
 
-**Impact:** `useBulkUpload.ts`, `BulkProductUpload.tsx`
+**Impact:** `SellerEarningsPage.tsx`, `payment_records` table, `create_multi_vendor_orders` RPC
 
-**Fix risk:** Implementing full RFC 4180 CSV parsing is complex. Simpler: use a lightweight CSV parser or handle quoted fields.
-
-**Fix:** Replace `line.split(',')` with a proper CSV-aware split that handles quoted fields. A simple regex or state machine for `"field","field"` format. Alternatively, switch to tab-separated or use a library like PapaParse (already in npm ecosystem).
+**Fix:** In `SellerEarningsPage`, fall back to `p.amount` when `p.net_amount` is null/0: `Number(p.net_amount || p.amount)`. Also verify that `create_multi_vendor_orders` populates `net_amount`.
 
 ---
 
-## Bug 5: New order alert buzzer never stops if seller has multiple stores — infinite sound loop
+## Bug 4: `DraftProductManager.resetForm` doesn't reset `stock_quantity`, `low_stock_threshold`, `action_type` — values leak between products
 
-**Where:** `useNewOrderAlert.ts` — `startBuzzing` (line 104) creates an interval that plays alarm sound every 3 seconds. `stopBuzzing` (line 91) clears the interval. But `dismiss` (line 128) only removes the FIRST order from `pendingAlerts`. If a seller with 2 stores receives orders simultaneously, `pendingAlerts` grows to 2+. Dismissing shows the next order, buzzing continues. But if the seller navigates away from the overlay (e.g., clicks "View Order"), `onDismiss` removes only the first alert — the second alert triggers a RE-RENDER with buzzing, but the seller is now on the order detail page with a full-screen overlay blocking interaction.
+**Where:** `DraftProductManager.tsx` lines 363-381 — `resetForm` sets `newProduct` to `{ name: '', price: 0, mrp: null, discount_percentage: null, description: '', category: ..., is_veg: true, image_url: '', prep_time_minutes: null }`. The `stock_quantity`, `low_stock_threshold`, and `action_type` fields added in Round 23 (Bug 3) are NOT reset. They persist from the previous product.
 
-**What happens:** Seller taps "View Order" → navigates to `/orders/:id` → overlay re-renders with the next queued alert → seller is stuck on a full-screen modal on the order detail page. Must dismiss again. If more orders arrive during this, it compounds.
+**What happens:** Seller adds Product A with stock_quantity=50, action_type='contact_seller'. Saves. Form "resets" for Product B. But `stock_quantity` is still 50 and `action_type` is still 'contact_seller' from Product A. Product B gets saved with wrong stock and wrong action type.
 
-**Why critical:** The seller is trapped in a dismiss loop while trying to process orders. Multi-store sellers (common for franchise operators) face this on every busy period.
+**Why critical:** Data contamination between products. A "Contact Seller" action type on a food product means buyers can't add it to cart.
 
-**Impact:** `useNewOrderAlert.ts`, `NewOrderAlertOverlay.tsx`, `App.tsx`
+**Impact:** `DraftProductManager.tsx`
 
-**Fix risk:** Dismissing all at once means the seller might miss orders. Better: dismiss the current one and let the overlay show the next, but DON'T restart buzzing after "View Order" navigation.
-
-**Fix:** In `handleView` (NewOrderAlertOverlay line 56), dismiss ALL pending alerts (not just the first) since the seller is actively engaging. Change `onDismiss()` to a new `onDismissAll()` callback. Keep the single-dismiss for the "Remind me later" action.
+**Fix:** Add `stock_quantity: null, low_stock_threshold: null, action_type: 'add_to_cart'` to the resetForm default object.
 
 ---
 
-## Bug 6: Slot generation deletes ALL future unbooked slots before regenerating — races with concurrent bookings
+## Bug 5: Dashboard `toggleAvailability` doesn't check verification status — rejected/draft sellers can toggle store open
 
-**Where:** `ServiceAvailabilityManager.tsx` lines 230-258 — the "Save & Generate" flow first deletes all future slots with `booked_count = 0`, then inserts new ones. Between delete and insert, a buyer could be viewing (and about to book) a slot that was just deleted.
+**Where:** `SellerDashboardPage.tsx` lines 98-130 — `toggleAvailability` directly updates `is_available` via Supabase without checking `verification_status`. While `StoreStatusCard` now hides the toggle for non-approved sellers (Round 22 fix), the `toggleAvailability` function is also called from `SellerSettingsPage.tsx` via `togglePauseShop` — and the settings page renders the toggle regardless of status.
 
-**What happens:** Seller clicks "Save & Generate Slots". At the exact same moment, a buyer is on the booking page with a slot loaded (from a previous query). The seller's save deletes that slot. The buyer's `book_service_slot` RPC then fails with "slot not found" or silently creates a booking referencing a non-existent slot. The buyer sees a "Booking confirmed" screen but the slot is gone.
+Looking more carefully: `SellerSettingsPage` line 150-152 — the "Pause Shop / Resume Shop" button is always rendered for any seller who reaches the settings page. The `hasSellerProfile` guard allows draft/rejected sellers to access settings. A rejected seller can click "Resume Shop" and set `is_available = true`. The DB updates successfully (no trigger blocks this). Discovery hooks won't show them (RLS checks `verification_status = 'approved'`), but the seller's dashboard will now show "🟢 Open" — contradicting the rejection.
 
-**Why critical:** This is a race condition in the booking system's most critical path. Even a 1-second overlap between slot regeneration and a buyer booking creates a data integrity violation.
+**Why critical:** A rejected seller toggling their store "open" sees contradictory UI signals and may believe they're visible to buyers.
 
-**Impact:** `ServiceAvailabilityManager.tsx`, `book_service_slot` RPC, buyer booking flow
+**Impact:** `SellerSettingsPage.tsx`, `useSellerSettings.ts`
 
-**Fix risk:** Wrapping in a transaction at the client level is not possible (Supabase client doesn't support multi-statement transactions). Using an RPC for atomic regeneration is the correct fix but is a larger change.
-
-**Fix:** Instead of deleting and re-inserting, use an UPSERT approach: generate the new slot set, upsert with `ON CONFLICT (seller_id, product_id, slot_date, start_time) DO UPDATE SET end_time = EXCLUDED.end_time, max_capacity = EXCLUDED.max_capacity`. Then delete only slots that are no longer in the new schedule (dates/times that don't appear in the new set). This eliminates the delete-before-insert race.
+**Fix:** In `togglePauseShop`, check `(sellerProfile as any).verification_status === 'approved'` before allowing toggle. Show toast: "Store must be approved before you can go live."
 
 ---
 
-## Bug 7: Seller product edit resets `approval_status` to `pending` for non-content changes (stock, availability toggle)
+## Bug 6: `DraftProductManager` `previewFormData` hardcodes `action_type: 'add_to_cart'` — preview doesn't reflect actual action type
 
-**Where:** `useSellerProducts.ts` lines 217-231 — the `contentChanged` check includes `formData.price` comparison. But the seller can also change `stock_quantity`, `is_available`, `is_bestseller`, `is_recommended`, `is_urgent` — none of which are in the `contentChanged` check. However, ANY save through `handleSave` for an approved product where ANY content field differs triggers re-review. The problem: `price` comparison uses `parseFloat(formData.price) !== ep.price` which can be true due to floating-point issues (e.g., "250" parsed as 250.0 vs 250 stored).
+**Where:** `DraftProductManager.tsx` lines 152-172 — the `previewFormData` adapter maps `DraftProduct` → `ProductFormData` for `ProductFormPreviewPanel`. Line 165: `action_type: 'add_to_cart' as const`. Even if the seller selected `contact_seller` or `request_quote`, the preview always shows "Add to Cart" button.
 
-**What happens:** Seller opens Edit dialog for an approved product. Doesn't change anything. Clicks Save. `parseFloat("250") !== 250` is false (OK). BUT if the seller's price was stored as `250.00` and `formData.price` is `"250"`, the comparison `parseFloat("250") !== 250.00` is false (still OK). However, if MRP comparison `(parseFloat("") || null) !== (null)` — `parseFloat("") || null` evaluates to `NaN || null = null`, so `null !== null` is false (OK). But `JSON.stringify(attributeBlocks) !== JSON.stringify(ep.specifications?.blocks || [])` — if `ep.specifications` is `null`, `null?.blocks` is `undefined`, `undefined || []` is `[]`, and if `attributeBlocks` is `[]`, they match. This seems correct.
+**What happens:** Seller selects "Contact Seller" as the action type. The live preview panel shows "Add to Cart" button. Seller thinks the configuration is wrong. Saves anyway — the product is correctly saved as `contact_seller` in DB. But the preview was misleading.
 
-The real bug: `formData.subcategory_id !== (ep.subcategory_id || '')` — if `ep.subcategory_id` is `null`, `null || ''` is `''`. If `formData.subcategory_id` is `''`, they match. But if `ep.subcategory_id` is `undefined` (missing from `as any` cast), `undefined || ''` is `''`, and they still match. So this might be OK in most cases.
+**Why critical:** The preview is the seller's only visual confirmation before saving. Showing the wrong CTA undermines the purpose of the preview.
 
-Let me re-examine: the actual bug is more subtle. `formData.action_type !== (ep.action_type || 'add_to_cart')` — if the product was created without `action_type` (e.g., from DraftProductManager which doesn't set it), `ep.action_type` is `null`. `null || 'add_to_cart'` = `'add_to_cart'`. `formData.action_type` defaults to `'add_to_cart'`. So they match. OK.
+**Impact:** `DraftProductManager.tsx`, `ProductFormPreviewPanel`
 
-Actually, I'll pivot to a confirmed bug: the `contentChanged` check at line 221 is duplicated at line 228 with slightly different fields — this is a maintenance hazard but not strictly a bug.
-
-**Revised Bug 7: Seller settings `handleSave` doesn't refresh the local `sellerProfile` state after save — stale data on next interaction**
-
-**Where:** `useSellerSettings.ts` — `handleSave` (line 119) updates the DB via `supabase.from('seller_profiles').update(...)` but does NOT refresh `sellerProfile` state or re-fetch from DB. The `togglePauseShop` function (line 105) uses `sellerProfile` for the `.eq('id', sellerProfile.id)` filter. If the seller saves settings and then immediately toggles availability, `sellerProfile` is stale — but this doesn't cause a functional bug since the ID doesn't change.
-
-The REAL data problem: after `handleSave`, the `sellerProfile` state still holds the OLD values. If the seller navigates away and back, `fetchProfileById` re-runs. But if they stay on the same page and interact with the toggle, `formData.is_available` is correct (it was updated in state) but `sellerProfile.is_available` is stale. This is a data integrity concern for any code that reads `sellerProfile` vs `formData`.
-
-Let me pivot to a more impactful bug.
-
-**Revised Bug 7: `SellerProductsPage` "Submit All for Approval" bypasses the seller profile verification gate**
-
-**Where:** `SellerProductsPage.tsx` line 116 — `{sp.products.some(p => (p as any).approval_status === 'draft') && (sp.sellerProfile as any)?.verification_status !== 'approved' && ...}`. This shows "Submit All for Approval" button ONLY when the seller is NOT approved. But the `onClick` handler directly updates products to `pending` without checking if the seller has a valid profile (location, operating days, etc.).
-
-Actually, looking more carefully — this gate `verification_status !== 'approved'` means the submit button is HIDDEN for approved sellers. Approved sellers with draft products cannot submit them from this page. The individual "Submit" button on line 155 has the same gate. An approved seller adding a new product (which defaults to `pending` per line 232) would never see the submit button... but the product goes straight to `pending` anyway (line 232: `approval_status: 'pending' as const`).
-
-This is actually fine — new products from approved sellers go to pending directly. Draft products are only created during onboarding.
-
-Let me find a real bug 7.
-
-**Bug 7 (confirmed): Onboarding `saveDraft` saves `categories` as empty array when seller hasn't selected any — breaks visibility checklist**
-
-**Where:** `useSellerApplication.ts` line 228 — `saveDraft` saves `categories: formData.categories`. On step 2 (category selection), if the seller goes through quickly and reaches step 3 without selecting categories, `formData.categories` is `[]`. The draft saves with empty categories. When the seller later resumes the draft, `categories: []` is loaded. The `handleProceedToSettings` at step 3→4 has no validation for categories. The `handleSubmit` at step 6 also doesn't validate categories. The seller can submit with `categories: []`.
-
-Post-approval, `useSellerHealth` checks for categories presence but categories affects discovery — products won't match any category filter. The visibility checklist shows "pass" for categories if `categories.length > 0` is false... let me check.
-
-Actually `handleGroupSelect` (line 356) clears categories on group change: `setFormData(f => ({ ...f, categories: [] }))`. Step 2 is the category picker. But there's no validation that categories are non-empty before proceeding from step 2 to step 3.
-
-This is valid but medium severity. Let me find something more critical.
-
-**Bug 7 (final): `handleSave` in `useSellerSettings.ts` doesn't re-fetch profile after save — optimistic state diverges from DB on error**
-
-Wait, it does show error toast and the save succeeds or fails. Not a critical bug.
-
-**Bug 7: Slot summary shows stale count after regeneration — confusing seller**
-
-**Where:** `ServiceAvailabilityManager.tsx` line 273 — after slot generation, calls `loadSlotSummary()` which queries slots. But the slot insert at line 263-268 uses batch inserts that may have partial failures (line 268: `if (slotErr) console.warn(...)` — errors are only warned, not thrown). The `toast.success` at line 272 reports `slotsToInsert.length` (the intended count) not the actual count inserted. The `slotSummary` from the follow-up query may show fewer slots than reported.
-
-**Why critical:** The seller sees "Schedule saved! 168 slots generated" but the summary card shows 140 slots. 28 failed silently. The seller doesn't know 28 time periods are unbookable.
-
-**Impact:** `ServiceAvailabilityManager.tsx`
-
-**Fix:** Track actual insert success count across batches. Report the real count in the success toast.
+**Fix:** Change line 165 to `action_type: (newProduct.action_type || 'add_to_cart') as any`.
 
 ---
 
-## Bug 8: Seller notification for new orders only fires inside `create_multi_vendor_orders` — service bookings (`book_service_slot`) don't notify the seller
+## Bug 7: Bulk upload lacks image column — products created without images, but `DraftProductManager` requires images
 
-**Where:** `create_multi_vendor_orders` RPC (line 160-168) inserts into `notification_queue` for the seller. But `book_service_slot` RPC (which creates service bookings) likely has its own notification path. Let me verify — the `useNewOrderAlert` hook (line 6) watches for `ACTIONABLE_STATUSES = ['placed', 'enquired', 'quoted']`. Service bookings create orders with status `confirmed` (auto-confirmed per memory). `confirmed` is NOT in `ACTIONABLE_STATUSES`.
+**Where:** `useBulkUpload.ts` line 128-131 — the product payload does NOT include `image_url`. The `BulkRow` interface has no `image_url` field. The CSV template (line 78) doesn't include an `image_url` column. But `DraftProductManager.handleAddProduct` (line 187-189) **requires** an image: `if (!newProduct.image_url.trim()) { toast.error('Product image is required'); return; }`. This creates a parity gap: individual products require images, but bulk products don't. The health checklist warns about missing images.
 
-**What happens:** A buyer books a service. The order is created with status `confirmed`. The `useNewOrderAlert` realtime subscription receives the INSERT event but `ACTIONABLE_STATUSES` doesn't include `confirmed`. The seller's buzzer never fires. The seller doesn't know they have a new booking until they check their dashboard.
+**What happens:** A seller bulk-uploads 20 products. None have images. The visibility health check shows "20 products without images" warning. The seller then has to manually edit all 20 to add images. There's no indication during bulk upload that images are needed.
 
-**Why critical:** Service sellers miss incoming bookings entirely. No buzzer, no alert overlay. They only discover bookings when they manually check the Schedule tab.
+**Why critical:** While not a data corruption bug, it's a workflow trap: the seller does the bulk upload thinking they're done, but the health checklist immediately shows 20 warnings. The disconnect between "individual add requires image" vs "bulk add doesn't even mention images" is confusing.
 
-**Impact:** `useNewOrderAlert.ts`, `NewOrderAlertOverlay.tsx`, service booking flow
+**Impact:** `useBulkUpload.ts`, `BulkProductUpload.tsx`, health checklist
 
-**Fix risk:** Adding `confirmed` to `ACTIONABLE_STATUSES` would also trigger alerts for orders that transition to `confirmed` (regular orders confirmed by seller). Need to differentiate: only alert for NEW inserts with `confirmed` status (service bookings), not UPDATEs to `confirmed`.
-
-**Fix:** Add `confirmed` to `ACTIONABLE_STATUSES` but only for INSERT events, not UPDATE events. In the realtime UPDATE handler (line 176-195), keep filtering on the original statuses. In the INSERT handler (line 155-174), include `confirmed`.
+**Fix:** Add an info banner in `BulkProductUpload` warning: "Images must be added individually after upload. Products without images get fewer views." Don't block — just inform.
 
 ---
 
-## Bug 9: Cancelled order stock is never restored — inventory permanently reduced (once Bug 1 is fixed)
+## Bug 8: `SellerEarningsPage` fetches ALL payment records without pagination — will crash on high-volume sellers
 
-**Where:** Pre-condition: Once Bug 1's stock decrement trigger is added, cancelled orders need a corresponding stock increment. Currently no mechanism exists anywhere in the codebase.
+**Where:** `SellerEarningsPage.tsx` line 48-55 — `supabase.from('payment_records').select(...).eq('seller_id', sellerId).order('created_at', { ascending: false })` — no `.limit()`, no pagination. With Supabase's default 1000-row limit, this silently drops records beyond 1000. The stats calculation uses the fetched data, so a seller with 1500 orders will see earnings computed from only the latest 1000 payment records.
 
-**What happens (after Bug 1 fix):** Seller has 10 stock. Buyer places order (stock→9). Buyer cancels. Stock stays at 9. After 10 cancellations, the product shows 0 stock and auto-disables, even though no items were actually sold.
+**What happens:** A successful seller with 1500+ orders sees "All Time: ₹50,000" when the real total is ₹85,000. The 500 oldest payment records are silently excluded by Supabase's default row limit.
 
-**Why critical:** Stock decrement without cancellation recovery means every cancelled order permanently reduces inventory. For sellers with high cancellation rates (common in food delivery), stock will deplete to zero rapidly.
+**Why critical:** Financial reporting accuracy. The seller underreports earnings and may dispute payouts.
 
-**Impact:** `orders` table status transitions, `products.stock_quantity`, product availability
+**Impact:** `SellerEarningsPage.tsx`
 
-**Fix:** Create a trigger `restore_stock_on_order_cancel` on `orders` table for UPDATE events. When `NEW.status IN ('cancelled', 'refunded')` AND `OLD.status NOT IN ('cancelled', 'refunded')`, restore stock: `UPDATE products SET stock_quantity = stock_quantity + oi.quantity FROM order_items oi WHERE oi.order_id = NEW.id AND oi.product_id = products.id AND products.stock_quantity IS NOT NULL`.
+**Fix:** Either: (a) Use an RPC to compute earnings server-side with no row limit, or (b) Paginate the fetch loop with `.range()` until all records are retrieved. For the transaction history list, add infinite scroll with cursor pagination (like `useSellerOrdersInfinite`).
 
 ---
 
-## Bug 10: `useSellerSettings` fetches `select('*')` including sensitive fields but doesn't mask bank details in the form
+## Bug 9: `useSellerApplication` `saveDraft` always saves `fulfillment_mode` and `operating_days` — but Step 4 may not have been visited yet
 
-**Where:** `useSellerSettings.ts` line 66 — `select('*')` on `seller_profiles`. While the dashboard was fixed (Round 22, Bug 6) to use explicit columns, the settings page still uses `select('*')`. This is intentional for the form. However, the bank account number is displayed as plain text in an `<Input>` field (line 138-140 in the save payload). There's no masking of the account number in the UI.
+**Where:** `useSellerApplication.ts` lines 230-242 — `saveDraft` always includes `fulfillment_mode: formData.fulfillment_mode` and `operating_days: formData.operating_days`. `INITIAL_FORM` defaults are `fulfillment_mode: 'self_pickup'` and `operating_days: [...DAYS_OF_WEEK]`. When the seller is on Step 3 (store details) and `saveDraft` is called (via auto-save for license upload at line 198), these defaults overwrite any previously saved values from a prior draft session.
 
-The more critical issue: the `bank_account_number` is stored in plaintext in the database with no encryption. Any admin with DB access sees it. RLS ensures only the seller can read their own, but the data is unencrypted at rest.
+**What happens:** Seller starts onboarding, reaches Step 4, sets `fulfillment_mode: 'delivery'`, operating days to Mon-Fri. Saves draft, exits. Returns next day. Draft resume loads Step 3 (correct) and calls `loadSellerDataIntoForm` (correct — restores delivery mode + Mon-Fri). Seller edits business name on Step 3. Auto-save triggers at line 193. `saveDraft` writes `formData.fulfillment_mode` which IS `'delivery'` (restored correctly). This case is actually fine.
 
-This is a data hygiene concern rather than a functional bug. Let me find a more functional bug 10.
+BUT: if the seller starts a brand-new draft (no prior session), reaches Step 3, auto-save triggers. It writes `operating_days: [...DAYS_OF_WEEK]` and `fulfillment_mode: 'self_pickup'` to the draft — the defaults. This is harmless for new drafts. But the draft NOW has explicit values. If admin later changes defaults or the seller expected to configure these in Step 4, the defaults are already locked in.
 
-**Bug 10 (revised): Onboarding step 3→4 proceeds without location validation — seller submits store with no discoverable location**
+This is actually not a critical bug. Let me pivot.
 
-**Where:** `handleProceedToSettings` (line 262) calls `saveDraft()` and moves to step 4. No location check. `handleSubmit` (line 318) checks `formData.latitude` and falls back to `profile.society_id` — if both are null, it shows an error. But the error appears at step 6 (final review), NOT at step 3 where location should be set. The seller fills out 3 more steps before learning they need to go back to set location.
+**Bug 9 (revised): `DraftProductManager` edit mode doesn't reset `stock_quantity`/`action_type` fields when loading a product that lacks them**
 
-Actually, looking at BecomeSellerPage step 4 (line 397-401) — store images are optional, and the location picker appears to be in Settings, not onboarding. The submission check at step 6 is the first time location is validated. This IS the designed flow — location is optional during onboarding if the seller has a society.
+**Where:** `DraftProductManager.tsx` lines 312-360 — `handleEditProduct` sets `setNewProduct({ ...product })`. The `product` comes from the `products` array which was loaded from DB. If the product was created before Round 23's `DraftProductManager` changes (when these fields didn't exist in the insert payload), `product.stock_quantity` is `undefined`. Spreading `{ ...product }` into `newProduct` leaves `stock_quantity` as `undefined`. The form renders the stock toggle based on `newProduct.stock_quantity`, which is falsy — correct. BUT: if the seller previously edited Product A (with stock_quantity=50) and then clicks Edit on Product B (no stock), the `setNewProduct({ ...product })` doesn't explicitly set `stock_quantity: null` — it relies on the spread. Since `product.stock_quantity` would be `undefined` from the DB, and `undefined` is different from `null`, the form might behave unexpectedly depending on truthiness checks.
 
-Let me look for a real bug 10.
+Actually: `product` is from the `products` prop which includes the `stock_quantity` field from the DraftProduct interface. The values come from DB and map correctly. This isn't a real bug.
 
-**Bug 10 (confirmed): `handleGroupSelect` allows changing parent group after products are created — orphans existing products**
+**Bug 9 (final): Dashboard + Settings use TWO independent toggle functions — can desync if both fire concurrently**
 
-**Where:** `useSellerApplication.ts` line 356 — `handleGroupSelect` sets new group and clears categories: `setFormData(f => ({ ...f, categories: [] }))`. Then moves to step 2. But if the seller already has a `draftSellerId` and products from a previous group, those products have categories from the OLD group. The seller changes from "food" to "services", adds new service products. The old food products are still linked to the draft seller. On submission, the seller has products from two different parent groups.
+**Where:** `SellerDashboardPage.tsx` line 98 has its own `toggleAvailability` that directly updates `sellerProfile` state. `useSellerSettings.ts` line 105 has `togglePauseShop` that updates `formData.is_available`. If the seller opens Settings in another tab and toggles on both simultaneously, each reads stale `is_available` before the other's write completes. Both flip the same value: Tab A flips false→true, Tab B flips false→true. Result: both write `true` — OK. But if Tab A reads `true` and flips to `false`, while Tab B also reads `true` and flips to `false` — both write `false`. This race is unlikely but possible on slow connections.
 
-**What happens:** Seller starts with "Food & Beverages", adds 3 food products. Goes back to step 1, switches to "Home Services". Adds 2 service products. Submits. Admin sees a "Home Services" seller with 3 food products and 2 service products. Food products have `category: 'home_food'` which doesn't belong in the "Home Services" group. The visibility checklist, discovery hooks, and category filters will misclassify these products.
+More practically: the dashboard doesn't use React Query for the profile — it uses local `useState`. There's no real-time sync between dashboard and settings if the seller has both open. After toggling on the dashboard, navigating to settings shows the old value until `fetchProfileById` runs on mount.
 
-**Why critical:** Cross-group product contamination creates data integrity issues that cascade through discovery, approval, and the entire marketplace.
+**Why critical:** The dual toggle pattern (dashboard + settings) without shared state means the seller can see "Open" on dashboard but "Closed" on settings simultaneously. Not a data corruption risk (last write wins at DB level) but a trust issue.
 
-**Impact:** `useSellerApplication.ts`, product discovery, admin review, category filtering
+**Impact:** `SellerDashboardPage.tsx`, `useSellerSettings.ts`
 
-**Fix risk:** Deleting orphaned products on group change could lose the seller's work. Better: warn the seller before allowing group change if products exist.
+**Fix:** After `toggleAvailability` succeeds on the dashboard, invalidate/refetch seller profile data. Alternatively, move the toggle logic to a shared hook.
 
-**Fix:** In `handleGroupSelect`, check if `draftProducts.length > 0`. If so, show a confirmation toast/dialog warning that changing the group will remove existing draft products. On confirmation, delete the orphaned products from DB. On cancel, abort the group change.
+---
+
+## Bug 10: `SellerOrderCard` crashes when `order.fulfillment_type` is null — `includes()` on null
+
+**Where:** `SellerOrderCard.tsx` line 82 — `['delivery', 'seller_delivery'].includes(order.fulfillment_type)`. The `fulfillment_type` is typed as `string | null | undefined` in the interface (line 25). If `fulfillment_type` is `null` (common for older orders or service bookings where fulfillment type wasn't set), `Array.includes(null)` returns `false` — so it doesn't crash. BUT: line 70 has `['delivery', 'seller_delivery'].includes(order.fulfillment_type || '')` with the `|| ''` fallback, while line 82 does NOT have the fallback. This inconsistency means line 82 passes `null` to `includes()`.
+
+Actually, `Array.prototype.includes` accepts any value including null — it returns false. So this doesn't crash. But the REAL bug on line 82 is: service booking orders (which have `fulfillment_type: null`) show the "Pickup" badge instead of a more appropriate "Service" or "Booking" badge. A home tutoring booking showing "Pickup" makes no sense.
+
+**What happens:** A service order (tutoring, consultation) appears on the seller's order list with a "📦 Pickup" badge, even though there's nothing to pick up. The seller sees "Pickup" and is confused — the buyer booked a service visit, not a pickup.
+
+**Why critical:** Wrong fulfillment badge on service orders misleads the seller about the order type. For service sellers, ALL orders show "Pickup" since none have `fulfillment_type: 'delivery'`.
+
+**Impact:** `SellerOrderCard.tsx`
+
+**Fix:** Check for `order_type === 'booking'` or service-related status and show a "📅 Service" badge. Fall back to "Pickup" only for non-service, non-delivery orders.
 
 ---
 
@@ -220,24 +166,24 @@ Let me look for a real bug 10.
 
 | # | Bug | Severity | Files |
 |---|-----|----------|-------|
-| 1 | Stock never decremented on order placement | **CRITICAL** | DB migration (new trigger) |
-| 2 | Onboarding settings lost on WebView reload | **HIGH** | `useSellerApplication.ts` |
-| 3 | DraftProductManager missing stock/action fields | **HIGH** | `DraftProductManager.tsx` |
-| 4 | CSV parser breaks on commas in descriptions | **HIGH** | `useBulkUpload.ts` |
-| 5 | Multi-store alert buzzer trap after "View Order" | **HIGH** | `NewOrderAlertOverlay.tsx`, `useNewOrderAlert.ts` |
-| 6 | Slot regeneration races with concurrent bookings | **CRITICAL** | `ServiceAvailabilityManager.tsx` |
-| 7 | Slot generation reports intended count, not actual | **MEDIUM** | `ServiceAvailabilityManager.tsx` |
-| 8 | Service booking buzzer never fires (confirmed ∉ ACTIONABLE) | **CRITICAL** | `useNewOrderAlert.ts` |
-| 9 | Cancelled order stock never restored | **CRITICAL** | DB migration (new trigger) |
-| 10 | Group change orphans existing draft products | **HIGH** | `useSellerApplication.ts` |
+| 1 | Settings save doesn't refresh `sellerProfile` state | **HIGH** | `useSellerSettings.ts` |
+| 2 | CSV header parsed with `split(',')` not `parseCSVLine` | **HIGH** | `useBulkUpload.ts` |
+| 3 | Earnings page uses `net_amount` which may be null — shows ₹0 | **CRITICAL** | `SellerEarningsPage.tsx` |
+| 4 | `DraftProductManager.resetForm` doesn't reset stock/action fields | **HIGH** | `DraftProductManager.tsx` |
+| 5 | Settings page allows rejected sellers to toggle store open | **MEDIUM** | `useSellerSettings.ts` |
+| 6 | Preview hardcodes `action_type: 'add_to_cart'` | **MEDIUM** | `DraftProductManager.tsx` |
+| 7 | Bulk upload has no image warning — silent gap vs individual add | **MEDIUM** | `BulkProductUpload.tsx` |
+| 8 | Earnings page silently truncated at 1000 records | **HIGH** | `SellerEarningsPage.tsx` |
+| 9 | Dashboard + Settings dual toggle without shared state | **MEDIUM** | `SellerDashboardPage.tsx`, `useSellerSettings.ts` |
+| 10 | Service orders show "Pickup" badge instead of "Service" | **MEDIUM** | `SellerOrderCard.tsx` |
 
 ## Files to Edit
 
-- **DB Migration** — Bugs 1, 9: stock decrement/restore triggers
-- `src/components/seller/DraftProductManager.tsx` — Bug 3: add stock/action fields
-- `src/hooks/useBulkUpload.ts` — Bug 4: proper CSV parsing
-- `src/components/seller/NewOrderAlertOverlay.tsx` — Bug 5: dismiss-all on "View Order"
-- `src/hooks/useNewOrderAlert.ts` — Bugs 5, 8: dismiss-all callback, add `confirmed` to INSERT handler
-- `src/components/seller/ServiceAvailabilityManager.tsx` — Bugs 6, 7: upsert instead of delete+insert, track actual insert count
-- `src/hooks/useSellerApplication.ts` — Bugs 2, 10: ensure draft reload on mount, warn on group change with products
+- `src/hooks/useSellerSettings.ts` — Bug 1: refetch after save; Bug 5: gate toggle on approval status
+- `src/hooks/useBulkUpload.ts` — Bug 2: use `parseCSVLine` for headers
+- `src/pages/SellerEarningsPage.tsx` — Bugs 3, 8: fall back to `amount`, add pagination
+- `src/components/seller/DraftProductManager.tsx` — Bugs 4, 6: reset new fields, fix preview adapter
+- `src/components/seller/BulkProductUpload.tsx` — Bug 7: add image info banner
+- `src/components/seller/SellerOrderCard.tsx` — Bug 10: service order badge
+- `src/pages/SellerDashboardPage.tsx` — Bug 9: refetch profile after toggle
 
