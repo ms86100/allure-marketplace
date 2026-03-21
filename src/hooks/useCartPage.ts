@@ -153,12 +153,13 @@ export function useCartPage() {
   useEffect(() => {
     if (sellerGroups.length > 1 && appliedCoupon) setAppliedCoupon(null);
   }, [sellerGroups.length]);
+  const prevSellerIdRef = useRef(currentSellerId);
   useEffect(() => {
-    // If single-seller cart switches to a different seller, clear stale coupon
-    if (appliedCoupon && currentSellerId && appliedCoupon.id) {
-      // CouponInput already remounts via key, but parent state needs clearing too
+    // Only clear coupon when seller genuinely changes (not on initial mount or same-seller re-derive)
+    if (prevSellerIdRef.current && currentSellerId && prevSellerIdRef.current !== currentSellerId && appliedCoupon) {
       setAppliedCoupon(null);
     }
+    prevSellerIdRef.current = currentSellerId;
   }, [currentSellerId]);
 
   // Auto-select default delivery address
