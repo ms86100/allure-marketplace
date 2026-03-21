@@ -58,11 +58,58 @@ Deno.serve(async (req) => {
 
     console.log(`Processing ${pending.length} queued notifications`);
 
+    // Batch-fetch notification preferences for all unique users in this batch
+    const userIds = [...new Set(pending.map((item: any) => item.user_id))];
+    const { data: prefRows } = await supabase
+      .from("notification_preferences")
+      .select("user_id, orders, chat, promotions")
+      .in("user_id", userIds);
+    const prefMap = new Map<string, Record<string, boolean>>();
+    for (const row of prefRows || []) {
+      prefMap.set(row.user_id, { orders: row.orders, chat: row.chat, promotions: row.promotions });
+    }
+
     let processed = 0;
     let deadLettered = 0;
+    let skippedPrefs = 0;
 
     for (const item of pending) {
       try {
+        // Enforce user notification preferences — skip push if user opted out
+        const userPrefs = prefMap.get(item.user_id);
+        const notifType = item.type || item.payload?.type || "order";
+        let prefAllowed = true;
+        if (userPrefs) {
+          if ((notifType === "order" || notifType === "order_status") && userPrefs.orders === false) prefAllowed = false;
+          if (notifType === "chat" && userPrefs.chat === false) prefAllowed = false;
+          if (notifType === "promotion" && userPrefs.promotions === false) prefAllowed = false;
+        }
+        if (!prefAllowed) {
+          // Still save in-app notification (visible in inbox) but skip push delivery
+          console.log(`[Queue][${item.id}] Skipped push — user ${item.user_id} opted out of '${notifType}'`);
+          const { error: insertError } = await supabase
+            .from("user_notifications")
+            .insert({
+              user_id: item.user_id,
+              title: item.title,
+              body: item.body,
+              type: item.type,
+              reference_path: item.reference_path,
+              queue_item_id: item.id,
+              payload: item.payload || null,
+            });
+          if (insertError && insertError.code !== '23505') {
+            console.warn(`[Queue][${item.id}] In-app insert error (pref-skip): ${insertError.message}`);
+          }
+          await supabase
+            .from("notification_queue")
+            .update({ status: "processed", processed_at: new Date().toISOString() })
+            .eq("id", item.id);
+          skippedPrefs++;
+          processed++;
+          continue;
+        }
+
         const silentPush = item.payload?.silent_push === true;
 
         // C5: Insert into user_notifications with queue_item_id to deduplicate on retry
@@ -192,7 +239,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ processed, dead_lettered: deadLettered, total: pending.length }),
+      JSON.stringify({ processed, dead_lettered: deadLettered, skipped_prefs: skippedPrefs, total: pending.length }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
