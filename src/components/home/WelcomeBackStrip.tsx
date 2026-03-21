@@ -33,7 +33,7 @@ export function WelcomeBackStrip() {
   if (!lastOrder?.seller) return null;
 
   const dateLabel = format(new Date(lastOrder.created_at), 'MMM d');
-  const statusLabel = lastOrder.status.replace(/_/g, ' ');
+  const statusLabel = lastOrder.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
   return (
     <Link
