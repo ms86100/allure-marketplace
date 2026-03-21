@@ -1,72 +1,56 @@
 
 
-# Fix Dynamic Island Compact Leading: SocivaIcon Visibility
+# Duplicate Toast Analysis
 
-## Problem
+## The Specific Bug in the Screenshot
 
-In the Dynamic Island compact view, the "SV" logo circle has two issues:
-1. The "S" letter is invisible — it's likely a dark color (dark green or black) on the dark `Color.white.opacity(0.15)` background, making it blend in
-2. The circle background is too dark/transparent to create proper contrast
+The "Your session has expired" toast appears **twice** because the same session expiry event triggers **two independent handlers**:
 
-The "V" appears green and visible because it happens to be a brighter shade, but the overall circle needs better contrast.
+1. **`src/App.tsx` (line 148)** — The React Query `QueryCache.onError` / `MutationCache.onError` detects auth errors (JWT expired, 401, etc.) and calls `handleAuthError()` which fires `toast.error('Your session has expired...')`
+2. **`src/contexts/auth/useAuthState.ts` (line 166)** — The `onAuthStateChange` listener fires on `SIGNED_OUT` event and independently calls `toast.error('Your session has expired...')`
 
-## Root Cause
+When a session expires: a query fails (triggering handler #1, which calls `signOut`), and then the sign-out event fires (triggering handler #2). Both fire within milliseconds, producing duplicate toasts.
 
-The `compactLeading` view (lines 169-181) uses:
-- `Circle().fill(Color.white.opacity(0.15))` — nearly invisible dark circle on the Dynamic Island's black background
-- The `SocivaIcon` asset likely has dark-colored letters that don't contrast against this
+## Fix for This Specific Issue
 
-## Fix
+**Remove the toast from `useAuthState.ts` (line 166)** — let the App.tsx centralized handler be the single source of truth for session-expired toasts. The `useAuthState` handler should only do the redirect, not show a toast, since `handleAuthError` in App.tsx already covers it.
 
-Replace the low-opacity circle with a more visible background that matches the brand. Two changes:
+### File: `src/contexts/auth/useAuthState.ts`
+- Line 166: Remove `toast.error('Your session has expired...')` from the `SIGNED_OUT` branch
+- Keep the `window.location.hash = '#/auth'` redirect (though App.tsx also does this, it's a harmless safety net)
 
-1. **Increase circle background opacity** from `0.15` to `0.25` to make the circle itself more visible
-2. **Add a subtle border stroke** using the phase accent color so the circle "pops" on the black Dynamic Island surface
+## Broader Duplicate Toast Patterns Found Across the Codebase
 
-Apply the same fix to the `minimal` view (lines 196-203) for consistency.
+### Pattern A: `friendlyError` + QueryCache double-fire
+When a query's `onError` callback calls `toast.error(friendlyError(err))` AND the error is an auth error, `friendlyError` returns "Your session has expired..." while the QueryCache `onError` in App.tsx ALSO fires `handleAuthError()` → another toast. This affects **every component** that uses `toast.error(friendlyError(error))` in a React Query `onError`:
 
-### File: `native/ios/LiveDeliveryWidget.swift`
+- `src/pages/WorkerJobsPage.tsx`
+- `src/pages/WorkerMyJobsPage.tsx`  
+- `src/pages/BuilderInspectionsPage.tsx`
+- `src/components/ui/image-upload.tsx`
+- `src/components/ui/croppable-image-upload.tsx`
+- `src/pages/SellerDashboardPage.tsx`
+- `src/hooks/useVisitorManagement.ts`
+- `src/components/admin/BuilderManagementSheet.tsx`
+- ...and ~30+ more files
 
-**compactLeading (lines 169-181):** Replace the ZStack with:
-```swift
-compactLeading: {
-    let phase = OrderPhase.from(context.state.workflowStatus)
-    ZStack {
-        Circle()
-            .fill(Color.white.opacity(0.25))
-            .overlay(
-                Circle()
-                    .stroke(phase.accentColor.opacity(0.6), lineWidth: 1)
-            )
-            .frame(width: 24, height: 24)
-        Image("SocivaIcon")
-            .resizable()
-            .scaledToFill()
-            .frame(width: 20, height: 20)
-            .clipShape(Circle())
-    }
-}
-```
+### Pattern B: `handleApiError` in `query-utils.ts` also fires toast
+`handleApiError()` calls `toast.error(message)` internally. If a caller also shows a toast, it doubles. Any component using both `handleApiError` and its own toast on the same error path gets duplicates.
 
-**minimal (lines 195-204):** Same treatment:
-```swift
-minimal: {
-    let phase = OrderPhase.from(context.state.workflowStatus)
-    ZStack {
-        Circle()
-            .fill(Color.white.opacity(0.25))
-            .overlay(
-                Circle()
-                    .stroke(phase.accentColor.opacity(0.6), lineWidth: 1)
-            )
-        Image("SocivaIcon")
-            .resizable()
-            .scaledToFill()
-            .clipShape(Circle())
-            .padding(2)
-    }
-}
-```
+### Pattern C: Mixed toast libraries
+`src/components/disputes/CreateDisputeSheet.tsx` and `src/components/bulletin/CreatePostSheet.tsx` use `toast()` from `@/hooks/use-toast` (shadcn toast), while most of the app uses `toast` from `sonner`. Both render independently, so an error could show in both toast systems.
 
-> **Note to user:** If the "S" is still hard to see after this change, the root issue is in the `SocivaIcon` asset itself in the widget extension's `Assets.xcassets`. You may need a variant of the icon with lighter/brighter letters specifically for the Dynamic Island's dark context (e.g., white "S" + green "V" on transparent background).
+## Recommended Fixes
+
+| Change | File(s) | Description |
+|--------|---------|-------------|
+| Remove duplicate session toast | `useAuthState.ts` line 166 | Delete the `toast.error(...)` call; App.tsx handles it |
+| Guard `friendlyError` auth errors | `App.tsx` QueryCache `onError` | If `handleAuthError()` fires, don't let individual query `onError` callbacks also toast. Add a flag or return early pattern |
+| Remove toast from `handleApiError` | `src/lib/query-utils.ts` | Make it return the message only; let callers decide whether to toast (prevents silent double-toasts) |
+| Standardize on sonner | `CreateDisputeSheet.tsx`, `CreatePostSheet.tsx` | Replace `@/hooks/use-toast` usage with `sonner` to avoid dual toast systems |
+
+### Implementation Priority
+1. **Fix the session-expired double toast** (useAuthState.ts) — immediate, 1-line change
+2. **Remove auto-toast from `handleApiError`** — make it return-only, audit callers
+3. **Standardize toast library** — migrate remaining shadcn toast usages to sonner
 
