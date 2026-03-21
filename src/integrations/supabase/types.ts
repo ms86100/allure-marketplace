@@ -9133,6 +9133,7 @@ export type Database = {
           is_available: boolean
           is_featured: boolean
           matching_products: Json
+          operating_days: string[]
           primary_group: string
           profile_image_url: string
           rating: number

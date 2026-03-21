@@ -45,10 +45,18 @@ function loadFromStorage(): BrowsingLocation | null {
   return null;
 }
 
-function saveToStorage(loc: BrowsingLocation | null) {
+function loadStoredUserId(): string | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw)._user_id || null;
+  } catch { return null; }
+}
+
+function saveToStorage(loc: BrowsingLocation | null, userId?: string | null) {
   try {
     if (loc) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(loc));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...loc, _user_id: userId || null }));
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -74,6 +82,16 @@ export function BrowsingLocationProvider({ children }: { children: React.ReactNo
   const [pendingLocationChange, setPendingLocationChange] = useState<BrowsingLocation | null>(null);
   const previousLocationRef = useRef<BrowsingLocation | null>(null);
 
+  // Bug 4 fix: Clear stale GPS override when user changes (shared device)
+  useEffect(() => {
+    if (!user?.id) return;
+    const storedUserId = loadStoredUserId();
+    if (storedUserId && storedUserId !== user.id) {
+      setOverride(null);
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [user?.id]);
+
   const invalidateDiscovery = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['store-discovery'] });
     queryClient.invalidateQueries({ queryKey: ['trending-products'] });
@@ -85,9 +103,9 @@ export function BrowsingLocationProvider({ children }: { children: React.ReactNo
 
   const applyLocation = useCallback((loc: BrowsingLocation | null) => {
     setOverride(loc);
-    saveToStorage(loc);
+    saveToStorage(loc, user?.id);
     invalidateDiscovery();
-  }, [invalidateDiscovery]);
+  }, [invalidateDiscovery, user?.id]);
 
   const setBrowsingLocation = useCallback((loc: BrowsingLocation | null) => {
     const current = previousLocationRef.current;

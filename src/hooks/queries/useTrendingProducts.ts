@@ -36,9 +36,9 @@ export function useTrendingProducts(limit = 10) {
           products.push({
             id: p.id, name: p.name, description: null, price: p.price,
             image_url: p.image_url, category: p.category || '', is_veg: p.is_veg ?? true,
-            is_available: true, is_bestseller: false, is_recommended: false, is_urgent: false,
+            is_available: p.is_available ?? true, is_bestseller: false, is_recommended: false, is_urgent: false,
             seller_id: seller.seller_id, created_at: '', updated_at: '',
-            seller_name: seller.business_name || 'Seller',
+            seller_name: seller.business_name || '',
             seller_rating: seller.rating || 0,
             action_type: p.action_type || 'add_to_cart',
             contact_phone: p.contact_phone || null,
