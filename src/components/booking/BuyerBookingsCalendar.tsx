@@ -65,7 +65,7 @@ export function BuyerBookingsCalendar() {
   const nextBooking = useMemo(() => {
     const now = new Date();
     return bookings.find((b) => {
-      if (!['confirmed', 'scheduled', 'rescheduled'].includes(b.status)) return false;
+      if (!['requested', 'confirmed', 'scheduled', 'rescheduled'].includes(b.status)) return false;
       const apptTime = new Date(`${b.booking_date}T${b.start_time}`);
       return apptTime > now;
     }) || null;

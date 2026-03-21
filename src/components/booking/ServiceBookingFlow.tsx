@@ -286,6 +286,7 @@ export function ServiceBookingFlow({
 
       queryClient.invalidateQueries({ queryKey: ['service-slots', productId] });
       queryClient.invalidateQueries({ queryKey: ['seller-service-bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['buyer-service-bookings'] });
       window.dispatchEvent(new Event('booking-changed'));
 
       toast.success('Booking request sent!');

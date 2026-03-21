@@ -46,7 +46,7 @@ export function UpcomingAppointmentBanner() {
         .select('id, order_id, booking_date, start_time, end_time, status, product:products!service_bookings_product_id_fkey(name, seller_id)')
         .eq('buyer_id', user.id)
         .gte('booking_date', today)
-        .not('status', 'in', '("cancelled","completed","no_show")')
+        .not('status', 'in', '(cancelled,completed,no_show)')
         .order('booking_date', { ascending: true })
         .order('start_time', { ascending: true })
         .limit(5);
