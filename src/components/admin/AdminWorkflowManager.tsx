@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 import { type FlowStep, type Transition, type WorkflowGroup, ACTORS, FULFILLMENT_VARIANTS, formatName } from './workflow/types';
 import { CreateWorkflowDialog } from './workflow/CreateWorkflowDialog';
+import { TransitionRulesEditor } from './workflow/TransitionRulesEditor';
 import { CloneWorkflowDialog } from './workflow/CloneWorkflowDialog';
 import { DeleteWorkflowDialog } from './workflow/DeleteWorkflowDialog';
 import { WorkflowLinkage } from './workflow/WorkflowLinkage';
