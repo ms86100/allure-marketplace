@@ -12,6 +12,8 @@ import { ActiveOrderStrip } from '@/components/home/ActiveOrderStrip';
 import { ForYouSection } from '@/components/home/ForYouSection';
 import { SocietyLeaderboard } from '@/components/home/SocietyLeaderboard';
 import { RecentlyViewedRow } from '@/components/home/RecentlyViewedRow';
+import { WelcomeBackStrip } from '@/components/home/WelcomeBackStrip';
+import { WhatsNewSection } from '@/components/home/WhatsNewSection';
 
 import { useAuth } from '@/contexts/AuthContext';
 
