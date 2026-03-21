@@ -92,6 +92,9 @@ export default function HomePage() {
         {/* Active order tracking */}
         <ActiveOrderStrip />
 
+        {/* Plan #15: Welcome back context when no active orders */}
+        <WelcomeBackStrip />
+
         {/* Notification banner */}
         <HomeNotificationBanner />
 
