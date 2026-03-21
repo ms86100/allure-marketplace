@@ -75,6 +75,15 @@ export function CouponManager() {
       toast.error('Code and discount value are required');
       return;
     }
+    const discountVal = Number(formData.discount_value);
+    if (discountVal <= 0) {
+      toast.error('Discount value must be greater than 0');
+      return;
+    }
+    if (formData.discount_type === 'percentage' && discountVal > 100) {
+      toast.error('Percentage discount cannot exceed 100%');
+      return;
+    }
 
     const { error } = await supabase.from('coupons').insert({
       seller_id: currentSellerId,
@@ -104,18 +113,21 @@ export function CouponManager() {
   };
 
   const toggleCoupon = async (id: string, isActive: boolean) => {
-    await supabase.from('coupons').update({ is_active: !isActive }).eq('id', id);
+    if (!currentSellerId) return;
+    await supabase.from('coupons').update({ is_active: !isActive }).eq('id', id).eq('seller_id', currentSellerId);
     setCoupons(coupons.map(c => c.id === id ? { ...c, is_active: !isActive } : c));
   };
 
   const toggleVisibility = async (id: string, current: boolean) => {
-    await supabase.from('coupons').update({ show_to_buyers: !current }).eq('id', id);
+    if (!currentSellerId) return;
+    await supabase.from('coupons').update({ show_to_buyers: !current }).eq('id', id).eq('seller_id', currentSellerId);
     setCoupons(coupons.map(c => c.id === id ? { ...c, show_to_buyers: !current } : c));
     toast.success(!current ? 'Coupon now visible to buyers at checkout' : 'Coupon hidden — buyers must enter code manually');
   };
 
   const deleteCoupon = async (id: string) => {
-    await supabase.from('coupons').delete().eq('id', id);
+    if (!currentSellerId) return;
+    await supabase.from('coupons').delete().eq('id', id).eq('seller_id', currentSellerId);
     setCoupons(coupons.filter(c => c.id !== id));
     toast.success('Coupon deleted');
   };

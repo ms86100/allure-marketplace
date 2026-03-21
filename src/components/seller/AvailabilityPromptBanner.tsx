@@ -18,17 +18,26 @@ export function AvailabilityPromptBanner({ sellerId }: AvailabilityPromptBannerP
   const { data: needsSetup } = useQuery({
     queryKey: ['availability-prompt', sellerId],
     queryFn: async () => {
-      // Check if seller has any service listings
+      // Check if seller has any service listings via products
+      const { data: products } = await supabase
+        .from('products')
+        .select('id')
+        .eq('seller_id', sellerId)
+        .limit(1);
+
+      if (!products || products.length === 0) return false;
+
+      // Check if any of these products have service listings
       const { count: listingCount } = await (supabase
         .from('service_listings') as any)
         .select('id', { count: 'exact', head: true })
-        .eq('seller_id', sellerId);
+        .in('product_id', products.map(p => p.id));
 
       if (!listingCount || listingCount === 0) return false;
 
       // Check if seller has any availability schedules
-      const { count: scheduleCount } = await (supabase
-        .from('service_availability_schedules') as any)
+      const { count: scheduleCount } = await supabase
+        .from('service_availability_schedules')
         .select('id', { count: 'exact', head: true })
         .eq('seller_id', sellerId)
         .eq('is_active', true);
@@ -55,7 +64,7 @@ export function AvailabilityPromptBanner({ sellerId }: AvailabilityPromptBannerP
           variant="outline"
           size="sm"
           className="mt-2 h-7 text-xs gap-1 border-amber-300 text-amber-800 hover:bg-amber-100"
-          onClick={() => navigate('/seller/services/availability')}
+          onClick={() => navigate('/seller/settings')}
         >
           Set Up Now <ArrowRight size={12} />
         </Button>

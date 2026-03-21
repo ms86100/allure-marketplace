@@ -67,7 +67,7 @@ export default function SellerDashboardPage() {
     try {
       const { data: profile, error } = await supabase
         .from('seller_profiles')
-        .select('*')
+        .select('id, user_id, business_name, description, verification_status, is_available, rating, total_reviews, avg_response_minutes, completed_order_count, cancellation_rate, society_id, seller_type, primary_group, latitude, longitude, rejection_note, operating_days, sell_beyond_community, delivery_radius_km, cover_image_url, profile_image_url, categories, is_featured, availability_start, availability_end, accepts_cod, accepts_upi, upi_id, created_at, updated_at')
         .eq('id', sellerId)
         .single();
 
