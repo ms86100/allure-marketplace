@@ -120,8 +120,8 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
                 onClick={() => navigate(`/search?category=${cat.slug}`)}
                 className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 active:bg-muted transition-colors text-left border-b border-border last:border-0"
               >
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-sm shrink-0">
-                  {cat.icon}
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <DynamicIcon name={cat.icon} size={16} className="text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium text-foreground truncate">{cat.displayName}</p>
