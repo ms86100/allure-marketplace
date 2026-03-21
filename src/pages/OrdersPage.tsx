@@ -187,7 +187,7 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
 
   const filteredOrders = type === 'buyer' ? orders.filter(order => {
     if (buyerFilter === 'all') return true;
-    if (buyerFilter === 'cancelled') return order.status === 'cancelled';
+    if (buyerFilter === 'cancelled') return terminalSet.has(order.status) && !successSet.has(order.status);
     if (buyerFilter === 'completed') return successSet.has(order.status);
     if (buyerFilter === 'active') return !terminalSet.has(order.status);
     return true;

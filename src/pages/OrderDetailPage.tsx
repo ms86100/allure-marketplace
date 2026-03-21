@@ -306,9 +306,7 @@ export default function OrderDetailPage() {
                 <p className="text-xs text-muted-foreground mt-3 bg-muted/50 rounded-lg px-3 py-2">{hint}</p>
               ) : null;
             })()}
-            {o.isBuyerView && !o.buyerNextStatus && (
-              <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => o.fetchOrder()} canCancel={o.canBuyerCancel} />
-            )}
+            {/* Cancellation handled in bottom action bar — removed inline duplicate */}
           </div>
 
           {/* Appointment Details for Service Bookings */}

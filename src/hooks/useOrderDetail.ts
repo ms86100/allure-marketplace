@@ -146,7 +146,8 @@ export function useOrderDetail(id: string | undefined) {
       if (!data) { setOrder(null); return; }
       if (cancelled) return;
       setOrder(data as any);
-      if (data?.status && isSuccessfulTerminal(flow, data.status)) {
+      // Always check for review if flow says terminal-success, OR if flow isn't loaded yet (fallback: check anyway to avoid stale hasReview)
+      if (data?.status && (flow.length === 0 || isSuccessfulTerminal(flow, data.status))) {
         const { data: reviewData } = await supabase.from('reviews').select('id').eq('order_id', id).maybeSingle();
         if (!cancelled) setHasReview(!!reviewData);
       } else { if (!cancelled) setHasReview(false); }

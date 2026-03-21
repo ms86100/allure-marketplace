@@ -354,7 +354,7 @@ export function useCartPage() {
     finally { setIsPlacingOrder(false); }
   };
 
-  const handlePlaceOrder = useSubmitGuard(handlePlaceOrderInner, 3000, 5000);
+  const handlePlaceOrder = useSubmitGuard(handlePlaceOrderInner, 3000, 0);
 
   const handleRazorpaySuccess = async (_paymentId: string) => {
     setShowRazorpayCheckout(false);
@@ -362,11 +362,18 @@ export function useCartPage() {
     if (targetOrderId) {
       let confirmed = false;
       for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1500)); const { data } = await supabase.from('orders').select('payment_status').eq('id', targetOrderId).single(); if (data?.payment_status === 'paid') { confirmed = true; break; } }
-      if (!confirmed) toast.info('Payment is being verified. Your order will update shortly.', { id: 'razorpay-verifying' });
-      else toast.success('Payment successful! Order placed.', { id: 'razorpay-success' });
+      if (!confirmed) {
+        toast.info('Payment is being verified. Your order will update shortly.', { id: 'razorpay-verifying' });
+        // Do NOT clear cart — payment unconfirmed. Navigate to order detail so buyer can track status.
+        clearPaymentSession();
+        navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
+        setPendingOrderIds([]);
+        return;
+      }
+      toast.success('Payment successful! Order placed.', { id: 'razorpay-success' });
     }
     supabase.functions.invoke('process-notification-queue').catch(() => {});
-    // Clear cart and payment session ONLY after payment success
+    // Clear cart ONLY after confirmed payment
     await clearCartAndCache();
     clearPaymentSession();
     navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
