@@ -23,6 +23,7 @@ interface SellerOrderCardOrder {
   payment_status?: string | null;
   payment_type?: string | null;
   fulfillment_type?: string | null;
+  order_type?: string | null;
   buyer?: { name: string; block: string; flat_number: string };
   items?: OrderItemWithStatus[];
 }
