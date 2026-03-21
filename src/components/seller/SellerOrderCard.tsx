@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { OrderItemStatusBadge, ItemStatus } from './OrderItemStatusBadge';
-import { ChevronRight, Clock, CreditCard, Package, MessageSquare, User, Truck, ShoppingBag } from 'lucide-react';
+import { ChevronRight, Clock, CreditCard, Package, MessageSquare, User, Truck, ShoppingBag, CalendarDays } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { format } from 'date-fns';
 
