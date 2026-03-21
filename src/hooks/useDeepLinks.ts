@@ -103,7 +103,7 @@ export function useDeepLinks() {
       } catch (error) {
         console.error('Error parsing deep link:', error);
         setPendingDeepLink('/orders');
-        navigate('/orders');
+        navigate('/orders', { replace: true });
       }
     };
 
