@@ -121,7 +121,10 @@ export function useCartPage() {
   const acceptsCod = sellerGroups.length > 1
     ? sellerGroups.every(g => g.items[0]?.product?.seller?.accepts_cod ?? true)
     : (firstSeller?.accepts_cod ?? true);
-  const acceptsUpi = sellerGroups.length <= 1 && !!(firstSeller as any)?.accepts_upi && !!(firstSeller as any)?.upi_id;
+  // When Razorpay is enabled, online payment is always available (not dependent on seller UPI config)
+  const acceptsUpi = paymentMode.isRazorpay
+    ? true
+    : (sellerGroups.length <= 1 && !!(firstSeller as any)?.accepts_upi && !!(firstSeller as any)?.upi_id);
   const hasFulfillmentConflict = sellerGroups.length > 1 && sellerGroups.some(g => {
     const mode = (g.items[0]?.product?.seller as any)?.fulfillment_mode;
     return mode && mode !== 'self_pickup' && !mode.startsWith('pickup_and_') && mode !== fulfillmentType;
@@ -302,10 +305,12 @@ export function useCartPage() {
     if (paymentMethod === 'cod' && !acceptsCod) { toast.error('This seller does not accept Cash on Delivery. Please select UPI.', { id: 'checkout-no-cod' }); setIsPlacingOrder(false); return; }
 
     if (paymentMethod === 'upi') {
-      if (!acceptsUpi) { toast.error('UPI payment not available for this seller', { id: 'upi-unavailable' }); setIsPlacingOrder(false); return; }
-      // Pre-validate seller UPI ID before creating orders
-      const firstSeller = sellerGroups[0]?.items[0]?.product?.seller as any;
-      if (!firstSeller?.upi_id) { toast.error('This seller is not accepting UPI payments right now', { id: 'upi-no-id' }); setIsPlacingOrder(false); return; }
+      if (!acceptsUpi) { toast.error('Online payment not available', { id: 'upi-unavailable' }); setIsPlacingOrder(false); return; }
+      // Pre-validate seller UPI ID only for direct UPI mode (not Razorpay)
+      if (!paymentMode.isRazorpay) {
+        const firstSeller = sellerGroups[0]?.items[0]?.product?.seller as any;
+        if (!firstSeller?.upi_id) { toast.error('This seller is not accepting UPI payments right now', { id: 'upi-no-id' }); setIsPlacingOrder(false); return; }
+      }
       setOrderStep('creating');
       try {
         const orderIds = await createOrdersForAllSellers('pending');

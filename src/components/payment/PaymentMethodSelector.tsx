@@ -1,9 +1,7 @@
-import { useState } from 'react';
 import { PaymentMethod } from '@/types/database';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Banknote, Smartphone, Check } from 'lucide-react';
+import { Banknote, Smartphone, CreditCard, Check } from 'lucide-react';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { usePaymentMode } from '@/hooks/usePaymentMode';
 
@@ -21,27 +19,49 @@ export function PaymentMethodSelector({
   onSelect,
 }: PaymentMethodSelectorProps) {
   const { upiProviderLabel } = useSystemSettings();
-  const { isUpiDeepLink } = usePaymentMode();
-  const methods = [
-    {
-      id: 'upi' as PaymentMethod,
-      label: 'UPI Payment',
-      description: isUpiDeepLink ? 'Pay directly via UPI app' : `Pay via ${upiProviderLabel}`,
-      icon: Smartphone,
-      enabled: acceptsUpi,
-      color: 'text-info',
-      bgColor: 'bg-info/10',
-    },
-    {
-      id: 'cod' as PaymentMethod,
-      label: 'Cash on Delivery',
-      description: 'Pay when you receive',
-      icon: Banknote,
-      enabled: acceptsCod,
-      color: 'text-success',
-      bgColor: 'bg-success/10',
-    },
-  ];
+  const { isUpiDeepLink, isRazorpay } = usePaymentMode();
+
+  const methods = isRazorpay
+    ? [
+        {
+          id: 'upi' as PaymentMethod,
+          label: 'Pay Online',
+          description: 'Pay securely via Razorpay (UPI, Cards, Wallets)',
+          icon: CreditCard,
+          enabled: true,
+          color: 'text-info',
+          bgColor: 'bg-info/10',
+        },
+        {
+          id: 'cod' as PaymentMethod,
+          label: 'Cash on Delivery',
+          description: 'Pay when you receive',
+          icon: Banknote,
+          enabled: acceptsCod,
+          color: 'text-success',
+          bgColor: 'bg-success/10',
+        },
+      ]
+    : [
+        {
+          id: 'upi' as PaymentMethod,
+          label: 'UPI Payment',
+          description: isUpiDeepLink ? 'Pay directly via UPI app' : `Pay via ${upiProviderLabel}`,
+          icon: Smartphone,
+          enabled: acceptsUpi,
+          color: 'text-info',
+          bgColor: 'bg-info/10',
+        },
+        {
+          id: 'cod' as PaymentMethod,
+          label: 'Cash on Delivery',
+          description: 'Pay when you receive',
+          icon: Banknote,
+          enabled: acceptsCod,
+          color: 'text-success',
+          bgColor: 'bg-success/10',
+        },
+      ];
 
   return (
     <div className="space-y-3">

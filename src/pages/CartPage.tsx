@@ -317,7 +317,7 @@ export default function CartPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Items</span><span className="font-medium">{c.itemCount} item{c.itemCount !== 1 ? 's' : ''}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span className="font-medium">{c.paymentMethod === 'cod' ? 'Cash on Delivery' : 'UPI'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span className="font-medium">{c.paymentMethod === 'cod' ? 'Cash on Delivery' : (c.paymentMode.isRazorpay ? 'Online Payment' : 'UPI')}</span></div>
                 {/* #9: Prominent delivery address in confirm dialog */}
                 {c.fulfillmentType === 'self_pickup' ? (
                   <div className="flex justify-between"><span className="text-muted-foreground">Pickup from</span><span className="font-medium text-right">{c.sellerGroups[0]?.sellerName || 'Seller'}</span></div>
