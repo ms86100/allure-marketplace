@@ -139,9 +139,19 @@ export function useOrderDetail(id: string | undefined) {
 
   useEffect(() => {
     if (!id) return;
-    const channel = supabase.channel(`order-${id}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${id}` }, () => { fetchOrder(); }).subscribe();
+    const channel = supabase.channel(`order-${id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `id=eq.${id}` }, () => { fetchOrder(); }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [id]);
+
+  // Reliability fallback: heartbeat polling while order is active so timeout-driven
+  // state changes always reconcile even if realtime delivery is delayed.
+  useEffect(() => {
+    if (!id || !order || isTerminalStatus(flow, order.status)) return;
+    const interval = window.setInterval(() => {
+      fetchOrder();
+    }, 15000);
+    return () => window.clearInterval(interval);
+  }, [id, order?.status, flow]);
 
   const fetchOrder = async (cancelled = false) => {
     try {

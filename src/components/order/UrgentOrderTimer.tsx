@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { AlertTriangle, Clock, Bell, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Clock, Bell, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface UrgentOrderTimerProps {
@@ -18,7 +18,8 @@ export function UrgentOrderTimer({
   variant = 'seller',
 }: UrgentOrderTimerProps) {
   const [timeLeft, setTimeLeft] = useState<number>(0);
-  const [isExpired, setIsExpired] = useState(false);
+  const [isSyncingTimeout, setIsSyncingTimeout] = useState(false);
+  const timeoutHandledRef = useRef(false);
 
   const calculateTimeLeft = useCallback(() => {
     const now = new Date().getTime();
@@ -27,21 +28,24 @@ export function UrgentOrderTimer({
   }, [autoCancelAt]);
 
   useEffect(() => {
+    timeoutHandledRef.current = false;
+    setIsSyncingTimeout(false);
     setTimeLeft(calculateTimeLeft());
 
     const timer = setInterval(() => {
       const remaining = calculateTimeLeft();
       setTimeLeft(remaining);
 
-      if (remaining <= 0 && !isExpired) {
-        setIsExpired(true);
+      if (remaining <= 0 && !timeoutHandledRef.current) {
+        timeoutHandledRef.current = true;
+        setIsSyncingTimeout(true);
         onTimeout?.();
         clearInterval(timer);
       }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [autoCancelAt, calculateTimeLeft, isExpired, onTimeout]);
+  }, [calculateTimeLeft, onTimeout]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
@@ -50,15 +54,19 @@ export function UrgentOrderTimer({
   const isCritical = timeLeft <= 30;
   const isBuyer = variant === 'buyer';
 
-  if (isExpired) {
+  if (isSyncingTimeout) {
     return (
-      <div className={cn('flex items-center gap-2 text-destructive', className)}>
-        <AlertTriangle size={18} />
+      <div className={cn('flex items-center gap-2 text-muted-foreground', className)}>
+        <Loader2 size={18} className="animate-spin" />
         <span className="font-medium">
-          {isBuyer ? "Seller didn\u2019t respond \u2014 order auto-cancelled" : 'Time expired - Order auto-cancelled'}
+          {isBuyer ? 'Refreshing order status…' : 'Checking order status…'}
         </span>
       </div>
     );
+  }
+
+  if (timeLeft <= 0) {
+    return null;
   }
 
   if (isBuyer) {
@@ -84,7 +92,7 @@ export function UrgentOrderTimer({
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-foreground">Waiting for seller to respond</p>
           <p className="text-xs text-muted-foreground">
-            {isCritical ? "Order will auto-cancel soon if seller doesn\u2019t respond" : "Order will be auto-cancelled if seller doesn\u2019t respond"}
+            {isCritical ? 'Order will auto-cancel soon if seller doesn’t respond' : 'Order will be auto-cancelled if seller doesn’t respond'}
           </p>
         </div>
 
@@ -99,7 +107,6 @@ export function UrgentOrderTimer({
     );
   }
 
-  // Seller variant (original)
   return (
     <div
       className={cn(
