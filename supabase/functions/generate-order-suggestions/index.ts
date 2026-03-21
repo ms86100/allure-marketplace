@@ -16,8 +16,11 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const now = new Date();
-    const currentDay = now.getDay(); // 0=Sun..6=Sat
-    const currentHour = now.getHours();
+    // Bug fix: Use IST for time-of-day pattern matching (Deno runs in UTC)
+    const IST_OFFSET_MS = 5.5 * 60 * 60_000;
+    const nowIST = new Date(now.getTime() + IST_OFFSET_MS);
+    const currentDay = nowIST.getUTCDay(); // 0=Sun..6=Sat in IST
+    const currentHour = nowIST.getUTCHours(); // Hour in IST
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
     // Get all users who have completed orders in the last 30 days
