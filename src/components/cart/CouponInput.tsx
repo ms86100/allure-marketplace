@@ -99,7 +99,7 @@ export function CouponInput({ sellerId, totalAmount, onApply, onRemove, appliedC
       return;
     }
     const discountAmount = calculateDiscount(coupon);
-    onApply({ id: coupon.id, code: coupon.code, discountAmount, discount_type: coupon.discount_type, discount_value: coupon.discount_value, max_discount_amount: coupon.max_discount_amount });
+    onApply({ id: coupon.id, code: coupon.code, discountAmount, discount_type: coupon.discount_type, discount_value: coupon.discount_value, max_discount_amount: coupon.max_discount_amount, min_order_amount: coupon.min_order_amount });
     feedbackCouponApplied(formatPrice(discountAmount));
   };
 
