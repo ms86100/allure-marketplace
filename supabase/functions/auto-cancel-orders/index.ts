@@ -122,11 +122,9 @@ app.post("/", async (c) => {
     const cancelResults = await Promise.allSettled(
       (expiredOrders || []).map(async (order) => {
         // Dynamic rejection reason based on WHY the order is being cancelled
-        const reason = urgentIds.has(order.id) && !orphanIds.has(order.id)
-          ? "Order automatically cancelled — seller did not respond in time"
-          : orphanIds.has(order.id) && !urgentIds.has(order.id)
-          ? "Order automatically cancelled — payment was not completed within the allowed time"
-          : "Order automatically cancelled — seller did not respond in time";
+        const reason = orphanIds.has(order.id) && !urgentIds.has(order.id)
+          ? "Order was cancelled as payment was not completed in time"
+          : "We couldn't confirm your order as the seller didn't respond in time";
 
         const { error: updateError, data: updated } = await supabase
           .from("orders")
