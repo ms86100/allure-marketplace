@@ -192,6 +192,28 @@ export function AdminWorkflowManager() {
     return <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-2xl" />)}</div>;
   }
 
+  // Group workflows by transaction_type, with 'default' parent_group first
+  const groupedByType = (() => {
+    const map = new Map<string, WorkflowGroup[]>();
+    for (const wf of workflows) {
+      const list = map.get(wf.transaction_type) || [];
+      list.push(wf);
+      map.set(wf.transaction_type, list);
+    }
+    // Sort each group: 'default' first, rest alphabetically
+    for (const [, list] of map) {
+      list.sort((a, b) => {
+        if (a.parent_group === 'default') return -1;
+        if (b.parent_group === 'default') return 1;
+        return a.parent_group.localeCompare(b.parent_group);
+      });
+    }
+    return map;
+  })();
+
+  // Fixed order matching TRANSACTION_TYPES
+  const typeOrder = ['cart_purchase', 'service_booking', 'request_service', 'contact_enquiry'];
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -204,40 +226,73 @@ export function AdminWorkflowManager() {
         </Button>
       </div>
 
-      <div className="space-y-2">
-        {workflows.map(wf => (
-          <Card
-            key={`${wf.parent_group}::${wf.transaction_type}`}
-            className="border-0 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-md)] transition-all cursor-pointer rounded-2xl"
-            onClick={() => openEditor(wf)}
-          >
-            <CardContent className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <GitBranch size={16} className="text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold">{formatName(wf.parent_group)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatName(wf.transaction_type)} · {wf.steps.filter(s => !(s as any).is_deprecated).length} steps
-                    {wf.steps.some(s => (s as any).is_deprecated) && <span className="ml-1 text-amber-500">({wf.steps.filter(s => (s as any).is_deprecated).length} deprecated)</span>}
-                  </p>
-                  <WorkflowLinkage parentGroup={wf.parent_group} transactionType={wf.transaction_type} />
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setCloneSource(wf); }}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                  title="Clone workflow"
+      <div className="space-y-3">
+        {typeOrder.map(txType => {
+          const group = groupedByType.get(txType);
+          if (!group || group.length === 0) return null;
+          const defaultWf = group.find(g => g.parent_group === 'default') || group[0];
+          const overrides = group.filter(g => g !== defaultWf);
+          const activeStepCount = defaultWf.steps.filter(s => !(s as any).is_deprecated).length;
+
+          return (
+            <Card
+              key={txType}
+              className="border-0 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-md)] transition-all rounded-2xl"
+            >
+              <CardContent className="p-4 space-y-2.5">
+                <div
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => openEditor(defaultWf)}
                 >
-                  <Copy size={14} />
-                </button>
-                <ChevronRight size={16} className="text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <GitBranch size={16} className="text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold">{formatName(txType)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {activeStepCount} steps (default)
+                        {defaultWf.steps.some(s => (s as any).is_deprecated) && (
+                          <span className="ml-1 text-amber-500">
+                            ({defaultWf.steps.filter(s => (s as any).is_deprecated).length} deprecated)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setCloneSource(defaultWf); }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                      title="Clone workflow"
+                    >
+                      <Copy size={14} />
+                    </button>
+                    <ChevronRight size={16} className="text-muted-foreground" />
+                  </div>
+                </div>
+
+                {overrides.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap pl-12">
+                    {overrides.map(ov => (
+                      <Badge
+                        key={ov.parent_group}
+                        variant="secondary"
+                        className="text-[10px] px-2 py-0.5 cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
+                        onClick={() => openEditor(ov)}
+                      >
+                        {formatName(ov.parent_group)} · {ov.steps.filter(s => !(s as any).is_deprecated).length}
+                      </Badge>
+                    ))}
+                    <span className="text-[10px] text-muted-foreground">
+                      {overrides.length} override{overrides.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Editor Sheet */}
