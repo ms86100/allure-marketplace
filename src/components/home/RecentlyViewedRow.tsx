@@ -20,7 +20,8 @@ export function RecentlyViewedRow() {
         .from('products')
         .select('id, name, price, image_url, seller_id, is_available, is_veg, category, is_bestseller, is_recommended, is_urgent, description, created_at, updated_at')
         .in('id', recentIds)
-        .eq('is_available', true);
+        .eq('is_available', true)
+        .eq('approval_status', 'approved');
       if (!data) return [];
       return recentIds
         .map(id => data.find(p => p.id === id))

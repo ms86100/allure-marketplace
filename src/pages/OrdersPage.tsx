@@ -178,6 +178,20 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
     prevKeyRef.current = location.key;
   }, [type, userId, sellerId, location.key]);
 
+  // Refresh order list when tab becomes visible or after status-change alerts
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchOrders();
+    };
+    const handleRefetchEvent = () => fetchOrders();
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('order-detail-refetch', handleRefetchEvent);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('order-detail-refetch', handleRefetchEvent);
+    };
+  }, [fetchOrders]);
+
   const loadMore = () => {
     if (orders.length > 0 && hasMore) {
       const lastOrder = orders[orders.length - 1];

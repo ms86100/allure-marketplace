@@ -33,6 +33,7 @@ export function useNotifications(userId: string | undefined) {
     },
     enabled: !!userId,
     staleTime: 0,
+    refetchInterval: 30_000,
   });
 }
 

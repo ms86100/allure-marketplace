@@ -218,8 +218,13 @@ export function useOrderDetail(id: string | undefined) {
   const canReview = isBuyerView && order ? isSuccessfulTerminal(flow, order.status) && !hasReview : false;
   const canChat = order ? !isTerminalStatus(flow, order.status) : false;
   const canReorder = isBuyerView && order ? isSuccessfulTerminal(flow, order.status) : false;
-  const chatRecipientId = isSellerView ? order?.buyer_id : seller?.user_id;
-  const chatRecipientName = isSellerView ? (order as any)?.buyer?.name : seller?.business_name;
+  let chatRecipientId = isSellerView ? order?.buyer_id : seller?.user_id;
+  let chatRecipientName = isSellerView ? (order as any)?.buyer?.name : seller?.business_name;
+  // Guard: if recipient resolved to self (dual-role user edge case), flip to the other party
+  if (chatRecipientId && user?.id && chatRecipientId === user.id) {
+    chatRecipientId = isSellerView ? seller?.user_id : order?.buyer_id;
+    chatRecipientName = isSellerView ? seller?.business_name : (order as any)?.buyer?.name;
+  }
 
   const copyOrderId = () => { if (!order) return; navigator.clipboard.writeText(order.id.slice(0, 8)); toast.success('Order ID copied', { id: 'order-id-copied' }); };
 
