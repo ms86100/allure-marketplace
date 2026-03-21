@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { WorkflowFlowDiagram } from './workflow/WorkflowFlowDiagram';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -319,6 +321,21 @@ export function AdminWorkflowManager() {
 
           <ScrollArea className="h-[calc(90dvh-120px)]">
             <div className="px-4 py-4 space-y-5">
+              {/* Transition Flow Diagram */}
+              {editSteps.length > 0 && transitions.length > 0 && (
+                <Collapsible defaultOpen>
+                  <CollapsibleTrigger className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground transition-colors mb-2">
+                    <ChevronRight size={12} className="transition-transform data-[state=open]:rotate-90" />
+                    Transition Flow
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="bg-muted/30 rounded-xl border border-border/50 p-3 overflow-x-auto">
+                      <WorkflowFlowDiagram steps={editSteps} transitions={transitions} />
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
               {/* Status Steps */}
               <div>
                 <div className="flex items-center justify-between mb-3">
