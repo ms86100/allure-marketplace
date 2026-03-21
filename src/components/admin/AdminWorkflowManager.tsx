@@ -15,7 +15,7 @@ import {
   ArrowRight, Copy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { type FlowStep, type Transition, type WorkflowGroup, ACTORS, formatName } from './workflow/types';
+import { type FlowStep, type Transition, type WorkflowGroup, ACTORS, FULFILLMENT_VARIANTS, formatName } from './workflow/types';
 import { CreateWorkflowDialog } from './workflow/CreateWorkflowDialog';
 import { CloneWorkflowDialog } from './workflow/CloneWorkflowDialog';
 import { DeleteWorkflowDialog } from './workflow/DeleteWorkflowDialog';
@@ -62,7 +62,8 @@ export function AdminWorkflowManager() {
       group.step_count++;
     }
 
-    setWorkflows(Array.from(groupMap.values()));
+    // Filter out fulfillment sub-variants (seller_delivery, self_fulfillment) — they are auto-derived at runtime
+    setWorkflows(Array.from(groupMap.values()).filter(wf => !FULFILLMENT_VARIANTS.includes(wf.transaction_type)));
     setIsLoading(false);
   };
 
