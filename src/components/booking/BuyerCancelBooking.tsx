@@ -94,7 +94,7 @@ export function BuyerCancelBooking({ bookingId, orderId, slotId, status }: Buyer
         .update({
           status: 'cancelled',
           cancelled_at: new Date().toISOString(),
-          cancellation_reason: reason.trim().slice(0, 500) || 'Cancelled by buyer',
+          cancellation_reason: reason.trim().slice(0, 500) || 'No reason provided',
         })
         .eq('id', bookingId)
         .eq('buyer_id', user.id);

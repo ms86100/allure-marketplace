@@ -159,6 +159,24 @@ app.post("/", async (c) => {
     const cancelledCount = cancelResults.filter(r => r.status === 'fulfilled').length;
     const completedCount = autoCompleteResults.filter(r => r.status === 'fulfilled').length;
 
+    // Trigger push notifications for affected orders
+    if (cancelledCount > 0 || completedCount > 0) {
+      try {
+        const fnUrl = `${supabaseUrl}/functions/v1/process-notification-queue`;
+        await fetch(fnUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${supabaseServiceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+        });
+        console.log("Triggered process-notification-queue");
+      } catch (e) {
+        console.warn("Failed to trigger notification queue:", e);
+      }
+    }
+
     return c.json(
       {
         message: `Cancelled ${cancelledCount}, auto-completed ${completedCount}`,
