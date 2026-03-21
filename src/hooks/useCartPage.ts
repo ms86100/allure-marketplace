@@ -502,7 +502,7 @@ export function useCartPage() {
     effectiveCouponDiscount, firstSellerFulfillmentMode,
     hasFulfillmentConflict, hasBelowMinimumOrder, noPaymentMethodAvailable,
     selectedDeliveryAddress, setSelectedDeliveryAddress, addresses, addressesLoading,
-    handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed,
+    handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed, handleRazorpayDismiss,
     handleUpiDeepLinkSuccess, handleUpiDeepLinkFailed,
     hasActivePaymentSession, sessionSellerUpiId, sessionSellerName, sessionAmount,
     cancelPlacingOrder: () => { setIsPlacingOrder(false); setOrderStep('validating'); },
