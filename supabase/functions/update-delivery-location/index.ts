@@ -475,7 +475,7 @@ serve(async (req) => {
 
         // MUTUALLY EXCLUSIVE tiers: <200m = imminent ONLY, 200-500m = nearby ONLY
         if (distanceMeters < 200) {
-          const thirtySecsAgoImm = new Date(Date.now() - 30_000).toISOString();
+          const threeMinAgoImm = new Date(Date.now() - 3 * 60_000).toISOString();
           const { count: imminentCount } = await supabase
             .from('notification_queue')
             .select('id', { count: 'exact', head: true })
