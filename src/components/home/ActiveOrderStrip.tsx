@@ -15,6 +15,7 @@ interface ActiveOrder {
   status: string;
   created_at: string;
   estimated_delivery_at: string | null;
+  auto_cancel_at: string | null;
   seller_name: string;
   item_count: number;
   display_label: string | null;
