@@ -75,7 +75,7 @@ export function useCartPage() {
   const paymentMode = usePaymentMode();
   const [pendingOrderIds, setPendingOrderIds] = useState<string[]>([]);
   const pendingOrderIdsRef = useRef<string[]>([]);
-  const [appliedCoupon, setAppliedCoupon] = useState<{ id: string; code: string; discountAmount: number; discount_type?: string; discount_value?: number; max_discount_amount?: number | null } | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ id: string; code: string; discountAmount: number; discount_type?: string; discount_value?: number; max_discount_amount?: number | null; min_order_amount?: number | null } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [fulfillmentType, setFulfillmentType] = useState<'self_pickup' | 'delivery'>('self_pickup');
   const [orderStep, setOrderStep] = useState<'validating' | 'creating' | 'confirming'>('validating');
