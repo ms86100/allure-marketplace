@@ -38,6 +38,7 @@ export function OrderChat({
 
   useEffect(() => {
     if (isOpen && orderId) {
+      document.body.style.overflow = 'hidden';
       fetchMessages();
       markMessagesAsRead();
 
@@ -62,8 +63,11 @@ export function OrderChat({
         .subscribe();
 
       return () => {
+        document.body.style.overflow = '';
         supabase.removeChannel(channel);
       };
+    } else {
+      document.body.style.overflow = '';
     }
   }, [isOpen, orderId]);
 

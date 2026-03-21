@@ -117,7 +117,7 @@ function HeaderInner({
                     {browsingLocation?.label || displaySociety?.name || 'Set location'}
                   </span>
                   {stats && (stats.sellers > 0 || stats.orders > 0) && (
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                    <span className="hidden sm:inline-flex text-[10px] text-muted-foreground whitespace-nowrap items-center gap-1">
                       <span className="text-border">·</span>
                       {stats.sellers > 0 && <span>🏪 {stats.sellers} seller{stats.sellers !== 1 ? 's' : ''}</span>}
                       {stats.sellers > 0 && stats.orders > 0 && <span className="text-border">·</span>}

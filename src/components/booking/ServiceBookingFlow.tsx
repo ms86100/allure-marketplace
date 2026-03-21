@@ -356,7 +356,7 @@ export function ServiceBookingFlow({
           </DrawerTitle>
         </DrawerHeader>
 
-        <div className="space-y-6 overflow-y-auto pb-20">
+        <div className="space-y-6 overflow-y-auto pb-6">
           {step === 'select' && (
             <>
               {/* Summary */}

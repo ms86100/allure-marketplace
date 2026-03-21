@@ -78,7 +78,7 @@ export function SnagDetailSheet({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="max-h-[90vh] overflow-y-auto">
         <DrawerHeader><DrawerTitle>Snag Details</DrawerTitle></DrawerHeader>
-        <div className="space-y-4 mt-4">
+        <div className="space-y-4 mt-4 px-4">
           {/* Description */}
           <div>
             <p className="text-sm">{ticket.description}</p>

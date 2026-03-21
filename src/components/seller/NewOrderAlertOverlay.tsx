@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Bell, ShoppingBag, ArrowRight } from 'lucide-react';
@@ -32,6 +32,20 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze
 
   const order = orders.length > 0 ? orders[0] : null;
   const queueCount = orders.length;
+
+  const handleBackgroundDismiss = useCallback(() => {
+    if (onSnooze) onSnooze();
+    else onDismiss();
+  }, [onSnooze, onDismiss]);
+
+  // Android back button handler
+  useEffect(() => {
+    if (!order) return;
+    const onPopState = () => handleBackgroundDismiss();
+    window.history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [order?.id, handleBackgroundDismiss]);
 
   // Auto-dismiss countdown
   useEffect(() => {
@@ -93,6 +107,7 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-6"
+          onClick={handleBackgroundDismiss}
         >
           <motion.div
             initial={{ scale: 0.8, y: 40 }}
