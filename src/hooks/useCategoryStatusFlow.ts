@@ -223,6 +223,20 @@ export function canActorCancel(
 }
 
 /**
+ * Returns side-action transitions available for an actor from a given status.
+ * These are transitions like reschedule/no-show that should appear as secondary buttons, not the primary CTA.
+ */
+export function getSideActionsForActor(
+  transitions: StatusTransition[],
+  currentStatus: string,
+  actor: string
+): StatusTransition[] {
+  return transitions.filter(
+    t => t.from_status === currentStatus && t.allowed_actor === actor && t.is_side_action
+  );
+}
+
+/**
  * Hook to fetch allowed transitions for a workflow.
  */
 export function useStatusTransitions(
