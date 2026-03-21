@@ -10,6 +10,31 @@ import SwiftUI
 import WidgetKit
 import ActivityKit
 
+// MARK: - Programmatic SV Badge
+
+@available(iOS 16.1, *)
+struct SocivaBadge: View {
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color(white: 0.12))
+
+            HStack(spacing: size * 0.02) {
+                Text("S")
+                    .font(.system(size: size * 0.48, weight: .heavy, design: .rounded))
+                    .foregroundColor(.white)
+                Text("V")
+                    .font(.system(size: size * 0.48, weight: .heavy, design: .rounded))
+                    .foregroundColor(Color(red: 0.2, green: 0.78, blue: 0.45))
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+    }
+}
+
 // MARK: - Status Phase
 
 @available(iOS 16.1, *)
@@ -24,11 +49,11 @@ enum OrderPhase {
     var accentColor: Color {
         switch self {
         case .confirmed:  return .orange
-        case .preparing:  return Color(red: 0.95, green: 0.65, blue: 0.15) // amber
-        case .ready:      return Color(red: 0.25, green: 0.55, blue: 0.95) // blue
-        case .transit:    return Color(red: 0.2, green: 0.78, blue: 0.45)  // green
+        case .preparing:  return Color(red: 0.95, green: 0.65, blue: 0.15)
+        case .ready:      return Color(red: 0.25, green: 0.55, blue: 0.95)
+        case .transit:    return Color(red: 0.2, green: 0.78, blue: 0.45)
         case .arrived:    return Color(red: 0.2, green: 0.78, blue: 0.45)
-        case .delivered:  return Color(red: 0.15, green: 0.75, blue: 0.5)  // emerald
+        case .delivered:  return Color(red: 0.15, green: 0.75, blue: 0.5)
         }
     }
 
@@ -47,7 +72,7 @@ enum OrderPhase {
         switch self {
         case .confirmed:  return "Order Confirmed"
         case .preparing:  return "Being Prepared"
-        case .ready:      return "Ready for Pickup"
+        case .ready:      return "Ready"
         case .transit:    return "On the Way"
         case .arrived:    return "At Your Location"
         case .delivered:  return "Delivered"
@@ -114,16 +139,13 @@ struct LiveDeliveryWidget: Widget {
 
         } dynamicIsland: { context in
             let phase = OrderPhase.from(context.state.workflowStatus)
+            let displayTitle = context.state.progressStage ?? phase.title
 
             return DynamicIsland {
                 // ── Expanded ──
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 6) {
-                        Image("SocivaIcon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 22, height: 22)
-                            .clipShape(Circle())
+                        SocivaBadge(size: 22)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(context.state.sellerName ?? "Sociva")
                                 .font(.caption2)
@@ -132,7 +154,7 @@ struct LiveDeliveryWidget: Widget {
                                 Image(systemName: phase.sfSymbol)
                                     .font(.caption2)
                                     .foregroundColor(phase.accentColor)
-                                Text(phase.title)
+                                Text(displayTitle)
                                     .font(.caption)
                                     .fontWeight(.semibold)
                                     .foregroundColor(.white)
@@ -167,21 +189,7 @@ struct LiveDeliveryWidget: Widget {
                     .padding(.top, 2)
                 }
             } compactLeading: {
-                let phase = OrderPhase.from(context.state.workflowStatus)
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.25))
-                        .overlay(
-                            Circle()
-                                .stroke(phase.accentColor.opacity(0.6), lineWidth: 1)
-                        )
-                        .frame(width: 24, height: 24)
-                    Image("SocivaIcon")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 20, height: 20)
-                        .clipShape(Circle())
-                }
+                SocivaBadge(size: 24)
             } compactTrailing: {
                 if let eta = context.state.etaMinutes {
                     Text("\(eta)m")
@@ -196,20 +204,7 @@ struct LiveDeliveryWidget: Widget {
                         .rotationEffect(.degrees(-90))
                 }
             } minimal: {
-                let phase = OrderPhase.from(context.state.workflowStatus)
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.25))
-                        .overlay(
-                            Circle()
-                                .stroke(phase.accentColor.opacity(0.6), lineWidth: 1)
-                        )
-                    Image("SocivaIcon")
-                        .resizable()
-                        .scaledToFill()
-                        .clipShape(Circle())
-                        .padding(2)
-                }
+                SocivaBadge(size: 22)
             }
             .widgetURL(URL(string: "sociva://orders/\(context.attributes.entityId)"))
         }
@@ -220,15 +215,12 @@ struct LiveDeliveryWidget: Widget {
     @ViewBuilder
     private func lockScreenView(context: ActivityViewContext<LiveDeliveryAttributes>) -> some View {
         let phase = OrderPhase.from(context.state.workflowStatus)
+        let displayTitle = context.state.progressStage ?? phase.title
 
         VStack(alignment: .leading, spacing: 10) {
             // ── Row 1: Brand + Order ID ──
             HStack {
-                Image("SocivaIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 24, height: 24)
-                    .clipShape(Circle())
+                SocivaBadge(size: 24)
 
                 Text(context.state.sellerName ?? "Sociva")
                     .font(.subheadline)
@@ -258,7 +250,7 @@ struct LiveDeliveryWidget: Widget {
                     .font(.subheadline)
                     .foregroundColor(phase.accentColor)
 
-                Text(phase.title)
+                Text(displayTitle)
                     .font(.subheadline)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
@@ -292,7 +284,6 @@ struct LiveDeliveryWidget: Widget {
         .background(
             ZStack {
                 Color(white: 0.1)
-                // Subtle accent glow at top-left
                 phase.accentColor
                     .opacity(0.08)
                     .blur(radius: 40)
