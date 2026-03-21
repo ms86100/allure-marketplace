@@ -216,9 +216,11 @@ export function useCartPage() {
       idempotencyKeyRef.current = `${user.id}_${Date.now()}_${simpleHash(cartHash)}`;
     }
 
+    // Bug 2 fix: Use 'card' for Razorpay payments instead of misleading 'upi'
+    const effectivePaymentMethod = paymentMode.isRazorpay && paymentMethod === 'upi' ? 'card' : paymentMethod;
     const { data, error } = await supabase.rpc('create_multi_vendor_orders', {
       _buyer_id: user.id, _delivery_address: deliveryAddressText,
-      _notes: notes || null, _payment_method: paymentMethod, _payment_status: paymentStatus,
+      _notes: notes || null, _payment_method: effectivePaymentMethod, _payment_status: paymentStatus,
       _coupon_id: appliedCoupon?.id || null, _coupon_code: appliedCoupon?.code || null,
       _coupon_discount: effectiveCouponDiscount, _cart_total: totalAmount, _has_urgent: hasUrgentItem,
       _seller_groups: sellerGroupsPayload, _fulfillment_type: fulfillmentType, _delivery_fee: effectiveDeliveryFee,
