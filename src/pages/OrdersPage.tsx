@@ -127,10 +127,12 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [buyerFilter, setBuyerFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
 
-  const fetchOrders = useCallback(async (cursor?: string) => {
+  const fetchOrders = useCallback(async (cursor?: string, filter?: 'all' | 'active' | 'completed' | 'cancelled') => {
     const isInitial = !cursor;
     if (isInitial) setIsLoading(true);
     else setIsLoadingMore(true);
+
+    const activeFilter = filter ?? buyerFilter;
 
     try {
       let query;
@@ -141,7 +143,17 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
           .eq('buyer_id', userId)
           .order('created_at', { ascending: false })
           .limit(PAGE_SIZE);
-        // payment_method is included via * select
+
+        // Apply server-side filter so pagination is consistent
+        if (activeFilter === 'active' && terminalSet.size > 0) {
+          const terminalArr = [...terminalSet];
+          query = query.not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`);
+        } else if (activeFilter === 'completed' && successSet.size > 0) {
+          query = query.in('status', [...successSet] as any);
+        } else if (activeFilter === 'cancelled' && terminalSet.size > 0 && successSet.size > 0) {
+          const cancelledStatuses = [...terminalSet].filter(s => !successSet.has(s));
+          if (cancelledStatuses.length > 0) query = query.in('status', cancelledStatuses as any);
+        }
       } else {
         query = supabase
           .from('orders')
@@ -167,7 +179,7 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [type, userId, sellerId]);
+  }, [type, userId, sellerId, buyerFilter, terminalSet, successSet]);
 
   const location = useLocation();
   const prevKeyRef = useRef(location.key);
