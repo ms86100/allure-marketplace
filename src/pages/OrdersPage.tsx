@@ -185,38 +185,33 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
   const prevKeyRef = useRef(location.key);
 
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(undefined, buyerFilter);
     prevKeyRef.current = location.key;
-  }, [type, userId, sellerId, location.key]);
+  }, [type, userId, sellerId, location.key, buyerFilter]);
 
   // Refresh order list when tab becomes visible or after status-change alerts
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') fetchOrders();
+      if (document.visibilityState === 'visible') fetchOrders(undefined, buyerFilter);
     };
-    const handleRefetchEvent = () => fetchOrders();
+    const handleRefetchEvent = () => fetchOrders(undefined, buyerFilter);
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('order-detail-refetch', handleRefetchEvent);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('order-detail-refetch', handleRefetchEvent);
     };
-  }, [fetchOrders]);
+  }, [fetchOrders, buyerFilter]);
 
   const loadMore = () => {
     if (orders.length > 0 && hasMore) {
       const lastOrder = orders[orders.length - 1];
-      fetchOrders(lastOrder.created_at);
+      fetchOrders(lastOrder.created_at, buyerFilter);
     }
   };
 
-  const filteredOrders = type === 'buyer' ? orders.filter(order => {
-    if (buyerFilter === 'all') return true;
-    if (buyerFilter === 'cancelled') return terminalSet.has(order.status) && !successSet.has(order.status);
-    if (buyerFilter === 'completed') return successSet.has(order.status);
-    if (buyerFilter === 'active') return !terminalSet.has(order.status);
-    return true;
-  }) : orders;
+  // With server-side filtering, we can pass orders directly
+  const filteredOrders = orders;
 
   if (isLoading) {
     return (
