@@ -39,6 +39,8 @@ const config: CapacitorConfig = {
       allowNavigation: [
         'rvvctaikytfeyzkwoqxg.supabase.co',
         'block-eats.lovable.app',
+        '*.razorpay.com',
+        '*.razorpay.in',
       ],
     },
   }),
