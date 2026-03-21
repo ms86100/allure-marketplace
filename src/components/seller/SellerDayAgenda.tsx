@@ -38,7 +38,24 @@ export function SellerDayAgenda({ sellerId }: SellerDayAgendaProps) {
     return <Card><CardContent className="p-4"><Skeleton className="h-20 w-full" /></CardContent></Card>;
   }
 
-  if (todayBookings.length === 0) return null;
+  if (todayBookings.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <CalendarCheck size={16} className="text-primary" />
+            Today's Schedule
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4">
+          <div className="text-center py-6">
+            <Clock size={24} className="mx-auto text-muted-foreground mb-2" />
+            <p className="text-sm text-muted-foreground">Nothing scheduled for today</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
