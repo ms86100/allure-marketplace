@@ -237,7 +237,7 @@ export function useStatusTransitions(
     (async () => {
       let { data } = await supabase
         .from('category_status_transitions')
-        .select('from_status, to_status, allowed_actor')
+        .select('from_status, to_status, allowed_actor, is_side_action')
         .eq('parent_group', parentGroup)
         .eq('transaction_type', transactionType);
 
