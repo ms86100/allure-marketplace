@@ -27,7 +27,11 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (open) getOrCreate();
+    if (open) {
+      getOrCreate();
+      document.body.style.overflow = 'hidden';
+    }
+    return () => { document.body.style.overflow = ''; };
   }, [open, getOrCreate]);
 
   // Auto-scroll to bottom on new messages
