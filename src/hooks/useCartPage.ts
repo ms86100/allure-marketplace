@@ -305,10 +305,12 @@ export function useCartPage() {
     if (paymentMethod === 'cod' && !acceptsCod) { toast.error('This seller does not accept Cash on Delivery. Please select UPI.', { id: 'checkout-no-cod' }); setIsPlacingOrder(false); return; }
 
     if (paymentMethod === 'upi') {
-      if (!acceptsUpi) { toast.error('UPI payment not available for this seller', { id: 'upi-unavailable' }); setIsPlacingOrder(false); return; }
-      // Pre-validate seller UPI ID before creating orders
-      const firstSeller = sellerGroups[0]?.items[0]?.product?.seller as any;
-      if (!firstSeller?.upi_id) { toast.error('This seller is not accepting UPI payments right now', { id: 'upi-no-id' }); setIsPlacingOrder(false); return; }
+      if (!acceptsUpi) { toast.error('Online payment not available', { id: 'upi-unavailable' }); setIsPlacingOrder(false); return; }
+      // Pre-validate seller UPI ID only for direct UPI mode (not Razorpay)
+      if (!paymentMode.isRazorpay) {
+        const firstSeller = sellerGroups[0]?.items[0]?.product?.seller as any;
+        if (!firstSeller?.upi_id) { toast.error('This seller is not accepting UPI payments right now', { id: 'upi-no-id' }); setIsPlacingOrder(false); return; }
+      }
       setOrderStep('creating');
       try {
         const orderIds = await createOrdersForAllSellers('pending');
