@@ -79,8 +79,8 @@ export function PaymentMethodSelector({
             'transition-all',
             selectedMethod === id && enabled && 'ring-2 ring-primary'
           )}>
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className={cn('w-12 h-12 rounded-full flex items-center justify-center', bgColor)}>
+            <CardContent className="p-4 flex items-center gap-4 min-h-[60px]">
+              <div className={cn('w-12 h-12 shrink-0 rounded-full flex items-center justify-center', bgColor)}>
                 <Icon className={color} size={24} />
               </div>
               <div className="flex-1 min-w-0">
