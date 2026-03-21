@@ -60,7 +60,7 @@ export function CreateDisputeSheet({ open, onOpenChange, onCreated }: Props) {
         );
       }
 
-      toast({ title: 'Concern submitted', description: ml.label('label_dispute_sla_notice') });
+      toast.success('Concern submitted — ' + ml.label('label_dispute_sla_notice'));
       setDescription('');
       setCategory(categories[0]?.value || 'other');
       setIsAnonymous(false);
