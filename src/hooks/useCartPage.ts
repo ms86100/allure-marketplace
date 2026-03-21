@@ -65,7 +65,7 @@ export function useCartPage() {
   const queryClient = useQueryClient();
   const { user, profile, society } = useAuth();
   const { requestFullPermission } = usePushNotifications();
-  const { items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, refresh, addItem, isLoading, hasHydrated, pendingMutations } = useCart();
+  const { items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, refresh, addItem, isLoading, isFetching, hasHydrated, pendingMutations } = useCart();
   const idempotencyKeyRef = useRef<string | null>(null);
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
