@@ -74,7 +74,7 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
 
   const handleSubmit = async () => {
     if (!title.trim()) {
-      toast({ title: 'Title is required', variant: 'destructive' });
+      toast.error('Title is required');
       return;
     }
     if (!profile?.society_id) {
