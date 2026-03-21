@@ -239,7 +239,7 @@ export default function CategoriesPage() {
       )}
 
       {/* Content */}
-      <div className="px-3 pb-20">
+      <div className="px-3 pb-24">
         {isLoading ? (
           <div className="space-y-5">
             {[1, 2].map(i => (
