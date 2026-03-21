@@ -104,8 +104,25 @@ export function ServiceBookingFlow({
     return subcategories.find(s => s.id === subcategoryId) || null;
   }, [subcategoryId, subcategories]);
 
-  const supportsAddons = activeSubcategory?.supports_addons ?? config?.supportsAddons ?? false;
-  const supportsRecurring = activeSubcategory?.supports_recurring ?? config?.supportsRecurring ?? false;
+  // Bug #20 fix: If subcategory not found via category config chain, fetch directly
+  const { data: directSubcategory } = useQuery({
+    queryKey: ['subcategory-direct', subcategoryId],
+    queryFn: async () => {
+      if (!subcategoryId) return null;
+      const { data } = await supabase
+        .from('subcategories')
+        .select('supports_addons, supports_recurring, supports_staff_assignment')
+        .eq('id', subcategoryId)
+        .eq('is_active', true)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!subcategoryId && !activeSubcategory,
+  });
+
+  const resolvedSubcategory = activeSubcategory || directSubcategory;
+  const supportsAddons = resolvedSubcategory?.supports_addons ?? config?.supportsAddons ?? false;
+  const supportsRecurring = resolvedSubcategory?.supports_recurring ?? config?.supportsRecurring ?? false;
   const needsAddress = resolvedLocation === 'home_visit' || resolvedLocation === 'at_buyer';
 
   const addonTotal = selectedAddons.reduce((s, a) => s + a.price, 0);
