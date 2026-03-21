@@ -40,9 +40,7 @@ export function useOrderDetail(id: string | undefined) {
     return false;
   }, [order?.seller_id, user?.id, currentSellerId, sellerProfiles, seller?.user_id]);
 
-  const isUrgentOrder = !!order?.auto_cancel_at && !!order?.status && isFirstFlowStep(flow, order.status);
-  const isUrgentSellerView = isUrgentOrder && isSellerView;
-  const isUrgentBuyerView = isUrgentOrder && !isSellerView;
+  const hasAutoCancelAt = !!order?.auto_cancel_at;
 
   useUrgentOrderSound(!!isUrgentOrder);
 
