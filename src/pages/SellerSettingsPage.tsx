@@ -108,7 +108,7 @@ export default function SellerSettingsPage() {
 
   return (
     <AppLayout showHeader={false} showNav={false}>
-      <div className="p-4 pb-36 safe-top">
+      <div className="p-4 pb-44 safe-top">
         <div className="flex items-center gap-3 mb-6">
           <Link to="/seller" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></Link>
           <h1 className="text-xl font-bold">Store Settings</h1>

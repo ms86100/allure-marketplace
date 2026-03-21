@@ -49,7 +49,7 @@ export default function GuardKioskPage() {
       <FeatureGate feature="guard_kiosk">
         <div className="p-4 space-y-4">
           <Tabs defaultValue="resident">
-            <TabsList className="w-full grid grid-cols-7 h-auto">
+            <TabsList className="w-full flex overflow-x-auto scrollbar-hide h-auto">
               <TabsTrigger value="resident" className="text-[9px] gap-0.5 flex-col h-auto py-2 min-h-[44px]">
                 <QrCode size={14} />
                 QR

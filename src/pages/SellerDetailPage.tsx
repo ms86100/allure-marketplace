@@ -250,12 +250,12 @@ export default function SellerDetailPage() {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/30 to-transparent" />
         
-        <div className="absolute top-[max(1rem,env(safe-area-inset-top))] left-4 right-4 flex justify-between">
+        <div className="absolute top-[max(1rem,env(safe-area-inset-top))] left-3 right-3 flex justify-between">
           <button
             onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-full bg-foreground/50 backdrop-blur-sm flex items-center justify-center shadow-md border border-primary-foreground/20"
+            className="w-11 h-11 rounded-full bg-foreground/50 backdrop-blur-sm flex items-center justify-center shadow-md border border-primary-foreground/20"
           >
-            <ArrowLeft size={18} className="text-primary-foreground" />
+            <ArrowLeft size={20} className="text-primary-foreground" />
           </button>
           <div className="flex gap-2">
             {user && (
