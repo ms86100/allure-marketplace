@@ -422,14 +422,10 @@ export function useCartPage() {
         if (recheckOrder?.payment_status === 'paid') { toast.success('Payment verified! Your order is confirmed.', { id: 'razorpay-verified' }); await clearCartAndCache(); clearPaymentSession(); navigate(`/orders/${pendingOrderIds[0]}`); setPendingOrderIds([]); return; }
         if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
       }
-      // Cancel only orders that are still unpaid — check each individually to avoid killing webhook-paid ones
-      for (const oid of pendingOrderIds) {
-        try {
-          const { data: check } = await supabase.from('orders').select('payment_status').eq('id', oid).single();
-          if (check?.payment_status === 'paid') continue; // Already paid via webhook
-          await supabase.from('orders').update({ status: 'cancelled' } as any).eq('id', oid).eq('payment_status', 'pending').eq('buyer_id', user.id);
-        } catch (err) { console.error('Failed to cancel order', oid, err); }
-      }
+      // Cancel only unpaid orders via RPC — respects workflow engine, RLS, and sends notifications
+      try {
+        await supabase.rpc('buyer_cancel_pending_orders', { _order_ids: pendingOrderIds });
+      } catch (err) { console.error('Failed to cancel pending orders:', err); }
     }
     setPendingOrderIds([]);
     clearPaymentSession();
