@@ -31,6 +31,9 @@ interface DraftProduct {
   is_veg: boolean;
   image_url: string;
   prep_time_minutes?: number | null;
+  stock_quantity?: number | null;
+  low_stock_threshold?: number | null;
+  action_type?: string;
 }
 
 interface DraftProductManagerProps {
