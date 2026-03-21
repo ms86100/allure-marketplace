@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { hapticVibrate, hapticNotification } from '@/lib/haptics';
@@ -27,15 +27,15 @@ export interface NewOrder {
   status: string;
   created_at: string;
   total_amount: number;
+  seller_id?: string;
 }
 
 const MIN_POLL_MS = 3000;
 const MAX_POLL_MS = 30000;
 const BACKOFF_FACTOR = 1.5;
 const SNOOZE_MS = 60000;
-const LOOKBACK_MS = 5 * 60 * 1000;
 
-export function useNewOrderAlert(sellerId: string | null) {
+export function useNewOrderAlert(sellerIds: string[]) {
   const queryClient = useQueryClient();
   const [pendingAlerts, setPendingAlerts] = useState<NewOrder[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -44,11 +44,18 @@ export function useNewOrderAlert(sellerId: string | null) {
   const pollDelayRef = useRef(MIN_POLL_MS);
   const mountedAtRef = useRef(new Date().toISOString());
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Bug 19 fix: Bounded Set to prevent unbounded memory growth
   const seenIdsRef = useRef<Set<string>>(new Set());
   const seenIdsOrderRef = useRef<string[]>([]);
   const dismissedIdsRef = useRef<Set<string>>(new Set());
   const snoozedUntilRef = useRef<Record<string, number>>({});
+
+  // Stable reference for sellerIds to use in callbacks
+  const sellerIdsRef = useRef<Set<string>>(new Set());
+  useMemo(() => {
+    sellerIdsRef.current = new Set(sellerIds);
+  }, [sellerIds]);
+
+  const enabled = sellerIds.length > 0;
 
   const MAX_SEEN_IDS = 500;
   const handleNewOrder = useCallback((order: NewOrder) => {
@@ -59,7 +66,6 @@ export function useNewOrderAlert(sellerId: string | null) {
     if (snoozedUntil && Date.now() < snoozedUntil) return;
     seenIdsRef.current.add(order.id);
     seenIdsOrderRef.current.push(order.id);
-    // Prune oldest entries when exceeding limit
     while (seenIdsRef.current.size > MAX_SEEN_IDS) {
       const oldest = seenIdsOrderRef.current.shift();
       if (oldest) seenIdsRef.current.delete(oldest);
@@ -69,9 +75,18 @@ export function useNewOrderAlert(sellerId: string | null) {
     }
     pollDelayRef.current = MIN_POLL_MS;
     setPendingAlerts(prev => [...prev, order]);
-    queryClient.invalidateQueries({ queryKey: ['seller-orders', sellerId] });
-    queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats', sellerId] });
-  }, [sellerId, queryClient]);
+    // Invalidate queries for the specific seller this order belongs to
+    if (order.seller_id) {
+      queryClient.invalidateQueries({ queryKey: ['seller-orders', order.seller_id] });
+      queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats', order.seller_id] });
+    } else {
+      // Fallback: invalidate all seller queries
+      for (const sid of sellerIdsRef.current) {
+        queryClient.invalidateQueries({ queryKey: ['seller-orders', sid] });
+        queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats', sid] });
+      }
+    }
+  }, [queryClient]);
 
   const stopBuzzing = useCallback(() => {
     if (intervalRef.current) {
@@ -133,46 +148,48 @@ export function useNewOrderAlert(sellerId: string | null) {
   }, [stopBuzzing]);
 
   // ── Realtime subscription (primary, instant) ──
+  // Subscribe without seller_id filter; check membership client-side
   useEffect(() => {
-    if (!sellerId) return;
+    if (!enabled) return;
 
     const channel = supabase
-      .channel(`seller-new-orders-${sellerId}`)
+      .channel('seller-new-orders-multi')
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'orders',
-          filter: `seller_id=eq.${sellerId}`,
         },
         (payload) => {
           const n = payload.new as any;
+          if (!sellerIdsRef.current.has(n.seller_id)) return;
           handleNewOrder({
             id: n.id,
             status: n.status,
             created_at: n.created_at,
             total_amount: n.total_amount,
+            seller_id: n.seller_id,
           });
         }
       )
-      // Also listen to UPDATE events (e.g. order created just before subscription was ready)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
           table: 'orders',
-          filter: `seller_id=eq.${sellerId}`,
         },
         (payload) => {
           const n = payload.new as any;
+          if (!sellerIdsRef.current.has(n.seller_id)) return;
           if (ACTIONABLE_STATUSES.includes(n.status)) {
             handleNewOrder({
               id: n.id,
               status: n.status,
               created_at: n.created_at,
               total_amount: n.total_amount,
+              seller_id: n.seller_id,
             });
           }
         }
@@ -180,11 +197,11 @@ export function useNewOrderAlert(sellerId: string | null) {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [sellerId, handleNewOrder]);
+  }, [enabled, handleNewOrder]);
 
-  // ── Polling fallback — pauses when tab hidden, resumes on visible ──
+  // ── Polling fallback — uses .in() for multiple seller IDs ──
   useEffect(() => {
-    if (!sellerId) return;
+    if (!enabled) return;
 
     let cancelled = false;
     let pausedByVisibility = false;
@@ -194,9 +211,9 @@ export function useNewOrderAlert(sellerId: string | null) {
       try {
         let query = supabase
           .from('orders')
-          .select('id, status, total_amount, created_at')
-          .eq('seller_id', sellerId)
-          .in('status', ACTIONABLE_STATUSES)
+          .select('id, status, total_amount, created_at, seller_id')
+          .in('seller_id', sellerIds)
+          .in('status', [...ACTIONABLE_STATUSES])
           .order('created_at', { ascending: true });
 
         if (lastSeenAtRef.current) {
@@ -241,7 +258,7 @@ export function useNewOrderAlert(sellerId: string | null) {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [sellerId, handleNewOrder]);
+  }, [enabled, sellerIds.join(','), handleNewOrder]);
 
   // ── Start/stop buzzing based on pendingAlerts ──
   useEffect(() => {
@@ -253,12 +270,12 @@ export function useNewOrderAlert(sellerId: string | null) {
     return () => stopBuzzing();
   }, [pendingAlerts.length, startBuzzing, stopBuzzing]);
 
-  // ── Cleanup on unmount or sellerId change ──
+  // ── Cleanup on unmount ──
   useEffect(() => {
     return () => {
       stopBuzzing();
     };
-  }, [sellerId, stopBuzzing]);
+  }, [stopBuzzing]);
 
   return { pendingAlerts, dismiss, snooze };
 }
