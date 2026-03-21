@@ -98,20 +98,25 @@ export function useRazorpay() {
         theme: {
           color: '#2D4A3E',
         },
-        // Enable UPI intent flow — shows installed UPI apps (GPay, PhonePe, Paytm)
-        // instead of requiring manual VPA entry
+        // UPI Intent flow — shows installed UPI apps as tap-to-open buttons
         config: {
           display: {
+            blocks: {
+              banks: {
+                name: 'Pay using UPI Apps',
+                instruments: [
+                  { method: 'upi', flows: ['intent'], apps: ['gpay'] },
+                  { method: 'upi', flows: ['intent'], apps: ['phonepe'] },
+                  { method: 'upi', flows: ['intent'], apps: ['paytm'] },
+                  { method: 'upi', flows: ['intent'], apps: ['any'] },
+                ],
+              },
+            },
+            sequence: ['block.banks'],
             preferences: {
               show_default_blocks: true,
             },
           },
-        },
-        method: {
-          upi: true,
-          card: true,
-          netbanking: true,
-          wallet: true,
         },
         handler: function (response: any) {
           console.log('Payment successful:', response);
