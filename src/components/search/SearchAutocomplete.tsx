@@ -5,6 +5,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Store, Package, Tag } from 'lucide-react';
+import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { useNavigate } from 'react-router-dom';
 import { useMemo } from 'react';
 
