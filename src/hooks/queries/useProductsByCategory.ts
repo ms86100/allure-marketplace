@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { jitteredStaleTime } from '@/lib/query-utils';
+import { mergeProductFlags } from './useProductFlags';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 import { useAuth } from '@/contexts/AuthContext';
@@ -94,9 +95,12 @@ export function useProductsByCategory(limit = 50) {
         }
       }
 
-      // Group by category
+      // Merge real flags from products table
+      const allWithFlags = await mergeProductFlags(allProducts);
+
+      // Group by category (using flagged products)
       const grouped: Record<string, ProductWithSeller[]> = {};
-      for (const product of allProducts) {
+      for (const product of allWithFlags) {
         const cat = product.category;
         if (!grouped[cat]) grouped[cat] = [];
         if (grouped[cat].length < limit) grouped[cat].push(product);

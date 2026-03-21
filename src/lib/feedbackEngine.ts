@@ -27,6 +27,7 @@ function dispatch(event: string) {
 
 export function feedbackAddItem(productName: string) {
   hapticImpact('medium');
+  toast.success(`${truncate(productName)} added`, { id: 'cart-add', duration: 1500 });
   dispatch('cart-item-added');
 }
 

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
+import { mergeProductFlags } from './useProductFlags';
 import { useNearbyProducts, mergeProducts } from './useNearbyProducts';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
@@ -65,7 +66,7 @@ export function usePopularProducts(limit = 12) {
       }
 
       // Sort: bestsellers first, then by name; limit
-      return products.slice(0, limit);
+      return mergeProductFlags(products.slice(0, limit));
     },
     enabled: !!(lat && lng),
     staleTime: 5 * 60 * 1000,
@@ -150,7 +151,7 @@ export function useCategoryProducts(parentGroup: string | null) {
           });
         }
       }
-      return products;
+      return mergeProductFlags(products);
     },
     enabled: !!parentGroup && !!(lat && lng),
     staleTime: 3 * 60 * 1000,

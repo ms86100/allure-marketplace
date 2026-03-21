@@ -16,7 +16,7 @@ export function useSocialProof(productIds: string[]) {
   const lng = browsingLocation?.lng;
 
   return useQuery({
-    queryKey: ['social-proof', lat, lng, productIds.slice(0, 5).join(',')],
+    queryKey: ['social-proof', lat, lng, productIds.length, productIds.slice().sort().join(',')],
     queryFn: async (): Promise<Map<string, number>> => {
       if (productIds.length === 0 || !lat || !lng) return new Map();
 

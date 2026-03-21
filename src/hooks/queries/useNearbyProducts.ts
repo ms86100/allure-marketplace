@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { jitteredStaleTime } from '@/lib/query-utils';
+import { mergeProductFlags } from './useProductFlags';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 import { useAuth } from '@/contexts/AuthContext';
@@ -73,7 +74,7 @@ export function useNearbyProducts() {
           });
         }
       }
-      return products;
+      return mergeProductFlags(products);
     },
     enabled: !!(lat && lng),
     staleTime: jitteredStaleTime(10 * 60 * 1000),
