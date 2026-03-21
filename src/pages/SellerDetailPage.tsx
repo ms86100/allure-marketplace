@@ -316,6 +316,28 @@ export default function SellerDetailPage() {
 
       </div>
 
+      {/* #1 + #2: Store closed banner with reopen time */}
+      {(() => {
+        const storeStatus = computeStoreStatus(
+          seller.availability_start,
+          seller.availability_end,
+          (seller as any).operating_days,
+          seller.is_available !== false
+        );
+        if (storeStatus.status === 'open') return null;
+        const closedMsg = formatStoreClosedMessage(storeStatus);
+        return (
+          <div className="mx-4 mt-3 flex items-start gap-3 bg-warning/10 border border-warning/30 rounded-xl p-3">
+            <AlertCircle size={18} className="text-warning shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-warning-foreground">This store is currently closed</p>
+              {closedMsg && <p className="text-xs text-muted-foreground mt-0.5">{closedMsg}</p>}
+              <p className="text-xs text-muted-foreground mt-0.5">Browse the menu and order when they reopen.</p>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Seller Info */}
       <div className="px-4 -mt-8 relative z-10">
         <div className="bg-card rounded-xl shadow-elevated p-4 space-y-3">
