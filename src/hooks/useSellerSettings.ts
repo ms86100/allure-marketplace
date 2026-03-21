@@ -104,6 +104,11 @@ export function useSellerSettings() {
   const togglePauseRef = useRef(false);
   const togglePauseShop = async () => {
     if (!sellerProfile || togglePauseRef.current) return;
+    // Bug 5: prevent non-approved sellers from toggling store open
+    if ((sellerProfile as any).verification_status !== 'approved') {
+      toast.error('Your store must be approved before you can go live', { id: 'settings-approval-gate' });
+      return;
+    }
     togglePauseRef.current = true;
     const newAvailability = !formData.is_available;
     setFormData(prev => ({ ...prev, is_available: newAvailability }));
