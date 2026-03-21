@@ -136,19 +136,26 @@ export function useLocalSellers() {
  */
 export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM, enabled: boolean = true) {
   const { browsingLocation } = useBrowsingLocation();
+  const { effectiveSocietyId, effectiveSociety } = useAuth();
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;
+  const hasSociety = !!effectiveSociety;
 
   return useQuery({
-    queryKey: ['store-discovery', 'nearby', lat, lng, radiusKm],
+    queryKey: ['store-discovery', 'nearby', lat, lng, radiusKm, effectiveSocietyId],
     queryFn: async () => {
       if (!lat || !lng) return [];
 
-      const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
+      const rpcParams: any = {
         _lat: lat,
         _lng: lng,
         _radius_km: radiusKm,
-      });
+      };
+      if (effectiveSocietyId) {
+        rpcParams._exclude_society_id = effectiveSocietyId;
+      }
+
+      const { data, error } = await supabase.rpc('search_sellers_by_location' as any, rpcParams);
 
       if (error) {
         console.error('Nearby sellers error:', error);
@@ -185,7 +192,7 @@ export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM
 
         const societyMap: Record<string, { distanceKm: number; sellers: NearbySeller[] }> = {};
         for (const s of bandSellers) {
-          const key = s.society_name || (s.distance_km <= 2 ? 'Near Your Society' : 'Independent Stores');
+          const key = s.society_name || (hasSociety ? 'Near Your Society' : 'Nearby Stores');
           if (!societyMap[key]) {
             societyMap[key] = { distanceKm: s.distance_km, sellers: [] };
           }

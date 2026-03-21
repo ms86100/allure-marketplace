@@ -40,20 +40,47 @@ export function ShopByStoreDiscovery() {
   const { data: localGrouped = {}, isLoading: loadingLocal } = useLocalSellers();
   const { data: nearbyBands = [], isLoading: loadingNearby } = useNearbySocietySellers(radiusKm, browseBeyond);
 
+  // Collect local seller IDs for deduplication
+  const localSellerIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const sellers of Object.values(localGrouped)) {
+      for (const s of sellers) ids.add(s.id);
+    }
+    return ids;
+  }, [localGrouped]);
+
+  // Filter nearby bands to remove sellers already shown in local section
+  const dedupedBands = useMemo(() => {
+    if (localSellerIds.size === 0) return nearbyBands;
+    return nearbyBands.map(band => ({
+      ...band,
+      societies: band.societies.map(society => {
+        const filteredGroups: Record<string, NearbySeller[]> = {};
+        for (const [group, sellers] of Object.entries(society.sellersByGroup)) {
+          const filtered = sellers.filter(s => !localSellerIds.has(s.seller_id));
+          if (filtered.length > 0) filteredGroups[group] = filtered;
+        }
+        return { ...society, sellersByGroup: filteredGroups };
+      }).filter(society => Object.keys(society.sellersByGroup).length > 0),
+    })).filter(band => band.societies.length > 0);
+  }, [nearbyBands, localSellerIds]);
+
   const hasLocal = Object.keys(localGrouped).length > 0;
-  const hasNearby = nearbyBands.length > 0;
+  const hasNearby = dedupedBands.length > 0;
 
   if (!loadingLocal && !loadingNearby && !hasLocal && !hasNearby) return null;
 
+  const localSectionLabel = effectiveSociety ? 'In Your Society' : 'Stores Near You';
+
   return (
     <div className="space-y-5">
-      {/* ━━━ In Your Society ━━━ */}
+      {/* ━━━ In Your Society / Stores Near You ━━━ */}
       {(loadingLocal || hasLocal) && (
         <section>
           <div className="flex items-center gap-2 px-4 mb-2.5">
             <Building2 size={16} className="text-primary" />
             <h3 className="font-bold text-sm text-foreground">
-              In Your Society
+              {localSectionLabel}
               {effectiveSociety?.name && (
                 <span className="font-normal text-muted-foreground ml-1">
                   – {effectiveSociety.name}
@@ -86,7 +113,7 @@ export function ShopByStoreDiscovery() {
             <NearbySkeleton />
           ) : (
             <div className="space-y-3">
-              {nearbyBands.map(band => (
+              {dedupedBands.map(band => (
                 <DistanceBandSection key={band.label} band={band} />
               ))}
             </div>
