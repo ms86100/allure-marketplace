@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { WorkflowFlowDiagram } from './workflow/WorkflowFlowDiagram';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
