@@ -1,102 +1,108 @@
 
 
-# Round 19: 5 Critical Bugs — Cross-Society Store Discovery (Round 2)
+# Round 20: 5 Critical Bugs — In-App Notification System
 
-Previous rounds fixed product-level hooks (useNearbyProducts, useTrendingProducts, etc.) but the **Store Discovery hooks** (`useLocalSellers`, `useNearbySocietySellers`) in `useStoreDiscovery.ts` were untouched. These power the "Shop By Store" section on the home page and categories page.
+## Bug 1: Proximity notifications spam the inbox — 30-second dedup window is too short for repeated location updates
 
----
+**Where:** `supabase/functions/update-delivery-location/index.ts` lines 478-536
 
-## Bug 1: Store Discovery shows duplicate sellers — local and nearby sections overlap completely
+**What happens:** The proximity dedup checks `notification_queue` for the same type within the last 30 seconds. But the `update-delivery-location` function is called every 5 seconds during active delivery. If the driver oscillates around the 200m boundary (common in congested Indian neighborhoods), the dedup window lets through a new "Driver arriving now!" every 31 seconds. Real data confirms: order `863f01f5` has **3** `delivery_proximity_imminent` AND **3** `delivery_proximity` notifications. Order `8085b506` has 3 of each too. The inbox becomes a wall of identical red "Driver arriving now!" cards (visible in screenshots).
 
-**Where:** `useStoreDiscovery.ts` — `useLocalSellers` (line 98) uses `MARKETPLACE_RADIUS_KM` (5km), `useNearbySocietySellers` (line 147) uses user's radius but starts bands at 0km.
+**Why critical:** The buyer's inbox is flooded with identical urgent notifications. The red cards with "View Tracking" buttons create alarm fatigue. A buyer scrolling through 6 identical "Driver arriving now!" cards loses trust in the system's intelligence.
 
-**What happens:** `useLocalSellers` returns all sellers within 5km. `useNearbySocietySellers` returns sellers from 0km outward, grouped into "Within 2km", "Within 5km", "Within 10km" bands. Every seller within 5km appears in BOTH the "In Your Society" section AND the "Nearby Societies > Within 2/5km" bands. The buyer sees the same store card twice on the same screen.
+**Impact:** `update-delivery-location` edge function (dedup window), `NotificationInboxPage` (display)
+**Risks:** (1) Increasing the dedup window too much (e.g., 10 min) means a genuinely new approach after a failed attempt won't notify. Safe window: 2-3 minutes per order per type. (2) Also need to deduplicate at display level in case historical spam already exists.
 
-**Why critical:** Duplicate store cards waste screen real estate and make the marketplace feel broken. A buyer who sees "Fresh Mart Express" twice thinks the system is glitchy.
-
-**Fix:** In `useNearbySocietySellers`, pass `_exclude_society_id: effectiveSocietyId` to remove own-society sellers from nearby results. Also, deduplicate at the UI level in `ShopByStoreDiscovery.tsx` by collecting local seller IDs and filtering them out of nearby results.
-
-**Impact:** `useStoreDiscovery.ts`, `ShopByStoreDiscovery.tsx`
-**Risks:** (1) Non-society users pass null — RPC already handles this. (2) If local and nearby use different radii, some sellers in the gap (5-10km) might only appear in nearby — this is correct behavior.
+**Fix:**
+- Edge function: Change dedup window from 30s to **3 minutes** for proximity notifications
+- Inbox page: Collapse consecutive notifications of the same type+order into a single card showing the latest one
 
 ---
 
-## Bug 2: "In Your Society" label shown for non-society users browsing via GPS
+## Bug 2: Booking reminder `reference_path` is `/orders` (generic) instead of `/orders/{orderId}` — action buttons lead nowhere useful
 
-**Where:** `ShopByStoreDiscovery.tsx` line 60-68
+**Where:** `supabase/functions/send-booking-reminders/index.ts` line 100, `RichNotificationCard.tsx` line 55
 
-**What happens:** The section header always says "In Your Society" with an optional society name appended. For users without a society (browsing via GPS or saved address), it displays "In Your Society" with no context — misleading since these are coordinate-based results, not society-filtered.
+**What happens:** The booking reminder code at line 100 does: `const buyerPath = booking.order_id ? '/orders/${booking.order_id}' : '/orders'`. Looking at the DB data, ALL booking reminders have `reference_path: /orders` (not `/orders/{uuid}`). This means `booking.order_id` is null/undefined for these bookings. The "Get Ready", "Open Now", and "View Details" buttons all navigate to the generic orders list — not the specific booking/order. The buyer taps "Open Now" expecting to see their appointment details but lands on a generic order history page.
 
-**Why critical:** A non-society user (or a user traveling) sees "In Your Society" when they have no society. This creates confusion about what the section means and undermines trust in the discovery system.
+**Why critical:** The most urgent notification type (10-minute reminder with red card) has a broken CTA. "Open Now" implies immediate relevance but drops the user on a generic list. This breaks the trust contract between urgency and action.
 
-**Fix:** When `effectiveSociety` is null, change the label to "Stores Near You". Keep "In Your Society – [name]" only when a society exists.
+**Impact:** `send-booking-reminders` edge function, `RichNotificationCard` navigation
+**Risks:** (1) If `order_id` is genuinely null on the booking record, we need a fallback route like `/bookings/{bookingId}`. (2) Need to check if a `/bookings/:id` route even exists.
 
-**Impact:** `ShopByStoreDiscovery.tsx` (3 lines)
-**Risks:** (1) None — purely cosmetic label change. (2) None.
-
----
-
-## Bug 3: Nearby society grouping labels "Near Your Society" for sellers without society even when buyer has no society
-
-**Where:** `useStoreDiscovery.ts` line 185
-
-**What happens:** When grouping sellers in the nearby section, sellers without a `society_name` are labeled: `s.distance_km <= 2 ? 'Near Your Society' : 'Independent Stores'`. This hardcodes "Near Your Society" regardless of whether the buyer actually has a society. A non-society buyer browsing by GPS sees "Near Your Society" as a group header — confusing and incorrect.
-
-**Why critical:** The label implies a society relationship that doesn't exist. For independent/commercial marketplace users, this creates a disconnected experience.
-
-**Fix:** Pass the buyer's society context into the grouping logic. When no society exists, use "Nearby Stores" instead of "Near Your Society".
-
-**Impact:** `useStoreDiscovery.ts` (accept a `hasSociety` parameter or resolve it internally)
-**Risks:** (1) Adding a parameter changes the hook signature — callers need updating. Better to resolve internally using `useAuth`. (2) None.
+**Fix:**
+- In `send-booking-reminders`: Use `booking.id` (the booking UUID) as fallback: `const buyerPath = booking.order_id ? '/orders/${booking.order_id}' : '/orders'` — but also include `bookingId` in the reference_path as a query param so the order page can scroll to it
+- In `resolveNotificationRoute`: Add cases for `booking_reminder_*` types that resolve to `/orders/{orderId}` using `payload.orderId`
 
 ---
 
-## Bug 4: `useLocalSellers` doesn't use user's `search_radius_km` — inconsistent with all other discovery hooks
+## Bug 3: `payload` exposes internal system data to the client — `driver_name`, `distance`, `eta`, `vehicle_type`, `workflow_status`
 
-**Where:** `useStoreDiscovery.ts` line 98
+**Where:** `useNotifications.ts` line 28: `select('*')` returns the full `payload` JSONB column, which is rendered in the inbox and accessible via browser dev tools
 
-**What happens:** `useLocalSellers` hardcodes `MARKETPLACE_RADIUS_KM` (5km) while every other discovery hook now respects `profile?.search_radius_km`. A buyer who expanded their radius to 10km sees more products in grids and trending sections but the "local stores" section still only shows 5km. Worse, the `useNearbySocietySellers` (nearby section) correctly uses the user's radius, so a seller at 6km appears in "Nearby" but not in "Local" — inconsistent.
+**What happens:** The `payload` column contains operational metadata never intended for buyer display: `driver_name: "Fresh Mart Express"`, `distance: 182`, `eta: 1`, `vehicle_type: null`, `workflow_status: "at_doorstep"`, `bookingId: UUID`, `entity_id: UUID`. The `select('*')` query returns everything. While the UI doesn't explicitly render these fields, they're in the React Query cache and visible in browser DevTools → Network tab. The `driver_name` field is the seller's business name (used as rider name in self-delivery), leaking seller identity context.
 
-**Why critical:** The buyer explicitly configured their discovery radius to 10km. The home page's most prominent store section ignores this preference. The asymmetry between product discovery (respects radius) and store discovery (ignores it) breaks the "single truth" principle.
+**Why critical:** Information exposure. Internal UUIDs (`entity_id`, `bookingId`), operational distances, and rider identity are accessible to any authenticated user via their browser. This is a data hygiene issue for production.
 
-**Fix:** Import `useAuth` in the hook and use `profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM` for the local radius. Cap it at a reasonable local max (e.g., keep MARKETPLACE_RADIUS_KM as the local cap since "local" is meant to be tight).
+**Impact:** `useNotifications.ts` query, `useLatestActionNotification` query
+**Risks:** (1) Changing `select('*')` to explicit columns may break components that read from payload (e.g., `RichNotificationCard` reads `payload.action`, `payload.reference_path`). Must include `payload` but can't strip internal fields without a DB view or RPC. (2) Simpler approach: only select needed fields from payload on the client.
 
-Actually, the better fix: keep local at a tight radius but make it dynamic relative to user preference — use `Math.min(profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM, MARKETPLACE_RADIUS_KM)` to ensure local never exceeds 5km but respects lower user preferences.
-
-**Impact:** `useStoreDiscovery.ts` — `useLocalSellers` function
-**Risks:** (1) Adding `useAuth` to the hook adds a dependency. (2) Query key needs to include radius to avoid stale cache.
+**Fix:**
+- Change `select('*')` to `select('id, title, body, type, reference_path, is_read, created_at, payload')` — this is equivalent but explicit (no `society_id`, `queue_item_id`, `reference_id` leakage)
+- For payload sanitization: Create a DB view `user_notifications_safe` that strips internal fields from payload, or accept the current exposure as low-risk for MVP
 
 ---
 
-## Bug 5: `useNearbySocietySellers` query key doesn't include `effectiveSocietyId` — stale cache after society change
+## Bug 4: "Dismiss" on `RichNotificationCard` only marks as read — notification stays visible in inbox with action buttons
 
-**Where:** `useStoreDiscovery.ts` line 140
+**Where:** `RichNotificationCard.tsx` line 61-64, `NotificationInboxPage.tsx` line 60
 
-**What happens:** The query key is `['store-discovery', 'nearby', lat, lng, radiusKm]`. It doesn't include `effectiveSocietyId`. If a buyer joins a society (or switches), the cached nearby results still include/exclude sellers based on the old society context. The `sell_beyond_community` RPC check uses `auth.uid()` which doesn't change, but the `_exclude_society_id` parameter (once we add it in Bug 1 fix) needs the key to vary by society. Without it, React Query serves stale data.
+**What happens:** The "Dismiss" button calls `markRead.mutate(notification.id)` and `onDismiss?.()`. In the inbox page (line 60), `RichNotificationCard` is rendered **without** passing `onDismiss`. So `onDismiss` is undefined. The "Dismiss" button only marks the notification as read. But the card stays in the list because `useNotifications` returns ALL notifications (read + unread). The card loses its unread styling but the prominent green/red action buttons ("View Tracking", "Get Ready", "Open Now") remain fully visible and clickable. For completed orders, "View Tracking" buttons on proximity notifications lead to a delivered order detail page with no active tracking — confusing.
 
-Similarly, `useLocalSellers` query key (line 91) is `['store-discovery', 'local', lat, lng]` — no society context at all.
+**Why critical:** A buyer taps "Dismiss" expecting the card to disappear. It doesn't. The action button remains. For completed orders, stale "View Tracking" CTAs on red urgency cards create a broken, zombie-like feel in the inbox.
 
-**Why critical:** After Round 1 fixes added `_exclude_society_id` to product hooks, the store discovery hooks need matching cache keys. Without this, the store section shows stale/duplicate results after any society context change.
+**Impact:** `RichNotificationCard`, `NotificationInboxPage`
+**Risks:** (1) Adding true dismissal (hiding) requires local state or a `dismissed_at` column. Simpler: hide action buttons when `is_read = true`. (2) Alternatively, filter out read rich notifications from the rich card rendering path — show them as plain cards instead.
 
-**Fix:** Add `effectiveSocietyId` to both query keys.
+**Fix:**
+- In `NotificationInboxPage`: When rendering `RichNotificationCard`, check `n.is_read` — if read, render as a plain card (no action buttons) instead of a rich card
+- This is a 1-line condition change: `if (hasAction && !n.is_read)` instead of `if (hasAction)`
 
-**Impact:** `useStoreDiscovery.ts` — both hooks' query keys
-**Risks:** (1) Cache invalidation on society change triggers refetch — acceptable. (2) None.
+---
+
+## Bug 5: Delivery proximity notifications for completed orders still show as urgent rich cards — stale red alerts in inbox
+
+**Where:** `NotificationInboxPage.tsx` lines 55-61, `useLatestActionNotification` lines 55-96
+
+**What happens:** The `useLatestActionNotification` hook correctly auto-marks stale delivery notifications as read when the order reaches a terminal status. But this only runs for the HOME BANNER. The INBOX PAGE (`useNotifications`) has no such cleanup. Delivery proximity notifications for completed orders retain `payload.action = "View Tracking"` so they render as `RichNotificationCard` with red urgency styling and "View Tracking" buttons — even though the order was completed hours/days ago. The DB confirms: order `863f01f5` is `completed` but has 6 proximity notifications, all with action buttons.
+
+**Why critical:** The inbox is dominated by stale urgent-looking red and green cards for orders that finished long ago. This makes the notification inbox feel unreliable and noisy — the opposite of trustworthy.
+
+**Impact:** `NotificationInboxPage`, potentially a DB trigger or batch cleanup
+**Risks:** (1) Adding order-status awareness to the inbox query increases complexity. (2) Simpler: use the same terminal-order cleanup logic from `useLatestActionNotification` but run it once when the inbox loads.
+
+**Fix:**
+- Extract the terminal-order cleanup logic from `useLatestActionNotification` into a shared utility
+- Call it in `useNotifications` on initial fetch: batch-check delivery notification order IDs against terminal statuses, auto-mark stale ones as read
+- OR simpler: in `NotificationInboxPage`, filter delivery types for completed orders out of the rich card rendering (combine with Bug 4 fix: `if (hasAction && !n.is_read)`)
 
 ---
 
 ## Summary
 
-| # | Bug | Severity | File(s) |
-|---|-----|----------|---------|
-| 1 | Duplicate stores in local vs nearby sections | **HIGH** | `useStoreDiscovery.ts`, `ShopByStoreDiscovery.tsx` |
-| 2 | "In Your Society" label for non-society users | **MEDIUM** | `ShopByStoreDiscovery.tsx` |
-| 3 | "Near Your Society" grouping label when buyer has no society | **MEDIUM** | `useStoreDiscovery.ts` |
-| 4 | `useLocalSellers` ignores user radius preference | **MEDIUM** | `useStoreDiscovery.ts` |
-| 5 | Query keys missing `effectiveSocietyId` — stale cache | **HIGH** | `useStoreDiscovery.ts` |
+| # | Bug | Severity | Root Cause |
+|---|-----|----------|-----------|
+| 1 | Proximity notification spam (3+ per order per type) | **CRITICAL** | 30s dedup window too short |
+| 2 | Booking reminder CTAs lead to generic `/orders` | **HIGH** | `order_id` null on bookings |
+| 3 | Payload exposes internal data (`driver_name`, distances, UUIDs) | **MEDIUM** | `select('*')` on notifications |
+| 4 | "Dismiss" doesn't hide card — action buttons persist | **HIGH** | No `onDismiss` + no read-state gate |
+| 5 | Stale red urgency cards for completed orders | **HIGH** | No terminal-order cleanup in inbox |
 
 ## Files to Edit
 
-- `src/hooks/queries/useStoreDiscovery.ts` — Bugs 1, 3, 4, 5 (add `useAuth`, pass `_exclude_society_id`, fix query keys, fix grouping label, use user radius)
-- `src/components/home/ShopByStoreDiscovery.tsx` — Bugs 1, 2 (deduplicate local vs nearby sellers, fix section label)
+- `supabase/functions/update-delivery-location/index.ts` — Bug 1: increase proximity dedup window from 30s to 3min
+- `supabase/functions/send-booking-reminders/index.ts` — Bug 2: improve reference_path resolution for bookings
+- `src/lib/notification-routes.ts` — Bug 2: add `booking_reminder_*` route resolution
+- `src/hooks/queries/useNotifications.ts` — Bug 3: explicit column select; Bug 5: add terminal-order cleanup to inbox query
+- `src/pages/NotificationInboxPage.tsx` — Bugs 4+5: gate rich card rendering on `!n.is_read`, collapse duplicate proximity notifications
 
