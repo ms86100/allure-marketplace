@@ -64,7 +64,7 @@ export function CreateSnagSheet({ onCreated }: { onCreated: () => void }) {
       </DrawerTrigger>
       <DrawerContent className="max-h-[85vh] overflow-y-auto">
         <DrawerHeader><DrawerTitle>Report a Defect</DrawerTitle></DrawerHeader>
-        <div className="space-y-4 mt-4">
+        <div className="space-y-4 mt-4 px-4">
           <div>
             <label className="text-sm font-medium">Category</label>
             <Select value={category} onValueChange={setCategory}>

@@ -62,7 +62,7 @@ export default function CartPage() {
 
   return (
     <AppLayout showHeader={false} showNav={false} showCart={false}>
-      <div className="pb-52">
+      <div className="pb-80">
         {/* Sticky Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></button>
