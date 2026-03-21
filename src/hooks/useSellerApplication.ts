@@ -199,7 +199,7 @@ export function useSellerApplication() {
           user_id: user.id, business_name: formData.business_name.trim(), description: formData.description.trim() || null,
           categories: formData.categories, primary_group: selectedGroup, availability_start: formData.availability_start,
           availability_end: formData.availability_end, accepts_cod: formData.accepts_cod,
-          sell_beyond_community: formData.sell_beyond_community, delivery_radius_km: formData.delivery_radius_km,
+          sell_beyond_community: formData.sell_beyond_community, delivery_radius_km: formData.sell_beyond_community ? formData.delivery_radius_km : 5,
           society_id: profile?.society_id || null, verification_status: 'draft' as any,
         } as any).select('id').single();
         if (!error && data) setDraftSellerId(data.id);
