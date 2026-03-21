@@ -52,7 +52,7 @@ export function useBuyerOrderAlerts() {
           if (!statusChanged && !paymentChanged) return;
 
           // Native haptic feedback
-          const hapticType = HAPTIC_MAP[newStatus] ?? 'success';
+          const hapticType = statusChanged ? (HAPTIC_MAP[newStatus] ?? 'success') : 'success';
           hapticNotification(hapticType);
 
           // Keep all queries fresh
