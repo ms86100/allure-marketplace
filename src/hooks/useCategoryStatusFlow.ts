@@ -104,12 +104,14 @@ export function getNextStatusForActor(
 ): string | null {
   // If transitions are available, use them (accurate non-linear lookup)
   if (transitions && transitions.length > 0) {
-    const validNextStatuses = getNextStatusesForActor(transitions, currentStatus, actor);
+    // Only consider non-side-action transitions for primary CTA
+    const primaryTransitions = transitions.filter(t => !t.is_side_action);
+    const validNextStatuses = getNextStatusesForActor(primaryTransitions, currentStatus, actor);
     if (validNextStatuses.length === 0) return null;
-    // If multiple valid transitions, pick the one that's next in sort_order (forward progression)
+    // Pick the one that's next in sort_order (forward progression)
     const flowOrder = flow.map(s => s.status_key);
     const sorted = validNextStatuses
-      .filter(s => s !== 'cancelled') // Don't offer cancel as "next action"
+      .filter(s => s !== 'cancelled')
       .sort((a, b) => flowOrder.indexOf(a) - flowOrder.indexOf(b));
     return sorted[0] || null;
   }
