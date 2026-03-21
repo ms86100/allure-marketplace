@@ -227,6 +227,8 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
         }
       }
 
+      let actualInserted = 0;
+
       if (slotsToInsert.length > 0) {
         // Delete future unbooked slots that have no active booking references
         const todayStr = format(today, 'yyyy-MM-dd');
@@ -249,7 +251,6 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
           .map((s: any) => s.id);
 
         if (idsToDelete.length > 0) {
-          // Delete in batches to avoid query size limits
           const batchSize = 200;
           for (let i = 0; i < idsToDelete.length; i += batchSize) {
             await (supabase.from('service_slots') as any)
@@ -260,7 +261,6 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
 
         // Bug 6 & 7: Upsert new slots to avoid race condition, track actual count
         const batchSize = 500;
-        let actualInserted = 0;
         for (let i = 0; i < slotsToInsert.length; i += batchSize) {
           const batch = slotsToInsert.slice(i, i + batchSize);
           const { data: upsertedData, error: slotErr } = await (supabase
