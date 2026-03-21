@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { notifySocietyAdmins } from '@/lib/society-notifications';

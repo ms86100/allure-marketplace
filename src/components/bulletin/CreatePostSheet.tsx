@@ -9,7 +9,7 @@ import { CATEGORY_CONFIG, type BulletinCategory } from './CategoryFilter';
 import { cn, friendlyError } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Loader2, Plus, X, ImagePlus } from 'lucide-react';
 
 interface CreatePostSheetProps {
