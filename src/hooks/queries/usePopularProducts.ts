@@ -151,7 +151,7 @@ export function useCategoryProducts(parentGroup: string | null) {
           });
         }
       }
-      return products;
+      return mergeProductFlags(products);
     },
     enabled: !!parentGroup && !!(lat && lng),
     staleTime: 3 * 60 * 1000,

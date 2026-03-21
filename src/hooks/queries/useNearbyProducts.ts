@@ -74,7 +74,7 @@ export function useNearbyProducts() {
           });
         }
       }
-      return products;
+      return mergeProductFlags(products);
     },
     enabled: !!(lat && lng),
     staleTime: jitteredStaleTime(10 * 60 * 1000),

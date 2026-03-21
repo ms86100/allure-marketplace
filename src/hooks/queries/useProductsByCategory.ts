@@ -95,9 +95,12 @@ export function useProductsByCategory(limit = 50) {
         }
       }
 
-      // Group by category
+      // Merge real flags from products table
+      const allWithFlags = await mergeProductFlags(allProducts);
+
+      // Group by category (using flagged products)
       const grouped: Record<string, ProductWithSeller[]> = {};
-      for (const product of allProducts) {
+      for (const product of allWithFlags) {
         const cat = product.category;
         if (!grouped[cat]) grouped[cat] = [];
         if (grouped[cat].length < limit) grouped[cat].push(product);
