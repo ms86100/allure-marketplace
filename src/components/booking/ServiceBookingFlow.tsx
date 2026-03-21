@@ -215,7 +215,7 @@ export function ServiceBookingFlow({
           seller_id: sellerId,
           total_amount: totalAmount,
           order_type: 'booking',
-          status: 'requested',
+          status: 'confirmed',
           payment_type: 'cod',
           payment_status: 'pending',
           notes: notes.trim().slice(0, MAX_NOTES_LENGTH) || null,

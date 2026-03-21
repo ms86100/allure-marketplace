@@ -20,6 +20,7 @@ export interface StatusTransition {
   from_status: string;
   to_status: string;
   allowed_actor: string;
+  is_side_action: boolean;
 }
 
 /**
@@ -103,12 +104,14 @@ export function getNextStatusForActor(
 ): string | null {
   // If transitions are available, use them (accurate non-linear lookup)
   if (transitions && transitions.length > 0) {
-    const validNextStatuses = getNextStatusesForActor(transitions, currentStatus, actor);
+    // Only consider non-side-action transitions for primary CTA
+    const primaryTransitions = transitions.filter(t => !t.is_side_action);
+    const validNextStatuses = getNextStatusesForActor(primaryTransitions, currentStatus, actor);
     if (validNextStatuses.length === 0) return null;
-    // If multiple valid transitions, pick the one that's next in sort_order (forward progression)
+    // Pick the one that's next in sort_order (forward progression)
     const flowOrder = flow.map(s => s.status_key);
     const sorted = validNextStatuses
-      .filter(s => s !== 'cancelled') // Don't offer cancel as "next action"
+      .filter(s => s !== 'cancelled')
       .sort((a, b) => flowOrder.indexOf(a) - flowOrder.indexOf(b));
     return sorted[0] || null;
   }
@@ -220,6 +223,20 @@ export function canActorCancel(
 }
 
 /**
+ * Returns side-action transitions available for an actor from a given status.
+ * These are transitions like reschedule/no-show that should appear as secondary buttons, not the primary CTA.
+ */
+export function getSideActionsForActor(
+  transitions: StatusTransition[],
+  currentStatus: string,
+  actor: string
+): StatusTransition[] {
+  return transitions.filter(
+    t => t.from_status === currentStatus && t.allowed_actor === actor && t.is_side_action
+  );
+}
+
+/**
  * Hook to fetch allowed transitions for a workflow.
  */
 export function useStatusTransitions(
@@ -234,7 +251,7 @@ export function useStatusTransitions(
     (async () => {
       let { data } = await supabase
         .from('category_status_transitions')
-        .select('from_status, to_status, allowed_actor')
+        .select('from_status, to_status, allowed_actor, is_side_action')
         .eq('parent_group', parentGroup)
         .eq('transaction_type', transactionType);
 
@@ -242,7 +259,7 @@ export function useStatusTransitions(
       if ((!data || data.length === 0) && parentGroup !== 'default') {
         const fallback = await supabase
           .from('category_status_transitions')
-          .select('from_status, to_status, allowed_actor')
+          .select('from_status, to_status, allowed_actor, is_side_action')
           .eq('parent_group', 'default')
           .eq('transaction_type', transactionType);
 
