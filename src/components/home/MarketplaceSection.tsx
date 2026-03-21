@@ -21,8 +21,6 @@ import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useMarketplaceConfig } from '@/hooks/useMarketplaceConfig';
 import { useBadgeConfig } from '@/hooks/useBadgeConfig';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 /* ── Section spacer ── */
@@ -46,23 +44,8 @@ export function MarketplaceSection() {
   const { data: localCategories = [], isLoading: loadingLocal } = useProductsByCategory(80);
   const { parentGroupInfos } = useParentGroups();
 
-  const { data: bannerCount = 0 } = useQuery({
-    queryKey: ['featured-banner-count', effectiveSocietyId],
-    queryFn: async () => {
-      let query = supabase
-        .from('featured_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_active', true);
-      if (effectiveSocietyId) {
-        query = query.or(`society_id.eq.${effectiveSocietyId},society_id.is.null`);
-      } else {
-        query = query.is('society_id', null);
-      }
-      const { count } = await query;
-      return count || 0;
-    },
-    staleTime: 60_000,
-  });
+  // Banner count is no longer needed — FeaturedBanners self-hides when empty
+  // (including when all banners link to categories with no nearby products)
 
   const allProducts = useMemo(() => localCategories.flatMap(c => c.products), [localCategories]);
   const allProductIds = useMemo(() => allProducts.map(p => p.id), [allProducts]);
@@ -129,12 +112,9 @@ export function MarketplaceSection() {
 
   return (
     <div className="pb-2 section-reveal">
-      {/* ── Hero: Featured Banners OR Auto-Highlights ── */}
-      {bannerCount > 0 ? (
-        <FeaturedBanners />
-      ) : (
-        <AutoHighlightStrip />
-      )}
+      {/* ── Hero: Featured Banners (self-hides when empty) + Auto-Highlights as supplement ── */}
+      <FeaturedBanners />
+      <AutoHighlightStrip />
 
       {/* ── Icon-forward Category Tabs ── */}
       <div className="pt-4 pb-5">

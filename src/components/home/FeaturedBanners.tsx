@@ -1,10 +1,23 @@
-import { useState, useEffect, useCallback, forwardRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, forwardRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
+
+/**
+ * Extract the target sub-category from a banner link_url like
+ * "/category/food_beverages?sub=groceries" → "groceries"
+ */
+function extractSubCategory(linkUrl: string | null): string | null {
+  if (!linkUrl) return null;
+  try {
+    const match = linkUrl.match(/[?&]sub=([^&]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  } catch { return null; }
+}
 
 export function FeaturedBanners() {
   const { effectiveSocietyId } = useAuth();
@@ -12,8 +25,18 @@ export function FeaturedBanners() {
   const [activeIndex, setActiveIndex] = useState(0);
 
   const queryClient = useQueryClient();
+  const { data: productCategories = [] } = useProductsByCategory();
 
-  const { data: banners = [], isLoading } = useQuery({
+  // Build a set of categories that have real products nearby
+  const categoriesWithProducts = useMemo(() => {
+    const set = new Set<string>();
+    for (const cat of productCategories) {
+      if (cat.products.length > 0) set.add(cat.category);
+    }
+    return set;
+  }, [productCategories]);
+
+  const { data: rawBanners = [], isLoading } = useQuery({
     queryKey: ['featured-banners', effectiveSocietyId],
     queryFn: async () => {
       let query = supabase
@@ -35,6 +58,18 @@ export function FeaturedBanners() {
     staleTime: 60_000,
     refetchOnMount: true,
   });
+
+  // CORE FIX: Filter out banners whose target category has zero nearby products.
+  // Banners without a sub-category link (e.g. linking to a store or external URL) are kept.
+  const banners = useMemo(() => {
+    return rawBanners.filter((banner: any) => {
+      const targetSub = extractSubCategory(banner.link_url);
+      // No sub-category in link → keep (e.g. store links, external URLs)
+      if (!targetSub) return true;
+      // Sub-category has products nearby → keep
+      return categoriesWithProducts.has(targetSub);
+    });
+  }, [rawBanners, categoriesWithProducts]);
 
   // Realtime subscription for featured_items — new banners appear immediately
   useEffect(() => {

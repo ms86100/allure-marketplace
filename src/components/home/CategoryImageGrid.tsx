@@ -41,11 +41,20 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
   const ml = useMarketplaceLabels();
 
   const allCategories = groupedConfigs[parentGroup] || [];
-  const categories = activeCategories
-    ? allCategories.filter(c => activeCategories.has(c.category))
-    : allCategories;
-
+  // Only show categories that have actual products nearby (activeCategories gate)
+  // AND have at least 1 real product in the metaMap
   const metaMap = useMemo(() => buildCategoryMeta(productCategories), [productCategories]);
+
+  const categories = useMemo(() => {
+    const filtered = activeCategories
+      ? allCategories.filter(c => activeCategories.has(c.category))
+      : allCategories;
+    // CORE FIX: Hide categories with zero products — prevents clickable empty states
+    return filtered.filter(c => {
+      const meta = metaMap[c.category];
+      return meta && meta.count > 0;
+    });
+  }, [allCategories, activeCategories, metaMap]);
 
   if (isLoading || productsLoading) {
     return (
