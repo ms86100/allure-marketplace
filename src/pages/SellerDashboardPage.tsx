@@ -99,17 +99,17 @@ export default function SellerDashboardPage() {
     if (!sellerProfile) return;
 
     try {
+      const newVal = !sellerProfile.is_available;
       const { error } = await supabase
         .from('seller_profiles')
-        .update({ is_available: !sellerProfile.is_available })
+        .update({ is_available: newVal })
         .eq('id', sellerProfile.id);
 
       if (error) throw error;
 
-      setSellerProfile({
-        ...sellerProfile,
-        is_available: !sellerProfile.is_available,
-      });
+      setSellerProfile({ ...sellerProfile, is_available: newVal });
+      // Bug 9: re-fetch to keep full profile in sync with DB
+      fetchSellerProfile(sellerProfile.id);
 
       toast.success(
         sellerProfile.is_available ? 'Store is now closed' : 'Store is now open'
@@ -117,7 +117,7 @@ export default function SellerDashboardPage() {
 
       if (sellerProfile.society_id) {
         logAudit(
-          sellerProfile.is_available ? 'store_closed' : 'store_opened',
+          newVal ? 'store_opened' : 'store_closed',
           'seller_profile',
           sellerProfile.id,
           sellerProfile.society_id

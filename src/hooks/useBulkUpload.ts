@@ -94,7 +94,7 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
       const lines = text.split('\n').filter(l => l.trim());
       if (lines.length < 2) { toast.error('CSV must have a header row and at least one data row'); return; }
 
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
       const nameIdx = headers.indexOf('name');
       const priceIdx = headers.indexOf('price');
       const categoryIdx = headers.indexOf('category');

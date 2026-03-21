@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { OrderItemStatusBadge, ItemStatus } from './OrderItemStatusBadge';
-import { ChevronRight, Clock, CreditCard, Package, MessageSquare, User, Truck, ShoppingBag } from 'lucide-react';
+import { ChevronRight, Clock, CreditCard, Package, MessageSquare, User, Truck, ShoppingBag, CalendarDays } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { format } from 'date-fns';
 
@@ -23,6 +23,7 @@ interface SellerOrderCardOrder {
   payment_status?: string | null;
   payment_type?: string | null;
   fulfillment_type?: string | null;
+  order_type?: string | null;
   buyer?: { name: string; block: string; flat_number: string };
   items?: OrderItemWithStatus[];
 }
@@ -79,9 +80,13 @@ export function SellerOrderCard({ order }: SellerOrderCardProps) {
                 {statusInfo.label}
               </span>
               <div className="flex items-center gap-1">
-                {['delivery', 'seller_delivery'].includes(order.fulfillment_type) ? (
+                {['delivery', 'seller_delivery'].includes(order.fulfillment_type || '') ? (
                   <Badge variant="outline" className="text-[10px] border-primary/40 text-primary gap-0.5">
                     <Truck size={10} /> Delivery
+                  </Badge>
+                ) : order.order_type === 'booking' ? (
+                  <Badge variant="outline" className="text-[10px] border-info/40 text-info gap-0.5">
+                    <CalendarDays size={10} /> Service
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-[10px] border-muted-foreground/40 text-muted-foreground gap-0.5">

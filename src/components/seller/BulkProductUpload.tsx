@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Upload, Download, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Upload, Download, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { CategoryConfig } from '@/types/categories';
 import { useBulkUpload } from '@/hooks/useBulkUpload';
@@ -44,6 +44,10 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
               <input id="csv-upload" type="file" accept=".csv" className="hidden" onChange={b.handleCSVUpload} />
             </div>
             <p className="text-xs text-muted-foreground">CSV columns: name (required), price (required), category, description, is_veg, prep_time_minutes</p>
+            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-warning/10 border border-warning/20">
+              <Info size={14} className="text-warning shrink-0 mt-0.5" />
+              <p className="text-xs text-warning">Images must be added individually after upload. Products without images get fewer views.</p>
+            </div>
           </TabsContent>
 
           <TabsContent value="grid" className="mt-4">
