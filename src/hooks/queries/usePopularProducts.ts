@@ -38,7 +38,7 @@ export function usePopularProducts(limit = 12) {
           products.push({
             ...p,
             seller_id: seller.seller_id,
-            seller_name: seller.business_name || 'Seller',
+             seller_name: seller.business_name || '',
             seller_rating: seller.rating || 0,
             is_available: true,
             is_bestseller: false,
