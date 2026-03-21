@@ -446,8 +446,8 @@ export function ServiceBookingFlow({
                 <div className="flex items-center gap-2 text-sm">
                   <Clock size={14} className="text-primary" />
                   <span>{selectedTime?.slice(0, 5)}</span>
-                  {durationMinutes && (
-                    <span className="text-muted-foreground">· {durationMinutes} min</span>
+                  {resolvedDuration && (
+                    <span className="text-muted-foreground">· {resolvedDuration} min</span>
                   )}
                 </div>
                 <div className="flex items-center gap-2 text-sm">
