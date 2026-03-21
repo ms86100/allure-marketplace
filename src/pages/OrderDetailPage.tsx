@@ -243,8 +243,8 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* Seller-side urgent timer */}
-          {o.isUrgentSellerView && order.auto_cancel_at && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} variant="seller" />}
+          {/* Seller-side urgent timer — BULLETPROOF: show whenever auto_cancel_at is set */}
+          {o.isSellerView && order.auto_cancel_at && !isTerminalStatus(o.flow, order.status) && <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} variant="seller" />}
 
           {/* Gap 8: Needs attention banner for buyer — hide on terminal statuses */}
           {o.isBuyerView && (order as any).needs_attention && !isTerminalStatus(o.flow, order.status) && (
