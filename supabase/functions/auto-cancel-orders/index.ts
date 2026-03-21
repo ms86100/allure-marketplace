@@ -42,7 +42,7 @@ app.post("/", async (c) => {
 
     // Find orders that have passed their auto_cancel_at time and are still in cancellable statuses
     const now = new Date().toISOString();
-    const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
     // Query 1: Urgent orders past auto_cancel_at (skip if buyer already confirmed/paid)
     const { data: urgentExpired, error: urgentErr } = await supabase
@@ -60,7 +60,7 @@ app.post("/", async (c) => {
       .in("status", cancellableStatuses)
       .eq("payment_status", "pending")
       .neq("payment_type", "cod")
-      .lt("created_at", fifteenMinAgo);
+      .lt("created_at", thirtyMinAgo);
 
     const fetchError = urgentErr || orphanErr;
     const expiredOrders = [

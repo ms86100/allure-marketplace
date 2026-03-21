@@ -275,10 +275,12 @@ export function useCartPage() {
       const stillPending = existingOrders?.filter(o => o.status !== 'cancelled' && o.payment_status !== 'paid' && o.payment_status !== 'buyer_confirmed');
       if (stillPending && stillPending.length > 0) {
         toast.error('You have a pending payment. Please complete or cancel it first.', { id: 'checkout-pending' });
-        // Re-open the UPI payment sheet
+        // Re-open the correct payment UI
         setPendingOrderIds(stillPending.map(o => o.id));
         if (paymentMethod === 'upi' && paymentMode.isUpiDeepLink) {
           setShowUpiDeepLink(true);
+        } else if (paymentMode.isRazorpay) {
+          setShowRazorpayCheckout(true);
         }
         return;
       }
@@ -396,10 +398,8 @@ export function useCartPage() {
       for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1500)); const { data } = await supabase.from('orders').select('payment_status').eq('id', targetOrderId).single(); if (data?.payment_status === 'paid') { confirmed = true; break; } }
       if (!confirmed) {
         toast.info('Payment is being verified. Your order will update shortly.', { id: 'razorpay-verifying' });
-        // Do NOT clear cart — payment unconfirmed. Navigate so buyer can track status.
-        clearPaymentSession();
+        // Keep session & pendingOrderIds alive so the guard prevents duplicate orders on re-entry
         navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
-        setPendingOrderIds([]);
         return;
       }
       toast.success('Payment successful! Order placed.', { id: 'razorpay-success' });
