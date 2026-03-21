@@ -1,86 +1,87 @@
 
 
-# Round 18: 5 Critical Bugs — Cross-Society Discovery & Buyer Browsing
+# Round 19: 5 Critical Bugs — Cross-Society Store Discovery (Round 2)
 
-## Bug 1: `useOrderSuggestions` queries non-existent column `image_urls` — 400 error on every home page load
-
-**Where:** `src/hooks/useOrderSuggestions.ts` line 51, `src/components/home/SmartSuggestionBanner.tsx` line 96
-
-**What happens:** The query selects `'id, name, image_urls, price'` from `products` table. The actual column is `image_url` (singular). This returns a 400 error (`column products.image_urls does not exist`) on every home page load for any logged-in user. The suggestion banner silently falls back to the ShoppingBag icon, but the network error pollutes logs and wastes a request. The TypeScript interface at line 18 also defines `image_urls: string[] | null` instead of `image_url: string | null`.
-
-**Why critical:** Every single home page load triggers a visible 400 error in network logs. The suggestion banner never shows product images — it always falls back to a generic icon. This is a data fetch failure masquerading as a cosmetic issue.
-
-**Impact:** `useOrderSuggestions.ts` (fix column name + interface), `SmartSuggestionBanner.tsx` (fix property access from `image_urls?.[0]` to `image_url`).
-
-**Risks:** (1) None — pure column name typo fix. (2) Products without images will still show the fallback icon, which is correct.
+Previous rounds fixed product-level hooks (useNearbyProducts, useTrendingProducts, etc.) but the **Store Discovery hooks** (`useLocalSellers`, `useNearbySocietySellers`) in `useStoreDiscovery.ts` were untouched. These power the "Shop By Store" section on the home page and categories page.
 
 ---
 
-## Bug 2: Home page discovery hooks ignore user's `search_radius_km` preference — sees fewer sellers than search page
+## Bug 1: Store Discovery shows duplicate sellers — local and nearby sections overlap completely
 
-**Where:** `useNearbyProducts.ts`, `useTrendingProducts.ts`, `usePopularProducts.ts`, `useProductsByCategory.ts` — all hardcode `MARKETPLACE_RADIUS_KM` (5km)
+**Where:** `useStoreDiscovery.ts` — `useLocalSellers` (line 98) uses `MARKETPLACE_RADIUS_KM` (5km), `useNearbySocietySellers` (line 147) uses user's radius but starts bands at 0km.
 
-**What happens:** The search page (`useSearchPage.ts` line 109) respects `profile?.search_radius_km` (default 5, user-configurable up to 10). The categories page and store discovery also use the profile preference. But ALL four home page discovery hooks pass `MARKETPLACE_RADIUS_KM = 5` to the RPC. A buyer who set their radius to 10km sees more sellers when searching but fewer on the home page. A seller with `delivery_radius_km = 8` is invisible on the home screen but appears in search.
+**What happens:** `useLocalSellers` returns all sellers within 5km. `useNearbySocietySellers` returns sellers from 0km outward, grouped into "Within 2km", "Within 5km", "Within 10km" bands. Every seller within 5km appears in BOTH the "In Your Society" section AND the "Nearby Societies > Within 2/5km" bands. The buyer sees the same store card twice on the same screen.
 
-**Why critical:** The home page is the primary discovery surface. If a buyer explicitly expanded their radius to 10km, they expect the home feed to reflect that. Seeing different results between home and search breaks the "single truth" principle.
+**Why critical:** Duplicate store cards waste screen real estate and make the marketplace feel broken. A buyer who sees "Fresh Mart Express" twice thinks the system is glitchy.
 
-**Impact:** 4 discovery hooks need to read `profile?.search_radius_km` from auth context (or accept it as parameter). The `BrowsingLocationContext.invalidateDiscovery` already covers their query keys.
+**Fix:** In `useNearbySocietySellers`, pass `_exclude_society_id: effectiveSocietyId` to remove own-society sellers from nearby results. Also, deduplicate at the UI level in `ShopByStoreDiscovery.tsx` by collecting local seller IDs and filtering them out of nearby results.
 
-**Risks:** (1) Hooks are used outside authenticated context — need fallback to `MARKETPLACE_RADIUS_KM`. (2) Increasing radius increases RPC payload — acceptable for small marketplace.
-
----
-
-## Bug 3: `invalidateDiscovery` misses `location-stats` query — stale seller count after location switch
-
-**Where:** `src/contexts/BrowsingLocationContext.tsx` lines 95-102
-
-**What happens:** When a buyer switches browsing location (GPS, address, society), `invalidateDiscovery` invalidates 6 query key families: `store-discovery`, `trending-products`, `popular-products`, `products-by-category`, `category-products`, `search-popular-products`. But it does NOT invalidate `location-stats`. The `useLocationStats` hook (used in store discovery) caches stats for 5 minutes. After switching from Society A to Society B, the buyer still sees "3 sellers nearby" from the old location until cache expires.
-
-**Why critical:** The location stats banner is a trust signal — "X sellers nearby" tells the buyer the app is aware of their context. Stale stats after an explicit location switch makes the app feel unresponsive.
-
-**Impact:** Add `queryClient.invalidateQueries({ queryKey: ['location-stats'] })` to `invalidateDiscovery`.
-
-**Risks:** (1) Extra RPC call on location switch — negligible. (2) None.
+**Impact:** `useStoreDiscovery.ts`, `ShopByStoreDiscovery.tsx`
+**Risks:** (1) Non-society users pass null — RPC already handles this. (2) If local and nearby use different radii, some sellers in the gap (5-10km) might only appear in nearby — this is correct behavior.
 
 ---
 
-## Bug 4: `sell_beyond_community = false` sellers are still visible to cross-society buyers
+## Bug 2: "In Your Society" label shown for non-society users browsing via GPS
 
-**Where:** `search_sellers_by_location` RPC (latest migration `20260321083551`) line 101
+**Where:** `ShopByStoreDiscovery.tsx` line 60-68
 
-**What happens:** The RPC filter is:
-```sql
-AND (_exclude_society_id IS NULL OR sp.society_id IS NULL OR sp.society_id != _exclude_society_id)
-```
-This only excludes the buyer's OWN society (to avoid duplicates). But there's NO check for `sell_beyond_community`. A society-resident seller who explicitly set `sell_beyond_community = false` (meaning "I only want to sell within my community") is still visible to buyers from other societies who are within radius.
+**What happens:** The section header always says "In Your Society" with an optional society name appended. For users without a society (browsing via GPS or saved address), it displays "In Your Society" with no context — misleading since these are coordinate-based results, not society-filtered.
 
-The earlier RPC versions (migration `20260312174505`) had:
-```sql
-AND (sp.sell_beyond_community = true OR sp.society_id = (...buyer's society...))
-```
-But this guard was removed during the coordinate-first refactor. The `_exclude_society_id` parameter is never even passed by any frontend hook — all hooks call with only `_lat`, `_lng`, `_radius_km`.
+**Why critical:** A non-society user (or a user traveling) sees "In Your Society" when they have no society. This creates confusion about what the section means and undermines trust in the discovery system.
 
-**Why critical:** This is a seller trust violation. A home cook who only wants to serve their own apartment complex is now visible to the entire 5km radius. They get orders from strangers they can't deliver to.
+**Fix:** When `effectiveSociety` is null, change the label to "Stores Near You". Keep "In Your Society – [name]" only when a society exists.
 
-**Impact:** Update the RPC WHERE clause to re-add the `sell_beyond_community` gate for society-resident sellers. Commercial sellers (`seller_type = 'commercial'`) should bypass this check per the architecture memory.
-
-**Risks:** (1) Some sellers currently visible will disappear — this is correct behavior. (2) Need to ensure `seller_type` column is checked; commercial sellers must always be visible within radius regardless of `sell_beyond_community`.
+**Impact:** `ShopByStoreDiscovery.tsx` (3 lines)
+**Risks:** (1) None — purely cosmetic label change. (2) None.
 
 ---
 
-## Bug 5: Discovery hooks don't pass `_exclude_society_id` — duplicate sellers shown when viewing own-society products alongside nearby
+## Bug 3: Nearby society grouping labels "Near Your Society" for sellers without society even when buyer has no society
 
-**Where:** All discovery hooks call `search_sellers_by_location` without passing `_exclude_society_id`
+**Where:** `useStoreDiscovery.ts` line 185
 
-**What happens:** The RPC accepts `_exclude_society_id` to prevent showing own-society sellers in the "nearby" results (since they're already shown in local/society sections). But no frontend hook passes this parameter. The `useNearbyProducts` hook, `useTrendingProducts`, etc. all call with only `{ _lat, _lng, _radius_km }`. This means own-society sellers appear in BOTH the "Your Society" section AND the "Nearby" section, creating duplicate product cards on the home page.
+**What happens:** When grouping sellers in the nearby section, sellers without a `society_name` are labeled: `s.distance_km <= 2 ? 'Near Your Society' : 'Independent Stores'`. This hardcodes "Near Your Society" regardless of whether the buyer actually has a society. A non-society buyer browsing by GPS sees "Near Your Society" as a group header — confusing and incorrect.
 
-With the `mergeProducts` deduplication in `usePopularProducts` (line 59), this is partially mitigated at the product level. But at the seller level (e.g., `ShopByStoreDiscovery`), the same store appears twice.
+**Why critical:** The label implies a society relationship that doesn't exist. For independent/commercial marketplace users, this creates a disconnected experience.
 
-**Why critical:** Seeing the same store twice — once in "Your Community" and once in "Nearby" — makes the marketplace feel broken. It wastes screen real estate and confuses the buyer about where the store actually belongs.
+**Fix:** Pass the buyer's society context into the grouping logic. When no society exists, use "Nearby Stores" instead of "Near Your Society".
 
-**Impact:** Pass `effectiveSocietyId` as `_exclude_society_id` in discovery hooks that are meant for "nearby/cross-society" results. The `useNearbyProducts` hook should accept the society ID and forward it.
+**Impact:** `useStoreDiscovery.ts` (accept a `hasSociety` parameter or resolve it internally)
+**Risks:** (1) Adding a parameter changes the hook signature — callers need updating. Better to resolve internally using `useAuth`. (2) None.
 
-**Risks:** (1) Non-society users (no `effectiveSocietyId`) must pass `null` — the RPC already handles this correctly with `_exclude_society_id IS NULL`. (2) If society data is stale, a recently-moved user might miss their old society's sellers temporarily.
+---
+
+## Bug 4: `useLocalSellers` doesn't use user's `search_radius_km` — inconsistent with all other discovery hooks
+
+**Where:** `useStoreDiscovery.ts` line 98
+
+**What happens:** `useLocalSellers` hardcodes `MARKETPLACE_RADIUS_KM` (5km) while every other discovery hook now respects `profile?.search_radius_km`. A buyer who expanded their radius to 10km sees more products in grids and trending sections but the "local stores" section still only shows 5km. Worse, the `useNearbySocietySellers` (nearby section) correctly uses the user's radius, so a seller at 6km appears in "Nearby" but not in "Local" — inconsistent.
+
+**Why critical:** The buyer explicitly configured their discovery radius to 10km. The home page's most prominent store section ignores this preference. The asymmetry between product discovery (respects radius) and store discovery (ignores it) breaks the "single truth" principle.
+
+**Fix:** Import `useAuth` in the hook and use `profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM` for the local radius. Cap it at a reasonable local max (e.g., keep MARKETPLACE_RADIUS_KM as the local cap since "local" is meant to be tight).
+
+Actually, the better fix: keep local at a tight radius but make it dynamic relative to user preference — use `Math.min(profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM, MARKETPLACE_RADIUS_KM)` to ensure local never exceeds 5km but respects lower user preferences.
+
+**Impact:** `useStoreDiscovery.ts` — `useLocalSellers` function
+**Risks:** (1) Adding `useAuth` to the hook adds a dependency. (2) Query key needs to include radius to avoid stale cache.
+
+---
+
+## Bug 5: `useNearbySocietySellers` query key doesn't include `effectiveSocietyId` — stale cache after society change
+
+**Where:** `useStoreDiscovery.ts` line 140
+
+**What happens:** The query key is `['store-discovery', 'nearby', lat, lng, radiusKm]`. It doesn't include `effectiveSocietyId`. If a buyer joins a society (or switches), the cached nearby results still include/exclude sellers based on the old society context. The `sell_beyond_community` RPC check uses `auth.uid()` which doesn't change, but the `_exclude_society_id` parameter (once we add it in Bug 1 fix) needs the key to vary by society. Without it, React Query serves stale data.
+
+Similarly, `useLocalSellers` query key (line 91) is `['store-discovery', 'local', lat, lng]` — no society context at all.
+
+**Why critical:** After Round 1 fixes added `_exclude_society_id` to product hooks, the store discovery hooks need matching cache keys. Without this, the store section shows stale/duplicate results after any society context change.
+
+**Fix:** Add `effectiveSocietyId` to both query keys.
+
+**Impact:** `useStoreDiscovery.ts` — both hooks' query keys
+**Risks:** (1) Cache invalidation on society change triggers refetch — acceptable. (2) None.
 
 ---
 
@@ -88,34 +89,14 @@ With the `mergeProducts` deduplication in `usePopularProducts` (line 59), this i
 
 | # | Bug | Severity | File(s) |
 |---|-----|----------|---------|
-| 1 | `image_urls` typo — 400 error on every home load | **HIGH** | `useOrderSuggestions.ts`, `SmartSuggestionBanner.tsx` |
-| 2 | Home discovery ignores user radius preference | **HIGH** | 4 discovery hooks |
-| 3 | Location stats not invalidated on location switch | **MEDIUM** | `BrowsingLocationContext.tsx` |
-| 4 | `sell_beyond_community=false` sellers leak to cross-society buyers | **CRITICAL** | `search_sellers_by_location` RPC (migration) |
-| 5 | Own-society sellers duplicated in nearby results | **MEDIUM** | 4 discovery hooks (pass `_exclude_society_id`) |
+| 1 | Duplicate stores in local vs nearby sections | **HIGH** | `useStoreDiscovery.ts`, `ShopByStoreDiscovery.tsx` |
+| 2 | "In Your Society" label for non-society users | **MEDIUM** | `ShopByStoreDiscovery.tsx` |
+| 3 | "Near Your Society" grouping label when buyer has no society | **MEDIUM** | `useStoreDiscovery.ts` |
+| 4 | `useLocalSellers` ignores user radius preference | **MEDIUM** | `useStoreDiscovery.ts` |
+| 5 | Query keys missing `effectiveSocietyId` — stale cache | **HIGH** | `useStoreDiscovery.ts` |
 
-## Technical Details
+## Files to Edit
 
-### Files to edit:
-- `src/hooks/useOrderSuggestions.ts` — Fix `image_urls` → `image_url` in select + interface (Bug 1)
-- `src/components/home/SmartSuggestionBanner.tsx` — Fix `image_urls?.[0]` → `image_url` (Bug 1)
-- `src/hooks/queries/useNearbyProducts.ts` — Accept radius param, pass `_exclude_society_id` (Bugs 2, 5)
-- `src/hooks/queries/useTrendingProducts.ts` — Same (Bugs 2, 5)
-- `src/hooks/queries/usePopularProducts.ts` — Same (Bugs 2, 5)
-- `src/hooks/queries/useProductsByCategory.ts` — Same (Bugs 2, 5)
-- `src/contexts/BrowsingLocationContext.tsx` — Add `location-stats` to invalidation list (Bug 3)
-- **DB Migration** — Update `search_sellers_by_location` to re-add `sell_beyond_community` gate (Bug 4)
-
-### RPC fix (Bug 4) — add after the existing WHERE conditions:
-```sql
-AND (
-  sp.seller_type = 'commercial'
-  OR sp.sell_beyond_community = true
-  OR sp.society_id IS NULL
-  OR sp.society_id = (
-    SELECT pr.society_id FROM public.profiles pr WHERE pr.id = auth.uid()
-  )
-)
-```
-This ensures: commercial sellers always visible, opted-in society sellers visible, no-society sellers visible, and same-society sellers visible. Only society-resident sellers with `sell_beyond_community = false` are hidden from cross-society buyers.
+- `src/hooks/queries/useStoreDiscovery.ts` — Bugs 1, 3, 4, 5 (add `useAuth`, pass `_exclude_society_id`, fix query keys, fix grouping label, use user radius)
+- `src/components/home/ShopByStoreDiscovery.tsx` — Bugs 1, 2 (deduplicate local vs nearby sellers, fix section label)
 
