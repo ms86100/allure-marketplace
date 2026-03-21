@@ -42,14 +42,14 @@ export function WhatsNewSection() {
 
       const { data } = await supabase
         .from('seller_profiles')
-        .select('id, business_name, cover_image_url, category')
+        .select('id, business_name, cover_image_url')
         .gte('created_at', lastOrderDate)
         .eq('is_available', true)
         .eq('verification_status', 'approved')
         .order('created_at', { ascending: false })
         .limit(6);
 
-      return (data || []) as { id: string; business_name: string; cover_image_url: string | null; category: string }[];
+      return (data || []) as { id: string; business_name: string; cover_image_url: string | null }[];
     },
     enabled: !!isDormant && !!browsingLocation?.lat,
     staleTime: jitteredStaleTime(10 * 60_000),
