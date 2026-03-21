@@ -23,7 +23,7 @@ export default function CartPage() {
   const navigate = useNavigate();
 
   // Show loading if cart hasn't hydrated yet OR if mutations are still in-flight
-  if (c.isLoading || !c.hasHydrated || c.pendingMutations > 0) {
+  if (c.isLoading || !c.hasHydrated || c.pendingMutations > 0 || c.isRecoveringCart) {
     // If we already have items, render them normally (don't flash loading)
     if (c.items.length === 0) {
       return (
@@ -40,7 +40,7 @@ export default function CartPage() {
     }
   }
 
-  if (c.items.length === 0 && !c.hasActivePaymentSession && c.pendingMutations === 0 && !c.isFetching) {
+  if (c.items.length === 0 && !c.hasActivePaymentSession && c.pendingMutations === 0 && !c.isFetching && !c.isRecoveringCart) {
     return (
       <AppLayout showHeader={false} showCart={false}>
         <div className="p-4 safe-top">
