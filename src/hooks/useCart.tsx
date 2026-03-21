@@ -63,6 +63,7 @@ interface CartContextType {
   isLoading: boolean;
   isFetching: boolean;
   hasHydrated: boolean;
+  isRecoveringCart: boolean;
   /** Number of cart mutations currently in-flight */
   pendingMutations: number;
   addItem: (product: Product, quantity?: number, silent?: boolean) => Promise<void>;
@@ -88,6 +89,16 @@ async function fetchCartItems(userId: string) {
   return items.filter(item => item.product != null && item.product.is_available !== false);
 }
 
+async function fetchCartItemCount(userId: string) {
+  const { data, error } = await supabase
+    .from('cart_items')
+    .select('quantity, product:products!inner(is_available)')
+    .eq('user_id', userId)
+    .eq('product.is_available', true);
+  if (error) throw error;
+  return (data || []).reduce((sum, row) => sum + (row.quantity || 0), 0);
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user, isSessionRestored } = useAuth();
   const queryClient = useQueryClient();
@@ -95,6 +106,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Global mutation counter — prevents stale reads from overwriting optimistic state
   const mutationSeqRef = useRef(0);
   const [pendingMutations, setPendingMutations] = useState(0);
+  const [recoveryAttempts, setRecoveryAttempts] = useState(0);
 
   const { data: items = [], isLoading, isFetching, isFetched } = useQuery({
     queryKey: [...CART_QUERY_KEY, user?.id],
@@ -106,6 +118,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     staleTime: 5 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  });
+
+  const { data: fallbackItemCount = 0 } = useQuery({
+    queryKey: ['cart-count', user?.id],
+    queryFn: async () => {
+      if (!user) return 0;
+      return fetchCartItemCount(user.id);
+    },
+    enabled: isSessionRestored && !!user,
+    staleTime: 5 * 1000,
     refetchOnWindowFocus: true,
   });
 
@@ -160,6 +183,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const itemCount = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
   const totalAmount = useMemo(() => items.reduce((sum, item) => sum + (item.product?.price || 0) * item.quantity, 0), [items]);
+  const hasCartCountMismatch = !!user && isFetched && !isFetching && pendingMutations === 0 && items.length === 0 && fallbackItemCount > 0;
+  const isRecoveringCart = hasCartCountMismatch && recoveryAttempts < 2;
 
   const sellerGroups: SellerGroup[] = useMemo(() =>
     Object.values(
@@ -350,17 +375,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const hasHydrated = isFetched;
 
+  useEffect(() => {
+    if (!user || items.length > 0 || fallbackItemCount === 0) {
+      setRecoveryAttempts((prev) => (prev === 0 ? prev : 0));
+    }
+  }, [user, items.length, fallbackItemCount]);
+
+  useEffect(() => {
+    if (!hasCartCountMismatch || recoveryAttempts >= 2) return;
+    setRecoveryAttempts((prev) => prev + 1);
+    queryClient.invalidateQueries({ queryKey: cartKey(), exact: true });
+  }, [hasCartCountMismatch, recoveryAttempts, queryClient, cartKey]);
+
   // Keep cart-count cache in sync with items (eliminates split-brain)
   useEffect(() => {
-    if (hasHydrated && user) {
+    if (hasHydrated && user && !hasCartCountMismatch) {
       queryClient.setQueryData(['cart-count', user.id], itemCount);
     }
-  }, [hasHydrated, user, itemCount, queryClient]);
+  }, [hasHydrated, user, itemCount, queryClient, hasCartCountMismatch]);
 
   const contextValue = useMemo<CartContextType>(() => ({
-    items, itemCount, totalAmount, sellerGroups, isLoading, isFetching, hasHydrated, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart,
+    items, itemCount, totalAmount, sellerGroups, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart,
     refresh: async () => { if (user) await reconcile(); },
-  }), [items, itemCount, totalAmount, sellerGroups, isLoading, isFetching, hasHydrated, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart, user, reconcile]);
+  }), [items, itemCount, totalAmount, sellerGroups, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart, user, reconcile]);
 
   return <CartContext.Provider value={contextValue}>{children}</CartContext.Provider>;
 }
