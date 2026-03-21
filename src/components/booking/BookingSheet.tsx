@@ -102,7 +102,7 @@ export function BookingSheet({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-[85vh]">
+      <DrawerContent className="max-h-[85vh]">
         <DrawerHeader className="pb-4">
           <DrawerTitle>
             {enquiryOnly ? 'Contact Seller' : hasDateRange ? 'Reserve Rental' : 'Book Service'}

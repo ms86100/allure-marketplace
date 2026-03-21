@@ -300,7 +300,7 @@ export function AdminWorkflowManager() {
 
       {/* Editor Sheet */}
       <Drawer open={!!selectedWorkflow} onOpenChange={(open) => !open && setSelectedWorkflow(null)}>
-        <DrawerContent className="h-[90dvh] p-0">
+        <DrawerContent className="max-h-[90dvh] p-0">
           <DrawerHeader className="px-4 pt-4 pb-3 border-b border-border">
             <div className="flex items-center justify-between">
               <DrawerTitle className="text-base font-bold">

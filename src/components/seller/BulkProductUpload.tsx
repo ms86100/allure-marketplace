@@ -26,7 +26,7 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
 
   return (
     <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DrawerContent className="h-[85vh]">
+      <DrawerContent className="max-h-[85vh]">
         <DrawerHeader><DrawerTitle>Bulk Add Products</DrawerTitle></DrawerHeader>
 
         <Tabs defaultValue="grid" className="mt-4">

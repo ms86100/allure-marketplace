@@ -141,7 +141,7 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-[85vh] overflow-y-auto">
+      <DrawerContent className="max-h-[85vh] overflow-y-auto">
         <DrawerHeader>
           <DrawerTitle>New Post</DrawerTitle>
         </DrawerHeader>

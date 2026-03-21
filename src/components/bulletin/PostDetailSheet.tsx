@@ -146,7 +146,7 @@ export function PostDetailSheet({ post, open, onOpenChange, onVote }: PostDetail
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-[90vh] overflow-y-auto">
+      <DrawerContent className="max-h-[90vh] overflow-y-auto">
         <DrawerHeader>
           <div className="flex items-center gap-2">
             <Badge variant="outline" className={cn('text-[10px] gap-1', cat.bg, cat.color)}>

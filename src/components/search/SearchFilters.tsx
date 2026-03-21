@@ -108,7 +108,7 @@ export function SearchFilters({
           )}
         </button>
       </DrawerTrigger>
-      <DrawerContent className="h-[85vh]">
+      <DrawerContent className="max-h-[85vh]">
         <DrawerHeader>
           <div className="flex items-center justify-between">
             <DrawerTitle>Filters & Sort</DrawerTitle>

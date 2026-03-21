@@ -230,7 +230,7 @@ export function AdminBannerManager() {
 
       {/* Create/Edit Sheet */}
       <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
-        <DrawerContent className="h-[90vh] overflow-y-auto">
+        <DrawerContent className="max-h-[90vh] overflow-y-auto">
           <DrawerHeader>
             <DrawerTitle className="font-bold">{editingId ? 'Edit Banner' : 'Create Banner'}</DrawerTitle>
           </DrawerHeader>
