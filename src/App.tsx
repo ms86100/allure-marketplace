@@ -327,7 +327,7 @@ function AppRoutes() {
       const pendingPath = consumePendingDeepLink();
       if (pendingPath) {
         console.log('[AppRoutes] Navigating to deferred deep link:', pendingPath);
-        deferredNavigate(pendingPath, { replace: true });
+        deferredNavigate(pendingPath);
       }
     }, 300); // Allow more time for context providers to initialize
     return () => clearTimeout(timer);
