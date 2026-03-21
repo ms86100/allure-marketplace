@@ -100,6 +100,10 @@ export function useCartPage() {
       setPaymentMethod('upi');
       // Small delay to allow component to mount with pendingOrderIds
       setTimeout(() => setShowUpiDeepLink(true), 100);
+    } else if (session.paymentMethod === 'razorpay') {
+      // Bug 3 fix: Restore Razorpay checkout on app resume
+      setPaymentMethod('upi'); // internal state for online payment
+      setTimeout(() => setShowRazorpayCheckout(true), 100);
     }
   }, []); // Only on mount
 
