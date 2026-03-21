@@ -258,14 +258,20 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
           }
         }
 
-        // Insert new slots in batches
+        // Bug 6 & 7: Upsert new slots to avoid race condition, track actual count
         const batchSize = 500;
+        let actualInserted = 0;
         for (let i = 0; i < slotsToInsert.length; i += batchSize) {
           const batch = slotsToInsert.slice(i, i + batchSize);
-          const { error: slotErr } = await (supabase
+          const { data: upsertedData, error: slotErr } = await (supabase
             .from('service_slots') as any)
-            .insert(batch);
-          if (slotErr) console.warn('Slot insert batch error:', slotErr.message);
+            .upsert(batch, { onConflict: 'seller_id,product_id,slot_date,start_time', ignoreDuplicates: false })
+            .select('id');
+          if (slotErr) {
+            console.warn('Slot upsert batch error:', slotErr.message);
+          } else {
+            actualInserted += upsertedData?.length || 0;
+          }
         }
       }
 
