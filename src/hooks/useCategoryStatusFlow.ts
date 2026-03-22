@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveTransactionType } from '@/lib/resolveTransactionType';
+import { jitteredStaleTime } from '@/lib/query-utils';
 
 export interface StatusFlowStep {
   status_key: string;
@@ -23,9 +25,59 @@ export interface StatusTransition {
   is_side_action: boolean;
 }
 
+/** Shared fetch function — also used for prefetching from useCartPage */
+export async function fetchStatusFlow(parentGroup: string, transactionType: string): Promise<StatusFlowStep[]> {
+  let { data, error } = await supabase
+    .from('category_status_flows')
+    .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint, is_deprecated')
+    .eq('parent_group', parentGroup)
+    .eq('transaction_type', transactionType)
+    .order('sort_order', { ascending: true });
+
+  if (!error && (!data || data.length === 0) && parentGroup !== 'default') {
+    const fallback = await supabase
+      .from('category_status_flows')
+      .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint, is_deprecated')
+      .eq('parent_group', 'default')
+      .eq('transaction_type', transactionType)
+      .order('sort_order', { ascending: true });
+    if (!fallback.error && fallback.data) data = fallback.data;
+  }
+
+  return (data as StatusFlowStep[]) || [];
+}
+
+/** Shared fetch function for transitions — also used for prefetching */
+export async function fetchStatusTransitions(parentGroup: string, transactionType: string): Promise<StatusTransition[]> {
+  let { data } = await supabase
+    .from('category_status_transitions')
+    .select('from_status, to_status, allowed_actor, is_side_action')
+    .eq('parent_group', parentGroup)
+    .eq('transaction_type', transactionType);
+
+  if ((!data || data.length === 0) && parentGroup !== 'default') {
+    const fallback = await supabase
+      .from('category_status_transitions')
+      .select('from_status, to_status, allowed_actor, is_side_action')
+      .eq('parent_group', 'default')
+      .eq('transaction_type', transactionType);
+    if (fallback.data) data = fallback.data;
+  }
+
+  return (data as StatusTransition[]) || [];
+}
+
+/** Query key builders for external prefetching */
+export const statusFlowQueryKey = (parentGroup: string, transactionType: string) =>
+  ['status-flow', parentGroup, transactionType] as const;
+
+export const statusTransitionsQueryKey = (parentGroup: string, transactionType: string) =>
+  ['status-transitions', parentGroup, transactionType] as const;
+
 /**
- * Fetches category-driven status flow for an order based on its seller's
- * parent_group and the order's type (purchase vs enquiry vs booking).
+ * Fetches category-driven status flow using React Query for caching.
+ * Flow data rarely changes so a 5-minute staleTime eliminates re-fetches
+ * when navigating back to order detail pages.
  */
 export function useCategoryStatusFlow(
   sellerPrimaryGroup: string | null | undefined,
@@ -33,46 +85,20 @@ export function useCategoryStatusFlow(
   fulfillmentType?: string | null,
   deliveryHandledBy?: string | null
 ) {
-  const [flow, setFlow] = useState<StatusFlowStep[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const parentGroup = sellerPrimaryGroup || 'default';
+  const transactionType = useMemo(
+    () => resolveTransactionType(parentGroup, orderType, fulfillmentType, deliveryHandledBy),
+    [parentGroup, orderType, fulfillmentType, deliveryHandledBy]
+  );
 
-  useEffect(() => {
-    setIsLoading(true);
-    const transactionType = resolveTransactionType(sellerPrimaryGroup || 'default', orderType, fulfillmentType, deliveryHandledBy);
+  const { data, isLoading } = useQuery({
+    queryKey: statusFlowQueryKey(parentGroup, transactionType),
+    queryFn: () => fetchStatusFlow(parentGroup, transactionType),
+    staleTime: jitteredStaleTime(5 * 60 * 1000),
+    enabled: !!transactionType,
+  });
 
-    (async () => {
-      // Try specific parent_group first, then fallback to 'default'
-      const parentGroup = sellerPrimaryGroup || 'default';
-      
-      let { data, error } = await supabase
-        .from('category_status_flows')
-        .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint, is_deprecated')
-        .eq('parent_group', parentGroup)
-        .eq('transaction_type', transactionType)
-        .order('sort_order', { ascending: true });
-
-      // Fallback to 'default' if no rows found for specific parent_group
-      if (!error && (!data || data.length === 0) && parentGroup !== 'default') {
-        const fallback = await supabase
-          .from('category_status_flows')
-          .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint, is_deprecated')
-          .eq('parent_group', 'default')
-          .eq('transaction_type', transactionType)
-          .order('sort_order', { ascending: true });
-        
-        if (!fallback.error && fallback.data) {
-          data = fallback.data;
-        }
-      }
-
-      if (!error && data) {
-        setFlow(data as StatusFlowStep[]);
-      }
-      setIsLoading(false);
-    })();
-  }, [sellerPrimaryGroup, orderType, fulfillmentType, deliveryHandledBy]);
-
-  return { flow, isLoading };
+  return { flow: data || [], isLoading };
 }
 
 
@@ -237,38 +263,21 @@ export function getSideActionsForActor(
 }
 
 /**
- * Hook to fetch allowed transitions for a workflow.
+ * Hook to fetch allowed transitions for a workflow using React Query for caching.
  */
 export function useStatusTransitions(
   parentGroup: string | null | undefined,
   transactionType: string | null | undefined
 ) {
-  const [transitions, setTransitions] = useState<StatusTransition[]>([]);
+  const pg = parentGroup || 'default';
+  const tt = transactionType || '';
 
-  useEffect(() => {
-    if (!parentGroup || !transactionType) return;
+  const { data } = useQuery({
+    queryKey: statusTransitionsQueryKey(pg, tt),
+    queryFn: () => fetchStatusTransitions(pg, tt),
+    staleTime: jitteredStaleTime(5 * 60 * 1000),
+    enabled: !!parentGroup && !!transactionType,
+  });
 
-    (async () => {
-      let { data } = await supabase
-        .from('category_status_transitions')
-        .select('from_status, to_status, allowed_actor, is_side_action')
-        .eq('parent_group', parentGroup)
-        .eq('transaction_type', transactionType);
-
-      // Fallback to 'default' if no rows found for specific parent_group
-      if ((!data || data.length === 0) && parentGroup !== 'default') {
-        const fallback = await supabase
-          .from('category_status_transitions')
-          .select('from_status, to_status, allowed_actor, is_side_action')
-          .eq('parent_group', 'default')
-          .eq('transaction_type', transactionType);
-
-        if (fallback.data) data = fallback.data;
-      }
-
-      if (data) setTransitions(data as StatusTransition[]);
-    })();
-  }, [parentGroup, transactionType]);
-
-  return transitions;
+  return data || [];
 }

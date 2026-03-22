@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentMethod } from '@/types/database';
+import { fetchStatusFlow, fetchStatusTransitions, statusFlowQueryKey, statusTransitionsQueryKey } from '@/hooks/useCategoryStatusFlow';
+import { resolveTransactionType } from '@/lib/resolveTransactionType';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubmitGuard } from '@/hooks/useSubmitGuard';
@@ -264,6 +266,28 @@ export function useCartPage() {
     }
   }, [clearCart, queryClient, user]);
 
+  /** Prefetch status flow + transitions so order detail page loads instantly */
+  const prefetchFlowData = useCallback(() => {
+    try {
+      const seller = sellerGroups[0]?.items[0]?.product?.seller as any;
+      const parentGroup = seller?.primary_group || 'default';
+      const ft = fulfillmentType === 'delivery' ? (seller?.fulfillment_mode === 'platform_delivery' ? 'delivery' : 'seller_delivery') : 'self_pickup';
+      const dhb = fulfillmentType === 'delivery' ? (seller?.fulfillment_mode === 'platform_delivery' ? 'platform' : 'seller') : null;
+      const txnType = resolveTransactionType(parentGroup, 'purchase', ft, dhb);
+
+      queryClient.prefetchQuery({
+        queryKey: statusFlowQueryKey(parentGroup, txnType),
+        queryFn: () => fetchStatusFlow(parentGroup, txnType),
+        staleTime: 5 * 60 * 1000,
+      });
+      queryClient.prefetchQuery({
+        queryKey: statusTransitionsQueryKey(parentGroup, txnType),
+        queryFn: () => fetchStatusTransitions(parentGroup, txnType),
+        staleTime: 5 * 60 * 1000,
+      });
+    } catch { /* best-effort prefetch */ }
+  }, [sellerGroups, fulfillmentType, queryClient]);
+
   const handlePlaceOrderInner = async () => {
     if (!user || !profile || sellerGroups.length === 0) return;
 
@@ -417,6 +441,7 @@ export function useCartPage() {
       await clearCartAndCache(); hapticNotification('success');
       requestFullPermission().catch(() => {});
       supabase.functions.invoke('process-notification-queue').catch(() => {});
+      prefetchFlowData(); // Warm cache so order detail page loads instantly
       if (orderIds.length === 1) { toast.success('Order placed successfully!', { id: 'order-placed' }); navigate(`/orders/${orderIds[0]}`); }
       else { toast.success(`${orderIds.length} orders placed successfully!`, { id: 'order-placed' }); navigate('/orders'); }
     } catch (error: any) { console.error('Error placing order:', error); toast.error(friendlyError(error), { id: 'checkout-error' }); }
