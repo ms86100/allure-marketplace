@@ -184,6 +184,8 @@ export function useNewOrderAlert(sellerIds: string[]) {
             created_at: n.created_at,
             total_amount: n.total_amount,
             seller_id: n.seller_id,
+            fulfillment_type: n.fulfillment_type,
+            delivery_handled_by: n.delivery_handled_by,
           });
         }
       )
