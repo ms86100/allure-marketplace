@@ -78,31 +78,31 @@ export function DeliveryArrivalOverlay({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 100 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="fixed inset-0 z-[60] flex items-end justify-center px-4 pb-24 pt-4 pointer-events-none"
+          className="fixed inset-0 z-[60] flex items-center justify-center px-4 pointer-events-none"
           onClick={handleDismiss}
         >
           <motion.div
             initial={{ scale: 0.9 }}
             animate={{ scale: 1 }}
-            className="w-full max-w-md bg-card border-2 border-primary/30 rounded-2xl shadow-2xl overflow-hidden pointer-events-auto"
+            className="w-full max-w-sm bg-card border-2 border-primary/30 rounded-2xl shadow-2xl overflow-hidden pointer-events-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Pulsing header */}
-            <div className="bg-primary/10 p-4 text-center relative">
+            <div className="bg-primary/10 p-3 text-center relative">
               <button
                 onClick={handleDismiss}
-                className="absolute top-3 right-3 w-10 h-10 rounded-full bg-muted flex items-center justify-center"
+                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-muted flex items-center justify-center"
               >
-                <X size={16} className="text-muted-foreground" />
+                <X size={14} className="text-muted-foreground" />
               </button>
               <motion.div
                 animate={{ scale: [1, 1.15, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
-                className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3"
+                className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-2"
               >
-                <MapPin size={28} className="text-primary" />
+                <MapPin size={20} className="text-primary" />
               </motion.div>
-              <h2 className="text-lg font-bold text-foreground">
+              <h2 className="text-base font-bold text-foreground">
                 {distance !== null && distance < doorstepDistanceMeters
                   ? (proximityMessages?.at_doorstep_title || '🏠 At your doorstep!')
                   : (proximityMessages?.arriving_title || '🏃 Driver arriving now!')}
@@ -113,7 +113,7 @@ export function DeliveryArrivalOverlay({
             </div>
 
             {/* Info */}
-            <div className="p-4 space-y-3">
+            <div className="p-3 space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Distance</span>
                 <span className="font-semibold text-foreground">
@@ -145,7 +145,7 @@ export function DeliveryArrivalOverlay({
               {deliveryCode && (
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-center">
                   <p className="text-[10px] text-muted-foreground mb-0.5">Your Delivery OTP</p>
-                  <p className="text-2xl font-bold tracking-[0.3em] text-primary">{deliveryCode}</p>
+                  <p className="text-xl font-bold tracking-[0.3em] text-primary">{deliveryCode}</p>
                 </div>
               )}
             </div>
