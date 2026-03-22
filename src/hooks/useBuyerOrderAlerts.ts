@@ -60,6 +60,7 @@ export function useBuyerOrderAlerts() {
           queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
           queryClient.invalidateQueries({ queryKey: ['notifications'] });
           queryClient.invalidateQueries({ queryKey: ['active-orders-strip'] });
+          queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
         }
       )
       .subscribe();

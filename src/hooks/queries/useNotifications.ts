@@ -109,22 +109,18 @@ export function useLatestActionNotification(userId: string | undefined) {
       const notifications = (data as unknown as UserNotification[]) || [];
       if (notifications.length === 0) return null;
 
-      const deliveryTypes = new Set(['delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent']);
-
-      // Collect delivery notifications that need order status checks
-      const deliveryNotifs: UserNotification[] = [];
+      // Collect ALL order-linked notifications (not just delivery types)
+      const orderLinkedNotifs: UserNotification[] = [];
       const orderIds = new Set<string>();
       for (const n of notifications) {
-        if (deliveryTypes.has(n.type)) {
-          const oid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
-          if (oid) {
-            orderIds.add(oid);
-            deliveryNotifs.push(n);
-          }
+        const oid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
+        if (oid) {
+          orderIds.add(oid);
+          orderLinkedNotifs.push(n);
         }
       }
 
-      // Batch-fetch order statuses for all delivery notifications at once
+      // Batch-fetch terminal order statuses
       let terminalOrderIds = new Set<string>();
       if (orderIds.size > 0) {
         const { data: orders } = await supabase
@@ -137,9 +133,9 @@ export function useLatestActionNotification(userId: string | undefined) {
         }
       }
 
-      // Batch-mark stale delivery notifications as read
+      // Batch-mark stale notifications for terminal orders as read
       const staleIds: string[] = [];
-      for (const n of deliveryNotifs) {
+      for (const n of orderLinkedNotifs) {
         const oid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
         if (oid && terminalOrderIds.has(oid)) {
           staleIds.push(n.id);
