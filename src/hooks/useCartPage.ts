@@ -490,19 +490,8 @@ export function useCartPage() {
       } catch (err) { console.error('Failed to store payment ID client-side:', err); }
     }
 
-    // P0 FIX: Client-side fallback — transition payment_pending → placed
-    // Primary path is the webhook, but this ensures it happens even if webhook is delayed
-    if (user?.id && pendingOrderIds.length > 0) {
-      try {
-        for (const oid of pendingOrderIds) {
-          await supabase.from('orders')
-            .update({ status: 'placed' as any, payment_status: 'paid' } as any)
-            .eq('id', oid)
-            .eq('buyer_id', user.id)
-            .eq('status', 'payment_pending' as any);
-        }
-      } catch (err) { console.error('Failed to transition orders to placed:', err); }
-    }
+    // Security: Do NOT transition status to 'placed' client-side — that's the webhook's job.
+    // Client only stores razorpay_payment_id (done above) to aid reconciliation.
 
     if (targetOrderId) {
       let confirmed = false;
