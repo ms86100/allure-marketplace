@@ -244,6 +244,7 @@ class _LiveActivityManager {
               entityId,
               lastUpdate: Date.now(),
               pendingTimer: null,
+              lastStatus: null,
             });
           } else if (existing.activityId !== act.activityId) {
             existing.activityId = act.activityId;
