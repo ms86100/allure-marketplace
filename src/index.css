@@ -502,18 +502,14 @@ body.razorpay-active::before {
   pointer-events: none;
 }
 
-/* Generic selectors — push iframe below the status bar backdrop */
-.razorpay-container,
-.razorpay-checkout-frame,
-body.razorpay-active .razorpay-container,
-body.razorpay-active iframe[src*="razorpay"],
-body.razorpay-active iframe[src*="checkout.razorpay"],
-body.razorpay-active iframe[src*="api.razorpay"],
-body.razorpay-active .razorpay-backdrop {
+/* Push the entire Razorpay wrapper div below status bar */
+body.razorpay-active > div[style*="z-index"],
+body.razorpay-active > div[style*="position: fixed"],
+body.razorpay-active .razorpay-checkout-frame,
+body.razorpay-active .razorpay-container {
   top: env(safe-area-inset-top, 0px) !important;
-  bottom: 0 !important;
-  height: auto !important;
-  padding-top: 0 !important;
+  height: calc(100% - env(safe-area-inset-top, 0px)) !important;
+  bottom: auto !important;
   z-index: 2147483647 !important;
   touch-action: auto !important;
 }
@@ -526,30 +522,23 @@ body.razorpay-active {
   height: 100% !important;
 }
 
-/* Ensure the Razorpay iframe container respects safe areas on notched devices */
-body.razorpay-active .razorpay-container {
+/* Ensure bottom safe area for home indicator */
+body.razorpay-active .razorpay-container,
+body.razorpay-active .razorpay-checkout-frame {
   padding-bottom: env(safe-area-inset-bottom, 0px) !important;
   box-sizing: border-box !important;
 }
 
-/* Fix for Capacitor webview: inset positioning avoids calc() fragility */
+/* iframe inside the wrapper — fill the adjusted wrapper, not the viewport */
 body.razorpay-active iframe[src*="razorpay"],
 body.razorpay-active iframe[src*="api.razorpay"],
 body.razorpay-active iframe[src*="checkout.razorpay"] {
-  position: fixed !important;
-  top: env(safe-area-inset-top, 0px) !important;
+  position: absolute !important;
+  top: 0 !important;
   left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100vw !important;
-  height: auto !important;
-  max-width: 100vw !important;
+  width: 100% !important;
+  height: 100% !important;
   border: none !important;
-  touch-action: auto !important;
-}
-
-/* Razorpay overlay backdrop — catch dynamically injected divs */
-body.razorpay-active > div[style*="z-index"] {
   touch-action: auto !important;
 }
 
