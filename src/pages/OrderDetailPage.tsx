@@ -26,6 +26,8 @@ import { AppointmentDetailsCard } from '@/components/order/AppointmentDetailsCar
 import { useServiceBookingForOrder } from '@/hooks/useServiceBookings';
 import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
 import { SellerPaymentConfirmation } from '@/components/payment/SellerPaymentConfirmation';
+import { SellerCodConfirmation } from '@/components/payment/SellerCodConfirmation';
+import { PaymentProofReadonly } from '@/components/payment/PaymentProofReadonly';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
 import { isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, stepRequiresOtp } from '@/hooks/useCategoryStatusFlow';
@@ -390,7 +392,23 @@ export default function OrderDetailPage() {
             />
           )}
 
-          {/* Gap 11: ETA banner for buyer — shown from acceptance until delivery */}
+          {/* COD Payment Confirmation — seller confirms cash received */}
+          {o.isSellerView && (order as any).payment_type === 'cod' && (order as any).payment_status !== 'paid' && isSuccessfulTerminal(o.flow, order.status) && (
+            <SellerCodConfirmation
+              orderId={order.id}
+              amount={order.total_amount}
+              buyerName={buyer?.name}
+              onConfirmed={() => o.fetchOrder()}
+            />
+          )}
+
+          {/* Read-only payment proof — visible to seller when screenshot exists and NOT in payment_pending (that case has action buttons above) */}
+          {o.isSellerView && (order as any).payment_screenshot_url && (order as any).status !== 'payment_pending' && (
+            <PaymentProofReadonly
+              screenshotUrl={(order as any).payment_screenshot_url}
+              utrRef={(order as any).upi_transaction_ref}
+            />
+          )}
           {o.isBuyerView && isDeliveryOrder && (order as any).estimated_delivery_at && !isTerminalStatus(o.flow, order.status) && !(deliveryAssignmentId && deliveryTracking.eta) && (
             <DeliveryETABanner estimatedDeliveryAt={(order as any).estimated_delivery_at} />
           )}
