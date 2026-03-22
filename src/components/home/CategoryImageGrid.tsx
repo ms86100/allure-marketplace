@@ -88,7 +88,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
       </div>
 
       {/* 4-column tile grid — Blinkit style: dark card + 2×2 images + label below */}
-      <div className="grid grid-cols-4 gap-x-3 gap-y-4 stagger-children">
+      <div className="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-3 gap-y-4 stagger-children">
         {categories.slice(0, 8).map((cat) => {
           const meta = metaMap[cat.category] || { count: 0, images: [] };
           const images = meta.images.length > 0
@@ -99,10 +99,10 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
             <Link
               key={cat.category}
               to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-              className="flex flex-col items-center group active:scale-[0.96] transition-transform duration-150 card-hover"
+              className="flex flex-col items-center group active:scale-[0.96] transition-transform duration-150 card-hover max-w-[180px] mx-auto"
             >
-              {/* Dark card tile */}
-              <div className="w-full aspect-square rounded-xl overflow-hidden bg-card border border-border img-zoom relative">
+              {/* Compact card tile */}
+              <div className="w-full aspect-[4/3] rounded-xl overflow-hidden bg-card border border-border img-zoom relative">
                 {images.length >= 4 ? (
                   <div className="grid grid-cols-2 grid-rows-2 w-full h-full gap-[2px] p-[2px]">
                     {images.slice(0, 4).map((src, i) => (
