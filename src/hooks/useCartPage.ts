@@ -235,7 +235,7 @@ export function useCartPage() {
     }
 
     // Bug 2 fix: Use 'card' for Razorpay payments instead of misleading 'upi'
-    const effectivePaymentMethod = paymentMode.isRazorpay && paymentMethod === 'upi' ? 'card' : paymentMethod;
+    const effectivePaymentMethod = paymentMode.isRazorpay && paymentMethod === 'upi' ? 'online' : paymentMethod;
     const { data, error } = await supabase.rpc('create_multi_vendor_orders', {
       _buyer_id: user.id, _delivery_address: deliveryAddressText,
       _notes: notes || null, _payment_method: effectivePaymentMethod, _payment_status: paymentStatus,
