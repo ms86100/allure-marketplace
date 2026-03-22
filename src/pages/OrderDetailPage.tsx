@@ -187,7 +187,7 @@ export default function OrderDetailPage() {
   const hasBuyerActionBar = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel || order.status === 'placed');
 
   return (
-    <AppLayout showHeader={false} showNav={!hasSellerActionBar && !hasBuyerActionBar && (isTerminalStatus(o.flow, order.status) || (o.isBuyerView && isFirstFlowStep(o.flow, order.status)))}>
+    <AppLayout showHeader={false} showNav={!hasSellerActionBar && !hasBuyerActionBar}>
       <div className="pb-44">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
