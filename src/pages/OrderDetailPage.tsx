@@ -613,7 +613,7 @@ export default function OrderDetailPage() {
                   </Button>
                 )
               ) : (
-                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.nextStatus!)} disabled={o.isUpdating}>{o.isUpdating ? 'Updating...' : `Mark ${o.getOrderStatus(o.nextStatus).label}`}<ChevronRight size={14} className="ml-1" /></Button>
+                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.nextStatus!)} disabled={o.isUpdating}>{o.isUpdating ? 'Updating...' : `Mark ${o.getFlowStepLabel(o.nextStatus).label}`}<ChevronRight size={14} className="ml-1" /></Button>
               )
             ) : null}
           </div>
