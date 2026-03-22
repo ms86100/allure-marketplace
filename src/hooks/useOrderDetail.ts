@@ -212,6 +212,7 @@ export function useOrderDetail(id: string | undefined) {
     if (!order || !user) return;
     setIsUpdating(true);
     try {
+      const previousOrder = order;
       const updateData: any = { status: newStatus, auto_cancel_at: null };
       if (rejectionReason) updateData.rejection_reason = rejectionReason;
       let query = supabase.from('orders').update(updateData).eq('id', order.id).eq('status', order.status as any).select();
@@ -225,8 +226,18 @@ export function useOrderDetail(id: string | undefined) {
         toast.error('Order status has changed. Refreshing...', { id: `order-${order.id}-conflict` });
         return;
       }
+
+      const updatedOrder = updatedRows[0] as Partial<Order>;
+
+      // Reflect the confirmed status change immediately in the UI,
+      // then reconcile related/computed fields in the background.
+      setOrder({
+        ...previousOrder,
+        ...updatedOrder,
+      } as Order);
+
       // Re-fetch full order to sync server-side computed fields (ready_at, status_updated_at, etc.)
-      fetchOrder();
+      void fetchOrder();
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus, rejection_reason: rejectionReason });
     } catch (error: any) {
