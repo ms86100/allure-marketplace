@@ -233,6 +233,7 @@ class _LiveActivityManager {
             entityId,
             lastUpdate: Date.now(),
             pendingTimer: null,
+            lastStatus: null,
           });
         } else {
           const act = acts[0];
