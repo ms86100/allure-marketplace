@@ -65,6 +65,7 @@ function CelebrationBanner({ order, isBuyerView, flow }: { order: any; isBuyerVi
 export default function OrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const o = useOrderDetail(id);
   const [deliveryAssignmentId, setDeliveryAssignmentId] = useState<string | null>(null);
   const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
