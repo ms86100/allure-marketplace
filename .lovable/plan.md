@@ -1,86 +1,73 @@
 
 
-## Make Notification Settings Auto-Inherit from Default — Systemic Fix
-
-### Problem
-The Bug 3 fix was a static one-time data patch for `food_beverages/self_fulfillment`. Any future category added with `notify_buyer=false` / `notification_title=NULL` will have the same broken behavior. The system needs a dynamic guarantee.
+## Fix: Order Detail Page Slow Load After Placement (3-4s Waterfall)
 
 ### Root Cause
-When new `category_status_flows` rows are inserted for a non-default parent_group, the notification fields (`notify_buyer`, `notify_seller`, `notification_title`, `notification_body`, `notification_action`) default to `false`/`NULL`. The trigger's fallback only fires when `notification_title IS NULL`, but it respects the category-specific `notify_buyer=false` flag — so the fallback title is found but then blocked by the flag.
 
-### Fix: DB Trigger to Auto-Inherit Notification Fields
+The order detail page has a **sequential waterfall of 4-6 DB round trips** before it can render:
 
-Create a trigger on `category_status_flows` that fires on INSERT. When a non-default row is inserted with `notification_title IS NULL`, it automatically copies notification fields from the matching `default` row (same `transaction_type` + `status_key`).
-
-This ensures:
-- Any new category workflow automatically gets correct notification settings
-- Admins can still override by explicitly setting values
-- No client-side changes needed
-- Works for ALL current and future categories
-
-### SQL Migration
-
-**1. Auto-inherit trigger:**
-```sql
-CREATE OR REPLACE FUNCTION fn_inherit_notification_defaults()
-RETURNS trigger AS $$
-BEGIN
-  -- Only apply to non-default groups where notification_title is not explicitly set
-  IF NEW.parent_group <> 'default' AND NEW.notification_title IS NULL THEN
-    SELECT 
-      COALESCE(NEW.notify_buyer, d.notify_buyer),
-      COALESCE(NEW.notify_seller, d.notify_seller),
-      d.notification_title,
-      d.notification_body,
-      d.notification_action,
-      d.seller_notification_title,
-      d.seller_notification_body
-    INTO
-      NEW.notify_buyer,
-      NEW.notify_seller,
-      NEW.notification_title,
-      NEW.notification_body,
-      NEW.notification_action,
-      NEW.seller_notification_title,
-      NEW.seller_notification_body
-    FROM category_status_flows d
-    WHERE d.parent_group = 'default'
-      AND d.transaction_type = NEW.transaction_type
-      AND d.status_key = NEW.status_key;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+```text
+1. fetchOrder() ──────────────────────── ~400ms
+2. derive parent_group (3 queries)  ──── ~1200ms  (order_items → products → category_config)
+3. useCategoryStatusFlow (1-2 queries) ─ ~800ms   (flow + possible fallback)
+4. useStatusTransitions ─────────────── ~400ms
+                                         ─────────
+                                         ~2800ms total (best case)
 ```
 
-**2. Backfill ALL existing non-default rows that still have NULL notification_title:**
-```sql
-UPDATE category_status_flows csf
-SET notify_buyer = d.notify_buyer,
-    notify_seller = d.notify_seller,
-    notification_title = d.notification_title,
-    notification_body = d.notification_body,
-    notification_action = d.notification_action,
-    seller_notification_title = d.seller_notification_title,
-    seller_notification_body = d.seller_notification_body
-FROM category_status_flows d
-WHERE csf.parent_group <> 'default'
-  AND csf.notification_title IS NULL
-  AND d.parent_group = 'default'
-  AND d.transaction_type = csf.transaction_type
-  AND d.status_key = csf.status_key;
+Steps 2-4 cannot start until the previous step completes because each depends on the prior result. On mobile networks this easily reaches 3-4 seconds.
+
+### Fix Strategy: Eliminate the Waterfall
+
+**Approach A — Include `parent_group` in the order query (primary fix):**
+
+The 3-query chain in step 2 exists only because the seller's `primary_group` isn't always available. But the order already joins `seller_profiles` which HAS `primary_group`. The issue is the select clause doesn't include it.
+
+Looking at the `fetchOrder` query on line 158:
+```
+seller:seller_profiles(id, business_name, user_id, primary_group, profile:...)
 ```
 
-This is a single backfill that fixes ALL categories at once — not just food_beverages.
+Actually `primary_group` IS already selected. The problem is that `sellerPrimaryGroup` reads from `seller?.primary_group` and the seller is only available AFTER `fetchOrder` completes and sets `order`. Then the `derivedParentGroup` effect fires anyway because the state update hasn't propagated yet.
 
-### What This Replaces
-- The static `food_beverages/self_fulfillment` UPDATE from the previous migration becomes redundant (already applied, no harm)
-- No future per-category data patches will ever be needed
+The real waterfall is:
+1. **Render 1**: `fetchOrder` starts, `isLoading=true`
+2. **Render 2**: order loads, `seller.primary_group` available, `useCategoryStatusFlow` fires with correct group
+3. **Render 3**: flow loads, `useStatusTransitions` fires
+4. **Render 4**: transitions load, page finally renders
+
+**Fix: Parallel fetch flow and transitions alongside the order**, and cache/prefetch the flow data.
+
+### Implementation Plan
+
+**1. Prefetch flow data during checkout navigation** (`useCartPage.ts`):
+- After order creation, before navigating to `/orders/:id`, call `queryClient.prefetchQuery` for the `category_status_flows` data using the known seller's `parent_group` and `transaction_type`. This data is already known at checkout time.
+
+**2. Convert `useCategoryStatusFlow` to use React Query** (`useCategoryStatusFlow.ts`):
+- Replace `useState/useEffect` with `useQuery` so flow data is cached across navigations
+- Use a stable query key like `['status-flow', parentGroup, transactionType]`
+- Set `staleTime: 5 * 60 * 1000` (5 min) since flow config rarely changes
+
+**3. Convert `useStatusTransitions` to use React Query** (`useCategoryStatusFlow.ts`):
+- Same pattern — cached and stale-while-revalidate
+
+**4. Eliminate the 3-query parent_group derivation waterfall** (`useOrderDetail.ts`):
+- The `seller.primary_group` is already fetched in the order query. The `derivedParentGroup` fallback (3 sequential queries) only fires when `sellerPrimaryGroup` is null.
+- Fix: Compute `effectiveParentGroup` immediately from the fetched order data instead of waiting for a separate `useEffect` cycle. Move the derivation into `fetchOrder` itself — after getting the order, if `seller.primary_group` is null, do the 3 lookups there (still sequential but within a single async function, not across renders).
+
+**5. Show skeleton with partial data** (`OrderDetailPage.tsx`):
+- Render the order header (seller name, amount, items) immediately when the order loads, even before the flow is ready. Only the status timeline section needs flow data.
 
 ### Files Changed
+
 | File | Change |
 |---|---|
-| SQL Migration | Create `fn_inherit_notification_defaults` trigger + backfill all existing NULL rows |
+| `src/hooks/useCategoryStatusFlow.ts` | Convert `useCategoryStatusFlow` and `useStatusTransitions` to `useQuery` with caching |
+| `src/hooks/useOrderDetail.ts` | Move parent_group derivation into `fetchOrder`; eliminate render-cycle waterfall |
+| `src/hooks/useCartPage.ts` | Prefetch flow data before navigating to order detail |
+| `src/pages/OrderDetailPage.tsx` | Show partial content while flow loads (progressive rendering) |
 
-No client-side changes required.
+### Expected Impact
+- **Before**: 3-4 seconds of blank skeleton
+- **After**: ~400ms to show order content, flow data arrives from cache or within 800ms
 
