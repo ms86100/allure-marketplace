@@ -88,7 +88,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
       </div>
 
       {/* 4-column tile grid — Blinkit style: dark card + 2×2 images + label below */}
-      <div className="grid grid-cols-4 gap-x-3 gap-y-4 stagger-children">
+      <div className="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-3 gap-y-4 stagger-children">
         {categories.slice(0, 8).map((cat) => {
           const meta = metaMap[cat.category] || { count: 0, images: [] };
           const images = meta.images.length > 0
