@@ -155,25 +155,58 @@ serve(async (req) => {
         }
 
         // Update order status — C1: never resurrect a cancelled order as paid
+        // P0 FIX: Also transition payment_pending → placed so seller gets notified
         const { error: orderError, data: updatedOrder } = await supabase
           .from('orders')
           .update({
+            status: 'placed',
             payment_status: 'paid',
             razorpay_payment_id: razorpayPaymentId,
           })
           .eq('id', orderId)
-          .neq('status', 'cancelled')
-          .select('id');
+          .in('status', ['payment_pending', 'placed'])
+          .select('id, seller_id, buyer_id');
 
         if (!updatedOrder || updatedOrder.length === 0) {
-          console.warn(`Order ${orderId} is cancelled — skipping payment.captured update`);
+          console.warn(`Order ${orderId} is cancelled or already advanced — skipping payment.captured update`);
         }
 
         if (orderError) {
           console.error(`Error updating order ${orderId}:`, orderError);
         }
 
-        console.log(`Order ${orderId} marked as paid`);
+        // P0 FIX: Queue seller notification now that payment is confirmed
+        if (updatedOrder && updatedOrder.length > 0) {
+          const order = updatedOrder[0];
+          // Look up seller user_id and buyer name for notification
+          const { data: sellerProfile } = await supabase
+            .from('seller_profiles')
+            .select('user_id')
+            .eq('id', order.seller_id)
+            .single();
+
+          const { data: buyerProfile } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('id', order.buyer_id)
+            .single();
+
+          if (sellerProfile?.user_id) {
+            const buyerName = buyerProfile?.name || 'A buyer';
+            await supabase
+              .from('notification_queue')
+              .insert({
+                user_id: sellerProfile.user_id,
+                type: 'order',
+                title: '🆕 New Order Received!',
+                body: `${buyerName} placed an order. Tap to view and accept.`,
+                reference_path: `/orders/${orderId}`,
+                payload: { orderId, status: 'placed', type: 'order' },
+              });
+          }
+        }
+
+        console.log(`Order ${orderId} marked as paid and placed`);
       }
     } else if (event === 'payment.failed') {
       const allOrderIds = resolveOrderIds(paymentEntity.notes);

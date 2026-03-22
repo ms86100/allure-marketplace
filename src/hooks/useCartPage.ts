@@ -312,7 +312,7 @@ export function useCartPage() {
         .in('id', pendingIds)
         .eq('buyer_id', user.id);
 
-      const stillPending = existingOrders?.filter(o => o.status !== 'cancelled' && o.payment_status !== 'paid' && o.payment_status !== 'buyer_confirmed');
+      const stillPending = existingOrders?.filter(o => o.status !== 'cancelled' && o.payment_status !== 'paid' && o.payment_status !== 'buyer_confirmed') as any[];
       if (stillPending && stillPending.length > 0) {
         toast.error('You have a pending payment. Please complete or cancel it first.', { id: 'checkout-pending' });
         // Re-open the correct payment UI
@@ -477,12 +477,25 @@ export function useCartPage() {
       } catch (err) { console.error('Failed to store payment ID client-side:', err); }
     }
 
+    // P0 FIX: Client-side fallback — transition payment_pending → placed
+    // Primary path is the webhook, but this ensures it happens even if webhook is delayed
+    if (user?.id && pendingOrderIds.length > 0) {
+      try {
+        for (const oid of pendingOrderIds) {
+          await supabase.from('orders')
+            .update({ status: 'placed' as any, payment_status: 'paid' } as any)
+            .eq('id', oid)
+            .eq('buyer_id', user.id)
+            .eq('status', 'payment_pending' as any);
+        }
+      } catch (err) { console.error('Failed to transition orders to placed:', err); }
+    }
+
     if (targetOrderId) {
       let confirmed = false;
       for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1500)); const { data } = await supabase.from('orders').select('payment_status').eq('id', targetOrderId).single(); if (data?.payment_status === 'paid') { confirmed = true; break; } }
       if (!confirmed) {
         toast.info('Payment is being verified. Your order will update shortly.', { id: 'razorpay-verifying' });
-        // Keep session & pendingOrderIds alive so the guard prevents duplicate orders on re-entry
         navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
         return;
       }
@@ -530,7 +543,22 @@ export function useCartPage() {
     if (upiCompletionRef.current) return;
     upiCompletionRef.current = true;
     setShowUpiDeepLink(false);
+
+    // P0 FIX: Transition payment_pending → placed after UPI payment confirmation
+    if (user?.id && pendingOrderIds.length > 0) {
+      try {
+        for (const oid of pendingOrderIds) {
+          await supabase.from('orders')
+            .update({ status: 'placed' as any, payment_status: 'buyer_confirmed' } as any)
+            .eq('id', oid)
+            .eq('buyer_id', user.id)
+            .eq('status', 'payment_pending' as any);
+        }
+      } catch (err) { console.error('Failed to transition orders to placed:', err); }
+    }
+
     toast.success('Payment submitted! Seller will verify shortly.', { id: 'upi-confirmed' });
+    supabase.functions.invoke('process-notification-queue').catch(() => {});
     // Clear cart and payment session ONLY after payment confirmation submitted
     await clearCartAndCache();
     clearPaymentSession();

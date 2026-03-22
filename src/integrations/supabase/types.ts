@@ -9264,6 +9264,7 @@ export type Database = {
         | "no_show"
         | "at_gate"
         | "failed"
+        | "payment_pending"
       product_category:
         | "home_food"
         | "bakery"
@@ -9483,6 +9484,7 @@ export const Constants = {
         "no_show",
         "at_gate",
         "failed",
+        "payment_pending",
       ],
       product_category: ["home_food", "bakery", "snacks", "groceries", "other"],
       seller_type_enum: ["society_resident", "commercial"],
