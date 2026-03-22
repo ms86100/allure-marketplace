@@ -150,11 +150,19 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze
               )}
             </div>
 
-            <div className="text-center space-y-1">
+            <div className="text-center space-y-2">
               <h2 className="text-xl font-bold text-foreground">{statusLabel(order.status)}</h2>
               {order.total_amount > 0 && (
                 <p className="text-2xl font-bold text-accent tabular-nums">{formatPrice(order.total_amount)}</p>
               )}
+              {(() => {
+                const ff = fulfillmentLabel(order);
+                return (
+                  <Badge variant="outline" className={`text-xs gap-1 ${ff.className}`}>
+                    {ff.icon} {ff.label}
+                  </Badge>
+                );
+              })()}
               <p className="text-sm text-muted-foreground">
                 {queueCount > 1
                   ? `${queueCount} orders waiting — tap to view this one`
