@@ -8704,19 +8704,14 @@ export type Database = {
         }
         Returns: Json
       }
-      confirm_upi_payment:
-        | {
-            Args: { _order_id: string; _upi_transaction_ref: string }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              _order_id: string
-              _payment_screenshot_url?: string
-              _upi_transaction_ref?: string
-            }
-            Returns: undefined
-          }
+      confirm_upi_payment: {
+        Args: {
+          _order_id: string
+          _payment_screenshot_url?: string
+          _upi_transaction_ref: string
+        }
+        Returns: undefined
+      }
       create_multi_vendor_orders: {
         Args: {
           _buyer_id: string
