@@ -103,6 +103,7 @@ export function useLatestActionNotification(userId: string | undefined) {
         .eq('user_id', userId!)
         .eq('is_read', false)
         .not('payload', 'is', null)
+        .not('type', 'in', SELLER_ONLY_FILTER)
         .order('created_at', { ascending: false })
         .limit(10);
       const notifications = (data as unknown as UserNotification[]) || [];
