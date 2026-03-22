@@ -1,47 +1,18 @@
 
 
-## Fix: `confirm_upi_payment` RPC Rejects `payment_pending` Orders
+## QA Audit: Checkout, Payment & Order Flow — COMPLETED
 
-### Root Cause
+All 8 bugs fixed (Bugs 1-5, 7-9). Bug 6 (variable naming) and Bug 10 (COD guard verification) are low-priority and deferred.
 
-The `confirm_upi_payment` RPC (line 74) checks:
-```sql
-IF _order.status NOT IN ('placed', 'accepted') THEN
-  RAISE EXCEPTION 'Order is not in a payable state';
-END IF;
-```
+### Changes Made
 
-After the earlier P0 fix, UPI orders are created with `status = 'payment_pending'`. This status is not in the allowed list, so the RPC throws "Order is not in a payable state", which surfaces as "Failed to submit payment confirmation."
-
-### Fix
-
-**1. Database migration** — Update `confirm_upi_payment` RPC to allow `payment_pending` status:
-- Change line 74 to: `IF _order.status NOT IN ('placed', 'accepted', 'payment_pending')`
-- When confirming a `payment_pending` order, also transition status to `'placed'` (same as the Razorpay webhook does) so the seller gets notified
-
-**2. Updated RPC logic:**
-```sql
-IF _order.status NOT IN ('placed', 'accepted', 'payment_pending') THEN
-  RAISE EXCEPTION 'Order is not in a payable state';
-END IF;
-
-UPDATE public.orders
-SET upi_transaction_ref = ...,
-    payment_screenshot_url = ...,
-    payment_status = 'buyer_confirmed',
-    status = CASE WHEN _order.status = 'payment_pending' THEN 'placed' ELSE _order.status END,
-    updated_at = now()
-WHERE id = _order_id;
-```
-
-This ensures:
-- UPI confirmation transitions `payment_pending` → `placed` (triggering seller notifications via realtime)
-- Already-placed orders (COD UPI flow) keep their current status
-- Seller notification in `UpiDeepLinkCheckout.tsx` still fires from the client side as a belt-and-suspenders approach
-
-### Files
-- **Database migration**: Update `confirm_upi_payment` function
-
-### No client-side changes needed
-The error is purely server-side. The existing client code in `UpiDeepLinkCheckout.tsx` is correct.
-
+| Bug | File | Fix |
+|-----|------|-----|
+| 1 | `useRazorpay.ts` | Replaced hardcoded gpay/phonepe/paytm with generic `{ method: 'upi', flows: ['intent'] }` (all installed apps) + `{ method: 'upi', flows: ['collect'] }` (manual UPI ID fallback) |
+| 2 | `useCartPage.ts` | Removed direct `.update()` in `handleUpiDeepLinkSuccess` — RPC call in `UpiDeepLinkCheckout` handles the transition |
+| 3 | `useCartPage.ts` | Clear cart + session in unconfirmed Razorpay branch (order exists, webhook will confirm) |
+| 4 | `useCartPage.ts` | Changed `effectivePaymentMethod` from `'card'` to `'online'` for Razorpay payments |
+| 5 | `useCartPage.ts` | Changed `accepts_cod` default from `true` to `false` |
+| 7 | `useCartPage.ts` | Added `process-notification-queue` invocation after dismiss cancellation |
+| 8 | `useCartPage.ts` | Added `idempotencyKeyRef.current = null` in `handleRazorpayFailed` |
+| 9 | `useCartPage.ts` | `clearPendingPayment` now calls `buyer_cancel_pending_orders` RPC before clearing local state |
