@@ -1,52 +1,51 @@
 
 
-## Analysis: "Did you receive your order?" on Ready Status (Self-Pickup Flow)
+## Analysis: Device Token Deduplication — What's Already Implemented vs What's Missing
 
-### What workflow is this?
+### Current State (Already Robust)
 
-This is the **self-pickup / self-fulfillment** workflow: `Placed → Accepted → Preparing → Ready → Completed`.
+Your system already handles most of the scenarios described:
 
-The order's `fulfillment_type` is **pickup** (not delivery). The status text "Your order is ready for pickup!" confirms this.
+| Scenario | Current handling |
+|---|---|
+| iOS token rotation | `claim_device_token` deletes old iOS entries when new `apns_token` arrives |
+| Same FCM token, different user | `claim_device_token` deletes token from other users before upserting |
+| iOS dedup at send time | `send-push-notification` keeps only the most recent iOS token per user |
+| Invalid/expired tokens | Both APNs (410) and FCM (UNREGISTERED) trigger immediate `DELETE` of the token row |
+| APNs placeholder cleanup | Real FCM token replaces `apns:` prefixed placeholders |
 
-### When does the "Did you receive my order?" prompt appear?
+### Actual Gap: Android Reinstall
 
-It appears whenever ALL of these are true (line 417 of `OrderDetailPage.tsx`):
-- Buyer is viewing the order
-- Order is NOT a delivery order
-- `buyerNextStatus` exists (DB says buyer can advance)
-- Order is not yet terminal
+When an Android user reinstalls, a **new FCM token** is generated. The old token stays in `device_tokens`. On next push:
+- FCM returns `UNREGISTERED` → old token gets deleted (self-healing)
+- But there's a **window** where the user gets a duplicate push (one to old token that silently fails, one to new token that succeeds)
 
-At **Ready** status, the DB transitions say the **buyer** is the actor who advances to `completed`. So `buyerNextStatus = 'completed'`, and the prompt appears.
+This is not a real duplicate delivery problem — the old token fails silently. The only real issue is wasted API calls.
 
-### Is this correct behavior?
+### Proposed Fix (Minimal, Non-Breaking)
 
-**Partially.** The prompt IS the mechanism for the buyer to advance `ready → completed`. It's not supposed to appear AFTER completed — it's how you GET to completed.
+**File: `supabase/migrations/` — Update `claim_device_token`**
+- Add Android dedup: when platform is `android`, delete all other Android entries for the same `user_id` with a different token. Mirrors the iOS cleanup logic. This ensures only one Android token exists per user at any time.
 
-### What's actually wrong (two bugs):
+```sql
+-- After the existing upsert, add:
+IF p_platform = 'android' THEN
+  DELETE FROM public.device_tokens
+  WHERE user_id = p_user_id
+    AND platform = 'android'
+    AND token != p_token;
+END IF;
+```
 
-**Bug 1 — Duplicate actions.** Both the `BuyerDeliveryConfirmation` card ("Yes, I received my order") AND the bottom Buyer Action Bar button appear simultaneously. They do the same thing — advance to `completed`. This is confusing and redundant.
+**File: `supabase/functions/send-push-notification/index.ts`**
+- Extend the existing iOS dedup logic to also deduplicate Android tokens (keep only most recent per platform). Currently only iOS is deduped at send time.
 
-**Bug 2 — Wrong wording for pickup.** The card says "Did you receive your order?" and "Yes, I received my order" — this implies delivery. For self-pickup orders, it should say "Have you picked up your order?" / "Yes, I picked up my order".
+That's it. Two small changes. The rest of the user's request (device registry, stable device_id, notification event_id, background cleanup jobs) is either already implemented or would be over-engineering given the self-healing invalid-token cleanup already in place.
 
-### Proposed Fix
-
-**File: `src/pages/OrderDetailPage.tsx`**
-- Remove the `BuyerDeliveryConfirmation` component entirely from the page. The bottom Buyer Action Bar already handles this transition with the correct DB-driven label. Having two UI elements for the same action is redundant and confusing.
-- The action bar button (line 624) already uses `o.getFlowStepLabel(o.buyerNextStatus)` which pulls the correct label from the workflow DB — this is the single source of truth.
-
-**Alternative (if you prefer keeping the prominent card):**
-- Keep `BuyerDeliveryConfirmation` but make it fulfillment-aware:
-  - Pickup orders: "Have you picked up your order?" / "Yes, I picked it up"
-  - Non-delivery orders with other flows: current wording
-- Hide the duplicate button in the action bar when the confirmation card is visible
-
-### Recommendation
-
-Remove `BuyerDeliveryConfirmation` and rely solely on the Buyer Action Bar. It's already DB-driven, uses correct labels, and is the canonical way to advance order status. One action, one button, zero confusion.
-
-### Files to change
+### Files Changed
 
 | File | Change |
 |---|---|
-| `src/pages/OrderDetailPage.tsx` | Remove `BuyerDeliveryConfirmation` block (lines 415-423) |
+| New migration SQL | Add Android platform dedup to `claim_device_token` |
+| `supabase/functions/send-push-notification/index.ts` | Extend send-time dedup to cover Android (keep latest per platform) |
 
