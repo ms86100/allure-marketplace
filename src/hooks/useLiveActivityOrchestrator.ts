@@ -150,6 +150,10 @@ export function useLiveActivityOrchestrator(): void {
         flowEntries = flowEntriesRef.current;
       }
 
+      // ETA nullification: only pass ETA for transit statuses
+      const transitSet = getTransitStatuses();
+      const effectiveEta = transitSet.has(newStatus) ? (delivery?.eta_minutes ?? null) : null;
+
       const activityData = buildLiveActivityData(
         { id: orderId, status: newStatus },
         delivery,
@@ -157,7 +161,7 @@ export function useLiveActivityOrchestrator(): void {
         itemCount,
         flowEntries,
         sellerLogoUrl,
-        delivery?.eta_minutes ?? null,
+        effectiveEta,
       );
       if (isNative) await LiveActivityManager.push(activityData);
     };
