@@ -333,7 +333,7 @@ function AppRoutes() {
           return;
         }
         console.log('[AppRoutes] Navigating to deferred deep link:', pendingPath);
-        deferredNavigate(pendingPath);
+        deferredNavigate(pendingPath, { state: { from: 'deeplink' } });
       }
     }, 300); // Allow more time for context providers to initialize
     return () => clearTimeout(timer);
