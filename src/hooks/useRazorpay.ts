@@ -157,9 +157,10 @@ export function useRazorpay() {
               upi: {
                 name: 'Pay via UPI',
                 instruments: [
-                  { method: 'upi', flows: ['intent'], apps: ['gpay'] },
-                  { method: 'upi', flows: ['intent'], apps: ['phonepe'] },
-                  { method: 'upi', flows: ['intent'], apps: ['paytm'] },
+                  // Show ALL installed UPI apps (not just gpay/phonepe/paytm)
+                  { method: 'upi', flows: ['intent'] },
+                  // Fallback: manual UPI ID entry for apps not detected via intent
+                  { method: 'upi', flows: ['collect'] },
                 ],
               },
               other: {
