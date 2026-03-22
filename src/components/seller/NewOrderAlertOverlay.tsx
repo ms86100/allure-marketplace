@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Bell, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Bell, ShoppingBag, ArrowRight, Truck, Package, MapPin } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { NewOrder } from '@/hooks/useNewOrderAlert';
