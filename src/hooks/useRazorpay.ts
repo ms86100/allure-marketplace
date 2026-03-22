@@ -201,7 +201,13 @@ export function useRazorpay() {
       document.body.dataset.scrollY = String(scrollY);
       document.body.style.top = `-${scrollY}px`;
       document.body.classList.add('razorpay-active');
-      razorpay.open();
+
+      // Open Razorpay — use rAF to ensure the CSS changes are painted
+      // before the SDK injects its overlay, preventing the brief
+      // non-interactive flash on iOS WebView
+      requestAnimationFrame(() => {
+        razorpay.open();
+      });
     } catch (error: any) {
       console.error('Razorpay error:', error);
       toast.error(friendlyError(error));
