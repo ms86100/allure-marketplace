@@ -229,7 +229,7 @@ export function useNewOrderAlert(sellerIds: string[]) {
       try {
         let query = supabase
           .from('orders')
-          .select('id, status, total_amount, created_at, seller_id')
+          .select('id, status, total_amount, created_at, seller_id, fulfillment_type, delivery_handled_by')
           .in('seller_id', sellerIds)
           .in('status', [...ACTIONABLE_STATUSES])
           .order('created_at', { ascending: true });
