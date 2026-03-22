@@ -314,7 +314,20 @@ export function useCartPage() {
 
       const stillPending = existingOrders?.filter(o => o.status !== 'cancelled' && o.payment_status !== 'paid' && o.payment_status !== 'buyer_confirmed') as any[];
       if (stillPending && stillPending.length > 0) {
-        toast.error('You have a pending payment. Please complete or cancel it first.', { id: 'checkout-pending' });
+        toast.error('You have a pending payment. Please complete or cancel it first.', {
+          id: 'checkout-pending',
+          action: {
+            label: 'Cancel Payment',
+            onClick: async () => {
+              try {
+                await supabase.rpc('buyer_cancel_pending_orders', { _order_ids: stillPending.map((o: any) => o.id) });
+              } catch (err) { console.error('Failed to cancel pending orders:', err); }
+              setPendingOrderIds([]);
+              clearPaymentSession();
+              toast.success('Pending payment cancelled. You can place a new order.', { id: 'checkout-pending-cancelled' });
+            },
+          },
+        });
         // Re-open the correct payment UI
         setPendingOrderIds(stillPending.map(o => o.id));
         if (paymentMethod === 'upi' && paymentMode.isUpiDeepLink) {
@@ -477,19 +490,8 @@ export function useCartPage() {
       } catch (err) { console.error('Failed to store payment ID client-side:', err); }
     }
 
-    // P0 FIX: Client-side fallback — transition payment_pending → placed
-    // Primary path is the webhook, but this ensures it happens even if webhook is delayed
-    if (user?.id && pendingOrderIds.length > 0) {
-      try {
-        for (const oid of pendingOrderIds) {
-          await supabase.from('orders')
-            .update({ status: 'placed' as any, payment_status: 'paid' } as any)
-            .eq('id', oid)
-            .eq('buyer_id', user.id)
-            .eq('status', 'payment_pending' as any);
-        }
-      } catch (err) { console.error('Failed to transition orders to placed:', err); }
-    }
+    // Security: Do NOT transition status to 'placed' client-side — that's the webhook's job.
+    // Client only stores razorpay_payment_id (done above) to aid reconciliation.
 
     if (targetOrderId) {
       let confirmed = false;
@@ -530,10 +532,18 @@ export function useCartPage() {
     toast.error('Payment was not completed. Your order has been cancelled. You can try again.', { id: 'razorpay-failed' });
   };
 
-  // Bug 4 fix: Dismiss handler — closes UI without cancelling orders
-  const handleRazorpayDismiss = () => {
+  // Bug 1 fix: Dismiss handler — cancel pending orders so user isn't deadlocked
+  const handleRazorpayDismiss = async () => {
     setShowRazorpayCheckout(false);
-    // Orders stay pending — user can retry by tapping Place Order again
+    if (pendingOrderIds.length > 0) {
+      try {
+        await supabase.rpc('buyer_cancel_pending_orders', { _order_ids: pendingOrderIds });
+      } catch (err) { console.error('Failed to cancel pending orders on dismiss:', err); }
+    }
+    setPendingOrderIds([]);
+    clearPaymentSession();
+    idempotencyKeyRef.current = null;
+    // Cart is preserved — user can retry with a fresh order
   };
 
   // ── UPI completion guard: only ONE of success/failed can execute per session ──
@@ -598,6 +608,20 @@ export function useCartPage() {
   const sessionSellerName = activeSession?.sellerName || 'Seller';
   const sessionAmount = activeSession?.amount || 0;
 
+  const clearPendingPayment = useCallback(() => {
+    setPendingOrderIds([]);
+    clearPaymentSession();
+    idempotencyKeyRef.current = null;
+  }, []);
+
+  const retryPendingPayment = useCallback(() => {
+    if (paymentMode.isRazorpay) {
+      setShowRazorpayCheckout(true);
+    } else if (paymentMode.isUpiDeepLink) {
+      setShowUpiDeepLink(true);
+    }
+  }, [paymentMode]);
+
   return {
     user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations,
     notes, setNotes, paymentMethod, setPaymentMethod,
@@ -613,6 +637,7 @@ export function useCartPage() {
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed, handleRazorpayDismiss,
     handleUpiDeepLinkSuccess, handleUpiDeepLinkFailed,
     hasActivePaymentSession, sessionSellerUpiId, sessionSellerName, sessionAmount,
+    clearPendingPayment, retryPendingPayment,
     cancelPlacingOrder: () => { setIsPlacingOrder(false); setOrderStep('validating'); },
   };
 }

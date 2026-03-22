@@ -146,7 +146,7 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
 
         // Apply server-side filter so pagination is consistent
         if (activeFilter === 'active' && terminalSet.size > 0) {
-          const terminalArr = [...terminalSet];
+          const terminalArr = [...terminalSet, 'payment_pending'];
           query = query.not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`);
         } else if (activeFilter === 'completed' && successSet.size > 0) {
           query = query.in('status', [...successSet] as any);

@@ -56,6 +56,34 @@ export default function CartPage() {
     );
   }
 
+  // Bug 9: Cart empty but pending payment session — show a clear escape hatch
+  if (c.items.length === 0 && c.hasActivePaymentSession && c.pendingMutations === 0 && !c.isFetching && !c.isRecoveringCart) {
+    return (
+      <AppLayout showHeader={false} showCart={false}>
+        <div className="p-4 safe-top">
+          <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted mb-6"><ArrowLeft size={18} /></button>
+          <div className="text-center py-16">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-warning/10 flex items-center justify-center"><span className="text-4xl">⏳</span></div>
+            <h2 className="text-lg font-bold mb-1">Pending Payment</h2>
+            <p className="text-sm text-muted-foreground mb-6">You have an incomplete payment. Complete it or cancel to start fresh.</p>
+            <div className="flex gap-3 justify-center">
+              <Button variant="outline" onClick={async () => {
+                if (c.pendingOrderIds.length > 0) {
+                  const { supabase: sb } = await import('@/integrations/supabase/client');
+                  try { await sb.rpc('buyer_cancel_pending_orders', { _order_ids: c.pendingOrderIds }); } catch {}
+                }
+                c.clearPendingPayment();
+              }}>Cancel Payment</Button>
+              {c.paymentMode.isRazorpay && c.pendingOrderIds.length > 0 && (
+                <Button onClick={() => c.retryPendingPayment()}>Retry Payment</Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
   const communityText = ml.label('label_checkout_community_support')
     .replace('{count}', String(c.sellerGroups.length))
     .replace('{suffix}', c.sellerGroups.length !== 1 ? 'es' : '');
@@ -74,7 +102,7 @@ export default function CartPage() {
             <AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="text-destructive text-xs h-8 min-w-[44px] px-2">Clear</Button></AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader><AlertDialogTitle>Clear cart?</AlertDialogTitle><AlertDialogDescription>This will remove all items from your cart. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-              <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { c.setAppliedCoupon(null); c.clearCart(); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Clear All</AlertDialogAction></AlertDialogFooter>
+              <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={async () => { c.setAppliedCoupon(null); if (c.hasActivePaymentSession && c.pendingOrderIds.length > 0) { try { const { rpc } = await import('@/integrations/supabase/client').then(m => ({ rpc: m.supabase.rpc })); await rpc('buyer_cancel_pending_orders', { _order_ids: c.pendingOrderIds }); } catch {} } c.clearCart(); c.clearPendingPayment(); }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Clear All</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         </div>
