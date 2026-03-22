@@ -94,16 +94,15 @@ export function useDeepLinks() {
 
           console.log('Deep link path resolved:', path);
 
-          // Always store as pending — the deferred consumer will navigate
-          // after auth is ready. Also attempt immediate navigation for
-          // cases where auth is already hydrated.
+          // Store as pending — the deferred consumer in AppRoutes will
+          // navigate after auth is fully hydrated. Do NOT navigate
+          // immediately to avoid double-push (which causes back-button
+          // loops where the user bounces between two identical entries).
           setPendingDeepLink(path);
-          navigate(path);
         }
       } catch (error) {
         console.error('Error parsing deep link:', error);
         setPendingDeepLink('/orders');
-        navigate('/orders');
       }
     };
 

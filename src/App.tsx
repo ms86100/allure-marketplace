@@ -326,6 +326,12 @@ function AppRoutes() {
     const timer = setTimeout(() => {
       const pendingPath = consumePendingDeepLink();
       if (pendingPath) {
+        // Deduplicate: skip if we're already on the target path
+        const currentHash = window.location.hash.replace(/^#/, '') || '/';
+        if (currentHash === pendingPath) {
+          console.log('[AppRoutes] Already on deep link path, skipping:', pendingPath);
+          return;
+        }
         console.log('[AppRoutes] Navigating to deferred deep link:', pendingPath);
         deferredNavigate(pendingPath);
       }
