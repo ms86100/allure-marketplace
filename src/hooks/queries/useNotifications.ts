@@ -136,12 +136,18 @@ export function useLatestActionNotification(userId: string | undefined) {
           .in('id', staleIds);
       }
 
-      // Return first valid notification
+      // Return first valid notification (with action or actionable reference_path)
       const staleSet = new Set(staleIds);
       for (const n of notifications) {
         if (staleSet.has(n.id)) continue;
-        if (!n?.payload?.action) continue;
-        return n;
+        if (n?.payload?.action) return n;
+        // Fallback: treat order-linked notifications as actionable even without explicit action
+        if (n.reference_path?.startsWith('/orders/')) {
+          return {
+            ...n,
+            payload: { ...n.payload, action: 'View Order' },
+          } as UserNotification;
+        }
       }
       return null;
     },
