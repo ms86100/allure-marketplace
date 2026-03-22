@@ -314,7 +314,20 @@ export function useCartPage() {
 
       const stillPending = existingOrders?.filter(o => o.status !== 'cancelled' && o.payment_status !== 'paid' && o.payment_status !== 'buyer_confirmed') as any[];
       if (stillPending && stillPending.length > 0) {
-        toast.error('You have a pending payment. Please complete or cancel it first.', { id: 'checkout-pending' });
+        toast.error('You have a pending payment. Please complete or cancel it first.', {
+          id: 'checkout-pending',
+          action: {
+            label: 'Cancel Payment',
+            onClick: async () => {
+              try {
+                await supabase.rpc('buyer_cancel_pending_orders', { _order_ids: stillPending.map((o: any) => o.id) });
+              } catch (err) { console.error('Failed to cancel pending orders:', err); }
+              setPendingOrderIds([]);
+              clearPaymentSession();
+              toast.success('Pending payment cancelled. You can place a new order.', { id: 'checkout-pending-cancelled' });
+            },
+          },
+        });
         // Re-open the correct payment UI
         setPendingOrderIds(stillPending.map(o => o.id));
         if (paymentMethod === 'upi' && paymentMode.isUpiDeepLink) {
