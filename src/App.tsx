@@ -1,20 +1,44 @@
 import React, { useEffect, lazy, Suspense, ComponentType } from "react";
 
-// Retry wrapper for lazy imports — handles stale chunks after idle periods
+// Fallback component shown when a lazy page fails to resolve
+function LazyLoadFailed() {
+  return (
+    <div className="min-h-[60vh] flex flex-col items-center justify-center p-6">
+      <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-destructive"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+      </div>
+      <h2 className="text-lg font-semibold text-center mb-1">Page failed to load</h2>
+      <p className="text-sm text-muted-foreground text-center mb-6 max-w-xs">This page could not be loaded. Please reload to try again.</p>
+      <button onClick={() => window.location.reload()} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">Reload App</button>
+    </div>
+  );
+}
+
+// Retry wrapper for lazy imports — handles stale chunks AND undefined exports (React #306)
 function lazyWithRetry<T extends ComponentType<any>>(
   factory: () => Promise<{ default: T }>,
   retries = 2,
 ): React.LazyExoticComponent<T> {
   return lazy(() =>
-    factory().catch((err) => {
-      if (retries > 0 && String(err).includes('Failed to fetch dynamically imported module')) {
-        // Cache-bust by appending timestamp to force fresh fetch
-        return new Promise<{ default: T }>((resolve) => {
-          setTimeout(() => resolve(lazyWithRetry(factory, retries - 1) as any), 500);
-        });
-      }
-      throw err;
-    }),
+    factory()
+      .then((mod) => {
+        // Guard against React error #306: module loaded but default export is undefined/null
+        if (!mod || typeof mod.default !== 'function') {
+          console.error('[lazyWithRetry] Module loaded but default export is invalid:', mod);
+          return { default: LazyLoadFailed as unknown as T };
+        }
+        return mod;
+      })
+      .catch((err) => {
+        if (retries > 0 && String(err).includes('Failed to fetch dynamically imported module')) {
+          return new Promise<{ default: T }>((resolve) => {
+            setTimeout(() => resolve(lazyWithRetry(factory, retries - 1) as any), 500);
+          });
+        }
+        // Any other import error — show fallback instead of crashing
+        console.error('[lazyWithRetry] Import failed:', err);
+        return { default: LazyLoadFailed as unknown as T };
+      }),
   );
 }
 import { supabase } from "@/integrations/supabase/client";
