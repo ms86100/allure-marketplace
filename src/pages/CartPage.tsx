@@ -321,6 +321,11 @@ export default function CartPage() {
             <AlertDialogTitle>Confirm Your Order</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm">
+                {/* Prominent fulfillment badge */}
+                <div className={`flex items-center gap-2 p-2.5 rounded-lg border-2 ${c.fulfillmentType === 'delivery' ? 'border-primary bg-primary/5' : 'border-accent bg-accent/10'}`}>
+                  <span className="text-lg">{c.fulfillmentType === 'delivery' ? '🚚' : '📦'}</span>
+                  <span className="font-semibold text-foreground">{c.fulfillmentType === 'delivery' ? 'Delivery' : 'Self Pickup'}</span>
+                </div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Items</span><span className="font-medium">{c.itemCount} item{c.itemCount !== 1 ? 's' : ''}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span className="font-medium">{c.paymentMethod === 'cod' ? 'Cash on Delivery' : (c.paymentMode.isRazorpay ? 'Online Payment' : 'UPI')}</span></div>
                 {/* #9: Prominent delivery address in confirm dialog */}

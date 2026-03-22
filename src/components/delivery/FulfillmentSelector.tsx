@@ -102,6 +102,7 @@ export function FulfillmentSelector({ value, onChange, deliveryFee, freeDelivery
           <span className={`text-[11px] font-medium ${isFreeDelivery ? 'text-primary' : 'text-muted-foreground'}`}>
             {isFreeDelivery ? 'FREE' : formatPrice(deliveryFee)}
           </span>
+          <span className="text-[10px] text-primary/70 font-medium">Recommended</span>
         </button>
       </div>
       {value === 'delivery' && !isFreeDelivery && freeDeliveryThreshold > 0 && (
