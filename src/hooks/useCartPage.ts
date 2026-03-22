@@ -146,8 +146,8 @@ export function useCartPage() {
   const firstSeller = sellerGroups[0]?.items[0]?.product?.seller;
   const firstSellerFulfillmentMode = (firstSeller as any)?.fulfillment_mode as 'self_pickup' | 'seller_delivery' | 'platform_delivery' | 'pickup_and_seller_delivery' | 'pickup_and_platform_delivery' | undefined;
   const acceptsCod = sellerGroups.length > 1
-    ? sellerGroups.every(g => g.items[0]?.product?.seller?.accepts_cod ?? true)
-    : (firstSeller?.accepts_cod ?? true);
+    ? sellerGroups.every(g => g.items[0]?.product?.seller?.accepts_cod ?? false)
+    : (firstSeller?.accepts_cod ?? false);
   // When Razorpay is enabled, online payment is always available (not dependent on seller UPI config)
   const acceptsUpi = paymentMode.isRazorpay
     ? true
@@ -235,7 +235,7 @@ export function useCartPage() {
     }
 
     // Bug 2 fix: Use 'card' for Razorpay payments instead of misleading 'upi'
-    const effectivePaymentMethod = paymentMode.isRazorpay && paymentMethod === 'upi' ? 'card' : paymentMethod;
+    const effectivePaymentMethod = paymentMode.isRazorpay && paymentMethod === 'upi' ? 'online' : paymentMethod;
     const { data, error } = await supabase.rpc('create_multi_vendor_orders', {
       _buyer_id: user.id, _delivery_address: deliveryAddressText,
       _notes: notes || null, _payment_method: effectivePaymentMethod, _payment_status: paymentStatus,
@@ -498,6 +498,10 @@ export function useCartPage() {
       for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1500)); const { data } = await supabase.from('orders').select('payment_status').eq('id', targetOrderId).single(); if (data?.payment_status === 'paid') { confirmed = true; break; } }
       if (!confirmed) {
         toast.info('Payment is being verified. Your order will update shortly.', { id: 'razorpay-verifying' });
+        // Bug 3 fix: Clear cart + session even on unconfirmed — the order exists, webhook will confirm
+        await clearCartAndCache();
+        clearPaymentSession();
+        setPendingOrderIds([]);
         navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
         return;
       }
@@ -528,6 +532,7 @@ export function useCartPage() {
     }
     setPendingOrderIds([]);
     clearPaymentSession();
+    idempotencyKeyRef.current = null; // Bug 8 fix: Reset so retry creates fresh orders
     // Do NOT clear cart on payment failure — user can retry
     toast.error('Payment was not completed. Your order has been cancelled. You can try again.', { id: 'razorpay-failed' });
   };
@@ -538,6 +543,8 @@ export function useCartPage() {
     if (pendingOrderIds.length > 0) {
       try {
         await supabase.rpc('buyer_cancel_pending_orders', { _order_ids: pendingOrderIds });
+        // Bug 7 fix: Notify seller in case the order briefly appeared
+        supabase.functions.invoke('process-notification-queue').catch(() => {});
       } catch (err) { console.error('Failed to cancel pending orders on dismiss:', err); }
     }
     setPendingOrderIds([]);
@@ -554,18 +561,9 @@ export function useCartPage() {
     upiCompletionRef.current = true;
     setShowUpiDeepLink(false);
 
-    // P0 FIX: Transition payment_pending → placed after UPI payment confirmation
-    if (user?.id && pendingOrderIds.length > 0) {
-      try {
-        for (const oid of pendingOrderIds) {
-          await supabase.from('orders')
-            .update({ status: 'placed' as any, payment_status: 'buyer_confirmed' } as any)
-            .eq('id', oid)
-            .eq('buyer_id', user.id)
-            .eq('status', 'payment_pending' as any);
-        }
-      } catch (err) { console.error('Failed to transition orders to placed:', err); }
-    }
+    // Bug 2 fix: The confirm_upi_payment RPC is called inside UpiDeepLinkCheckout
+    // which handles payment_pending → placed transitions with proper validation.
+    // No direct .update() needed here — the RPC already ran before this callback fires.
 
     toast.success('Payment submitted! Seller will verify shortly.', { id: 'upi-confirmed' });
     supabase.functions.invoke('process-notification-queue').catch(() => {});
@@ -608,7 +606,18 @@ export function useCartPage() {
   const sessionSellerName = activeSession?.sellerName || 'Seller';
   const sessionAmount = activeSession?.amount || 0;
 
-  const clearPendingPayment = useCallback(() => {
+  // Bug 9 fix: Cancel orders in DB before clearing local state
+  const clearPendingPayment = useCallback(async () => {
+    const ids = pendingOrderIdsRef.current;
+    if (ids.length > 0) {
+      try {
+        await supabase.rpc('buyer_cancel_pending_orders', { _order_ids: ids });
+      } catch (err) {
+        console.error('Failed to cancel pending orders:', err);
+        toast.error('Could not cancel pending orders. Please try again.', { id: 'clear-pending-fail' });
+        return; // Don't clear local state if DB cancel failed
+      }
+    }
     setPendingOrderIds([]);
     clearPaymentSession();
     idempotencyKeyRef.current = null;
