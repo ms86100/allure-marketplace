@@ -78,7 +78,7 @@ export function DeliveryArrivalOverlay({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 100 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="fixed inset-0 z-[60] flex items-end justify-center px-4 pb-24 pt-4 pointer-events-none"
+          className="fixed inset-0 z-[60] flex items-center justify-center px-4 pointer-events-none"
           onClick={handleDismiss}
         >
           <motion.div
