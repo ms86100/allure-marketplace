@@ -608,6 +608,20 @@ export function useCartPage() {
   const sessionSellerName = activeSession?.sellerName || 'Seller';
   const sessionAmount = activeSession?.amount || 0;
 
+  const clearPendingPayment = useCallback(() => {
+    setPendingOrderIds([]);
+    clearPaymentSession();
+    idempotencyKeyRef.current = null;
+  }, []);
+
+  const retryPendingPayment = useCallback(() => {
+    if (paymentMode.isRazorpay) {
+      setShowRazorpayCheckout(true);
+    } else if (paymentMode.isUpiDeepLink) {
+      setShowUpiDeepLink(true);
+    }
+  }, [paymentMode]);
+
   return {
     user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations,
     notes, setNotes, paymentMethod, setPaymentMethod,
@@ -623,6 +637,7 @@ export function useCartPage() {
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed, handleRazorpayDismiss,
     handleUpiDeepLinkSuccess, handleUpiDeepLinkFailed,
     hasActivePaymentSession, sessionSellerUpiId, sessionSellerName, sessionAmount,
+    clearPendingPayment, retryPendingPayment,
     cancelPlacingOrder: () => { setIsPlacingOrder(false); setOrderStep('validating'); },
   };
 }

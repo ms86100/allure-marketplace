@@ -63,6 +63,8 @@ export function ActiveOrderStrip() {
       if (!user?.id || !terminalSet) return [];
 
       const terminalArr = [...terminalSet];
+      // Also exclude payment_pending — these are unpaid orders not yet visible to sellers
+      const excludeStatuses = [...terminalArr, 'payment_pending'];
 
       const { data, error } = await supabase
         .from('orders')
@@ -72,7 +74,7 @@ export function ActiveOrderStrip() {
           order_items(id, product:products(image_url))
         `)
         .eq('buyer_id', user.id)
-        .not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`)
+        .not('status', 'in', `(${excludeStatuses.map(s => `"${s}"`).join(',')})`)
         .order('created_at', { ascending: false })
         .limit(5);
 
