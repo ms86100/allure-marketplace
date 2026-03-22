@@ -131,10 +131,10 @@ function HeaderInner({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full shrink-0"
+                    className="h-11 w-11 min-h-[44px] min-w-[44px] rounded-full shrink-0"
                     onClick={handleBack}
                   >
-                    <ArrowLeft size={18} />
+                    <ArrowLeft size={20} />
                   </Button>
                   <span className="text-base font-bold text-foreground truncate">{title}</span>
                 </div>
