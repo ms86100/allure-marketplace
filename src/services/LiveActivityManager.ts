@@ -194,6 +194,7 @@ class _LiveActivityManager {
             entityId,
             lastUpdate: Date.now(),
             pendingTimer: null,
+            lastStatus: null,
           });
         }
       }
