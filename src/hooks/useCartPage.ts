@@ -543,7 +543,22 @@ export function useCartPage() {
     if (upiCompletionRef.current) return;
     upiCompletionRef.current = true;
     setShowUpiDeepLink(false);
+
+    // P0 FIX: Transition payment_pending → placed after UPI payment confirmation
+    if (user?.id && pendingOrderIds.length > 0) {
+      try {
+        for (const oid of pendingOrderIds) {
+          await supabase.from('orders')
+            .update({ status: 'placed' as any, payment_status: 'buyer_confirmed' } as any)
+            .eq('id', oid)
+            .eq('buyer_id', user.id)
+            .eq('status', 'payment_pending' as any);
+        }
+      } catch (err) { console.error('Failed to transition orders to placed:', err); }
+    }
+
     toast.success('Payment submitted! Seller will verify shortly.', { id: 'upi-confirmed' });
+    supabase.functions.invoke('process-notification-queue').catch(() => {});
     // Clear cart and payment session ONLY after payment confirmation submitted
     await clearCartAndCache();
     clearPaymentSession();
