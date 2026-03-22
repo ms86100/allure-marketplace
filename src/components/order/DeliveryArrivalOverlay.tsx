@@ -113,7 +113,7 @@ export function DeliveryArrivalOverlay({
             </div>
 
             {/* Info */}
-            <div className="p-4 space-y-3">
+            <div className="p-3 space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Distance</span>
                 <span className="font-semibold text-foreground">
