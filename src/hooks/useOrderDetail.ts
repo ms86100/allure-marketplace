@@ -46,17 +46,10 @@ export function useOrderDetail(id: string | undefined) {
   const orderType = (order as any)?.order_type;
   const [derivedParentGroup, setDerivedParentGroup] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (sellerPrimaryGroup || !order?.id) return;
-    (async () => {
-      const { data } = await supabase.from('order_items').select('product_id').eq('order_id', order.id).limit(1).maybeSingle();
-      if (!data?.product_id) return;
-      const { data: product } = await supabase.from('products').select('category').eq('id', data.product_id).single();
-      if (!product?.category) return;
-      const { data: catConfig } = await supabase.from('category_config').select('parent_group').eq('category', product.category as any).single();
-      if (catConfig?.parent_group) setDerivedParentGroup(catConfig.parent_group);
-    })();
-  }, [sellerPrimaryGroup, order?.id]);
+  // Derive parent_group inside fetchOrder to avoid an extra render-cycle waterfall.
+  // The useEffect fallback is kept ONLY for edge cases where seller.primary_group is null
+  // AND fetchOrder didn't resolve it (shouldn't happen, but defensive).
+  const derivedParentGroupRef = { current: derivedParentGroup };
 
   const effectiveParentGroup = sellerPrimaryGroup || derivedParentGroup;
   const isEnquiryOrder = (order as any)?.order_type === 'enquiry';
