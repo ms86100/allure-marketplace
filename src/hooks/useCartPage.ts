@@ -155,14 +155,18 @@ export function useCartPage() {
     else if (acceptsCod && !acceptsUpi) setPaymentMethod('cod');
   }, [acceptsCod, acceptsUpi]);
 
-  const hasSetDefaultFulfillment = useRef(false);
+  // Track which seller the default was computed for — reset when seller changes
+  const defaultFulfillmentSellerId = useRef<string | null>(null);
   useEffect(() => {
-    if (sellerGroups.length === 0 || hasSetDefaultFulfillment.current) return;
+    if (sellerGroups.length === 0) return;
+    const sellerId = sellerGroups[0]?.sellerId || null;
+    // Only compute default once per unique seller (not on every re-render)
+    if (defaultFulfillmentSellerId.current === sellerId) return;
     const firstMode = (firstSeller as any)?.fulfillment_mode;
     if (firstMode === 'seller_delivery' || firstMode === 'platform_delivery') setFulfillmentType('delivery');
     else if (firstMode?.startsWith('pickup_and_')) setFulfillmentType('delivery');
     else setFulfillmentType('self_pickup');
-    hasSetDefaultFulfillment.current = true;
+    defaultFulfillmentSellerId.current = sellerId;
   }, [sellerGroups.length, firstSeller]);
 
   // Clear coupon when seller composition changes (multi-vendor or different seller)
