@@ -1,55 +1,66 @@
 
 
-## Fix: Live Activity Real-Time Sync + Location Tracking Failure (Revised)
+## P0 Fix: Prevent Seller Notification Before Payment Completion
 
-### Issue 1: Live Activity Not Updating in Real Time
+### Root Cause
 
-**Root Cause: 5-second throttle swallows status changes**
+The order creation flow has a critical sequencing flaw for online payments (Razorpay/UPI):
 
-In `LiveActivityManager.ts`, ALL updates go through `throttledUpdate()` (line 465-477) which delays by up to 5 seconds. Status changes (e.g., "accepted" → "preparing" → "picked_up") are high-priority discrete events that should update the Dynamic Island instantly. The current code treats them identically to high-frequency location/ETA pings.
+1. **Buyer taps "Place Order"** → `create_multi_vendor_orders` RPC is called with `_payment_status = 'pending'`
+2. **RPC inserts the order** with `status = 'placed'` immediately — regardless of payment status
+3. **Three notification paths fire instantly:**
+   - The RPC itself inserts into `notification_queue` (seller push notification)
+   - Realtime subscription in `useNewOrderAlert` detects the INSERT with `status = 'placed'` → buzzer fires
+   - Polling fallback also picks up orders with `status = 'placed'`
+4. **Payment hasn't happened yet** — buyer is still on the Razorpay/UPI screen
 
-Additionally, both realtime channels in `useLiveActivityOrchestrator.ts` only handle `CHANNEL_ERROR` and `TIMED_OUT` but not `CLOSED`. After iOS background/foreground transitions, a WebSocket can close cleanly without triggering reconnect, leaving the Live Activity deaf to updates.
+For COD orders, this is correct (payment is implicit). For online payments, the seller gets notified before the buyer has paid.
 
-**Fix (2 files):**
+### Solution
 
-**`src/services/LiveActivityManager.ts`:**
-- Add `lastStatus` field to `ActiveEntry` interface to track the last-known workflow status per entity
-- In `push()` method: when `workflow_status` differs from `lastStatus`, bypass `throttledUpdate()` and call `doUpdate()` directly — instant update for status changes
-- Update `lastStatus` in `doUpdate()` after successful native call
+Introduce a new `payment_pending` order status that acts as a "holding" state for unpaid online orders. Seller-facing alerts will ignore this status.
 
-**`src/hooks/useLiveActivityOrchestrator.ts`:**
-- In both channel subscribe callbacks (order channel ~line 189, delivery channel ~line 306): also handle `CLOSED` status to trigger `attemptReconnect()`
+### Changes
 
----
+**1. Add `payment_pending` enum value**
+- Add `ALTER TYPE order_status ADD VALUE IF NOT EXISTS 'payment_pending'` via migration
 
-### Issue 2: Location Tracking Failure ("Could not start location tracking")
+**2. Update `create_multi_vendor_orders` RPC**
+- When `_payment_status = 'pending'` (online payment), insert order with `status = 'payment_pending'` instead of `'placed'`
+- When `_payment_status` is anything else (COD), keep `status = 'placed'`
+- **Skip** the `notification_queue` insert when status is `'payment_pending'` — no seller notification yet
 
-**Root Cause: NOT a plugin/license issue** (confirmed working recently). The problem is in the error handling and diagnostic opacity.
+**3. Transition to `placed` after payment confirmation**
+- In the Razorpay webhook (`payment.captured` handler): after marking `payment_status = 'paid'`, also update `status` from `'payment_pending'` to `'placed'`
+- This UPDATE triggers the existing realtime subscription and notification triggers
+- In the UPI deep link success handler: same pattern — update status to `'placed'` after payment confirmation
 
-The catch block at line 281-283 of `useBackgroundLocationTracking.ts` catches ALL errors from `startNativeTracking()` but shows only a generic "Could not start location tracking" toast. The actual error (which could be a permission timing issue, a config race, or a transient native bridge error) is logged to console but the seller sees no actionable information.
+**4. Handle payment failure/abandonment**
+- Razorpay `payment.failed` webhook: orders stay in `payment_pending` (existing auto-cancel cron will clean them up)
+- Client-side `handleRazorpayFailed`: the existing `buyer_cancel_pending_orders` RPC already cancels these
+- No seller notification ever fires for abandoned payments
 
-Since this was working before, the most likely causes are:
-1. **Config race condition**: `configRef.current` is loaded async (line 50) but `startNativeTracking` can be called before it resolves (via auto-start in SellerGPSTracker). The `BackgroundGeolocation.ready()` config uses hardcoded values so this isn't blocking, but if the native bridge isn't fully ready when auto-start fires, it fails.
-2. **Auto-start fires before component is fully mounted**: `SellerGPSTracker` auto-starts in a `useEffect` that depends on `startTracking` (which is recreated on every render due to its dependency chain). A stale closure or double-invocation could cause the native plugin to error.
+**5. `useNewOrderAlert` — no changes needed**
+- `ACTIONABLE_STATUSES` already only includes `['placed', 'enquired', 'quoted']`
+- `payment_pending` is naturally excluded — sellers won't see or hear anything
 
-**Fix (2 files):**
+**6. Auto-cancel edge function**
+- Verify it also handles `payment_pending` status orders (treat same as current pending logic)
 
-**`src/hooks/useBackgroundLocationTracking.ts`:**
-- In `startNativeTracking` catch block (line 281-283): log the full error details AND include the error message in the toast so the seller sees what actually failed (e.g., "Location permission denied", "Plugin not ready")
-- Add a retry mechanism: if `startNativeTracking` fails, automatically retry once after 1 second. This handles transient native bridge readiness issues on cold start.
-- Guard `startTracking` with a `startingRef` flag to prevent double-invocation from React strict mode or rapid re-renders.
+**7. Order status config seed**
+- Add `payment_pending` to `order_status_config` table with a buyer-facing label like "Awaiting Payment"
 
-**`src/components/delivery/SellerGPSTracker.tsx`:**
-- Add a small delay (500ms) before auto-start to ensure the native bridge is fully initialized after app launch. This prevents the cold-start race condition.
+### Files to Modify
+- **New migration SQL**: Add enum value, update RPC, add status config row
+- **`supabase/functions/razorpay-webhook/index.ts`**: Update `payment.captured` to also set `status = 'placed'`
+- **`src/hooks/useCartPage.ts`**: In `handleRazorpaySuccess` and `handleUpiDeepLinkSuccess`, update order status to `'placed'` as a client-side fallback (webhook is primary)
+- **Auto-cancel function**: Include `payment_pending` in cancellation scope
 
----
-
-### Summary of Changes
-
-| File | Change |
-|---|---|
-| `src/services/LiveActivityManager.ts` | Track `lastStatus` per entity; bypass throttle for status changes |
-| `src/hooks/useLiveActivityOrchestrator.ts` | Handle `CLOSED` channel status for reconnect |
-| `src/hooks/useBackgroundLocationTracking.ts` | Surface real error in toast; add single retry; prevent double-start |
-| `src/components/delivery/SellerGPSTracker.tsx` | 500ms delay before auto-start for native bridge readiness |
+### Edge Cases Covered
+- **Payment succeeds**: webhook updates `payment_pending` → `placed`, seller gets notified
+- **Payment fails**: client cancels orders, or auto-cancel cron cleans up — no seller alert
+- **Payment abandoned**: auto-cancel cron handles cleanup after 30 min
+- **COD**: unchanged flow — orders created as `placed` immediately
+- **Webhook arrives before client**: works fine — status transitions happen atomically
+- **Client success but webhook delayed**: client-side fallback also updates to `placed`
 
