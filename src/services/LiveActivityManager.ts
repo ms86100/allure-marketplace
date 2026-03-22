@@ -368,6 +368,7 @@ class _LiveActivityManager {
           entityId: entity_id,
           lastUpdate: Date.now(),
           pendingTimer: null,
+          lastStatus: workflow_status,
         });
         this.persistMap();
         this.enforceMaxActive();
