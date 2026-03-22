@@ -166,7 +166,7 @@ export function useLiveActivityOrchestrator(): void {
       console.log(TAG, `Subscribing to order updates for buyer ${userId} (attempt ${retryCount + 1})`);
 
       const channel = supabase
-        .channel(`la-order-status-${userId}-${Date.now()}`)
+        .channel(`la-order-status-${userId}`)
         .on(
           'postgres_changes',
           {
