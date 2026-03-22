@@ -291,7 +291,7 @@ export function useLiveActivityOrchestrator(): void {
       }
 
       const channel = supabase
-        .channel(`la-delivery-${userId}-${Date.now()}`)
+        .channel(`la-delivery-${userId}`)
         .on('postgres_changes', insertOpts, handleDeliveryChange)
         .on('postgres_changes', updateOpts, handleDeliveryChange)
         .subscribe((status) => {
