@@ -97,9 +97,15 @@ export function useLiveActivityOrchestrator(): void {
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const handleOrderUpdate = async (payload: any) => {
-      const newStatus = (payload.new as any)?.status as string | undefined;
-      const orderId = (payload.new as any)?.id as string | undefined;
+      const row = payload.new as any;
+      const newStatus = row?.status as string | undefined;
+      const orderId = row?.id as string | undefined;
       if (!newStatus || !orderId) return;
+
+      // Composite dedup: skip if we already processed this exact state
+      const eventKey = `${orderId}:${newStatus}:${row?.updated_at}`;
+      if (lastProcessedEvents.get(orderId) === eventKey) return;
+      lastProcessedEvents.set(orderId, eventKey);
 
       console.log(TAG, `Order ${orderId} status → ${newStatus}`);
 
