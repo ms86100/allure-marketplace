@@ -498,6 +498,10 @@ export function useCartPage() {
       for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1500)); const { data } = await supabase.from('orders').select('payment_status').eq('id', targetOrderId).single(); if (data?.payment_status === 'paid') { confirmed = true; break; } }
       if (!confirmed) {
         toast.info('Payment is being verified. Your order will update shortly.', { id: 'razorpay-verifying' });
+        // Bug 3 fix: Clear cart + session even on unconfirmed — the order exists, webhook will confirm
+        await clearCartAndCache();
+        clearPaymentSession();
+        setPendingOrderIds([]);
         navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
         return;
       }
