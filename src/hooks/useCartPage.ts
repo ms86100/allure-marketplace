@@ -606,7 +606,18 @@ export function useCartPage() {
   const sessionSellerName = activeSession?.sellerName || 'Seller';
   const sessionAmount = activeSession?.amount || 0;
 
-  const clearPendingPayment = useCallback(() => {
+  // Bug 9 fix: Cancel orders in DB before clearing local state
+  const clearPendingPayment = useCallback(async () => {
+    const ids = pendingOrderIdsRef.current;
+    if (ids.length > 0) {
+      try {
+        await supabase.rpc('buyer_cancel_pending_orders', { _order_ids: ids });
+      } catch (err) {
+        console.error('Failed to cancel pending orders:', err);
+        toast.error('Could not cancel pending orders. Please try again.', { id: 'clear-pending-fail' });
+        return; // Don't clear local state if DB cancel failed
+      }
+    }
     setPendingOrderIds([]);
     clearPaymentSession();
     idempotencyKeyRef.current = null;
