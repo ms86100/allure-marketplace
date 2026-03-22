@@ -62,6 +62,7 @@ interface ActiveEntry {
   entityId: string;
   lastUpdate: number;
   pendingTimer: ReturnType<typeof setTimeout> | null;
+  lastStatus: string | null;
 }
 
 interface PersistedMap {
@@ -193,6 +194,7 @@ class _LiveActivityManager {
             entityId,
             lastUpdate: Date.now(),
             pendingTimer: null,
+            lastStatus: null,
           });
         }
       }
@@ -231,6 +233,7 @@ class _LiveActivityManager {
             entityId,
             lastUpdate: Date.now(),
             pendingTimer: null,
+            lastStatus: null,
           });
         } else {
           const act = acts[0];
@@ -241,6 +244,7 @@ class _LiveActivityManager {
               entityId,
               lastUpdate: Date.now(),
               pendingTimer: null,
+              lastStatus: null,
             });
           } else if (existing.activityId !== act.activityId) {
             existing.activityId = act.activityId;
@@ -351,6 +355,7 @@ class _LiveActivityManager {
             entityId: entity_id,
             lastUpdate: Date.now(),
             pendingTimer: null,
+            lastStatus: workflow_status,
           });
           this.persistMap();
           await LiveActivity.updateLiveActivity(data);
@@ -366,6 +371,7 @@ class _LiveActivityManager {
           entityId: entity_id,
           lastUpdate: Date.now(),
           pendingTimer: null,
+          lastStatus: workflow_status,
         });
         this.persistMap();
         this.enforceMaxActive();
@@ -384,10 +390,17 @@ class _LiveActivityManager {
       return;
     }
 
-    // Active entry exists → throttled update
+    // Active entry exists → update
     if (existing) {
-      console.log(TAG, `UPDATE (throttled) entity=${entity_id} status=${workflow_status}`);
-      this.throttledUpdate(existing, data);
+      // Status change = high-priority: bypass throttle for instant Dynamic Island update
+      const statusChanged = existing.lastStatus !== null && existing.lastStatus !== workflow_status;
+      if (statusChanged) {
+        console.log(TAG, `UPDATE (INSTANT — status changed ${existing.lastStatus} → ${workflow_status}) entity=${entity_id}`);
+        this.doUpdate(existing, data);
+      } else {
+        console.log(TAG, `UPDATE (throttled) entity=${entity_id} status=${workflow_status}`);
+        this.throttledUpdate(existing, data);
+      }
     } else {
       console.log(TAG, `SKIP — no active entry and status '${workflow_status}' not in START_STATUSES`);
     }
@@ -484,6 +497,7 @@ class _LiveActivityManager {
     }
     entry.lastUpdate = Date.now();
     entry.pendingTimer = null;
+    entry.lastStatus = data.workflow_status;
     try {
       console.log(TAG, `UPDATE EXEC entity=${data.entity_id} status=${data.workflow_status}`);
       await LiveActivity.updateLiveActivity(data);

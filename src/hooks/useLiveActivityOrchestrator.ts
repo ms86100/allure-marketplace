@@ -186,7 +186,7 @@ export function useLiveActivityOrchestrator(): void {
           if (status === 'SUBSCRIBED') {
             retryCount = 0;
           }
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             console.warn(TAG, `Order channel degraded (${status}), attempting reconnect...`);
             attemptReconnect();
           }
@@ -303,7 +303,7 @@ export function useLiveActivityOrchestrator(): void {
           if (status === 'SUBSCRIBED') {
             retryCount = 0;
           }
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             console.warn(TAG, `Delivery channel degraded (${status}), attempting reconnect...`);
             attemptReconnect();
           }
