@@ -387,10 +387,17 @@ class _LiveActivityManager {
       return;
     }
 
-    // Active entry exists → throttled update
+    // Active entry exists → update
     if (existing) {
-      console.log(TAG, `UPDATE (throttled) entity=${entity_id} status=${workflow_status}`);
-      this.throttledUpdate(existing, data);
+      // Status change = high-priority: bypass throttle for instant Dynamic Island update
+      const statusChanged = existing.lastStatus !== null && existing.lastStatus !== workflow_status;
+      if (statusChanged) {
+        console.log(TAG, `UPDATE (INSTANT — status changed ${existing.lastStatus} → ${workflow_status}) entity=${entity_id}`);
+        this.doUpdate(existing, data);
+      } else {
+        console.log(TAG, `UPDATE (throttled) entity=${entity_id} status=${workflow_status}`);
+        this.throttledUpdate(existing, data);
+      }
     } else {
       console.log(TAG, `SKIP — no active entry and status '${workflow_status}' not in START_STATUSES`);
     }
