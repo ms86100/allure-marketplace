@@ -152,6 +152,22 @@ export function useOrderDetail(id: string | undefined) {
       if (error) throw error;
       if (!data) { setOrder(null); return; }
       if (cancelled) return;
+
+      // Derive parent_group inline if seller doesn't have one — avoids extra render cycle
+      const sellerPg = (data as any)?.seller?.primary_group;
+      if (!sellerPg && !derivedParentGroupRef.current) {
+        const firstItem = (data as any)?.items?.[0];
+        if (firstItem?.product_id) {
+          const { data: product } = await supabase.from('products').select('category').eq('id', firstItem.product_id).single();
+          if (product?.category) {
+            const { data: catConfig } = await supabase.from('category_config').select('parent_group').eq('category', product.category as any).single();
+            if (catConfig?.parent_group && !cancelled) {
+              setDerivedParentGroup(catConfig.parent_group);
+            }
+          }
+        }
+      }
+
       setOrder(data as any);
       // Always check for review if flow says terminal-success, OR if flow isn't loaded yet (fallback: check anyway to avoid stale hasReview)
       if (data?.status && (flow.length === 0 || isSuccessfulTerminal(flow, data.status))) {
