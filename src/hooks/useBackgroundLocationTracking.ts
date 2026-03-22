@@ -279,9 +279,10 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
       }
 
       startHealthCheck();
-    } catch (err) {
-      console.error('[LocationTracking] Native tracking setup failed:', err);
-      toast.error('Could not start location tracking.');
+    } catch (err: any) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error('[LocationTracking] Native tracking setup failed:', errMsg, err);
+      toast.error(`Location error: ${errMsg || 'Unknown failure'}`, { duration: 8000 });
     }
   }, [sendLocation, startHealthCheck]);
 
