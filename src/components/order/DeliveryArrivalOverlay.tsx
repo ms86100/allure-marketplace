@@ -102,7 +102,7 @@ export function DeliveryArrivalOverlay({
               >
                 <MapPin size={20} className="text-primary" />
               </motion.div>
-              <h2 className="text-lg font-bold text-foreground">
+              <h2 className="text-base font-bold text-foreground">
                 {distance !== null && distance < doorstepDistanceMeters
                   ? (proximityMessages?.at_doorstep_title || '🏠 At your doorstep!')
                   : (proximityMessages?.arriving_title || '🏃 Driver arriving now!')}
