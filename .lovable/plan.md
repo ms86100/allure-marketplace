@@ -1,51 +1,47 @@
 
 
-## Analysis: Device Token Deduplication — What's Already Implemented vs What's Missing
+## Fix: Deterministic Back Navigation + Action Bar Overlap on OrderDetailPage
 
-### Current State (Already Robust)
+### Root Cause
 
-Your system already handles most of the scenarios described:
+**Back button**: The current logic uses `window.history.state?.idx` (React Router internal) to decide navigation. On cold starts from Live Activity/push notifications, this value is unreliable in Capacitor WebViews, causing `navigate(-1)` to go back to the WebView's initial blank entry (triggering a reload) or `replace: true` to destroy the history stack.
 
-| Scenario | Current handling |
-|---|---|
-| iOS token rotation | `claim_device_token` deletes old iOS entries when new `apns_token` arrives |
-| Same FCM token, different user | `claim_device_token` deletes token from other users before upserting |
-| iOS dedup at send time | `send-push-notification` keeps only the most recent iOS token per user |
-| Invalid/expired tokens | Both APNs (410) and FCM (UNREGISTERED) trigger immediate `DELETE` of the token row |
-| APNs placeholder cleanup | Real FCM token replaces `apns:` prefixed placeholders |
+**Action bar overlap**: Buyer action bar at `bottom-16 z-[60]` with `pb-[env(safe-area-inset-bottom)]` extends into the BottomNav's safe-area zone, blocking touch targets on iOS devices.
 
-### Actual Gap: Android Reinstall
+### Solution: Deterministic Entry Source Tracking
 
-When an Android user reinstalls, a **new FCM token** is generated. The old token stays in `device_tokens`. On next push:
-- FCM returns `UNREGISTERED` → old token gets deleted (self-healing)
-- But there's a **window** where the user gets a duplicate push (one to old token that silently fails, one to new token that succeeds)
+Instead of guessing history state, **explicitly mark** how the user arrived at the page using React Router's `location.state`.
 
-This is not a real duplicate delivery problem — the old token fails silently. The only real issue is wasted API calls.
+### Changes
 
-### Proposed Fix (Minimal, Non-Breaking)
+**File: `src/App.tsx`** (deep link consumer, ~line 336)
+- When navigating to a deep link path, pass `{ state: { from: 'deeplink' } }` so the destination page knows the entry source deterministically.
 
-**File: `supabase/migrations/` — Update `claim_device_token`**
-- Add Android dedup: when platform is `android`, delete all other Android entries for the same `user_id` with a different token. Mirrors the iOS cleanup logic. This ensures only one Android token exists per user at any time.
+**File: `src/pages/OrderDetailPage.tsx`**
 
-```sql
--- After the existing upsert, add:
-IF p_platform = 'android' THEN
-  DELETE FROM public.device_tokens
-  WHERE user_id = p_user_id
-    AND platform = 'android'
-    AND token != p_token;
-END IF;
-```
+1. **Back button** (line 194): Replace the `idx`-based logic with deterministic check:
+   - Read `location.state?.from`
+   - If `from === 'deeplink'` → `navigate('/orders')` (push, not replace — preserves stack)
+   - Otherwise → `navigate(-1)` (normal in-app back)
+   - No `replace: true` anywhere — never destroy history
 
-**File: `supabase/functions/send-push-notification/index.ts`**
-- Extend the existing iOS dedup logic to also deduplicate Android tokens (keep only most recent per platform). Currently only iOS is deduped at send time.
+2. **Buyer Action Bar** (line 608): Change `bottom-16` to `bottom-[calc(4rem+env(safe-area-inset-bottom))]` and remove the redundant `pb-[env(safe-area-inset-bottom)]` so it sits above the full BottomNav including safe area.
 
-That's it. Two small changes. The rest of the user's request (device registry, stable device_id, notification event_id, background cleanup jobs) is either already implemented or would be over-engineering given the self-healing invalid-token cleanup already in place.
+3. **Seller Action Bar loading** (line 564): Same positioning fix — `bottom-[calc(4rem+env(safe-area-inset-bottom))]` and remove `pb-[env(safe-area-inset-bottom)]`.
+
+4. **Seller Action Bar** (line 575): Same fix.
+
+### Why This Is Bulletproof
+
+- **Deterministic**: No heuristics. The deep link consumer explicitly tags navigation state at the source.
+- **No `replace: true`**: History stack is never destroyed, so BottomNav tabs always work.
+- **No browser API guessing**: Doesn't rely on `history.length`, `history.state.idx`, or any WebView-specific behavior.
+- **Testable**: `location.state.from === 'deeplink'` is a simple, predictable condition.
 
 ### Files Changed
 
 | File | Change |
 |---|---|
-| New migration SQL | Add Android platform dedup to `claim_device_token` |
-| `supabase/functions/send-push-notification/index.ts` | Extend send-time dedup to cover Android (keep latest per platform) |
+| `src/App.tsx` | Pass `{ state: { from: 'deeplink' } }` when navigating to pending deep link |
+| `src/pages/OrderDetailPage.tsx` | Deterministic back button using `location.state.from`; fix action bar positioning |
 
