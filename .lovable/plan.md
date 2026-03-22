@@ -1,83 +1,50 @@
 
 
-## Bulletproof UPI Intent Fix for Razorpay in Capacitor WebView
+## Fix: Razorpay Checkout Header Overlapping iOS Status Bar
 
-### What's Wrong Now
-The current code has `config.display.blocks` with UPI intent instruments — but this alone **does not work in a Capacitor WebView**. Per Razorpay's official docs, WebView-based checkout requires an additional flag: **`webview_intent: true`** passed at the top level of the checkout options. Without it, Razorpay's JS SDK detects it's inside a WebView and disables intent flows entirely, falling back to generic UPI categories.
+### Problem
+The screenshot shows Razorpay's header (back arrow + "Fresh Mart Express") colliding with the iOS status bar (time, battery). Despite existing CSS rules that set `top: env(safe-area-inset-top)` on iframe selectors, the Razorpay overlay still renders behind the status bar on notched iPhones.
 
-Additionally, the `apps` identifiers should include `'gpay'` (Razorpay's documented alias) alongside `'google_pay'` for maximum compatibility, and `'any'` should be added on Android to catch other installed UPI apps (BHIM, Cred, etc.).
+### Root Cause
+The current CSS targets specific selectors like `iframe[src*="razorpay"]` and `.razorpay-container`, but Razorpay's SDK dynamically injects a wrapper `<div>` directly on `<body>` with inline `position: fixed; top: 0` styles. This wrapper div is the actual visual container — the iframe inherits position from it. Our CSS pushes the iframe down but not the wrapper, and Razorpay's inline `top: 0` overrides our rules on the wrapper.
 
-### The Fix — 3 Layers
+### Fix — `src/index.css`
 
-**Layer 1: `webview_intent: true` flag** (the missing critical piece)
-Add to the top-level Razorpay options object. This is the single flag that tells Razorpay's SDK to enable intent-based UPI inside a WebView/Capacitor context.
+Replace the current Razorpay safe-area CSS block with a more aggressive approach:
 
-**Layer 2: Broader app coverage in instruments**
-- Add `gpay` as an alias for `google_pay` (Razorpay docs list `gpay` as the official identifier)
-- Add an `any` instrument to catch all other installed UPI apps on Android
+1. **Target the Razorpay wrapper div** — `body.razorpay-active > div[style*="z-index"]` needs `top: env(safe-area-inset-top) !important` and `height: calc(100% - env(safe-area-inset-top)) !important` to push the entire overlay below the status bar
+2. **Also target `.razorpay-checkout-frame`** — Razorpay's standard frame class — with the same inset
+3. **Keep the solid backdrop `::before`** unchanged (it fills the status bar area with the theme color)
+4. **Add bottom safe-area** to the wrapper div to prevent the "Continue" button from being hidden behind the home indicator
 
-**Layer 3: Capacitor deep link handling**
-The `capacitor.config.ts` already has `*.razorpay.com` and `*.razorpay.in` in `allowNavigation`. For Android, the WebView needs to handle `upi://` and `intent://` scheme URLs. This requires adding `androidAllowIntentUrls: true` to the Capacitor server config so the native WebView allows UPI app deep links.
+Key CSS changes:
+```css
+/* Push the entire Razorpay overlay below status bar */
+body.razorpay-active > div[style*="z-index"],
+body.razorpay-active > div[style*="position: fixed"],
+body.razorpay-active .razorpay-checkout-frame {
+  top: env(safe-area-inset-top, 0px) !important;
+  height: calc(100% - env(safe-area-inset-top, 0px)) !important;
+  bottom: auto !important;
+}
+
+/* iframe inside the wrapper — fill the wrapper, not the viewport */
+body.razorpay-active iframe[src*="razorpay"],
+body.razorpay-active iframe[src*="api.razorpay"],
+body.razorpay-active iframe[src*="checkout.razorpay"] {
+  position: absolute !important;  /* relative to the wrapper, not viewport */
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+}
+```
 
 ### Files Changed
-
 | File | Change |
 |---|---|
-| `src/hooks/useRazorpay.ts` | Add `webview_intent: true` to options; update instruments to use `gpay` + add `any` catch-all |
-| `capacitor.config.ts` | Add `allowIntentUrls: true` to Android server config for `upi://` and `intent://` scheme handling |
+| `src/index.css` | Rewrite Razorpay safe-area CSS to target wrapper divs, not just iframes |
 
-### Detailed Changes
-
-**`src/hooks/useRazorpay.ts`** — inside `razorpayOptions` object:
-```typescript
-const razorpayOptions = {
-  key: data.razorpay_key_id,
-  // ... existing fields ...
-  
-  // CRITICAL: Enable UPI intent inside Capacitor WebView
-  webview_intent: true,
-  
-  config: {
-    display: {
-      blocks: {
-        upi: {
-          name: 'Pay via UPI',
-          instruments: [
-            { method: 'upi', flows: ['intent'], apps: ['gpay'] },
-            { method: 'upi', flows: ['intent'], apps: ['phonepe'] },
-            { method: 'upi', flows: ['intent'], apps: ['paytm'] },
-            { method: 'upi', flows: ['intent'], apps: ['any'] },
-          ],
-        },
-      },
-      sequence: ['block.upi'],
-      preferences: {
-        show_default_blocks: true,
-      },
-    },
-  },
-  // ... rest unchanged
-};
-```
-
-**`capacitor.config.ts`** — Android config:
-```typescript
-android: {
-  allowMixedContent: !isProduction,
-  captureInput: true,
-  webContentsDebuggingEnabled: !isProduction,
-  // Allow UPI intent:// and upi:// deep links from Razorpay
-  allowIntentUrls: true,
-},
-```
-
-### Why This Is Bulletproof
-1. **`webview_intent: true`** — Razorpay's documented requirement for WebView contexts; without it, intent flows are silently disabled
-2. **`gpay` not `google_pay`** — matches Razorpay's official app identifier in their docs
-3. **`any` instrument** — catches all installed UPI apps beyond the big 3, improving coverage on Android
-4. **`allowIntentUrls`** — lets the Android WebView handle `intent://` scheme URLs that Razorpay generates for app switching
-5. **`show_default_blocks: true`** — Cards/Netbanking/Wallets remain accessible as fallback
-6. **Backward compatible** — if merchant doesn't have UPI Intent enabled, Razorpay silently falls back to default view
-
-~8 lines changed across 2 files. Run `npx cap sync` after to apply native config.
+~20 lines changed in 1 file. Run `npx cap sync` after to apply.
 
