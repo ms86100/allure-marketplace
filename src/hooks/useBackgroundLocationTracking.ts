@@ -196,6 +196,30 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
 
   const startNativeTracking = useCallback(async () => {
     try {
+      // Pre-flight: Request location permission via Capacitor Geolocation plugin first
+      // This ensures the iOS permission dialog is shown to the user before BackgroundGeolocation starts
+      try {
+        const { Geolocation } = await import('@capacitor/geolocation');
+        const permStatus = await Geolocation.checkPermissions();
+        console.log('[LocationTracking] Pre-flight permission status:', permStatus.location);
+        if (permStatus.location === 'prompt' || permStatus.location === 'prompt-with-rationale') {
+          console.log('[LocationTracking] Requesting location permission via Capacitor...');
+          const requested = await Geolocation.requestPermissions();
+          console.log('[LocationTracking] Permission result:', requested.location);
+          if (requested.location === 'denied') {
+            setState(s => ({ ...s, permissionDenied: true, permissionLevel: 'denied' }));
+            toast.error('Location permission denied. Enable it in device settings.', { duration: 8000 });
+            return;
+          }
+        } else if (permStatus.location === 'denied') {
+          setState(s => ({ ...s, permissionDenied: true, permissionLevel: 'denied' }));
+          toast.error('Location permission denied. Enable it in device settings.', { duration: 8000 });
+          return;
+        }
+      } catch (preflightErr) {
+        console.warn('[LocationTracking] Pre-flight permission check failed, continuing with BG plugin:', preflightErr);
+      }
+
       const BackgroundGeolocation = (await import('@transistorsoft/capacitor-background-geolocation')).default;
       bgGeoRef.current = BackgroundGeolocation;
 
