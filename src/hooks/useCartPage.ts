@@ -532,10 +532,18 @@ export function useCartPage() {
     toast.error('Payment was not completed. Your order has been cancelled. You can try again.', { id: 'razorpay-failed' });
   };
 
-  // Bug 4 fix: Dismiss handler — closes UI without cancelling orders
-  const handleRazorpayDismiss = () => {
+  // Bug 1 fix: Dismiss handler — cancel pending orders so user isn't deadlocked
+  const handleRazorpayDismiss = async () => {
     setShowRazorpayCheckout(false);
-    // Orders stay pending — user can retry by tapping Place Order again
+    if (pendingOrderIds.length > 0) {
+      try {
+        await supabase.rpc('buyer_cancel_pending_orders', { _order_ids: pendingOrderIds });
+      } catch (err) { console.error('Failed to cancel pending orders on dismiss:', err); }
+    }
+    setPendingOrderIds([]);
+    clearPaymentSession();
+    idempotencyKeyRef.current = null;
+    // Cart is preserved — user can retry with a fresh order
   };
 
   // ── UPI completion guard: only ONE of success/failed can execute per session ──
