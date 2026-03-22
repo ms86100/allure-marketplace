@@ -379,7 +379,7 @@ export default function OrderDetailPage() {
           </div>
 
           {/* Seller Payment Confirmation Banner */}
-          {o.isSellerView && (order as any).payment_status === 'buyer_confirmed' && (order as any).payment_confirmed_by_seller === null && (
+          {o.isSellerView && order.status === 'payment_pending' && (order as any).payment_status === 'buyer_confirmed' && (order as any).payment_confirmed_by_seller === null && (
             <SellerPaymentConfirmation
               orderId={order.id}
               amount={order.total_amount}
