@@ -8,7 +8,12 @@ import { runLiveActivityDiagnostics } from '@/services/liveActivityDiagnostics';
 import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statusFlowCache';
 import { Capacitor } from '@capacitor/core';
 
+import { getTransitStatuses } from '@/lib/visibilityEngine';
+
 const TAG = '[LiveActivityOrchestrator]';
+
+/** Composite event dedup: orderId → "orderId:status:updated_at" */
+const lastProcessedEvents = new Map<string, string>();
 
 /** DB-backed terminal statuses — loaded once at init. No hardcoded fallbacks. */
 let terminalStatusesCache: Set<string> = new Set();
