@@ -26,6 +26,8 @@ import { AppointmentDetailsCard } from '@/components/order/AppointmentDetailsCar
 import { useServiceBookingForOrder } from '@/hooks/useServiceBookings';
 import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
 import { SellerPaymentConfirmation } from '@/components/payment/SellerPaymentConfirmation';
+import { SellerCodConfirmation } from '@/components/payment/SellerCodConfirmation';
+import { PaymentProofReadonly } from '@/components/payment/PaymentProofReadonly';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
 import { isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, stepRequiresOtp } from '@/hooks/useCategoryStatusFlow';
