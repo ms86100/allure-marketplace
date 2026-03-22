@@ -62,6 +62,7 @@ interface ActiveEntry {
   entityId: string;
   lastUpdate: number;
   pendingTimer: ReturnType<typeof setTimeout> | null;
+  lastStatus: string | null;
 }
 
 interface PersistedMap {
