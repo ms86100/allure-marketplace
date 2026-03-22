@@ -26,6 +26,22 @@ function statusLabel(status: string): string {
   }
 }
 
+function fulfillmentLabel(order: NewOrder): { label: string; icon: React.ReactNode; className: string } {
+  const ft = order.fulfillment_type || '';
+  if (ft === 'seller_delivery' || (ft === 'delivery' && order.delivery_handled_by !== 'platform')) {
+    return { label: 'Seller Delivery', icon: <Truck size={12} />, className: 'border-warning/40 text-warning' };
+  }
+  if (ft === 'delivery') {
+    return { label: 'Delivery Partner', icon: <Truck size={12} />, className: 'border-primary/40 text-primary' };
+  }
+  if (ft === 'pickup' || ft === 'self_pickup') {
+    return { label: 'Self Pickup', icon: <Package size={12} />, className: 'border-muted-foreground/40 text-muted-foreground' };
+  }
+  if (ft === 'at_seller' || ft === 'at_buyer') {
+    return { label: ft === 'at_seller' ? 'At Your Location' : 'At Buyer Location', icon: <MapPin size={12} />, className: 'border-info/40 text-info' };
+  }
+  return { label: 'Pickup', icon: <Package size={12} />, className: 'border-muted-foreground/40 text-muted-foreground' };
+}
 export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze }: NewOrderAlertOverlayProps) {
   const navigate = useNavigate();
   const { formatPrice } = useCurrency();
