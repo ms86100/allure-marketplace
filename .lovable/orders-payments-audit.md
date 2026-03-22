@@ -298,3 +298,31 @@
 ### SEC-06 — Gate token security ✓ VERIFIED
 - **Severity**: N/A
 - **Status**: AES-GCM encryption, HMAC signing, timing-safe comparison, nonce-based replay prevention, security officer verification. Comprehensive.
+
+---
+
+## QA Round 7 — Multi-Vendor Order Flow Audit
+
+### MVO-01 — P0: RPC regression — missing delivery_fee, discount, coupon, payment_records, delivery_handled_by, auth guard ✅ FIXED
+- **Problem**: Migration `20260321135149` rewrote `create_multi_vendor_orders` for `auto_cancel_at` but stripped: `delivery_fee`, `discount_amount`, `coupon_id`, `delivery_handled_by`, `payment_records` INSERT, `coupon_redemptions` INSERT, `auth.uid()` caller check, delivery radius validation
+- **Impact**: Payment recording broken (webhook no-op), unlimited coupon reuse, wrong delivery routing, no auth guard
+- **Fix**: New migration merging all idempotency layers (advisory lock, ON CONFLICT, canonical response) with restored columns, payment_records INSERT, coupon tracking, auth guard, radius validation, and delivery_handled_by resolution
+
+### MVO-02 — P0: Razorpay webhook silent failure ✅ FIXED (via MVO-01)
+- **Problem**: No `payment_records` rows meant webhook's `UPDATE payment_records` found 0 rows → payments never marked paid → auto-cancelled
+- **Fix**: Restored payment_records INSERT in the RPC
+
+### MVO-03 — P1: Delivery fee only on first seller's order (DOCUMENTED)
+- **Severity**: P1
+- **Problem**: Flat delivery fee applied to first seller's order only in multi-vendor cart
+- **Status**: Matches current UI (single "Delivery Fee" line in bill). True per-seller fees require UI + backend redesign.
+
+### MVO-04 — P1: buyer_cancel_pending_orders guard ✓ VERIFIED
+- **Problem**: Hypothesized that accepted orders could be cancelled on payment failure
+- **Analysis**: RPC has `AND payment_status = 'pending'` guard. Additionally, `validate_order_status_transition` trigger blocks invalid transitions at DB level.
+- **Status**: No fix needed
+
+### MVO-05 — P2: COD cancellation message ✓ VERIFIED
+- **Problem**: Hypothesized misleading cancellation reason for COD orders
+- **Analysis**: `auto-cancel-orders` already differentiates: urgent-expired → "seller didn't respond in time", orphaned UPI → "payment not completed". COD orders hit the urgent path correctly.
+- **Status**: No fix needed
