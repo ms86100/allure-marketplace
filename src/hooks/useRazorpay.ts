@@ -192,6 +192,7 @@ export function useRazorpay() {
           escape: true,
           backdropclose: false,
           confirm_close: true,
+          animation: false,
         },
       };
 
