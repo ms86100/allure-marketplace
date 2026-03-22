@@ -322,6 +322,44 @@ export default function OrderDetailPage() {
             {/* Cancellation handled in bottom action bar — removed inline duplicate */}
           </div>
 
+          {/* Fulfillment Method Card */}
+          <div className="bg-card border border-border rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                {isDeliveryOrder ? (
+                  <Truck size={16} className="text-primary" />
+                ) : (
+                  <Package size={16} className="text-muted-foreground" />
+                )}
+                <div>
+                  <p className="text-sm font-medium">
+                    {fulfillmentType === 'seller_delivery' || (fulfillmentType === 'delivery' && (order as any).delivery_handled_by !== 'platform')
+                      ? 'Seller Delivery'
+                      : fulfillmentType === 'delivery'
+                        ? 'Delivery Partner'
+                        : fulfillmentType === 'at_seller'
+                          ? 'At Seller Location'
+                          : fulfillmentType === 'at_buyer'
+                            ? 'At Your Location'
+                            : 'Self Pickup'}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {isDeliveryOrder
+                      ? 'Will be delivered to your address'
+                      : fulfillmentType === 'at_seller' || fulfillmentType === 'at_buyer'
+                        ? 'Service appointment'
+                        : 'Pick up from seller location'}
+                  </p>
+                </div>
+              </div>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                isDeliveryOrder ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+              }`}>
+                {isDeliveryOrder ? '🚚 Delivery' : '📦 Pickup'}
+              </span>
+            </div>
+          </div>
+
           {/* Appointment Details for Service Bookings */}
           {serviceBooking && <AppointmentDetailsCard booking={serviceBooking} />}
 

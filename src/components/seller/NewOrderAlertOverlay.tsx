@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Bell, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Bell, ShoppingBag, ArrowRight, Truck, Package, MapPin } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { NewOrder } from '@/hooks/useNewOrderAlert';
@@ -25,6 +26,22 @@ function statusLabel(status: string): string {
   }
 }
 
+function fulfillmentLabel(order: NewOrder): { label: string; icon: React.ReactNode; className: string } {
+  const ft = order.fulfillment_type || '';
+  if (ft === 'seller_delivery' || (ft === 'delivery' && order.delivery_handled_by !== 'platform')) {
+    return { label: 'Seller Delivery', icon: <Truck size={12} />, className: 'border-warning/40 text-warning' };
+  }
+  if (ft === 'delivery') {
+    return { label: 'Delivery Partner', icon: <Truck size={12} />, className: 'border-primary/40 text-primary' };
+  }
+  if (ft === 'pickup' || ft === 'self_pickup') {
+    return { label: 'Self Pickup', icon: <Package size={12} />, className: 'border-muted-foreground/40 text-muted-foreground' };
+  }
+  if (ft === 'at_seller' || ft === 'at_buyer') {
+    return { label: ft === 'at_seller' ? 'At Your Location' : 'At Buyer Location', icon: <MapPin size={12} />, className: 'border-info/40 text-info' };
+  }
+  return { label: 'Pickup', icon: <Package size={12} />, className: 'border-muted-foreground/40 text-muted-foreground' };
+}
 export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze }: NewOrderAlertOverlayProps) {
   const navigate = useNavigate();
   const { formatPrice } = useCurrency();
@@ -133,11 +150,19 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze
               )}
             </div>
 
-            <div className="text-center space-y-1">
+            <div className="text-center space-y-2">
               <h2 className="text-xl font-bold text-foreground">{statusLabel(order.status)}</h2>
               {order.total_amount > 0 && (
                 <p className="text-2xl font-bold text-accent tabular-nums">{formatPrice(order.total_amount)}</p>
               )}
+              {(() => {
+                const ff = fulfillmentLabel(order);
+                return (
+                  <Badge variant="outline" className={`text-xs gap-1 ${ff.className}`}>
+                    {ff.icon} {ff.label}
+                  </Badge>
+                );
+              })()}
               <p className="text-sm text-muted-foreground">
                 {queueCount > 1
                   ? `${queueCount} orders waiting — tap to view this one`
