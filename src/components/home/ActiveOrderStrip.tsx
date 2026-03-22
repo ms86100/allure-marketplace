@@ -123,7 +123,8 @@ export function ActiveOrderStrip() {
     refetchOnWindowFocus: true,
   });
 
-  // Realtime: subscribe to order updates for this buyer → instant query invalidation
+  // Realtime: subscribe to order updates — composite dedup key prevents duplicate processing
+  const lastEventRef = useRef<string>('');
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
@@ -133,7 +134,11 @@ export function ActiveOrderStrip() {
         schema: 'public',
         table: 'orders',
         filter: `buyer_id=eq.${user.id}`,
-      }, () => {
+      }, (payload) => {
+        const row = payload.new as any;
+        const eventKey = `${row?.id}:${row?.status}:${row?.updated_at}`;
+        if (eventKey === lastEventRef.current) return;
+        lastEventRef.current = eventKey;
         queryClient.invalidateQueries({ queryKey: ['active-orders-strip'] });
       })
       .subscribe();
