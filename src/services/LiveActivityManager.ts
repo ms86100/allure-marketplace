@@ -494,6 +494,7 @@ class _LiveActivityManager {
     }
     entry.lastUpdate = Date.now();
     entry.pendingTimer = null;
+    entry.lastStatus = data.workflow_status;
     try {
       console.log(TAG, `UPDATE EXEC entity=${data.entity_id} status=${data.workflow_status}`);
       await LiveActivity.updateLiveActivity(data);

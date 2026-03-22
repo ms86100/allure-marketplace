@@ -351,12 +351,24 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
   // ─── Public API ────────────────────────────────────────
 
   const startTracking = useCallback(async () => {
-    if (state.isTracking || !assignmentId) return;
+    if (state.isTracking || !assignmentId || startingRef.current) return;
+    startingRef.current = true;
 
-    if (isNative) {
-      await startNativeTracking();
-    } else {
-      startWebTracking();
+    try {
+      if (isNative) {
+        try {
+          await startNativeTracking();
+        } catch (firstErr) {
+          // Single retry after 1s for transient native bridge readiness issues
+          console.warn('[LocationTracking] First attempt failed, retrying in 1s...', firstErr);
+          await new Promise(r => setTimeout(r, 1000));
+          await startNativeTracking();
+        }
+      } else {
+        startWebTracking();
+      }
+    } finally {
+      startingRef.current = false;
     }
   }, [assignmentId, isNative, startNativeTracking, startWebTracking, state.isTracking]);
 
