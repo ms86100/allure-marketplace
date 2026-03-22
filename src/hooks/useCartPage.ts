@@ -312,7 +312,7 @@ export function useCartPage() {
         .in('id', pendingIds)
         .eq('buyer_id', user.id);
 
-      const stillPending = existingOrders?.filter(o => o.status !== 'cancelled' && o.payment_status !== 'paid' && o.payment_status !== 'buyer_confirmed');
+      const stillPending = existingOrders?.filter(o => o.status !== 'cancelled' && o.payment_status !== 'paid' && o.payment_status !== 'buyer_confirmed') as any[];
       if (stillPending && stillPending.length > 0) {
         toast.error('You have a pending payment. Please complete or cancel it first.', { id: 'checkout-pending' });
         // Re-open the correct payment UI

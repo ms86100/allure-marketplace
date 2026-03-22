@@ -33,8 +33,8 @@ app.post("/", async (c) => {
     }
 
     let cancellableStatuses: string[];
-    try { cancellableStatuses = JSON.parse(settings["cancellable_statuses"] || '["placed"]'); }
-    catch { cancellableStatuses = ["placed"]; }
+    try { cancellableStatuses = JSON.parse(settings["cancellable_statuses"] || '["placed","payment_pending"]'); }
+    catch { cancellableStatuses = ["placed", "payment_pending"]; }
 
     let autoCompletableStatuses: string[];
     try { autoCompletableStatuses = JSON.parse(settings["auto_completable_statuses"] || '["delivered"]'); }
