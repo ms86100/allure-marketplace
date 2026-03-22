@@ -263,38 +263,21 @@ export function getSideActionsForActor(
 }
 
 /**
- * Hook to fetch allowed transitions for a workflow.
+ * Hook to fetch allowed transitions for a workflow using React Query for caching.
  */
 export function useStatusTransitions(
   parentGroup: string | null | undefined,
   transactionType: string | null | undefined
 ) {
-  const [transitions, setTransitions] = useState<StatusTransition[]>([]);
+  const pg = parentGroup || 'default';
+  const tt = transactionType || '';
 
-  useEffect(() => {
-    if (!parentGroup || !transactionType) return;
+  const { data } = useQuery({
+    queryKey: statusTransitionsQueryKey(pg, tt),
+    queryFn: () => fetchStatusTransitions(pg, tt),
+    staleTime: jitteredStaleTime(5 * 60 * 1000),
+    enabled: !!parentGroup && !!transactionType,
+  });
 
-    (async () => {
-      let { data } = await supabase
-        .from('category_status_transitions')
-        .select('from_status, to_status, allowed_actor, is_side_action')
-        .eq('parent_group', parentGroup)
-        .eq('transaction_type', transactionType);
-
-      // Fallback to 'default' if no rows found for specific parent_group
-      if ((!data || data.length === 0) && parentGroup !== 'default') {
-        const fallback = await supabase
-          .from('category_status_transitions')
-          .select('from_status, to_status, allowed_actor, is_side_action')
-          .eq('parent_group', 'default')
-          .eq('transaction_type', transactionType);
-
-        if (fallback.data) data = fallback.data;
-      }
-
-      if (data) setTransitions(data as StatusTransition[]);
-    })();
-  }, [parentGroup, transactionType]);
-
-  return transitions;
+  return data || [];
 }
