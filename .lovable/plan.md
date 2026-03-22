@@ -1,29 +1,17 @@
 
 
-# Fix: Seller Action Bar Shows "Mark Unknown" — Using Legacy Labels Instead of Workflow
+# Fix: DeliveryArrivalOverlay — Center on screen and make compact
 
-## Root Cause
+## Problem
+The overlay is positioned with `items-end pb-24` which pushes it to the bottom. It's also too wide (`max-w-md`) and has oversized elements (large icon, generous padding).
 
-**Line 616 of `OrderDetailPage.tsx`** uses `o.getOrderStatus(o.nextStatus).label` — this reads from a **hardcoded/legacy status label map**. The new `buyer_received` status only exists in the **DB workflow** (`category_status_flows.display_label = "Confirm Receipt"`), not in the legacy map, so it returns `"Unknown"`.
+## Fix — Single file change: `DeliveryArrivalOverlay.tsx`
 
-The buyer action bar (line 635) already correctly uses `o.getFlowStepLabel(o.buyerNextStatus).label`, which checks the DB flow first.
+1. **Center vertically**: Change `items-end pb-24 pt-4` → `items-center` on the outer container
+2. **Reduce width**: `max-w-md` → `max-w-sm` (384px → 320px range)
+3. **Compact header**: Shrink pulsing icon from `w-16 h-16` → `w-12 h-12`, MapPin from 28 → 20, reduce padding `p-4` → `p-3`, title from `text-lg` → `text-base`, margin `mb-3` → `mb-2`
+4. **Compact body**: Reduce padding `p-4` → `p-3`, spacing `space-y-3` → `space-y-2`, OTP text from `text-2xl` → `text-xl`
+5. **Smaller dismiss button**: `w-10 h-10` → `w-8 h-8`
 
-## Fix
-
-**One-line change** in `src/pages/OrderDetailPage.tsx` line 616:
-
-Replace `o.getOrderStatus(o.nextStatus).label` with `o.getFlowStepLabel(o.nextStatus).label`
-
-This makes the seller action bar fully workflow-driven — the button will show **"Mark Confirm Receipt"** (from `display_label` in `category_status_flows`).
-
-## Audit: Other Uses of `getOrderStatus`
-
-- **Line 180** (`statusInfo` badge): Acceptable — it's the current status badge, and `getFlowStepLabel` already handles this with DB fallback. But should also be switched for consistency.
-- **OrdersPage.tsx line 25**: List view — uses `getOrderStatus` for order cards. This should also use flow labels, but flow data isn't loaded per-order in list view. Lower priority — the list view doesn't show `buyer_received` as an action, only as a status badge. Can be addressed separately.
-
-## Files Changed
-
-| File | Change |
-|------|--------|
-| `src/pages/OrderDetailPage.tsx` | Line 616: `getOrderStatus` → `getFlowStepLabel` for seller action button |
+These are purely CSS/sizing changes in one file.
 
