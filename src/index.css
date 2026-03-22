@@ -489,6 +489,17 @@ html.large-font a {
 
 /* Razorpay safe area fix — status bar backdrop + full-viewport iframe */
 
+/* Hide ALL app-level sticky/fixed elements behind Razorpay */
+body.razorpay-active header,
+body.razorpay-active nav,
+body.razorpay-active [class*="FloatingCart"],
+body.razorpay-active [class*="BottomNav"],
+body.razorpay-active .sticky,
+body.razorpay-active [style*="position: sticky"] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 /* Solid backdrop behind the iOS status bar so text stays readable over Razorpay */
 body.razorpay-active::before {
   content: '';
@@ -506,12 +517,15 @@ body.razorpay-active::before {
 body.razorpay-active > div[style*="z-index"],
 body.razorpay-active > div[style*="position: fixed"],
 body.razorpay-active .razorpay-checkout-frame,
-body.razorpay-active .razorpay-container {
+body.razorpay-active .razorpay-container,
+body.razorpay-active > div[class*="razorpay"] {
   top: env(safe-area-inset-top, 0px) !important;
   height: calc(100% - env(safe-area-inset-top, 0px)) !important;
   bottom: auto !important;
   z-index: 2147483647 !important;
   touch-action: auto !important;
+  pointer-events: auto !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
 /* Prevent body scroll and ensure the overlay is interactive */
@@ -520,6 +534,7 @@ body.razorpay-active {
   position: fixed !important;
   width: 100% !important;
   height: 100% !important;
+  touch-action: none !important;
 }
 
 /* Ensure bottom safe area for home indicator */
@@ -540,6 +555,8 @@ body.razorpay-active iframe[src*="checkout.razorpay"] {
   height: 100% !important;
   border: none !important;
   touch-action: auto !important;
+  pointer-events: auto !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
 /* ═══════════════════════════════════════════════
