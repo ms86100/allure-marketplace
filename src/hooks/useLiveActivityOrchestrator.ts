@@ -8,7 +8,12 @@ import { runLiveActivityDiagnostics } from '@/services/liveActivityDiagnostics';
 import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statusFlowCache';
 import { Capacitor } from '@capacitor/core';
 
+import { getTransitStatuses } from '@/lib/visibilityEngine';
+
 const TAG = '[LiveActivityOrchestrator]';
+
+/** Composite event dedup: orderId → "orderId:status:updated_at" */
+const lastProcessedEvents = new Map<string, string>();
 
 /** DB-backed terminal statuses — loaded once at init. No hardcoded fallbacks. */
 let terminalStatusesCache: Set<string> = new Set();
@@ -92,9 +97,15 @@ export function useLiveActivityOrchestrator(): void {
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const handleOrderUpdate = async (payload: any) => {
-      const newStatus = (payload.new as any)?.status as string | undefined;
-      const orderId = (payload.new as any)?.id as string | undefined;
+      const row = payload.new as any;
+      const newStatus = row?.status as string | undefined;
+      const orderId = row?.id as string | undefined;
       if (!newStatus || !orderId) return;
+
+      // Composite dedup: skip if we already processed this exact state
+      const eventKey = `${orderId}:${newStatus}:${row?.updated_at}`;
+      if (lastProcessedEvents.get(orderId) === eventKey) return;
+      lastProcessedEvents.set(orderId, eventKey);
 
       console.log(TAG, `Order ${orderId} status → ${newStatus}`);
 
@@ -139,6 +150,10 @@ export function useLiveActivityOrchestrator(): void {
         flowEntries = flowEntriesRef.current;
       }
 
+      // ETA nullification: only pass ETA for transit statuses
+      const transitSet = getTransitStatuses();
+      const effectiveEta = transitSet.has(newStatus) ? (delivery?.eta_minutes ?? null) : null;
+
       const activityData = buildLiveActivityData(
         { id: orderId, status: newStatus },
         delivery,
@@ -146,7 +161,7 @@ export function useLiveActivityOrchestrator(): void {
         itemCount,
         flowEntries,
         sellerLogoUrl,
-        delivery?.eta_minutes ?? null,
+        effectiveEta,
       );
       if (isNative) await LiveActivityManager.push(activityData);
     };
@@ -155,7 +170,7 @@ export function useLiveActivityOrchestrator(): void {
       console.log(TAG, `Subscribing to order updates for buyer ${userId} (attempt ${retryCount + 1})`);
 
       const channel = supabase
-        .channel(`la-order-status-${userId}-${Date.now()}`)
+        .channel(`la-order-status-${userId}`)
         .on(
           'postgres_changes',
           {
@@ -280,7 +295,7 @@ export function useLiveActivityOrchestrator(): void {
       }
 
       const channel = supabase
-        .channel(`la-delivery-${userId}-${Date.now()}`)
+        .channel(`la-delivery-${userId}`)
         .on('postgres_changes', insertOpts, handleDeliveryChange)
         .on('postgres_changes', updateOpts, handleDeliveryChange)
         .subscribe((status) => {

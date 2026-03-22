@@ -187,8 +187,8 @@ export default function OrderDetailPage() {
   const hasBuyerActionBar = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel || order.status === 'placed');
 
   return (
-    <AppLayout showHeader={false} showNav={!hasSellerActionBar && !hasBuyerActionBar}>
-      <div className="pb-44">
+    <AppLayout showHeader={false} showNav={!hasSellerActionBar}>
+      <div className="pb-56">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
           <button onClick={() => { const idx = (window.history.state as any)?.idx; if (typeof idx === 'number' && idx > 0) { navigate(-1); } else { navigate('/orders', { replace: true }); } }} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></button>
@@ -576,7 +576,7 @@ export default function OrderDetailPage() {
           Uses DB transitions when loaded, but ALWAYS shows cancel for placed status as hardened fallback.
           This ensures the cancel button never disappears due to async transition loading. */}
       {hasBuyerActionBar && (
-        <div className="fixed bottom-0 left-0 right-0 z-[60] bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
+        <div className="fixed bottom-16 left-0 right-0 z-[60] bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
           <div className="px-4 py-3 flex gap-3">
             {/* Cancel button: show from DB transitions OR hardened fallback for placed status */}
             {(o.canBuyerCancel || order.status === 'placed') && (

@@ -433,6 +433,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         throw error;
       }
       await reconcile();
+      // Signal reorder completion for downstream payment state reset
+      window.dispatchEvent(new CustomEvent('cart-replaced'));
     } catch (error) {
       await reconcile();
       throw error;

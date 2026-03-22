@@ -69,6 +69,16 @@ export function useCartPage() {
   const { requestFullPermission } = usePushNotifications();
   const { items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, refresh, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations } = useCart();
   const idempotencyKeyRef = useRef<string | null>(null);
+
+  // Hard reset stale payment state when cart is replaced (reorder flow)
+  useEffect(() => {
+    const handler = () => {
+      clearPaymentSession();
+      idempotencyKeyRef.current = null;
+    };
+    window.addEventListener('cart-replaced', handler);
+    return () => window.removeEventListener('cart-replaced', handler);
+  }, []);
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
