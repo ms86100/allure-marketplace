@@ -374,16 +374,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Deduplicate iOS tokens: keep only the most recently updated iOS entry per user
+    // Deduplicate tokens: keep only the most recently updated entry per platform per user
     const sorted = [...tokens].sort((a: any, b: any) =>
       new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     );
-    let seenIos = false;
+    const seenPlatform = new Set<string>();
     const deduped = sorted.filter((t: any) => {
-      if (t.platform === "ios") {
-        if (seenIos) return false;
-        seenIos = true;
-      }
+      if (seenPlatform.has(t.platform)) return false;
+      seenPlatform.add(t.platform);
       return true;
     });
 
