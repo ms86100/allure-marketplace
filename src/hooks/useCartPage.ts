@@ -301,6 +301,25 @@ export function useCartPage() {
     if (fulfillmentType === 'delivery' && !selectedDeliveryAddress) { toast.error('Please select a delivery address before placing your order.', { id: 'checkout-no-address' }); return; }
     if (fulfillmentType === 'delivery' && selectedDeliveryAddress && !selectedDeliveryAddress.latitude) { toast.error('Your selected address has no location coordinates. Please update it with a precise location.', { id: 'checkout-no-coords' }); return; }
 
+    // GUARD: Server-side fulfillment validation — prevent sending self_pickup when seller only does delivery (and vice versa)
+    for (const group of sellerGroups) {
+      const sellerMode = (group.items[0]?.product?.seller as any)?.fulfillment_mode;
+      if (sellerMode) {
+        const sellerSupportsPickup = sellerMode === 'self_pickup' || sellerMode.startsWith('pickup_and_');
+        const sellerSupportsDelivery = sellerMode !== 'self_pickup';
+        if (fulfillmentType === 'self_pickup' && !sellerSupportsPickup) {
+          toast.error(`${group.sellerName} only supports delivery. Switching to delivery.`, { id: 'checkout-fulfillment-mismatch' });
+          setFulfillmentType('delivery');
+          return;
+        }
+        if (fulfillmentType === 'delivery' && !sellerSupportsDelivery) {
+          toast.error(`${group.sellerName} only supports self-pickup. Switching to pickup.`, { id: 'checkout-fulfillment-mismatch' });
+          setFulfillmentType('self_pickup');
+          return;
+        }
+      }
+    }
+
     for (const group of sellerGroups) {
       const minOrder = (group.items[0]?.product?.seller as any)?.minimum_order_amount;
       if (minOrder && group.subtotal < minOrder) { toast.error(`${group.sellerName} requires a minimum order of ${formatPrice(minOrder)}. Your current total is ${formatPrice(group.subtotal)}.`, { id: 'checkout-min-order' }); return; }
