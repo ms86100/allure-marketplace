@@ -41,6 +41,7 @@ export function useNotifications(userId: string | undefined) {
         .from('user_notifications')
         .select('id, title, body, type, reference_path, is_read, created_at, payload')
         .eq('user_id', userId!)
+        .not('type', 'in', SELLER_ONLY_FILTER)
         .order('created_at', { ascending: false })
         .limit(50);
 
