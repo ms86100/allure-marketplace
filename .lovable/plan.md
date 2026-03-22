@@ -1,30 +1,52 @@
 
 
-## P0 Fix: Stale "On The Way" Notification Banner Persisting After Delivery
+## Analysis: "Did you receive your order?" on Ready Status (Self-Pickup Flow)
 
-### Root Cause (Two Bugs)
+### What workflow is this?
 
-**Bug 1 — `useLatestActionNotification` only filters delivery-type notifications for terminal orders, not order status notifications.**
+This is the **self-pickup / self-fulfillment** workflow: `Placed → Accepted → Preparing → Ready → Completed`.
 
-The hook (lines 112-125) checks if notifications with types like `delivery_en_route`, `delivery_stalled` etc. belong to terminal orders and marks them as read. But an `order_status` notification saying "On The Way" has type `order_status` or `order` — which is NOT in the `deliveryTypes` set. So it passes through and gets displayed even when the order is already `delivered`/`completed`.
+The order's `fulfillment_type` is **pickup** (not delivery). The status text "Your order is ready for pickup!" confirms this.
 
-**Bug 2 — `useBuyerOrderAlerts` doesn't invalidate `['latest-action-notification']`.**
+### When does the "Did you receive my order?" prompt appear?
 
-When a terminal status arrives via Realtime, the hook invalidates `['orders']`, `['notifications']`, `['unread-notifications']`, and `['active-orders-strip']` — but NOT `['latest-action-notification']`. The banner query keeps serving stale cached data until its 30s polling interval fires.
+It appears whenever ALL of these are true (line 417 of `OrderDetailPage.tsx`):
+- Buyer is viewing the order
+- Order is NOT a delivery order
+- `buyerNextStatus` exists (DB says buyer can advance)
+- Order is not yet terminal
 
-### Fix
+At **Ready** status, the DB transitions say the **buyer** is the actor who advances to `completed`. So `buyerNextStatus = 'completed'`, and the prompt appears.
 
-**File: `src/hooks/queries/useNotifications.ts`**
-- Expand the terminal-order filter to include ALL order-linked notification types (not just delivery types). Any unread notification whose `reference_path` starts with `/orders/{id}` or has `payload.order_id` should be checked against terminal order statuses. This makes the stale-detection universal.
-- Collect order IDs from ALL order-linked notifications, not just delivery-specific ones.
+### Is this correct behavior?
 
-**File: `src/hooks/useBuyerOrderAlerts.ts`**
-- Add `queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] })` to the Realtime handler. This forces the banner to re-evaluate immediately on any status change, rather than waiting up to 30 seconds.
+**Partially.** The prompt IS the mechanism for the buyer to advance `ready → completed`. It's not supposed to appear AFTER completed — it's how you GET to completed.
 
-### Files Changed
+### What's actually wrong (two bugs):
+
+**Bug 1 — Duplicate actions.** Both the `BuyerDeliveryConfirmation` card ("Yes, I received my order") AND the bottom Buyer Action Bar button appear simultaneously. They do the same thing — advance to `completed`. This is confusing and redundant.
+
+**Bug 2 — Wrong wording for pickup.** The card says "Did you receive your order?" and "Yes, I received my order" — this implies delivery. For self-pickup orders, it should say "Have you picked up your order?" / "Yes, I picked up my order".
+
+### Proposed Fix
+
+**File: `src/pages/OrderDetailPage.tsx`**
+- Remove the `BuyerDeliveryConfirmation` component entirely from the page. The bottom Buyer Action Bar already handles this transition with the correct DB-driven label. Having two UI elements for the same action is redundant and confusing.
+- The action bar button (line 624) already uses `o.getFlowStepLabel(o.buyerNextStatus)` which pulls the correct label from the workflow DB — this is the single source of truth.
+
+**Alternative (if you prefer keeping the prominent card):**
+- Keep `BuyerDeliveryConfirmation` but make it fulfillment-aware:
+  - Pickup orders: "Have you picked up your order?" / "Yes, I picked it up"
+  - Non-delivery orders with other flows: current wording
+- Hide the duplicate button in the action bar when the confirmation card is visible
+
+### Recommendation
+
+Remove `BuyerDeliveryConfirmation` and rely solely on the Buyer Action Bar. It's already DB-driven, uses correct labels, and is the canonical way to advance order status. One action, one button, zero confusion.
+
+### Files to change
 
 | File | Change |
 |---|---|
-| `src/hooks/queries/useNotifications.ts` | Expand stale-notification detection to all order-linked types, not just delivery types |
-| `src/hooks/useBuyerOrderAlerts.ts` | Add `['latest-action-notification']` invalidation on status change |
+| `src/pages/OrderDetailPage.tsx` | Remove `BuyerDeliveryConfirmation` block (lines 415-423) |
 
