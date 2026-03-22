@@ -1,6 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+// Seller-only notification types that should not appear in buyer inbox
+const SELLER_ONLY_TYPES = [
+  'settlement',
+  'seller_approved',
+  'seller_rejected',
+  'seller_suspended',
+  'product_approved',
+  'product_rejected',
+  'license_approved',
+  'license_rejected',
+] as const;
+
+const SELLER_ONLY_FILTER = `(${SELLER_ONLY_TYPES.join(',')})`;
+
 export interface NotificationPayload {
   action?: string;
   reference_path?: string;
@@ -27,6 +41,7 @@ export function useNotifications(userId: string | undefined) {
         .from('user_notifications')
         .select('id, title, body, type, reference_path, is_read, created_at, payload')
         .eq('user_id', userId!)
+        .not('type', 'in', SELLER_ONLY_FILTER)
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -88,6 +103,7 @@ export function useLatestActionNotification(userId: string | undefined) {
         .eq('user_id', userId!)
         .eq('is_read', false)
         .not('payload', 'is', null)
+        .not('type', 'in', SELLER_ONLY_FILTER)
         .order('created_at', { ascending: false })
         .limit(10);
       const notifications = (data as unknown as UserNotification[]) || [];
