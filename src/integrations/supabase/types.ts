@@ -3464,6 +3464,7 @@ export type Database = {
         Row: {
           auto_cancel_at: string | null
           auto_complete_at: string | null
+          buyer_confirmed_at: string | null
           buyer_id: string | null
           buyer_society_id: string | null
           coupon_id: string | null
@@ -3513,6 +3514,7 @@ export type Database = {
         Insert: {
           auto_cancel_at?: string | null
           auto_complete_at?: string | null
+          buyer_confirmed_at?: string | null
           buyer_id?: string | null
           buyer_society_id?: string | null
           coupon_id?: string | null
@@ -3562,6 +3564,7 @@ export type Database = {
         Update: {
           auto_cancel_at?: string | null
           auto_complete_at?: string | null
+          buyer_confirmed_at?: string | null
           buyer_id?: string | null
           buyer_society_id?: string | null
           coupon_id?: string | null
@@ -8514,6 +8517,7 @@ export type Database = {
         Returns: {
           auto_cancel_at: string | null
           auto_complete_at: string | null
+          buyer_confirmed_at: string | null
           buyer_id: string | null
           buyer_society_id: string | null
           coupon_id: string | null
@@ -8580,6 +8584,7 @@ export type Database = {
         Returns: {
           auto_cancel_at: string | null
           auto_complete_at: string | null
+          buyer_confirmed_at: string | null
           buyer_id: string | null
           buyer_society_id: string | null
           coupon_id: string | null
@@ -8704,6 +8709,7 @@ export type Database = {
         }
         Returns: Json
       }
+      confirm_cod_payment: { Args: { _order_id: string }; Returns: undefined }
       confirm_upi_payment: {
         Args: {
           _order_id: string
@@ -9161,6 +9167,7 @@ export type Database = {
         Returns: {
           auto_cancel_at: string | null
           auto_complete_at: string | null
+          buyer_confirmed_at: string | null
           buyer_id: string | null
           buyer_society_id: string | null
           coupon_id: string | null
@@ -9241,6 +9248,7 @@ export type Database = {
         | "accepted"
         | "preparing"
         | "ready"
+        | "buyer_received"
         | "picked_up"
         | "delivered"
         | "completed"
@@ -9461,6 +9469,7 @@ export const Constants = {
         "accepted",
         "preparing",
         "ready",
+        "buyer_received",
         "picked_up",
         "delivered",
         "completed",
