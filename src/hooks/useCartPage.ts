@@ -532,6 +532,7 @@ export function useCartPage() {
     }
     setPendingOrderIds([]);
     clearPaymentSession();
+    idempotencyKeyRef.current = null; // Bug 8 fix: Reset so retry creates fresh orders
     // Do NOT clear cart on payment failure — user can retry
     toast.error('Payment was not completed. Your order has been cancelled. You can try again.', { id: 'razorpay-failed' });
   };
