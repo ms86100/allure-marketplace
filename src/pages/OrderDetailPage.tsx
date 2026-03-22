@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -65,6 +65,7 @@ function CelebrationBanner({ order, isBuyerView, flow }: { order: any; isBuyerVi
 export default function OrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const o = useOrderDetail(id);
   const [deliveryAssignmentId, setDeliveryAssignmentId] = useState<string | null>(null);
   const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
@@ -191,7 +192,7 @@ export default function OrderDetailPage() {
       <div className="pb-56">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3">
-          <button onClick={() => { const idx = (window.history.state as any)?.idx; if (typeof idx === 'number' && idx > 0) { navigate(-1); } else { navigate('/orders', { replace: true }); } }} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></button>
+          <button onClick={() => { if (location.state?.from === 'deeplink') { navigate('/orders'); } else { navigate(-1); } }} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></button>
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold">Order Summary</h1>
             <button onClick={o.copyOrderId} className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono">#{order.id.slice(0, 8)} <Copy size={10} /></button>
@@ -561,7 +562,7 @@ export default function OrderDetailPage() {
 
       {/* Seller Action Bar — loading state */}
       {o.isSellerView && o.isFlowLoading && !isTerminalStatus(o.flow, order.status) && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
+        <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 bg-background border-t border-border">
           <div className="px-4 py-3 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground">
             <Loader2 size={16} className="animate-spin" />
             <span>Loading actions…</span>
@@ -572,7 +573,7 @@ export default function OrderDetailPage() {
       {/* Seller Action Bar */}
       {/* Gap 2: Seller Action Bar — intercept "delivered" to require OTP for delivery orders */}
       {hasSellerActionBar && (
-        <div className="fixed bottom-0 left-0 right-0 z-[60] bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
+        <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[60] bg-background border-t border-border">
           <div className="px-4 py-3 flex gap-3">
             {o.canSellerReject && <Button variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground h-12" onClick={() => o.setIsRejectionDialogOpen(true)} disabled={o.isUpdating}><XCircle size={16} className="mr-1.5" />Reject</Button>}
             {o.orderFulfillmentType === 'delivery' && o.flow.find(s => s.status_key === order.status)?.actor === 'system' && (order as any).delivery_handled_by === 'platform' ? (
@@ -605,7 +606,7 @@ export default function OrderDetailPage() {
           Uses DB transitions when loaded, but ALWAYS shows cancel for placed status as hardened fallback.
           This ensures the cancel button never disappears due to async transition loading. */}
       {hasBuyerActionBar && (
-        <div className="fixed bottom-16 left-0 right-0 z-[60] bg-background border-t border-border pb-[env(safe-area-inset-bottom)]">
+        <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[60] bg-background border-t border-border">
           <div className="px-4 py-3 flex gap-3">
             {/* Cancel button: show from DB transitions OR hardened fallback for placed status */}
             {(o.canBuyerCancel || order.status === 'placed') && (
