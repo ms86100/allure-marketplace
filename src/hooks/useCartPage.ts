@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentMethod } from '@/types/database';
+import { fetchStatusFlow, fetchStatusTransitions, statusFlowQueryKey, statusTransitionsQueryKey } from '@/hooks/useCategoryStatusFlow';
+import { resolveTransactionType } from '@/lib/resolveTransactionType';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubmitGuard } from '@/hooks/useSubmitGuard';
