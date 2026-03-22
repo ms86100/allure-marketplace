@@ -145,7 +145,7 @@ export function DeliveryArrivalOverlay({
               {deliveryCode && (
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-center">
                   <p className="text-[10px] text-muted-foreground mb-0.5">Your Delivery OTP</p>
-                  <p className="text-2xl font-bold tracking-[0.3em] text-primary">{deliveryCode}</p>
+                  <p className="text-xl font-bold tracking-[0.3em] text-primary">{deliveryCode}</p>
                 </div>
               )}
             </div>
