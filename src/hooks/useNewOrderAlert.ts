@@ -29,6 +29,8 @@ export interface NewOrder {
   created_at: string;
   total_amount: number;
   seller_id?: string;
+  fulfillment_type?: string | null;
+  delivery_handled_by?: string | null;
 }
 
 const MIN_POLL_MS = 3000;
