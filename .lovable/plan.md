@@ -1,73 +1,48 @@
 
 
-## Fix: Order Detail Page Slow Load After Placement (3-4s Waterfall)
+## P0 Fix: Navigation Deadlock on Live Activity → Order Summary
 
-### Root Cause
+### Root Causes Found
 
-The order detail page has a **sequential waterfall of 4-6 DB round trips** before it can render:
+**Bug A — Double history push (back button loops to same page):**
+`useDeepLinks.ts` line 100-101 does TWO things: stores the path as pending AND calls `navigate(path)` immediately. Then `AppRoutes` line 324-333 consumes the pending deep link and calls `navigate(pendingPath)` AGAIN after auth hydration. Result: history stack = `[/orders/123, /orders/123]`. When user taps back, `navigate(-1)` pops to the first duplicate — same page reloads.
 
-```text
-1. fetchOrder() ──────────────────────── ~400ms
-2. derive parent_group (3 queries)  ──── ~1200ms  (order_items → products → category_config)
-3. useCategoryStatusFlow (1-2 queries) ─ ~800ms   (flow + possible fallback)
-4. useStatusTransitions ─────────────── ~400ms
-                                         ─────────
-                                         ~2800ms total (best case)
+**Bug B — BottomNav hidden with no escape (the actual trap):**
+`OrderDetailPage.tsx` line 190:
+```tsx
+showNav={!hasSellerActionBar && !hasBuyerActionBar && (isTerminalStatus(...) || (isBuyerView && isFirstFlowStep(...)))}
 ```
+For a buyer viewing "preparing" status: no action bar exists (buyer has no actions), not terminal, not first step → `showNav=false`. The nav is hidden precisely when there's nothing else to navigate with. This is a dead end **even without deep links** — the only exit is the back button, which is broken by Bug A.
 
-Steps 2-4 cannot start until the previous step completes because each depends on the prior result. On mobile networks this easily reaches 3-4 seconds.
+**Bug C — Flow loading race hides everything:**
+While `isFlowLoading=true`, both `hasSellerActionBar` and `hasBuyerActionBar` are `false`, AND `isTerminalStatus`/`isFirstFlowStep` return `false` (empty flow array). So during flow loading, nav is hidden AND action bars are hidden. Combined with Bug A, the user sees a page with zero navigation for the first 1-2 seconds.
 
-### Fix Strategy: Eliminate the Waterfall
+### Fix Plan
 
-**Approach A — Include `parent_group` in the order query (primary fix):**
+**1. Fix double navigation in deep links** (`src/hooks/useDeepLinks.ts`):
+- Remove the immediate `navigate(path)` call on line 101. Only store as pending via `setPendingDeepLink(path)`.
+- The deferred consumer in `AppRoutes` (line 324-333) already handles navigation after auth hydration — that's the single source of truth.
+- For warm-start (app already open, `appUrlOpen` fires), check if current location already matches the deep link path before navigating to avoid duplicates.
 
-The 3-query chain in step 2 exists only because the seller's `primary_group` isn't always available. But the order already joins `seller_profiles` which HAS `primary_group`. The issue is the select clause doesn't include it.
+**2. Fix BottomNav visibility logic** (`src/pages/OrderDetailPage.tsx` line 190):
+- Change `showNav` to: show nav whenever there's no action bar. The action bar replaces the nav (they share the same bottom space). When no action bar is present, nav must always be visible as an escape route.
+- Before: `showNav={!hasSellerActionBar && !hasBuyerActionBar && (isTerminalStatus(...) || isFirstFlowStep(...))}`
+- After: `showNav={!hasSellerActionBar && !hasBuyerActionBar}`
+- This guarantees a visible exit path for every order status where no action bar is rendered.
 
-Looking at the `fetchOrder` query on line 158:
-```
-seller:seller_profiles(id, business_name, user_id, primary_group, profile:...)
-```
-
-Actually `primary_group` IS already selected. The problem is that `sellerPrimaryGroup` reads from `seller?.primary_group` and the seller is only available AFTER `fetchOrder` completes and sets `order`. Then the `derivedParentGroup` effect fires anyway because the state update hasn't propagated yet.
-
-The real waterfall is:
-1. **Render 1**: `fetchOrder` starts, `isLoading=true`
-2. **Render 2**: order loads, `seller.primary_group` available, `useCategoryStatusFlow` fires with correct group
-3. **Render 3**: flow loads, `useStatusTransitions` fires
-4. **Render 4**: transitions load, page finally renders
-
-**Fix: Parallel fetch flow and transitions alongside the order**, and cache/prefetch the flow data.
-
-### Implementation Plan
-
-**1. Prefetch flow data during checkout navigation** (`useCartPage.ts`):
-- After order creation, before navigating to `/orders/:id`, call `queryClient.prefetchQuery` for the `category_status_flows` data using the known seller's `parent_group` and `transaction_type`. This data is already known at checkout time.
-
-**2. Convert `useCategoryStatusFlow` to use React Query** (`useCategoryStatusFlow.ts`):
-- Replace `useState/useEffect` with `useQuery` so flow data is cached across navigations
-- Use a stable query key like `['status-flow', parentGroup, transactionType]`
-- Set `staleTime: 5 * 60 * 1000` (5 min) since flow config rarely changes
-
-**3. Convert `useStatusTransitions` to use React Query** (`useCategoryStatusFlow.ts`):
-- Same pattern — cached and stale-while-revalidate
-
-**4. Eliminate the 3-query parent_group derivation waterfall** (`useOrderDetail.ts`):
-- The `seller.primary_group` is already fetched in the order query. The `derivedParentGroup` fallback (3 sequential queries) only fires when `sellerPrimaryGroup` is null.
-- Fix: Compute `effectiveParentGroup` immediately from the fetched order data instead of waiting for a separate `useEffect` cycle. Move the derivation into `fetchOrder` itself — after getting the order, if `seller.primary_group` is null, do the 3 lookups there (still sequential but within a single async function, not across renders).
-
-**5. Show skeleton with partial data** (`OrderDetailPage.tsx`):
-- Render the order header (seller name, amount, items) immediately when the order loads, even before the flow is ready. Only the status timeline section needs flow data.
+**3. Deduplicate deferred navigation** (`src/App.tsx` line 324-333):
+- Before navigating to pending deep link, check if `window.location.hash` already contains the target path. Skip navigation if already there (handles warm-start case where immediate navigate already fired before this fix).
 
 ### Files Changed
 
 | File | Change |
 |---|---|
-| `src/hooks/useCategoryStatusFlow.ts` | Convert `useCategoryStatusFlow` and `useStatusTransitions` to `useQuery` with caching |
-| `src/hooks/useOrderDetail.ts` | Move parent_group derivation into `fetchOrder`; eliminate render-cycle waterfall |
-| `src/hooks/useCartPage.ts` | Prefetch flow data before navigating to order detail |
-| `src/pages/OrderDetailPage.tsx` | Show partial content while flow loads (progressive rendering) |
+| `src/hooks/useDeepLinks.ts` | Remove immediate `navigate(path)`, keep only `setPendingDeepLink`. For warm-start, check current path before navigating. |
+| `src/pages/OrderDetailPage.tsx` | Simplify `showNav` to `!hasSellerActionBar && !hasBuyerActionBar` |
+| `src/App.tsx` | Add path dedup check in deferred deep link consumer |
 
-### Expected Impact
-- **Before**: 3-4 seconds of blank skeleton
-- **After**: ~400ms to show order content, flow data arrives from cache or within 800ms
+### Expected Result
+- Back button navigates to `/orders` (clean history, no duplicates)
+- BottomNav always visible when no action bar is present
+- No navigation dead ends from any entry point (Live Activity, push notification, direct deep link)
 
