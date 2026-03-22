@@ -58,6 +58,10 @@ export function resolveNotificationRoute(
       return orderId ? `/orders/${orderId}` : '/orders';
     }
 
+    // Settlement (seller-facing, but needed for dual-role users)
+    case 'settlement':
+      return '/seller/settlements';
+
     default:
       return '/notifications';
   }
