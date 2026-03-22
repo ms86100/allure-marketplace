@@ -160,13 +160,20 @@ export function useRazorpay() {
                   { method: 'upi', flows: ['intent'], apps: ['gpay'] },
                   { method: 'upi', flows: ['intent'], apps: ['phonepe'] },
                   { method: 'upi', flows: ['intent'], apps: ['paytm'] },
-                  { method: 'upi', flows: ['intent'], apps: ['any'] },
+                ],
+              },
+              other: {
+                name: 'Other Payment Methods',
+                instruments: [
+                  { method: 'card' },
+                  { method: 'netbanking' },
+                  { method: 'wallet' },
                 ],
               },
             },
-            sequence: ['block.upi'],
+            sequence: ['block.upi', 'block.other'],
             preferences: {
-              show_default_blocks: true,
+              show_default_blocks: false,
             },
           },
         },
@@ -185,6 +192,7 @@ export function useRazorpay() {
           escape: true,
           backdropclose: false,
           confirm_close: true,
+          animation: false,
         },
       };
 
