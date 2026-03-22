@@ -88,19 +88,19 @@ export function DeliveryArrivalOverlay({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Pulsing header */}
-            <div className="bg-primary/10 p-4 text-center relative">
+            <div className="bg-primary/10 p-3 text-center relative">
               <button
                 onClick={handleDismiss}
-                className="absolute top-3 right-3 w-10 h-10 rounded-full bg-muted flex items-center justify-center"
+                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-muted flex items-center justify-center"
               >
-                <X size={16} className="text-muted-foreground" />
+                <X size={14} className="text-muted-foreground" />
               </button>
               <motion.div
                 animate={{ scale: [1, 1.15, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
-                className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3"
+                className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-2"
               >
-                <MapPin size={28} className="text-primary" />
+                <MapPin size={20} className="text-primary" />
               </motion.div>
               <h2 className="text-lg font-bold text-foreground">
                 {distance !== null && distance < doorstepDistanceMeters
