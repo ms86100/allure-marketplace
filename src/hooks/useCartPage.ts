@@ -155,14 +155,18 @@ export function useCartPage() {
     else if (acceptsCod && !acceptsUpi) setPaymentMethod('cod');
   }, [acceptsCod, acceptsUpi]);
 
-  const hasSetDefaultFulfillment = useRef(false);
+  // Track which seller the default was computed for — reset when seller changes
+  const defaultFulfillmentSellerId = useRef<string | null>(null);
   useEffect(() => {
-    if (sellerGroups.length === 0 || hasSetDefaultFulfillment.current) return;
+    if (sellerGroups.length === 0) return;
+    const sellerId = sellerGroups[0]?.sellerId || null;
+    // Only compute default once per unique seller (not on every re-render)
+    if (defaultFulfillmentSellerId.current === sellerId) return;
     const firstMode = (firstSeller as any)?.fulfillment_mode;
     if (firstMode === 'seller_delivery' || firstMode === 'platform_delivery') setFulfillmentType('delivery');
     else if (firstMode?.startsWith('pickup_and_')) setFulfillmentType('delivery');
     else setFulfillmentType('self_pickup');
-    hasSetDefaultFulfillment.current = true;
+    defaultFulfillmentSellerId.current = sellerId;
   }, [sellerGroups.length, firstSeller]);
 
   // Clear coupon when seller composition changes (multi-vendor or different seller)
@@ -296,6 +300,25 @@ export function useCartPage() {
     if (!navigator.onLine) { toast.error("You're offline. Please check your connection and try again.", { id: 'checkout-offline' }); return; }
     if (fulfillmentType === 'delivery' && !selectedDeliveryAddress) { toast.error('Please select a delivery address before placing your order.', { id: 'checkout-no-address' }); return; }
     if (fulfillmentType === 'delivery' && selectedDeliveryAddress && !selectedDeliveryAddress.latitude) { toast.error('Your selected address has no location coordinates. Please update it with a precise location.', { id: 'checkout-no-coords' }); return; }
+
+    // GUARD: Server-side fulfillment validation — prevent sending self_pickup when seller only does delivery (and vice versa)
+    for (const group of sellerGroups) {
+      const sellerMode = (group.items[0]?.product?.seller as any)?.fulfillment_mode;
+      if (sellerMode) {
+        const sellerSupportsPickup = sellerMode === 'self_pickup' || sellerMode.startsWith('pickup_and_');
+        const sellerSupportsDelivery = sellerMode !== 'self_pickup';
+        if (fulfillmentType === 'self_pickup' && !sellerSupportsPickup) {
+          toast.error(`${group.sellerName} only supports delivery. Switching to delivery.`, { id: 'checkout-fulfillment-mismatch' });
+          setFulfillmentType('delivery');
+          return;
+        }
+        if (fulfillmentType === 'delivery' && !sellerSupportsDelivery) {
+          toast.error(`${group.sellerName} only supports self-pickup. Switching to pickup.`, { id: 'checkout-fulfillment-mismatch' });
+          setFulfillmentType('self_pickup');
+          return;
+        }
+      }
+    }
 
     for (const group of sellerGroups) {
       const minOrder = (group.items[0]?.product?.seller as any)?.minimum_order_amount;
