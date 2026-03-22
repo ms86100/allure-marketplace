@@ -1,47 +1,55 @@
 
 
-## Fix: Deterministic Back Navigation + Action Bar Overlap on OrderDetailPage
+## Fix: Live Activity Real-Time Sync + Location Tracking Failure (Revised)
 
-### Root Cause
+### Issue 1: Live Activity Not Updating in Real Time
 
-**Back button**: The current logic uses `window.history.state?.idx` (React Router internal) to decide navigation. On cold starts from Live Activity/push notifications, this value is unreliable in Capacitor WebViews, causing `navigate(-1)` to go back to the WebView's initial blank entry (triggering a reload) or `replace: true` to destroy the history stack.
+**Root Cause: 5-second throttle swallows status changes**
 
-**Action bar overlap**: Buyer action bar at `bottom-16 z-[60]` with `pb-[env(safe-area-inset-bottom)]` extends into the BottomNav's safe-area zone, blocking touch targets on iOS devices.
+In `LiveActivityManager.ts`, ALL updates go through `throttledUpdate()` (line 465-477) which delays by up to 5 seconds. Status changes (e.g., "accepted" → "preparing" → "picked_up") are high-priority discrete events that should update the Dynamic Island instantly. The current code treats them identically to high-frequency location/ETA pings.
 
-### Solution: Deterministic Entry Source Tracking
+Additionally, both realtime channels in `useLiveActivityOrchestrator.ts` only handle `CHANNEL_ERROR` and `TIMED_OUT` but not `CLOSED`. After iOS background/foreground transitions, a WebSocket can close cleanly without triggering reconnect, leaving the Live Activity deaf to updates.
 
-Instead of guessing history state, **explicitly mark** how the user arrived at the page using React Router's `location.state`.
+**Fix (2 files):**
 
-### Changes
+**`src/services/LiveActivityManager.ts`:**
+- Add `lastStatus` field to `ActiveEntry` interface to track the last-known workflow status per entity
+- In `push()` method: when `workflow_status` differs from `lastStatus`, bypass `throttledUpdate()` and call `doUpdate()` directly — instant update for status changes
+- Update `lastStatus` in `doUpdate()` after successful native call
 
-**File: `src/App.tsx`** (deep link consumer, ~line 336)
-- When navigating to a deep link path, pass `{ state: { from: 'deeplink' } }` so the destination page knows the entry source deterministically.
+**`src/hooks/useLiveActivityOrchestrator.ts`:**
+- In both channel subscribe callbacks (order channel ~line 189, delivery channel ~line 306): also handle `CLOSED` status to trigger `attemptReconnect()`
 
-**File: `src/pages/OrderDetailPage.tsx`**
+---
 
-1. **Back button** (line 194): Replace the `idx`-based logic with deterministic check:
-   - Read `location.state?.from`
-   - If `from === 'deeplink'` → `navigate('/orders')` (push, not replace — preserves stack)
-   - Otherwise → `navigate(-1)` (normal in-app back)
-   - No `replace: true` anywhere — never destroy history
+### Issue 2: Location Tracking Failure ("Could not start location tracking")
 
-2. **Buyer Action Bar** (line 608): Change `bottom-16` to `bottom-[calc(4rem+env(safe-area-inset-bottom))]` and remove the redundant `pb-[env(safe-area-inset-bottom)]` so it sits above the full BottomNav including safe area.
+**Root Cause: NOT a plugin/license issue** (confirmed working recently). The problem is in the error handling and diagnostic opacity.
 
-3. **Seller Action Bar loading** (line 564): Same positioning fix — `bottom-[calc(4rem+env(safe-area-inset-bottom))]` and remove `pb-[env(safe-area-inset-bottom)]`.
+The catch block at line 281-283 of `useBackgroundLocationTracking.ts` catches ALL errors from `startNativeTracking()` but shows only a generic "Could not start location tracking" toast. The actual error (which could be a permission timing issue, a config race, or a transient native bridge error) is logged to console but the seller sees no actionable information.
 
-4. **Seller Action Bar** (line 575): Same fix.
+Since this was working before, the most likely causes are:
+1. **Config race condition**: `configRef.current` is loaded async (line 50) but `startNativeTracking` can be called before it resolves (via auto-start in SellerGPSTracker). The `BackgroundGeolocation.ready()` config uses hardcoded values so this isn't blocking, but if the native bridge isn't fully ready when auto-start fires, it fails.
+2. **Auto-start fires before component is fully mounted**: `SellerGPSTracker` auto-starts in a `useEffect` that depends on `startTracking` (which is recreated on every render due to its dependency chain). A stale closure or double-invocation could cause the native plugin to error.
 
-### Why This Is Bulletproof
+**Fix (2 files):**
 
-- **Deterministic**: No heuristics. The deep link consumer explicitly tags navigation state at the source.
-- **No `replace: true`**: History stack is never destroyed, so BottomNav tabs always work.
-- **No browser API guessing**: Doesn't rely on `history.length`, `history.state.idx`, or any WebView-specific behavior.
-- **Testable**: `location.state.from === 'deeplink'` is a simple, predictable condition.
+**`src/hooks/useBackgroundLocationTracking.ts`:**
+- In `startNativeTracking` catch block (line 281-283): log the full error details AND include the error message in the toast so the seller sees what actually failed (e.g., "Location permission denied", "Plugin not ready")
+- Add a retry mechanism: if `startNativeTracking` fails, automatically retry once after 1 second. This handles transient native bridge readiness issues on cold start.
+- Guard `startTracking` with a `startingRef` flag to prevent double-invocation from React strict mode or rapid re-renders.
 
-### Files Changed
+**`src/components/delivery/SellerGPSTracker.tsx`:**
+- Add a small delay (500ms) before auto-start to ensure the native bridge is fully initialized after app launch. This prevents the cold-start race condition.
+
+---
+
+### Summary of Changes
 
 | File | Change |
 |---|---|
-| `src/App.tsx` | Pass `{ state: { from: 'deeplink' } }` when navigating to pending deep link |
-| `src/pages/OrderDetailPage.tsx` | Deterministic back button using `location.state.from`; fix action bar positioning |
+| `src/services/LiveActivityManager.ts` | Track `lastStatus` per entity; bypass throttle for status changes |
+| `src/hooks/useLiveActivityOrchestrator.ts` | Handle `CLOSED` channel status for reconnect |
+| `src/hooks/useBackgroundLocationTracking.ts` | Surface real error in toast; add single retry; prevent double-start |
+| `src/components/delivery/SellerGPSTracker.tsx` | 500ms delay before auto-start for native bridge readiness |
 
