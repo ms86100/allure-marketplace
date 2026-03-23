@@ -1,62 +1,33 @@
 
-# ✅ COMPLETED: Safe Workflow Stabilization (Phase 1)
 
-## Decision: Visible-but-Separate Approach
-The single-workflow consolidation (V2) is **deferred**. The current system keeps `cart_purchase`, `seller_delivery`, and `self_fulfillment` as separate, visible, editable workflows.
+## Problem
 
-## What Was Done
+You edited the **default** Seller Delivery workflow and enabled `is_transit` on the `preparing` step. However, there's a **Food Beverages override** for `seller_delivery` that still has `is_transit = false` on `preparing`. Since your seller (home_food) belongs to the `food_beverages` group, the system uses the override — not the default.
 
-### 1. Exposed `seller_delivery` and `self_fulfillment` in Admin Workflow Manager
-- Moved from hidden `FULFILLMENT_VARIANTS` array into `TRANSACTION_TYPES`
-- Removed filter that excluded them from the workflow list
+**The override badge IS in the UI** — under the Seller Delivery card, you should see a small clickable badge labeled **"Food Beverages · 10"**. Clicking it opens the override for editing.
 
-### 2. Added Workflow Resolution Badge on Order Detail
-- Seller view shows `workflow: {parent_group} / {transaction_type}` under the order ID
+## Two Options to Fix
 
-### 3. Removed Hardcoded Fallbacks
-- **DeliveryActionCard.tsx**: Removed hardcoded `assigned → picked_up → at_gate → delivered` fallback chain. Now fully workflow-driven using `is_terminal`, `is_success`, `requires_otp` flags and `order.transaction_type`.
-- **ActiveOrderStrip.tsx**: Removed hardcoded `IN ('cart_purchase', 'self_fulfillment', 'seller_delivery')` filter — now fetches display data for ALL workflow types.
+### Option A: Edit the override directly (recommended)
+1. Go to **Workflow Manager**
+2. Find the **Seller Delivery** card
+3. Below it, click the small badge **"Food Beverages · 10"**
+4. This opens the override editor — enable `is_transit` on the `preparing` step
+5. Save
 
-### 4. Scoped `transit_statuses` System Setting Sync
-- AdminWorkflowManager now only collects `is_transit` steps from delivery-related workflows (`cart_purchase`, `seller_delivery`) when syncing to `system_settings`
-- Prevents pickup-only workflows from polluting transit status lists used by GPS tracking and Live Activities
+### Option B: Delete the override
+1. Click the **"Food Beverages · 10"** badge under Seller Delivery
+2. Click the **Delete** button in the editor drawer header
+3. Now all `food_beverages` sellers will fall back to the default workflow (which already has `is_transit` enabled)
 
-### 5. DeliveryMonitoringTab — No Change Needed
-- Confirmed: hardcoded status arrays (`pending`, `assigned`, `picked_up`, etc.) refer to `delivery_assignments.status` (fixed delivery lifecycle), NOT `category_status_flows` (workflow statuses). These are correct and appropriate.
+## UI Improvement Plan
 
-## How the System Works Now
+To prevent this confusion in the future, I'll make the override badges more prominent:
 
-### Workflow Resolution at Order Creation
-When a purchase order is placed, `resolveTransactionType.ts` determines the workflow:
-- `fulfillment_type = 'self_pickup'` → `self_fulfillment`
-- `fulfillment_type = 'seller_delivery'` or `delivery` with `delivery_handled_by = 'seller'` → `seller_delivery`
-- `fulfillment_type = 'delivery'` with `delivery_handled_by = 'platform'` → `cart_purchase`
+1. **`AdminWorkflowManager.tsx`** — Make override badges larger and more visible with an "Override" label prefix and a warning icon. Add a subtitle hint: *"Category-specific overrides take priority over the default"*
 
-The resolved `transaction_type` is stored on the order row at creation and never re-resolved.
+2. **Editor drawer** — When editing a default workflow that has overrides, show a warning banner: *"This workflow has X category overrides. Changes here won't affect overridden categories."*
 
-### Category Config Linkage
-- `category_config.transaction_type` is the **base workflow** linked to a category (e.g., `cart_purchase`)
-- At runtime, the fulfillment mode overrides this to the correct sub-variant
-- Admins edit ALL three workflows independently in the Workflow Manager
+### Files to modify
+- `src/components/admin/AdminWorkflowManager.tsx` — Enhanced override badge styling + warning banner in editor
 
----
-
-# 🔮 DEFERRED: Single Workflow Architecture (V2)
-
-## Decision
-The single-workflow consolidation is **deferred** as a V2 architecture change.
-
-## Reason
-- High blast radius: touches DB schema, RPCs, triggers, hooks, edge functions
-- Risk to active orders mid-lifecycle
-- Requires staged rollout with backward compatibility
-- Current system works correctly when all workflows are visible and editable
-
-## V2 Plan (When Ready)
-1. Add `fulfillment_scope` column to `category_status_flows` and `category_status_transitions`
-2. Merge `seller_delivery` and `self_fulfillment` steps into `cart_purchase` with scope tags
-3. Update RPCs to filter by scope
-4. Simplify `resolveTransactionType` to always return `cart_purchase` for purchases
-5. Update `useCategoryStatusFlow` hook with scope filtering
-6. Migrate existing orders
-7. Update Admin UI with scope selector per step
