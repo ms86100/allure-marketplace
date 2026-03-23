@@ -159,19 +159,26 @@ Deno.serve(async (req) => {
 
     // Auto-seed test users if they don't exist
     async function ensureTestUser(actor: string, creds: { email: string; password: string }) {
-      // Check if user exists
-      const { data: existingUsers } = await adminClient.auth.admin.listUsers();
-      const existing = existingUsers?.users?.find((u: any) => u.email === creds.email);
-      if (existing) return existing.id;
+      const { data: listed, error: listErr } = await adminClient.auth.admin.listUsers();
+      if (listErr) throw new Error(`Failed to list users for ${actor}: ${listErr.message}`);
 
-      // Create user with auto-confirm
-      const { data: authData, error: authErr } = await adminClient.auth.admin.createUser({
-        email: creds.email,
-        password: creds.password,
-        email_confirm: true,
-      });
-      if (authErr) throw new Error(`Failed to create test user ${actor}: ${authErr.message}`);
-      const userId = authData.user!.id;
+      let userId = listed?.users?.find((u: any) => u.email === creds.email)?.id as string | undefined;
+
+      if (userId) {
+        const { error: updateErr } = await adminClient.auth.admin.updateUserById(userId, {
+          password: creds.password,
+          email_confirm: true,
+        });
+        if (updateErr) throw new Error(`Failed to refresh test user ${actor}: ${updateErr.message}`);
+      } else {
+        const { data: authData, error: authErr } = await adminClient.auth.admin.createUser({
+          email: creds.email,
+          password: creds.password,
+          email_confirm: true,
+        });
+        if (authErr) throw new Error(`Failed to create test user ${actor}: ${authErr.message}`);
+        userId = authData.user!.id;
+      }
 
       // Get or create test society
       let societyId: string;
@@ -201,7 +208,6 @@ Deno.serve(async (req) => {
         societyId = newSociety!.id;
       }
 
-      // Create profile
       await adminClient.from("profiles").upsert({
         id: userId,
         name: `Integration ${actor.charAt(0).toUpperCase() + actor.slice(1)}`,
@@ -213,7 +219,6 @@ Deno.serve(async (req) => {
         phone: `98765432${Object.keys(TEST_ACTORS).indexOf(actor) + 1}`,
       }, { onConflict: "id" });
 
-      // Grant admin role if needed
       if (actor === "admin") {
         await adminClient.from("user_roles").upsert(
           { user_id: userId, role: "admin" },
@@ -221,7 +226,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log(`Created test user: ${actor} (${creds.email})`);
       return userId;
     }
 
