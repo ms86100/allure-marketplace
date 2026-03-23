@@ -40,6 +40,7 @@ import AdminFeedbackViewer from '@/components/admin/AdminFeedbackViewer';
 import { NotificationDiagnostics } from '@/components/admin/NotificationDiagnostics';
 import OtpSettings from '@/components/admin/OtpSettings';
 import { AdminCronManager } from '@/components/admin/AdminCronManager';
+import AdminTestScenariosTab from '@/components/admin/AdminTestScenariosTab';
 import { useAdminData } from '@/hooks/useAdminData';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -350,6 +351,7 @@ export default function AdminPage() {
           {admin.activeTab === 'campaigns' && <CampaignSender />}
           {admin.activeTab === 'ai-review' && <AdminAIReviewLog />}
           {admin.activeTab === 'feedback' && <AdminFeedbackViewer />}
+          {admin.activeTab === 'test-scenarios' && <AdminTestScenariosTab />}
           {admin.activeTab === 'analytics' && <AdminAnalyticsTab />}
           {admin.activeTab === 'navigator' && <AppNavigator />}
         </div>
