@@ -7588,6 +7588,7 @@ export type Database = {
           name: string
           priority: number
           steps: Json
+          tags: string[] | null
           updated_at: string
         }
         Insert: {
@@ -7602,6 +7603,7 @@ export type Database = {
           name: string
           priority?: number
           steps?: Json
+          tags?: string[] | null
           updated_at?: string
         }
         Update: {
@@ -7616,6 +7618,7 @@ export type Database = {
           name?: string
           priority?: number
           steps?: Json
+          tags?: string[] | null
           updated_at?: string
         }
         Relationships: []
