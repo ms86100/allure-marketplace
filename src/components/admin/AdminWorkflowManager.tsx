@@ -389,6 +389,14 @@ export function AdminWorkflowManager() {
                           </span>
                         )}
                       </p>
+                      {(() => {
+                        const usage = workflowUsage[txType] || 0;
+                        return (
+                          <p className={cn("text-[10px]", usage > 0 ? "text-accent" : "text-muted-foreground/60")}>
+                            {usage > 0 ? `${usage} order${usage > 1 ? 's' : ''}` : '0 orders (unused)'}
+                          </p>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
