@@ -57,7 +57,7 @@ export function useOrderDetail(id: string | undefined) {
   const orderFulfillmentType = (order as any)?.fulfillment_type || 'self_pickup';
   const deliveryHandledBy = (order as any)?.delivery_handled_by || null;
   const storedTransactionType = (order as any)?.transaction_type || null;
-  const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType);
+  const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType, storedTransactionType);
 
   // Timer-based tick to re-evaluate urgency when auto_cancel_at passes
   const [urgencyTick, setUrgencyTick] = useState(0);

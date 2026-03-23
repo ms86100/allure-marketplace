@@ -62,13 +62,14 @@ export function AdminWorkflowManager() {
   const [editSteps, setEditSteps] = useState<FlowStep[]>([]);
   const [transitions, setTransitions] = useState<Transition[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [workflowUsage, setWorkflowUsage] = useState<Record<string, number>>({});
 
   // Dialog states
   const [showCreate, setShowCreate] = useState(false);
   const [cloneSource, setCloneSource] = useState<WorkflowGroup | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WorkflowGroup | null>(null);
 
-  useEffect(() => { loadWorkflows(); }, []);
+  useEffect(() => { loadWorkflows(); loadUsageCounts(); }, []);
 
   const loadWorkflows = async () => {
     setIsLoading(true);
@@ -98,6 +99,25 @@ export function AdminWorkflowManager() {
 
     setWorkflows(Array.from(groupMap.values()));
     setIsLoading(false);
+  };
+
+  const loadUsageCounts = async () => {
+    try {
+      const { data } = await supabase
+        .from('orders')
+        .select('transaction_type')
+        .not('transaction_type', 'is', null);
+      if (data) {
+        const counts: Record<string, number> = {};
+        for (const row of data) {
+          const key = row.transaction_type as string;
+          counts[key] = (counts[key] || 0) + 1;
+        }
+        setWorkflowUsage(counts);
+      }
+    } catch (e) {
+      console.warn('Failed to load workflow usage counts:', e);
+    }
   };
 
   const openEditor = async (wf: WorkflowGroup) => {
@@ -182,6 +202,20 @@ export function AdminWorkflowManager() {
     });
     if (backwardTransitions.length > 0) {
       toast.warning(`Backward transition detected: ${backwardTransitions.map(t => `${t.from_status} → ${t.to_status}`).join(', ')}`);
+    }
+
+    // Self-pickup validation: auto-clear transit/tracking flags that are ignored by DB triggers
+    const isSelfPickupWorkflow = selectedWorkflow.transaction_type.includes('self_fulfillment') || selectedWorkflow.transaction_type.includes('self_pickup');
+    if (isSelfPickupWorkflow) {
+      const flaggedSteps = editSteps.filter(s => s.is_transit || s.creates_tracking_assignment);
+      if (flaggedSteps.length > 0) {
+        toast.warning('Self-pickup workflows cannot use transit or tracking flags — auto-cleared before saving.');
+        for (const s of editSteps) {
+          s.is_transit = false;
+          s.creates_tracking_assignment = false;
+        }
+        setEditSteps([...editSteps]);
+      }
     }
 
     setIsSaving(true);
@@ -355,6 +389,14 @@ export function AdminWorkflowManager() {
                           </span>
                         )}
                       </p>
+                      {(() => {
+                        const usage = workflowUsage[txType] || 0;
+                        return (
+                          <p className={cn("text-[10px]", usage > 0 ? "text-accent" : "text-muted-foreground/60")}>
+                            {usage > 0 ? `${usage} order${usage > 1 ? 's' : ''}` : '0 orders (unused)'}
+                          </p>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -539,6 +581,13 @@ export function AdminWorkflowManager() {
                       {/* Behavior Toggles */}
                       <div className="flex items-center gap-4 flex-wrap border-t border-border/30 pt-2">
                         <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Behavior</span>
+
+                        {selectedWorkflow && (selectedWorkflow.transaction_type.includes('self_fulfillment') || selectedWorkflow.transaction_type.includes('self_pickup')) && (step.is_transit || step.creates_tracking_assignment) && (
+                          <div className="w-full flex items-center gap-1.5 text-[10px] text-amber-600 bg-amber-50 rounded-md px-2 py-1 border border-amber-200">
+                            <AlertTriangle size={11} className="shrink-0" />
+                            <span>Transit & tracking flags are ignored for self-pickup workflows (blocked by DB triggers).</span>
+                          </div>
+                        )}
 
                         <div className="flex items-center gap-1.5">
                           <Checkbox checked={step.is_transit} onCheckedChange={(v) => updateStep(index, 'is_transit', !!v)} id={`transit-${index}`} />
