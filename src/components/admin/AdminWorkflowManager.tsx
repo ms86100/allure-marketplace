@@ -375,10 +375,13 @@ export function AdminWorkflowManager() {
                 </Collapsible>
               )}
 
-              {/* Status Steps */}
+               {/* Status Steps */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Status Pipeline</p>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Status Pipeline</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Each step represents a stage in the order lifecycle. Drag to reorder.</p>
+                  </div>
                   <Button size="sm" variant="outline" onClick={addStep} className="h-7 text-xs rounded-lg">
                     <Plus size={12} className="mr-1" /> Add Step
                   </Button>
@@ -386,59 +389,127 @@ export function AdminWorkflowManager() {
 
                 <div className="space-y-2">
                   {editSteps.map((step, index) => (
-                    <div key={index} className={cn("bg-muted/40 rounded-xl p-3 space-y-2 border border-border/50", (step as any).is_deprecated && "opacity-60 border-amber-300/50 bg-amber-50/30 dark:bg-amber-900/10")}>
+                    <div key={index} className={cn("bg-muted/40 rounded-xl p-3 space-y-3 border border-border/50", (step as any).is_deprecated && "opacity-60 border-amber-300/50 bg-amber-50/30 dark:bg-amber-900/10")}>
+                      {/* Row 1: Order + Status Key + Delete */}
                       <div className="flex items-center gap-2">
                         <div className="flex flex-col gap-0.5">
                           <button onClick={() => moveStep(index, 'up')} disabled={index === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30 text-xs">▲</button>
                           <button onClick={() => moveStep(index, 'down')} disabled={index === editSteps.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30 text-xs">▼</button>
                         </div>
                         <span className="text-[10px] font-mono text-muted-foreground w-5">{index + 1}</span>
-                        <Input value={step.status_key} onChange={(e) => updateStep(index, 'status_key', e.target.value)} placeholder="status_key" className="h-8 text-xs font-mono flex-1 rounded-lg" />
+                        <div className="flex-1">
+                          <FieldLabel label="Status Key" tooltip="Unique identifier for this step (e.g. 'placed', 'accepted', 'picked_up'). Used internally — must be lowercase with underscores." />
+                          <Input value={step.status_key} onChange={(e) => updateStep(index, 'status_key', e.target.value)} placeholder="e.g. picked_up" className="h-8 text-xs font-mono rounded-lg" />
+                        </div>
                         {(step as any).is_deprecated && <Badge variant="outline" className="text-[9px] bg-amber-100 text-amber-700 border-amber-300 shrink-0">Deprecated</Badge>}
-                        <button onClick={() => removeStep(index)} className="text-destructive hover:text-destructive/80"><Trash2 size={14} /></button>
+                        <button onClick={() => removeStep(index)} className="text-destructive hover:text-destructive/80 mt-4" title="Delete this step"><Trash2 size={14} /></button>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input value={step.display_label} onChange={(e) => updateStep(index, 'display_label', e.target.value)} placeholder="Display Label" className="h-7 text-xs rounded-lg" />
-                        <Input value={step.color} onChange={(e) => updateStep(index, 'color', e.target.value)} placeholder="Color classes" className="h-7 text-xs rounded-lg" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input value={step.icon} onChange={(e) => updateStep(index, 'icon', e.target.value)} placeholder="Icon name" className="h-7 text-xs rounded-lg" />
-                        <div className="flex items-center gap-2">
-                          <Checkbox checked={step.is_terminal} onCheckedChange={(v) => updateStep(index, 'is_terminal', !!v)} id={`terminal-${index}`} />
-                          <label htmlFor={`terminal-${index}`} className="text-xs text-muted-foreground">Terminal</label>
+
+                      {/* Row 2: Display Label + Badge Color */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <FieldLabel label="Display Name" tooltip="The label shown to buyers and sellers in the app (e.g. 'Picked Up', 'On the Way')." />
+                          <Input value={step.display_label} onChange={(e) => updateStep(index, 'display_label', e.target.value)} placeholder="e.g. Picked Up" className="h-7 text-xs rounded-lg" />
+                        </div>
+                        <div>
+                          <FieldLabel label="Badge Color" tooltip="The color scheme used for the status badge in the order timeline." />
+                          <Select value={step.color} onValueChange={(v) => updateStep(index, 'color', v)}>
+                            <SelectTrigger className="h-7 text-xs rounded-lg">
+                              <div className="flex items-center gap-2">
+                                {(() => {
+                                  const match = BADGE_COLORS.find(c => c.value === step.color);
+                                  return match ? (
+                                    <><span className={cn("w-3 h-3 rounded-full shrink-0", match.preview)} /><span>{match.label}</span></>
+                                  ) : (
+                                    <span className="text-muted-foreground">{step.color || 'Select color'}</span>
+                                  );
+                                })()}
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {BADGE_COLORS.map(c => (
+                                <SelectItem key={c.value} value={c.value}>
+                                  <div className="flex items-center gap-2">
+                                    <span className={cn("w-3 h-3 rounded-full", c.preview)} />
+                                    <span>{c.label}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                      {/* Behavior Flags */}
-                      <div className="flex items-center gap-4 flex-wrap border-t border-border/30 pt-2 mt-1">
-                        <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Flags</span>
+
+                      {/* Row 3: Icon + End State */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <FieldLabel label="Icon" tooltip="Icon shown next to this status in the timeline (e.g. 'Truck', 'ShoppingCart', 'CheckCircle'). Uses Lucide icon names." />
+                          <Input value={step.icon} onChange={(e) => updateStep(index, 'icon', e.target.value)} placeholder="e.g. Truck" className="h-7 text-xs rounded-lg" />
+                        </div>
+                        <div className="flex items-end pb-1">
+                          <div className="flex items-center gap-2">
+                            <Checkbox checked={step.is_terminal} onCheckedChange={(v) => updateStep(index, 'is_terminal', !!v)} id={`terminal-${index}`} />
+                            <label htmlFor={`terminal-${index}`} className="text-xs text-muted-foreground cursor-pointer">End State</label>
+                            <Tooltip>
+                              <TooltipTrigger asChild><HelpCircle size={11} className="text-muted-foreground/50 cursor-help" /></TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[220px] text-xs">
+                                Mark this as an end state if the order lifecycle stops here. Examples: "Completed", "Cancelled", "Refunded". No further transitions happen after this.
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Behavior Toggles */}
+                      <div className="flex items-center gap-4 flex-wrap border-t border-border/30 pt-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Behavior</span>
+
                         <div className="flex items-center gap-1.5">
                           <Checkbox checked={step.is_transit} onCheckedChange={(v) => updateStep(index, 'is_transit', !!v)} id={`transit-${index}`} />
-                          <label htmlFor={`transit-${index}`} className="text-[11px] text-muted-foreground">🚚 Transit</label>
+                          <label htmlFor={`transit-${index}`} className="text-[11px] text-muted-foreground cursor-pointer">🚚 In Transit</label>
+                          <Tooltip>
+                            <TooltipTrigger asChild><HelpCircle size={10} className="text-muted-foreground/40 cursor-help" /></TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[200px] text-xs">Enables live delivery tracking, map UI, and GPS updates for the buyer during this step.</TooltipContent>
+                          </Tooltip>
                         </div>
+
                         <div className="flex items-center gap-1.5">
                           <Checkbox checked={step.requires_otp} onCheckedChange={(v) => updateStep(index, 'requires_otp', !!v)} id={`otp-${index}`} />
-                          <label htmlFor={`otp-${index}`} className="text-[11px] text-muted-foreground">🔐 OTP</label>
+                          <label htmlFor={`otp-${index}`} className="text-[11px] text-muted-foreground cursor-pointer">🔐 Requires OTP</label>
+                          <Tooltip>
+                            <TooltipTrigger asChild><HelpCircle size={10} className="text-muted-foreground/40 cursor-help" /></TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[200px] text-xs">A 4-digit code will be sent to the buyer. The delivery agent or seller must enter this code to advance past this step.</TooltipContent>
+                          </Tooltip>
                         </div>
+
                         <div className="flex items-center gap-1.5">
                           <Checkbox checked={step.is_success} onCheckedChange={(v) => updateStep(index, 'is_success', !!v)} id={`success-${index}`} />
-                          <label htmlFor={`success-${index}`} className="text-[11px] text-muted-foreground">✅ Success</label>
+                          <label htmlFor={`success-${index}`} className="text-[11px] text-muted-foreground cursor-pointer">✅ Successful</label>
+                          <Tooltip>
+                            <TooltipTrigger asChild><HelpCircle size={10} className="text-muted-foreground/40 cursor-help" /></TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[200px] text-xs">Marks this as a successful completion. Triggers celebration UI, enables reviews, and settles payments. Only meaningful on end states.</TooltipContent>
+                          </Tooltip>
                         </div>
                       </div>
-                      {/* Allowed Actors: clickable toggles that auto-manage transitions */}
+
+                      {/* Allowed Actors */}
                       {!step.is_terminal && step.status_key && (
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Allowed Actors</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Who can advance?</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild><HelpCircle size={10} className="text-muted-foreground/40 cursor-help" /></TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[240px] text-xs">Select which roles can move the order forward from this step. Toggle multiple to allow shared responsibility (e.g., both seller and delivery agent).</TooltipContent>
+                          </Tooltip>
                           {ACTORS.map(actor => {
                             const hasAnyTransition = transitions.some(t => t.from_status === step.status_key && t.allowed_actor === actor);
+                            const actorLabels: Record<string, string> = { buyer: '👤 Buyer', seller: '🏪 Seller', delivery: '🚚 Delivery', system: '⚙️ System', admin: '🛡️ Admin' };
                             return (
                               <button
                                 key={actor}
                                 onClick={() => {
                                   if (hasAnyTransition) {
-                                    // Remove all transitions from this step for this actor
                                     setTransitions(prev => prev.filter(t => !(t.from_status === step.status_key && t.allowed_actor === actor)));
                                   } else {
-                                    // Auto-create transition to the next step in pipeline for this actor
                                     const nextStep = editSteps.find((s, i) => i > index && s.status_key);
                                     if (nextStep) {
                                       setTransitions(prev => [...prev, { from_status: step.status_key, to_status: nextStep.status_key, allowed_actor: actor }]);
@@ -452,37 +523,69 @@ export function AdminWorkflowManager() {
                                     : "bg-background text-muted-foreground border-border hover:border-primary/50"
                                 )}
                               >
-                                {actor}
+                                {actorLabels[actor] || actor}
                               </button>
                             );
                           })}
                         </div>
                       )}
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input value={step.buyer_hint} onChange={(e) => updateStep(index, 'buyer_hint', e.target.value)} placeholder="Buyer hint message" className="h-7 text-xs rounded-lg" />
-                        <Input value={step.seller_hint} onChange={(e) => updateStep(index, 'seller_hint', e.target.value)} placeholder="Seller hint message" className="h-7 text-xs rounded-lg" />
+
+                      {/* Hint Messages */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <FieldLabel label="Buyer Message" tooltip="A short message shown to the buyer when the order is at this step (e.g. 'Your order is being prepared')." />
+                          <Input value={step.buyer_hint} onChange={(e) => updateStep(index, 'buyer_hint', e.target.value)} placeholder="e.g. Your order is on the way!" className="h-7 text-xs rounded-lg" />
+                        </div>
+                        <div>
+                          <FieldLabel label="Seller Message" tooltip="A short message shown to the seller when the order is at this step (e.g. 'Customer is waiting for pickup')." />
+                          <Input value={step.seller_hint} onChange={(e) => updateStep(index, 'seller_hint', e.target.value)} placeholder="e.g. Prepare the order now" className="h-7 text-xs rounded-lg" />
+                        </div>
                       </div>
+
                       {/* Notification Config */}
-                      <div className="border-t border-border/30 pt-2 mt-1 space-y-2">
+                      <div className="border-t border-border/30 pt-2 space-y-2">
                         <div className="flex items-center gap-2">
                           <Checkbox checked={step.notify_buyer} onCheckedChange={(v) => updateStep(index, 'notify_buyer', !!v)} id={`notify-${index}`} />
-                          <label htmlFor={`notify-${index}`} className="text-xs text-muted-foreground">🔔 Send Buyer Notification</label>
+                          <label htmlFor={`notify-${index}`} className="text-xs text-muted-foreground cursor-pointer">🔔 Send Buyer Push Notification</label>
+                          <Tooltip>
+                            <TooltipTrigger asChild><HelpCircle size={10} className="text-muted-foreground/40 cursor-help" /></TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[220px] text-xs">Send a push notification to the buyer when the order enters this step.</TooltipContent>
+                          </Tooltip>
                         </div>
                         {step.notify_buyer && (
                           <div className="space-y-1.5 pl-6">
-                            <Input value={step.notification_title} onChange={(e) => updateStep(index, 'notification_title', e.target.value)} placeholder="Notification title (e.g. ✅ Order Accepted!)" className="h-7 text-xs rounded-lg" />
-                            <Input value={step.notification_body} onChange={(e) => updateStep(index, 'notification_body', e.target.value)} placeholder="Notification body — use {seller_name} placeholder" className="h-7 text-xs rounded-lg" />
-                            <Input value={step.notification_action} onChange={(e) => updateStep(index, 'notification_action', e.target.value)} placeholder="Action button (e.g. Rate Order)" className="h-7 text-xs rounded-lg" />
+                            <div>
+                              <FieldLabel label="Notification Title" tooltip="Title of the push notification (e.g. '✅ Order Accepted!'). Keep it short and clear." />
+                              <Input value={step.notification_title} onChange={(e) => updateStep(index, 'notification_title', e.target.value)} placeholder="e.g. ✅ Order Accepted!" className="h-7 text-xs rounded-lg" />
+                            </div>
+                            <div>
+                              <FieldLabel label="Notification Body" tooltip="Body text of the push notification. You can use {seller_name} as a placeholder." />
+                              <Input value={step.notification_body} onChange={(e) => updateStep(index, 'notification_body', e.target.value)} placeholder="e.g. {seller_name} accepted your order" className="h-7 text-xs rounded-lg" />
+                            </div>
+                            <div>
+                              <FieldLabel label="Action Button" tooltip="Optional button text shown in the notification (e.g. 'Track Order', 'Rate Order')." />
+                              <Input value={step.notification_action} onChange={(e) => updateStep(index, 'notification_action', e.target.value)} placeholder="e.g. Track Order" className="h-7 text-xs rounded-lg" />
+                            </div>
                           </div>
                         )}
                         <div className="flex items-center gap-2">
                           <Checkbox checked={step.notify_seller} onCheckedChange={(v) => updateStep(index, 'notify_seller', !!v)} id={`notify-seller-${index}`} />
-                          <label htmlFor={`notify-seller-${index}`} className="text-xs text-muted-foreground">📣 Send Seller Notification</label>
+                          <label htmlFor={`notify-seller-${index}`} className="text-xs text-muted-foreground cursor-pointer">📣 Send Seller Push Notification</label>
+                          <Tooltip>
+                            <TooltipTrigger asChild><HelpCircle size={10} className="text-muted-foreground/40 cursor-help" /></TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[220px] text-xs">Send a push notification to the seller when the order enters this step.</TooltipContent>
+                          </Tooltip>
                         </div>
                         {step.notify_seller && (
                           <div className="space-y-1.5 pl-6">
-                            <Input value={step.seller_notification_title} onChange={(e) => updateStep(index, 'seller_notification_title', e.target.value)} placeholder="Seller notification title (e.g. 🆕 New Order!)" className="h-7 text-xs rounded-lg" />
-                            <Input value={step.seller_notification_body} onChange={(e) => updateStep(index, 'seller_notification_body', e.target.value)} placeholder="Seller notification body" className="h-7 text-xs rounded-lg" />
+                            <div>
+                              <FieldLabel label="Notification Title" tooltip="Title of the seller push notification." />
+                              <Input value={step.seller_notification_title} onChange={(e) => updateStep(index, 'seller_notification_title', e.target.value)} placeholder="e.g. 🆕 New Order Received!" className="h-7 text-xs rounded-lg" />
+                            </div>
+                            <div>
+                              <FieldLabel label="Notification Body" tooltip="Body text of the seller push notification." />
+                              <Input value={step.seller_notification_body} onChange={(e) => updateStep(index, 'seller_notification_body', e.target.value)} placeholder="e.g. Review items and accept promptly" className="h-7 text-xs rounded-lg" />
+                            </div>
                           </div>
                         )}
                       </div>
