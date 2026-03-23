@@ -19,6 +19,7 @@ export interface FlowStep {
   is_transit: boolean;
   requires_otp: boolean;
   is_success: boolean;
+  creates_tracking_assignment: boolean;
 }
 
 export interface Transition {
