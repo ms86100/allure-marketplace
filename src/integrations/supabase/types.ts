@@ -1058,6 +1058,7 @@ export type Database = {
           is_deprecated: boolean
           is_success: boolean
           is_terminal: boolean | null
+          is_transit: boolean
           notification_action: string | null
           notification_body: string | null
           notification_image_url: string | null
@@ -1086,6 +1087,7 @@ export type Database = {
           is_deprecated?: boolean
           is_success?: boolean
           is_terminal?: boolean | null
+          is_transit?: boolean
           notification_action?: string | null
           notification_body?: string | null
           notification_image_url?: string | null
@@ -1114,6 +1116,7 @@ export type Database = {
           is_deprecated?: boolean
           is_success?: boolean
           is_terminal?: boolean | null
+          is_transit?: boolean
           notification_action?: string | null
           notification_body?: string | null
           notification_image_url?: string | null
@@ -3508,6 +3511,7 @@ export type Database = {
           society_id: string | null
           status: Database["public"]["Enums"]["order_status"] | null
           total_amount: number
+          transaction_type: string | null
           updated_at: string | null
           upi_transaction_ref: string | null
         }
@@ -3558,6 +3562,7 @@ export type Database = {
           society_id?: string | null
           status?: Database["public"]["Enums"]["order_status"] | null
           total_amount: number
+          transaction_type?: string | null
           updated_at?: string | null
           upi_transaction_ref?: string | null
         }
@@ -3608,6 +3613,7 @@ export type Database = {
           society_id?: string | null
           status?: Database["public"]["Enums"]["order_status"] | null
           total_amount?: number
+          transaction_type?: string | null
           updated_at?: string | null
           upi_transaction_ref?: string | null
         }
@@ -8596,6 +8602,7 @@ export type Database = {
           society_id: string | null
           status: Database["public"]["Enums"]["order_status"] | null
           total_amount: number
+          transaction_type: string | null
           updated_at: string | null
           upi_transaction_ref: string | null
         }
@@ -8663,6 +8670,7 @@ export type Database = {
           society_id: string | null
           status: Database["public"]["Enums"]["order_status"] | null
           total_amount: number
+          transaction_type: string | null
           updated_at: string | null
           upi_transaction_ref: string | null
         }
@@ -9246,6 +9254,7 @@ export type Database = {
           society_id: string | null
           status: Database["public"]["Enums"]["order_status"] | null
           total_amount: number
+          transaction_type: string | null
           updated_at: string | null
           upi_transaction_ref: string | null
         }
