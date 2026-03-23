@@ -33,33 +33,8 @@ export interface CategoryConfigRow {
   supports_staff_assignment?: boolean;
 }
 
-export const LISTING_TYPE_PRESETS = [
-  { value: 'cart_purchase', label: 'Product (Add to Cart)', description: 'Buyers add items to cart and checkout together' },
-  { value: 'buy_now', label: 'Buy Now', description: 'Direct purchase, no cart' },
-  { value: 'book_slot', label: 'Bookable Service', description: 'Buyers pick a time slot to book' },
-  { value: 'request_service', label: 'Request Service', description: 'Buyers send a service request to the seller' },
-  { value: 'request_quote', label: 'Request Quote', description: 'Buyers request a price quote, negotiable' },
-  { value: 'contact_only', label: 'Contact Only', description: 'Buyers contact the seller directly' },
-  { value: 'schedule_visit', label: 'Schedule Visit', description: 'Buyers schedule an in-person visit' },
-] as const;
-
-export function deriveBehaviorFlags(transactionType: string) {
-  const base = {
-    supports_cart: false, has_quantity: false, requires_time_slot: false,
-    has_duration: false, has_date_range: false, enquiry_only: false,
-    is_negotiable: false, layout_type: 'ecommerce',
-  };
-  switch (transactionType) {
-    case 'cart_purchase': return { ...base, supports_cart: true, has_quantity: true, layout_type: 'ecommerce' };
-    case 'buy_now': return { ...base, has_quantity: true, layout_type: 'ecommerce' };
-    case 'book_slot': return { ...base, requires_time_slot: true, has_duration: true, layout_type: 'service' };
-    case 'request_service': return { ...base, enquiry_only: true, layout_type: 'service' };
-    case 'request_quote': return { ...base, enquiry_only: true, is_negotiable: true, layout_type: 'service' };
-    case 'contact_only': return { ...base, enquiry_only: true, layout_type: 'service' };
-    case 'schedule_visit': return { ...base, requires_time_slot: true, has_date_range: true, layout_type: 'service' };
-    default: return { ...base, supports_cart: true, has_quantity: true };
-  }
-}
+// LISTING_TYPE_PRESETS removed — workflows are now fetched from DB via useAvailableWorkflows
+// deriveBehaviorFlags removed — behavior flags are stored directly on category_config
 
 export function useCategoryManagerData() {
   const queryClient = useQueryClient();
@@ -117,8 +92,7 @@ export function useCategoryManagerData() {
     if (!editForm.display_name.trim()) { toast.error('Display name is required'); return; }
     setIsSaving(true);
     try {
-      const behaviorFlags = deriveBehaviorFlags(editForm.transaction_type);
-      const { error } = await supabase.from('category_config').update({ display_name: editForm.display_name.trim(), icon: editForm.icon.trim(), color: editForm.color.trim(), image_url: editForm.image_url || null, name_placeholder: editForm.name_placeholder.trim() || null, description_placeholder: editForm.description_placeholder.trim() || null, price_label: editForm.price_label.trim() || 'Price', duration_label: editForm.duration_label.trim() || null, show_veg_toggle: editForm.show_veg_toggle, show_duration_field: editForm.show_duration_field, transaction_type: editForm.transaction_type, supports_addons: editForm.supports_addons, supports_recurring: editForm.supports_recurring, supports_staff_assignment: editForm.supports_staff_assignment, ...behaviorFlags }).eq('id', editingCategory.id);
+      const { error } = await supabase.from('category_config').update({ display_name: editForm.display_name.trim(), icon: editForm.icon.trim(), color: editForm.color.trim(), image_url: editForm.image_url || null, name_placeholder: editForm.name_placeholder.trim() || null, description_placeholder: editForm.description_placeholder.trim() || null, price_label: editForm.price_label.trim() || 'Price', duration_label: editForm.duration_label.trim() || null, show_veg_toggle: editForm.show_veg_toggle, show_duration_field: editForm.show_duration_field, transaction_type: editForm.transaction_type, supports_addons: editForm.supports_addons, supports_recurring: editForm.supports_recurring, supports_staff_assignment: editForm.supports_staff_assignment }).eq('id', editingCategory.id);
       if (error) throw error;
       setCategories(categories.map(c => c.id === editingCategory.id ? { ...c, ...editForm } : c));
       queryClient.invalidateQueries({ queryKey: ['category-configs'] });
@@ -145,8 +119,7 @@ export function useCategoryManagerData() {
     try {
       const groupCats = categories.filter(c => c.parent_group === addForm.parent_group);
       const maxOrder = groupCats.length > 0 ? Math.max(...groupCats.map(c => c.display_order)) : 0;
-      const behaviorFlags = deriveBehaviorFlags(addForm.transaction_type);
-      const { data, error } = await supabase.from('category_config').insert({ category: categoryKey as any, display_name: addForm.display_name.trim(), icon: addForm.icon.trim(), color: addForm.color, parent_group: addForm.parent_group, display_order: maxOrder + 1, is_active: true, image_url: addForm.image_url || null, transaction_type: addForm.transaction_type, ...behaviorFlags } as any).select().single();
+      const { data, error } = await supabase.from('category_config').insert({ category: categoryKey as any, display_name: addForm.display_name.trim(), icon: addForm.icon.trim(), color: addForm.color, parent_group: addForm.parent_group, display_order: maxOrder + 1, is_active: true, image_url: addForm.image_url || null, transaction_type: addForm.transaction_type } as any).select().single();
       if (error) throw error;
       setCategories([...categories, data]);
       queryClient.invalidateQueries({ queryKey: ['category-configs'] });

@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useWorkflowMap, getWorkflowKeyFromMap } from '@/hooks/useWorkflowMap';
-import { getWorkflowKey } from '@/lib/listingTypeWorkflowMap';
 import { Badge } from '@/components/ui/badge';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
-import { Link2, AlertTriangle, ChevronRight, CheckCircle2, AlertCircle, HelpCircle } from 'lucide-react';
-import { TRANSACTION_TYPES, formatName } from '@/components/admin/workflow/types';
+import { Link2, AlertTriangle, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { formatName } from '@/components/admin/workflow/types';
 
 interface Props {
-  listingType: string;
+  /** The workflow key (transaction_type) — used directly, no indirect resolution */
+  workflowKey: string;
   parentGroup: string;
   category?: string;
 }
@@ -30,29 +29,20 @@ interface RecentOrder {
   created_at: string;
 }
 
-export function CategoryWorkflowPreview({ listingType, parentGroup, category }: Props) {
+export function CategoryWorkflowPreview({ workflowKey, parentGroup, category }: Props) {
   const [steps, setSteps] = useState<FlowStep[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
 
-  const { data: workflowMap, isLoading: mapLoading } = useWorkflowMap();
-
-  // Resolve workflow key from DB map, fallback to static
-  const mapEntry = getWorkflowKeyFromMap(workflowMap, listingType);
-  const workflowKey = mapEntry?.workflow_key ?? getWorkflowKey(listingType);
-  const isConditional = mapEntry?.is_conditional ?? false;
-  const conditionNote = mapEntry?.condition_note ?? null;
-
-  const workflowLabel = TRANSACTION_TYPES.find(t => t.value === workflowKey)?.label ?? formatName(workflowKey);
+  const workflowLabel = formatName(workflowKey);
 
   // Fetch workflow steps — try parent_group first, fallback to 'default'
   useEffect(() => {
     if (!parentGroup || !workflowKey) return;
     setLoading(true);
-    
+
     (async () => {
-      // Try specific parent_group
       const { data } = await supabase
         .from('category_status_flows')
         .select('status_key, display_label, icon, color, sort_order, is_terminal, actor, is_deprecated')
@@ -95,10 +85,7 @@ export function CategoryWorkflowPreview({ listingType, parentGroup, category }: 
     if (!parentGroup || !category) return;
     supabase
       .from('orders')
-      .select(`
-        id, order_type, fulfillment_type, created_at,
-        order_items!inner(products!inner(category))
-      `)
+      .select(`id, order_type, fulfillment_type, created_at, order_items!inner(products!inner(category))`)
       .eq('order_items.products.category', category)
       .order('created_at', { ascending: false })
       .limit(5)
@@ -107,22 +94,13 @@ export function CategoryWorkflowPreview({ listingType, parentGroup, category }: 
       });
   }, [parentGroup, category]);
 
-  if (loading || mapLoading) {
+  if (loading) {
     return (
       <div className="p-3 rounded-xl bg-muted/30 border border-border/30 animate-pulse">
         <div className="h-4 w-32 bg-muted rounded" />
       </div>
     );
   }
-
-  // Determinism indicator
-  const determinism = notFound
-    ? { label: 'Fallback', color: 'text-destructive', bg: 'bg-destructive/10 border-destructive/30', icon: AlertCircle }
-    : isConditional
-      ? { label: 'Conditional', color: 'text-amber-600', bg: 'bg-amber-500/10 border-amber-500/30', icon: HelpCircle }
-      : { label: 'Deterministic', color: 'text-emerald-600', bg: 'bg-emerald-500/10 border-emerald-500/30', icon: CheckCircle2 };
-
-  const DetIcon = determinism.icon;
 
   return (
     <div className="p-3 rounded-xl bg-muted/30 border border-border/40 space-y-2">
@@ -133,11 +111,12 @@ export function CategoryWorkflowPreview({ listingType, parentGroup, category }: 
         <Badge variant="secondary" className="text-[9px] h-4 px-1.5 rounded-md font-mono">
           {workflowLabel}
         </Badge>
-        {/* Determinism badge */}
-        <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[9px] font-semibold ${determinism.bg} ${determinism.color}`}>
-          <DetIcon size={10} />
-          {determinism.label}
-        </div>
+        {!notFound && (
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[9px] font-semibold bg-emerald-500/10 border-emerald-500/30 text-emerald-600">
+            <CheckCircle2 size={10} />
+            Direct
+          </div>
+        )}
       </div>
 
       {notFound ? (
@@ -178,13 +157,6 @@ export function CategoryWorkflowPreview({ listingType, parentGroup, category }: 
             <span>{formatName(parentGroup)} pipeline</span>
           </div>
         </>
-      )}
-
-      {/* Condition note from DB */}
-      {isConditional && conditionNote && (
-        <p className="text-[10px] text-muted-foreground/80 italic">
-          ℹ️ {conditionNote}
-        </p>
       )}
 
       {/* Recent orders audit trail */}

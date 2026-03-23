@@ -20,7 +20,8 @@ import { CategoryWorkflowPreview } from '@/components/admin/CategoryWorkflowPrev
 import { DndContext, closestCenter } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useCategoryManagerData, CategoryConfigRow, LISTING_TYPE_PRESETS } from '@/hooks/useCategoryManagerData';
+import { useCategoryManagerData, CategoryConfigRow } from '@/hooks/useCategoryManagerData';
+import { useAvailableWorkflows } from '@/hooks/useAvailableWorkflows';
 import { ParentGroupRow } from '@/hooks/useParentGroups';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -168,7 +169,7 @@ function SortableCategoryItem({ cat, groupIsActive, onToggle, onEdit, onDelete, 
           <span className={cn('text-sm font-medium block truncate', !cat.is_active && 'text-muted-foreground')}>{cat.display_name}</span>
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] text-muted-foreground">
-              {LISTING_TYPE_PRESETS.find(p => p.value === cat.transaction_type)?.label || cat.transaction_type || 'Product'}
+              {(cat.transaction_type || 'cart_purchase').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
             </span>
             <span className="text-[10px] text-muted-foreground font-mono">({cat.category})</span>
             {!cat.image_url && <span className="text-[10px] text-amber-500 font-semibold">No image</span>}
@@ -193,6 +194,7 @@ function SortableCategoryItem({ cat, groupIsActive, onToggle, onEdit, onDelete, 
 
 export function CategoryManager() {
   const cm = useCategoryManagerData();
+  const { data: availableWorkflows, isLoading: workflowsLoading } = useAvailableWorkflows();
 
   const openSubcategoryCreate = (category: CategoryConfigRow) => {
     if (typeof window === 'undefined') return;
@@ -282,25 +284,23 @@ export function CategoryManager() {
               <Input id="display_name" value={cm.editForm.display_name} onChange={(e) => cm.setEditForm({ ...cm.editForm, display_name: e.target.value })} className="rounded-xl" />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-semibold">Listing Type</Label>
+              <Label className="text-xs font-semibold">Workflow</Label>
               <Select value={cm.editForm.transaction_type} onValueChange={(value) => cm.setEditForm({ ...cm.editForm, transaction_type: value })}>
                 <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {LISTING_TYPE_PRESETS.map((preset) => (
-                    <SelectItem key={preset.value} value={preset.value}>
-                      <div className="flex flex-col">
-                        <span>{preset.label}</span>
+                  {(availableWorkflows ?? []).map((wf) => (
+                    <SelectItem key={wf.key} value={wf.key}>
+                      <div className="flex items-center gap-2">
+                        <span>{wf.label}</span>
+                        <span className="text-[10px] text-muted-foreground">({wf.stepCount} steps)</span>
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground">
-                {LISTING_TYPE_PRESETS.find(p => p.value === cm.editForm.transaction_type)?.description}
-              </p>
               {cm.editingCategory && (
                 <CategoryWorkflowPreview
-                  listingType={cm.editForm.transaction_type}
+                  workflowKey={cm.editForm.transaction_type}
                   parentGroup={cm.editingCategory.parent_group}
                 />
               )}
@@ -422,25 +422,23 @@ export function CategoryManager() {
               <Input value={cm.addForm.display_name} onChange={(e) => cm.setAddForm({ ...cm.addForm, display_name: e.target.value })} className="rounded-xl" />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-semibold">Listing Type</Label>
+              <Label className="text-xs font-semibold">Workflow</Label>
               <Select value={cm.addForm.transaction_type} onValueChange={(value) => cm.setAddForm({ ...cm.addForm, transaction_type: value })}>
                 <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {LISTING_TYPE_PRESETS.map((preset) => (
-                    <SelectItem key={preset.value} value={preset.value}>
-                      <div className="flex flex-col">
-                        <span>{preset.label}</span>
+                  {(availableWorkflows ?? []).map((wf) => (
+                    <SelectItem key={wf.key} value={wf.key}>
+                      <div className="flex items-center gap-2">
+                        <span>{wf.label}</span>
+                        <span className="text-[10px] text-muted-foreground">({wf.stepCount} steps)</span>
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground">
-                {LISTING_TYPE_PRESETS.find(p => p.value === cm.addForm.transaction_type)?.description}
-              </p>
               {cm.addingToGroup && (
                 <CategoryWorkflowPreview
-                  listingType={cm.addForm.transaction_type}
+                  workflowKey={cm.addForm.transaction_type}
                   parentGroup={cm.addingToGroup}
                 />
               )}
