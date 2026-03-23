@@ -135,6 +135,74 @@ Deno.serve(async (req) => {
     const cleanupIds: { table: string; ids: string[] }[] = [];
     const context: Record<string, any> = {}; // step_id -> response_data
 
+    // Auto-seed test users if they don't exist
+    async function ensureTestUser(actor: string, creds: { email: string; password: string }) {
+      // Check if user exists
+      const { data: existingUsers } = await adminClient.auth.admin.listUsers();
+      const existing = existingUsers?.users?.find((u: any) => u.email === creds.email);
+      if (existing) return existing.id;
+
+      // Create user with auto-confirm
+      const { data: authData, error: authErr } = await adminClient.auth.admin.createUser({
+        email: creds.email,
+        password: creds.password,
+        email_confirm: true,
+      });
+      if (authErr) throw new Error(`Failed to create test user ${actor}: ${authErr.message}`);
+      const userId = authData.user!.id;
+
+      // Get or create test society
+      let societyId: string;
+      const { data: existingSociety } = await adminClient
+        .from("societies")
+        .select("id")
+        .eq("name", "Integration Test Society")
+        .single();
+
+      if (existingSociety) {
+        societyId = existingSociety.id;
+      } else {
+        const { data: newSociety, error: socErr } = await adminClient
+          .from("societies")
+          .insert({
+            name: "Integration Test Society",
+            slug: "integration-test-society",
+            address: "123 Test Lane, Bangalore",
+            latitude: 13.035,
+            longitude: 77.65,
+            is_active: true,
+            security_mode: "basic",
+          })
+          .select("id")
+          .single();
+        if (socErr) throw socErr;
+        societyId = newSociety!.id;
+      }
+
+      // Create profile
+      await adminClient.from("profiles").upsert({
+        id: userId,
+        name: `Integration ${actor.charAt(0).toUpperCase() + actor.slice(1)}`,
+        email: creds.email,
+        flat_number: actor === "buyer" ? "B-204" : actor === "seller" ? "S-101" : "A-001",
+        block: "Tower A",
+        society_id: societyId,
+        verification_status: "approved",
+        phone: `98765432${Object.keys(TEST_ACTORS).indexOf(actor) + 1}`,
+      }, { onConflict: "id" });
+
+      // Grant admin role if needed
+      if (actor === "admin") {
+        await adminClient.from("user_roles").upsert(
+          { user_id: userId, role: "admin" },
+          { onConflict: "user_id,role" }
+        );
+      }
+
+      console.log(`Created test user: ${actor} (${creds.email})`);
+      return userId;
+    }
+
     // Auth clients cache
     const actorClients: Record<string, any> = {};
     async function getActorClient(actor: string) {
@@ -142,6 +210,10 @@ Deno.serve(async (req) => {
       if (actorClients[actor]) return actorClients[actor];
       const creds = TEST_ACTORS[actor];
       if (!creds) throw new Error(`Unknown actor: ${actor}`);
+
+      // Ensure user exists before trying to sign in
+      await ensureTestUser(actor, creds);
+
       const client = createClient(supabaseUrl, anonKey, {
         auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
       });
@@ -157,7 +229,7 @@ Deno.serve(async (req) => {
         const client = await getActorClient(actor);
         const { data: { user } } = await client.auth.getUser();
         if (user) context[`${actor}_user`] = { id: user.id, email: user.email };
-      } catch (_) { /* skip if auth fails */ }
+      } catch (e) { console.error(`Actor ${actor} init failed:`, e.message); }
     }
 
     await adminClient
