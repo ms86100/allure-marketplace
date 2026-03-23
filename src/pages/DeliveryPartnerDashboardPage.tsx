@@ -298,7 +298,7 @@ export default function DeliveryPartnerDashboardPage() {
     );
   }
 
-  const activeCount = deliveries.filter(d => ['assigned', 'picked_up', 'at_gate'].includes(d.status)).length;
+  const activeCount = deliveries.filter(d => !['delivered', 'failed', 'cancelled'].includes(d.status)).length;
 
   return (
     <AppLayout headerTitle="My Deliveries" showLocation={false}>
