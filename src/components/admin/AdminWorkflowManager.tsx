@@ -370,20 +370,24 @@ export function AdminWorkflowManager() {
                 </div>
 
                 {overrides.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap pl-12">
-                    {overrides.map(ov => (
-                      <Badge
-                        key={ov.parent_group}
-                        variant="secondary"
-                        className="text-[10px] px-2 py-0.5 cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
-                        onClick={() => openEditor(ov)}
-                      >
-                        {formatName(ov.parent_group)} · {ov.steps.filter(s => !(s as any).is_deprecated).length}
-                      </Badge>
-                    ))}
-                    <span className="text-[10px] text-muted-foreground">
-                      {overrides.length} override{overrides.length > 1 ? 's' : ''}
-                    </span>
+                  <div className="pl-12 space-y-1.5">
+                    <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
+                      <AlertTriangle size={11} className="shrink-0" />
+                      <span>{overrides.length} category override{overrides.length > 1 ? 's' : ''} — these take priority over default</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {overrides.map(ov => (
+                        <Badge
+                          key={ov.parent_group}
+                          variant="outline"
+                          className="text-[10px] px-2.5 py-1 cursor-pointer border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-400 transition-colors font-medium"
+                          onClick={() => openEditor(ov)}
+                        >
+                          <AlertTriangle size={10} className="mr-1 shrink-0" />
+                          Override: {formatName(ov.parent_group)} · {ov.steps.filter(s => !(s as any).is_deprecated).length} steps
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>
