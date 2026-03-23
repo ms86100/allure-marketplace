@@ -169,7 +169,7 @@ function SortableCategoryItem({ cat, groupIsActive, onToggle, onEdit, onDelete, 
           <span className={cn('text-sm font-medium block truncate', !cat.is_active && 'text-muted-foreground')}>{cat.display_name}</span>
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] text-muted-foreground">
-              {LISTING_TYPE_PRESETS.find(p => p.value === cat.transaction_type)?.label || cat.transaction_type || 'Product'}
+              {(cat.transaction_type || 'cart_purchase').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
             </span>
             <span className="text-[10px] text-muted-foreground font-mono">({cat.category})</span>
             {!cat.image_url && <span className="text-[10px] text-amber-500 font-semibold">No image</span>}
