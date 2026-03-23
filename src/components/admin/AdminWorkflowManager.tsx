@@ -392,20 +392,40 @@ export function AdminWorkflowManager() {
                           <label htmlFor={`success-${index}`} className="text-[11px] text-muted-foreground">✅ Success</label>
                         </div>
                       </div>
-                      {/* Multi-Actor Indicator: show which actors have transitions FROM this step */}
-                      {(() => {
-                        const actorsWithTransitions = [...new Set(transitions.filter(t => t.from_status === step.status_key).map(t => t.allowed_actor))];
-                        if (actorsWithTransitions.length <= 1) return null;
-                        return (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Actors</span>
-                            {actorsWithTransitions.map(a => (
-                              <Badge key={a} variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-primary/5 border-primary/20 text-primary">{a}</Badge>
-                            ))}
-                            <span className="text-[9px] text-muted-foreground italic ml-1">Multi-actor step</span>
-                          </div>
-                        );
-                      })()}
+                      {/* Allowed Actors: clickable toggles that auto-manage transitions */}
+                      {!step.is_terminal && step.status_key && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Allowed Actors</span>
+                          {ACTORS.map(actor => {
+                            const hasAnyTransition = transitions.some(t => t.from_status === step.status_key && t.allowed_actor === actor);
+                            return (
+                              <button
+                                key={actor}
+                                onClick={() => {
+                                  if (hasAnyTransition) {
+                                    // Remove all transitions from this step for this actor
+                                    setTransitions(prev => prev.filter(t => !(t.from_status === step.status_key && t.allowed_actor === actor)));
+                                  } else {
+                                    // Auto-create transition to the next step in pipeline for this actor
+                                    const nextStep = editSteps.find((s, i) => i > index && s.status_key);
+                                    if (nextStep) {
+                                      setTransitions(prev => [...prev, { from_status: step.status_key, to_status: nextStep.status_key, allowed_actor: actor }]);
+                                    }
+                                  }
+                                }}
+                                className={cn(
+                                  "text-[10px] px-2 py-0.5 rounded-md border transition-all",
+                                  hasAnyTransition
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                )}
+                              >
+                                {actor}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-2">
                         <Input value={step.buyer_hint} onChange={(e) => updateStep(index, 'buyer_hint', e.target.value)} placeholder="Buyer hint message" className="h-7 text-xs rounded-lg" />
                         <Input value={step.seller_hint} onChange={(e) => updateStep(index, 'seller_hint', e.target.value)} placeholder="Seller hint message" className="h-7 text-xs rounded-lg" />
