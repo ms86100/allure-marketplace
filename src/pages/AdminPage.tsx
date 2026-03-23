@@ -40,6 +40,7 @@ import AdminFeedbackViewer from '@/components/admin/AdminFeedbackViewer';
 import { NotificationDiagnostics } from '@/components/admin/NotificationDiagnostics';
 import OtpSettings from '@/components/admin/OtpSettings';
 import { AdminCronManager } from '@/components/admin/AdminCronManager';
+import AdminTestScenariosTab from '@/components/admin/AdminTestScenariosTab';
 import { useAdminData } from '@/hooks/useAdminData';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
