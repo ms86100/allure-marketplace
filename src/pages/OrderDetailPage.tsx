@@ -189,7 +189,7 @@ export default function OrderDetailPage() {
   const buyer = (order as any).buyer;
   const items: OrderItem[] = (order as any).items || [];
   const hasItemsField = 'items' in (order as any);
-  const statusInfo = o.getOrderStatus(order.status);
+  const statusInfo = o.getFlowStepLabel(order.status);
   const paymentStatusInfo = o.getPaymentStatus((order.payment_status as PaymentStatus) || 'pending');
   const displayStatuses = o.displayStatuses;
   const isInTransit = o.isInTransit;

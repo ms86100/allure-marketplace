@@ -33,11 +33,11 @@ interface SellerOrderCardProps {
 }
 
 export function SellerOrderCard({ order }: SellerOrderCardProps) {
-  const { getOrderStatus } = useStatusLabels();
+  const { getFlowLabel } = useFlowStepLabels();
   const { formatPrice } = useCurrency();
   const buyer = order.buyer;
   const items = order.items || [];
-  const statusInfo = getOrderStatus(order.status);
+  const statusInfo = getFlowLabel(order.status);
 
   // Calculate item-level stats
   const itemStatuses = items.map(item => item.status || 'pending');

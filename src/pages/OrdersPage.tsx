@@ -21,9 +21,9 @@ import { useCurrency } from '@/hooks/useCurrency';
 const PAGE_SIZE = 20;
 
 function OrderCard({ order, type, successTerminals }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string> }) {
-  const { getOrderStatus } = useStatusLabels();
+  const { getFlowLabel } = useFlowStepLabels();
   const { formatPrice } = useCurrency();
-  const statusInfo = getOrderStatus(order.status);
+  const statusInfo = getFlowLabel(order.status);
   const seller = (order as any).seller;
   const buyer = (order as any).buyer;
   const items = (order as any).items || [];
