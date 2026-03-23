@@ -80,7 +80,9 @@ export default function OrderDetailPage() {
   const order = o.order;
   const orderId = order?.id;
   const fulfillmentType = o.orderFulfillmentType;
-  const isDeliveryOrder = ['delivery', 'seller_delivery'].includes(fulfillmentType);
+  // Bug 5 fix: Derive delivery order flag from workflow's is_transit steps — not hardcoded fulfillment types
+  const hasDeliverySteps = o.flow.some((s: any) => s.is_transit === true);
+  const isDeliveryOrder = hasDeliverySteps || ['delivery', 'seller_delivery'].includes(fulfillmentType);
 
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
   const trackingConfig = useTrackingConfig();
