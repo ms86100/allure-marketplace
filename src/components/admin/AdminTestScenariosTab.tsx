@@ -83,7 +83,7 @@ export default function AdminTestScenariosTab() {
   const [showCreate, setShowCreate] = useState(false);
   const [editScenario, setEditScenario] = useState<Scenario | null>(null);
   const [filterModule, setFilterModule] = useState<string>('all');
-
+  const [generating, setGenerating] = useState(false);
   // Form state
   const [formName, setFormName] = useState('');
   const [formModule, setFormModule] = useState('general');
