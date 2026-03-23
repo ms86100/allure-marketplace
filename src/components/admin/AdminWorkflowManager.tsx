@@ -160,16 +160,21 @@ export function AdminWorkflowManager() {
 
       await supabase.from('category_status_flows').delete().eq('parent_group', parent_group).eq('transaction_type', transaction_type);
 
-      const stepsToInsert = editSteps.map((s, i) => ({
+      const stepsToInsert = editSteps.map((s, i) => {
+        // Auto-derive primary actor from transitions (first allowed actor, or fallback to stored value)
+        const stepActors = [...new Set(transitions.filter(t => t.from_status === s.status_key).map(t => t.allowed_actor))];
+        const primaryActor = stepActors[0] || s.actor || 'system';
+        return {
         parent_group, transaction_type, status_key: s.status_key, sort_order: (i + 1) * 10,
-        actor: s.actor, is_terminal: s.is_terminal, display_label: s.display_label || s.status_key,
+        actor: primaryActor, is_terminal: s.is_terminal, display_label: s.display_label || s.status_key,
         color: s.color, icon: s.icon, buyer_hint: s.buyer_hint, seller_hint: s.seller_hint,
         notify_buyer: s.notify_buyer, notification_title: s.notification_title || null,
         notification_body: s.notification_body || null, notification_action: s.notification_action || null,
         notify_seller: s.notify_seller, seller_notification_title: s.seller_notification_title || null,
         seller_notification_body: s.seller_notification_body || null,
         is_transit: s.is_transit, requires_otp: s.requires_otp, is_success: s.is_success,
-      }));
+        };
+      });
       const { error: insertError } = await supabase.from('category_status_flows').insert(stepsToInsert);
       if (insertError) throw insertError;
 
@@ -359,10 +364,6 @@ export function AdminWorkflowManager() {
                         <span className="text-[10px] font-mono text-muted-foreground w-5">{index + 1}</span>
                         <Input value={step.status_key} onChange={(e) => updateStep(index, 'status_key', e.target.value)} placeholder="status_key" className="h-8 text-xs font-mono flex-1 rounded-lg" />
                         {(step as any).is_deprecated && <Badge variant="outline" className="text-[9px] bg-amber-100 text-amber-700 border-amber-300 shrink-0">Deprecated</Badge>}
-                        <Select value={step.actor} onValueChange={(v) => updateStep(index, 'actor', v)}>
-                          <SelectTrigger className="h-8 text-xs w-24 rounded-lg"><SelectValue /></SelectTrigger>
-                          <SelectContent>{ACTORS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-                        </Select>
                         <button onClick={() => removeStep(index)} className="text-destructive hover:text-destructive/80"><Trash2 size={14} /></button>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
