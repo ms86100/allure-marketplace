@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,13 +10,11 @@ import { FeatureGate } from '@/components/ui/FeatureGate';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Truck, Package, MapPin, Clock, CheckCircle2, Phone, Navigation, Loader2, Radio, ShieldCheck } from 'lucide-react';
-import { useStatusLabels } from '@/hooks/useStatusLabels';
+import { Truck, Package, CheckCircle2, Loader2, Radio } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useBackgroundLocationTracking } from '@/hooks/useBackgroundLocationTracking';
 import { DeliveryCompletionOtpDialog } from '@/components/delivery/DeliveryCompletionOtpDialog';
-import { format } from 'date-fns';
-import type { StatusFlowStep } from '@/hooks/useCategoryStatusFlow';
+import { DeliveryActionCard } from '@/components/delivery/DeliveryActionCard';
 
 /** Fetch the delivery-relevant workflow steps for an order */
 function useDeliveryWorkflow(orderId: string | undefined) {
