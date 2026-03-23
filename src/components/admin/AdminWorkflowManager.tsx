@@ -247,12 +247,15 @@ export function AdminWorkflowManager() {
         if (transError) throw transError;
       }
 
-      // Bug 2 fix: Auto-sync transit_statuses system setting from workflow is_transit flags
+      // Sync transit_statuses system setting — scoped to delivery-related workflows only
+      // to prevent pickup-only workflows from polluting transit status lists
       try {
+        const DELIVERY_WORKFLOWS = ['cart_purchase', 'seller_delivery'];
         const { data: allFlows } = await supabase
           .from('category_status_flows')
-          .select('status_key, is_transit')
-          .eq('is_transit', true);
+          .select('status_key, is_transit, transaction_type')
+          .eq('is_transit', true)
+          .in('transaction_type', DELIVERY_WORKFLOWS);
         if (allFlows) {
           const transitKeys = [...new Set(allFlows.map(f => f.status_key))];
           const transitJson = JSON.stringify(transitKeys);
