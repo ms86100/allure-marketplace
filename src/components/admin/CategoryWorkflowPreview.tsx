@@ -65,7 +65,7 @@ export function CategoryWorkflowPreview({ workflowKey, parentGroup, category }: 
       if (parentGroup !== 'default') {
         const fallback = await supabase
           .from('category_status_flows')
-          .select('status_key, display_label, icon, color, sort_order, is_terminal, actor, is_deprecated, is_transit, requires_otp, is_success')
+          .select('status_key, display_label, icon, color, sort_order, is_terminal, actor, is_deprecated, is_transit, requires_otp, is_success, creates_tracking_assignment')
           .eq('parent_group', 'default')
           .eq('transaction_type', workflowKey)
           .order('sort_order');
