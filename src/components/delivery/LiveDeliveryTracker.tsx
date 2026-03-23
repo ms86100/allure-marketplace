@@ -139,8 +139,9 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
 
   if (!tracking.status) return null;
 
+  // Use workflow-derived isInTransit prop when available, fallback to system_settings
   const transitSet = new Set(trackingConfig.transit_statuses);
-  const isInTransit = transitSet.has(tracking.status);
+  const isInTransit = isInTransitProp ?? (tracking.status ? transitSet.has(tracking.status) : false);
   const lastSeen = getLastSeenText(tracking.lastLocationAt);
 
   return (
