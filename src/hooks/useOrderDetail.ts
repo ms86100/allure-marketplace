@@ -45,6 +45,7 @@ export function useOrderDetail(id: string | undefined) {
   const sellerPrimaryGroup = seller?.primary_group;
   const orderType = (order as any)?.order_type;
   const [derivedParentGroup, setDerivedParentGroup] = useState<string | null>(null);
+  const [derivedListingType, setDerivedListingType] = useState<string | null>(null);
 
   // Derive parent_group inside fetchOrder to avoid an extra render-cycle waterfall.
   // The useEffect fallback is kept ONLY for edge cases where seller.primary_group is null
@@ -55,7 +56,7 @@ export function useOrderDetail(id: string | undefined) {
   const isEnquiryOrder = (order as any)?.order_type === 'enquiry';
   const orderFulfillmentType = (order as any)?.fulfillment_type || 'self_pickup';
   const deliveryHandledBy = (order as any)?.delivery_handled_by || null;
-  const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy);
+  const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType);
 
   const isUrgentOrder = hasAutoCancelAt && !!order?.status && isFirstFlowStep(flow, order.status);
   const isUrgentSellerView = isUrgentOrder && isSellerView;
@@ -65,8 +66,8 @@ export function useOrderDetail(id: string | undefined) {
 
   // Load transitions for accurate next-status and cancellation checks
   const resolvedTxnType = useMemo(
-    () => resolveTransactionType(effectiveParentGroup || 'default', orderType, orderFulfillmentType, deliveryHandledBy),
-    [effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy]
+    () => resolveTransactionType(effectiveParentGroup || 'default', orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType),
+    [effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType]
   );
   const transitions = useStatusTransitions(effectiveParentGroup || 'default', resolvedTxnType);
 
@@ -153,13 +154,18 @@ export function useOrderDetail(id: string | undefined) {
       if (!data) { setOrder(null); return; }
       if (cancelled) return;
 
-      // Derive parent_group inline if seller doesn't have one — avoids extra render cycle
+      // Derive parent_group and listing_type inline — avoids extra render cycle
       const sellerPg = (data as any)?.seller?.primary_group;
-      if (!sellerPg && !derivedParentGroupRef.current) {
-        const firstItem = (data as any)?.items?.[0];
-        if (firstItem?.product_id) {
-          const { data: product } = await supabase.from('products').select('category').eq('id', firstItem.product_id).single();
-          if (product?.category) {
+      const firstItem = (data as any)?.items?.[0];
+      if (firstItem?.product_id && (!sellerPg || !derivedListingType)) {
+        const { data: product } = await supabase.from('products').select('category, listing_type').eq('id', firstItem.product_id).single();
+        if (!cancelled && product) {
+          // Set listing_type for workflow resolution (critical for contact_only)
+          if (product.listing_type && !derivedListingType) {
+            setDerivedListingType(product.listing_type);
+          }
+          // Derive parent_group if seller doesn't have one
+          if (!sellerPg && !derivedParentGroupRef.current && product.category) {
             const { data: catConfig } = await supabase.from('category_config').select('parent_group').eq('category', product.category as any).single();
             if (catConfig?.parent_group && !cancelled) {
               setDerivedParentGroup(catConfig.parent_group);
