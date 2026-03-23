@@ -19,6 +19,7 @@ export function UrgentOrderTimer({
 }: UrgentOrderTimerProps) {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isSyncingTimeout, setIsSyncingTimeout] = useState(false);
+  const [syncExpired, setSyncExpired] = useState(false);
   const timeoutHandledRef = useRef(false);
 
   const calculateTimeLeft = useCallback(() => {
