@@ -196,7 +196,7 @@ export default function DeliveryPartnerDashboardPage() {
   // Auto-start tracking for existing in-transit deliveries on mount
   useEffect(() => {
     if (!deliveries || deliveries.length === 0) return;
-    const inTransit = deliveries.find((d: any) => ['picked_up', 'at_gate'].includes(d.status));
+    const inTransit = deliveries.find((d: any) => !['pending', 'assigned', 'delivered', 'failed', 'cancelled'].includes(d.status));
     if (inTransit && !activeTrackingId) {
       setActiveTrackingId(inTransit.id);
     }
