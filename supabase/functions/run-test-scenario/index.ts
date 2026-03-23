@@ -377,10 +377,12 @@ Deno.serve(async (req) => {
           response_data: data,
         });
       } catch (err) {
+        const fix = suggestFix(err.message, step);
         results.push({
           step_id: step.step_id, label: step.label, outcome: "failed",
           duration_ms: Math.round(performance.now() - start),
           error_message: err.message,
+          suggested_fix: fix,
         });
         if (step.on_fail === "abort") break;
         if (step.on_fail === "skip_remaining") skipRemaining = true;
