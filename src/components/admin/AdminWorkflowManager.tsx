@@ -15,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { toast } from 'sonner';
 import {
   GitBranch, Plus, Trash2, Save, ChevronRight,
-  ArrowRight, Copy, HelpCircle,
+  ArrowRight, Copy, HelpCircle, AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { type FlowStep, type Transition, type WorkflowGroup, ACTORS, TRANSACTION_TYPES, formatName } from './workflow/types';
