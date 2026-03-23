@@ -54,9 +54,9 @@ interface StepResult {
   response_data?: any;
 }
 
-const MODULES = ['checkout', 'booking', 'seller', 'delivery', 'auth', 'cart', 'payment', 'general'];
-const ACTIONS = ['select', 'insert', 'update', 'delete', 'rpc', 'assert'];
-const ACTORS = ['buyer', 'seller', 'admin', 'guard'];
+const MODULES = ['checkout', 'cart', 'lifecycle', 'rls', 'edge_cases', 'booking', 'seller', 'delivery', 'auth', 'payment', 'general'];
+const ACTIONS = ['select', 'insert', 'update', 'delete', 'rpc', 'assert', 'setup'];
+const ACTORS = ['buyer', 'seller', 'admin', 'guard', 'service_role'];
 
 const resultColor: Record<string, string> = {
   passed: 'bg-emerald-500/10 text-emerald-600 border-emerald-200',
