@@ -96,8 +96,7 @@ export function AdminWorkflowManager() {
       group.step_count++;
     }
 
-    // Filter out fulfillment sub-variants (seller_delivery, self_fulfillment) — they are auto-derived at runtime
-    setWorkflows(Array.from(groupMap.values()).filter(wf => !FULFILLMENT_VARIANTS.includes(wf.transaction_type)));
+    setWorkflows(Array.from(groupMap.values()));
     setIsLoading(false);
   };
 
