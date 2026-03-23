@@ -11,10 +11,11 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import {
   GitBranch, Plus, Trash2, Save, ChevronRight,
-  ArrowRight, Copy,
+  ArrowRight, Copy, HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { type FlowStep, type Transition, type WorkflowGroup, ACTORS, FULFILLMENT_VARIANTS, formatName } from './workflow/types';
@@ -23,6 +24,36 @@ import { TransitionRulesEditor } from './workflow/TransitionRulesEditor';
 import { CloneWorkflowDialog } from './workflow/CloneWorkflowDialog';
 import { DeleteWorkflowDialog } from './workflow/DeleteWorkflowDialog';
 import { WorkflowLinkage } from './workflow/WorkflowLinkage';
+
+/** Inline label with tooltip helper */
+function FieldLabel({ label, tooltip, className }: { label: string; tooltip: string; className?: string }) {
+  return (
+    <div className={cn("flex items-center gap-1 mb-0.5", className)}>
+      <span className="text-[10px] font-medium text-muted-foreground">{label}</span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <HelpCircle size={11} className="text-muted-foreground/50 cursor-help shrink-0" />
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[220px] text-xs">
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
+/** Predefined badge color options */
+const BADGE_COLORS = [
+  { label: 'Blue', value: 'bg-blue-100 text-blue-700', preview: 'bg-blue-500' },
+  { label: 'Green', value: 'bg-green-100 text-green-700', preview: 'bg-green-500' },
+  { label: 'Yellow', value: 'bg-yellow-100 text-yellow-700', preview: 'bg-yellow-500' },
+  { label: 'Orange', value: 'bg-orange-100 text-orange-700', preview: 'bg-orange-500' },
+  { label: 'Red', value: 'bg-red-100 text-red-700', preview: 'bg-red-500' },
+  { label: 'Purple', value: 'bg-purple-100 text-purple-700', preview: 'bg-purple-500' },
+  { label: 'Pink', value: 'bg-pink-100 text-pink-700', preview: 'bg-pink-500' },
+  { label: 'Gray', value: 'bg-gray-100 text-gray-600', preview: 'bg-gray-500' },
+  { label: 'Teal', value: 'bg-teal-100 text-teal-700', preview: 'bg-teal-500' },
+];
 
 export function AdminWorkflowManager() {
   const [workflows, setWorkflows] = useState<WorkflowGroup[]>([]);
