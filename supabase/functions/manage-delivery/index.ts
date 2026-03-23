@@ -201,9 +201,7 @@ async function handleUpdateStatus(req: Request, db: any, userId: string) {
 
   if (!assignment_id || !status) return jsonResponse({ error: 'assignment_id and status required' }, 400);
 
-  const validStatuses = ['picked_up', 'at_gate', 'failed', 'cancelled'];
-  if (!validStatuses.includes(status)) return jsonResponse({ error: `Invalid status: ${status}` }, 400);
-
+  // DB-driven: validate status against allowed delivery transitions
   const { data: assignment } = await db
     .from('delivery_assignments')
     .select('id, order_id, society_id, status as current_status')
@@ -211,6 +209,29 @@ async function handleUpdateStatus(req: Request, db: any, userId: string) {
     .single();
 
   if (!assignment) return jsonResponse({ error: 'Assignment not found' }, 404);
+
+  // Look up the order's transaction_type to validate against DB transitions
+  const { data: orderData } = await db
+    .from('orders')
+    .select('transaction_type, seller_id')
+    .eq('id', assignment.order_id)
+    .single();
+
+  const txnType = orderData?.transaction_type || 'self_fulfillment';
+
+  // Query valid delivery transitions from DB
+  const { data: validTransitions } = await db
+    .from('category_status_transitions')
+    .select('to_status')
+    .eq('transaction_type', txnType)
+    .eq('allowed_actor', 'delivery');
+
+  const validStatuses = new Set((validTransitions || []).map((t: any) => t.to_status));
+  // Always allow system-level statuses
+  validStatuses.add('failed');
+  validStatuses.add('cancelled');
+
+  if (!validStatuses.has(status)) return jsonResponse({ error: `Invalid status: ${status}` }, 400);
 
   const updateData: Record<string, any> = { status };
 
