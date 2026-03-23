@@ -43,7 +43,7 @@ export function AdminWorkflowManager() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('category_status_flows')
-      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint, seller_hint, id, notify_buyer, notification_title, notification_body, notification_action, notify_seller, seller_notification_title, seller_notification_body, is_deprecated')
+      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint, seller_hint, id, notify_buyer, notification_title, notification_body, notification_action, notify_seller, seller_notification_title, seller_notification_body, is_deprecated, is_transit, requires_otp, is_success')
       .order('parent_group')
       .order('transaction_type')
       .order('sort_order', { ascending: true });
@@ -61,7 +61,7 @@ export function AdminWorkflowManager() {
         groupMap.set(key, { parent_group: row.parent_group, transaction_type: row.transaction_type, steps: [], step_count: 0 });
       }
       const group = groupMap.get(key)!;
-      group.steps.push({ ...row, seller_hint: (row as any).seller_hint || '', notify_buyer: (row as any).notify_buyer || false, notification_title: (row as any).notification_title || '', notification_body: (row as any).notification_body || '', notification_action: (row as any).notification_action || '', notify_seller: (row as any).notify_seller || false, seller_notification_title: (row as any).seller_notification_title || '', seller_notification_body: (row as any).seller_notification_body || '' } as FlowStep);
+      group.steps.push({ ...row, seller_hint: (row as any).seller_hint || '', notify_buyer: (row as any).notify_buyer || false, notification_title: (row as any).notification_title || '', notification_body: (row as any).notification_body || '', notification_action: (row as any).notification_action || '', notify_seller: (row as any).notify_seller || false, seller_notification_title: (row as any).seller_notification_title || '', seller_notification_body: (row as any).seller_notification_body || '', is_transit: !!(row as any).is_transit, requires_otp: !!(row as any).requires_otp, is_success: !!(row as any).is_success } as FlowStep);
       group.step_count++;
     }
 
@@ -88,6 +88,7 @@ export function AdminWorkflowManager() {
       display_label: '', color: 'bg-gray-100 text-gray-600', icon: 'Circle', buyer_hint: '', seller_hint: '',
       notify_buyer: false, notification_title: '', notification_body: '', notification_action: '',
       notify_seller: false, seller_notification_title: '', seller_notification_body: '',
+      is_transit: false, requires_otp: false, is_success: false,
     }]);
   };
 
@@ -167,6 +168,7 @@ export function AdminWorkflowManager() {
         notification_body: s.notification_body || null, notification_action: s.notification_action || null,
         notify_seller: s.notify_seller, seller_notification_title: s.seller_notification_title || null,
         seller_notification_body: s.seller_notification_body || null,
+        is_transit: s.is_transit, requires_otp: s.requires_otp, is_success: s.is_success,
       }));
       const { error: insertError } = await supabase.from('category_status_flows').insert(stepsToInsert);
       if (insertError) throw insertError;
@@ -372,6 +374,22 @@ export function AdminWorkflowManager() {
                         <div className="flex items-center gap-2">
                           <Checkbox checked={step.is_terminal} onCheckedChange={(v) => updateStep(index, 'is_terminal', !!v)} id={`terminal-${index}`} />
                           <label htmlFor={`terminal-${index}`} className="text-xs text-muted-foreground">Terminal</label>
+                        </div>
+                      </div>
+                      {/* Behavior Flags */}
+                      <div className="flex items-center gap-4 flex-wrap border-t border-border/30 pt-2 mt-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Flags</span>
+                        <div className="flex items-center gap-1.5">
+                          <Checkbox checked={step.is_transit} onCheckedChange={(v) => updateStep(index, 'is_transit', !!v)} id={`transit-${index}`} />
+                          <label htmlFor={`transit-${index}`} className="text-[11px] text-muted-foreground">🚚 Transit</label>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Checkbox checked={step.requires_otp} onCheckedChange={(v) => updateStep(index, 'requires_otp', !!v)} id={`otp-${index}`} />
+                          <label htmlFor={`otp-${index}`} className="text-[11px] text-muted-foreground">🔐 OTP</label>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Checkbox checked={step.is_success} onCheckedChange={(v) => updateStep(index, 'is_success', !!v)} id={`success-${index}`} />
+                          <label htmlFor={`success-${index}`} className="text-[11px] text-muted-foreground">✅ Success</label>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2">

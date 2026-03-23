@@ -1,7 +1,7 @@
 import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { type FlowStep, type Transition, formatName } from './types';
 import { cn } from '@/lib/utils';
-import { CircleStop, Play } from 'lucide-react';
+import { CircleStop, Play, Truck, KeyRound, CheckCircle2 } from 'lucide-react';
 
 const ACTOR_COLORS: Record<string, string> = {
   buyer: 'hsl(var(--primary))',
@@ -220,7 +220,16 @@ export function WorkflowFlowDiagram({ steps, transitions }: Props) {
               {isFirst && (
                 <Play size={10} className="text-primary shrink-0" />
               )}
+              {step.is_transit && (
+                <Truck size={9} className="text-blue-500 shrink-0" />
+              )}
+              {step.requires_otp && (
+                <KeyRound size={9} className="text-amber-500 shrink-0" />
+              )}
               <span>{step.display_label || formatName(step.status_key)}</span>
+              {step.is_success && (
+                <CheckCircle2 size={9} className="text-emerald-500 shrink-0" />
+              )}
               {isTerminal && (
                 <CircleStop size={10} className="text-green-600 dark:text-green-400 shrink-0" />
               )}
