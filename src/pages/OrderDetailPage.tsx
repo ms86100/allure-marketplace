@@ -492,7 +492,7 @@ export default function OrderDetailPage() {
               <p className="text-[10px] text-warning mt-1.5">⚠️ Only share when you've received your items. This code confirms delivery is complete.</p>
             </div>
           )}
-          {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} />}
+          {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} flow={o.flow} />}
 
           {o.canReorder && (
             <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 flex items-center justify-between">
