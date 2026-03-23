@@ -269,7 +269,12 @@ export function useOrderDetail(id: string | undefined) {
   };
 
   const handleReject = async (reason: string) => { await updateOrderStatus('cancelled', reason); };
-  const handleTimeout = () => { fetchOrder(); };
+  const handleTimeout = () => {
+    // Proactively trigger the auto-cancel edge function so we don't wait for cron
+    supabase.functions.invoke('auto-cancel-orders', { method: 'POST', body: {} }).catch(() => {});
+    // Then re-fetch to pick up the cancellation
+    setTimeout(() => fetchOrder(), 2000);
+  };
 
   const isBuyerView = order ? order.buyer_id === user?.id : false;
   const nextStatus = getNextStatus();
