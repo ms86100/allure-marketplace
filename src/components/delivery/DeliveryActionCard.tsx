@@ -23,10 +23,8 @@ function useDeliveryWorkflow(orderId: string | undefined) {
       if (!order) return null;
 
       const parentGroup = (order as any)?.seller?.primary_group || 'default';
-      let txnType = 'cart_purchase';
-      if (order.fulfillment_type === 'seller_delivery' || (order.fulfillment_type === 'delivery' && order.delivery_handled_by !== 'platform')) {
-        txnType = 'seller_delivery';
-      }
+      // Use the stored transaction_type from the order (set at creation) — single source of truth
+      const txnType = (order as any)?.transaction_type || 'cart_purchase';
 
       const { data: steps } = await supabase
         .from('category_status_flows')
