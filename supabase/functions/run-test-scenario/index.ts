@@ -336,7 +336,11 @@ Deno.serve(async (req) => {
           }
           case "rpc": {
             const res = await client.rpc(resolvedParams?.function_name, resolvedParams?.args || {});
-            data = res.data; error = res.error;
+            data = res.data;
+            error = res.error;
+            if (!error && data && typeof data === "object" && data.success === false) {
+              error = { message: data.error || `RPC ${resolvedParams?.function_name} returned success=false` };
+            }
             break;
           }
           case "assert": {
