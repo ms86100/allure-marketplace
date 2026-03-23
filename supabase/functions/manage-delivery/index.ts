@@ -210,7 +210,7 @@ async function handleUpdateStatus(req: Request, db: any, userId: string) {
 
   if (!assignment) return jsonResponse({ error: 'Assignment not found' }, 404);
 
-  // Look up the order's transaction_type to validate against DB transitions
+  // Look up the order's transaction_type + seller's parent_group for workflow validation
   const { data: orderData } = await db
     .from('orders')
     .select('transaction_type, seller_id')
@@ -219,12 +219,38 @@ async function handleUpdateStatus(req: Request, db: any, userId: string) {
 
   const txnType = orderData?.transaction_type || 'self_fulfillment';
 
-  // Query valid delivery transitions from DB
-  const { data: validTransitions } = await db
+  // Bug 1 fix: Derive parent_group from seller for accurate transition lookup
+  let parentGroup = 'default';
+  if (orderData?.seller_id) {
+    const { data: sellerData } = await db
+      .from('seller_profiles')
+      .select('primary_group')
+      .eq('id', orderData.seller_id)
+      .single();
+    if (sellerData?.primary_group) parentGroup = sellerData.primary_group;
+  }
+
+  // Bug 1 fix: Validate transition using from_status + parent_group (matching frontend logic)
+  // First try specific parent_group, then fallback to 'default'
+  let { data: validTransitions } = await db
     .from('category_status_transitions')
     .select('to_status')
+    .eq('parent_group', parentGroup)
     .eq('transaction_type', txnType)
+    .eq('from_status', assignment.current_status)
     .eq('allowed_actor', 'delivery');
+
+  // Fallback to default parent_group if no transitions found
+  if ((!validTransitions || validTransitions.length === 0) && parentGroup !== 'default') {
+    const fallback = await db
+      .from('category_status_transitions')
+      .select('to_status')
+      .eq('parent_group', 'default')
+      .eq('transaction_type', txnType)
+      .eq('from_status', assignment.current_status)
+      .eq('allowed_actor', 'delivery');
+    validTransitions = fallback.data;
+  }
 
   const validStatuses = new Set((validTransitions || []).map((t: any) => t.to_status));
   // Always allow system-level statuses
@@ -235,8 +261,67 @@ async function handleUpdateStatus(req: Request, db: any, userId: string) {
 
   const updateData: Record<string, any> = { status };
 
+  // Bug 3 fix: Check if the NEXT step in the workflow requires OTP — generate OTP dynamically
+  const { data: nextFlowStep } = await db
+    .from('category_status_flows')
+    .select('requires_otp')
+    .eq('transaction_type', txnType)
+    .eq('parent_group', parentGroup)
+    .eq('status_key', status)
+    .maybeSingle();
+
+  // Also check default parent_group for requires_otp
+  let nextStepRequiresOtp = nextFlowStep?.requires_otp === true;
+  if (!nextFlowStep && parentGroup !== 'default') {
+    const { data: defaultStep } = await db
+      .from('category_status_flows')
+      .select('requires_otp')
+      .eq('transaction_type', txnType)
+      .eq('parent_group', 'default')
+      .eq('status_key', status)
+      .maybeSingle();
+    nextStepRequiresOtp = defaultStep?.requires_otp === true;
+  }
+
+  // Bug 3 fix: Generate OTP when entering a status that PRECEDES an OTP-requiring step
+  // OR when the current step itself requires OTP (the OTP is for the delivery confirmation)
+  // We check: does any step after this one have requires_otp = true?
+  let shouldGenerateOtp = false;
+  {
+    const { data: allFlowSteps } = await db
+      .from('category_status_flows')
+      .select('status_key, sort_order, requires_otp')
+      .eq('transaction_type', txnType)
+      .eq('parent_group', parentGroup !== 'default' ? parentGroup : 'default')
+      .order('sort_order', { ascending: true });
+
+    if (allFlowSteps && allFlowSteps.length > 0) {
+      const currentStepIdx = allFlowSteps.findIndex((s: any) => s.status_key === status);
+      if (currentStepIdx >= 0) {
+        // Check if any subsequent step requires OTP
+        const futureOtpStep = allFlowSteps.slice(currentStepIdx + 1).find((s: any) => s.requires_otp === true);
+        // Generate OTP on this status if a future step needs it and we haven't generated one yet
+        if (futureOtpStep) {
+          // Check if OTP already exists on the assignment
+          const { data: currentAssignment } = await db
+            .from('delivery_assignments')
+            .select('otp_hash')
+            .eq('id', assignment_id)
+            .single();
+          if (!currentAssignment?.otp_hash) {
+            shouldGenerateOtp = true;
+          }
+        }
+      }
+    }
+  }
+
   if (status === 'picked_up') {
     updateData.pickup_at = new Date().toISOString();
+  }
+
+  // Bug 3 fix: Dynamic OTP generation based on workflow, not hardcoded status
+  if (shouldGenerateOtp) {
     const otp = generateOTP();
     updateData.otp_hash = await hashOTP(otp);
     updateData.otp_expires_at = new Date(Date.now() + 30 * 60 * 1000).toISOString();
@@ -249,7 +334,7 @@ async function handleUpdateStatus(req: Request, db: any, userId: string) {
         body: `Your delivery OTP is ${otp}. Share this with the delivery partner to confirm delivery.`,
         type: 'delivery',
         reference_path: `/orders/${assignment.order_id}`,
-        payload: { orderId: assignment.order_id, deliveryStatus: 'picked_up' },
+        payload: { orderId: assignment.order_id, deliveryStatus: status },
       });
 
       const { data: asgn } = await db
@@ -291,8 +376,6 @@ async function handleUpdateStatus(req: Request, db: any, userId: string) {
         });
       }
     }
-
-    await db.from('orders').update({ status: 'picked_up' }).eq('id', assignment.order_id);
   }
 
   if (status === 'failed') {
@@ -336,6 +419,12 @@ async function handleUpdateStatus(req: Request, db: any, userId: string) {
     .eq('id', assignment_id);
 
   if (error) return jsonResponse({ error: error.message }, 500);
+
+  // Bug 2 fix: Sync orders.status for ALL delivery status updates (not just picked_up)
+  // Skip terminal/failure statuses which have their own order update logic above
+  if (!['failed', 'cancelled'].includes(status)) {
+    await db.from('orders').update({ status }).eq('id', assignment.order_id);
+  }
 
   await db.from('delivery_tracking_logs').insert({
     assignment_id,
