@@ -1,16 +1,29 @@
 
 
-## Plan: Multi-Actor Support for Workflow Actions — ✅ IMPLEMENTED
+## Plan: Multi-Select "Waiting On" Actor Field
 
 ### Problem
-The system only queried transitions for a single actor (`'seller'`), but workflows need multiple actors to perform the same action (e.g., seller acting as delivery agent in self-delivery).
+The "Waiting On" dropdown is a single-select, but some steps need multiple actors displayed (e.g., `picked_up` is waiting on both seller and delivery). The DB `actor` column stores a single value.
 
-### Changes Made
+### Approach
+Keep the DB `actor` column as-is (store the primary/first actor), but change the UI to use **toggle buttons** (like the transition actor toggles) instead of a single-select dropdown. Store the selected actors as a comma-separated string in the `actor` field (e.g., `"seller,delivery"`).
 
-1. **`useCategoryStatusFlow.ts`** — Added `getNextStatusForActors()` helper that accepts an array of actors and returns the first valid next status across all of them. Backward compatible — `getNextStatusForActor` unchanged.
+### Changes
 
-2. **`useOrderDetail.ts`** — `getNextStatus()` now passes `['seller', 'delivery']` when `delivery_handled_by !== 'platform'`, so sellers in self-delivery mode see delivery-actor transitions.
+**1. `src/components/admin/AdminWorkflowManager.tsx`**
+- Replace the single `<Select>` for "Waiting On" (lines 492-512) with clickable toggle buttons for each actor (same style as transition actor badges)
+- Each actor button toggles on/off; at least one must remain selected
+- On save, join selected actors with comma → store in `actor` column (line 197)
+- On load, split `actor` string by comma to populate toggle state
 
-3. **`manage-delivery` edge function** — Transition validation changed from `.eq('allowed_actor', 'delivery')` to `.in('allowed_actor', ['delivery', 'seller'])`, so sellers can call delivery actions in self-delivery workflows.
+**2. `src/hooks/useCategoryStatusFlow.ts`** (read-only awareness)
+- The `actor` field is currently used for display hints ("Waiting for X"). Code that reads it will need to handle comma-separated values. We'll check and update any consumer that reads `step.actor`.
 
-4. **OTP dialog** — Already works for seller self-delivery via `isSellerView`. No change needed.
+**3. No DB migration needed** — the `actor` column is already `text`, so comma-separated values work without schema changes.
+
+### Technical Details
+- Toggle UI: reuse the same `cn()` pattern with `bg-primary text-primary-foreground` for active actors
+- Parse on load: `step.actor.split(',')` → array of active actors
+- Serialize on save: `selectedActors.join(',')` → single string
+- Validation: prevent deselecting the last actor (toast warning)
+
