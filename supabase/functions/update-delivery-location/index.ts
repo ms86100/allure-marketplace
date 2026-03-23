@@ -347,7 +347,6 @@ serve(async (req) => {
     // Guard: Only send when the ORDER (not just assignment) is in a transit stage AND is at least 2 min old.
     // This prevents false "on the way" alerts for seller-delivery where seller IS the rider and is already nearby.
     if (assignment.status === 'picked_up' && !assignment.last_location_at && buyerId) {
-      const EN_ROUTE_ORDER_STATUSES = ['picked_up', 'on_the_way', 'at_gate'];
       const { data: orderForEnRoute } = await supabase
         .from('orders')
         .select('status, created_at')
