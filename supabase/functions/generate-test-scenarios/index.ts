@@ -495,13 +495,13 @@ function generateRLSScenarios(): GeneratedScenario[] {
       orderRpcStep("place", "Place order", "cod", "paid", [{ ref: "product", price: 100, name: "RLS Order" }]),
       {
         step_id: "get_order", label: "Get order", action: "select", table: "orders", actor: "service_role",
-        params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" }, limit: 1 },
+        params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" } },
         expect: { status: "success", row_count: 1 }, on_fail: "abort",
       },
       {
         step_id: "guard_cancel", label: "Guard tries to cancel buyer's order (should fail)",
         action: "rpc", actor: "guard",
-        params: { function_name: "buyer_cancel_order", args: { _order_id: "{{get_order.id}}", _reason: "Unauthorized" } },
+        params: { function_name: "buyer_cancel_order", args: { _order_id: "{{get_order.0.id}}", _reason: "Unauthorized" } },
         expect: { status: "error" }, on_fail: "continue",
       },
     ],
