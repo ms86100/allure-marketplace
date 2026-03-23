@@ -106,7 +106,7 @@ export function AdminWorkflowManager() {
     setEditSteps(wf.steps.map(s => ({ ...s })));
     const { data } = await supabase
       .from('category_status_transitions')
-      .select('from_status, to_status, allowed_actor')
+      .select('from_status, to_status, allowed_actor, is_side_action')
       .eq('parent_group', wf.parent_group)
       .eq('transaction_type', wf.transaction_type);
     setTransitions((data || []) as Transition[]);
