@@ -53,7 +53,7 @@ function buildLocationFromData(data: any): RiderLocation | null {
   };
 }
 
-export function useDeliveryTracking(assignmentId: string | null | undefined): DeliveryTrackingState {
+export function useDeliveryTracking(assignmentId: string | null | undefined, isInTransitOverride?: boolean): DeliveryTrackingState {
   const [state, setState] = useState<DeliveryTrackingState>({
     riderLocation: null,
     eta: null,
