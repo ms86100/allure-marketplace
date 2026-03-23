@@ -158,12 +158,16 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
     try {
       await flushQueue();
       await postLocation(payload);
-      lastSentRef.current = now;
-      if (mountedRef.current) setState(s => ({ ...s, lastSentAt: now, trackingPaused: false }));
+      lastSentRef.current = Date.now();
+      if (mountedRef.current) setState(s => ({ ...s, lastSentAt: Date.now(), trackingPaused: false }));
     } catch (err: any) {
       if (err?.message === 'DELIVERY_TERMINAL') {
-        // Auto-stop: don't queue, don't retry
         stopTrackingRef.current?.();
+        return;
+      }
+      if (err?.message === 'RATE_LIMITED') {
+        // Don't queue — the point was too soon, just skip
+        console.log('[LocationTracking] Skipping point due to rate limit');
         return;
       }
       console.error('[LocationTracking] Send failed, queueing point:', err);
