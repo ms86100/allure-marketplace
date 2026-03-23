@@ -6,18 +6,44 @@ import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
 import { getTerminalStatuses } from '@/services/statusFlowCache';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SellerGPSTrackerProps {
-  assignmentId: string;
+  assignmentId?: string | null;
+  orderId?: string;
   autoStart?: boolean;
   deliveryStatus?: string;
 }
 
-export function SellerGPSTracker({ assignmentId, autoStart = true, deliveryStatus }: SellerGPSTrackerProps) {
+export function SellerGPSTracker({ assignmentId, orderId, autoStart = true, deliveryStatus }: SellerGPSTrackerProps) {
+  const [resolvedAssignmentId, setResolvedAssignmentId] = useState<string | null>(assignmentId || null);
+
+  // Resolve assignmentId from orderId if not directly provided
+  useEffect(() => {
+    if (assignmentId) { setResolvedAssignmentId(assignmentId); return; }
+    if (!orderId) return;
+
+    const fetchAssignment = () => {
+      supabase.from('delivery_assignments').select('id').eq('order_id', orderId).maybeSingle()
+        .then(({ data }) => { if (data) setResolvedAssignmentId(data.id); });
+    };
+    fetchAssignment();
+
+    // Subscribe for when trigger creates it
+    const channel = supabase
+      .channel(`gps-assignment-${orderId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'delivery_assignments', filter: `order_id=eq.${orderId}` },
+        (payload) => { const id = (payload.new as any)?.id; if (id) setResolvedAssignmentId(id); })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [assignmentId, orderId]);
+
+  const effectiveAssignmentId = resolvedAssignmentId || '';
   const {
     isTracking, permissionDenied, permissionLevel, lastSentAt,
     trackingPaused, startTracking, stopTracking,
-  } = useBackgroundLocationTracking(assignmentId);
+  } = useBackgroundLocationTracking(effectiveAssignmentId);
   const [now, setNow] = useState(Date.now());
   const wakeLockRef = useRef<any>(null);
   const isNative = Capacitor.isNativePlatform();
@@ -44,12 +70,12 @@ export function SellerGPSTracker({ assignmentId, autoStart = true, deliveryStatu
 
   // Delay auto-start by 500ms to ensure the native bridge is fully initialized on cold start
   useEffect(() => {
-    if (!autoStart || isTracking || permissionDenied || isTerminal) return;
+    if (!autoStart || !effectiveAssignmentId || isTracking || permissionDenied || isTerminal) return;
     const timer = setTimeout(() => {
       startTracking();
     }, isNative ? 500 : 0);
     return () => clearTimeout(timer);
-  }, [autoStart, isTerminal, isTracking, isNative, permissionDenied, startTracking]);
+  }, [autoStart, effectiveAssignmentId, isTerminal, isTracking, isNative, permissionDenied, startTracking]);
 
   useEffect(() => {
     if (isTerminal && isTracking) {

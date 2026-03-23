@@ -322,6 +322,13 @@ export function useOrderDetail(id: string | undefined) {
     return step?.is_transit === true;
   }, [order?.status, flow]);
 
+  // Workflow-driven: expose current step's actor(s) for actor-based tracking decisions
+  const currentStepActor = useMemo(() => {
+    if (!order) return '';
+    const step = flow.find(s => s.status_key === order.status);
+    return step?.actor || '';
+  }, [order?.status, flow]);
+
   return {
     order, setOrder, isLoading, isUpdating, hasReview, setHasReview,
     isChatOpen, setIsChatOpen, unreadMessages, fetchUnreadCount,
@@ -329,6 +336,7 @@ export function useOrderDetail(id: string | undefined) {
     seller, isSellerView, isUrgentOrder, isUrgentSellerView, isUrgentBuyerView, isBuyerView, isEnquiryOrder,
     nextStatus, buyerNextStatus, canReview, canChat, canReorder,
     canSellerReject, canBuyerCancel, isInTransit, isFlowLoading,
+    currentStepActor,
     chatRecipientId, chatRecipientName,
     orderFulfillmentType, currentStatusIndex, statusOrder,
     displayStatuses, timelineSteps, flow,

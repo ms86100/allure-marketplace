@@ -183,6 +183,8 @@ export default function OrderDetailPage() {
   const paymentStatusInfo = o.getPaymentStatus((order.payment_status as PaymentStatus) || 'pending');
   const displayStatuses = o.displayStatuses;
   const isInTransit = o.isInTransit;
+  // Workflow-driven: derive current step actor(s) for actor-based tracking
+  const currentActors = (o.currentStepActor || '').split(',').map(a => a.trim());
 
   // Gap G: Only show arrival overlay for BUYER when rider is close AND order is not terminal
   const showArrivalOverlay = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && deliveryAssignmentId && deliveryTracking.riderLocation && deliveryTracking.distance != null && deliveryTracking.distance < trackingConfig.arrival_overlay_distance_meters;
@@ -434,34 +436,48 @@ export default function OrderDetailPage() {
           )}
 
 
-          {/* Live Delivery Tracking or Static Card */}
-          {isDeliveryOrder && isInTransit && deliveryAssignmentId && (
+          {/* Live Delivery Tracking — workflow-driven: render whenever isInTransit, regardless of deliveryAssignmentId */}
+          {isDeliveryOrder && isInTransit && (
             <>
-              {/* Gap 10: Map view — fallback to buyer profile coords if delivery_lat/lng missing */}
-              {deliveryTracking.riderLocation && (() => {
+              {/* Map view: use rider location if available, else seller coords as static origin */}
+              {(() => {
+                const riderLoc = deliveryTracking.riderLocation;
+                const sellerLat = (seller as any)?.latitude || null;
+                const sellerLng = (seller as any)?.longitude || null;
+                const originLat = riderLoc?.latitude ?? sellerLat;
+                const originLng = riderLoc?.longitude ?? sellerLng;
                 const destLat = (order as any).delivery_lat || (buyer as any)?.latitude || null;
                 const destLng = (order as any).delivery_lng || (buyer as any)?.longitude || null;
-                return destLat && destLng ? (
+                return originLat && originLng && destLat && destLng ? (
                   <Suspense fallback={<Skeleton className="h-48 w-full rounded-xl" />}>
                     <DeliveryMapView
-                      riderLat={deliveryTracking.riderLocation.latitude}
-                      riderLng={deliveryTracking.riderLocation.longitude}
+                      riderLat={originLat}
+                      riderLng={originLng}
                       destinationLat={destLat}
                       destinationLng={destLng}
-                      riderName={deliveryTracking.riderName}
-                      heading={deliveryTracking.riderLocation.heading}
+                      riderName={deliveryTracking.riderName || (seller as any)?.business_name || ''}
+                      heading={riderLoc?.heading}
                       onRoadEtaChange={setRoadEtaMinutes}
                     />
                   </Suspense>
                 ) : null;
               })()}
-              <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} trackingState={deliveryTracking} roadEtaMinutes={roadEtaMinutes} isInTransit={isInTransit} statusHints={(() => {
-                const hints: Record<string, { buyer_hint?: string | null; seller_hint?: string | null; display_label?: string | null }> = {};
-                for (const step of o.flow) {
-                  hints[step.status_key] = { buyer_hint: step.buyer_hint, seller_hint: (step as any).seller_hint, display_label: step.display_label };
-                }
-                return hints;
-              })()} />
+              {deliveryAssignmentId ? (
+                <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} trackingState={deliveryTracking} roadEtaMinutes={roadEtaMinutes} isInTransit={isInTransit} statusHints={(() => {
+                  const hints: Record<string, { buyer_hint?: string | null; seller_hint?: string | null; display_label?: string | null }> = {};
+                  for (const step of o.flow) {
+                    hints[step.status_key] = { buyer_hint: step.buyer_hint, seller_hint: (step as any).seller_hint, display_label: step.display_label };
+                  }
+                  return hints;
+                })()} />
+              ) : (
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <div className="flex items-center gap-3 justify-center text-muted-foreground">
+                    <Loader2 size={16} className="animate-spin" />
+                    <p className="text-sm">{getSetting('ui_setting_up_tracking') || 'Setting up live tracking...'}</p>
+                  </div>
+                </div>
+              )}
               {o.isBuyerView && (
                 <div className="flex justify-end">
                   <UpdateBuyerLocationButton orderId={order.id} />
@@ -469,19 +485,9 @@ export default function OrderDetailPage() {
               )}
             </>
           )}
-          {/* Gap 3: Fallback when delivery is in transit but assignment hasn't been created yet */}
-          {isDeliveryOrder && isInTransit && !deliveryAssignmentId && (
-            <div className="bg-card border border-border rounded-xl p-4">
-              <div className="flex items-center gap-3 justify-center text-muted-foreground">
-                <Loader2 size={16} className="animate-spin" />
-                <p className="text-sm">{getSetting('ui_setting_up_tracking') || 'Setting up live tracking...'}</p>
-              </div>
-            </div>
-          )}
-          {/* Seller self-delivery GPS broadcasting */}
-          {/* Gap 1: Pass deliveryStatus so GPS auto-stops on terminal states */}
-          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && o.isInTransit && deliveryAssignmentId && (
-            <SellerGPSTracker assignmentId={deliveryAssignmentId} autoStart deliveryStatus={order.status} />
+          {/* Seller self-delivery GPS broadcasting — workflow-driven: actor-based, no deliveryAssignmentId gate */}
+          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && o.isInTransit && currentActors.includes('seller') && (
+            <SellerGPSTracker assignmentId={deliveryAssignmentId} orderId={order.id} autoStart deliveryStatus={order.status} />
           )}
           {/* Persistent OTP card — visible to buyer for ALL non-terminal delivery statuses */}
           {o.isBuyerView && isDeliveryOrder && buyerOtp && !isTerminalStatus(o.flow, order.status) && (
