@@ -306,17 +306,11 @@ export function useOrderDetail(id: string | undefined) {
     return (step as any)?.seller_hint || null;
   };
 
-  // Derive isInTransit from DB-backed flow: statuses between 'picked_up' and terminal are transit.
-  // For robustness, check if status actor is 'delivery' or if it matches known transit keys from flow.
+  // DB-driven transit detection via is_transit flag on workflow steps
   const isInTransit = useMemo(() => {
     if (!order) return false;
-    // Primary: check DB-backed transit_statuses from system_settings
-    const transitStatuses = getTrackingConfigSync().transit_statuses;
-    if (transitStatuses.includes(order.status)) return true;
-    // Secondary: check if flow step actor is 'delivery'
-    const transitStep = flow.find(s => s.status_key === order.status);
-    if (transitStep?.actor === 'delivery') return true;
-    return false;
+    const step = flow.find(s => s.status_key === order.status);
+    return step?.is_transit === true;
   }, [order?.status, flow]);
 
   return {
