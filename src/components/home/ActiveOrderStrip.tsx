@@ -88,11 +88,11 @@ export function ActiveOrderStrip() {
       if (!data) return [];
 
       const statusKeys = [...new Set(data.map((o: any) => o.status))];
+      // Fetch display data for all workflow types — no hardcoded list
       const { data: flowData } = await supabase
         .from('category_status_flows')
         .select('status_key, display_label, color, icon, transaction_type')
-        .in('status_key', statusKeys)
-        .in('transaction_type', ['cart_purchase', 'self_fulfillment', 'seller_delivery']);
+        .in('status_key', statusKeys);
 
       const flowMap = new Map<string, { display_label: string | null; color: string | null; icon: string | null }>();
       for (const f of (flowData || []) as any[]) {
