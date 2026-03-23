@@ -6,7 +6,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// Test user credentials (must match seed-integration-test-users)
 const TEST_ACTORS: Record<string, { email: string; password: string }> = {
   buyer: { email: "integration-buyer@test.sociva.com", password: "TestBuyer2026!" },
   seller: { email: "integration-seller@test.sociva.com", password: "TestSeller2026!" },
@@ -17,7 +16,7 @@ const TEST_ACTORS: Record<string, { email: string; password: string }> = {
 interface TestStep {
   step_id: string;
   label: string;
-  action: "insert" | "update" | "select" | "delete" | "rpc" | "assert";
+  action: "insert" | "update" | "select" | "delete" | "rpc" | "assert" | "setup";
   table?: string;
   actor: string;
   params?: Record<string, any>;
@@ -37,6 +36,42 @@ interface StepResult {
   duration_ms: number;
   error_message?: string;
   response_data?: any;
+}
+
+// ─── Template Resolution ──────────────────────────────────────────────
+// Resolves {{step_id.field}} or {{step_id.field.nested}} references
+function resolveTemplates(obj: any, context: Record<string, any>): any {
+  if (typeof obj === "string") {
+    // Full-string replacement (preserves type — e.g. keeps UUID as string, number as number)
+    const fullMatch = obj.match(/^\{\{([^}]+)\}\}$/);
+    if (fullMatch) {
+      return resolvePath(fullMatch[1], context);
+    }
+    // Inline replacement (always returns string)
+    return obj.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
+      const val = resolvePath(path, context);
+      return val !== undefined ? String(val) : `{{${path}}}`;
+    });
+  }
+  if (Array.isArray(obj)) return obj.map(item => resolveTemplates(item, context));
+  if (obj && typeof obj === "object") {
+    const resolved: Record<string, any> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      resolved[k] = resolveTemplates(v, context);
+    }
+    return resolved;
+  }
+  return obj;
+}
+
+function resolvePath(path: string, context: Record<string, any>): any {
+  const parts = path.trim().split(".");
+  let current: any = context;
+  for (const part of parts) {
+    if (current === undefined || current === null) return undefined;
+    current = current[part];
+  }
+  return current;
 }
 
 Deno.serve(async (req) => {
@@ -61,7 +96,6 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    // Check admin role
     const { data: roleData } = await adminClient
       .from("user_roles")
       .select("role")
@@ -83,7 +117,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch scenario
     const { data: scenario, error: fetchErr } = await adminClient
       .from("test_scenarios")
       .select("*")
@@ -100,10 +133,12 @@ Deno.serve(async (req) => {
     const runId = crypto.randomUUID();
     const results: StepResult[] = [];
     const cleanupIds: { table: string; ids: string[] }[] = [];
+    const context: Record<string, any> = {}; // step_id -> response_data
 
     // Auth clients cache
     const actorClients: Record<string, any> = {};
     async function getActorClient(actor: string) {
+      if (actor === "service_role") return adminClient;
       if (actorClients[actor]) return actorClients[actor];
       const creds = TEST_ACTORS[actor];
       if (!creds) throw new Error(`Unknown actor: ${actor}`);
@@ -116,7 +151,15 @@ Deno.serve(async (req) => {
       return client;
     }
 
-    // Mark as running
+    // Store actor user IDs in context for template access
+    for (const [actor, creds] of Object.entries(TEST_ACTORS)) {
+      try {
+        const client = await getActorClient(actor);
+        const { data: { user } } = await client.auth.getUser();
+        if (user) context[`${actor}_user`] = { id: user.id, email: user.email };
+      } catch (_) { /* skip if auth fails */ }
+    }
+
     await adminClient
       .from("test_scenarios")
       .update({ last_result: "running", last_run_at: new Date().toISOString(), last_run_id: runId })
@@ -132,25 +175,19 @@ Deno.serve(async (req) => {
 
       const start = performance.now();
       try {
+        // Resolve templates in params and expect using context
+        const resolvedParams = step.params ? resolveTemplates(step.params, context) : undefined;
+        const resolvedExpect = step.expect ? resolveTemplates(step.expect, context) : undefined;
+
         const client = await getActorClient(step.actor);
         let data: any = null;
         let error: any = null;
 
         switch (step.action) {
-          case "select": {
-            let q = client.from(step.table).select(step.params?.columns || "*");
-            if (step.params?.filters) {
-              for (const [col, val] of Object.entries(step.params.filters)) {
-                q = q.eq(col, val);
-              }
-            }
-            if (step.params?.limit) q = q.limit(step.params.limit);
-            const res = await q;
-            data = res.data; error = res.error;
-            break;
-          }
+          case "setup":
           case "insert": {
-            const res = await client.from(step.table).insert(step.params?.row || step.params).select().single();
+            const row = resolvedParams?.row || resolvedParams;
+            const res = await client.from(step.table).insert(row).select().single();
             data = res.data; error = res.error;
             if (data?.id && step.cleanup !== false) {
               const existing = cleanupIds.find(c => c.table === step.table);
@@ -159,21 +196,39 @@ Deno.serve(async (req) => {
             }
             break;
           }
+          case "select": {
+            let q = client.from(step.table).select(resolvedParams?.columns || "*");
+            if (resolvedParams?.filters) {
+              for (const [col, val] of Object.entries(resolvedParams.filters)) {
+                q = q.eq(col, val);
+              }
+            }
+            if (resolvedParams?.limit) q = q.limit(resolvedParams.limit);
+            if (resolvedParams?.single) {
+              const res = await q.single();
+              data = res.data; error = res.error;
+            } else {
+              const res = await q;
+              data = res.data; error = res.error;
+            }
+            break;
+          }
           case "update": {
-            let q = client.from(step.table).update(step.params?.set || {});
-            if (step.params?.match) {
-              for (const [col, val] of Object.entries(step.params.match)) {
+            let q = client.from(step.table).update(resolvedParams?.set || {});
+            if (resolvedParams?.match) {
+              for (const [col, val] of Object.entries(resolvedParams.match)) {
                 q = q.eq(col, val);
               }
             }
             const res = await q.select();
             data = res.data; error = res.error;
+            if (Array.isArray(data) && data.length === 1) data = data[0];
             break;
           }
           case "delete": {
             let q = client.from(step.table).delete();
-            if (step.params?.match) {
-              for (const [col, val] of Object.entries(step.params.match)) {
+            if (resolvedParams?.match) {
+              for (const [col, val] of Object.entries(resolvedParams.match)) {
                 q = q.eq(col, val);
               }
             }
@@ -182,43 +237,45 @@ Deno.serve(async (req) => {
             break;
           }
           case "rpc": {
-            const res = await client.rpc(step.params?.function_name, step.params?.args || {});
+            const res = await client.rpc(resolvedParams?.function_name, resolvedParams?.args || {});
             data = res.data; error = res.error;
             break;
           }
           case "assert": {
-            // Assert uses previous step results
             const prevResult = results[results.length - 1];
-            if (step.expect?.status === "error" && prevResult?.outcome === "failed") {
+            if (resolvedExpect?.status === "error" && prevResult?.outcome === "failed") {
               data = { assertion: "expected_error_confirmed" };
-            } else if (step.expect?.status === "success" && prevResult?.outcome === "passed") {
+            } else if (resolvedExpect?.status === "success" && prevResult?.outcome === "passed") {
               data = { assertion: "expected_success_confirmed" };
             } else {
-              error = { message: `Assertion failed: expected ${step.expect?.status}, got ${prevResult?.outcome}` };
+              error = { message: `Assertion failed: expected ${resolvedExpect?.status}, got ${prevResult?.outcome}` };
             }
             break;
           }
         }
 
         // Validate expectations
-        const expectStatus = step.expect?.status || "success";
+        const expectStatus = resolvedExpect?.status || "success";
         if (expectStatus === "success" && error) {
           throw new Error(error.message || JSON.stringify(error));
         }
         if (expectStatus === "error" && !error) {
           throw new Error("Expected error but operation succeeded");
         }
-        if (step.expect?.row_count !== undefined && Array.isArray(data) && data.length !== step.expect.row_count) {
-          throw new Error(`Expected ${step.expect.row_count} rows, got ${data.length}`);
+        if (resolvedExpect?.row_count !== undefined && Array.isArray(data) && data.length !== resolvedExpect.row_count) {
+          throw new Error(`Expected ${resolvedExpect.row_count} rows, got ${data.length}`);
         }
-        if (step.expect?.field_checks && data) {
+        if (resolvedExpect?.field_checks && data) {
           const target = Array.isArray(data) ? data[0] : data;
-          for (const [field, expected] of Object.entries(step.expect.field_checks)) {
+          for (const [field, expected] of Object.entries(resolvedExpect.field_checks)) {
             if (target?.[field] !== expected) {
               throw new Error(`Field ${field}: expected ${expected}, got ${target?.[field]}`);
             }
           }
         }
+
+        // Store in context for later template resolution
+        context[step.step_id] = data;
 
         results.push({
           step_id: step.step_id, label: step.label, outcome: "passed",
@@ -241,7 +298,7 @@ Deno.serve(async (req) => {
       await adminClient.from(table).delete().in("id", ids);
     }
 
-    // Save results to test_results
+    // Save results
     const testResultRows = results.map(r => ({
       run_id: runId,
       module_name: scenario.module,
@@ -257,7 +314,6 @@ Deno.serve(async (req) => {
       await adminClient.from("test_results").insert(testResultRows);
     }
 
-    // Update scenario with final result
     const allPassed = results.every(r => r.outcome === "passed");
     const hasFailed = results.some(r => r.outcome === "failed");
     const finalResult = hasFailed ? "failed" : allPassed ? "passed" : "partial";
