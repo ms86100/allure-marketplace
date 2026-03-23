@@ -211,6 +211,7 @@ export function AdminWorkflowManager() {
       if (transitions.length > 0) {
         const transToInsert = transitions.map(t => ({
           parent_group, transaction_type, from_status: t.from_status, to_status: t.to_status, allowed_actor: t.allowed_actor,
+          is_side_action: t.is_side_action || false,
         }));
         const { error: transError } = await supabase.from('category_status_transitions').insert(transToInsert);
         if (transError) throw transError;
