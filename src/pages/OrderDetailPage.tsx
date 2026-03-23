@@ -655,7 +655,7 @@ export default function OrderDetailPage() {
               <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => o.fetchOrder()} canCancel={true} />
             )}
             {o.buyerNextStatus && (
-              stepRequiresOtp(o.flow, o.buyerNextStatus) ? (
+              (stepRequiresOtp(o.flow, o.buyerNextStatus) || (hasDeliveryOtpGate && buyerNextIsTerminal)) ? (
                 deliveryAssignmentId ? (
                   <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                     {o.isUpdating ? 'Updating...' : 'Verify & Confirm'}
