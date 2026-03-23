@@ -95,14 +95,29 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
       }
       while (queueRef.current.length > 0) {
         const nextPayload = queueRef.current[0];
-        await postLocation(nextPayload);
+        try {
+          await postLocation(nextPayload);
+        } catch (err: any) {
+          if (err?.message === 'RATE_LIMITED') {
+            // Stop flushing — will retry on next location update or online event
+            console.log('[LocationTracking] Queue flush paused due to rate limit');
+            break;
+          }
+          throw err;
+        }
         queueRef.current.shift();
         const now = Date.now();
         lastSentRef.current = now;
         if (mountedRef.current) setState(s => ({ ...s, lastSentAt: now, trackingPaused: false }));
+        // Throttle between consecutive queue sends to respect server 2s rate limit
+        if (queueRef.current.length > 0) {
+          await new Promise(r => setTimeout(r, 2500));
+        }
       }
-    } catch (error) {
-      console.error('[LocationTracking] Queue flush failed:', error);
+    } catch (error: any) {
+      if (error?.message !== 'DELIVERY_TERMINAL') {
+        console.error('[LocationTracking] Queue flush failed:', error);
+      }
     } finally {
       flushingRef.current = false;
     }
