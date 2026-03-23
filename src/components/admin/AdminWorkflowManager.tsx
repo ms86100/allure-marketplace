@@ -15,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { toast } from 'sonner';
 import {
   GitBranch, Plus, Trash2, Save, ChevronRight,
-  ArrowRight, Copy, HelpCircle,
+  ArrowRight, Copy, HelpCircle, AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { type FlowStep, type Transition, type WorkflowGroup, ACTORS, TRANSACTION_TYPES, formatName } from './workflow/types';
@@ -370,20 +370,24 @@ export function AdminWorkflowManager() {
                 </div>
 
                 {overrides.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap pl-12">
-                    {overrides.map(ov => (
-                      <Badge
-                        key={ov.parent_group}
-                        variant="secondary"
-                        className="text-[10px] px-2 py-0.5 cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors"
-                        onClick={() => openEditor(ov)}
-                      >
-                        {formatName(ov.parent_group)} · {ov.steps.filter(s => !(s as any).is_deprecated).length}
-                      </Badge>
-                    ))}
-                    <span className="text-[10px] text-muted-foreground">
-                      {overrides.length} override{overrides.length > 1 ? 's' : ''}
-                    </span>
+                  <div className="pl-12 space-y-1.5">
+                    <div className="flex items-center gap-1 text-[10px] text-amber-600 font-medium">
+                      <AlertTriangle size={11} className="shrink-0" />
+                      <span>{overrides.length} category override{overrides.length > 1 ? 's' : ''} — these take priority over default</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {overrides.map(ov => (
+                        <Badge
+                          key={ov.parent_group}
+                          variant="outline"
+                          className="text-[10px] px-2.5 py-1 cursor-pointer border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-400 transition-colors font-medium"
+                          onClick={() => openEditor(ov)}
+                        >
+                          <AlertTriangle size={10} className="mr-1 shrink-0" />
+                          Override: {formatName(ov.parent_group)} · {ov.steps.filter(s => !(s as any).is_deprecated).length} steps
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -412,6 +416,22 @@ export function AdminWorkflowManager() {
             {selectedWorkflow && (
               <WorkflowLinkage parentGroup={selectedWorkflow.parent_group} transactionType={selectedWorkflow.transaction_type} />
             )}
+            {selectedWorkflow?.parent_group === 'default' && (() => {
+              const overridesForType = workflows.filter(
+                w => w.transaction_type === selectedWorkflow.transaction_type && w.parent_group !== 'default'
+              );
+              if (overridesForType.length === 0) return null;
+              return (
+                <div className="mt-2 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                  <AlertTriangle size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-amber-700">
+                    This default workflow has <strong>{overridesForType.length} category override{overridesForType.length > 1 ? 's' : ''}</strong>{' '}
+                    ({overridesForType.map(o => formatName(o.parent_group)).join(', ')}).
+                    Changes here <strong>won't affect</strong> those overridden categories.
+                  </p>
+                </div>
+              );
+            })()}
           </DrawerHeader>
 
           <ScrollArea className="h-[calc(90dvh-120px)]">
