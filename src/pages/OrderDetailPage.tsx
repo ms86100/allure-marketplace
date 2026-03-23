@@ -84,7 +84,7 @@ export default function OrderDetailPage() {
   const hasDeliverySteps = o.flow.some((s: any) => s.is_transit === true);
   const isDeliveryOrder = hasDeliverySteps || ['delivery', 'seller_delivery'].includes(fulfillmentType);
 
-  const deliveryTracking = useDeliveryTracking(deliveryAssignmentId);
+  const deliveryTracking = useDeliveryTracking(deliveryAssignmentId, o.isInTransit);
   const trackingConfig = useTrackingConfig();
 
   // Defensive guard: end any lingering Live Activity if order is terminal
