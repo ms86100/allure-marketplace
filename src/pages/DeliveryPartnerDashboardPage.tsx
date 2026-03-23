@@ -420,51 +420,51 @@ export default function DeliveryPartnerDashboardPage() {
                         <span className="text-success font-medium tabular-nums">Fee: {formatPrice(delivery.delivery_fee)}</span>
                       </div>
 
-                      {/* Action Buttons */}
-                      {delivery.status === 'assigned' && (
-                        <Button
-                          size="sm"
-                          className="w-full"
-                          onClick={() => updateDeliveryStatus(delivery.id, 'picked_up')}
-                          disabled={updatingId === delivery.id}
-                        >
-                          {updatingId === delivery.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Navigation size={14} className="mr-1" />}
-                          Mark Picked Up
-                        </Button>
-                      )}
-                      {delivery.status === 'picked_up' && (
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => updateDeliveryStatus(delivery.id, 'at_gate')}
-                            disabled={updatingId === delivery.id}
-                          >
-                            At Gate
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => setOtpOrderId(delivery.order?.id || null)}
-                            disabled={updatingId === delivery.id}
-                          >
-                            <ShieldCheck size={14} className="mr-1" />
-                            Verify & Deliver
-                          </Button>
-                        </div>
-                      )}
-                      {delivery.status === 'at_gate' && (
-                        <Button
-                          size="sm"
-                          className="w-full"
-                          onClick={() => setOtpOrderId(delivery.order?.id || null)}
-                          disabled={updatingId === delivery.id}
-                        >
-                          <ShieldCheck size={14} className="mr-1" />
-                          Verify & Deliver
-                        </Button>
-                      )}
+                      {/* Action Buttons — workflow-driven */}
+                      {(() => {
+                        const action = getNextDeliveryAction(undefined /* TODO: pass per-order flow */, delivery.status);
+                        if (!action) return null;
+                        if (action.requiresOtp) {
+                          return (
+                            <Button
+                              size="sm"
+                              className="w-full"
+                              onClick={() => setOtpOrderId(delivery.order?.id || null)}
+                              disabled={updatingId === delivery.id}
+                            >
+                              <ShieldCheck size={14} className="mr-1" />
+                              Verify & Deliver
+                            </Button>
+                          );
+                        }
+                        // Non-OTP next step: also show OTP shortcut if available
+                        const otpAction = getNextDeliveryAction(undefined, action.nextStatus);
+                        return (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant={otpAction?.requiresOtp ? 'outline' : 'default'}
+                              className="flex-1"
+                              onClick={() => updateDeliveryStatus(delivery.id, action.nextStatus)}
+                              disabled={updatingId === delivery.id}
+                            >
+                              {updatingId === delivery.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Navigation size={14} className="mr-1" />}
+                              {action.nextStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                            </Button>
+                            {otpAction?.requiresOtp && (
+                              <Button
+                                size="sm"
+                                className="flex-1"
+                                onClick={() => setOtpOrderId(delivery.order?.id || null)}
+                                disabled={updatingId === delivery.id}
+                              >
+                                <ShieldCheck size={14} className="mr-1" />
+                                Verify & Deliver
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </CardContent>
                   </Card>
                 );
