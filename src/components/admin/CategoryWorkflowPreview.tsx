@@ -20,6 +20,9 @@ interface FlowStep {
   sort_order: number;
   is_terminal: boolean | null;
   actor: string;
+  is_transit: boolean;
+  requires_otp: boolean;
+  is_success: boolean;
 }
 
 interface RecentOrder {
