@@ -86,7 +86,10 @@ export function useOrderDetail(id: string | undefined) {
     if (!order) return null;
     if (isTerminalStatus(flow, order.status)) return null;
     if (flow.length > 0) {
-      const next = getNextStatusForActor(flow, order.status, 'seller', transitions);
+      // Multi-actor: if seller handles delivery, also check 'delivery' actor transitions
+      const sellerHandlesDelivery = deliveryHandledBy && deliveryHandledBy !== 'platform';
+      const actors = sellerHandlesDelivery ? ['seller', 'delivery'] : ['seller'];
+      const next = getNextStatusForActors(flow, order.status, actors, transitions);
       return next as OrderStatus | null;
     }
     return null;
