@@ -582,6 +582,13 @@ export function AdminWorkflowManager() {
                       <div className="flex items-center gap-4 flex-wrap border-t border-border/30 pt-2">
                         <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Behavior</span>
 
+                        {selectedWorkflow && (selectedWorkflow.transaction_type.includes('self_fulfillment') || selectedWorkflow.transaction_type.includes('self_pickup')) && (step.is_transit || step.creates_tracking_assignment) && (
+                          <div className="w-full flex items-center gap-1.5 text-[10px] text-amber-600 bg-amber-50 rounded-md px-2 py-1 border border-amber-200">
+                            <AlertTriangle size={11} className="shrink-0" />
+                            <span>Transit & tracking flags are ignored for self-pickup workflows (blocked by DB triggers).</span>
+                          </div>
+                        )}
+
                         <div className="flex items-center gap-1.5">
                           <Checkbox checked={step.is_transit} onCheckedChange={(v) => updateStep(index, 'is_transit', !!v)} id={`transit-${index}`} />
                           <label htmlFor={`transit-${index}`} className="text-[11px] text-muted-foreground cursor-pointer">🚚 In Transit</label>
