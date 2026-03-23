@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
-import { Link2, AlertTriangle, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Link2, AlertTriangle, ChevronRight, CheckCircle2, Truck, KeyRound } from 'lucide-react';
 import { formatName } from '@/components/admin/workflow/types';
 
 interface Props {
