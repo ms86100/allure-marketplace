@@ -144,6 +144,22 @@ export default function AdminTestScenariosTab() {
     }
   }
 
+  async function generateScenarios() {
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-test-scenarios', {
+        body: { modules: ['cart', 'checkout', 'lifecycle', 'rls', 'edge_cases'], clear_existing: true },
+      });
+      if (error) throw error;
+      toast.success(`Generated ${data?.total_inserted || 0} test scenarios across ${Object.keys(data?.by_module || {}).length} modules`);
+      fetchScenarios();
+    } catch (err: any) {
+      toast.error(`Generation failed: ${err.message}`);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   async function toggleActive(id: string, active: boolean) {
     await supabase.from('test_scenarios').update({ is_active: active }).eq('id', id);
     fetchScenarios();
