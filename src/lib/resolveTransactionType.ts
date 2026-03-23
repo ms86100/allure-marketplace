@@ -16,10 +16,14 @@ export function resolveTransactionType(
   orderType: string | null | undefined,
   fulfillmentType?: string | null,
   deliveryHandledBy?: string | null,
-  listingType?: string | null
+  listingType?: string | null,
+  /** Stored transaction_type from the order row (new orders have this set at creation) */
+  storedTransactionType?: string | null
 ): string {
-  // If a workflow key is provided directly (from category_config.transaction_type),
-  // use it — unless fulfillment variants apply
+  // Prefer the stored transaction_type from the order (set at creation, single source of truth)
+  if (storedTransactionType) return storedTransactionType;
+
+  // Legacy fallback for orders created before the migration
   if (listingType === 'contact_enquiry') return 'contact_enquiry';
 
   if (orderType === 'enquiry') {
@@ -36,7 +40,6 @@ export function resolveTransactionType(
   }
   if (fulfillmentType === 'delivery' && deliveryHandledBy === 'platform') return 'cart_purchase';
 
-  // Use the direct workflow key from category_config if available
   if (listingType) return listingType;
 
   return 'self_fulfillment';

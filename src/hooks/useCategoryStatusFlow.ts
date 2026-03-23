@@ -12,6 +12,7 @@ export interface StatusFlowStep {
   is_terminal: boolean;
   is_success: boolean;
   requires_otp: boolean;
+  is_transit: boolean;
   display_label: string | null;
   color: string | null;
   icon: string | null;
@@ -29,7 +30,7 @@ export interface StatusTransition {
 export async function fetchStatusFlow(parentGroup: string, transactionType: string): Promise<StatusFlowStep[]> {
   let { data, error } = await supabase
     .from('category_status_flows')
-    .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint, is_deprecated')
+    .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, is_transit, display_label, color, icon, buyer_hint, is_deprecated')
     .eq('parent_group', parentGroup)
     .eq('transaction_type', transactionType)
     .order('sort_order', { ascending: true });
@@ -37,7 +38,7 @@ export async function fetchStatusFlow(parentGroup: string, transactionType: stri
   if (!error && (!data || data.length === 0) && parentGroup !== 'default') {
     const fallback = await supabase
       .from('category_status_flows')
-      .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, display_label, color, icon, buyer_hint, is_deprecated')
+      .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, is_transit, display_label, color, icon, buyer_hint, is_deprecated')
       .eq('parent_group', 'default')
       .eq('transaction_type', transactionType)
       .order('sort_order', { ascending: true });

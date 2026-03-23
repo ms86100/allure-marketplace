@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getTrackingConfigSync } from '@/services/trackingConfig';
+// trackingConfig import removed — transit detection is now DB-driven via is_transit flag
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
@@ -56,6 +56,7 @@ export function useOrderDetail(id: string | undefined) {
   const isEnquiryOrder = (order as any)?.order_type === 'enquiry';
   const orderFulfillmentType = (order as any)?.fulfillment_type || 'self_pickup';
   const deliveryHandledBy = (order as any)?.delivery_handled_by || null;
+  const storedTransactionType = (order as any)?.transaction_type || null;
   const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType);
 
   const isUrgentOrder = hasAutoCancelAt && !!order?.status && isFirstFlowStep(flow, order.status);
@@ -66,8 +67,8 @@ export function useOrderDetail(id: string | undefined) {
 
   // Load transitions for accurate next-status and cancellation checks
   const resolvedTxnType = useMemo(
-    () => resolveTransactionType(effectiveParentGroup || 'default', orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType),
-    [effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType]
+    () => resolveTransactionType(effectiveParentGroup || 'default', orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType, storedTransactionType),
+    [effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType, storedTransactionType]
   );
   const transitions = useStatusTransitions(effectiveParentGroup || 'default', resolvedTxnType);
 
@@ -306,17 +307,11 @@ export function useOrderDetail(id: string | undefined) {
     return (step as any)?.seller_hint || null;
   };
 
-  // Derive isInTransit from DB-backed flow: statuses between 'picked_up' and terminal are transit.
-  // For robustness, check if status actor is 'delivery' or if it matches known transit keys from flow.
+  // DB-driven transit detection via is_transit flag on workflow steps
   const isInTransit = useMemo(() => {
     if (!order) return false;
-    // Primary: check DB-backed transit_statuses from system_settings
-    const transitStatuses = getTrackingConfigSync().transit_statuses;
-    if (transitStatuses.includes(order.status)) return true;
-    // Secondary: check if flow step actor is 'delivery'
-    const transitStep = flow.find(s => s.status_key === order.status);
-    if (transitStep?.actor === 'delivery') return true;
-    return false;
+    const step = flow.find(s => s.status_key === order.status);
+    return step?.is_transit === true;
   }, [order?.status, flow]);
 
   return {
