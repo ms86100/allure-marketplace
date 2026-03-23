@@ -5905,6 +5905,7 @@ export type Database = {
           end_time: string
           id: string
           location_type: string
+          notes: string | null
           order_id: string
           product_id: string
           reminder_1h_sent_at: string | null
@@ -5927,6 +5928,7 @@ export type Database = {
           end_time: string
           id?: string
           location_type?: string
+          notes?: string | null
           order_id: string
           product_id: string
           reminder_1h_sent_at?: string | null
@@ -5949,6 +5951,7 @@ export type Database = {
           end_time?: string
           id?: string
           location_type?: string
+          notes?: string | null
           order_id?: string
           product_id?: string
           reminder_1h_sent_at?: string | null
