@@ -1,7 +1,7 @@
 import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { type FlowStep, type Transition, formatName } from './types';
 import { cn } from '@/lib/utils';
-import { CircleStop, Play } from 'lucide-react';
+import { CircleStop, Play, Truck, KeyRound, CheckCircle2 } from 'lucide-react';
 
 const ACTOR_COLORS: Record<string, string> = {
   buyer: 'hsl(var(--primary))',
