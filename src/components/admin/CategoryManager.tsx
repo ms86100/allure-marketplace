@@ -422,25 +422,23 @@ export function CategoryManager() {
               <Input value={cm.addForm.display_name} onChange={(e) => cm.setAddForm({ ...cm.addForm, display_name: e.target.value })} className="rounded-xl" />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-semibold">Listing Type</Label>
+              <Label className="text-xs font-semibold">Workflow</Label>
               <Select value={cm.addForm.transaction_type} onValueChange={(value) => cm.setAddForm({ ...cm.addForm, transaction_type: value })}>
                 <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {LISTING_TYPE_PRESETS.map((preset) => (
-                    <SelectItem key={preset.value} value={preset.value}>
-                      <div className="flex flex-col">
-                        <span>{preset.label}</span>
+                  {(availableWorkflows ?? []).map((wf) => (
+                    <SelectItem key={wf.key} value={wf.key}>
+                      <div className="flex items-center gap-2">
+                        <span>{wf.label}</span>
+                        <span className="text-[10px] text-muted-foreground">({wf.stepCount} steps)</span>
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground">
-                {LISTING_TYPE_PRESETS.find(p => p.value === cm.addForm.transaction_type)?.description}
-              </p>
               {cm.addingToGroup && (
                 <CategoryWorkflowPreview
-                  listingType={cm.addForm.transaction_type}
+                  workflowKey={cm.addForm.transaction_type}
                   parentGroup={cm.addingToGroup}
                 />
               )}
