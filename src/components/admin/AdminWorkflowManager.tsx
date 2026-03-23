@@ -106,7 +106,7 @@ export function AdminWorkflowManager() {
     setEditSteps(wf.steps.map(s => ({ ...s })));
     const { data } = await supabase
       .from('category_status_transitions')
-      .select('from_status, to_status, allowed_actor')
+      .select('from_status, to_status, allowed_actor, is_side_action')
       .eq('parent_group', wf.parent_group)
       .eq('transaction_type', wf.transaction_type);
     setTransitions((data || []) as Transition[]);
@@ -211,6 +211,7 @@ export function AdminWorkflowManager() {
       if (transitions.length > 0) {
         const transToInsert = transitions.map(t => ({
           parent_group, transaction_type, from_status: t.from_status, to_status: t.to_status, allowed_actor: t.allowed_actor,
+          is_side_action: t.is_side_action || false,
         }));
         const { error: transError } = await supabase.from('category_status_transitions').insert(transToInsert);
         if (transError) throw transError;
@@ -521,6 +522,50 @@ export function AdminWorkflowManager() {
                               );
                             })}
                           </div>
+                        </div>
+                      )}
+
+                      {/* Cancellation / Rejection toggles */}
+                      {!step.is_terminal && step.status_key && (
+                        <div className="flex items-center gap-4 flex-wrap">
+                          <FieldLabel label="Cancellation" tooltip="Controls who can cancel/reject the order at this step. This creates transition rules to the 'cancelled' status." className="mb-0" />
+                          {[
+                            { actor: 'buyer', label: '👤 Buyer can cancel', color: 'bg-orange-100 text-orange-700 border-orange-300' },
+                            { actor: 'seller', label: '🏪 Seller can reject', color: 'bg-red-100 text-red-700 border-red-300' },
+                            { actor: 'admin', label: '🛡️ Admin can cancel', color: 'bg-purple-100 text-purple-700 border-purple-300' },
+                          ].map(({ actor, label, color }) => {
+                            const hasCancelTransition = transitions.some(
+                              t => t.from_status === step.status_key && t.to_status === 'cancelled' && t.allowed_actor === actor
+                            );
+                            return (
+                              <button
+                                key={actor}
+                                type="button"
+                                onClick={() => {
+                                  if (hasCancelTransition) {
+                                    setTransitions(prev => prev.filter(
+                                      t => !(t.from_status === step.status_key && t.to_status === 'cancelled' && t.allowed_actor === actor)
+                                    ));
+                                  } else {
+                                    setTransitions(prev => [...prev, {
+                                      from_status: step.status_key,
+                                      to_status: 'cancelled',
+                                      allowed_actor: actor,
+                                      is_side_action: false,
+                                    }]);
+                                  }
+                                }}
+                                className={cn(
+                                  "text-[10px] px-2 py-1 rounded-md border transition-all",
+                                  hasCancelTransition
+                                    ? color
+                                    : "bg-background text-muted-foreground border-border hover:border-destructive/50"
+                                )}
+                              >
+                                {label}
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
 
