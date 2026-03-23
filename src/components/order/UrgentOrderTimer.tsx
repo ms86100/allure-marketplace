@@ -19,6 +19,7 @@ export function UrgentOrderTimer({
 }: UrgentOrderTimerProps) {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isSyncingTimeout, setIsSyncingTimeout] = useState(false);
+  const [syncExpired, setSyncExpired] = useState(false);
   const timeoutHandledRef = useRef(false);
 
   const calculateTimeLeft = useCallback(() => {
@@ -30,6 +31,7 @@ export function UrgentOrderTimer({
   useEffect(() => {
     timeoutHandledRef.current = false;
     setIsSyncingTimeout(false);
+    setSyncExpired(false);
     setTimeLeft(calculateTimeLeft());
 
     const timer = setInterval(() => {
@@ -41,6 +43,8 @@ export function UrgentOrderTimer({
         setIsSyncingTimeout(true);
         onTimeout?.();
         clearInterval(timer);
+        // After 10s of "Checking order status", give up and show expired state
+        setTimeout(() => setSyncExpired(true), 10000);
       }
     }, 1000);
 
@@ -55,6 +59,17 @@ export function UrgentOrderTimer({
   const isBuyer = variant === 'buyer';
 
   if (isSyncingTimeout) {
+    if (syncExpired) {
+      // Sync took too long — show expired state instead of infinite spinner
+      return (
+        <div className={cn('flex items-center gap-2 p-3 rounded-lg border bg-destructive/5 border-destructive/30', className)}>
+          <Clock size={18} className="text-destructive" />
+          <span className="text-sm font-medium text-destructive">
+            {isBuyer ? 'Response time expired — order may be auto-cancelled' : 'Response time expired'}
+          </span>
+        </div>
+      );
+    }
     return (
       <div className={cn('flex items-center gap-2 text-muted-foreground', className)}>
         <Loader2 size={18} className="animate-spin" />
