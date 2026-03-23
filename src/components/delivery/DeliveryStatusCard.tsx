@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Truck, Phone, MapPin, Key, CheckCircle, XCircle, Clock, Loader2, Package, Navigation, Home } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
+import type { StatusFlowStep } from '@/hooks/useCategoryStatusFlow';
 
 interface DeliveryAssignment {
   id: string;
@@ -20,6 +21,8 @@ interface DeliveryStatusCardProps {
   orderId: string;
   isBuyerView: boolean;
   showOtp?: boolean;
+  /** Workflow flow steps — when provided, progress bar is derived dynamically */
+  flow?: StatusFlowStep[];
 }
 
 interface StatusLabelConfig {
@@ -69,7 +72,9 @@ const DEFAULT_LABELS: Record<string, StatusLabelConfig> = {
   cancelled: { label: 'Cancelled', buyer_msg: '', seller_msg: '' },
 };
 
-export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliveryStatusCardProps) {
+const HARDCODED_DELIVERY_STEPS = ['pending', 'assigned', 'picked_up', 'on_the_way', 'at_gate', 'delivered'];
+
+export function DeliveryStatusCard({ orderId, isBuyerView, showOtp, flow }: DeliveryStatusCardProps) {
   const [assignment, setAssignment] = useState<DeliveryAssignment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -82,6 +87,24 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
     } catch { /* use defaults */ }
     return DEFAULT_LABELS;
   }, [getSetting]);
+
+  // Derive delivery progress steps from workflow flow (is_transit steps) or fallback to hardcoded
+  const deliverySteps = useMemo(() => {
+    if (flow && flow.length > 0) {
+      const transitSteps = flow
+        .filter(s => s.is_transit && !s.is_terminal)
+        .map(s => s.status_key);
+      // Add 'delivered' as the final step if it's a success terminal in the flow
+      const deliveredStep = flow.find(s => s.status_key === 'delivered');
+      if (deliveredStep && !transitSteps.includes('delivered')) {
+        transitSteps.push('delivered');
+      }
+      if (transitSteps.length > 0) return transitSteps;
+    }
+    // Fallback: use labelsConfig keys minus terminal statuses, or hardcoded list
+    const configKeys = Object.keys(labelsConfig).filter(k => !['failed', 'cancelled'].includes(k));
+    return configKeys.length > 0 ? configKeys : HARDCODED_DELIVERY_STEPS;
+  }, [flow, labelsConfig]);
 
   useEffect(() => {
     fetchAssignment();
@@ -137,7 +160,6 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
   const StatusIcon = LUCIDE_ICON_MAP[iconName] || Clock;
   const colorClass = statusConfig.color || DEFAULT_COLOR_MAP[assignment.status] || DEFAULT_COLOR_MAP.pending;
 
-  const deliverySteps = Object.keys(labelsConfig).filter(k => !['failed', 'cancelled'].includes(k));
   const currentStepIndex = deliverySteps.indexOf(assignment.status);
 
   const buyerMsg = statusConfig.buyer_msg || '';
@@ -145,7 +167,6 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp }: DeliverySt
   const buyerEmoji = statusConfig.buyer_emoji || '';
   const sellerEmoji = statusConfig.seller_emoji || '';
 
-  // Use DB-backed emoji prefix, fallback empty if not configured
   const displayBuyerMsg = assignment.status === 'assigned' && assignment.rider_name
     ? `${buyerEmoji || '✅'} ${assignment.rider_name} ${buyerMsg}`
     : buyerMsg ? `${buyerEmoji} ${buyerMsg}`.trim() : '';

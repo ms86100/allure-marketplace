@@ -169,8 +169,10 @@ export function getNextStatusForActor(
   const next = flow[currentIndex + 1];
   if (!next) return null;
 
-  // Seller can only advance to seller-actionable steps
-  if (actor === 'seller' && next.actor !== 'seller') return null;
+  // Actor can only advance to steps where they appear in the actor list
+  // Supports comma-separated multi-actor values (e.g. "seller,delivery")
+  const stepActors = next.actor.split(',').map(a => a.trim());
+  if (!stepActors.includes(actor)) return null;
 
   return next.status_key;
 }
