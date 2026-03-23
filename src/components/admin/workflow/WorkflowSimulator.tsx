@@ -324,9 +324,16 @@ export function WorkflowSimulator() {
                       No transitions available for "{formatName(simActor)}" from "{currentStatus}"
                     </p>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    This actor cannot move the order forward from this status. Try switching to another actor.
-                  </p>
+                  {currentStep?.actor?.split(',').map(a => a.trim()).includes(simActor) ? (
+                    <p className="text-[11px] text-amber-600 font-medium">
+                      ⚠️ The step's actor field includes "{simActor}", but no transition rule exists in the Transitions tab. 
+                      Add a transition from "{currentStatus}" for actor "{simActor}" to fix this.
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-muted-foreground">
+                      This actor cannot move the order forward from this status. Try switching to another actor.
+                    </p>
+                  )}
                   <Button size="sm" variant="outline" onClick={tryInvalidTransition} className="h-7 text-xs rounded-lg text-destructive border-destructive/30 hover:bg-destructive/10">
                     <XCircle size={12} className="mr-1" /> Simulate Invalid Attempt
                   </Button>
