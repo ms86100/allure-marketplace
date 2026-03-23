@@ -240,6 +240,10 @@ export default function AdminTestScenariosTab() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={generateScenarios} disabled={generating} className="text-xs gap-1.5">
+            {generating ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+            {generating ? 'Generating...' : 'Generate All'}
+          </Button>
           <Button size="sm" variant="outline" onClick={runAllActive} className="text-xs gap-1.5">
             <Zap size={13} /> Run All
           </Button>
