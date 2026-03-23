@@ -154,13 +154,18 @@ export function useOrderDetail(id: string | undefined) {
       if (!data) { setOrder(null); return; }
       if (cancelled) return;
 
-      // Derive parent_group inline if seller doesn't have one — avoids extra render cycle
+      // Derive parent_group and listing_type inline — avoids extra render cycle
       const sellerPg = (data as any)?.seller?.primary_group;
-      if (!sellerPg && !derivedParentGroupRef.current) {
-        const firstItem = (data as any)?.items?.[0];
-        if (firstItem?.product_id) {
-          const { data: product } = await supabase.from('products').select('category').eq('id', firstItem.product_id).single();
-          if (product?.category) {
+      const firstItem = (data as any)?.items?.[0];
+      if (firstItem?.product_id && (!sellerPg || !derivedListingType)) {
+        const { data: product } = await supabase.from('products').select('category, listing_type').eq('id', firstItem.product_id).single();
+        if (!cancelled && product) {
+          // Set listing_type for workflow resolution (critical for contact_only)
+          if (product.listing_type && !derivedListingType) {
+            setDerivedListingType(product.listing_type);
+          }
+          // Derive parent_group if seller doesn't have one
+          if (!sellerPg && !derivedParentGroupRef.current && product.category) {
             const { data: catConfig } = await supabase.from('category_config').select('parent_group').eq('category', product.category as any).single();
             if (catConfig?.parent_group && !cancelled) {
               setDerivedParentGroup(catConfig.parent_group);
