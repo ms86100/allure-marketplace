@@ -57,11 +57,9 @@ function getNextDeliveryAction(flow: StatusFlowStep[] | null | undefined, curren
   return { nextStatus: nextStep.status_key, requiresOtp: nextStep.requires_otp || false };
 }
 
-/** Check if delivery is in-transit based on workflow */
+/** Check if delivery is in-transit based on workflow — no hardcoded fallbacks */
 export function isDeliveryInTransit(flow: StatusFlowStep[] | null | undefined, status: string): boolean {
-  if (!flow || flow.length === 0) {
-    return !['pending', 'assigned', 'delivered', 'failed', 'cancelled'].includes(status);
-  }
+  if (!flow || flow.length === 0) return false;
   return flow.some(s => s.status_key === status && s.is_transit);
 }
 
