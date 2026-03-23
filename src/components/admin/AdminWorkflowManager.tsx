@@ -192,9 +192,6 @@ export function AdminWorkflowManager() {
       await supabase.from('category_status_flows').delete().eq('parent_group', parent_group).eq('transaction_type', transaction_type);
 
       const stepsToInsert = editSteps.map((s, i) => {
-        // Auto-derive primary actor from transitions (first allowed actor, or fallback to stored value)
-        const stepActors = [...new Set(transitions.filter(t => t.from_status === s.status_key).map(t => t.allowed_actor))];
-        const primaryActor = stepActors[0] || s.actor || 'system';
         return {
         parent_group, transaction_type, status_key: s.status_key, sort_order: (i + 1) * 10,
         actor: primaryActor, is_terminal: s.is_terminal, display_label: s.display_label || s.status_key,
