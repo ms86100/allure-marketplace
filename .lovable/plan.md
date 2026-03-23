@@ -1,73 +1,75 @@
 
 
-# Fix: Replace `actor LIKE '%seller%'` with Dedicated Workflow Flag
+# Honest Assessment: Why Your Workflow Edit Didn't Work
 
-## Problem
+## The Real Problem
 
-The trigger uses `actor LIKE '%seller%'` to decide whether to create a delivery assignment. This embeds business logic (actor = seller → create assignment) in code instead of deriving it purely from configuration. Actor means "who can act on this step" — it should not be overloaded to mean "who gets tracked."
+You edited `preparing → is_transit = true` in **Cart Purchase**. But your order (`e1f556c4`) is NOT using Cart Purchase.
 
-## Solution
+Here's the proof from the database:
 
-Add a new boolean column `creates_tracking_assignment` to `category_status_flows`. This is a pure workflow configuration flag that the admin toggles — the trigger reads it without interpreting actor semantics.
+| Order Field | Value |
+|---|---|
+| `transaction_type` | `NULL` (not stored) |
+| `fulfillment_type` | `delivery` |
+| `delivery_handled_by` | `seller` |
+| Seller `primary_group` | `food_beverages` |
 
-### 1. Database Migration — Add Column + Backfill
+The runtime resolver (`resolveTransactionType`) sees `delivery + seller` and resolves to **`seller_delivery`** — a completely separate workflow that exists in the DB but is **hidden from your admin UI**.
 
-```sql
-ALTER TABLE category_status_flows
-  ADD COLUMN IF NOT EXISTS creates_tracking_assignment boolean DEFAULT false;
+Your system actually has **6 workflows**, not 4:
 
--- Backfill: existing steps where is_transit=true and actor includes seller
-UPDATE category_status_flows
-  SET creates_tracking_assignment = true
-  WHERE is_transit = true AND actor LIKE '%seller%';
+| Workflow | Visible in Admin? |
+|---|---|
+| `cart_purchase` | ✅ Yes |
+| `service_booking` | ✅ Yes |
+| `request_service` | ✅ Yes |
+| `contact_enquiry` | ✅ Yes |
+| `seller_delivery` | ❌ Hidden |
+| `self_fulfillment` | ❌ Hidden |
+
+The hidden workflows (`seller_delivery`, `self_fulfillment`) are **fulfillment sub-variants** defined in `src/components/admin/workflow/types.ts` under `FULFILLMENT_VARIANTS` — deliberately excluded from the admin UI.
+
+In `food_beverages / seller_delivery`, `preparing` has `is_transit: false`. That's why the map doesn't show. The system IS reading from the DB correctly — it's just reading from a different workflow than the one you edited.
+
+## Why This Is Still a Critical Problem
+
+Even though the system is technically correct, the architecture has a serious UX gap:
+
+1. **Invisible workflows**: You cannot see or edit `seller_delivery` / `self_fulfillment` in the admin panel, yet they control real order behavior.
+2. **Silent resolution**: Orders silently resolve to hidden workflows based on `fulfillmentType` + `deliveryHandledBy`, with no visibility to the admin.
+3. **Confusing admin experience**: You see "Cart Purchase → Food Beverages" linked, assume that's what your orders use, but they actually use a hidden variant.
+
+## Fix Plan
+
+### Step 1: Expose all workflows in admin UI
+In `src/components/admin/workflow/types.ts`, the `FULFILLMENT_VARIANTS` array hides `seller_delivery` and `self_fulfillment` from the workflow list. Add them to `TRANSACTION_TYPES` so admins can see and edit them:
+
+```
+TRANSACTION_TYPES = [
+  { value: 'cart_purchase', label: 'Cart Purchase' },
+  { value: 'seller_delivery', label: 'Seller Delivery' },
+  { value: 'self_fulfillment', label: 'Self Pickup' },
+  { value: 'service_booking', label: 'Service Booking' },
+  { value: 'request_service', label: 'Request Service' },
+  { value: 'contact_enquiry', label: 'Contact Enquiry' },
+];
 ```
 
-### 2. Database Migration — Update Trigger
+### Step 2: Show resolution path on order detail
+Add a small debug badge on the order detail page showing which workflow the order resolved to (e.g., "Workflow: food_beverages / seller_delivery"). This gives immediate visibility.
 
-Replace:
-```sql
-AND is_transit = true
-AND actor LIKE '%seller%'
-```
-With:
-```sql
-AND is_transit = true
-AND creates_tracking_assignment = true
-```
+### Step 3: Fix `preparing` in the correct workflow
+Once visible, you can edit `food_beverages / seller_delivery` and set `is_transit = true` on `preparing`.
 
-Now the trigger has zero actor interpretation. It reads two boolean flags, both set by admin in workflow config.
-
-### 3. Frontend — Workflow Editor Support
-
-**File: Workflow step editor (admin)**
-- Add a toggle for `creates_tracking_assignment` alongside the existing `is_transit` / `requires_otp` / `is_success` toggles
-- Only show it when `is_transit = true` (it's meaningless otherwise)
-- Label: "Auto-create tracking assignment"
-
-### 4. Workflow Preview
-
-**File: `CategoryWorkflowPreview.tsx`**
-- Show an icon indicator when `creates_tracking_assignment = true` (e.g., a MapPin icon alongside the existing Truck/KeyRound icons)
+### Step 4: Address the remaining 5 audit bugs
+The bugs from the previous audit (hardcoded fallbacks in `DeliveryActionCard`, `DeliveryMonitoringTab`, and `transit_statuses` system_settings sync) are still valid and should be fixed in a follow-up.
 
 ## Files to Modify
 
 | File | Change |
-|------|--------|
-| New migration SQL | Add `creates_tracking_assignment` column, backfill, update trigger |
-| Workflow step editor component | Add toggle for the new flag |
-| `CategoryWorkflowPreview.tsx` | Show indicator icon |
-| `src/components/admin/workflow/types.ts` | Add `creates_tracking_assignment` to `FlowStep` interface |
-
-## Why This Is Correct
-
-| Before | After |
-|--------|-------|
-| `actor LIKE '%seller%'` — code interprets actor | `creates_tracking_assignment = true` — config flag |
-| Actor overloaded for two meanings | Actor = who acts, flag = system behavior |
-| New actors require code changes | New actors just need admin to toggle the flag |
-
-## Risk
-
-- **Zero regression**: Backfill sets the flag to `true` exactly where `actor LIKE '%seller%'` would have matched
-- **Forward-compatible**: Any future actor/role works without trigger changes
+|---|---|
+| `src/components/admin/workflow/types.ts` | Move `seller_delivery` and `self_fulfillment` into `TRANSACTION_TYPES`, remove `FULFILLMENT_VARIANTS` |
+| `src/components/admin/AdminWorkflowManager.tsx` | Remove filtering that hides fulfillment variants from the workflow list |
+| `src/pages/OrderDetailPage.tsx` | Add small workflow resolution indicator (optional, for admin debugging) |
 
