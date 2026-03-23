@@ -329,6 +329,7 @@ export function AdminWorkflowManager() {
           const defaultWf = group.find(g => g.parent_group === 'default') || group[0];
           const overrides = group.filter(g => g !== defaultWf);
           const activeStepCount = defaultWf.steps.filter(s => !(s as any).is_deprecated).length;
+          const typeLabel = TRANSACTION_TYPES.find(t => t.value === txType)?.label || formatName(txType);
 
           return (
             <Card
@@ -345,7 +346,7 @@ export function AdminWorkflowManager() {
                       <GitBranch size={16} className="text-primary" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-bold">{formatName(txType)}</p>
+                      <p className="text-sm font-bold">{typeLabel}</p>
                       <p className="text-xs text-muted-foreground">
                         {activeStepCount} steps (default)
                         {defaultWf.steps.some(s => (s as any).is_deprecated) && (
