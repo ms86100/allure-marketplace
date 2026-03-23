@@ -388,7 +388,7 @@ function generateOrderLifecycleScenarios(): GeneratedScenario[] {
       orderRpcStep("place", "Place COD order", "cod", "paid", [{ ref: "product", price: 200, name: "Lifecycle Full Item" }], { _fulfillment_type: path.fulfillment }),
       {
         step_id: "get_order", label: "Get order", action: "select", table: "orders", actor: "service_role",
-        params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" }, limit: 1 },
+        params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" } },
         expect: { status: "success", row_count: 1 }, on_fail: "abort",
       },
     ];
@@ -397,7 +397,7 @@ function generateOrderLifecycleScenarios(): GeneratedScenario[] {
       steps.push({
         step_id: `to_${status}`, label: `Seller → ${status}`, action: "update",
         table: "orders", actor: "service_role",
-        params: { set: { status }, match: { id: "{{get_order.id}}" } },
+        params: { set: { status }, match: { id: "{{get_order.0.id}}" } },
         expect: { status: "success" }, on_fail: "abort",
       });
     }
@@ -405,7 +405,7 @@ function generateOrderLifecycleScenarios(): GeneratedScenario[] {
     if (path.buyerAction) {
       steps.push({
         step_id: "buyer_action", label: `Buyer → ${path.buyerAction}`, action: "rpc", actor: "buyer",
-        params: { function_name: "buyer_advance_order", args: { _order_id: "{{get_order.id}}", _new_status: path.buyerAction } },
+        params: { function_name: "buyer_advance_order", args: { _order_id: "{{get_order.0.id}}", _new_status: path.buyerAction } },
         expect: { status: "success" }, on_fail: "abort",
       });
     }
