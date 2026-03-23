@@ -12,6 +12,7 @@ export interface StatusFlowStep {
   is_terminal: boolean;
   is_success: boolean;
   requires_otp: boolean;
+  is_transit: boolean;
   display_label: string | null;
   color: string | null;
   icon: string | null;
