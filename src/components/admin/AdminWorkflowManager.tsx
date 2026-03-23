@@ -173,7 +173,8 @@ export function AdminWorkflowManager() {
         notify_seller: s.notify_seller, seller_notification_title: s.seller_notification_title || null,
         seller_notification_body: s.seller_notification_body || null,
         is_transit: s.is_transit, requires_otp: s.requires_otp, is_success: s.is_success,
-      }));
+        };
+      });
       const { error: insertError } = await supabase.from('category_status_flows').insert(stepsToInsert);
       if (insertError) throw insertError;
 
