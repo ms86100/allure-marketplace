@@ -355,7 +355,7 @@ serve(async (req) => {
 
       const enRouteOrderStatus = orderForEnRoute?.status ?? null;
       const enRouteOrderAgeMs = orderForEnRoute?.created_at ? Date.now() - new Date(orderForEnRoute.created_at).getTime() : 0;
-      const isEnRouteOrderInTransit = enRouteOrderStatus && EN_ROUTE_ORDER_STATUSES.includes(enRouteOrderStatus);
+      const isEnRouteOrderInTransit = enRouteOrderStatus && transitStatusesForChecks.has(enRouteOrderStatus);
       const isEnRouteOrderOldEnough = enRouteOrderAgeMs > 2 * 60 * 1000;
 
       if (isEnRouteOrderInTransit && isEnRouteOrderOldEnough) {
