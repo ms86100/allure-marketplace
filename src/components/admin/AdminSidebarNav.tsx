@@ -7,7 +7,7 @@ import {
   Store, Users, Building2, AlertCircle, LayoutGrid, Flag,
   CreditCard, Star, Megaphone, Layers, Settings2, Bot,
   Menu, ChevronRight, FileCode, Send, Package, Wrench, MessageSquare, KeyRound,
-  BarChart3, GitBranch,
+  BarChart3, GitBranch, FlaskConical,
 } from 'lucide-react';
 import { useState } from 'react';
 
