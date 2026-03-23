@@ -432,6 +432,7 @@ export function AdminWorkflowManager() {
                 </div>
               );
             })()}
+          </DrawerHeader>
 
           <ScrollArea className="h-[calc(90dvh-120px)]">
             <div className="px-4 py-4 space-y-5">
