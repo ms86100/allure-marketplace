@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { useUrgentOrderSound } from '@/hooks/useUrgentOrderSound';
 import { useCurrency } from '@/hooks/useCurrency';
-import { useCategoryStatusFlow, getNextStatusForActor, getTimelineSteps, isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, canActorCancel, useStatusTransitions } from '@/hooks/useCategoryStatusFlow';
+import { useCategoryStatusFlow, getNextStatusForActor, getNextStatusForActors, getTimelineSteps, isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, canActorCancel, useStatusTransitions } from '@/hooks/useCategoryStatusFlow';
 import { logAudit } from '@/lib/audit';
 import { resolveTransactionType } from '@/lib/resolveTransactionType';
 import { Order, OrderStatus } from '@/types/database';
@@ -86,7 +86,10 @@ export function useOrderDetail(id: string | undefined) {
     if (!order) return null;
     if (isTerminalStatus(flow, order.status)) return null;
     if (flow.length > 0) {
-      const next = getNextStatusForActor(flow, order.status, 'seller', transitions);
+      // Multi-actor: if seller handles delivery, also check 'delivery' actor transitions
+      const sellerHandlesDelivery = deliveryHandledBy && deliveryHandledBy !== 'platform';
+      const actors = sellerHandlesDelivery ? ['seller', 'delivery'] : ['seller'];
+      const next = getNextStatusForActors(flow, order.status, actors, transitions);
       return next as OrderStatus | null;
     }
     return null;

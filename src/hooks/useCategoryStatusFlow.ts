@@ -120,6 +120,24 @@ export function getNextStatusesForActor(
 }
 
 /**
+ * Multi-actor variant: accepts an array of actors and returns the first valid
+ * next status across all of them (checked in priority order).
+ * This enables scenarios where a seller also acts as the delivery agent.
+ */
+export function getNextStatusForActors(
+  flow: StatusFlowStep[],
+  currentStatus: string,
+  actors: string[],
+  transitions?: StatusTransition[]
+): string | null {
+  for (const actor of actors) {
+    const result = getNextStatusForActor(flow, currentStatus, actor, transitions);
+    if (result) return result;
+  }
+  return null;
+}
+
+/**
  * Given a flow + current status + actor, returns the next status the actor can move to.
  * Now uses transitions table instead of array position.
  * Falls back to linear flow if no transitions loaded.
