@@ -465,9 +465,8 @@ serve(async (req) => {
     // ═══ Proximity notifications ═══
     // Guard: Only send proximity alerts when the ORDER (not just assignment) is in an actual transit stage
     // This prevents false alerts for seller-delivery where seller is already near the buyer at acceptance
-    const TRANSIT_ORDER_STATUSES = ['on_the_way', 'at_gate', 'picked_up'];
     let orderStatusForProximity: string | null = null;
-    if (distanceMeters !== null && buyerId && ['picked_up', 'on_the_way', 'at_gate'].includes(assignment.status)) {
+    if (distanceMeters !== null && buyerId && transitStatusesForChecks.has(assignment.status)) {
       // Fetch the actual order status to gate proximity notifications
       const { data: orderForStatus } = await supabase
         .from('orders')
