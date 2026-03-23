@@ -18,7 +18,7 @@ import {
   ArrowRight, Copy, HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { type FlowStep, type Transition, type WorkflowGroup, ACTORS, FULFILLMENT_VARIANTS, formatName } from './workflow/types';
+import { type FlowStep, type Transition, type WorkflowGroup, ACTORS, TRANSACTION_TYPES, formatName } from './workflow/types';
 import { CreateWorkflowDialog } from './workflow/CreateWorkflowDialog';
 import { TransitionRulesEditor } from './workflow/TransitionRulesEditor';
 import { CloneWorkflowDialog } from './workflow/CloneWorkflowDialog';
@@ -96,8 +96,7 @@ export function AdminWorkflowManager() {
       group.step_count++;
     }
 
-    // Filter out fulfillment sub-variants (seller_delivery, self_fulfillment) — they are auto-derived at runtime
-    setWorkflows(Array.from(groupMap.values()).filter(wf => !FULFILLMENT_VARIANTS.includes(wf.transaction_type)));
+    setWorkflows(Array.from(groupMap.values()));
     setIsLoading(false);
   };
 
@@ -306,7 +305,7 @@ export function AdminWorkflowManager() {
   })();
 
   // Fixed order matching TRANSACTION_TYPES
-  const typeOrder = ['cart_purchase', 'service_booking', 'request_service', 'contact_enquiry'];
+  const typeOrder = TRANSACTION_TYPES.map(t => t.value);
 
   return (
     <div className="space-y-4">
