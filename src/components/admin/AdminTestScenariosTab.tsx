@@ -349,6 +349,14 @@ export default function AdminTestScenariosTab() {
                                   {r.error_message && (
                                     <p className="text-destructive mt-0.5 font-mono text-[10px] break-all">{r.error_message}</p>
                                   )}
+                                  {r.suggested_fix && (
+                                    <div className="mt-1 px-2 py-1.5 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40">
+                                      <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                                        <AlertTriangle size={10} /> Suggested Fix:
+                                      </p>
+                                      <p className="text-[10px] text-amber-800 dark:text-amber-300 mt-0.5">{r.suggested_fix}</p>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             ))}
