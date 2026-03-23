@@ -59,7 +59,13 @@ export function useOrderDetail(id: string | undefined) {
   const storedTransactionType = (order as any)?.transaction_type || null;
   const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType);
 
-  const isUrgentOrder = hasAutoCancelAt && !!order?.status && isFirstFlowStep(flow, order.status);
+  // Urgent only while auto_cancel_at is in the future AND order is on the first flow step
+  const isUrgentOrder = useMemo(() => {
+    if (!hasAutoCancelAt || !order?.status || !order?.auto_cancel_at) return false;
+    if (!isFirstFlowStep(flow, order.status)) return false;
+    return new Date(order.auto_cancel_at).getTime() > Date.now();
+  }, [hasAutoCancelAt, order?.status, order?.auto_cancel_at, flow]);
+
   const isUrgentSellerView = isUrgentOrder && isSellerView;
   const isUrgentBuyerView = isUrgentOrder && !isSellerView;
 
