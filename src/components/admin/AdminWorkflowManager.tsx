@@ -543,6 +543,17 @@ export function AdminWorkflowManager() {
                             <TooltipContent side="top" className="max-w-[200px] text-xs">Marks this as a successful completion. Triggers celebration UI, enables reviews, and settles payments. Only meaningful on end states.</TooltipContent>
                           </Tooltip>
                         </div>
+
+                        {step.is_transit && (
+                          <div className="flex items-center gap-1.5">
+                            <Checkbox checked={step.creates_tracking_assignment} onCheckedChange={(v) => updateStep(index, 'creates_tracking_assignment', !!v)} id={`tracking-${index}`} />
+                            <label htmlFor={`tracking-${index}`} className="text-[11px] text-muted-foreground cursor-pointer">📍 Auto-create Tracking</label>
+                            <Tooltip>
+                              <TooltipTrigger asChild><HelpCircle size={10} className="text-muted-foreground/40 cursor-help" /></TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[200px] text-xs">Automatically creates a delivery tracking assignment when the order enters this step. Enable for seller-handled deliveries.</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        )}
                       </div>
 
                       {/* Display Actor (who this step is "waiting on") — multi-select toggles */}
