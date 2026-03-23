@@ -7575,6 +7575,51 @@ export type Database = {
         }
         Relationships: []
       }
+      test_scenarios: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          last_result: string | null
+          last_run_at: string | null
+          last_run_id: string | null
+          module: string
+          name: string
+          priority: number
+          steps: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_result?: string | null
+          last_run_at?: string | null
+          last_run_id?: string | null
+          module?: string
+          name: string
+          priority?: number
+          steps?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_result?: string | null
+          last_run_at?: string | null
+          last_run_id?: string | null
+          module?: string
+          name?: string
+          priority?: number
+          steps?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       trigger_errors: {
         Row: {
           created_at: string
