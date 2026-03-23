@@ -67,7 +67,7 @@ function orderRpcStep(
   extras: Record<string, any> = {}
 ) {
   const sellerItems = items.map(i => ({
-    product_id: `{{${i.ref}.id}}`, quantity: i.qty || 1, price: i.price, name: i.name,
+    product_id: `{{${i.ref}.id}}`, quantity: i.qty || 1, unit_price: i.price, product_name: i.name,
   }));
   const subtotal = items.reduce((s, i) => s + i.price * (i.qty || 1), 0);
   return {
@@ -79,6 +79,7 @@ function orderRpcStep(
         _payment_status: payStatus, _delivery_address: "Test Flat 101",
         _notes: "Auto-generated test", _cart_total: subtotal,
         _seller_groups: [{ seller_id: "{{setup_seller.id}}", items: sellerItems, subtotal }],
+        _idempotency_key: `scenario-${stepId}-{{buyer_user.id}}-{{setup_seller.id}}`,
         ...extras,
       },
     },
