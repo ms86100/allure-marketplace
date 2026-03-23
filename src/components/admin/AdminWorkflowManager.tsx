@@ -217,6 +217,30 @@ export function AdminWorkflowManager() {
         if (transError) throw transError;
       }
 
+      // Bug 2 fix: Auto-sync transit_statuses system setting from workflow is_transit flags
+      try {
+        const { data: allFlows } = await supabase
+          .from('category_status_flows')
+          .select('status_key, is_transit')
+          .eq('is_transit', true);
+        if (allFlows) {
+          const transitKeys = [...new Set(allFlows.map(f => f.status_key))];
+          const transitJson = JSON.stringify(transitKeys);
+          // Upsert transit_statuses
+          await supabase.from('system_settings').upsert(
+            { key: 'transit_statuses', value: transitJson },
+            { onConflict: 'key' }
+          );
+          // Also sync transit_statuses_la (used by Live Activities)
+          await supabase.from('system_settings').upsert(
+            { key: 'transit_statuses_la', value: transitJson },
+            { onConflict: 'key' }
+          );
+        }
+      } catch (syncErr) {
+        console.warn('Failed to sync transit_statuses system setting:', syncErr);
+      }
+
       toast.success('Workflow saved successfully');
       await loadWorkflows();
       setSelectedWorkflow(null);
