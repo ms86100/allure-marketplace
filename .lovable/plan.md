@@ -1,43 +1,50 @@
 
 
-## Plan: Expose Workflow Flags in Admin Workflow Editor
+## Plan: Multi-Actor Support for Workflow Actions
 
 ### Problem
-The recent workflow-driven refactor added three critical flags to `category_status_flows`:
-- **`is_transit`** — drives delivery UI (maps, tracking, OTP card visibility)
-- **`requires_otp`** — drives OTP generation and verification
-- **`is_success`** — marks successful terminal states
+The system only queries transitions for a single actor (`'seller'` or `'buyer'`), but workflows need to support statuses where **multiple actors** can perform the same action (e.g., both `seller` and `delivery` can advance a `picked_up` step in self-delivery scenarios).
 
-These flags are actively used by the backend and frontend, but the admin workflow editor has **no UI to view or edit them**. An admin cannot verify or configure workflow behavior without direct database access.
+Currently, `useOrderDetail.ts` line 89 hardcodes `getNextStatusForActor(flow, order.status, 'seller', transitions)`. If a transition is defined for `allowed_actor: 'delivery'`, the seller sees "Awaiting next step" even though they should be able to act.
 
-### Changes
+The **transitions table already supports multi-actor** — you just add a row per actor. The bugs are in the **frontend query layer** and the **edge function validation**.
 
-**1. Update `FlowStep` type in `src/components/admin/workflow/types.ts`**
-- Add `is_transit`, `requires_otp`, `is_success` boolean fields to the `FlowStep` interface
+### 5 Changes
 
-**2. Update the workflow step editor UI (wherever steps are edited — likely inline in the admin workflow tab)**
-- Add toggle switches or checkboxes for the three flags on each step's edit row
-- Group them visually: "Behavior Flags" section with:
-  - 🚚 **Transit step** (`is_transit`) — "Enables delivery tracking & map UI"
-  - 🔐 **Requires OTP** (`requires_otp`) — "OTP verification needed at this step"
-  - ✅ **Success state** (`is_success`) — "Marks order as successfully completed"
+**1. `useOrderDetail.ts` — Seller next-status resolves across multiple actors**
+- Change `getNextStatus()` to try `'seller'` first, then fall back to `'delivery'` if the seller is handling delivery (`delivery_handled_by !== 'platform'`)
+- This means: if the admin adds a transition for `allowed_actor: 'seller'` on `picked_up → on_the_way`, the seller gets it directly. If only `delivery` actor is defined, the seller still gets it in self-delivery mode.
 
-**3. Update the flow diagram (`WorkflowFlowDiagram.tsx`)**
-- Show small indicator icons on step nodes for active flags (e.g., a truck icon for transit, lock for OTP)
-- This gives instant visual verification without opening each step
+**2. `useCategoryStatusFlow.ts` — New `getNextStatusForActors()` function**
+- Add a new helper that accepts an **array of actors** and returns the first valid next status across all of them
+- `getNextStatusForActor` remains unchanged (backward compatible)
+- `useOrderDetail` calls `getNextStatusForActors(flow, status, ['seller', 'delivery'], transitions)` for self-delivery orders
 
-**4. Update the step pipeline in `CategoryWorkflowPreview.tsx`**
-- Show flag badges on steps so admins can verify linked workflow behavior at a glance
+**3. `manage-delivery` edge function — Accept seller as delivery actor**
+- The transition validation on line 241 hardcodes `.eq('allowed_actor', 'delivery')`
+- Change to `.in('allowed_actor', ['delivery', 'seller'])` so that when a seller calls `manage-delivery` in self-delivery mode, the transition passes validation
 
-**5. Ensure save/load includes the new fields**
-- Verify the admin workflow save function reads and writes `is_transit`, `requires_otp`, `is_success` to/from the DB
+**4. `OrderDetailPage.tsx` — OTP dialog available for any actor performing delivery**
+- Currently gated by `o.isSellerView` — this already works for seller self-delivery
+- Add: when `stepRequiresOtp` is true and the user is the delivery actor (check `delivery_assignments.delivery_partner_id === user.id`), also show the OTP dialog
+- This enables third-party delivery riders to verify OTP too
+
+**5. `TransitionRulesEditor.tsx` — Already supports multi-actor (no change needed)**
+- The admin UI already lets you toggle multiple actor badges per transition (e.g., both `seller` and `delivery` for `picked_up → on_the_way`)
+- No code change needed — just confirming this works correctly
 
 ### Files Modified
+
 | File | Change |
 |---|---|
-| `src/components/admin/workflow/types.ts` | Add 3 boolean fields to `FlowStep` |
-| Admin step editor component | Add toggle controls for the 3 flags |
-| `src/components/admin/workflow/WorkflowFlowDiagram.tsx` | Show flag icons on step nodes |
-| `src/components/admin/CategoryWorkflowPreview.tsx` | Show flag badges in preview |
-| Admin workflow save/load logic | Include new fields in DB operations |
+| `src/hooks/useCategoryStatusFlow.ts` | Add `getNextStatusForActors()` helper |
+| `src/hooks/useOrderDetail.ts` | Use multi-actor resolution for seller next-status |
+| `supabase/functions/manage-delivery/index.ts` | Accept seller as valid delivery actor |
+| `src/pages/OrderDetailPage.tsx` | Show OTP dialog for any authorized delivery actor |
+
+### Risk Assessment
+
+- **Low risk**: `getNextStatusForActors` is additive — existing single-actor calls unchanged
+- **Low risk**: Edge function change only widens validation, doesn't remove checks
+- **Medium risk**: OTP dialog visibility change — must verify `delivery_assignments.delivery_partner_id` is correctly set for seller self-delivery. If not populated, the dialog won't show for riders. Need to verify the assignment creation logic.
 
