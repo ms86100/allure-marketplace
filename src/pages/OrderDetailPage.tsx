@@ -183,6 +183,8 @@ export default function OrderDetailPage() {
   const paymentStatusInfo = o.getPaymentStatus((order.payment_status as PaymentStatus) || 'pending');
   const displayStatuses = o.displayStatuses;
   const isInTransit = o.isInTransit;
+  // Workflow-driven: derive current step actor(s) for actor-based tracking
+  const currentActors = (o.currentStepActor || '').split(',').map(a => a.trim());
 
   // Gap G: Only show arrival overlay for BUYER when rider is close AND order is not terminal
   const showArrivalOverlay = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && deliveryAssignmentId && deliveryTracking.riderLocation && deliveryTracking.distance != null && deliveryTracking.distance < trackingConfig.arrival_overlay_distance_meters;
