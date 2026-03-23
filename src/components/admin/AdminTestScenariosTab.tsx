@@ -50,12 +50,13 @@ interface StepResult {
   outcome: 'passed' | 'failed' | 'skipped';
   duration_ms: number;
   error_message?: string;
+  suggested_fix?: string;
   response_data?: any;
 }
 
-const MODULES = ['checkout', 'booking', 'seller', 'delivery', 'auth', 'cart', 'payment', 'general'];
-const ACTIONS = ['select', 'insert', 'update', 'delete', 'rpc', 'assert'];
-const ACTORS = ['buyer', 'seller', 'admin', 'guard'];
+const MODULES = ['checkout', 'cart', 'lifecycle', 'rls', 'edge_cases', 'booking', 'seller', 'delivery', 'auth', 'payment', 'general'];
+const ACTIONS = ['select', 'insert', 'update', 'delete', 'rpc', 'assert', 'setup'];
+const ACTORS = ['buyer', 'seller', 'admin', 'guard', 'service_role'];
 
 const resultColor: Record<string, string> = {
   passed: 'bg-emerald-500/10 text-emerald-600 border-emerald-200',
@@ -82,7 +83,7 @@ export default function AdminTestScenariosTab() {
   const [showCreate, setShowCreate] = useState(false);
   const [editScenario, setEditScenario] = useState<Scenario | null>(null);
   const [filterModule, setFilterModule] = useState<string>('all');
-
+  const [generating, setGenerating] = useState(false);
   // Form state
   const [formName, setFormName] = useState('');
   const [formModule, setFormModule] = useState('general');
@@ -140,6 +141,22 @@ export default function AdminTestScenariosTab() {
     const active = scenarios.filter(s => s.is_active);
     for (const s of active) {
       await runScenario(s.id);
+    }
+  }
+
+  async function generateScenarios() {
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-test-scenarios', {
+        body: { modules: ['cart', 'checkout', 'lifecycle', 'rls', 'edge_cases'], clear_existing: true },
+      });
+      if (error) throw error;
+      toast.success(`Generated ${data?.total_inserted || 0} test scenarios across ${Object.keys(data?.by_module || {}).length} modules`);
+      fetchScenarios();
+    } catch (err: any) {
+      toast.error(`Generation failed: ${err.message}`);
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -223,6 +240,10 @@ export default function AdminTestScenariosTab() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={generateScenarios} disabled={generating} className="text-xs gap-1.5">
+            {generating ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+            {generating ? 'Generating...' : 'Generate All'}
+          </Button>
           <Button size="sm" variant="outline" onClick={runAllActive} className="text-xs gap-1.5">
             <Zap size={13} /> Run All
           </Button>
@@ -327,6 +348,14 @@ export default function AdminTestScenariosTab() {
                                   </div>
                                   {r.error_message && (
                                     <p className="text-destructive mt-0.5 font-mono text-[10px] break-all">{r.error_message}</p>
+                                  )}
+                                  {r.suggested_fix && (
+                                    <div className="mt-1 px-2 py-1.5 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40">
+                                      <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                                        <AlertTriangle size={10} /> Suggested Fix:
+                                      </p>
+                                      <p className="text-[10px] text-amber-800 dark:text-amber-300 mt-0.5">{r.suggested_fix}</p>
+                                    </div>
                                   )}
                                 </div>
                               </div>
