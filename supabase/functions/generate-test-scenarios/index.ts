@@ -438,19 +438,19 @@ function generateOrderLifecycleScenarios(): GeneratedScenario[] {
         orderRpcStep("place", "Place COD order", "cod", "paid", [{ ref: "product", price: 100, name: "Invalid Trans" }]),
         {
           step_id: "get_order", label: "Get order", action: "select", table: "orders", actor: "service_role",
-          params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" }, limit: 1 },
+          params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" } },
           expect: { status: "success", row_count: 1 }, on_fail: "abort",
         },
         ...(t.from !== "placed" ? [{
           step_id: "transition_to_from", label: `Move to ${t.from}`, action: "update" as const,
           table: "orders", actor: "service_role",
-          params: { set: { status: t.from }, match: { id: "{{get_order.id}}" } },
+          params: { set: { status: t.from }, match: { id: "{{get_order.0.id}}" } },
           expect: { status: "success" }, on_fail: "abort",
         }] : []),
         {
           step_id: "invalid_transition", label: `Invalid: ${t.from}→${t.to}`, action: "update",
           table: "orders", actor: "service_role",
-          params: { set: { status: t.to }, match: { id: "{{get_order.id}}" } },
+          params: { set: { status: t.to }, match: { id: "{{get_order.0.id}}" } },
           expect: { status: "error" }, on_fail: "continue",
         },
       ],
