@@ -70,12 +70,12 @@ export function SellerGPSTracker({ assignmentId, orderId, autoStart = true, deli
 
   // Delay auto-start by 500ms to ensure the native bridge is fully initialized on cold start
   useEffect(() => {
-    if (!autoStart || isTracking || permissionDenied || isTerminal) return;
+    if (!autoStart || !effectiveAssignmentId || isTracking || permissionDenied || isTerminal) return;
     const timer = setTimeout(() => {
       startTracking();
     }, isNative ? 500 : 0);
     return () => clearTimeout(timer);
-  }, [autoStart, isTerminal, isTracking, isNative, permissionDenied, startTracking]);
+  }, [autoStart, effectiveAssignmentId, isTerminal, isTracking, isNative, permissionDenied, startTracking]);
 
   useEffect(() => {
     if (isTerminal && isTracking) {
