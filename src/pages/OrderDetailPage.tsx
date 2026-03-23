@@ -171,6 +171,16 @@ export default function OrderDetailPage() {
     return () => { supabase.removeChannel(otpChannel); };
   }, [isDeliveryOrder, deliveryAssignmentId]);
 
+  // Listen for OTP-required events from updateOrderStatus (backend rejection auto-opens dialog)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.orderId === orderId) setIsOtpDialogOpen(true);
+    };
+    window.addEventListener('delivery-otp-required', handler);
+    return () => window.removeEventListener('delivery-otp-required', handler);
+  }, [orderId]);
+
   if (o.isLoading) return <AppLayout showHeader={false}><div className="p-4 space-y-3"><Skeleton className="h-8 w-32" /><Skeleton className="h-28 w-full rounded-xl" /><Skeleton className="h-40 w-full rounded-xl" /></div></AppLayout>;
   if (!order) return <AppLayout showHeader={false}><div className="p-4 text-center py-16"><p className="text-sm text-muted-foreground">Order not found</p><Link to="/orders"><Button size="sm" className="mt-4">View Orders</Button></Link></div></AppLayout>;
 
@@ -192,6 +202,12 @@ export default function OrderDetailPage() {
 
   const hasSellerActionBar = o.isSellerView && !o.isFlowLoading && o.flow.length > 0 && !isTerminalStatus(o.flow, order.status);
   const hasBuyerActionBar = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel);
+
+  // Bulletproof OTP gate: if delivery assignment exists and next status is terminal, always require OTP
+  // This catches the mismatch where stepRequiresOtp returns false but DB trigger enforces OTP
+  const hasDeliveryOtpGate = !!(deliveryAssignmentId && isDeliveryOrder);
+  const sellerNextIsTerminal = o.nextStatus ? isTerminalStatus(o.flow, o.nextStatus) || ['delivered', 'completed'].includes(o.nextStatus) : false;
+  const buyerNextIsTerminal = o.buyerNextStatus ? isTerminalStatus(o.flow, o.buyerNextStatus) || ['delivered', 'completed'].includes(o.buyerNextStatus) : false;
 
   return (
     <AppLayout showHeader={false} showNav={!hasSellerActionBar}>
@@ -609,8 +625,8 @@ export default function OrderDetailPage() {
             {!o.nextStatus ? (
               <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground"><Truck size={16} className="text-primary" /><span>Awaiting next step</span></div>
             ) : (
-              /* DB-driven: use requires_otp flag from workflow steps — no hardcoded status checks */
-              stepRequiresOtp(o.flow, o.nextStatus) ? (
+              /* Bulletproof OTP: use requires_otp OR secondary gate (delivery assignment + terminal next status) */
+              (stepRequiresOtp(o.flow, o.nextStatus) || (hasDeliveryOtpGate && sellerNextIsTerminal)) ? (
                 deliveryAssignmentId ? (
                   <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                     {o.isUpdating ? 'Updating...' : 'Verify & Deliver'}
@@ -639,7 +655,7 @@ export default function OrderDetailPage() {
               <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => o.fetchOrder()} canCancel={true} />
             )}
             {o.buyerNextStatus && (
-              stepRequiresOtp(o.flow, o.buyerNextStatus) ? (
+              (stepRequiresOtp(o.flow, o.buyerNextStatus) || (hasDeliveryOtpGate && buyerNextIsTerminal)) ? (
                 deliveryAssignmentId ? (
                   <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                     {o.isUpdating ? 'Updating...' : 'Verify & Confirm'}
