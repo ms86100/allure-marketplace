@@ -65,13 +65,19 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
       console.log('[LocationTracking] Delivery terminal — auto-stopping');
       throw new Error('DELIVERY_TERMINAL');
     }
-    // Legacy: also handle 400 error responses for backward compatibility
+    // Handle 429 rate limit — wait and signal caller to slow down
     if (error) {
       let errorBody: any = null;
       try {
         errorBody = typeof error === 'object' && error.context ? await error.context.json?.() : null;
       } catch { /* ignore */ }
       const msg = errorBody?.error || (typeof data === 'object' ? data?.error : '') || '';
+      if (msg === 'Rate limited' || msg === 'Rate limited') {
+        const retryMs = errorBody?.retry_after_ms || data?.retry_after_ms || 2500;
+        console.log(`[LocationTracking] Rate limited — waiting ${retryMs}ms`);
+        await new Promise(r => setTimeout(r, retryMs));
+        throw new Error('RATE_LIMITED');
+      }
       if (msg === 'Delivery is no longer active') {
         console.log('[LocationTracking] Delivery terminal — auto-stopping');
         throw new Error('DELIVERY_TERMINAL');
