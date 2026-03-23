@@ -196,7 +196,10 @@ export function useDeliveryTracking(assignmentId: string | null | undefined, isI
 
       const getInterval = () => {
         if (channelDegraded.current) return POLL_DEGRADED_MS;
-        // Bug 10 fix: use idle rate for non-transit statuses
+        // Use workflow-derived isInTransit when available, fallback to system_settings
+        if (isInTransitOverride != null) {
+          return isInTransitOverride ? POLL_TRANSIT_MS : POLL_IDLE_MS;
+        }
         const transitStatuses = new Set(getTrackingConfigSync().transit_statuses);
         if (currentStatusRef.current && !transitStatuses.has(currentStatusRef.current)) {
           return POLL_IDLE_MS;
