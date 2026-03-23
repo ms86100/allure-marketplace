@@ -452,7 +452,18 @@ async function handleComplete(req: Request, db: any, userId: string) {
     .single();
 
   if (!assignment) return jsonResponse({ error: 'Assignment not found' }, 404);
-  if (!['picked_up', 'at_gate'].includes(assignment.status)) {
+  // Bug 1 fix: Validate deliverable status from DB (is_transit or delivery actor) instead of hardcoded list
+  const { data: orderForComplete } = await db.from('orders').select('transaction_type, seller_id').eq('id', assignment.order_id).single();
+  const completeTxnType = orderForComplete?.transaction_type || 'self_fulfillment';
+  const { data: transitCheck } = await db
+    .from('category_status_flows')
+    .select('status_key')
+    .eq('transaction_type', completeTxnType)
+    .in('status_key', [assignment.status])
+    .or('is_transit.eq.true,actor.eq.delivery')
+    .maybeSingle();
+
+  if (!transitCheck) {
     return jsonResponse({ error: 'Assignment not in deliverable status' }, 400);
   }
 
