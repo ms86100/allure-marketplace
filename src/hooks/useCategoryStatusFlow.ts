@@ -83,12 +83,13 @@ export function useCategoryStatusFlow(
   sellerPrimaryGroup: string | null | undefined,
   orderType: string | null | undefined,
   fulfillmentType?: string | null,
-  deliveryHandledBy?: string | null
+  deliveryHandledBy?: string | null,
+  listingType?: string | null
 ) {
   const parentGroup = sellerPrimaryGroup || 'default';
   const transactionType = useMemo(
-    () => resolveTransactionType(parentGroup, orderType, fulfillmentType, deliveryHandledBy),
-    [parentGroup, orderType, fulfillmentType, deliveryHandledBy]
+    () => resolveTransactionType(parentGroup, orderType, fulfillmentType, deliveryHandledBy, listingType),
+    [parentGroup, orderType, fulfillmentType, deliveryHandledBy, listingType]
   );
 
   const { data, isLoading } = useQuery({

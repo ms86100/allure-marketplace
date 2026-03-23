@@ -45,6 +45,7 @@ export function useOrderDetail(id: string | undefined) {
   const sellerPrimaryGroup = seller?.primary_group;
   const orderType = (order as any)?.order_type;
   const [derivedParentGroup, setDerivedParentGroup] = useState<string | null>(null);
+  const [derivedListingType, setDerivedListingType] = useState<string | null>(null);
 
   // Derive parent_group inside fetchOrder to avoid an extra render-cycle waterfall.
   // The useEffect fallback is kept ONLY for edge cases where seller.primary_group is null
@@ -55,7 +56,7 @@ export function useOrderDetail(id: string | undefined) {
   const isEnquiryOrder = (order as any)?.order_type === 'enquiry';
   const orderFulfillmentType = (order as any)?.fulfillment_type || 'self_pickup';
   const deliveryHandledBy = (order as any)?.delivery_handled_by || null;
-  const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy);
+  const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType);
 
   const isUrgentOrder = hasAutoCancelAt && !!order?.status && isFirstFlowStep(flow, order.status);
   const isUrgentSellerView = isUrgentOrder && isSellerView;
