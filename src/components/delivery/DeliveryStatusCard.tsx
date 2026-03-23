@@ -217,7 +217,17 @@ export function DeliveryStatusCard({ orderId, isBuyerView, showOtp, flow }: Deli
         </div>
       )}
 
-      {isBuyerView && ['picked_up', 'at_gate'].includes(assignment.status) && (
+      {isBuyerView && (() => {
+        // Workflow-driven: show OTP hint when current or next step requires OTP, or when in transit
+        const FALLBACK_OTP_STATUSES = ['picked_up', 'at_gate'];
+        if (flow && flow.length > 0) {
+          const currentStep = flow.find(s => s.status_key === assignment.status);
+          const currentIdx = flow.findIndex(s => s.status_key === assignment.status);
+          const nextStep = currentIdx >= 0 && currentIdx < flow.length - 1 ? flow[currentIdx + 1] : null;
+          return currentStep?.requires_otp || nextStep?.requires_otp || currentStep?.is_transit;
+        }
+        return FALLBACK_OTP_STATUSES.includes(assignment.status);
+      })() && (
         <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-center gap-3">
           <Key size={18} className="text-primary shrink-0" />
           <div>
