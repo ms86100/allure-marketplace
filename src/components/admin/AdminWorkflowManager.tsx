@@ -62,13 +62,14 @@ export function AdminWorkflowManager() {
   const [editSteps, setEditSteps] = useState<FlowStep[]>([]);
   const [transitions, setTransitions] = useState<Transition[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [workflowUsage, setWorkflowUsage] = useState<Record<string, number>>({});
 
   // Dialog states
   const [showCreate, setShowCreate] = useState(false);
   const [cloneSource, setCloneSource] = useState<WorkflowGroup | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<WorkflowGroup | null>(null);
 
-  useEffect(() => { loadWorkflows(); }, []);
+  useEffect(() => { loadWorkflows(); loadUsageCounts(); }, []);
 
   const loadWorkflows = async () => {
     setIsLoading(true);
