@@ -208,8 +208,39 @@ export function AdminWorkflowManager() {
 
       await supabase.from('category_status_transitions').delete().eq('parent_group', parent_group).eq('transaction_type', transaction_type);
 
-      if (transitions.length > 0) {
-        const transToInsert = transitions.map(t => ({
+      // Auto-generate missing forward transitions from step actor fields
+      const enrichedTransitions = [...transitions];
+      const sortedSteps = [...editSteps].sort((a, b) => a.sort_order - b.sort_order);
+      for (let i = 0; i < sortedSteps.length; i++) {
+        const step = sortedSteps[i];
+        if (step.is_terminal) continue;
+        const nextStep = sortedSteps[i + 1];
+        if (!nextStep) continue;
+        const actors = (step.actor || 'system').split(',').map(a => a.trim()).filter(Boolean);
+        for (const actor of actors) {
+          const hasForward = enrichedTransitions.some(
+            t => t.from_status === step.status_key && t.allowed_actor === actor && !t.is_side_action
+          );
+          if (!hasForward) {
+            enrichedTransitions.push({
+              from_status: step.status_key,
+              to_status: nextStep.status_key,
+              allowed_actor: actor,
+              is_side_action: false,
+            });
+          }
+        }
+      }
+
+      if (enrichedTransitions.length > 0) {
+        // Deduplicate
+        const seen = new Set<string>();
+        const transToInsert = enrichedTransitions.filter(t => {
+          const key = `${t.from_status}:${t.to_status}:${t.allowed_actor}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }).map(t => ({
           parent_group, transaction_type, from_status: t.from_status, to_status: t.to_status, allowed_actor: t.allowed_actor,
           is_side_action: t.is_side_action || false,
         }));
