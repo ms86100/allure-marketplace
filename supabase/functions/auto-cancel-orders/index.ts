@@ -21,24 +21,58 @@ app.post("/", async (c) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Load admin-configured statuses from system_settings
+    // --- DB-driven: resolve cancellable statuses from category_status_transitions ---
+    // Any status that has a transition TO 'cancelled' (by any actor) is auto-cancellable.
+    const { data: cancelTransitions } = await supabase
+      .from("category_status_transitions")
+      .select("from_status")
+      .eq("to_status", "cancelled");
+
+    const dbCancellableStatuses = cancelTransitions
+      ? [...new Set(cancelTransitions.map((t: any) => t.from_status))]
+      : [];
+
+    // Fallback only if DB returns nothing (e.g. empty transitions table)
+    const cancellableStatuses = dbCancellableStatuses.length > 0
+      ? dbCancellableStatuses
+      : ["placed", "payment_pending"];
+
+    // --- DB-driven: resolve auto-completable statuses from category_status_flows ---
+    // Any status flagged as non-terminal that transitions to a terminal+success state
+    const { data: completableTransitions } = await supabase
+      .from("category_status_transitions")
+      .select("from_status")
+      .eq("to_status", "completed");
+
+    const dbCompletableStatuses = completableTransitions
+      ? [...new Set(completableTransitions.map((t: any) => t.from_status))]
+      : [];
+
+    // Load admin overrides from system_settings (optional narrowing)
     const { data: settingsRows } = await supabase
       .from("system_settings")
       .select("key, value")
-      .in("key", ["cancellable_statuses", "auto_completable_statuses"]);
+      .in("key", ["cancellable_statuses_override", "auto_completable_statuses_override"]);
 
     const settings: Record<string, string> = {};
     for (const row of settingsRows || []) {
       if (row.key && row.value) settings[row.key] = row.value;
     }
 
-    let cancellableStatuses: string[];
-    try { cancellableStatuses = JSON.parse(settings["cancellable_statuses"] || '["placed","payment_pending"]'); }
-    catch { cancellableStatuses = ["placed", "payment_pending"]; }
+    // Admin overrides narrow the DB-derived set (intersection), not replace it
+    if (settings["cancellable_statuses_override"]) {
+      try {
+        const override: string[] = JSON.parse(settings["cancellable_statuses_override"]);
+        const overrideSet = new Set(override);
+        // Only keep statuses that exist in BOTH the DB transitions and the admin override
+        const narrowed = cancellableStatuses.filter(s => overrideSet.has(s));
+        if (narrowed.length > 0) cancellableStatuses.splice(0, cancellableStatuses.length, ...narrowed);
+      } catch { /* ignore malformed override */ }
+    }
 
-    let autoCompletableStatuses: string[];
-    try { autoCompletableStatuses = JSON.parse(settings["auto_completable_statuses"] || '["delivered"]'); }
-    catch { autoCompletableStatuses = ["delivered"]; }
+    let autoCompletableStatuses = dbCompletableStatuses.length > 0
+      ? dbCompletableStatuses
+      : ["delivered"];
 
     // Find orders that have passed their auto_cancel_at time and are still in cancellable statuses
     const now = new Date().toISOString();
