@@ -42,19 +42,17 @@ function useDeliveryWorkflow(orderId: string | undefined) {
 
 /** Get the next delivery action for the current status from the workflow */
 function getNextDeliveryAction(flow: StatusFlowStep[] | null | undefined, currentStatus: string): { nextStatus: string; requiresOtp: boolean } | null {
-  if (!flow || flow.length === 0) {
-    if (currentStatus === 'assigned') return { nextStatus: 'picked_up', requiresOtp: false };
-    if (currentStatus === 'picked_up') return { nextStatus: 'at_gate', requiresOtp: false };
-    if (currentStatus === 'at_gate') return { nextStatus: 'delivered', requiresOtp: true };
-    return null;
-  }
+  // No hardcoded fallbacks — if flow is empty, return null (show loading/unavailable state)
+  if (!flow || flow.length === 0) return null;
+
   const transitSteps = flow.filter(s => s.is_transit || s.status_key === 'assigned');
   const currentIdx = transitSteps.findIndex(s => s.status_key === currentStatus);
   if (currentIdx < 0) return null;
   const nextStep = currentIdx < transitSteps.length - 1 ? transitSteps[currentIdx + 1] : null;
   if (!nextStep) {
-    const deliveredStep = flow.find(s => s.status_key === 'delivered' || (s.is_terminal && s.is_success));
-    return deliveredStep ? { nextStatus: deliveredStep.status_key, requiresOtp: true } : null;
+    // Use workflow flags: find the terminal success step (DB-driven, not hardcoded)
+    const terminalSuccessStep = flow.find(s => s.is_terminal && s.is_success);
+    return terminalSuccessStep ? { nextStatus: terminalSuccessStep.status_key, requiresOtp: terminalSuccessStep.requires_otp || false } : null;
   }
   return { nextStatus: nextStep.status_key, requiresOtp: nextStep.requires_otp || false };
 }
