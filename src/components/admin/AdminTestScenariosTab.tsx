@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -84,6 +84,9 @@ export default function AdminTestScenariosTab() {
   const [editScenario, setEditScenario] = useState<Scenario | null>(null);
   const [filterModule, setFilterModule] = useState<string>('all');
   const [generating, setGenerating] = useState(false);
+  const [isBatchRunning, setIsBatchRunning] = useState(false);
+  const [stopRequested, setStopRequested] = useState(false);
+  const stopRequestedRef = useRef(false);
   // Form state
   const [formName, setFormName] = useState('');
   const [formModule, setFormModule] = useState('general');
@@ -93,7 +96,6 @@ export default function AdminTestScenariosTab() {
 
   useEffect(() => {
     fetchScenarios();
-    // Subscribe to realtime updates
     const channel = supabase
       .channel('test-scenarios-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'test_scenarios' }, () => {
@@ -117,7 +119,7 @@ export default function AdminTestScenariosTab() {
     setLoading(false);
   }
 
-  async function runScenario(id: string) {
+  async function runScenario(id: string, options?: { silent?: boolean }) {
     setRunningIds(prev => new Set(prev).add(id));
     setExpandedId(id);
     try {
@@ -128,19 +130,60 @@ export default function AdminTestScenariosTab() {
       if (data?.steps) {
         setStepResults(prev => ({ ...prev, [id]: data.steps }));
       }
-      toast.success(`Scenario ${data?.result === 'passed' ? 'passed ✓' : 'completed with issues'}`);
+      if (!options?.silent) {
+        toast.success(`Scenario ${data?.result === 'passed' ? 'passed ✓' : 'completed with issues'}`);
+      }
+      return data?.result as string | undefined;
     } catch (err: any) {
-      toast.error(`Run failed: ${err.message}`);
+      if (!options?.silent) {
+        toast.error(`Run failed: ${err.message}`);
+      }
+      return 'failed';
     } finally {
       setRunningIds(prev => { const s = new Set(prev); s.delete(id); return s; });
       fetchScenarios();
     }
   }
 
+  function stopRunningQueue() {
+    stopRequestedRef.current = true;
+    setStopRequested(true);
+    toast.message('Stopping after the current scenario finishes.');
+  }
+
   async function runAllActive() {
+    if (isBatchRunning) return;
+
     const active = scenarios.filter(s => s.is_active);
-    for (const s of active) {
-      await runScenario(s.id);
+    if (active.length === 0) {
+      toast.error('No active scenarios to run');
+      return;
+    }
+
+    stopRequestedRef.current = false;
+    setStopRequested(false);
+    setIsBatchRunning(true);
+
+    let completed = 0;
+    let failed = 0;
+
+    try {
+      for (const scenario of active) {
+        if (stopRequestedRef.current) break;
+        const result = await runScenario(scenario.id, { silent: true });
+        completed += 1;
+        if (result !== 'passed') failed += 1;
+      }
+
+      if (stopRequestedRef.current) {
+        toast.message(`Stopped after ${completed}/${active.length} scenarios.`);
+      } else {
+        toast.success(`Finished ${completed} scenarios${failed ? ` · ${failed} with issues` : ''}`);
+      }
+    } finally {
+      stopRequestedRef.current = false;
+      setStopRequested(false);
+      setIsBatchRunning(false);
     }
   }
 
@@ -240,14 +283,20 @@ export default function AdminTestScenariosTab() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={generateScenarios} disabled={generating} className="text-xs gap-1.5">
+          <Button size="sm" variant="outline" onClick={generateScenarios} disabled={generating || isBatchRunning} className="text-xs gap-1.5">
             {generating ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
             {generating ? 'Generating...' : 'Generate All'}
           </Button>
-          <Button size="sm" variant="outline" onClick={runAllActive} className="text-xs gap-1.5">
-            <Zap size={13} /> Run All
-          </Button>
-          <Button size="sm" onClick={openCreate} className="text-xs gap-1.5">
+          {isBatchRunning ? (
+            <Button size="sm" variant="outline" onClick={stopRunningQueue} disabled={stopRequested} className="text-xs gap-1.5 border-destructive/30 text-destructive hover:text-destructive">
+              <XCircle size={13} /> {stopRequested ? 'Stopping…' : 'Stop Queue'}
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" onClick={runAllActive} className="text-xs gap-1.5">
+              <Zap size={13} /> Run All
+            </Button>
+          )}
+          <Button size="sm" onClick={openCreate} className="text-xs gap-1.5" disabled={isBatchRunning}>
             <Plus size={13} /> New
           </Button>
         </div>
@@ -316,7 +365,7 @@ export default function AdminTestScenariosTab() {
                           size="sm"
                           className="h-8 text-xs gap-1"
                           onClick={() => runScenario(scenario.id)}
-                          disabled={isRunning}
+                          disabled={isRunning || isBatchRunning}
                         >
                           {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
                           Run

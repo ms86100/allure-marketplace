@@ -67,7 +67,7 @@ function orderRpcStep(
   extras: Record<string, any> = {}
 ) {
   const sellerItems = items.map(i => ({
-    product_id: `{{${i.ref}.id}}`, quantity: i.qty || 1, price: i.price, name: i.name,
+    product_id: `{{${i.ref}.id}}`, quantity: i.qty || 1, unit_price: i.price, product_name: i.name,
   }));
   const subtotal = items.reduce((s, i) => s + i.price * (i.qty || 1), 0);
   return {
@@ -79,6 +79,7 @@ function orderRpcStep(
         _payment_status: payStatus, _delivery_address: "Test Flat 101",
         _notes: "Auto-generated test", _cart_total: subtotal,
         _seller_groups: [{ seller_id: "{{setup_seller.id}}", items: sellerItems, subtotal }],
+        _idempotency_key: `scenario-${stepId}-{{buyer_user.id}}-{{setup_seller.id}}`,
         ...extras,
       },
     },
@@ -268,23 +269,22 @@ function generateCheckoutScenarios(): GeneratedScenario[] {
           steps.push({
             step_id: "verify", label: `Verify order status = ${expectedStatus}`,
             action: "select", table: "orders", actor: "service_role",
-            params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: expectedStatus }, limit: 1 },
+            params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: expectedStatus } },
             expect: { status: "success", row_count: 1, field_checks: { status: expectedStatus } },
             on_fail: "abort",
           });
 
-          // For UPI, add payment confirmation
           if (pay.method === "upi") {
             steps.push({
               step_id: "confirm_upi", label: "Confirm UPI payment",
               action: "rpc", actor: "buyer",
-              params: { function_name: "confirm_upi_payment", args: { _order_id: "{{verify.id}}", _upi_transaction_ref: `TEST-UTR-${Date.now()}` } },
+              params: { function_name: "confirm_upi_payment", args: { _order_id: "{{verify.0.id}}", _upi_transaction_ref: `TEST-UTR-${Date.now()}` } },
               expect: { status: "success" }, on_fail: "abort",
             });
             steps.push({
               step_id: "verify_placed", label: "Verify order placed after UPI",
               action: "select", table: "orders", actor: "buyer",
-              params: { filters: { id: "{{verify.id}}" }, columns: "id,status" },
+              params: { filters: { id: "{{verify.0.id}}" }, columns: "id,status", single: true },
               expect: { status: "success", field_checks: { status: "placed" } }, on_fail: "abort",
             });
           }
@@ -328,19 +328,19 @@ function generateOrderLifecycleScenarios(): GeneratedScenario[] {
       steps.push(orderRpcStep("place", "Place UPI order", "upi", "pending", [{ ref: "product", price: 150, name: "Lifecycle Item" }]));
       steps.push({
         step_id: "get_order", label: "Get order", action: "select", table: "orders", actor: "service_role",
-        params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "payment_pending" }, limit: 1 },
+        params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "payment_pending" } },
         expect: { status: "success", row_count: 1 }, on_fail: "abort",
       });
       steps.push({
         step_id: "cancel", label: "Cancel pending orders", action: "rpc", actor: "buyer",
-        params: { function_name: "buyer_cancel_pending_orders", args: { _order_ids: ["{{get_order.id}}"] } },
+        params: { function_name: "buyer_cancel_pending_orders", args: { _order_ids: ["{{get_order.0.id}}"] } },
         expect: { status: "success" }, on_fail: "abort",
       });
     } else {
       steps.push(orderRpcStep("place", "Place COD order", "cod", "paid", [{ ref: "product", price: 150, name: "Lifecycle Item" }]));
       steps.push({
         step_id: "get_order", label: "Get order", action: "select", table: "orders", actor: "service_role",
-        params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" }, limit: 1 },
+        params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" } },
         expect: { status: "success", row_count: 1 }, on_fail: "abort",
       });
 
@@ -348,14 +348,14 @@ function generateOrderLifecycleScenarios(): GeneratedScenario[] {
         steps.push({
           step_id: `to_${status}`, label: `Transition to ${status}`, action: "update",
           table: "orders", actor: "service_role",
-          params: { set: { status }, match: { id: "{{get_order.id}}" } },
+          params: { set: { status }, match: { id: "{{get_order.0.id}}" } },
           expect: { status: "success" }, on_fail: "abort",
         });
       }
 
       steps.push({
         step_id: "cancel", label: `Cancel from ${cancel.status}`, action: "rpc", actor: "buyer",
-        params: { function_name: "buyer_cancel_order", args: { _order_id: "{{get_order.id}}", _reason: "Test cancel" } },
+        params: { function_name: "buyer_cancel_order", args: { _order_id: "{{get_order.0.id}}", _reason: "Test cancel" } },
         expect: { status: "success" }, on_fail: "abort",
       });
     }
@@ -363,7 +363,7 @@ function generateOrderLifecycleScenarios(): GeneratedScenario[] {
     steps.push({
       step_id: "verify_cancelled", label: "Verify cancelled", action: "select",
       table: "orders", actor: "service_role",
-      params: { filters: { id: "{{get_order.id}}" }, columns: "id,status" },
+      params: { filters: { id: "{{get_order.0.id}}" }, columns: "id,status", single: true },
       expect: { status: "success", field_checks: { status: "cancelled" } }, on_fail: "abort",
     });
 
@@ -388,7 +388,7 @@ function generateOrderLifecycleScenarios(): GeneratedScenario[] {
       orderRpcStep("place", "Place COD order", "cod", "paid", [{ ref: "product", price: 200, name: "Lifecycle Full Item" }], { _fulfillment_type: path.fulfillment }),
       {
         step_id: "get_order", label: "Get order", action: "select", table: "orders", actor: "service_role",
-        params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" }, limit: 1 },
+        params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" } },
         expect: { status: "success", row_count: 1 }, on_fail: "abort",
       },
     ];
@@ -397,7 +397,7 @@ function generateOrderLifecycleScenarios(): GeneratedScenario[] {
       steps.push({
         step_id: `to_${status}`, label: `Seller → ${status}`, action: "update",
         table: "orders", actor: "service_role",
-        params: { set: { status }, match: { id: "{{get_order.id}}" } },
+        params: { set: { status }, match: { id: "{{get_order.0.id}}" } },
         expect: { status: "success" }, on_fail: "abort",
       });
     }
@@ -405,7 +405,7 @@ function generateOrderLifecycleScenarios(): GeneratedScenario[] {
     if (path.buyerAction) {
       steps.push({
         step_id: "buyer_action", label: `Buyer → ${path.buyerAction}`, action: "rpc", actor: "buyer",
-        params: { function_name: "buyer_advance_order", args: { _order_id: "{{get_order.id}}", _new_status: path.buyerAction } },
+        params: { function_name: "buyer_advance_order", args: { _order_id: "{{get_order.0.id}}", _new_status: path.buyerAction } },
         expect: { status: "success" }, on_fail: "abort",
       });
     }
@@ -438,19 +438,19 @@ function generateOrderLifecycleScenarios(): GeneratedScenario[] {
         orderRpcStep("place", "Place COD order", "cod", "paid", [{ ref: "product", price: 100, name: "Invalid Trans" }]),
         {
           step_id: "get_order", label: "Get order", action: "select", table: "orders", actor: "service_role",
-          params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" }, limit: 1 },
+          params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" } },
           expect: { status: "success", row_count: 1 }, on_fail: "abort",
         },
         ...(t.from !== "placed" ? [{
           step_id: "transition_to_from", label: `Move to ${t.from}`, action: "update" as const,
           table: "orders", actor: "service_role",
-          params: { set: { status: t.from }, match: { id: "{{get_order.id}}" } },
+          params: { set: { status: t.from }, match: { id: "{{get_order.0.id}}" } },
           expect: { status: "success" }, on_fail: "abort",
         }] : []),
         {
           step_id: "invalid_transition", label: `Invalid: ${t.from}→${t.to}`, action: "update",
           table: "orders", actor: "service_role",
-          params: { set: { status: t.to }, match: { id: "{{get_order.id}}" } },
+          params: { set: { status: t.to }, match: { id: "{{get_order.0.id}}" } },
           expect: { status: "error" }, on_fail: "continue",
         },
       ],
@@ -495,13 +495,13 @@ function generateRLSScenarios(): GeneratedScenario[] {
       orderRpcStep("place", "Place order", "cod", "paid", [{ ref: "product", price: 100, name: "RLS Order" }]),
       {
         step_id: "get_order", label: "Get order", action: "select", table: "orders", actor: "service_role",
-        params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" }, limit: 1 },
+        params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: "placed" } },
         expect: { status: "success", row_count: 1 }, on_fail: "abort",
       },
       {
         step_id: "guard_cancel", label: "Guard tries to cancel buyer's order (should fail)",
         action: "rpc", actor: "guard",
-        params: { function_name: "buyer_cancel_order", args: { _order_id: "{{get_order.id}}", _reason: "Unauthorized" } },
+        params: { function_name: "buyer_cancel_order", args: { _order_id: "{{get_order.0.id}}", _reason: "Unauthorized" } },
         expect: { status: "error" }, on_fail: "continue",
       },
     ],
