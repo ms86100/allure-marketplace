@@ -317,87 +317,16 @@ export default function DeliveryPartnerDashboardPage() {
                 <p className="text-sm">No {activeTab === 'active' ? 'active' : 'completed'} deliveries</p>
               </div>
             ) : (
-              deliveries.map((delivery: any) => {
-                const sc = getDeliveryStatus(delivery.status);
-                return (
-                  <Card key={delivery.id}>
-                    <CardContent className="p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="font-semibold text-sm">{delivery.order?.seller?.business_name || 'Order'}</p>
-                        <Badge variant="outline" className={`text-[10px] ${sc.color}`}>{sc.label}</Badge>
-                      </div>
-                      <div className="space-y-1 text-xs text-muted-foreground">
-                        <p className="flex items-center gap-1">
-                          <MapPin size={12} /> {delivery.order?.buyer?.block}-{delivery.order?.buyer?.flat_number}
-                        </p>
-                        {delivery.order?.buyer?.phone && (
-                          <p className="flex items-center gap-1">
-                            <Phone size={12} /> {delivery.order.buyer.phone}
-                          </p>
-                        )}
-                      <p className="flex items-center gap-1 tabular-nums">
-                          <Clock size={12} /> {format(new Date(delivery.created_at), 'dd MMM, hh:mm a')}
-                        </p>
-                        {delivery.delivery_code && delivery.status !== 'delivered' && (
-                          <p className="text-primary font-mono font-bold">
-                            OTP: {delivery.delivery_code}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="tabular-nums">{formatPrice(delivery.order?.total_amount || 0)}</span>
-                        <span className="text-success font-medium tabular-nums">Fee: {formatPrice(delivery.delivery_fee)}</span>
-                      </div>
-
-                      {/* Action Buttons — workflow-driven */}
-                      {(() => {
-                        const action = getNextDeliveryAction(undefined /* TODO: pass per-order flow */, delivery.status);
-                        if (!action) return null;
-                        if (action.requiresOtp) {
-                          return (
-                            <Button
-                              size="sm"
-                              className="w-full"
-                              onClick={() => setOtpOrderId(delivery.order?.id || null)}
-                              disabled={updatingId === delivery.id}
-                            >
-                              <ShieldCheck size={14} className="mr-1" />
-                              Verify & Deliver
-                            </Button>
-                          );
-                        }
-                        // Non-OTP next step: also show OTP shortcut if available
-                        const otpAction = getNextDeliveryAction(undefined, action.nextStatus);
-                        return (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant={otpAction?.requiresOtp ? 'outline' : 'default'}
-                              className="flex-1"
-                              onClick={() => updateDeliveryStatus(delivery.id, action.nextStatus)}
-                              disabled={updatingId === delivery.id}
-                            >
-                              {updatingId === delivery.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Navigation size={14} className="mr-1" />}
-                              {action.nextStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                            </Button>
-                            {otpAction?.requiresOtp && (
-                              <Button
-                                size="sm"
-                                className="flex-1"
-                                onClick={() => setOtpOrderId(delivery.order?.id || null)}
-                                disabled={updatingId === delivery.id}
-                              >
-                                <ShieldCheck size={14} className="mr-1" />
-                                Verify & Deliver
-                              </Button>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </CardContent>
-                  </Card>
-                );
-              })
+              deliveries.map((delivery: any) => (
+                <DeliveryActionCard
+                  key={delivery.id}
+                  delivery={delivery}
+                  updatingId={updatingId}
+                  onUpdateStatus={updateDeliveryStatus}
+                  onOtpVerify={(orderId) => setOtpOrderId(orderId)}
+                  onTransitDetected={handleTransitDetected}
+                />
+              ))
             )}
           </TabsContent>
         </Tabs>
