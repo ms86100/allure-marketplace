@@ -65,13 +65,19 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
       console.log('[LocationTracking] Delivery terminal — auto-stopping');
       throw new Error('DELIVERY_TERMINAL');
     }
-    // Legacy: also handle 400 error responses for backward compatibility
+    // Handle 429 rate limit — wait and signal caller to slow down
     if (error) {
       let errorBody: any = null;
       try {
         errorBody = typeof error === 'object' && error.context ? await error.context.json?.() : null;
       } catch { /* ignore */ }
       const msg = errorBody?.error || (typeof data === 'object' ? data?.error : '') || '';
+      if (msg === 'Rate limited' || msg === 'Rate limited') {
+        const retryMs = errorBody?.retry_after_ms || data?.retry_after_ms || 2500;
+        console.log(`[LocationTracking] Rate limited — waiting ${retryMs}ms`);
+        await new Promise(r => setTimeout(r, retryMs));
+        throw new Error('RATE_LIMITED');
+      }
       if (msg === 'Delivery is no longer active') {
         console.log('[LocationTracking] Delivery terminal — auto-stopping');
         throw new Error('DELIVERY_TERMINAL');
@@ -89,14 +95,29 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
       }
       while (queueRef.current.length > 0) {
         const nextPayload = queueRef.current[0];
-        await postLocation(nextPayload);
+        try {
+          await postLocation(nextPayload);
+        } catch (err: any) {
+          if (err?.message === 'RATE_LIMITED') {
+            // Stop flushing — will retry on next location update or online event
+            console.log('[LocationTracking] Queue flush paused due to rate limit');
+            break;
+          }
+          throw err;
+        }
         queueRef.current.shift();
         const now = Date.now();
         lastSentRef.current = now;
         if (mountedRef.current) setState(s => ({ ...s, lastSentAt: now, trackingPaused: false }));
+        // Throttle between consecutive queue sends to respect server 2s rate limit
+        if (queueRef.current.length > 0) {
+          await new Promise(r => setTimeout(r, 2500));
+        }
       }
-    } catch (error) {
-      console.error('[LocationTracking] Queue flush failed:', error);
+    } catch (error: any) {
+      if (error?.message !== 'DELIVERY_TERMINAL') {
+        console.error('[LocationTracking] Queue flush failed:', error);
+      }
     } finally {
       flushingRef.current = false;
     }
@@ -137,12 +158,16 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
     try {
       await flushQueue();
       await postLocation(payload);
-      lastSentRef.current = now;
-      if (mountedRef.current) setState(s => ({ ...s, lastSentAt: now, trackingPaused: false }));
+      lastSentRef.current = Date.now();
+      if (mountedRef.current) setState(s => ({ ...s, lastSentAt: Date.now(), trackingPaused: false }));
     } catch (err: any) {
       if (err?.message === 'DELIVERY_TERMINAL') {
-        // Auto-stop: don't queue, don't retry
         stopTrackingRef.current?.();
+        return;
+      }
+      if (err?.message === 'RATE_LIMITED') {
+        // Don't queue — the point was too soon, just skip
+        console.log('[LocationTracking] Skipping point due to rate limit');
         return;
       }
       console.error('[LocationTracking] Send failed, queueing point:', err);
