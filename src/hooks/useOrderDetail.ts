@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getTrackingConfigSync } from '@/services/trackingConfig';
+// trackingConfig import removed — transit detection is now DB-driven via is_transit flag
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStatusLabels } from '@/hooks/useStatusLabels';

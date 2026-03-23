@@ -187,7 +187,7 @@ export default function OrderDetailPage() {
 
 
   const hasSellerActionBar = o.isSellerView && !o.isFlowLoading && o.flow.length > 0 && !isTerminalStatus(o.flow, order.status);
-  const hasBuyerActionBar = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel || order.status === 'placed');
+  const hasBuyerActionBar = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel);
 
   return (
     <AppLayout showHeader={false} showNav={!hasSellerActionBar}>
