@@ -17,6 +17,8 @@ interface LiveDeliveryTrackerProps {
   trackingState?: DeliveryTrackingState;
   roadEtaMinutes?: number | null;
   statusHints?: Record<string, StatusHint>;
+  /** Workflow-derived transit flag — overrides system_settings when provided */
+  isInTransit?: boolean;
 }
 
 interface ProximityThreshold {
@@ -109,7 +111,7 @@ function getLastSeenText(lastLocationAt: string | null): string | null {
   return null;
 }
 
-export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, roadEtaMinutes, statusHints }: LiveDeliveryTrackerProps) {
+export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, roadEtaMinutes, statusHints, isInTransit: isInTransitProp }: LiveDeliveryTrackerProps) {
   const ownTracking = useDeliveryTracking(trackingState ? null : assignmentId);
   const tracking = trackingState || ownTracking;
   const trackingConfig = useTrackingConfig();
@@ -137,8 +139,9 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
 
   if (!tracking.status) return null;
 
+  // Use workflow-derived isInTransit prop when available, fallback to system_settings
   const transitSet = new Set(trackingConfig.transit_statuses);
-  const isInTransit = transitSet.has(tracking.status);
+  const isInTransit = isInTransitProp ?? (tracking.status ? transitSet.has(tracking.status) : false);
   const lastSeen = getLastSeenText(tracking.lastLocationAt);
 
   return (

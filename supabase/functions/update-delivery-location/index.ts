@@ -67,6 +67,23 @@ async function loadTerminalStatuses(supabase: ReturnType<typeof createClient>): 
   return FALLBACK;
 }
 
+/** Load transit statuses from system_settings — single source of truth */
+async function loadTransitStatuses(supabase: ReturnType<typeof createClient>): Promise<Set<string>> {
+  const FALLBACK = new Set(['picked_up', 'on_the_way', 'at_gate']);
+  try {
+    const { data } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'transit_statuses')
+      .maybeSingle();
+    if (data?.value) {
+      const parsed = JSON.parse(data.value);
+      if (Array.isArray(parsed) && parsed.length > 0) return new Set(parsed);
+    }
+  } catch { /* fall through */ }
+  return FALLBACK;
+}
+
 function calculateEta(distanceMeters: number, speedKmh: number | null, accuracyMeters: number | null, historicalAvgMin: number | null = null): { eta: number | null; skipUpdate: boolean } {
   if (accuracyMeters != null && accuracyMeters > 100) {
     return { eta: null, skipUpdate: true };
@@ -158,7 +175,10 @@ serve(async (req) => {
     }
 
     // Load terminal statuses from DB (single request scope cache)
-    const terminalStatuses = await loadTerminalStatuses(supabase);
+    const [terminalStatuses, transitStatusesForChecks] = await Promise.all([
+      loadTerminalStatuses(supabase),
+      loadTransitStatuses(supabase),
+    ]);
 
     // Get assignment
     const { data: assignment, error: aErr } = await supabase
@@ -327,7 +347,6 @@ serve(async (req) => {
     // Guard: Only send when the ORDER (not just assignment) is in a transit stage AND is at least 2 min old.
     // This prevents false "on the way" alerts for seller-delivery where seller IS the rider and is already nearby.
     if (assignment.status === 'picked_up' && !assignment.last_location_at && buyerId) {
-      const EN_ROUTE_ORDER_STATUSES = ['picked_up', 'on_the_way', 'at_gate'];
       const { data: orderForEnRoute } = await supabase
         .from('orders')
         .select('status, created_at')
@@ -336,7 +355,7 @@ serve(async (req) => {
 
       const enRouteOrderStatus = orderForEnRoute?.status ?? null;
       const enRouteOrderAgeMs = orderForEnRoute?.created_at ? Date.now() - new Date(orderForEnRoute.created_at).getTime() : 0;
-      const isEnRouteOrderInTransit = enRouteOrderStatus && EN_ROUTE_ORDER_STATUSES.includes(enRouteOrderStatus);
+      const isEnRouteOrderInTransit = enRouteOrderStatus && transitStatusesForChecks.has(enRouteOrderStatus);
       const isEnRouteOrderOldEnough = enRouteOrderAgeMs > 2 * 60 * 1000;
 
       if (isEnRouteOrderInTransit && isEnRouteOrderOldEnough) {
@@ -370,7 +389,7 @@ serve(async (req) => {
     if (
       assignment.last_location_at &&
       !assignment.stalled_notified &&
-      ['picked_up', 'at_gate', 'on_the_way'].includes(assignment.status)
+      transitStatusesForChecks.has(assignment.status)
     ) {
       const lastAt = new Date(assignment.last_location_at).getTime();
       const staleDiffMs = Date.now() - lastAt;
@@ -398,7 +417,7 @@ serve(async (req) => {
     }
 
     // ═══ Smart Delay Detection ═══
-    if (distanceMeters !== null && buyerId && ['picked_up', 'on_the_way', 'at_gate'].includes(assignment.status)) {
+    if (distanceMeters !== null && buyerId && transitStatusesForChecks.has(assignment.status)) {
       const prevEta = assignment.eta_minutes;
       const etaSpike = prevEta != null && etaMinutes != null && (etaMinutes - prevEta) > 5;
 
@@ -446,9 +465,8 @@ serve(async (req) => {
     // ═══ Proximity notifications ═══
     // Guard: Only send proximity alerts when the ORDER (not just assignment) is in an actual transit stage
     // This prevents false alerts for seller-delivery where seller is already near the buyer at acceptance
-    const TRANSIT_ORDER_STATUSES = ['on_the_way', 'at_gate', 'picked_up'];
     let orderStatusForProximity: string | null = null;
-    if (distanceMeters !== null && buyerId && ['picked_up', 'on_the_way', 'at_gate'].includes(assignment.status)) {
+    if (distanceMeters !== null && buyerId && transitStatusesForChecks.has(assignment.status)) {
       // Fetch the actual order status to gate proximity notifications
       const { data: orderForStatus } = await supabase
         .from('orders')
@@ -459,7 +477,7 @@ serve(async (req) => {
 
       // Only fire if the ORDER itself is in a transit stage AND order is at least 2 min old
       const orderAgeMs = orderForStatus?.created_at ? Date.now() - new Date(orderForStatus.created_at).getTime() : Infinity;
-      const isOrderInTransit = orderStatusForProximity && TRANSIT_ORDER_STATUSES.includes(orderStatusForProximity);
+      const isOrderInTransit = orderStatusForProximity && transitStatusesForChecks.has(orderStatusForProximity);
       const isOrderOldEnough = orderAgeMs > 2 * 60 * 1000;
 
       if (isOrderInTransit && isOrderOldEnough) {
