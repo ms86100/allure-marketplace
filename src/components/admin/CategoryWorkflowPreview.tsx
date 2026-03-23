@@ -146,6 +146,9 @@ export function CategoryWorkflowPreview({ workflowKey, parentGroup, category }: 
                     {step.display_label || formatName(step.status_key)}
                   </span>
                   <span className="text-[8px] text-muted-foreground">({step.actor})</span>
+                  {step.is_transit && <Truck size={8} className="text-blue-500" />}
+                  {step.requires_otp && <KeyRound size={8} className="text-amber-500" />}
+                  {step.is_success && <CheckCircle2 size={8} className="text-emerald-500" />}
                 </div>
                 {i < steps.length - 1 && (
                   <ChevronRight size={10} className="text-muted-foreground/50 shrink-0" />

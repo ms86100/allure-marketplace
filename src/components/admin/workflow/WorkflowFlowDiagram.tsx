@@ -220,7 +220,16 @@ export function WorkflowFlowDiagram({ steps, transitions }: Props) {
               {isFirst && (
                 <Play size={10} className="text-primary shrink-0" />
               )}
+              {step.is_transit && (
+                <Truck size={9} className="text-blue-500 shrink-0" />
+              )}
+              {step.requires_otp && (
+                <KeyRound size={9} className="text-amber-500 shrink-0" />
+              )}
               <span>{step.display_label || formatName(step.status_key)}</span>
+              {step.is_success && (
+                <CheckCircle2 size={9} className="text-emerald-500 shrink-0" />
+              )}
               {isTerminal && (
                 <CircleStop size={10} className="text-green-600 dark:text-green-400 shrink-0" />
               )}

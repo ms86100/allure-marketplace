@@ -376,6 +376,22 @@ export function AdminWorkflowManager() {
                           <label htmlFor={`terminal-${index}`} className="text-xs text-muted-foreground">Terminal</label>
                         </div>
                       </div>
+                      {/* Behavior Flags */}
+                      <div className="flex items-center gap-4 flex-wrap border-t border-border/30 pt-2 mt-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Flags</span>
+                        <div className="flex items-center gap-1.5">
+                          <Checkbox checked={step.is_transit} onCheckedChange={(v) => updateStep(index, 'is_transit', !!v)} id={`transit-${index}`} />
+                          <label htmlFor={`transit-${index}`} className="text-[11px] text-muted-foreground">🚚 Transit</label>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Checkbox checked={step.requires_otp} onCheckedChange={(v) => updateStep(index, 'requires_otp', !!v)} id={`otp-${index}`} />
+                          <label htmlFor={`otp-${index}`} className="text-[11px] text-muted-foreground">🔐 OTP</label>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Checkbox checked={step.is_success} onCheckedChange={(v) => updateStep(index, 'is_success', !!v)} id={`success-${index}`} />
+                          <label htmlFor={`success-${index}`} className="text-[11px] text-muted-foreground">✅ Success</label>
+                        </div>
+                      </div>
                       <div className="grid grid-cols-2 gap-2">
                         <Input value={step.buyer_hint} onChange={(e) => updateStep(index, 'buyer_hint', e.target.value)} placeholder="Buyer hint message" className="h-7 text-xs rounded-lg" />
                         <Input value={step.seller_hint} onChange={(e) => updateStep(index, 'seller_hint', e.target.value)} placeholder="Seller hint message" className="h-7 text-xs rounded-lg" />
