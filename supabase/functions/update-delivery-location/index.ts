@@ -417,7 +417,7 @@ serve(async (req) => {
     }
 
     // ═══ Smart Delay Detection ═══
-    if (distanceMeters !== null && buyerId && ['picked_up', 'on_the_way', 'at_gate'].includes(assignment.status)) {
+    if (distanceMeters !== null && buyerId && transitStatusesForChecks.has(assignment.status)) {
       const prevEta = assignment.eta_minutes;
       const etaSpike = prevEta != null && etaMinutes != null && (etaMinutes - prevEta) > 5;
 
