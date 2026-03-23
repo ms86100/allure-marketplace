@@ -35,6 +35,7 @@ interface StepResult {
   outcome: "passed" | "failed" | "skipped";
   duration_ms: number;
   error_message?: string;
+  suggested_fix?: string;
   response_data?: any;
 }
 
