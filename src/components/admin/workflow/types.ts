@@ -16,6 +16,9 @@ export interface FlowStep {
   notify_seller: boolean;
   seller_notification_title: string;
   seller_notification_body: string;
+  is_transit: boolean;
+  requires_otp: boolean;
+  is_success: boolean;
 }
 
 export interface Transition {
