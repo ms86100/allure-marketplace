@@ -118,14 +118,18 @@ export default function DeliveryPartnerDashboardPage() {
     },
     enabled: !!effectiveSocietyId && !!partnerProfile?.id,
   });
-  // Auto-start tracking for existing in-transit deliveries on mount
-  useEffect(() => {
-    if (!deliveries || deliveries.length === 0) return;
-    const inTransit = deliveries.find((d: any) => !['pending', 'assigned', 'delivered', 'failed', 'cancelled'].includes(d.status));
-    if (inTransit && !activeTrackingId) {
-      setActiveTrackingId(inTransit.id);
+  // Transit tracking callback from DeliveryActionCard
+  const transitDeliveriesRef = useRef<Set<string>>(new Set());
+  const handleTransitDetected = useCallback((assignmentId: string, isTransit: boolean) => {
+    if (isTransit && !activeTrackingId) {
+      setActiveTrackingId(assignmentId);
     }
-  }, [deliveries, activeTrackingId]);
+    if (isTransit) {
+      transitDeliveriesRef.current.add(assignmentId);
+    } else {
+      transitDeliveriesRef.current.delete(assignmentId);
+    }
+  }, [activeTrackingId]);
 
   // Auto-start when tracking ID is set
   useEffect(() => {
