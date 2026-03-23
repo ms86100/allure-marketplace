@@ -477,7 +477,7 @@ serve(async (req) => {
 
       // Only fire if the ORDER itself is in a transit stage AND order is at least 2 min old
       const orderAgeMs = orderForStatus?.created_at ? Date.now() - new Date(orderForStatus.created_at).getTime() : Infinity;
-      const isOrderInTransit = orderStatusForProximity && TRANSIT_ORDER_STATUSES.includes(orderStatusForProximity);
+      const isOrderInTransit = orderStatusForProximity && transitStatusesForChecks.has(orderStatusForProximity);
       const isOrderOldEnough = orderAgeMs > 2 * 60 * 1000;
 
       if (isOrderInTransit && isOrderOldEnough) {
