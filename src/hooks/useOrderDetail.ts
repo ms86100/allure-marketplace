@@ -66,8 +66,8 @@ export function useOrderDetail(id: string | undefined) {
 
   // Load transitions for accurate next-status and cancellation checks
   const resolvedTxnType = useMemo(
-    () => resolveTransactionType(effectiveParentGroup || 'default', orderType, orderFulfillmentType, deliveryHandledBy),
-    [effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy]
+    () => resolveTransactionType(effectiveParentGroup || 'default', orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType),
+    [effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType]
   );
   const transitions = useStatusTransitions(effectiveParentGroup || 'default', resolvedTxnType);
 
