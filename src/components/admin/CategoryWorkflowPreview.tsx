@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
-import { Link2, AlertTriangle, ChevronRight, CheckCircle2, Truck, KeyRound } from 'lucide-react';
+import { Link2, AlertTriangle, ChevronRight, CheckCircle2, Truck, KeyRound, MapPin } from 'lucide-react';
 import { formatName } from '@/components/admin/workflow/types';
 
 interface Props {
@@ -23,6 +23,7 @@ interface FlowStep {
   is_transit: boolean;
   requires_otp: boolean;
   is_success: boolean;
+  creates_tracking_assignment: boolean;
 }
 
 interface RecentOrder {
@@ -48,7 +49,7 @@ export function CategoryWorkflowPreview({ workflowKey, parentGroup, category }: 
     (async () => {
       const { data } = await supabase
         .from('category_status_flows')
-        .select('status_key, display_label, icon, color, sort_order, is_terminal, actor, is_deprecated, is_transit, requires_otp, is_success')
+        .select('status_key, display_label, icon, color, sort_order, is_terminal, actor, is_deprecated, is_transit, requires_otp, is_success, creates_tracking_assignment')
         .eq('parent_group', parentGroup)
         .eq('transaction_type', workflowKey)
         .order('sort_order');
@@ -64,7 +65,7 @@ export function CategoryWorkflowPreview({ workflowKey, parentGroup, category }: 
       if (parentGroup !== 'default') {
         const fallback = await supabase
           .from('category_status_flows')
-          .select('status_key, display_label, icon, color, sort_order, is_terminal, actor, is_deprecated, is_transit, requires_otp, is_success')
+          .select('status_key, display_label, icon, color, sort_order, is_terminal, actor, is_deprecated, is_transit, requires_otp, is_success, creates_tracking_assignment')
           .eq('parent_group', 'default')
           .eq('transaction_type', workflowKey)
           .order('sort_order');
@@ -149,6 +150,7 @@ export function CategoryWorkflowPreview({ workflowKey, parentGroup, category }: 
                   {step.is_transit && <Truck size={8} className="text-blue-500" />}
                   {step.requires_otp && <KeyRound size={8} className="text-amber-500" />}
                   {step.is_success && <CheckCircle2 size={8} className="text-emerald-500" />}
+                  {step.creates_tracking_assignment && <MapPin size={8} className="text-violet-500" />}
                 </div>
                 {i < steps.length - 1 && (
                   <ChevronRight size={10} className="text-muted-foreground/50 shrink-0" />

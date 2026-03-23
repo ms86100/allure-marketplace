@@ -74,7 +74,7 @@ export function AdminWorkflowManager() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('category_status_flows')
-      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint, seller_hint, id, notify_buyer, notification_title, notification_body, notification_action, notify_seller, seller_notification_title, seller_notification_body, is_deprecated, is_transit, requires_otp, is_success')
+      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint, seller_hint, id, notify_buyer, notification_title, notification_body, notification_action, notify_seller, seller_notification_title, seller_notification_body, is_deprecated, is_transit, requires_otp, is_success, creates_tracking_assignment')
       .order('parent_group')
       .order('transaction_type')
       .order('sort_order', { ascending: true });
@@ -92,7 +92,7 @@ export function AdminWorkflowManager() {
         groupMap.set(key, { parent_group: row.parent_group, transaction_type: row.transaction_type, steps: [], step_count: 0 });
       }
       const group = groupMap.get(key)!;
-      group.steps.push({ ...row, seller_hint: (row as any).seller_hint || '', notify_buyer: (row as any).notify_buyer || false, notification_title: (row as any).notification_title || '', notification_body: (row as any).notification_body || '', notification_action: (row as any).notification_action || '', notify_seller: (row as any).notify_seller || false, seller_notification_title: (row as any).seller_notification_title || '', seller_notification_body: (row as any).seller_notification_body || '', is_transit: !!(row as any).is_transit, requires_otp: !!(row as any).requires_otp, is_success: !!(row as any).is_success } as FlowStep);
+      group.steps.push({ ...row, seller_hint: (row as any).seller_hint || '', notify_buyer: (row as any).notify_buyer || false, notification_title: (row as any).notification_title || '', notification_body: (row as any).notification_body || '', notification_action: (row as any).notification_action || '', notify_seller: (row as any).notify_seller || false, seller_notification_title: (row as any).seller_notification_title || '', seller_notification_body: (row as any).seller_notification_body || '', is_transit: !!(row as any).is_transit, requires_otp: !!(row as any).requires_otp, is_success: !!(row as any).is_success, creates_tracking_assignment: !!(row as any).creates_tracking_assignment } as FlowStep);
       group.step_count++;
     }
 
@@ -119,7 +119,7 @@ export function AdminWorkflowManager() {
       display_label: '', color: 'bg-gray-100 text-gray-600', icon: 'Circle', buyer_hint: '', seller_hint: '',
       notify_buyer: false, notification_title: '', notification_body: '', notification_action: '',
       notify_seller: false, seller_notification_title: '', seller_notification_body: '',
-      is_transit: false, requires_otp: false, is_success: false,
+      is_transit: false, requires_otp: false, is_success: false, creates_tracking_assignment: false,
     }]);
   };
 
@@ -200,7 +200,7 @@ export function AdminWorkflowManager() {
         notification_body: s.notification_body || null, notification_action: s.notification_action || null,
         notify_seller: s.notify_seller, seller_notification_title: s.seller_notification_title || null,
         seller_notification_body: s.seller_notification_body || null,
-        is_transit: s.is_transit, requires_otp: s.requires_otp, is_success: s.is_success,
+        is_transit: s.is_transit, requires_otp: s.requires_otp, is_success: s.is_success, creates_tracking_assignment: s.creates_tracking_assignment,
         };
       });
       const { error: insertError } = await supabase.from('category_status_flows').insert(stepsToInsert);
@@ -543,6 +543,17 @@ export function AdminWorkflowManager() {
                             <TooltipContent side="top" className="max-w-[200px] text-xs">Marks this as a successful completion. Triggers celebration UI, enables reviews, and settles payments. Only meaningful on end states.</TooltipContent>
                           </Tooltip>
                         </div>
+
+                        {step.is_transit && (
+                          <div className="flex items-center gap-1.5">
+                            <Checkbox checked={step.creates_tracking_assignment} onCheckedChange={(v) => updateStep(index, 'creates_tracking_assignment', !!v)} id={`tracking-${index}`} />
+                            <label htmlFor={`tracking-${index}`} className="text-[11px] text-muted-foreground cursor-pointer">📍 Auto-create Tracking</label>
+                            <Tooltip>
+                              <TooltipTrigger asChild><HelpCircle size={10} className="text-muted-foreground/40 cursor-help" /></TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[200px] text-xs">Automatically creates a delivery tracking assignment when the order enters this step. Enable for seller-handled deliveries.</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        )}
                       </div>
 
                       {/* Display Actor (who this step is "waiting on") — multi-select toggles */}

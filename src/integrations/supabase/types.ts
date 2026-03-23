@@ -1052,6 +1052,7 @@ export type Database = {
           buyer_hint: string | null
           color: string | null
           created_at: string | null
+          creates_tracking_assignment: boolean | null
           display_label: string | null
           icon: string | null
           id: string
@@ -1081,6 +1082,7 @@ export type Database = {
           buyer_hint?: string | null
           color?: string | null
           created_at?: string | null
+          creates_tracking_assignment?: boolean | null
           display_label?: string | null
           icon?: string | null
           id?: string
@@ -1110,6 +1112,7 @@ export type Database = {
           buyer_hint?: string | null
           color?: string | null
           created_at?: string | null
+          creates_tracking_assignment?: boolean | null
           display_label?: string | null
           icon?: string | null
           id?: string
