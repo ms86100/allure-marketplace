@@ -158,7 +158,10 @@ serve(async (req) => {
     }
 
     // Load terminal statuses from DB (single request scope cache)
-    const terminalStatuses = await loadTerminalStatuses(supabase);
+    const [terminalStatuses, transitStatusesForChecks] = await Promise.all([
+      loadTerminalStatuses(supabase),
+      loadTransitStatuses(supabase),
+    ]);
 
     // Get assignment
     const { data: assignment, error: aErr } = await supabase
