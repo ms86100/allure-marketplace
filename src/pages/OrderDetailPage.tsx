@@ -171,6 +171,16 @@ export default function OrderDetailPage() {
     return () => { supabase.removeChannel(otpChannel); };
   }, [isDeliveryOrder, deliveryAssignmentId]);
 
+  // Listen for OTP-required events from updateOrderStatus (backend rejection auto-opens dialog)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.orderId === orderId) setIsOtpDialogOpen(true);
+    };
+    window.addEventListener('delivery-otp-required', handler);
+    return () => window.removeEventListener('delivery-otp-required', handler);
+  }, [orderId]);
+
   if (o.isLoading) return <AppLayout showHeader={false}><div className="p-4 space-y-3"><Skeleton className="h-8 w-32" /><Skeleton className="h-28 w-full rounded-xl" /><Skeleton className="h-40 w-full rounded-xl" /></div></AppLayout>;
   if (!order) return <AppLayout showHeader={false}><div className="p-4 text-center py-16"><p className="text-sm text-muted-foreground">Order not found</p><Link to="/orders"><Button size="sm" className="mt-4">View Orders</Button></Link></div></AppLayout>;
 
@@ -198,16 +208,6 @@ export default function OrderDetailPage() {
   const hasDeliveryOtpGate = !!(deliveryAssignmentId && isDeliveryOrder);
   const sellerNextIsTerminal = o.nextStatus ? isTerminalStatus(o.flow, o.nextStatus) || ['delivered', 'completed'].includes(o.nextStatus) : false;
   const buyerNextIsTerminal = o.buyerNextStatus ? isTerminalStatus(o.flow, o.buyerNextStatus) || ['delivered', 'completed'].includes(o.buyerNextStatus) : false;
-
-  // Listen for OTP-required events from updateOrderStatus (backend rejection auto-opens dialog)
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail?.orderId === orderId) setIsOtpDialogOpen(true);
-    };
-    window.addEventListener('delivery-otp-required', handler);
-    return () => window.removeEventListener('delivery-otp-required', handler);
-  }, [orderId]);
 
   return (
     <AppLayout showHeader={false} showNav={!hasSellerActionBar}>
