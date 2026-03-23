@@ -202,6 +202,9 @@ export default function OrderDetailPage() {
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold">Order Summary</h1>
             <button onClick={o.copyOrderId} className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono">#{order.id.slice(0, 8)} <Copy size={10} /></button>
+            {o.isSellerView && o.resolvedTxnType && (
+              <p className="text-[9px] text-muted-foreground/60 font-mono truncate">workflow: {(order as any).seller_profiles?.primary_group || 'default'} / {o.resolvedTxnType}</p>
+            )}
           </div>
           {o.canChat && o.chatRecipientId ? (
             <button onClick={() => o.setIsChatOpen(true)} className="relative inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted">
