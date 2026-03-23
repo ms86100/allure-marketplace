@@ -1,44 +1,73 @@
 
 
-# Fix: Add Actor-Awareness to Delivery Assignment Trigger
+# Fix: Replace `actor LIKE '%seller%'` with Dedicated Workflow Flag
 
-## Gap Identified
+## Problem
 
-The current trigger checks `is_transit = true` but does **not** check the workflow step's `actor` field. This means an assignment could be created even when the actor is `delivery` only (platform rider scenario that slipped past the `delivery_handled_by` guard) or in future multi-stage workflows where different transit steps have different actors.
+The trigger uses `actor LIKE '%seller%'` to decide whether to create a delivery assignment. This embeds business logic (actor = seller → create assignment) in code instead of deriving it purely from configuration. Actor means "who can act on this step" — it should not be overloaded to mean "who gets tracked."
 
-## Fix
+## Solution
 
-Add an `actor` check to the existing `SELECT EXISTS` query on line 42-49. The assignment should only be created when the workflow step's actor includes `seller`:
+Add a new boolean column `creates_tracking_assignment` to `category_status_flows`. This is a pure workflow configuration flag that the admin toggles — the trigger reads it without interpreting actor semantics.
+
+### 1. Database Migration — Add Column + Backfill
 
 ```sql
-SELECT EXISTS (
-  SELECT 1 FROM category_status_flows
-  WHERE status_key = NEW.status
-    AND is_transit = true
-    AND actor LIKE '%seller%'              -- ← NEW: actor must include seller
-    AND transaction_type = COALESCE(NEW.transaction_type, 'seller_delivery')
-    AND parent_group IN (COALESCE(_v_parent_group, 'default'), 'default')
-    AND is_deprecated = false
-) INTO _is_transit_step;
+ALTER TABLE category_status_flows
+  ADD COLUMN IF NOT EXISTS creates_tracking_assignment boolean DEFAULT false;
+
+-- Backfill: existing steps where is_transit=true and actor includes seller
+UPDATE category_status_flows
+  SET creates_tracking_assignment = true
+  WHERE is_transit = true AND actor LIKE '%seller%';
 ```
 
-This ensures the trigger is fully workflow-driven on **both** `is_transit` and `actor`, matching the three guards:
+### 2. Database Migration — Update Trigger
 
-| Guard | Source |
-|-------|--------|
-| `is_transit = true` | Workflow flag |
-| `actor LIKE '%seller%'` | Workflow actor field |
-| `delivery_handled_by != 'platform'` | Order-level field (already present at line 32) |
+Replace:
+```sql
+AND is_transit = true
+AND actor LIKE '%seller%'
+```
+With:
+```sql
+AND is_transit = true
+AND creates_tracking_assignment = true
+```
+
+Now the trigger has zero actor interpretation. It reads two boolean flags, both set by admin in workflow config.
+
+### 3. Frontend — Workflow Editor Support
+
+**File: Workflow step editor (admin)**
+- Add a toggle for `creates_tracking_assignment` alongside the existing `is_transit` / `requires_otp` / `is_success` toggles
+- Only show it when `is_transit = true` (it's meaningless otherwise)
+- Label: "Auto-create tracking assignment"
+
+### 4. Workflow Preview
+
+**File: `CategoryWorkflowPreview.tsx`**
+- Show an icon indicator when `creates_tracking_assignment = true` (e.g., a MapPin icon alongside the existing Truck/KeyRound icons)
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| New migration SQL | `CREATE OR REPLACE FUNCTION trg_create_seller_delivery_assignment()` — add `AND actor LIKE '%seller%'` to the `category_status_flows` lookup |
+| New migration SQL | Add `creates_tracking_assignment` column, backfill, update trigger |
+| Workflow step editor component | Add toggle for the new flag |
+| `CategoryWorkflowPreview.tsx` | Show indicator icon |
+| `src/components/admin/workflow/types.ts` | Add `creates_tracking_assignment` to `FlowStep` interface |
 
-Single-line addition. No frontend changes needed.
+## Why This Is Correct
+
+| Before | After |
+|--------|-------|
+| `actor LIKE '%seller%'` — code interprets actor | `creates_tracking_assignment = true` — config flag |
+| Actor overloaded for two meanings | Actor = who acts, flag = system behavior |
+| New actors require code changes | New actors just need admin to toggle the flag |
 
 ## Risk
 
-**Zero regression** — all existing workflows where `picked_up` has `is_transit=true` also have `actor` containing `seller`. The additional filter simply makes the trigger refuse to fire for hypothetical future steps where a non-seller actor handles transit.
+- **Zero regression**: Backfill sets the flag to `true` exactly where `actor LIKE '%seller%'` would have matched
+- **Forward-compatible**: Any future actor/role works without trigger changes
 
