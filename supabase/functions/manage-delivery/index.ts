@@ -231,6 +231,7 @@ async function handleUpdateStatus(req: Request, db: any, userId: string) {
   }
 
   // Bug 1 fix: Validate transition using from_status + parent_group (matching frontend logic)
+  // Multi-actor: accept both 'delivery' and 'seller' actors for self-delivery workflows
   // First try specific parent_group, then fallback to 'default'
   let { data: validTransitions } = await db
     .from('category_status_transitions')
@@ -238,7 +239,7 @@ async function handleUpdateStatus(req: Request, db: any, userId: string) {
     .eq('parent_group', parentGroup)
     .eq('transaction_type', txnType)
     .eq('from_status', assignment.current_status)
-    .eq('allowed_actor', 'delivery');
+    .in('allowed_actor', ['delivery', 'seller']);
 
   // Fallback to default parent_group if no transitions found
   if ((!validTransitions || validTransitions.length === 0) && parentGroup !== 'default') {
@@ -248,7 +249,7 @@ async function handleUpdateStatus(req: Request, db: any, userId: string) {
       .eq('parent_group', 'default')
       .eq('transaction_type', txnType)
       .eq('from_status', assignment.current_status)
-      .eq('allowed_actor', 'delivery');
+      .in('allowed_actor', ['delivery', 'seller']);
     validTransitions = fallback.data;
   }
 
