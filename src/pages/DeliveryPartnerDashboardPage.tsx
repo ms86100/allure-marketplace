@@ -158,7 +158,7 @@ export default function DeliveryPartnerDashboardPage() {
         .order('created_at', { ascending: false });
 
       if (activeTab === 'active') {
-        query = query.in('status', ['assigned', 'picked_up', 'at_gate']);
+        query = query.not('status', 'in', '(delivered,failed,cancelled)');
       } else {
         query = query.in('status', ['delivered', 'failed', 'cancelled']);
       }
