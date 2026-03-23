@@ -1,29 +1,21 @@
 
+## QA Audit: 5 Critical Bugs — FIXED ✅
 
-## Plan: Multi-Select "Waiting On" Actor Field
+### Bug 1: Fallback actor check for comma-separated values ✅
+- Fixed `getNextStatusForActor()` in `useCategoryStatusFlow.ts` — now uses `.split(',').includes(actor)` instead of strict `!== 'seller'`
 
-### Problem
-The "Waiting On" dropdown is a single-select, but some steps need multiple actors displayed (e.g., `picked_up` is waiting on both seller and delivery). The DB `actor` column stores a single value.
+### Bug 2: OTP RPC blocks delivery partners ✅
+- Updated `verify_delivery_otp_and_complete` to accept either the seller OR the assigned delivery rider (`delivery_partner_pool.user_id`)
 
-### Approach
-Keep the DB `actor` column as-is (store the primary/first actor), but change the UI to use **toggle buttons** (like the transition actor toggles) instead of a single-select dropdown. Store the selected actors as a comma-separated string in the `actor` field (e.g., `"seller,delivery"`).
+### Bug 3: Buyer action bar missing OTP check ✅
+- Added `stepRequiresOtp()` intercept to buyer action bar in `OrderDetailPage.tsx` — mirrors the seller pattern
 
-### Changes
+### Bug 4: DB trigger ignores allowed_actor ✅
+- Added `app.acting_as` session flag pattern to `validate_order_status_transition`
+- `buyer_advance_order` sets `app.acting_as = 'buyer'` before update
+- Trigger enforces actor when flag is set; falls back to any-actor check for direct seller updates
 
-**1. `src/components/admin/AdminWorkflowManager.tsx`**
-- Replace the single `<Select>` for "Waiting On" (lines 492-512) with clickable toggle buttons for each actor (same style as transition actor badges)
-- Each actor button toggles on/off; at least one must remain selected
-- On save, join selected actors with comma → store in `actor` column (line 197)
-- On load, split `actor` string by comma to populate toggle state
-
-**2. `src/hooks/useCategoryStatusFlow.ts`** (read-only awareness)
-- The `actor` field is currently used for display hints ("Waiting for X"). Code that reads it will need to handle comma-separated values. We'll check and update any consumer that reads `step.actor`.
-
-**3. No DB migration needed** — the `actor` column is already `text`, so comma-separated values work without schema changes.
-
-### Technical Details
-- Toggle UI: reuse the same `cn()` pattern with `bg-primary text-primary-foreground` for active actors
-- Parse on load: `step.actor.split(',')` → array of active actors
-- Serialize on save: `selectedActors.join(',')` → single string
-- Validation: prevent deselecting the last actor (toast warning)
-
+### Bug 5: DeliveryStatusCard hardcoded progress ✅
+- `DeliveryStatusCard` now accepts `flow` prop and derives progress bar from `is_transit` steps
+- Falls back to `DEFAULT_LABELS` when no flow provided
+- `OrderDetailPage` passes `o.flow` to `DeliveryStatusCard`
