@@ -269,23 +269,22 @@ function generateCheckoutScenarios(): GeneratedScenario[] {
           steps.push({
             step_id: "verify", label: `Verify order status = ${expectedStatus}`,
             action: "select", table: "orders", actor: "service_role",
-            params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: expectedStatus }, limit: 1 },
+            params: { filters: { buyer_id: "{{buyer_user.id}}", seller_id: "{{setup_seller.id}}", status: expectedStatus } },
             expect: { status: "success", row_count: 1, field_checks: { status: expectedStatus } },
             on_fail: "abort",
           });
 
-          // For UPI, add payment confirmation
           if (pay.method === "upi") {
             steps.push({
               step_id: "confirm_upi", label: "Confirm UPI payment",
               action: "rpc", actor: "buyer",
-              params: { function_name: "confirm_upi_payment", args: { _order_id: "{{verify.id}}", _upi_transaction_ref: `TEST-UTR-${Date.now()}` } },
+              params: { function_name: "confirm_upi_payment", args: { _order_id: "{{verify.0.id}}", _upi_transaction_ref: `TEST-UTR-${Date.now()}` } },
               expect: { status: "success" }, on_fail: "abort",
             });
             steps.push({
               step_id: "verify_placed", label: "Verify order placed after UPI",
               action: "select", table: "orders", actor: "buyer",
-              params: { filters: { id: "{{verify.id}}" }, columns: "id,status" },
+              params: { filters: { id: "{{verify.0.id}}" }, columns: "id,status", single: true },
               expect: { status: "success", field_checks: { status: "placed" } }, on_fail: "abort",
             });
           }
