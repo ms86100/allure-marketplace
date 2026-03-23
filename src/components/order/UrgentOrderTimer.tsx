@@ -31,6 +31,7 @@ export function UrgentOrderTimer({
   useEffect(() => {
     timeoutHandledRef.current = false;
     setIsSyncingTimeout(false);
+    setSyncExpired(false);
     setTimeLeft(calculateTimeLeft());
 
     const timer = setInterval(() => {
@@ -42,6 +43,8 @@ export function UrgentOrderTimer({
         setIsSyncingTimeout(true);
         onTimeout?.();
         clearInterval(timer);
+        // After 10s of "Checking order status", give up and show expired state
+        setTimeout(() => setSyncExpired(true), 10000);
       }
     }, 1000);
 
