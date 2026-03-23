@@ -204,6 +204,20 @@ export function AdminWorkflowManager() {
       toast.warning(`Backward transition detected: ${backwardTransitions.map(t => `${t.from_status} → ${t.to_status}`).join(', ')}`);
     }
 
+    // Self-pickup validation: auto-clear transit/tracking flags that are ignored by DB triggers
+    const isSelfPickupWorkflow = selectedWorkflow.transaction_type.includes('self_fulfillment') || selectedWorkflow.transaction_type.includes('self_pickup');
+    if (isSelfPickupWorkflow) {
+      const flaggedSteps = editSteps.filter(s => s.is_transit || s.creates_tracking_assignment);
+      if (flaggedSteps.length > 0) {
+        toast.warning('Self-pickup workflows cannot use transit or tracking flags — auto-cleared before saving.');
+        for (const s of editSteps) {
+          s.is_transit = false;
+          s.creates_tracking_assignment = false;
+        }
+        setEditSteps([...editSteps]);
+      }
+    }
+
     setIsSaving(true);
     try {
       const { parent_group, transaction_type } = selectedWorkflow;
