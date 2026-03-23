@@ -9209,6 +9209,14 @@ export type Database = {
           user_id: string
         }[]
       }
+      seller_advance_order: {
+        Args: {
+          _new_status: Database["public"]["Enums"]["order_status"]
+          _order_id: string
+          _rejection_reason?: string
+        }
+        Returns: undefined
+      }
       service_complete_delivery: {
         Args: { _assignment_id: string; _order_id: string }
         Returns: undefined

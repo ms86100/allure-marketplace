@@ -16,6 +16,80 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useBackgroundLocationTracking } from '@/hooks/useBackgroundLocationTracking';
 import { DeliveryCompletionOtpDialog } from '@/components/delivery/DeliveryCompletionOtpDialog';
 import { format } from 'date-fns';
+import type { StatusFlowStep } from '@/hooks/useCategoryStatusFlow';
+
+/** Fetch the delivery-relevant workflow steps for an order */
+function useDeliveryWorkflow(orderId: string | undefined) {
+  return useQuery({
+    queryKey: ['delivery-workflow', orderId],
+    queryFn: async () => {
+      if (!orderId) return null;
+      // Resolve order → transaction_type → workflow steps
+      const { data: order } = await supabase
+        .from('orders')
+        .select('seller_id, fulfillment_type, delivery_handled_by, order_type, seller:seller_profiles!orders_seller_id_fkey(primary_group), items:order_items(product_id)')
+        .eq('id', orderId)
+        .single();
+      if (!order) return null;
+
+      const parentGroup = (order as any)?.seller?.primary_group || 'default';
+      let txnType = 'cart_purchase';
+      if (order.fulfillment_type === 'seller_delivery' || (order.fulfillment_type === 'delivery' && order.delivery_handled_by !== 'platform')) {
+        txnType = 'seller_delivery';
+      }
+
+      const { data: steps } = await supabase
+        .from('category_status_flows')
+        .select('*')
+        .eq('parent_group', parentGroup)
+        .eq('transaction_type', txnType)
+        .order('sort_order');
+
+      return steps as StatusFlowStep[] | null;
+    },
+    enabled: !!orderId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** Derive delivery action statuses from workflow steps */
+function getDeliveryActionStatuses(flow: StatusFlowStep[] | null | undefined) {
+  if (!flow || flow.length === 0) {
+    // Fallback: hardcoded for backward compatibility
+    return {
+      activeStatuses: ['assigned', 'picked_up', 'at_gate'],
+      transitStatuses: ['picked_up', 'at_gate'],
+      terminalStatuses: ['delivered', 'failed', 'cancelled'],
+    };
+  }
+  const transitSteps = flow.filter(s => s.is_transit && !s.is_terminal).map(s => s.status_key);
+  // Active = assigned + transit steps (not terminal)
+  const activeStatuses = ['assigned', ...transitSteps.filter(s => s !== 'assigned')];
+  const terminalStatuses = flow.filter(s => s.is_terminal).map(s => s.status_key);
+  return { activeStatuses, transitStatuses: transitSteps, terminalStatuses };
+}
+
+/** Get the next delivery action for the current status from the workflow */
+function getNextDeliveryAction(flow: StatusFlowStep[] | null | undefined, currentStatus: string): { nextStatus: string; requiresOtp: boolean } | null {
+  if (!flow || flow.length === 0) {
+    // Fallback hardcoded
+    if (currentStatus === 'assigned') return { nextStatus: 'picked_up', requiresOtp: false };
+    if (currentStatus === 'picked_up') return { nextStatus: 'at_gate', requiresOtp: false };
+    if (currentStatus === 'at_gate') return { nextStatus: 'delivered', requiresOtp: true };
+    return null;
+  }
+  const transitSteps = flow.filter(s => s.is_transit || s.status_key === 'assigned');
+  const currentIdx = transitSteps.findIndex(s => s.status_key === currentStatus);
+  if (currentIdx < 0) return null;
+  // Next step in transit flow
+  const nextStep = currentIdx < transitSteps.length - 1 ? transitSteps[currentIdx + 1] : null;
+  if (!nextStep) {
+    // At last transit step — next is OTP-verified terminal delivery
+    const deliveredStep = flow.find(s => s.status_key === 'delivered' || (s.is_terminal && s.is_success));
+    return deliveredStep ? { nextStatus: deliveredStep.status_key, requiresOtp: true } : null;
+  }
+  return { nextStatus: nextStep.status_key, requiresOtp: nextStep.requires_otp || false };
+}
 
 export default function DeliveryPartnerDashboardPage() {
   const { user, effectiveSocietyId } = useAuth();
@@ -84,7 +158,7 @@ export default function DeliveryPartnerDashboardPage() {
         .order('created_at', { ascending: false });
 
       if (activeTab === 'active') {
-        query = query.in('status', ['assigned', 'picked_up', 'at_gate']);
+        query = query.not('status', 'in', '(delivered,failed,cancelled)');
       } else {
         query = query.in('status', ['delivered', 'failed', 'cancelled']);
       }
@@ -122,7 +196,7 @@ export default function DeliveryPartnerDashboardPage() {
   // Auto-start tracking for existing in-transit deliveries on mount
   useEffect(() => {
     if (!deliveries || deliveries.length === 0) return;
-    const inTransit = deliveries.find((d: any) => ['picked_up', 'at_gate'].includes(d.status));
+    const inTransit = deliveries.find((d: any) => !['pending', 'assigned', 'delivered', 'failed', 'cancelled'].includes(d.status));
     if (inTransit && !activeTrackingId) {
       setActiveTrackingId(inTransit.id);
     }
@@ -224,7 +298,7 @@ export default function DeliveryPartnerDashboardPage() {
     );
   }
 
-  const activeCount = deliveries.filter(d => ['assigned', 'picked_up', 'at_gate'].includes(d.status)).length;
+  const activeCount = deliveries.filter(d => !['delivered', 'failed', 'cancelled'].includes(d.status)).length;
 
   return (
     <AppLayout headerTitle="My Deliveries" showLocation={false}>
@@ -346,51 +420,51 @@ export default function DeliveryPartnerDashboardPage() {
                         <span className="text-success font-medium tabular-nums">Fee: {formatPrice(delivery.delivery_fee)}</span>
                       </div>
 
-                      {/* Action Buttons */}
-                      {delivery.status === 'assigned' && (
-                        <Button
-                          size="sm"
-                          className="w-full"
-                          onClick={() => updateDeliveryStatus(delivery.id, 'picked_up')}
-                          disabled={updatingId === delivery.id}
-                        >
-                          {updatingId === delivery.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Navigation size={14} className="mr-1" />}
-                          Mark Picked Up
-                        </Button>
-                      )}
-                      {delivery.status === 'picked_up' && (
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => updateDeliveryStatus(delivery.id, 'at_gate')}
-                            disabled={updatingId === delivery.id}
-                          >
-                            At Gate
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => setOtpOrderId(delivery.order?.id || null)}
-                            disabled={updatingId === delivery.id}
-                          >
-                            <ShieldCheck size={14} className="mr-1" />
-                            Verify & Deliver
-                          </Button>
-                        </div>
-                      )}
-                      {delivery.status === 'at_gate' && (
-                        <Button
-                          size="sm"
-                          className="w-full"
-                          onClick={() => setOtpOrderId(delivery.order?.id || null)}
-                          disabled={updatingId === delivery.id}
-                        >
-                          <ShieldCheck size={14} className="mr-1" />
-                          Verify & Deliver
-                        </Button>
-                      )}
+                      {/* Action Buttons — workflow-driven */}
+                      {(() => {
+                        const action = getNextDeliveryAction(undefined /* TODO: pass per-order flow */, delivery.status);
+                        if (!action) return null;
+                        if (action.requiresOtp) {
+                          return (
+                            <Button
+                              size="sm"
+                              className="w-full"
+                              onClick={() => setOtpOrderId(delivery.order?.id || null)}
+                              disabled={updatingId === delivery.id}
+                            >
+                              <ShieldCheck size={14} className="mr-1" />
+                              Verify & Deliver
+                            </Button>
+                          );
+                        }
+                        // Non-OTP next step: also show OTP shortcut if available
+                        const otpAction = getNextDeliveryAction(undefined, action.nextStatus);
+                        return (
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant={otpAction?.requiresOtp ? 'outline' : 'default'}
+                              className="flex-1"
+                              onClick={() => updateDeliveryStatus(delivery.id, action.nextStatus)}
+                              disabled={updatingId === delivery.id}
+                            >
+                              {updatingId === delivery.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Navigation size={14} className="mr-1" />}
+                              {action.nextStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                            </Button>
+                            {otpAction?.requiresOtp && (
+                              <Button
+                                size="sm"
+                                className="flex-1"
+                                onClick={() => setOtpOrderId(delivery.order?.id || null)}
+                                disabled={updatingId === delivery.id}
+                              >
+                                <ShieldCheck size={14} className="mr-1" />
+                                Verify & Deliver
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </CardContent>
                   </Card>
                 );

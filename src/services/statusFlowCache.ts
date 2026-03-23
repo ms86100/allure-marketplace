@@ -61,7 +61,7 @@ export async function getStatusFlowEntries(): Promise<FlowEntry[]> {
   const { data, error } = await supabase
     .from('category_status_flows')
     .select('status_key, sort_order, is_terminal, starts_live_activity')
-    .in('transaction_type', ['cart_purchase', 'seller_delivery', 'self_fulfillment', 'service_booking', 'request_service', 'contact_enquiry'])
+    /* No transaction_type filter — support all current and future workflow types dynamically */
     .order('sort_order');
 
   if (!error && data && data.length > 0) {

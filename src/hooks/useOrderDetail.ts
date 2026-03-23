@@ -218,42 +218,47 @@ export function useOrderDetail(id: string | undefined) {
     setUnreadMessages(count || 0);
   };
 
+  /** Seller-safe status advance via SECURITY DEFINER RPC — enforces actor */
   const updateOrderStatus = async (newStatus: OrderStatus, rejectionReason?: string) => {
     if (!order || !user) return;
     setIsUpdating(true);
     try {
       const previousOrder = order;
-      const updateData: any = { status: newStatus, auto_cancel_at: null };
-      if (rejectionReason) updateData.rejection_reason = rejectionReason;
-      let query = supabase.from('orders').update(updateData).eq('id', order.id).eq('status', order.status as any).select();
-      if (isSellerView) query = query.eq('seller_id', order.seller_id);
-      else query = query.eq('buyer_id', user.id);
-      const { data: updatedRows, error } = await query;
-      if (error) throw error;
-      if (!updatedRows || updatedRows.length === 0) {
-        // Concurrent update detected — refetch real state
-        fetchOrder();
-        toast.error('Order status has changed. Refreshing...', { id: `order-${order.id}-conflict` });
-        return;
+
+      if (isSellerView) {
+        // Use seller RPC to enforce app.acting_as = 'seller'
+        const { error } = await supabase.rpc('seller_advance_order', {
+          _order_id: order.id,
+          _new_status: newStatus,
+          _rejection_reason: rejectionReason || null,
+        });
+        if (error) throw error;
+      } else {
+        // Buyer path — use buyer RPC (already enforced)
+        const { error } = await supabase.rpc('buyer_advance_order', {
+          _order_id: order.id,
+          _new_status: newStatus,
+        });
+        if (error) throw error;
       }
 
-      const updatedOrder = updatedRows[0] as Partial<Order>;
-
-      // Reflect the confirmed status change immediately in the UI,
-      // then reconcile related/computed fields in the background.
-      setOrder({
-        ...previousOrder,
-        ...updatedOrder,
-      } as Order);
-
-      // Re-fetch full order to sync server-side computed fields (ready_at, status_updated_at, etc.)
+      // Optimistic update, then reconcile
+      setOrder({ ...previousOrder, status: newStatus } as Order);
       void fetchOrder();
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus, rejection_reason: rejectionReason });
     } catch (error: any) {
       console.error('Error updating order:', error, JSON.stringify(error));
       const errMsg = error?.message || error?.details || '';
-      toast.error(errMsg.includes('Invalid status transition') ? 'Invalid status transition — you cannot skip steps' : `Failed to update order: ${errMsg || 'Unknown error'}`, { id: `order-${order.id}-error` });
+      toast.error(
+        errMsg.includes('Invalid seller transition') || errMsg.includes('Invalid status transition')
+          ? 'Invalid status transition — you cannot skip steps'
+          : errMsg.includes('Not authorized')
+            ? 'You are not authorized to perform this action'
+            : `Failed to update order: ${errMsg || 'Unknown error'}`,
+        { id: `order-${order.id}-error` }
+      );
+      fetchOrder(); // Re-fetch to get real state
     } finally { setIsUpdating(false); }
   };
 
