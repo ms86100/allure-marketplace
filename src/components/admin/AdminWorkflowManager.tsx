@@ -489,25 +489,38 @@ export function AdminWorkflowManager() {
                         </div>
                       </div>
 
-                      {/* Display Actor (who this step is "waiting on") */}
+                      {/* Display Actor (who this step is "waiting on") — multi-select toggles */}
                       {!step.is_terminal && step.status_key && (
                         <div className="flex items-center gap-2 flex-wrap">
-                          <FieldLabel label="Waiting On" tooltip="Which role is this step waiting on? This controls the display hint (e.g. 'Waiting for seller to accept'). It does NOT control who can advance — configure that in the Transition Rules section below." />
-                          <Select value={step.actor} onValueChange={(v) => updateStep(index, 'actor', v)}>
-                            <SelectTrigger className="h-7 text-xs rounded-lg w-40">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ACTORS.map(actor => {
-                                const actorLabels: Record<string, string> = { buyer: '👤 Buyer', seller: '🏪 Seller', delivery: '🚚 Delivery', system: '⚙️ System', admin: '🛡️ Admin' };
-                                return (
-                                  <SelectItem key={actor} value={actor}>
-                                    {actorLabels[actor] || actor}
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
+                          <FieldLabel label="Waiting On" tooltip="Which role(s) is this step waiting on? This controls the display hint (e.g. 'Waiting for seller'). It does NOT control who can advance — configure that in the Transition Rules section below." />
+                          <div className="flex gap-1">
+                            {ACTORS.map(actor => {
+                              const actorLabels: Record<string, string> = { buyer: '👤 Buyer', seller: '🏪 Seller', delivery: '🚚 Delivery', system: '⚙️ System', admin: '🛡️ Admin' };
+                              const selectedActors = (step.actor || '').split(',').filter(Boolean);
+                              const isActive = selectedActors.includes(actor);
+                              return (
+                                <button
+                                  key={actor}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isActive && selectedActors.length <= 1) return;
+                                    const next = isActive
+                                      ? selectedActors.filter(a => a !== actor)
+                                      : [...selectedActors, actor];
+                                    updateStep(index, 'actor', next.join(','));
+                                  }}
+                                  className={cn(
+                                    "text-[10px] px-2 py-1 rounded-md border transition-all",
+                                    isActive
+                                      ? "bg-primary text-primary-foreground border-primary"
+                                      : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                                  )}
+                                >
+                                  {actorLabels[actor] || actor}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
 
