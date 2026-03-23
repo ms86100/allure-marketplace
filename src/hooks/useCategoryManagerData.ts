@@ -33,33 +33,8 @@ export interface CategoryConfigRow {
   supports_staff_assignment?: boolean;
 }
 
-export const LISTING_TYPE_PRESETS = [
-  { value: 'cart_purchase', label: 'Product (Add to Cart)', description: 'Buyers add items to cart and checkout together' },
-  { value: 'buy_now', label: 'Buy Now', description: 'Direct purchase, no cart' },
-  { value: 'book_slot', label: 'Bookable Service', description: 'Buyers pick a time slot to book' },
-  { value: 'request_service', label: 'Request Service', description: 'Buyers send a service request to the seller' },
-  { value: 'request_quote', label: 'Request Quote', description: 'Buyers request a price quote, negotiable' },
-  { value: 'contact_only', label: 'Contact Only', description: 'Buyers contact the seller directly' },
-  { value: 'schedule_visit', label: 'Schedule Visit', description: 'Buyers schedule an in-person visit' },
-] as const;
-
-export function deriveBehaviorFlags(transactionType: string) {
-  const base = {
-    supports_cart: false, has_quantity: false, requires_time_slot: false,
-    has_duration: false, has_date_range: false, enquiry_only: false,
-    is_negotiable: false, layout_type: 'ecommerce',
-  };
-  switch (transactionType) {
-    case 'cart_purchase': return { ...base, supports_cart: true, has_quantity: true, layout_type: 'ecommerce' };
-    case 'buy_now': return { ...base, has_quantity: true, layout_type: 'ecommerce' };
-    case 'book_slot': return { ...base, requires_time_slot: true, has_duration: true, layout_type: 'service' };
-    case 'request_service': return { ...base, enquiry_only: true, layout_type: 'service' };
-    case 'request_quote': return { ...base, enquiry_only: true, is_negotiable: true, layout_type: 'service' };
-    case 'contact_only': return { ...base, enquiry_only: true, layout_type: 'service' };
-    case 'schedule_visit': return { ...base, requires_time_slot: true, has_date_range: true, layout_type: 'service' };
-    default: return { ...base, supports_cart: true, has_quantity: true };
-  }
-}
+// LISTING_TYPE_PRESETS removed — workflows are now fetched from DB via useAvailableWorkflows
+// deriveBehaviorFlags removed — behavior flags are stored directly on category_config
 
 export function useCategoryManagerData() {
   const queryClient = useQueryClient();

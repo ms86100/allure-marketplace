@@ -20,7 +20,8 @@ import { CategoryWorkflowPreview } from '@/components/admin/CategoryWorkflowPrev
 import { DndContext, closestCenter } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useCategoryManagerData, CategoryConfigRow, LISTING_TYPE_PRESETS } from '@/hooks/useCategoryManagerData';
+import { useCategoryManagerData, CategoryConfigRow } from '@/hooks/useCategoryManagerData';
+import { useAvailableWorkflows } from '@/hooks/useAvailableWorkflows';
 import { ParentGroupRow } from '@/hooks/useParentGroups';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';

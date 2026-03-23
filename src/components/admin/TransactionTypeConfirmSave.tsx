@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import {
@@ -6,7 +6,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Loader2, AlertTriangle } from 'lucide-react';
-import { LISTING_TYPE_PRESETS, CategoryConfigRow } from '@/hooks/useCategoryManagerData';
+import { CategoryConfigRow } from '@/hooks/useCategoryManagerData';
+import { useAvailableWorkflows } from '@/hooks/useAvailableWorkflows';
 
 interface Props {
   editingCategory: CategoryConfigRow | null;
@@ -19,15 +20,17 @@ export function TransactionTypeConfirmSave({ editingCategory, newTransactionType
   const [showConfirm, setShowConfirm] = useState(false);
   const [affectedCount, setAffectedCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const { data: workflows } = useAvailableWorkflows();
 
   const transactionTypeChanged = editingCategory?.transaction_type !== newTransactionType;
+
+  const getLabel = (key: string) => workflows?.find(w => w.key === key)?.label ?? key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
   const handleClick = async () => {
     if (!transactionTypeChanged) {
       onConfirmedSave();
       return;
     }
-    // Fetch affected product count
     setLoading(true);
     try {
       const { count } = await supabase
@@ -42,8 +45,8 @@ export function TransactionTypeConfirmSave({ editingCategory, newTransactionType
     setShowConfirm(true);
   };
 
-  const oldLabel = LISTING_TYPE_PRESETS.find(p => p.value === editingCategory?.transaction_type)?.label ?? editingCategory?.transaction_type;
-  const newLabel = LISTING_TYPE_PRESETS.find(p => p.value === newTransactionType)?.label ?? newTransactionType;
+  const oldLabel = getLabel(editingCategory?.transaction_type ?? '');
+  const newLabel = getLabel(newTransactionType);
 
   return (
     <>
@@ -57,7 +60,7 @@ export function TransactionTypeConfirmSave({ editingCategory, newTransactionType
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="text-destructive" size={20} />
-              Change Listing Type?
+              Change Workflow?
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
@@ -67,7 +70,7 @@ export function TransactionTypeConfirmSave({ editingCategory, newTransactionType
                 </p>
                 {affectedCount !== null && affectedCount > 0 && (
                   <p className="font-medium text-foreground">
-                    {affectedCount} existing product{affectedCount !== 1 ? 's' : ''} will be updated to show the new button type.
+                    {affectedCount} existing product{affectedCount !== 1 ? 's' : ''} will use the new workflow.
                   </p>
                 )}
                 <p className="text-muted-foreground text-xs">
