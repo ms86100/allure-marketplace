@@ -59,12 +59,23 @@ export function useOrderDetail(id: string | undefined) {
   const storedTransactionType = (order as any)?.transaction_type || null;
   const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType);
 
+  // Timer-based tick to re-evaluate urgency when auto_cancel_at passes
+  const [urgencyTick, setUrgencyTick] = useState(0);
+  useEffect(() => {
+    if (!order?.auto_cancel_at) return;
+    const msLeft = new Date(order.auto_cancel_at).getTime() - Date.now();
+    if (msLeft <= 0) { setUrgencyTick(t => t + 1); return; }
+    const timer = setTimeout(() => setUrgencyTick(t => t + 1), msLeft + 500);
+    return () => clearTimeout(timer);
+  }, [order?.auto_cancel_at]);
+
   // Urgent only while auto_cancel_at is in the future AND order is on the first flow step
   const isUrgentOrder = useMemo(() => {
     if (!hasAutoCancelAt || !order?.status || !order?.auto_cancel_at) return false;
     if (!isFirstFlowStep(flow, order.status)) return false;
     return new Date(order.auto_cancel_at).getTime() > Date.now();
-  }, [hasAutoCancelAt, order?.status, order?.auto_cancel_at, flow]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasAutoCancelAt, order?.status, order?.auto_cancel_at, flow, urgencyTick]);
 
   const isUrgentSellerView = isUrgentOrder && isSellerView;
   const isUrgentBuyerView = isUrgentOrder && !isSellerView;
