@@ -8517,38 +8517,22 @@ export type Database = {
       apply_maintenance_late_fees: { Args: never; Returns: undefined }
       auto_checkout_visitors: { Args: never; Returns: undefined }
       auto_escalate_overdue_disputes: { Args: never; Returns: undefined }
-      book_service_slot:
-        | {
-            Args: {
-              _booking_date: string
-              _buyer_address?: string
-              _buyer_id: string
-              _end_time: string
-              _location_type?: string
-              _order_id: string
-              _product_id: string
-              _seller_id: string
-              _slot_id: string
-              _start_time: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              _booking_date: string
-              _buyer_address?: string
-              _buyer_id: string
-              _end_time: string
-              _location_type?: string
-              _notes?: string
-              _order_id: string
-              _product_id: string
-              _seller_id: string
-              _slot_id: string
-              _start_time: string
-            }
-            Returns: Json
-          }
+      book_service_slot: {
+        Args: {
+          _booking_date: string
+          _buyer_address?: string
+          _buyer_id: string
+          _end_time: string
+          _location_type?: string
+          _notes?: string
+          _order_id: string
+          _product_id: string
+          _seller_id: string
+          _slot_id: string
+          _start_time: string
+        }
+        Returns: Json
+      }
       buyer_advance_order: {
         Args: {
           _new_status: Database["public"]["Enums"]["order_status"]
