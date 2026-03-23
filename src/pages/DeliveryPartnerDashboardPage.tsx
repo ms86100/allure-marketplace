@@ -19,7 +19,7 @@ import { DeliveryActionCard } from '@/components/delivery/DeliveryActionCard';
 export default function DeliveryPartnerDashboardPage() {
   const { user, effectiveSocietyId } = useAuth();
   const queryClient = useQueryClient();
-  const { getDeliveryStatus } = useStatusLabels();
+  // useStatusLabels and formatPrice moved to DeliveryActionCard
   const { formatPrice } = useCurrency();
   const [activeTab, setActiveTab] = useState('active');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
