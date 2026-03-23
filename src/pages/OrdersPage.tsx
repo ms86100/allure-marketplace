@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Order } from '@/types/database';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { useTerminalStatuses } from '@/hooks/useCategoryStatusFlow';
+import { useFlowStepLabels } from '@/hooks/useFlowStepLabels';
 import { Package, ChevronRight, Loader2, ArrowLeft, CheckCircle, Truck } from 'lucide-react';
 import { format } from 'date-fns';
 import { useCurrency } from '@/hooks/useCurrency';
