@@ -416,7 +416,22 @@ export function AdminWorkflowManager() {
             {selectedWorkflow && (
               <WorkflowLinkage parentGroup={selectedWorkflow.parent_group} transactionType={selectedWorkflow.transaction_type} />
             )}
-          </DrawerHeader>
+            {selectedWorkflow?.parent_group === 'default' && (() => {
+              const overridesForType = workflows.filter(
+                w => w.transaction_type === selectedWorkflow.transaction_type && w.parent_group !== 'default'
+              );
+              if (overridesForType.length === 0) return null;
+              return (
+                <div className="mt-2 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                  <AlertTriangle size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-amber-700">
+                    This default workflow has <strong>{overridesForType.length} category override{overridesForType.length > 1 ? 's' : ''}</strong>{' '}
+                    ({overridesForType.map(o => formatName(o.parent_group)).join(', ')}).
+                    Changes here <strong>won't affect</strong> those overridden categories.
+                  </p>
+                </div>
+              );
+            })()}
 
           <ScrollArea className="h-[calc(90dvh-120px)]">
             <div className="px-4 py-4 space-y-5">
