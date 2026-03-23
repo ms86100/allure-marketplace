@@ -193,6 +193,22 @@ export default function OrderDetailPage() {
   const hasSellerActionBar = o.isSellerView && !o.isFlowLoading && o.flow.length > 0 && !isTerminalStatus(o.flow, order.status);
   const hasBuyerActionBar = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel);
 
+  // Bulletproof OTP gate: if delivery assignment exists and next status is terminal, always require OTP
+  // This catches the mismatch where stepRequiresOtp returns false but DB trigger enforces OTP
+  const hasDeliveryOtpGate = !!(deliveryAssignmentId && isDeliveryOrder);
+  const sellerNextIsTerminal = o.nextStatus ? isTerminalStatus(o.flow, o.nextStatus) || ['delivered', 'completed'].includes(o.nextStatus) : false;
+  const buyerNextIsTerminal = o.buyerNextStatus ? isTerminalStatus(o.flow, o.buyerNextStatus) || ['delivered', 'completed'].includes(o.buyerNextStatus) : false;
+
+  // Listen for OTP-required events from updateOrderStatus (backend rejection auto-opens dialog)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.orderId === orderId) setIsOtpDialogOpen(true);
+    };
+    window.addEventListener('delivery-otp-required', handler);
+    return () => window.removeEventListener('delivery-otp-required', handler);
+  }, [orderId]);
+
   return (
     <AppLayout showHeader={false} showNav={!hasSellerActionBar}>
       <div className="pb-56">

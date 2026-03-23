@@ -267,14 +267,21 @@ export function useOrderDetail(id: string | undefined) {
     } catch (error: any) {
       console.error('Error updating order:', error, JSON.stringify(error));
       const errMsg = error?.message || error?.details || '';
-      toast.error(
-        errMsg.includes('Invalid seller transition') || errMsg.includes('Invalid status transition')
-          ? 'Invalid status transition — you cannot skip steps'
-          : errMsg.includes('Not authorized')
-            ? 'You are not authorized to perform this action'
-            : `Failed to update order: ${errMsg || 'Unknown error'}`,
-        { id: `order-${order.id}-error` }
-      );
+
+      // Bulletproof OTP gate: if DB rejects with OTP requirement, emit event to auto-open OTP dialog
+      if (errMsg.includes('Delivery OTP verification required') || errMsg.includes('otp')) {
+        window.dispatchEvent(new CustomEvent('delivery-otp-required', { detail: { orderId: order.id } }));
+        toast.info('OTP verification required — please enter the delivery code', { id: `order-${order.id}-otp` });
+      } else {
+        toast.error(
+          errMsg.includes('Invalid seller transition') || errMsg.includes('Invalid status transition')
+            ? 'Invalid status transition — you cannot skip steps'
+            : errMsg.includes('Not authorized')
+              ? 'You are not authorized to perform this action'
+              : `Failed to update order: ${errMsg || 'Unknown error'}`,
+          { id: `order-${order.id}-error` }
+        );
+      }
       fetchOrder(); // Re-fetch to get real state
     } finally { setIsUpdating(false); }
   };
