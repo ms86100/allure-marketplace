@@ -359,10 +359,6 @@ export function AdminWorkflowManager() {
                         <span className="text-[10px] font-mono text-muted-foreground w-5">{index + 1}</span>
                         <Input value={step.status_key} onChange={(e) => updateStep(index, 'status_key', e.target.value)} placeholder="status_key" className="h-8 text-xs font-mono flex-1 rounded-lg" />
                         {(step as any).is_deprecated && <Badge variant="outline" className="text-[9px] bg-amber-100 text-amber-700 border-amber-300 shrink-0">Deprecated</Badge>}
-                        <Select value={step.actor} onValueChange={(v) => updateStep(index, 'actor', v)}>
-                          <SelectTrigger className="h-8 text-xs w-24 rounded-lg"><SelectValue /></SelectTrigger>
-                          <SelectContent>{ACTORS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-                        </Select>
                         <button onClick={() => removeStep(index)} className="text-destructive hover:text-destructive/80"><Trash2 size={14} /></button>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
