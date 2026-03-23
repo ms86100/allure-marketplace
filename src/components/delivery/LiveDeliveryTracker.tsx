@@ -17,6 +17,8 @@ interface LiveDeliveryTrackerProps {
   trackingState?: DeliveryTrackingState;
   roadEtaMinutes?: number | null;
   statusHints?: Record<string, StatusHint>;
+  /** Workflow-derived transit flag — overrides system_settings when provided */
+  isInTransit?: boolean;
 }
 
 interface ProximityThreshold {
