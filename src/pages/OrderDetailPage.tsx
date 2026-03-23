@@ -625,8 +625,8 @@ export default function OrderDetailPage() {
             {!o.nextStatus ? (
               <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground"><Truck size={16} className="text-primary" /><span>Awaiting next step</span></div>
             ) : (
-              /* DB-driven: use requires_otp flag from workflow steps — no hardcoded status checks */
-              stepRequiresOtp(o.flow, o.nextStatus) ? (
+              /* Bulletproof OTP: use requires_otp OR secondary gate (delivery assignment + terminal next status) */
+              (stepRequiresOtp(o.flow, o.nextStatus) || (hasDeliveryOtpGate && sellerNextIsTerminal)) ? (
                 deliveryAssignmentId ? (
                   <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                     {o.isUpdating ? 'Updating...' : 'Verify & Deliver'}
