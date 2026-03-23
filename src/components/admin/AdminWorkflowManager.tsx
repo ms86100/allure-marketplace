@@ -305,7 +305,7 @@ export function AdminWorkflowManager() {
   })();
 
   // Fixed order matching TRANSACTION_TYPES
-  const typeOrder = ['cart_purchase', 'service_booking', 'request_service', 'contact_enquiry'];
+  const typeOrder = TRANSACTION_TYPES.map(t => t.value);
 
   return (
     <div className="space-y-4">
