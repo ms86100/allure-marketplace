@@ -492,41 +492,25 @@ export function AdminWorkflowManager() {
                         </div>
                       </div>
 
-                      {/* Allowed Actors */}
+                      {/* Display Actor (who this step is "waiting on") */}
                       {!step.is_terminal && step.status_key && (
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Who can advance?</span>
-                          <Tooltip>
-                            <TooltipTrigger asChild><HelpCircle size={10} className="text-muted-foreground/40 cursor-help" /></TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-[240px] text-xs">Select which roles can move the order forward from this step. Toggle multiple to allow shared responsibility (e.g., both seller and delivery agent).</TooltipContent>
-                          </Tooltip>
-                          {ACTORS.map(actor => {
-                            const hasAnyTransition = transitions.some(t => t.from_status === step.status_key && t.allowed_actor === actor);
-                            const actorLabels: Record<string, string> = { buyer: '👤 Buyer', seller: '🏪 Seller', delivery: '🚚 Delivery', system: '⚙️ System', admin: '🛡️ Admin' };
-                            return (
-                              <button
-                                key={actor}
-                                onClick={() => {
-                                  if (hasAnyTransition) {
-                                    setTransitions(prev => prev.filter(t => !(t.from_status === step.status_key && t.allowed_actor === actor)));
-                                  } else {
-                                    const nextStep = editSteps.find((s, i) => i > index && s.status_key);
-                                    if (nextStep) {
-                                      setTransitions(prev => [...prev, { from_status: step.status_key, to_status: nextStep.status_key, allowed_actor: actor }]);
-                                    }
-                                  }
-                                }}
-                                className={cn(
-                                  "text-[10px] px-2 py-0.5 rounded-md border transition-all",
-                                  hasAnyTransition
-                                    ? "bg-primary text-primary-foreground border-primary"
-                                    : "bg-background text-muted-foreground border-border hover:border-primary/50"
-                                )}
-                              >
-                                {actorLabels[actor] || actor}
-                              </button>
-                            );
-                          })}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <FieldLabel label="Waiting On" tooltip="Which role is this step waiting on? This controls the display hint (e.g. 'Waiting for seller to accept'). It does NOT control who can advance — configure that in the Transition Rules section below." />
+                          <Select value={step.actor} onValueChange={(v) => updateStep(index, 'actor', v)}>
+                            <SelectTrigger className="h-7 text-xs rounded-lg w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ACTORS.map(actor => {
+                                const actorLabels: Record<string, string> = { buyer: '👤 Buyer', seller: '🏪 Seller', delivery: '🚚 Delivery', system: '⚙️ System', admin: '🛡️ Admin' };
+                                return (
+                                  <SelectItem key={actor} value={actor}>
+                                    {actorLabels[actor] || actor}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
                         </div>
                       )}
 
