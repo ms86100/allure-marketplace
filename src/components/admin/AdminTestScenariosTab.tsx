@@ -365,7 +365,7 @@ export default function AdminTestScenariosTab() {
                           size="sm"
                           className="h-8 text-xs gap-1"
                           onClick={() => runScenario(scenario.id)}
-                          disabled={isRunning}
+                          disabled={isRunning || isBatchRunning}
                         >
                           {isRunning ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
                           Run
