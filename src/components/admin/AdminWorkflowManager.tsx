@@ -101,6 +101,25 @@ export function AdminWorkflowManager() {
     setIsLoading(false);
   };
 
+  const loadUsageCounts = async () => {
+    try {
+      const { data } = await supabase
+        .from('orders')
+        .select('transaction_type')
+        .not('transaction_type', 'is', null);
+      if (data) {
+        const counts: Record<string, number> = {};
+        for (const row of data) {
+          const key = row.transaction_type as string;
+          counts[key] = (counts[key] || 0) + 1;
+        }
+        setWorkflowUsage(counts);
+      }
+    } catch (e) {
+      console.warn('Failed to load workflow usage counts:', e);
+    }
+  };
+
   const openEditor = async (wf: WorkflowGroup) => {
     setSelectedWorkflow(wf);
     setEditSteps(wf.steps.map(s => ({ ...s })));
