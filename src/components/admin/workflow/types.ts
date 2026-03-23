@@ -25,6 +25,7 @@ export interface Transition {
   from_status: string;
   to_status: string;
   allowed_actor: string;
+  is_side_action?: boolean;
 }
 
 export interface WorkflowGroup {
