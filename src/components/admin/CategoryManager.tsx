@@ -194,6 +194,7 @@ function SortableCategoryItem({ cat, groupIsActive, onToggle, onEdit, onDelete, 
 
 export function CategoryManager() {
   const cm = useCategoryManagerData();
+  const { data: availableWorkflows, isLoading: workflowsLoading } = useAvailableWorkflows();
 
   const openSubcategoryCreate = (category: CategoryConfigRow) => {
     if (typeof window === 'undefined') return;
