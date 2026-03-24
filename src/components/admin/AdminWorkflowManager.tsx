@@ -698,7 +698,7 @@ export function AdminWorkflowManager() {
                           </div>
                         )}
 
-                        {/* Per-step capability indicators */}
+                        {/* Per-step capability indicators — context-sensitive */}
                         {(() => {
                           const sorted = [...editSteps].sort((a, b) => a.sort_order - b.sort_order);
                           const thisIdx = sorted.findIndex(s => s.status_key === step.status_key);
@@ -709,15 +709,15 @@ export function AdminWorkflowManager() {
                           return (
                             <div className="flex flex-wrap gap-1.5 mt-1">
                               {step.creates_tracking_assignment && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">🚚 Delivery starts here</span>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                  🚚 Delivery starts at this step — Delivery OTP available from here onward
+                                </span>
                               )}
-                              {hasDeliveryContext && !step.creates_tracking_assignment && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">✅ Delivery OTP available</span>
+                              {hasDeliveryContext && !step.creates_tracking_assignment && step.otp_type === 'delivery' && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                  ✅ Delivery OTP available (delivery started at: {trackingStepLabel})
+                                </span>
                               )}
-                              {!hasDeliveryContext && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">❌ No delivery — Delivery OTP unavailable</span>
-                              )}
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">✅ Generic OTP available</span>
                               {step.otp_type === 'delivery' && !hasDeliveryContext && (
                                 <div className="w-full mt-1 p-1.5 rounded border border-destructive/30 bg-destructive/5 text-[10px] text-destructive">
                                   ⚠️ Delivery OTP cannot work here. {trackingStepLabel ? `Delivery starts at: ${trackingStepLabel}` : 'No step has "Start Delivery Here" enabled.'} → Use Generic OTP instead, or move this to a later step.
