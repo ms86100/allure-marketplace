@@ -533,6 +533,19 @@ export default function OrderDetailPage() {
               <p className="text-[10px] text-warning mt-1.5">⚠️ Only share when you've received your items. This code confirms delivery is complete.</p>
             </div>
           )}
+          {/* Generic OTP card — shown to the non-advancing party when next step has otp_type='generic' */}
+          {(() => {
+            const nextStatus = o.isSellerView ? o.nextStatus : o.buyerNextStatus;
+            if (!nextStatus || isTerminalStatus(o.flow, order.status)) return null;
+            const nextOtpType = getStepOtpType(o.flow, nextStatus);
+            if (nextOtpType !== 'generic') return null;
+            // Show code card to the party who does NOT advance (they share the code)
+            const nextStepActors = (o.flow.find((s: any) => s.status_key === nextStatus)?.actor || '').split(',').map((a: string) => a.trim());
+            const isAdvancer = (o.isSellerView && nextStepActors.includes('seller')) || (o.isBuyerView && nextStepActors.includes('buyer'));
+            // The non-advancer sees the code; the advancer sees the "Verify" button in action bar
+            if (isAdvancer) return null;
+            return <GenericOtpCard orderId={order.id} targetStatus={nextStatus} targetStatusLabel={o.getFlowStepLabel(nextStatus).label} />;
+          })()}
           {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} flow={o.flow} />}
 
           {o.canReorder && (
