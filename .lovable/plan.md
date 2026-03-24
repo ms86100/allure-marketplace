@@ -24,3 +24,15 @@
 | 4 | `default/cart_purchase` had delivery OTP on both `picked_up` AND `on_the_way` | Cleared OTP from `picked_up`, kept only on `on_the_way` |
 | 5 | `delivered` step in `cart_purchase` had `actor='system'` | Changed to `actor='delivery'` to match transition rules |
 | 6 | `default/self_fulfillment` had `otp_type='delivery'` on `accepted` | Cleared — self-pickup doesn't need delivery OTP |
+
+## Round 3 Fixes (food_beverages + RPC)
+
+| # | Issue | Fix |
+|---|---|---|
+| 1 | `food_beverages/cart_purchase` + `self_fulfillment` had `is_success=true` on non-terminal | Set `is_success=false` on all non-terminal steps |
+| 2 | `food_beverages/cart_purchase` had double delivery OTP on `picked_up` + `on_the_way` | Cleared OTP from `picked_up` |
+| 3 | `food_beverages/cart_purchase` `delivered` had `actor='system'` | Changed to `actor='delivery'` |
+| 4 | `food_beverages/seller_delivery` had tracking + OTP on same step (deadlock) | Moved `creates_tracking_assignment` to `preparing` |
+| 5 | `food_beverages/seller_delivery` `accepted` had `is_transit=true` prematurely | Cleared `is_transit` flag |
+| 6 | `food_beverages/cart_purchase` missing `creates_tracking_assignment` | Added to `preparing` step |
+| 7 | Delivery assignment status not synced during non-terminal OTP | RPC now sets assignment status to next step's status_key |
