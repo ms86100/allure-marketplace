@@ -659,7 +659,7 @@ export default function OrderDetailPage() {
               const needsGenericOtp = nextOtpType === 'generic';
               return needsDeliveryOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
-                  {o.isUpdating ? 'Updating...' : 'Verify & Deliver'}
+                  {o.isUpdating ? 'Updating...' : `Verify & ${o.getFlowStepLabel(o.nextStatus).label}`}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               ) : needsGenericOtp ? (
@@ -689,7 +689,7 @@ export default function OrderDetailPage() {
               const buyerNeedsGenericOtp = buyerNextOtpType === 'generic';
               return buyerNeedsDeliveryOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
-                  {o.isUpdating ? 'Updating...' : 'Verify & Confirm'}
+                  {o.isUpdating ? 'Updating...' : `Verify & ${o.getFlowStepLabel(o.buyerNextStatus).label}`}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               ) : buyerNeedsGenericOtp ? (
