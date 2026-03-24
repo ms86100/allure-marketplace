@@ -505,14 +505,14 @@ export default function OrderDetailPage() {
                   }
                   return hints;
                 })()} />
-              ) : (
+              ) : o.flow.some((s: any) => s.creates_tracking_assignment) ? (
                 <div className="bg-card border border-border rounded-xl p-4">
                   <div className="flex items-center gap-3 justify-center text-muted-foreground">
                     <Loader2 size={16} className="animate-spin" />
                     <p className="text-sm">{getSetting('ui_setting_up_tracking') || 'Setting up live tracking...'}</p>
                   </div>
                 </div>
-              )}
+              ) : null}
               {o.isBuyerView && (
                 <div className="flex justify-end">
                   <UpdateBuyerLocationButton orderId={order.id} />

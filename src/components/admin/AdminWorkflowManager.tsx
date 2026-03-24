@@ -226,7 +226,7 @@ export function AdminWorkflowManager() {
       for (const s of sortedForValidation) {
         if (s.creates_tracking_assignment) trackingAssignmentSeen = true;
         if (s.otp_type === 'delivery' && !trackingAssignmentSeen) {
-          toast.warning(`Delivery OTP requires a delivery assignment. Step "${s.display_label || s.status_key}" comes before any tracking assignment step — cleared to 'None'.`);
+          toast.error(`Delivery OTP requires a delivery assignment. Step "${s.display_label || s.status_key}" comes before any tracking assignment step — cleared to 'None'. Review and save again.`, { duration: 8000 });
           s.otp_type = null;
           s.requires_otp = false;
           cleared = true;
@@ -234,6 +234,7 @@ export function AdminWorkflowManager() {
       }
       if (cleared) {
         setEditSteps([...editSteps]);
+        return; // Stop save — keep editor open so admin can review the cleared values
       }
     }
 
