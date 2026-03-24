@@ -22,6 +22,7 @@ interface FlowStep {
   actor: string;
   is_transit: boolean;
   requires_otp: boolean;
+  otp_type: string | null;
   is_success: boolean;
   creates_tracking_assignment: boolean;
 }
@@ -49,7 +50,7 @@ export function CategoryWorkflowPreview({ workflowKey, parentGroup, category }: 
     (async () => {
       const { data } = await supabase
         .from('category_status_flows')
-        .select('status_key, display_label, icon, color, sort_order, is_terminal, actor, is_deprecated, is_transit, requires_otp, is_success, creates_tracking_assignment')
+        .select('status_key, display_label, icon, color, sort_order, is_terminal, actor, is_deprecated, is_transit, requires_otp, otp_type, is_success, creates_tracking_assignment')
         .eq('parent_group', parentGroup)
         .eq('transaction_type', workflowKey)
         .order('sort_order');
@@ -65,7 +66,7 @@ export function CategoryWorkflowPreview({ workflowKey, parentGroup, category }: 
       if (parentGroup !== 'default') {
         const fallback = await supabase
           .from('category_status_flows')
-          .select('status_key, display_label, icon, color, sort_order, is_terminal, actor, is_deprecated, is_transit, requires_otp, is_success, creates_tracking_assignment')
+          .select('status_key, display_label, icon, color, sort_order, is_terminal, actor, is_deprecated, is_transit, requires_otp, otp_type, is_success, creates_tracking_assignment')
           .eq('parent_group', 'default')
           .eq('transaction_type', workflowKey)
           .order('sort_order');
@@ -148,7 +149,7 @@ export function CategoryWorkflowPreview({ workflowKey, parentGroup, category }: 
                   </span>
                   <span className="text-[8px] text-muted-foreground">({step.actor})</span>
                   {step.is_transit && <Truck size={8} className="text-blue-500" />}
-                  {step.requires_otp && <KeyRound size={8} className="text-amber-500" />}
+                  {step.otp_type === 'delivery' && <KeyRound size={8} className="text-amber-500" title="Delivery OTP" />}
                   {step.is_success && <CheckCircle2 size={8} className="text-emerald-500" />}
                   {step.creates_tracking_assignment && <MapPin size={8} className="text-violet-500" />}
                 </div>
