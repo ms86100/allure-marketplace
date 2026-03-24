@@ -208,12 +208,14 @@ export default function OrderDetailPage() {
   const hasSellerActionBar = o.isSellerView && !o.isFlowLoading && o.flow.length > 0 && !isTerminalStatus(o.flow, order.status);
   const hasBuyerActionBar = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel);
 
-  // Bulletproof OTP gate: if delivery assignment exists and next status is terminal, always require OTP
-  // This catches the mismatch where stepRequiresOtp returns false but DB trigger enforces OTP
-  const hasDeliveryOtpGate = !!(deliveryAssignmentId && isDeliveryOrder);
-  // Bug 2 fix: Remove hardcoded terminal checks — workflow is source of truth. DB trigger is safety net.
-  const sellerNextIsTerminal = o.nextStatus ? isTerminalStatus(o.flow, o.nextStatus) : false;
-  const buyerNextIsTerminal = o.buyerNextStatus ? isTerminalStatus(o.flow, o.buyerNextStatus) : false;
+  // Dynamic action label: workflow-driven with end-state awareness
+  const getActionLabel = (status: string, otpRequired: boolean) => {
+    const step = o.flow.find(s => s.status_key === status);
+    const label = step?.display_label || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const isEnd = step?.is_terminal === true;
+    if (otpRequired) return isEnd ? 'Verify & Complete' : `Verify & ${label}`;
+    return isEnd ? 'Complete Order' : `Mark ${label}`;
+  };
 
   return (
     <AppLayout showHeader={false} showNav={!hasSellerActionBar}>
@@ -655,20 +657,20 @@ export default function OrderDetailPage() {
               <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground"><Truck size={16} className="text-primary" /><span>Awaiting next step</span></div>
             ) : (() => {
               const nextOtpType = getStepOtpType(o.flow, o.nextStatus);
-              const needsDeliveryOtp = (nextOtpType === 'delivery' && deliveryAssignmentId) || (hasDeliveryOtpGate && sellerNextIsTerminal);
+              const needsDeliveryOtp = nextOtpType === 'delivery' && !!deliveryAssignmentId;
               const needsGenericOtp = nextOtpType === 'generic';
               return needsDeliveryOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
-                  {o.isUpdating ? 'Updating...' : `Verify & ${o.getFlowStepLabel(o.nextStatus).label}`}
+                  {o.isUpdating ? 'Updating...' : getActionLabel(o.nextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               ) : needsGenericOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => { setGenericOtpTargetStatus(o.nextStatus!); setIsGenericOtpDialogOpen(true); }} disabled={o.isUpdating}>
-                  {o.isUpdating ? 'Updating...' : `Verify & ${o.getFlowStepLabel(o.nextStatus).label}`}
+                  {o.isUpdating ? 'Updating...' : getActionLabel(o.nextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               ) : (
-                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.nextStatus!)} disabled={o.isUpdating}>{o.isUpdating ? 'Updating...' : `Mark ${o.getFlowStepLabel(o.nextStatus).label}`}<ChevronRight size={14} className="ml-1" /></Button>
+                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.nextStatus!)} disabled={o.isUpdating}>{o.isUpdating ? 'Updating...' : getActionLabel(o.nextStatus!, false)}<ChevronRight size={14} className="ml-1" /></Button>
               );
             })()}
           </div>
@@ -685,21 +687,21 @@ export default function OrderDetailPage() {
             )}
             {o.buyerNextStatus && (() => {
               const buyerNextOtpType = getStepOtpType(o.flow, o.buyerNextStatus);
-              const buyerNeedsDeliveryOtp = (buyerNextOtpType === 'delivery' && deliveryAssignmentId) || (hasDeliveryOtpGate && buyerNextIsTerminal);
+              const buyerNeedsDeliveryOtp = buyerNextOtpType === 'delivery' && !!deliveryAssignmentId;
               const buyerNeedsGenericOtp = buyerNextOtpType === 'generic';
               return buyerNeedsDeliveryOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
-                  {o.isUpdating ? 'Updating...' : `Verify & ${o.getFlowStepLabel(o.buyerNextStatus).label}`}
+                  {o.isUpdating ? 'Updating...' : getActionLabel(o.buyerNextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               ) : buyerNeedsGenericOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => { setGenericOtpTargetStatus(o.buyerNextStatus!); setIsGenericOtpDialogOpen(true); }} disabled={o.isUpdating}>
-                  {o.isUpdating ? 'Updating...' : `Verify & ${o.getFlowStepLabel(o.buyerNextStatus).label}`}
+                  {o.isUpdating ? 'Updating...' : getActionLabel(o.buyerNextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               ) : (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.buyerAdvanceOrder(o.buyerNextStatus!)} disabled={o.isUpdating}>
-                  {o.isUpdating ? 'Updating...' : o.getFlowStepLabel(o.buyerNextStatus).label}
+                  {o.isUpdating ? 'Updating...' : getActionLabel(o.buyerNextStatus!, false)}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               );
