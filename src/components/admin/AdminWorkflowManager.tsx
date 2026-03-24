@@ -218,6 +218,25 @@ export function AdminWorkflowManager() {
       }
     }
 
+    // Delivery OTP validation: otp_type='delivery' only valid AFTER a creates_tracking_assignment step
+    {
+      let trackingAssignmentSeen = false;
+      let cleared = false;
+      const sortedForValidation = [...editSteps].sort((a, b) => a.sort_order - b.sort_order);
+      for (const s of sortedForValidation) {
+        if (s.creates_tracking_assignment) trackingAssignmentSeen = true;
+        if (s.otp_type === 'delivery' && !trackingAssignmentSeen) {
+          toast.warning(`Delivery OTP requires a delivery assignment. Step "${s.display_label || s.status_key}" comes before any tracking assignment step — cleared to 'None'.`);
+          s.otp_type = null;
+          s.requires_otp = false;
+          cleared = true;
+        }
+      }
+      if (cleared) {
+        setEditSteps([...editSteps]);
+      }
+    }
+
     setIsSaving(true);
     try {
       const { parent_group, transaction_type } = selectedWorkflow;
@@ -609,6 +628,20 @@ export function AdminWorkflowManager() {
                               <SelectItem value="delivery">🔐 Delivery OTP</SelectItem>
                             </SelectContent>
                           </Select>
+                          {(() => {
+                            const sortedStepsForOtp = [...editSteps].sort((a, b) => a.sort_order - b.sort_order);
+                            const stepIdx = sortedStepsForOtp.findIndex(s => s.status_key === step.status_key);
+                            const hasTrackingBefore = sortedStepsForOtp.slice(0, stepIdx + 1).some(s => s.creates_tracking_assignment);
+                            if (step.otp_type === 'delivery' && !hasTrackingBefore) {
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild><AlertTriangle size={12} className="text-amber-500 shrink-0" /></TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-[220px] text-xs">Delivery OTP requires a delivery assignment. No step at or before this one has "Auto-create Tracking" enabled — this OTP will be ignored at runtime.</TooltipContent>
+                                </Tooltip>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
 
                         <div className="flex items-center gap-1.5">
