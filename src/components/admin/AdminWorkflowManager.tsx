@@ -666,6 +666,15 @@ export function AdminWorkflowManager() {
                                 </Tooltip>
                               );
                             }
+                            // Legacy mismatch warning: requires_otp=true but otp_type=null
+                            if (step.requires_otp && !step.otp_type) {
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild><AlertTriangle size={12} className="text-destructive shrink-0" /></TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-[220px] text-xs">Legacy mismatch: requires_otp is true but no OTP Type selected. This flag is ignored at runtime. Select an OTP Type or save to auto-fix.</TooltipContent>
+                                </Tooltip>
+                              );
+                            }
                             return null;
                           })()}
                         </div>
