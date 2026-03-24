@@ -657,20 +657,20 @@ export default function OrderDetailPage() {
               <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground"><Truck size={16} className="text-primary" /><span>Awaiting next step</span></div>
             ) : (() => {
               const nextOtpType = getStepOtpType(o.flow, o.nextStatus);
-              const needsDeliveryOtp = (nextOtpType === 'delivery' && deliveryAssignmentId) || (hasDeliveryOtpGate && sellerNextIsTerminal);
+              const needsDeliveryOtp = nextOtpType === 'delivery' && !!deliveryAssignmentId;
               const needsGenericOtp = nextOtpType === 'generic';
               return needsDeliveryOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
-                  {o.isUpdating ? 'Updating...' : `Verify & ${o.getFlowStepLabel(o.nextStatus).label}`}
+                  {o.isUpdating ? 'Updating...' : getActionLabel(o.nextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               ) : needsGenericOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => { setGenericOtpTargetStatus(o.nextStatus!); setIsGenericOtpDialogOpen(true); }} disabled={o.isUpdating}>
-                  {o.isUpdating ? 'Updating...' : `Verify & ${o.getFlowStepLabel(o.nextStatus).label}`}
+                  {o.isUpdating ? 'Updating...' : getActionLabel(o.nextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               ) : (
-                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.nextStatus!)} disabled={o.isUpdating}>{o.isUpdating ? 'Updating...' : `Mark ${o.getFlowStepLabel(o.nextStatus).label}`}<ChevronRight size={14} className="ml-1" /></Button>
+                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.nextStatus!)} disabled={o.isUpdating}>{o.isUpdating ? 'Updating...' : getActionLabel(o.nextStatus!, false)}<ChevronRight size={14} className="ml-1" /></Button>
               );
             })()}
           </div>
