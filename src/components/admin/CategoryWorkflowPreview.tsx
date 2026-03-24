@@ -149,7 +149,7 @@ export function CategoryWorkflowPreview({ workflowKey, parentGroup, category }: 
                   </span>
                   <span className="text-[8px] text-muted-foreground">({step.actor})</span>
                   {step.is_transit && <Truck size={8} className="text-blue-500" />}
-                  {step.otp_type === 'delivery' && <KeyRound size={8} className="text-amber-500" title="Delivery OTP" />}
+                  {step.otp_type === 'delivery' && <KeyRound size={8} className="text-amber-500" />}
                   {step.is_success && <CheckCircle2 size={8} className="text-emerald-500" />}
                   {step.creates_tracking_assignment && <MapPin size={8} className="text-violet-500" />}
                 </div>

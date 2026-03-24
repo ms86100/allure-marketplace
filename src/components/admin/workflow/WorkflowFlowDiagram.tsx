@@ -224,7 +224,7 @@ export function WorkflowFlowDiagram({ steps, transitions }: Props) {
                 <Truck size={9} className="text-blue-500 shrink-0" />
               )}
               {(step as any).otp_type === 'delivery' && (
-                <KeyRound size={9} className="text-amber-500 shrink-0" title="Delivery OTP" />
+                <KeyRound size={9} className="text-amber-500 shrink-0" />
               )}
               <span>{step.display_label || formatName(step.status_key)}</span>
               {step.is_success && (
