@@ -1,73 +1,71 @@
 
+Goal: remove the mismatch that makes order `46db6646` look “not workflow-driven” even though the runtime is following a different contract than the editor.
 
-# Fix: Add Workflow Validation for `otp_type = 'delivery'` on Non-Delivery Steps
+What is happening now (traceable facts):
+- This order resolves to `food_beverages / seller_delivery`, not `default / seller_delivery`:
+  - seller `primary_group = food_beverages`
+  - `fulfillment_type = delivery`
+  - `delivery_handled_by = seller`
+  - stored `transaction_type = null`
+  - so `resolveTransactionType(...)` returns `seller_delivery`
+- The page is displaying the wrong workflow source:
+  - `OrderDetailPage.tsx` prints `workflow: {(order as any).seller_profiles?.primary_group || 'default'} / ...`
+  - but `fetchOrder()` loads the seller relation as `order.seller`, not `order.seller_profiles`
+  - so the UI falsely shows `default`
+- In DB, `food_beverages / seller_delivery / accepted` has:
+  - `requires_otp = true`
+  - `otp_type = null`
+- Runtime OTP gating now uses `otp_type`, not the legacy boolean:
+  - `getStepOtpType()` reads `otp_type`
+  - `OrderDetailPage.tsx` checks `nextOtpType === 'delivery'`
+  - therefore the UI ignores `requires_otp=true` when `otp_type` is null and shows `Mark Preparing`
 
-## Problem
+Implementation plan:
 
-The user is right: the previous plan tried to "make the system support a wrong workflow" by creating fake delivery assignments. The correct fix is to **prevent the misconfiguration** and **gracefully handle it in the UI**.
+1. Fix workflow visibility on the order page
+- In `useOrderDetail.ts`, return explicit:
+  - `resolvedParentGroup`
+  - `resolvedTransactionType`
+  - `workflowSource` (`override` or `default fallback`)
+- In `OrderDetailPage.tsx`, replace the broken header label with those resolved values so the page shows the actual workflow being used.
 
-**Principle:** `otp_type = 'delivery'` is only valid on steps where a delivery assignment will already exist (i.e., steps that come AFTER a `creates_tracking_assignment = true` step, or steps that are `is_transit = true`).
+2. Remove the split-brain OTP model in admin
+- In `AdminWorkflowManager.tsx`, make `otp_type` the only editable OTP control.
+- Remove or disable any remaining UX that makes `requires_otp` look independently configurable.
+- Show `requires_otp` as derived/read-only: `otp_type !== null`.
 
----
+3. Detect and repair legacy OTP mismatches
+- In the admin editor, add a blocking warning for any step where:
+  - `requires_otp = true`
+  - `otp_type = null`
+- Message: “Legacy OTP flag is ignored at runtime until an OTP Type is selected.”
+- On save, normalize mismatches:
+  - valid post-tracking legacy rows → map to `otp_type = 'delivery'`
+  - invalid pre-tracking rows (like `accepted`) → clear the legacy boolean and keep a warning
 
-## Changes
+4. Make invalid early-step delivery OTP explicit
+- Keep the existing architectural rule: delivery OTP only works once delivery-assignment context exists.
+- In `AdminWorkflowManager.tsx`, show a hard inline warning on pre-tracking steps:
+  - “Delivery OTP cannot run here; this step will not prompt OTP in the UI.”
+- Do not create fake delivery assignments for early steps.
 
-### 1. Admin Workflow Manager — Validate `otp_type = 'delivery'` on save
+5. Add runtime debug clarity for admins/sellers
+- On the order detail page, add a compact debug chip visible to admins/sellers showing:
+  - active workflow
+  - next status
+  - `otp_type`
+  - whether OTP is expected
+  - why the OTP CTA is or is not shown
+- This makes future workflow-vs-UI discrepancies immediately explainable.
 
-**File: `src/components/admin/AdminWorkflowManager.tsx`** (after line 219, alongside self-pickup validation)
+Files to update:
+- `src/hooks/useOrderDetail.ts`
+- `src/pages/OrderDetailPage.tsx`
+- `src/components/admin/AdminWorkflowManager.tsx`
+- optionally `src/components/admin/workflow/types.ts` for clearer OTP typing
 
-Add validation: scan steps in sort order. Track whether a `creates_tracking_assignment` step has been encountered. If any step BEFORE that point has `otp_type = 'delivery'`, show a toast error and auto-clear it:
-
-```
-"Delivery OTP requires a delivery assignment. Step 'accepted' comes before any tracking assignment step — cleared to 'None'."
-```
-
-Also add an inline warning in the OTP Type dropdown: if the step has `otp_type = 'delivery'` but no prior step has `creates_tracking_assignment = true`, show an `AlertTriangle` icon with tooltip explaining why.
-
-### 2. Admin Workflow Manager — Add inline visual warning on the dropdown
-
-**File: `src/components/admin/AdminWorkflowManager.tsx`** (around line 601)
-
-Next to the OTP Type `<Select>`, check if the current step position is before any `creates_tracking_assignment` step. If so and `otp_type = 'delivery'` is selected, render an orange warning icon.
-
-### 3. OrderDetailPage — Graceful fallback when `otp_type = 'delivery'` but no assignment
-
-**File: `src/pages/OrderDetailPage.tsx`** (line 634-643)
-
-Current code already handles this correctly after the previous fix:
-- `needsDeliveryOtp = (nextOtpType === 'delivery' && deliveryAssignmentId)` — if no assignment, this is `false`
-- Falls through to the normal button — **correct behavior**
-
-No change needed here. The current code already shows a normal advance button when `otp_type = 'delivery'` but no `deliveryAssignmentId` exists. The DB trigger is the safety net.
-
-### 4. DeliveryActionCard — Same graceful handling
-
-**File: `src/components/delivery/DeliveryActionCard.tsx`** (line 56)
-
-Currently uses `requiresOtp: nextStep.requires_otp`. Update to use `otp_type`:
-- If `otp_type === 'delivery'` and assignment exists → show OTP button
-- If `otp_type === 'delivery'` and no assignment → show normal button
-- This aligns the delivery card with the same logic as OrderDetailPage
-
----
-
-## Files Modified
-
-| File | Change |
-|---|---|
-| `src/components/admin/AdminWorkflowManager.tsx` | Save-time validation + inline warning for delivery OTP on pre-assignment steps |
-| `src/components/delivery/DeliveryActionCard.tsx` | Use `otp_type` instead of `requires_otp` boolean |
-
-## What is NOT changed
-- No DB trigger modifications
-- No delivery assignment creation changes  
-- No schema changes
-- `OrderDetailPage.tsx` — already handles this correctly after previous fix
-- `useCategoryStatusFlow.ts` — already has `getStepOtpType()` and `otp_type` in queries
-
-## Result
-- Admin gets clear feedback when misconfiguring delivery OTP on early steps
-- UI never deadlocks — shows normal button when delivery context doesn't exist
-- DB trigger remains the safety net for any edge cases
-- System respects the principle: "delivery OTP requires delivery assignment to already exist"
-
+Expected outcome for this exact order:
+- The page will stop falsely saying `default / seller_delivery`.
+- It will clearly show the order is using `food_beverages / seller_delivery`.
+- The editor will make it obvious that `accepted` currently has a legacy mismatch (`requires_otp=true`, `otp_type=null`) that runtime ignores.
+- After cleanup, admin configuration and UI behavior will match exactly, with no silent OTP bypass caused by legacy fields.
