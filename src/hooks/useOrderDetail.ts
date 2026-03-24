@@ -369,7 +369,7 @@ export function useOrderDetail(id: string | undefined) {
     seller, isSellerView, isUrgentOrder, isUrgentSellerView, isUrgentBuyerView, isBuyerView, isEnquiryOrder,
     nextStatus, buyerNextStatus, canReview, canChat, canReorder,
     canSellerReject, canBuyerCancel, isInTransit, isFlowLoading,
-    currentStepActor, resolvedTxnType,
+    currentStepActor, resolvedTxnType, resolvedParentGroup,
     chatRecipientId, chatRecipientName,
     orderFulfillmentType, currentStatusIndex, statusOrder,
     displayStatuses, timelineSteps, flow,
