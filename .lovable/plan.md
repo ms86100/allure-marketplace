@@ -1,30 +1,34 @@
 
-# Fix: Workflow Visibility + OTP Split-Brain Resolution
+# Generic OTP — Admin Can Gate Any Workflow Step
 
-## Problem
-1. Order detail page showed wrong workflow (`default` instead of `food_beverages`) because it accessed `order.seller_profiles` instead of `order.seller`
-2. Legacy `requires_otp=true` with `otp_type=null` caused runtime to silently skip OTP (runtime reads `otp_type`, not the boolean)
-3. No admin visibility into which workflow an order is actually using or why OTP is/isn't triggering
+## What Changed
 
-## Changes Made
+### DB Migration
+- **New table**: `order_otp_codes` — stores generic OTP codes per (order, target_status) with UNIQUE constraint, 30-min expiry
+- **New RPC**: `generate_generic_otp` — generates/regenerates 4-digit code, returns plaintext
+- **New RPC**: `verify_generic_otp_and_advance` — verifies code, sets `app.otp_verified`, advances order atomically
+- **Unified trigger**: `enforce_delivery_otp_gate` → `enforce_otp_gate` — checks `otp_type` from `category_status_flows`:
+  - `delivery` → existing delivery assignment check
+  - `generic` → checks `order_otp_codes` for verified entry
+  - `null` → pass through
 
-### 1. `src/hooks/useOrderDetail.ts`
-- Added `resolvedParentGroup` derived from `effectiveParentGroup || 'default'`
-- Exposed in return object for consumers
+### Frontend
+- **`GenericOtpDialog.tsx`** — 4-digit code entry dialog, calls `verify_generic_otp_and_advance`
+- **`GenericOtpCard.tsx`** — shows generated code to the non-advancing party with copy + regenerate
+- **`OrderDetailPage.tsx`** — routes `otp_type='generic'` to new dialog for both seller and buyer action bars; shows code card to the party who shares the code
+- **`AdminWorkflowManager.tsx`** — added 🔑 Generic OTP to dropdown, updated tooltip
 
-### 2. `src/pages/OrderDetailPage.tsx`
-- Fixed workflow label: uses `o.resolvedParentGroup` instead of broken `order.seller_profiles?.primary_group`
-- Added debug chip (seller-only): shows active workflow, next status, otp_type, and assignment state
+## OTP Type Behavior Matrix
 
-### 3. `src/components/admin/AdminWorkflowManager.tsx`
-- **Save-time normalization**: detects `requires_otp=true` + `otp_type=null` mismatches
-  - Post-tracking steps → auto-mapped to `otp_type='delivery'`
-  - Pre-tracking steps → legacy flag cleared with warning
-- **Inline warning**: red alert icon next to OTP dropdown when legacy mismatch detected
-- Existing delivery OTP pre-tracking warning preserved
+| otp_type | Requires delivery? | Works at any step? | Who enters code? |
+|---|---|---|---|
+| `delivery` | Yes | Only post-tracking | Seller/rider enters buyer's delivery code |
+| `generic` | No | Yes | The advancing actor enters the other party's code |
+| `null` | N/A | N/A | No OTP gate |
 
-## Result
-- Workflow label on order page now shows the ACTUAL workflow being used
-- Admin can see and fix legacy OTP mismatches immediately
-- Debug chip provides instant clarity on OTP gating decisions
-- `requires_otp` is always derived from `otp_type !== null` on save — single source of truth
+## Guardrails
+1. UNIQUE(order_id, target_status) — one code per step
+2. 30-min expiry, rejected if expired, regeneration allowed
+3. `verified = true` blocks reuse
+4. DB trigger enforces both types — frontend cannot bypass
+5. Delivery OTP logic unchanged — isolated branch in trigger
