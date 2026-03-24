@@ -20,6 +20,8 @@ import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
 import { useTrackingConfig } from '@/hooks/useTrackingConfig';
 import { DeliveryCompletionOtpDialog } from '@/components/delivery/DeliveryCompletionOtpDialog';
 import { DeliveryFeedbackForm } from '@/components/delivery/DeliveryFeedbackForm';
+import { GenericOtpDialog } from '@/components/order/GenericOtpDialog';
+import { GenericOtpCard } from '@/components/order/GenericOtpCard';
 
 import { OrderItemCard } from '@/components/order/OrderItemCard';
 import { AppointmentDetailsCard } from '@/components/order/AppointmentDetailsCard';
