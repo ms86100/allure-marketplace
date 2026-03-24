@@ -652,6 +652,7 @@ export function AdminWorkflowManager() {
                             <SelectContent>
                               <SelectItem value="none">None</SelectItem>
                               <SelectItem value="delivery">🔐 Delivery OTP</SelectItem>
+                              <SelectItem value="generic">🔑 Generic OTP</SelectItem>
                             </SelectContent>
                           </Select>
                           {(() => {
