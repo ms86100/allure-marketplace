@@ -41,8 +41,7 @@ function useDeliveryWorkflow(orderId: string | undefined) {
 }
 
 /** Get the next delivery action for the current status from the workflow */
-function getNextDeliveryAction(flow: StatusFlowStep[] | null | undefined, currentStatus: string): { nextStatus: string; requiresOtp: boolean } | null {
-  // No hardcoded fallbacks — if flow is empty, return null (show loading/unavailable state)
+function getNextDeliveryAction(flow: StatusFlowStep[] | null | undefined, currentStatus: string): { nextStatus: string; otpType: string | null } | null {
   if (!flow || flow.length === 0) return null;
 
   const transitSteps = flow.filter(s => s.is_transit || s.status_key === 'assigned');
@@ -50,11 +49,10 @@ function getNextDeliveryAction(flow: StatusFlowStep[] | null | undefined, curren
   if (currentIdx < 0) return null;
   const nextStep = currentIdx < transitSteps.length - 1 ? transitSteps[currentIdx + 1] : null;
   if (!nextStep) {
-    // Use workflow flags: find the terminal success step (DB-driven, not hardcoded)
     const terminalSuccessStep = flow.find(s => s.is_terminal && s.is_success);
-    return terminalSuccessStep ? { nextStatus: terminalSuccessStep.status_key, requiresOtp: terminalSuccessStep.requires_otp || false } : null;
+    return terminalSuccessStep ? { nextStatus: terminalSuccessStep.status_key, otpType: terminalSuccessStep.otp_type || null } : null;
   }
-  return { nextStatus: nextStep.status_key, requiresOtp: nextStep.requires_otp || false };
+  return { nextStatus: nextStep.status_key, otpType: nextStep.otp_type || null };
 }
 
 /** Check if delivery is in-transit based on workflow — no hardcoded fallbacks */
@@ -116,9 +114,10 @@ export function DeliveryActionCard({ delivery, updatingId, onUpdateStatus, onOtp
           <span className="text-success font-medium tabular-nums">Fee: {formatPrice(delivery.delivery_fee)}</span>
         </div>
 
-        {/* Action Buttons — workflow-driven */}
+        {/* Action Buttons — workflow-driven, uses otp_type */}
         {action && (() => {
-          if (action.requiresOtp) {
+          const isDeliveryOtp = action.otpType === 'delivery';
+          if (isDeliveryOtp && delivery.delivery_code) {
             return (
               <Button
                 size="sm"
@@ -132,11 +131,12 @@ export function DeliveryActionCard({ delivery, updatingId, onUpdateStatus, onOtp
             );
           }
           const otpAction = getNextDeliveryAction(flow, action.nextStatus);
+          const nextIsDeliveryOtp = otpAction?.otpType === 'delivery';
           return (
             <div className="flex gap-2">
               <Button
                 size="sm"
-                variant={otpAction?.requiresOtp ? 'outline' : 'default'}
+                variant={nextIsDeliveryOtp ? 'outline' : 'default'}
                 className="flex-1"
                 onClick={() => onUpdateStatus(delivery.id, action.nextStatus)}
                 disabled={updatingId === delivery.id}
@@ -144,7 +144,7 @@ export function DeliveryActionCard({ delivery, updatingId, onUpdateStatus, onOtp
                 {updatingId === delivery.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Navigation size={14} className="mr-1" />}
                 {action.nextStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
               </Button>
-              {otpAction?.requiresOtp && (
+              {nextIsDeliveryOtp && (
                 <Button
                   size="sm"
                   className="flex-1"
