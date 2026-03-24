@@ -80,9 +80,10 @@ export default function OrderDetailPage() {
   const order = o.order;
   const orderId = order?.id;
   const fulfillmentType = o.orderFulfillmentType;
-  // Bug 5 fix: Derive delivery order flag from workflow's is_transit steps — not hardcoded fulfillment types
+  // Bug 4 fix: Self-pickup guard — fulfillmentType is ground truth for physical delivery
   const hasDeliverySteps = o.flow.some((s: any) => s.is_transit === true);
-  const isDeliveryOrder = hasDeliverySteps || ['delivery', 'seller_delivery'].includes(fulfillmentType);
+  const isDeliveryOrder = fulfillmentType !== 'self_pickup' && 
+    (hasDeliverySteps || ['delivery', 'seller_delivery'].includes(fulfillmentType));
 
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId, o.isInTransit);
   const trackingConfig = useTrackingConfig();
@@ -206,8 +207,9 @@ export default function OrderDetailPage() {
   // Bulletproof OTP gate: if delivery assignment exists and next status is terminal, always require OTP
   // This catches the mismatch where stepRequiresOtp returns false but DB trigger enforces OTP
   const hasDeliveryOtpGate = !!(deliveryAssignmentId && isDeliveryOrder);
-  const sellerNextIsTerminal = o.nextStatus ? isTerminalStatus(o.flow, o.nextStatus) || ['delivered', 'completed'].includes(o.nextStatus) : false;
-  const buyerNextIsTerminal = o.buyerNextStatus ? isTerminalStatus(o.flow, o.buyerNextStatus) || ['delivered', 'completed'].includes(o.buyerNextStatus) : false;
+  // Bug 2 fix: Remove hardcoded terminal checks — workflow is source of truth. DB trigger is safety net.
+  const sellerNextIsTerminal = o.nextStatus ? isTerminalStatus(o.flow, o.nextStatus) : false;
+  const buyerNextIsTerminal = o.buyerNextStatus ? isTerminalStatus(o.flow, o.buyerNextStatus) : false;
 
   return (
     <AppLayout showHeader={false} showNav={!hasSellerActionBar}>
@@ -662,9 +664,10 @@ export default function OrderDetailPage() {
                     <ChevronRight size={14} className="ml-1" />
                   </Button>
                 ) : (
-                  <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.buyerAdvanceOrder(o.buyerNextStatus!)} disabled={o.isUpdating}>
-                    {o.isUpdating ? 'Updating...' : o.getFlowStepLabel(o.buyerNextStatus).label}
-                    <ChevronRight size={14} className="ml-1" />
+                  /* Bug 5 fix: Show disabled loading button when OTP required but assignment not loaded yet */
+                  <Button className="flex-1 h-12" disabled>
+                    <Loader2 size={14} className="mr-1.5 animate-spin" />
+                    Preparing verification…
                   </Button>
                 )
               ) : (

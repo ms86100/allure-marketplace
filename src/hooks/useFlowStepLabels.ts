@@ -20,10 +20,12 @@ export function useFlowStepLabels() {
   const { data: flowLabelMap } = useQuery({
     queryKey: ['flow-step-labels-batch'],
     queryFn: async (): Promise<Record<string, FlowLabel>> => {
-      // Fetch all distinct status_key + display_label + color combinations
+      // Bug 1 fix: Only fetch 'default' parent_group labels to avoid cross-workflow contamination.
+      // Detail page uses per-order flow for accurate labels; list views use this canonical baseline.
       const { data, error } = await supabase
         .from('category_status_flows')
-        .select('status_key, display_label, color');
+        .select('status_key, display_label, color')
+        .eq('parent_group', 'default');
 
       if (error || !data) return {};
 
