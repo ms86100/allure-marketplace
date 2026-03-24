@@ -626,24 +626,22 @@ export default function OrderDetailPage() {
             {/* DB-driven: if no seller transition exists, show awaiting message */}
             {!o.nextStatus ? (
               <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground"><Truck size={16} className="text-primary" /><span>Awaiting next step</span></div>
-            ) : (
-              /* Bulletproof OTP: use requires_otp OR secondary gate (delivery assignment + terminal next status) */
-              (stepRequiresOtp(o.flow, o.nextStatus) || (hasDeliveryOtpGate && sellerNextIsTerminal)) ? (
-                deliveryAssignmentId ? (
-                  <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
-                    {o.isUpdating ? 'Updating...' : 'Verify & Deliver'}
-                    <ChevronRight size={14} className="ml-1" />
-                  </Button>
-                ) : (
-                  <Button className="flex-1 h-12" disabled>
-                    <Loader2 size={14} className="mr-1.5 animate-spin" />
-                    Preparing delivery verification…
-                  </Button>
-                )
+            ) : (() => {
+              // NOTE: otp_type explicitly declares OTP intent.
+              // 'delivery' = requires delivery assignment + code verification.
+              // OTP gating requires deliveryAssignmentId to exist.
+              // DB trigger enforces correctness if frontend skips.
+              const nextOtpType = getStepOtpType(o.flow, o.nextStatus);
+              const needsDeliveryOtp = (nextOtpType === 'delivery' && deliveryAssignmentId) || (hasDeliveryOtpGate && sellerNextIsTerminal);
+              return needsDeliveryOtp ? (
+                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
+                  {o.isUpdating ? 'Updating...' : 'Verify & Deliver'}
+                  <ChevronRight size={14} className="ml-1" />
+                </Button>
               ) : (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.updateOrderStatus(o.nextStatus!)} disabled={o.isUpdating}>{o.isUpdating ? 'Updating...' : `Mark ${o.getFlowStepLabel(o.nextStatus).label}`}<ChevronRight size={14} className="ml-1" /></Button>
-              )
-            )}
+              );
+            })()}
           </div>
         </div>
       )}
@@ -656,27 +654,21 @@ export default function OrderDetailPage() {
             {o.canBuyerCancel && (
               <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => o.fetchOrder()} canCancel={true} />
             )}
-            {o.buyerNextStatus && (
-              (stepRequiresOtp(o.flow, o.buyerNextStatus) || (hasDeliveryOtpGate && buyerNextIsTerminal)) ? (
-                deliveryAssignmentId ? (
-                  <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
-                    {o.isUpdating ? 'Updating...' : 'Verify & Confirm'}
-                    <ChevronRight size={14} className="ml-1" />
-                  </Button>
-                ) : (
-                  /* Bug 5 fix: Show disabled loading button when OTP required but assignment not loaded yet */
-                  <Button className="flex-1 h-12" disabled>
-                    <Loader2 size={14} className="mr-1.5 animate-spin" />
-                    Preparing verification…
-                  </Button>
-                )
+            {o.buyerNextStatus && (() => {
+              const buyerNextOtpType = getStepOtpType(o.flow, o.buyerNextStatus);
+              const buyerNeedsDeliveryOtp = (buyerNextOtpType === 'delivery' && deliveryAssignmentId) || (hasDeliveryOtpGate && buyerNextIsTerminal);
+              return buyerNeedsDeliveryOtp ? (
+                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
+                  {o.isUpdating ? 'Updating...' : 'Verify & Confirm'}
+                  <ChevronRight size={14} className="ml-1" />
+                </Button>
               ) : (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => o.buyerAdvanceOrder(o.buyerNextStatus!)} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : o.getFlowStepLabel(o.buyerNextStatus).label}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
-              )
-            )}
+              );
+            })()}
           </div>
         </div>
       )}
