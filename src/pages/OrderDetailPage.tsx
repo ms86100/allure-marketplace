@@ -30,7 +30,7 @@ import { SellerCodConfirmation } from '@/components/payment/SellerCodConfirmatio
 import { PaymentProofReadonly } from '@/components/payment/PaymentProofReadonly';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
-import { isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, stepRequiresOtp } from '@/hooks/useCategoryStatusFlow';
+import { isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, stepRequiresOtp, getStepOtpType } from '@/hooks/useCategoryStatusFlow';
 import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck, Loader2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
