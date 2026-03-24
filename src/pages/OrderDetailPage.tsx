@@ -641,15 +641,17 @@ export default function OrderDetailPage() {
             {!o.nextStatus ? (
               <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground"><Truck size={16} className="text-primary" /><span>Awaiting next step</span></div>
             ) : (() => {
-              // NOTE: otp_type explicitly declares OTP intent.
-              // 'delivery' = requires delivery assignment + code verification.
-              // OTP gating requires deliveryAssignmentId to exist.
-              // DB trigger enforces correctness if frontend skips.
               const nextOtpType = getStepOtpType(o.flow, o.nextStatus);
               const needsDeliveryOtp = (nextOtpType === 'delivery' && deliveryAssignmentId) || (hasDeliveryOtpGate && sellerNextIsTerminal);
+              const needsGenericOtp = nextOtpType === 'generic';
               return needsDeliveryOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : 'Verify & Deliver'}
+                  <ChevronRight size={14} className="ml-1" />
+                </Button>
+              ) : needsGenericOtp ? (
+                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => { setGenericOtpTargetStatus(o.nextStatus!); setIsGenericOtpDialogOpen(true); }} disabled={o.isUpdating}>
+                  {o.isUpdating ? 'Updating...' : `Verify & ${o.getFlowStepLabel(o.nextStatus).label}`}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               ) : (
@@ -671,9 +673,15 @@ export default function OrderDetailPage() {
             {o.buyerNextStatus && (() => {
               const buyerNextOtpType = getStepOtpType(o.flow, o.buyerNextStatus);
               const buyerNeedsDeliveryOtp = (buyerNextOtpType === 'delivery' && deliveryAssignmentId) || (hasDeliveryOtpGate && buyerNextIsTerminal);
+              const buyerNeedsGenericOtp = buyerNextOtpType === 'generic';
               return buyerNeedsDeliveryOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : 'Verify & Confirm'}
+                  <ChevronRight size={14} className="ml-1" />
+                </Button>
+              ) : buyerNeedsGenericOtp ? (
+                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => { setGenericOtpTargetStatus(o.buyerNextStatus!); setIsGenericOtpDialogOpen(true); }} disabled={o.isUpdating}>
+                  {o.isUpdating ? 'Updating...' : `Verify & ${o.getFlowStepLabel(o.buyerNextStatus).label}`}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               ) : (
