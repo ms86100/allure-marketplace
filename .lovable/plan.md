@@ -1,35 +1,65 @@
 
 
-# Fix: "Verify & Deliver" Button Shows Wrong Label
+# Fix: Fully Workflow-Driven Action Buttons
 
-## Root Cause
+## Problem
 
-The button text on line 662 is hardcoded to `"Verify & Deliver"` for ALL delivery OTP steps. So when the seller is at `accepted` and the next step is `preparing` (which has `otp_type = 'delivery'`), the button says "Verify & Deliver" — making it appear the system is skipping to the final step.
+Two issues remain:
 
-The step progression is actually correct (`accepted → preparing`). Only the label is wrong.
+1. **Legacy `hasDeliveryOtpGate` bypass** (lines 213-216, 658, 688): Forces delivery OTP on terminal steps regardless of workflow config — `(hasDeliveryOtpGate && sellerNextIsTerminal)`.
+2. **Button labels don't reflect end-state awareness**: All OTP buttons say `Verify & [label]` and non-OTP buttons say `Mark [label]`, but terminal steps should say "Complete" variants.
 
-Similarly, the buyer-side delivery OTP button on line 692 is hardcoded to `"Verify & Confirm"`.
+## Changes — `src/pages/OrderDetailPage.tsx`
 
-## Fix
+### 1. Remove legacy bypass (lines 211-216)
 
-**In `src/pages/OrderDetailPage.tsx`:**
+Delete `hasDeliveryOtpGate`, `sellerNextIsTerminal`, `buyerNextIsTerminal` entirely. These are non-workflow overrides.
 
-1. **Line 662** — Replace hardcoded `'Verify & Deliver'` with the dynamic flow step label:
-   ```
-   `Verify & ${o.getFlowStepLabel(o.nextStatus).label}`
-   ```
-   This matches how generic OTP already works on line 667.
+### 2. Simplify OTP checks (lines 658, 688)
 
-2. **Line 692** — Same fix for buyer delivery OTP button:
-   ```
-   `Verify & ${o.getFlowStepLabel(o.buyerNextStatus).label}`
-   ```
+```js
+// Before:
+const needsDeliveryOtp = (nextOtpType === 'delivery' && deliveryAssignmentId) || (hasDeliveryOtpGate && sellerNextIsTerminal);
 
-## Secondary Issue: Likely Misconfiguration
+// After:
+const needsDeliveryOtp = nextOtpType === 'delivery' && !!deliveryAssignmentId;
+```
 
-The DB shows `preparing` has `otp_type = 'delivery'`, meaning the seller must enter an OTP just to mark the order as "Preparing". This is almost certainly unintended — the admin likely meant to put delivery OTP on the `delivered` step (sort 70), not `preparing` (sort 30). No code change needed for this — admin needs to move the OTP config to the correct step.
+Same for buyer (line 688).
+
+### 3. Dynamic labels with end-state awareness
+
+Create a helper inside the component:
+
+```ts
+const getActionLabel = (status: string, otpRequired: boolean) => {
+  const step = o.flow.find(s => s.status_key === status);
+  const label = step?.display_label || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const isEnd = step?.is_terminal === true;
+  if (otpRequired) return isEnd ? `Verify & Complete` : `Verify & ${label}`;
+  return isEnd ? `Complete Order` : `Mark ${label}`;
+};
+```
+
+Replace all button label expressions:
+- Line 662: `getActionLabel(o.nextStatus, true)`
+- Line 667: `getActionLabel(o.nextStatus, true)`
+- Line 671: `getActionLabel(o.nextStatus, false)`
+- Line 692: `getActionLabel(o.buyerNextStatus, true)`
+- Line 697: `getActionLabel(o.buyerNextStatus, true)`
+- Line 702: `getActionLabel(o.buyerNextStatus, false)`
+
+### Result
+
+| Scenario | Button |
+|---|---|
+| Next = `preparing`, no OTP | "Mark Preparing" |
+| Next = `preparing`, delivery OTP | "Verify & Preparing" |
+| Next = `delivered`, terminal, delivery OTP | "Verify & Complete" |
+| Next = `delivered`, terminal, no OTP | "Complete Order" |
+| Next = `completed`, terminal, generic OTP | "Verify & Complete" |
 
 ## One file changed
 
-`src/pages/OrderDetailPage.tsx` — two line changes (seller button label + buyer button label)
+`src/pages/OrderDetailPage.tsx`
 
