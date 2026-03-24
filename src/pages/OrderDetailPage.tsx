@@ -206,7 +206,7 @@ export default function OrderDetailPage() {
 
 
   const hasSellerActionBar = o.isSellerView && !o.isFlowLoading && o.flow.length > 0 && !isTerminalStatus(o.flow, order.status);
-  const hasBuyerActionBar = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel);
+  const hasBuyerActionBar = o.isBuyerView && !o.isFlowLoading && o.flow.length > 0 && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel);
 
   // Dynamic action label: workflow-driven with end-state awareness
   const getActionLabel = (status: string, otpRequired: boolean) => {
@@ -526,8 +526,13 @@ export default function OrderDetailPage() {
           {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && o.isInTransit && currentActors.includes('seller') && (
             <SellerGPSTracker assignmentId={deliveryAssignmentId} orderId={order.id} autoStart deliveryStatus={order.status} />
           )}
-          {/* Persistent OTP card — visible to buyer for ALL non-terminal delivery statuses */}
-          {o.isBuyerView && isDeliveryOrder && buyerOtp && !isTerminalStatus(o.flow, order.status) && (
+          {/* Delivery OTP card — only shown when the next step requires delivery OTP */}
+          {o.isBuyerView && isDeliveryOrder && buyerOtp && !isTerminalStatus(o.flow, order.status) && (() => {
+            const nextStatus = o.buyerNextStatus || o.nextStatus;
+            if (!nextStatus) return false;
+            const nextOtp = getStepOtpType(o.flow, nextStatus);
+            return nextOtp === 'delivery';
+          })() && (
             <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 text-center">
               <p className="text-xs text-muted-foreground mb-1">Your Delivery Code</p>
               <p className="text-3xl font-bold tracking-[0.3em] text-primary">{buyerOtp}</p>
