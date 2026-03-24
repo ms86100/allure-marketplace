@@ -689,6 +689,10 @@ export function AdminWorkflowManager() {
                                 });
                               }
                               updateStep(index, 'creates_tracking_assignment', !!v);
+                              // Auto-select Delivery OTP when enabling tracking start
+                              if (v && (!step.otp_type || step.otp_type === 'none')) {
+                                updateStep(index, 'otp_type', 'delivery');
+                              }
                             }} id={`tracking-${index}`} />
                             <label htmlFor={`tracking-${index}`} className="text-[11px] text-muted-foreground cursor-pointer">🚚 Start Delivery Here</label>
                             <Tooltip>
