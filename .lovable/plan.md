@@ -1,65 +1,74 @@
 
 
-# Fix: Fully Workflow-Driven Action Buttons
+# Fix: OTP RPC Skips to `delivered` Instead of Advancing One Step
 
-## Problem
+## Root Cause
 
-Two issues remain:
+The `verify_delivery_otp_and_complete` RPC (lines 144-153) hardcodes the target status:
 
-1. **Legacy `hasDeliveryOtpGate` bypass** (lines 213-216, 658, 688): Forces delivery OTP on terminal steps regardless of workflow config — `(hasDeliveryOtpGate && sellerNextIsTerminal)`.
-2. **Button labels don't reflect end-state awareness**: All OTP buttons say `Verify & [label]` and non-OTP buttons say `Mark [label]`, but terminal steps should say "Complete" variants.
-
-## Changes — `src/pages/OrderDetailPage.tsx`
-
-### 1. Remove legacy bypass (lines 211-216)
-
-Delete `hasDeliveryOtpGate`, `sellerNextIsTerminal`, `buyerNextIsTerminal` entirely. These are non-workflow overrides.
-
-### 2. Simplify OTP checks (lines 658, 688)
-
-```js
-// Before:
-const needsDeliveryOtp = (nextOtpType === 'delivery' && deliveryAssignmentId) || (hasDeliveryOtpGate && sellerNextIsTerminal);
-
-// After:
-const needsDeliveryOtp = nextOtpType === 'delivery' && !!deliveryAssignmentId;
+```sql
+SELECT CASE
+  WHEN EXISTS (... status_key = 'delivered' ...) THEN 'delivered'
+  ELSE 'completed'
+END INTO _target_order_status;
 ```
 
-Same for buyer (line 688).
+This means ANY delivery OTP verification jumps to `delivered`/`completed`, regardless of which step the OTP was configured on. When OTP is on `preparing` (sort 30), it skips `ready` (40), `picked_up` (50), `on_the_way` (60) and lands on `delivered` (70).
 
-### 3. Dynamic labels with end-state awareness
+Additionally, the RPC validates the current status using `is_transit = true OR actor LIKE '%delivery%'` (lines 104-111), which is NOT workflow-driven — it should check if the current step's NEXT step requires delivery OTP.
 
-Create a helper inside the component:
+## Fix: Make the RPC advance to the NEXT workflow step
 
-```ts
-const getActionLabel = (status: string, otpRequired: boolean) => {
-  const step = o.flow.find(s => s.status_key === status);
-  const label = step?.display_label || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  const isEnd = step?.is_terminal === true;
-  if (otpRequired) return isEnd ? `Verify & Complete` : `Verify & ${label}`;
-  return isEnd ? `Complete Order` : `Mark ${label}`;
-};
+### Database Migration — Update `verify_delivery_otp_and_complete`
+
+Replace the hardcoded target status logic with workflow-driven next-step resolution:
+
+```sql
+-- Instead of hardcoding 'delivered'/'completed', find the next step in workflow
+SELECT csf.status_key INTO _target_order_status
+FROM category_status_flows csf
+WHERE csf.transaction_type = _resolved_txn_type
+  AND csf.parent_group IN (_parent_group, 'default')
+  AND csf.sort_order > (
+    SELECT sort_order FROM category_status_flows
+    WHERE transaction_type = _resolved_txn_type
+      AND parent_group IN (_parent_group, 'default')
+      AND status_key = _order_record.status::text
+    ORDER BY parent_group = _parent_group DESC
+    LIMIT 1
+  )
+ORDER BY csf.sort_order ASC
+LIMIT 1;
 ```
 
-Replace all button label expressions:
-- Line 662: `getActionLabel(o.nextStatus, true)`
-- Line 667: `getActionLabel(o.nextStatus, true)`
-- Line 671: `getActionLabel(o.nextStatus, false)`
-- Line 692: `getActionLabel(o.buyerNextStatus, true)`
-- Line 697: `getActionLabel(o.buyerNextStatus, true)`
-- Line 702: `getActionLabel(o.buyerNextStatus, false)`
+Also replace the `is_transit OR actor LIKE '%delivery%'` validation (lines 104-115) with a check that the NEXT step in the workflow has `otp_type = 'delivery'`:
 
-### Result
+```sql
+-- Validate: the next workflow step must require delivery OTP
+SELECT EXISTS (
+  SELECT 1 FROM category_status_flows
+  WHERE transaction_type = _resolved_txn_type
+    AND parent_group IN (_parent_group, 'default')
+    AND sort_order > current_sort_order
+    AND otp_type = 'delivery'
+  ORDER BY sort_order ASC
+  LIMIT 1
+) INTO _next_requires_otp;
+```
 
-| Scenario | Button |
+This ensures:
+- OTP on `preparing` → advances to `ready` (next step)
+- OTP on `on_the_way` → advances to `delivered` (next step)
+- No step is skipped
+- Behavior is purely workflow-driven
+
+### No frontend changes needed
+
+The `DeliveryCompletionOtpDialog` already calls this RPC and refreshes. The dynamic button labels already work correctly. Only the backend RPC needs fixing.
+
+## Files
+
+| File | Change |
 |---|---|
-| Next = `preparing`, no OTP | "Mark Preparing" |
-| Next = `preparing`, delivery OTP | "Verify & Preparing" |
-| Next = `delivered`, terminal, delivery OTP | "Verify & Complete" |
-| Next = `delivered`, terminal, no OTP | "Complete Order" |
-| Next = `completed`, terminal, generic OTP | "Verify & Complete" |
-
-## One file changed
-
-`src/pages/OrderDetailPage.tsx`
+| DB migration | Update `verify_delivery_otp_and_complete` — workflow-driven next-step resolution instead of hardcoded `delivered`/`completed` |
 
