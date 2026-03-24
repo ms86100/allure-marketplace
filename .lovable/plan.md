@@ -1,34 +1,44 @@
 
-# Generic OTP — Admin Can Gate Any Workflow Step
 
-## What Changed
+# Fix: Validation Error Disappears + Tracking Spinner When Not Applicable
 
-### DB Migration
-- **New table**: `order_otp_codes` — stores generic OTP codes per (order, target_status) with UNIQUE constraint, 30-min expiry
-- **New RPC**: `generate_generic_otp` — generates/regenerates 4-digit code, returns plaintext
-- **New RPC**: `verify_generic_otp_and_advance` — verifies code, sets `app.otp_verified`, advances order atomically
-- **Unified trigger**: `enforce_delivery_otp_gate` → `enforce_otp_gate` — checks `otp_type` from `category_status_flows`:
-  - `delivery` → existing delivery assignment check
-  - `generic` → checks `order_otp_codes` for verified entry
-  - `null` → pass through
+## Two bugs, two fixes
 
-### Frontend
-- **`GenericOtpDialog.tsx`** — 4-digit code entry dialog, calls `verify_generic_otp_and_advance`
-- **`GenericOtpCard.tsx`** — shows generated code to the non-advancing party with copy + regenerate
-- **`OrderDetailPage.tsx`** — routes `otp_type='generic'` to new dialog for both seller and buyer action bars; shows code card to the party who shares the code
-- **`AdminWorkflowManager.tsx`** — added 🔑 Generic OTP to dropdown, updated tooltip
+### Bug 1: Delivery OTP validation clears silently and saves anyway
 
-## OTP Type Behavior Matrix
+**Root cause**: In `AdminWorkflowManager.tsx` lines 222-238, when `otp_type = 'delivery'` is set on a pre-tracking step, the validation:
+1. Shows a toast warning
+2. Clears `otp_type` to null
+3. **Does NOT return** — continues to save the workflow
+4. Save completes → calls `setSelectedWorkflow(null)` → editor closes
 
-| otp_type | Requires delivery? | Works at any step? | Who enters code? |
-|---|---|---|---|
-| `delivery` | Yes | Only post-tracking | Seller/rider enters buyer's delivery code |
-| `generic` | No | Yes | The advancing actor enters the other party's code |
-| `null` | N/A | N/A | No OTP gate |
+The user sees a brief toast, then the editor vanishes. The OTP was silently cleared and saved as "None".
 
-## Guardrails
-1. UNIQUE(order_id, target_status) — one code per step
-2. 30-min expiry, rejected if expired, regeneration allowed
-3. `verified = true` blocks reuse
-4. DB trigger enforces both types — frontend cannot bypass
-5. Delivery OTP logic unchanged — isolated branch in trigger
+**Fix in `AdminWorkflowManager.tsx`**:
+- When delivery OTP is cleared by validation, **stop the save** (`return` after clearing)
+- The editor stays open with the corrected values visible
+- Show a persistent `toast.error()` instead of `toast.warning()` so it's clearly an actionable message
+- User can then review the cleared state and decide to save manually or change the setting
+
+### Bug 2: "Setting up live tracking..." spinner shows without delivery assignment
+
+**Root cause**: In `OrderDetailPage.tsx` lines 500-515, the tracking section renders when `isDeliveryOrder && isInTransit`. If `deliveryAssignmentId` is falsy, it shows the "Setting up live tracking..." spinner indefinitely — even if no delivery assignment will ever be created (e.g., seller-handled delivery where assignment hasn't been created yet, or a workflow step that's marked `is_transit` but has no `creates_tracking_assignment` earlier).
+
+**Fix in `OrderDetailPage.tsx`**:
+- Check if the workflow actually has a `creates_tracking_assignment` step before showing the spinner
+- If no step in the flow has `creates_tracking_assignment = true`, don't show the "Setting up" spinner — show nothing or a simple status card instead
+- This makes the spinner conditional on the workflow actually expecting a tracking assignment
+
+## Files to modify
+
+| File | Change |
+|---|---|
+| `src/components/admin/AdminWorkflowManager.tsx` | Return early after delivery OTP validation clears values; use `toast.error` for visibility |
+| `src/pages/OrderDetailPage.tsx` | Gate "Setting up live tracking" spinner on whether any flow step has `creates_tracking_assignment = true` |
+
+## What stays the same
+- The validation logic itself (correctly identifies pre-tracking delivery OTP)
+- Generic OTP — no restrictions, works anywhere
+- `isInTransit` computation — still workflow-driven
+- All DB triggers and RPCs
+
