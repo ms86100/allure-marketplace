@@ -73,6 +73,8 @@ export default function OrderDetailPage() {
   const o = useOrderDetail(id);
   const [deliveryAssignmentId, setDeliveryAssignmentId] = useState<string | null>(null);
   const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
+  const [isGenericOtpDialogOpen, setIsGenericOtpDialogOpen] = useState(false);
+  const [genericOtpTargetStatus, setGenericOtpTargetStatus] = useState<string | null>(null);
   const [hasDeliveryFeedback, setHasDeliveryFeedback] = useState(false);
   const [buyerOtp, setBuyerOtp] = useState<string | null>(null);
   const [roadEtaMinutes, setRoadEtaMinutes] = useState<number | null>(null);
