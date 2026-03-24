@@ -1,32 +1,35 @@
 
 
-# Fix: Simplify & Clarify Workflow Capability Indicators
+# Fix: "Verify & Deliver" Button Shows Wrong Label
 
-## Problem
+## Root Cause
 
-The capability indicators always show ALL possible states simultaneously — "Delivery starts here", "No delivery", AND "Generic OTP available" — regardless of context. This creates noise and confusion. The "Generic OTP available" chip shows on every single step unconditionally (line 720), which is misleading when the admin is configuring delivery OTP.
+The button text on line 662 is hardcoded to `"Verify & Deliver"` for ALL delivery OTP steps. So when the seller is at `accepted` and the next step is `preparing` (which has `otp_type = 'delivery'`), the button says "Verify & Deliver" — making it appear the system is skipping to the final step.
+
+The step progression is actually correct (`accepted → preparing`). Only the label is wrong.
+
+Similarly, the buyer-side delivery OTP button on line 692 is hardcoded to `"Verify & Confirm"`.
 
 ## Fix
 
-Replace the current "show everything" approach with **context-sensitive indicators** that only display what's relevant to the current step's configuration:
+**In `src/pages/OrderDetailPage.tsx`:**
 
-### New logic in `AdminWorkflowManager.tsx` (lines 700-728)
+1. **Line 662** — Replace hardcoded `'Verify & Deliver'` with the dynamic flow step label:
+   ```
+   `Verify & ${o.getFlowStepLabel(o.nextStatus).label}`
+   ```
+   This matches how generic OTP already works on line 667.
 
-**Show only relevant indicators based on step state:**
+2. **Line 692** — Same fix for buyer delivery OTP button:
+   ```
+   `Verify & ${o.getFlowStepLabel(o.buyerNextStatus).label}`
+   ```
 
-1. **If step has `creates_tracking_assignment`**: Show "🚚 Delivery starts at this step — Delivery OTP available from here onward"
-2. **If step is AFTER tracking start** (has delivery context, not the start step itself): Show "✅ Delivery OTP available (delivery started at: [step name])"
-3. **If step is BEFORE tracking start OR no tracking configured**: Show nothing by default. Only show a warning IF the admin has selected `otp_type = 'delivery'`: "⚠️ Delivery OTP cannot work here — delivery has not started yet."
-4. **Remove the always-visible "Generic OTP available" chip entirely** — it's always true and adds no information. Generic OTP is self-explanatory from the dropdown.
-5. **Keep the inline error block** (lines 721-725) for the invalid delivery OTP case, but only show it when `otp_type = 'delivery'` is actively selected on an invalid step.
+## Secondary Issue: Likely Misconfiguration
 
-### Result
+The DB shows `preparing` has `otp_type = 'delivery'`, meaning the seller must enter an OTP just to mark the order as "Preparing". This is almost certainly unintended — the admin likely meant to put delivery OTP on the `delivered` step (sort 70), not `preparing` (sort 30). No code change needed for this — admin needs to move the OTP config to the correct step.
 
-| Step state | OTP = None | OTP = Delivery | OTP = Generic |
-|---|---|---|---|
-| Before tracking | *(nothing)* | ⚠️ warning block | *(nothing)* |
-| Tracking start step | 🚚 "Delivery starts here" | 🚚 + ✅ valid | *(nothing)* |
-| After tracking | *(nothing)* | ✅ valid | *(nothing)* |
+## One file changed
 
-**One file changed**: `src/components/admin/AdminWorkflowManager.tsx` lines 700-728
+`src/pages/OrderDetailPage.tsx` — two line changes (seller button label + buyer button label)
 
