@@ -114,9 +114,10 @@ export function DeliveryActionCard({ delivery, updatingId, onUpdateStatus, onOtp
           <span className="text-success font-medium tabular-nums">Fee: {formatPrice(delivery.delivery_fee)}</span>
         </div>
 
-        {/* Action Buttons — workflow-driven */}
+        {/* Action Buttons — workflow-driven, uses otp_type */}
         {action && (() => {
-          if (action.requiresOtp) {
+          const isDeliveryOtp = action.otpType === 'delivery';
+          if (isDeliveryOtp && delivery.delivery_code) {
             return (
               <Button
                 size="sm"
@@ -130,11 +131,12 @@ export function DeliveryActionCard({ delivery, updatingId, onUpdateStatus, onOtp
             );
           }
           const otpAction = getNextDeliveryAction(flow, action.nextStatus);
+          const nextIsDeliveryOtp = otpAction?.otpType === 'delivery';
           return (
             <div className="flex gap-2">
               <Button
                 size="sm"
-                variant={otpAction?.requiresOtp ? 'outline' : 'default'}
+                variant={nextIsDeliveryOtp ? 'outline' : 'default'}
                 className="flex-1"
                 onClick={() => onUpdateStatus(delivery.id, action.nextStatus)}
                 disabled={updatingId === delivery.id}
@@ -142,7 +144,7 @@ export function DeliveryActionCard({ delivery, updatingId, onUpdateStatus, onOtp
                 {updatingId === delivery.id ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Navigation size={14} className="mr-1" />}
                 {action.nextStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
               </Button>
-              {otpAction?.requiresOtp && (
+              {nextIsDeliveryOtp && (
                 <Button
                   size="sm"
                   className="flex-1"
