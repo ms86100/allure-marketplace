@@ -1,76 +1,53 @@
 
 
-# Fix: Decouple Workflow OTP from Delivery OTP — Introduce `otp_type`
+# Fix: Add Workflow Validation for `otp_type = 'delivery'` on Non-Delivery Steps
 
 ## Problem
 
-`requires_otp = true` is ambiguous — the UI assumes it always means "delivery OTP" and gates on `deliveryAssignmentId`. When a step has `requires_otp` but no delivery context exists (e.g., `accepted` step), the UI shows an infinite spinner.
+The user is right: the previous plan tried to "make the system support a wrong workflow" by creating fake delivery assignments. The correct fix is to **prevent the misconfiguration** and **gracefully handle it in the UI**.
 
-## Solution
-
-Replace the boolean `requires_otp` with a typed `otp_type` column that explicitly declares OTP intent.
+**Principle:** `otp_type = 'delivery'` is only valid on steps where a delivery assignment will already exist (i.e., steps that come AFTER a `creates_tracking_assignment = true` step, or steps that are `is_transit = true`).
 
 ---
 
-### 1. DB Migration — Add `otp_type` column
+## Changes
 
-```sql
-ALTER TABLE category_status_flows 
-  ADD COLUMN otp_type text DEFAULT NULL;
+### 1. Admin Workflow Manager — Validate `otp_type = 'delivery'` on save
 
--- Migrate existing data: where requires_otp = true, set otp_type = 'delivery'
-UPDATE category_status_flows SET otp_type = 'delivery' WHERE requires_otp = true;
+**File: `src/components/admin/AdminWorkflowManager.tsx`** (after line 219, alongside self-pickup validation)
 
--- Keep requires_otp column for backward compat (DB triggers use it). 
--- It becomes derived: requires_otp = (otp_type IS NOT NULL)
+Add validation: scan steps in sort order. Track whether a `creates_tracking_assignment` step has been encountered. If any step BEFORE that point has `otp_type = 'delivery'`, show a toast error and auto-clear it:
+
+```
+"Delivery OTP requires a delivery assignment. Step 'accepted' comes before any tracking assignment step — cleared to 'None'."
 ```
 
-Values: `'delivery'` (needs delivery assignment + code) | `null` (no OTP) | future: `'generic'`, `'pickup'`, etc.
+Also add an inline warning in the OTP Type dropdown: if the step has `otp_type = 'delivery'` but no prior step has `creates_tracking_assignment = true`, show an `AlertTriangle` icon with tooltip explaining why.
 
-### 2. Frontend — Read `otp_type` everywhere
+### 2. Admin Workflow Manager — Add inline visual warning on the dropdown
 
-**`src/hooks/useCategoryStatusFlow.ts`**:
-- Add `otp_type: string | null` to `StatusFlowStep` interface
-- Add to all `select()` queries (lines 32, 41)
-- Update `stepRequiresOtp` → new `getStepOtpType(flow, statusKey): string | null`
-- Keep `stepRequiresOtp` as a thin wrapper: `return getStepOtpType(flow, statusKey) !== null`
+**File: `src/components/admin/AdminWorkflowManager.tsx`** (around line 601)
 
-**`src/pages/OrderDetailPage.tsx`**:
-- Import `getStepOtpType` instead of (or alongside) `stepRequiresOtp`
-- **Seller action bar (line 631)**: Change condition to:
-  ```
-  const nextOtpType = getStepOtpType(o.flow, o.nextStatus);
-  const needsDeliveryOtp = (nextOtpType === 'delivery' && deliveryAssignmentId) || (hasDeliveryOtpGate && sellerNextIsTerminal);
-  const needsGenericOtp = nextOtpType && nextOtpType !== 'delivery';
-  ```
-  - If `needsDeliveryOtp` → show delivery OTP dialog (existing)
-  - If `needsGenericOtp` → show normal button (future: generic OTP dialog)
-  - If `nextOtpType === 'delivery' && !deliveryAssignmentId` → show **normal button** (not spinner). DB trigger is safety net.
-  - Otherwise → normal advance button
-- **Buyer action bar (line 660)**: Same logic
+Next to the OTP Type `<Select>`, check if the current step position is before any `creates_tracking_assignment` step. If so and `otp_type = 'delivery'` is selected, render an orange warning icon.
 
-**`src/components/admin/workflow/types.ts`**:
-- Add `otp_type: string | null` to `FlowStep` interface
+### 3. OrderDetailPage — Graceful fallback when `otp_type = 'delivery'` but no assignment
 
-**`src/components/admin/AdminWorkflowManager.tsx`**:
-- Read/write `otp_type` in queries and save logic
-- Replace the `requires_otp` checkbox with an `otp_type` dropdown: `None | Delivery OTP`
-- On save, sync `requires_otp = (otp_type IS NOT NULL)` for backward compat with DB triggers
+**File: `src/pages/OrderDetailPage.tsx`** (line 634-643)
 
-**`src/components/admin/workflow/WorkflowFlowDiagram.tsx`**:
-- Show OTP icon with type label (🔐 Delivery OTP vs just 🔐)
+Current code already handles this correctly after the previous fix:
+- `needsDeliveryOtp = (nextOtpType === 'delivery' && deliveryAssignmentId)` — if no assignment, this is `false`
+- Falls through to the normal button — **correct behavior**
 
-**`src/components/admin/CategoryWorkflowPreview.tsx`**:
-- Read `otp_type` in query, show type-aware icon
+No change needed here. The current code already shows a normal advance button when `otp_type = 'delivery'` but no `deliveryAssignmentId` exists. The DB trigger is the safety net.
 
-### 3. Keep DB trigger backward-compatible
+### 4. DeliveryActionCard — Same graceful handling
 
-The existing `enforce_delivery_otp_gate` trigger reads `requires_otp`. We keep that column synced: `requires_otp = (otp_type IS NOT NULL)`. No trigger changes needed.
+**File: `src/components/delivery/DeliveryActionCard.tsx`** (line 56)
 
-### 4. Documentation update
-
-**`src/components/docs/WorkflowEngineDocs.tsx`**:
-- Update OTP section to explain `otp_type` field and that `requires_otp` is now derived
+Currently uses `requiresOtp: nextStep.requires_otp`. Update to use `otp_type`:
+- If `otp_type === 'delivery'` and assignment exists → show OTP button
+- If `otp_type === 'delivery'` and no assignment → show normal button
+- This aligns the delivery card with the same logic as OrderDetailPage
 
 ---
 
@@ -78,17 +55,19 @@ The existing `enforce_delivery_otp_gate` trigger reads `requires_otp`. We keep t
 
 | File | Change |
 |---|---|
-| DB migration | Add `otp_type` column, migrate data |
-| `src/hooks/useCategoryStatusFlow.ts` | Add `otp_type` to interface/queries, new `getStepOtpType()` |
-| `src/pages/OrderDetailPage.tsx` | Use `otp_type` to decouple delivery OTP from generic OTP |
-| `src/components/admin/workflow/types.ts` | Add `otp_type` to FlowStep |
-| `src/components/admin/AdminWorkflowManager.tsx` | Replace checkbox with dropdown, sync `requires_otp` |
-| `src/components/admin/workflow/WorkflowFlowDiagram.tsx` | Type-aware OTP icon |
-| `src/components/admin/CategoryWorkflowPreview.tsx` | Read `otp_type` |
-| `src/components/docs/WorkflowEngineDocs.tsx` | Update docs |
+| `src/components/admin/AdminWorkflowManager.tsx` | Save-time validation + inline warning for delivery OTP on pre-assignment steps |
+| `src/components/delivery/DeliveryActionCard.tsx` | Use `otp_type` instead of `requires_otp` boolean |
 
 ## What is NOT changed
-- DB trigger `enforce_delivery_otp_gate` — reads `requires_otp` which stays synced
-- `DeliveryCompletionOtpDialog` — unchanged, still called for delivery OTP
-- Order creation / resolution logic — unchanged
+- No DB trigger modifications
+- No delivery assignment creation changes  
+- No schema changes
+- `OrderDetailPage.tsx` — already handles this correctly after previous fix
+- `useCategoryStatusFlow.ts` — already has `getStepOtpType()` and `otp_type` in queries
+
+## Result
+- Admin gets clear feedback when misconfiguring delivery OTP on early steps
+- UI never deadlocks — shows normal button when delivery context doesn't exist
+- DB trigger remains the safety net for any edge cases
+- System respects the principle: "delivery OTP requires delivery assignment to already exist"
 
