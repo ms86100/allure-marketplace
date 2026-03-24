@@ -708,6 +708,17 @@ export default function OrderDetailPage() {
         }}
       />
 
+      {/* Generic OTP verification dialog */}
+      {genericOtpTargetStatus && (
+        <GenericOtpDialog
+          orderId={order.id}
+          targetStatus={genericOtpTargetStatus}
+          open={isGenericOtpDialogOpen}
+          onOpenChange={setIsGenericOtpDialogOpen}
+          onVerified={() => o.fetchOrder()}
+        />
+      )}
+
       {/* DeliveryArrivalOverlay — only when rider GPS exists and is close (Gap 9) */}
       {showArrivalOverlay && (
         <DeliveryArrivalOverlay
