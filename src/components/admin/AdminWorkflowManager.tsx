@@ -644,7 +644,7 @@ export function AdminWorkflowManager() {
                         </div>
 
                         <div className="flex items-center gap-1.5">
-                          <FieldLabel label="OTP Type" tooltip="Controls OTP verification. 'Delivery OTP' requires a delivery assignment with a code. The delivery agent or seller must enter the buyer's code to advance. 'None' means no OTP gate." className="mb-0" />
+                          <FieldLabel label="OTP Type" tooltip="Controls OTP verification. 'Delivery OTP' requires a delivery assignment. 'Generic OTP' works at any step — a 4-digit code is generated and must be shared between parties. 'None' means no OTP gate." className="mb-0" />
                           <Select value={step.otp_type || 'none'} onValueChange={(v) => { updateStep(index, 'otp_type', v === 'none' ? null : v); updateStep(index, 'requires_otp', v !== 'none'); }}>
                             <SelectTrigger className="h-7 w-[140px] text-[11px]">
                               <SelectValue />
@@ -652,6 +652,7 @@ export function AdminWorkflowManager() {
                             <SelectContent>
                               <SelectItem value="none">None</SelectItem>
                               <SelectItem value="delivery">🔐 Delivery OTP</SelectItem>
+                              <SelectItem value="generic">🔑 Generic OTP</SelectItem>
                             </SelectContent>
                           </Select>
                           {(() => {

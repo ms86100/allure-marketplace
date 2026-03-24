@@ -3379,6 +3379,54 @@ export type Database = {
           },
         ]
       }
+      order_otp_codes: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          order_id: string
+          otp_code: string
+          otp_hash: string
+          target_status: string
+          verified: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          order_id: string
+          otp_code: string
+          otp_hash: string
+          target_status: string
+          verified?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          order_id?: string
+          otp_code?: string
+          otp_hash?: string
+          target_status?: string
+          verified?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_otp_codes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_otp_codes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "transaction_audit_trail"
+            referencedColumns: ["order_id"]
+          },
+        ]
+      }
       order_status_config: {
         Row: {
           color: string
@@ -8811,6 +8859,10 @@ export type Database = {
           }
       disable_cron_job: { Args: { p_jobid: number }; Returns: undefined }
       enable_cron_job: { Args: { p_jobid: number }; Returns: undefined }
+      generate_generic_otp: {
+        Args: { _order_id: string; _target_status: string }
+        Returns: string
+      }
       generate_recurring_visitor_entries: { Args: never; Returns: undefined }
       get_allowed_transitions: {
         Args: { _actor?: string; _order_id: string }
@@ -9314,6 +9366,10 @@ export type Database = {
           new_status: Database["public"]["Enums"]["order_status"]
           order_id: string
         }[]
+      }
+      verify_generic_otp_and_advance: {
+        Args: { _order_id: string; _otp_code: string; _target_status: string }
+        Returns: undefined
       }
       verify_seller_payment: {
         Args: { _order_id: string; _received: boolean }

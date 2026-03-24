@@ -20,6 +20,8 @@ import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
 import { useTrackingConfig } from '@/hooks/useTrackingConfig';
 import { DeliveryCompletionOtpDialog } from '@/components/delivery/DeliveryCompletionOtpDialog';
 import { DeliveryFeedbackForm } from '@/components/delivery/DeliveryFeedbackForm';
+import { GenericOtpDialog } from '@/components/order/GenericOtpDialog';
+import { GenericOtpCard } from '@/components/order/GenericOtpCard';
 
 import { OrderItemCard } from '@/components/order/OrderItemCard';
 import { AppointmentDetailsCard } from '@/components/order/AppointmentDetailsCard';
@@ -71,6 +73,8 @@ export default function OrderDetailPage() {
   const o = useOrderDetail(id);
   const [deliveryAssignmentId, setDeliveryAssignmentId] = useState<string | null>(null);
   const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
+  const [isGenericOtpDialogOpen, setIsGenericOtpDialogOpen] = useState(false);
+  const [genericOtpTargetStatus, setGenericOtpTargetStatus] = useState<string | null>(null);
   const [hasDeliveryFeedback, setHasDeliveryFeedback] = useState(false);
   const [buyerOtp, setBuyerOtp] = useState<string | null>(null);
   const [roadEtaMinutes, setRoadEtaMinutes] = useState<number | null>(null);
@@ -529,6 +533,19 @@ export default function OrderDetailPage() {
               <p className="text-[10px] text-warning mt-1.5">⚠️ Only share when you've received your items. This code confirms delivery is complete.</p>
             </div>
           )}
+          {/* Generic OTP card — shown to the non-advancing party when next step has otp_type='generic' */}
+          {(() => {
+            const nextStatus = o.isSellerView ? o.nextStatus : o.buyerNextStatus;
+            if (!nextStatus || isTerminalStatus(o.flow, order.status)) return null;
+            const nextOtpType = getStepOtpType(o.flow, nextStatus);
+            if (nextOtpType !== 'generic') return null;
+            // Show code card to the party who does NOT advance (they share the code)
+            const nextStepActors = (o.flow.find((s: any) => s.status_key === nextStatus)?.actor || '').split(',').map((a: string) => a.trim());
+            const isAdvancer = (o.isSellerView && nextStepActors.includes('seller')) || (o.isBuyerView && nextStepActors.includes('buyer'));
+            // The non-advancer sees the code; the advancer sees the "Verify" button in action bar
+            if (isAdvancer) return null;
+            return <GenericOtpCard orderId={order.id} targetStatus={nextStatus} targetStatusLabel={o.getFlowStepLabel(nextStatus).label} />;
+          })()}
           {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} flow={o.flow} />}
 
           {o.canReorder && (
@@ -637,15 +654,17 @@ export default function OrderDetailPage() {
             {!o.nextStatus ? (
               <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground"><Truck size={16} className="text-primary" /><span>Awaiting next step</span></div>
             ) : (() => {
-              // NOTE: otp_type explicitly declares OTP intent.
-              // 'delivery' = requires delivery assignment + code verification.
-              // OTP gating requires deliveryAssignmentId to exist.
-              // DB trigger enforces correctness if frontend skips.
               const nextOtpType = getStepOtpType(o.flow, o.nextStatus);
               const needsDeliveryOtp = (nextOtpType === 'delivery' && deliveryAssignmentId) || (hasDeliveryOtpGate && sellerNextIsTerminal);
+              const needsGenericOtp = nextOtpType === 'generic';
               return needsDeliveryOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : 'Verify & Deliver'}
+                  <ChevronRight size={14} className="ml-1" />
+                </Button>
+              ) : needsGenericOtp ? (
+                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => { setGenericOtpTargetStatus(o.nextStatus!); setIsGenericOtpDialogOpen(true); }} disabled={o.isUpdating}>
+                  {o.isUpdating ? 'Updating...' : `Verify & ${o.getFlowStepLabel(o.nextStatus).label}`}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               ) : (
@@ -667,9 +686,15 @@ export default function OrderDetailPage() {
             {o.buyerNextStatus && (() => {
               const buyerNextOtpType = getStepOtpType(o.flow, o.buyerNextStatus);
               const buyerNeedsDeliveryOtp = (buyerNextOtpType === 'delivery' && deliveryAssignmentId) || (hasDeliveryOtpGate && buyerNextIsTerminal);
+              const buyerNeedsGenericOtp = buyerNextOtpType === 'generic';
               return buyerNeedsDeliveryOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : 'Verify & Confirm'}
+                  <ChevronRight size={14} className="ml-1" />
+                </Button>
+              ) : buyerNeedsGenericOtp ? (
+                <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => { setGenericOtpTargetStatus(o.buyerNextStatus!); setIsGenericOtpDialogOpen(true); }} disabled={o.isUpdating}>
+                  {o.isUpdating ? 'Updating...' : `Verify & ${o.getFlowStepLabel(o.buyerNextStatus).label}`}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               ) : (
@@ -695,6 +720,17 @@ export default function OrderDetailPage() {
           // Trust DB — realtime subscription handles state sync
         }}
       />
+
+      {/* Generic OTP verification dialog */}
+      {genericOtpTargetStatus && (
+        <GenericOtpDialog
+          orderId={order.id}
+          targetStatus={genericOtpTargetStatus}
+          open={isGenericOtpDialogOpen}
+          onOpenChange={setIsGenericOtpDialogOpen}
+          onVerified={() => o.fetchOrder()}
+        />
+      )}
 
       {/* DeliveryArrivalOverlay — only when rider GPS exists and is close (Gap 9) */}
       {showArrivalOverlay && (
