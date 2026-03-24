@@ -656,29 +656,16 @@ export function AdminWorkflowManager() {
                               <SelectItem value="generic">🔑 Generic OTP</SelectItem>
                             </SelectContent>
                           </Select>
-                          {(() => {
-                            const sortedStepsForOtp = [...editSteps].sort((a, b) => a.sort_order - b.sort_order);
-                            const stepIdx = sortedStepsForOtp.findIndex(s => s.status_key === step.status_key);
-                            const hasTrackingBefore = sortedStepsForOtp.slice(0, stepIdx + 1).some(s => s.creates_tracking_assignment);
-                            if (step.otp_type === 'delivery' && !hasTrackingBefore) {
-                              return (
-                                <Tooltip>
-                                  <TooltipTrigger asChild><AlertTriangle size={12} className="text-amber-500 shrink-0" /></TooltipTrigger>
-                                  <TooltipContent side="top" className="max-w-[220px] text-xs">Delivery OTP requires a delivery assignment. No step at or before this one has "Auto-create Tracking" enabled — this OTP will be ignored at runtime.</TooltipContent>
-                                </Tooltip>
-                              );
-                            }
-                            // Legacy mismatch warning: requires_otp=true but otp_type=null
-                            if (step.requires_otp && !step.otp_type) {
-                              return (
-                                <Tooltip>
-                                  <TooltipTrigger asChild><AlertTriangle size={12} className="text-destructive shrink-0" /></TooltipTrigger>
-                                  <TooltipContent side="top" className="max-w-[220px] text-xs">Legacy mismatch: requires_otp is true but no OTP Type selected. This flag is ignored at runtime. Select an OTP Type or save to auto-fix.</TooltipContent>
-                                </Tooltip>
-                              );
-                            }
-                            return null;
-                          })()}
+                          {step.otp_type === 'delivery' && (() => {
+                            const sorted = [...editSteps].sort((a, b) => a.sort_order - b.sort_order);
+                            const idx = sorted.findIndex(s => s.status_key === step.status_key);
+                            return !sorted.slice(0, idx + 1).some(s => s.creates_tracking_assignment);
+                          })() && (
+                            <AlertTriangle size={12} className="text-destructive shrink-0" />
+                          )}
+                          {step.requires_otp && !step.otp_type && (
+                            <AlertTriangle size={12} className="text-destructive shrink-0" />
+                          )}
                         </div>
 
                         <div className="flex items-center gap-1.5">
