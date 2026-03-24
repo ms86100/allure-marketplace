@@ -223,6 +223,9 @@ export function WorkflowFlowDiagram({ steps, transitions }: Props) {
               {step.is_transit && (
                 <Truck size={9} className="text-blue-500 shrink-0" />
               )}
+              {(step as any).creates_tracking_assignment && (
+                <span className="text-[8px] px-1 py-0 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-normal">Delivery starts</span>
+              )}
               {(step as any).otp_type === 'delivery' && (
                 <KeyRound size={9} className="text-amber-500 shrink-0" />
               )}
