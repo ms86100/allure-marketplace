@@ -227,10 +227,10 @@ export function isFirstFlowStep(flow: StatusFlowStep[], status: string): boolean
 export function stepRequiresOtp(flow: StatusFlowStep[], statusKey: string): boolean {
   const step = flow.find(s => s.status_key === statusKey);
   if (step) return step.requires_otp === true;
-  // Safe default: if step not found in flow (race condition / loading), default to true
-  // for terminal delivery statuses — matches the DB trigger's safe default behavior
-  const DELIVERY_TERMINAL_STATUSES = ['delivered', 'completed'];
-  return DELIVERY_TERMINAL_STATUSES.includes(statusKey);
+  // Bug 2 fix: Default to false when flow is loading/missing. The DB trigger
+  // (enforce_delivery_otp_gate) enforces OTP at the backend regardless, and the
+  // UI's error handler auto-opens the OTP dialog if a non-OTP attempt is rejected.
+  return false;
 }
 
 /**

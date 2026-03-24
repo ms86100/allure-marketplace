@@ -103,9 +103,13 @@ export function useOrderDetail(id: string | undefined) {
     if (!order) return null;
     if (isTerminalStatus(flow, order.status)) return null;
     if (flow.length > 0) {
-      // Multi-actor: if seller handles delivery, also check 'delivery' actor transitions
-      const sellerHandlesDelivery = deliveryHandledBy && deliveryHandledBy !== 'platform';
-      const actors = sellerHandlesDelivery ? ['seller', 'delivery'] : ['seller'];
+      // Bug 3 fix: Always start with 'seller'. The transitions table is the source of truth —
+      // if no seller transition exists, getNextStatusForActor returns null.
+      // Only add 'delivery' actor if the seller is explicitly handling delivery for this order.
+      const actors: string[] = ['seller'];
+      if (deliveryHandledBy && deliveryHandledBy !== 'platform') {
+        actors.push('delivery');
+      }
       const next = getNextStatusForActors(flow, order.status, actors, transitions);
       return next as OrderStatus | null;
     }
