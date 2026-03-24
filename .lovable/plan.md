@@ -1,44 +1,68 @@
 
 
-# Fix: Validation Error Disappears + Tracking Spinner When Not Applicable
+# Workflow Editor: Full Delivery & OTP Transparency
 
-## Two bugs, two fixes
+## Problem
 
-### Bug 1: Delivery OTP validation clears silently and saves anyway
+1. **`creates_tracking_assignment` is hidden** — only appears when `is_transit` is checked (line 693). Admin can't see or control where delivery starts independently.
+2. **No visual indicator** showing "delivery starts here" in the workflow timeline/diagram.
+3. **No step capability summary** — admin can't see at a glance whether delivery exists at each step and whether OTP is valid there.
+4. **OTP validation uses toasts** — errors should be inline, persistent, and blocking rather than disappearing messages.
+5. **No enforcement of single tracking start point** — multiple steps can have `creates_tracking_assignment = true`.
 
-**Root cause**: In `AdminWorkflowManager.tsx` lines 222-238, when `otp_type = 'delivery'` is set on a pre-tracking step, the validation:
-1. Shows a toast warning
-2. Clears `otp_type` to null
-3. **Does NOT return** — continues to save the workflow
-4. Save completes → calls `setSelectedWorkflow(null)` → editor closes
+## Changes
 
-The user sees a brief toast, then the editor vanishes. The OTP was silently cleared and saved as "None".
+### 1. Decouple `creates_tracking_assignment` from `is_transit` (`AdminWorkflowManager.tsx`)
 
-**Fix in `AdminWorkflowManager.tsx`**:
-- When delivery OTP is cleared by validation, **stop the save** (`return` after clearing)
-- The editor stays open with the corrected values visible
-- Show a persistent `toast.error()` instead of `toast.warning()` so it's clearly an actionable message
-- User can then review the cleared state and decide to save manually or change the setting
+Move the "Auto-create Tracking" checkbox out of the `{step.is_transit && (...)}` conditional (line 693). Make it a standalone toggle labeled **"🚚 Start Delivery Here"** visible on ALL non-terminal steps (for delivery-type workflows). Add enforcement: only one step can have this flag — toggling it on one step auto-clears it from all others.
 
-### Bug 2: "Setting up live tracking..." spinner shows without delivery assignment
+### 2. Add per-step capability indicators (`AdminWorkflowManager.tsx`)
 
-**Root cause**: In `OrderDetailPage.tsx` lines 500-515, the tracking section renders when `isDeliveryOrder && isInTransit`. If `deliveryAssignmentId` is falsy, it shows the "Setting up live tracking..." spinner indefinitely — even if no delivery assignment will ever be created (e.g., seller-handled delivery where assignment hasn't been created yet, or a workflow step that's marked `is_transit` but has no `creates_tracking_assignment` earlier).
+Below each step's behavior toggles, render a compact capability bar:
 
-**Fix in `OrderDetailPage.tsx`**:
-- Check if the workflow actually has a `creates_tracking_assignment` step before showing the spinner
-- If no step in the flow has `creates_tracking_assignment = true`, don't show the "Setting up" spinner — show nothing or a simple status card instead
-- This makes the spinner conditional on the workflow actually expecting a tracking assignment
+```text
+Step: accepted
+  ❌ Delivery not started — Delivery OTP unavailable
+  ✅ Generic OTP available
 
-## Files to modify
+Step: picked_up
+  🚚 Delivery starts here
+  ✅ Delivery OTP available
+  ✅ Generic OTP available
+```
+
+Logic: walk `editSteps` in sort order, track whether `creates_tracking_assignment` has been seen. Show capability chips per step.
+
+### 3. Replace OTP toast validation with inline blocking (`AdminWorkflowManager.tsx`)
+
+Remove the save-time toast + return pattern (lines 222-238). Instead, show a persistent inline warning directly below the OTP Type dropdown when `otp_type = 'delivery'` is selected on a pre-tracking step. The save button itself should be disabled if any step has an invalid OTP configuration, with the reason shown.
+
+### 4. Add "Delivery starts here" marker to `WorkflowFlowDiagram.tsx`
+
+In the flow diagram node rendering, if a step has `creates_tracking_assignment = true`, show a 🚚 badge/label below the node: "Delivery starts". This makes the delivery start point visible at a glance in the visual timeline.
+
+### 5. Smart guidance in OTP dropdown (`AdminWorkflowManager.tsx`)
+
+When admin selects "Delivery OTP" on a step, if no prior step has tracking, show an inline helper directly in the dropdown area:
+
+```text
+⚠️ Delivery OTP cannot work here.
+Delivery starts at: [step name] (or "not configured")
+→ Use Generic OTP instead, or move this to a later step.
+```
+
+This replaces the current tooltip-only warning (lines 659-681) with a visible, always-rendered message block.
+
+## Files
 
 | File | Change |
 |---|---|
-| `src/components/admin/AdminWorkflowManager.tsx` | Return early after delivery OTP validation clears values; use `toast.error` for visibility |
-| `src/pages/OrderDetailPage.tsx` | Gate "Setting up live tracking" spinner on whether any flow step has `creates_tracking_assignment = true` |
+| `src/components/admin/AdminWorkflowManager.tsx` | Decouple tracking toggle, add capability indicators, inline OTP validation, smart guidance, single-tracking enforcement |
+| `src/components/admin/workflow/WorkflowFlowDiagram.tsx` | Add "Delivery starts" marker on nodes with `creates_tracking_assignment` |
 
 ## What stays the same
-- The validation logic itself (correctly identifies pre-tracking delivery OTP)
-- Generic OTP — no restrictions, works anywhere
-- `isInTransit` computation — still workflow-driven
-- All DB triggers and RPCs
+- All DB triggers and RPCs unchanged
+- `OrderDetailPage.tsx` unchanged
+- Generic OTP components unchanged
+- Transition rules editor unchanged
 
