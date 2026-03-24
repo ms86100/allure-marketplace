@@ -221,7 +221,7 @@ export default function OrderDetailPage() {
             <h1 className="text-base font-bold">Order Summary</h1>
             <button onClick={o.copyOrderId} className="flex items-center gap-1 text-[11px] text-muted-foreground font-mono">#{order.id.slice(0, 8)} <Copy size={10} /></button>
             {o.isSellerView && o.resolvedTxnType && (
-              <p className="text-[9px] text-muted-foreground/60 font-mono truncate">workflow: {(order as any).seller_profiles?.primary_group || 'default'} / {o.resolvedTxnType}</p>
+              <p className="text-[9px] text-muted-foreground/60 font-mono truncate">workflow: {o.resolvedParentGroup} / {o.resolvedTxnType}</p>
             )}
           </div>
           {o.canChat && o.chatRecipientId ? (
@@ -348,6 +348,16 @@ export default function OrderDetailPage() {
               ) : null;
             })()}
             {/* Cancellation handled in bottom action bar — removed inline duplicate */}
+
+            {/* Admin/Seller debug chip: shows workflow resolution + OTP state */}
+            {o.isSellerView && !o.isFlowLoading && o.nextStatus && (
+              <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-mono text-muted-foreground/50">
+                <span className="bg-muted px-1.5 py-0.5 rounded">flow: {o.resolvedParentGroup}/{o.resolvedTxnType}</span>
+                <span className="bg-muted px-1.5 py-0.5 rounded">next: {o.nextStatus}</span>
+                <span className="bg-muted px-1.5 py-0.5 rounded">otp: {getStepOtpType(o.flow, o.nextStatus) || 'none'}</span>
+                {deliveryAssignmentId && <span className="bg-muted px-1.5 py-0.5 rounded">📦 assignment</span>}
+              </div>
+            )}
           </div>
 
           {/* Fulfillment Method Card */}

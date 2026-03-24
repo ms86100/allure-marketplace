@@ -237,6 +237,32 @@ export function AdminWorkflowManager() {
       }
     }
 
+    // Legacy mismatch normalization: requires_otp=true but otp_type=null
+    // This fixes the split-brain where the old checkbox was checked but no otp_type was selected
+    {
+      let normalized = false;
+      let trackingSeenForLegacy = false;
+      const sortedForLegacy = [...editSteps].sort((a, b) => a.sort_order - b.sort_order);
+      for (const s of sortedForLegacy) {
+        if (s.creates_tracking_assignment) trackingSeenForLegacy = true;
+        if (s.requires_otp && !s.otp_type) {
+          if (trackingSeenForLegacy) {
+            // Post-tracking step: safe to assume delivery OTP was intended
+            s.otp_type = 'delivery';
+            toast.info(`Step "${s.display_label || s.status_key}" had legacy OTP flag — auto-mapped to Delivery OTP.`);
+          } else {
+            // Pre-tracking step: delivery OTP cannot work here, clear the flag
+            s.requires_otp = false;
+            toast.warning(`Step "${s.display_label || s.status_key}" had legacy OTP flag but no delivery context — cleared.`);
+          }
+          normalized = true;
+        }
+      }
+      if (normalized) {
+        setEditSteps([...editSteps]);
+      }
+    }
+
     setIsSaving(true);
     try {
       const { parent_group, transaction_type } = selectedWorkflow;
@@ -637,6 +663,15 @@ export function AdminWorkflowManager() {
                                 <Tooltip>
                                   <TooltipTrigger asChild><AlertTriangle size={12} className="text-amber-500 shrink-0" /></TooltipTrigger>
                                   <TooltipContent side="top" className="max-w-[220px] text-xs">Delivery OTP requires a delivery assignment. No step at or before this one has "Auto-create Tracking" enabled — this OTP will be ignored at runtime.</TooltipContent>
+                                </Tooltip>
+                              );
+                            }
+                            // Legacy mismatch warning: requires_otp=true but otp_type=null
+                            if (step.requires_otp && !step.otp_type) {
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild><AlertTriangle size={12} className="text-destructive shrink-0" /></TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-[220px] text-xs">Legacy mismatch: requires_otp is true but no OTP Type selected. This flag is ignored at runtime. Select an OTP Type or save to auto-fix.</TooltipContent>
                                 </Tooltip>
                               );
                             }

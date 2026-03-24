@@ -53,6 +53,7 @@ export function useOrderDetail(id: string | undefined) {
   const derivedParentGroupRef = { current: derivedParentGroup };
 
   const effectiveParentGroup = sellerPrimaryGroup || derivedParentGroup;
+  const resolvedParentGroup = effectiveParentGroup || 'default';
   const isEnquiryOrder = (order as any)?.order_type === 'enquiry';
   const orderFulfillmentType = (order as any)?.fulfillment_type || 'self_pickup';
   const deliveryHandledBy = (order as any)?.delivery_handled_by || null;
@@ -369,7 +370,7 @@ export function useOrderDetail(id: string | undefined) {
     seller, isSellerView, isUrgentOrder, isUrgentSellerView, isUrgentBuyerView, isBuyerView, isEnquiryOrder,
     nextStatus, buyerNextStatus, canReview, canChat, canReorder,
     canSellerReject, canBuyerCancel, isInTransit, isFlowLoading,
-    currentStepActor, resolvedTxnType,
+    currentStepActor, resolvedTxnType, resolvedParentGroup,
     chatRecipientId, chatRecipientName,
     orderFulfillmentType, currentStatusIndex, statusOrder,
     displayStatuses, timelineSteps, flow,
