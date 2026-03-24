@@ -218,6 +218,15 @@ export function AdminWorkflowManager() {
       }
     }
 
+    // Enforce single creates_tracking_assignment per workflow
+    {
+      const trackingSteps = editSteps.filter(s => s.creates_tracking_assignment);
+      if (trackingSteps.length > 1) {
+        toast.error('Only one step can have "Start Delivery Here" enabled. Please remove duplicates.');
+        return;
+      }
+    }
+
     // Delivery OTP validation: otp_type='delivery' only valid AFTER a creates_tracking_assignment step
     {
       let trackingAssignmentSeen = false;
