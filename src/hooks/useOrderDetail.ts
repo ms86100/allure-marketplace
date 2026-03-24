@@ -53,6 +53,7 @@ export function useOrderDetail(id: string | undefined) {
   const derivedParentGroupRef = { current: derivedParentGroup };
 
   const effectiveParentGroup = sellerPrimaryGroup || derivedParentGroup;
+  const resolvedParentGroup = effectiveParentGroup || 'default';
   const isEnquiryOrder = (order as any)?.order_type === 'enquiry';
   const orderFulfillmentType = (order as any)?.fulfillment_type || 'self_pickup';
   const deliveryHandledBy = (order as any)?.delivery_handled_by || null;
