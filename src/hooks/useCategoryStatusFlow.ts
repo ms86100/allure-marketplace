@@ -13,6 +13,7 @@ export interface StatusFlowStep {
   is_success: boolean;
   requires_otp: boolean;
   is_transit: boolean;
+  otp_type: string | null;
   display_label: string | null;
   color: string | null;
   icon: string | null;
@@ -30,7 +31,7 @@ export interface StatusTransition {
 export async function fetchStatusFlow(parentGroup: string, transactionType: string): Promise<StatusFlowStep[]> {
   let { data, error } = await supabase
     .from('category_status_flows')
-    .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, is_transit, display_label, color, icon, buyer_hint, is_deprecated')
+    .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, is_transit, otp_type, display_label, color, icon, buyer_hint, is_deprecated')
     .eq('parent_group', parentGroup)
     .eq('transaction_type', transactionType)
     .order('sort_order', { ascending: true });
@@ -38,7 +39,7 @@ export async function fetchStatusFlow(parentGroup: string, transactionType: stri
   if (!error && (!data || data.length === 0) && parentGroup !== 'default') {
     const fallback = await supabase
       .from('category_status_flows')
-      .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, is_transit, display_label, color, icon, buyer_hint, is_deprecated')
+      .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, is_transit, otp_type, display_label, color, icon, buyer_hint, is_deprecated')
       .eq('parent_group', 'default')
       .eq('transaction_type', transactionType)
       .order('sort_order', { ascending: true });
@@ -221,16 +222,25 @@ export function isFirstFlowStep(flow: StatusFlowStep[], status: string): boolean
 }
 
 /**
- * Check if a given next-status step requires OTP verification.
- * Fully DB-driven: uses requires_otp flag from category_status_flows.
+ * Returns the typed OTP intent for a step.
+ * 'delivery' = requires delivery assignment + code verification
+ * null = no OTP required
+ * Future: 'generic', 'pickup', etc.
+ */
+export function getStepOtpType(flow: StatusFlowStep[], statusKey: string): string | null {
+  const step = flow.find(s => s.status_key === statusKey);
+  if (step) return step.otp_type || null;
+  return null;
+}
+
+/**
+ * Check if a given next-status step requires OTP verification (any type).
+ * Thin wrapper over getStepOtpType for backward compat.
+ * NOTE: requires_otp is now derived from otp_type. The DB trigger
+ * (enforce_delivery_otp_gate) enforces OTP at the backend regardless.
  */
 export function stepRequiresOtp(flow: StatusFlowStep[], statusKey: string): boolean {
-  const step = flow.find(s => s.status_key === statusKey);
-  if (step) return step.requires_otp === true;
-  // Bug 2 fix: Default to false when flow is loading/missing. The DB trigger
-  // (enforce_delivery_otp_gate) enforces OTP at the backend regardless, and the
-  // UI's error handler auto-opens the OTP dialog if a non-OTP attempt is rejected.
-  return false;
+  return getStepOtpType(flow, statusKey) !== null;
 }
 
 /**

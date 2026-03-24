@@ -18,6 +18,7 @@ export interface FlowStep {
   seller_notification_body: string;
   is_transit: boolean;
   requires_otp: boolean;
+  otp_type: string | null;
   is_success: boolean;
   creates_tracking_assignment: boolean;
 }

@@ -610,7 +610,8 @@ export function WorkflowEngineDocs() {
         <DocInfoCard title="Key Helper Functions" icon="🔧">
           <p>• <code className="text-[10px] bg-muted px-1 rounded">getNextStatusForActor(flow, currentStatus, actor, transitions)</code> — Returns the next valid status for a given actor</p>
           <p>• <code className="text-[10px] bg-muted px-1 rounded">getNextStatusForActors(flow, currentStatus, actors[], transitions)</code> — Multi-actor variant (seller who also delivers)</p>
-          <p>• <code className="text-[10px] bg-muted px-1 rounded">stepRequiresOtp(flow, statusKey)</code> — Checks if a step requires OTP. Defaults to TRUE for delivery terminal statuses if step not found (safe default).</p>
+          <p>• <code className="text-[10px] bg-muted px-1 rounded">getStepOtpType(flow, statusKey)</code> — Returns the typed OTP intent ('delivery' | null). Used by action bars to decouple delivery OTP from generic OTP.</p>
+          <p>• <code className="text-[10px] bg-muted px-1 rounded">stepRequiresOtp(flow, statusKey)</code> — Thin wrapper: returns true if any OTP type is set. DB trigger is the safety net.</p>
           <p>• <code className="text-[10px] bg-muted px-1 rounded">isTerminalStatus(flow, status)</code> — Checks if status is terminal</p>
           <p>• <code className="text-[10px] bg-muted px-1 rounded">isSuccessfulTerminal(flow, status)</code> — Checks if terminal AND successful</p>
           <p>• <code className="text-[10px] bg-muted px-1 rounded">canActorCancel(transitions, currentStatus, actor)</code> — Checks cancellation availability</p>
@@ -659,7 +660,7 @@ export function WorkflowEngineDocs() {
               ['is_terminal', 'Order cannot progress further', 'true for completed/cancelled'],
               ['is_success', 'Terminal + successful (enables review/settlement)', 'true for completed'],
               ['is_transit', 'Enables GPS tracking + map', 'true for on_the_way'],
-              ['requires_otp', 'OTP verification required', 'true for delivered'],
+              ['otp_type', 'OTP type: "delivery" (requires assignment + code) or null', '"delivery" for delivered step'],
               ['creates_tracking_assignment', 'Auto-creates delivery assignment', 'true for ready'],
               ['is_deprecated', 'Hide from new orders (legacy support)', 'false normally'],
             ]}
@@ -713,9 +714,9 @@ export function WorkflowEngineDocs() {
         </DocInfoCard>
 
         <DocInfoCard title="Three Layers of OTP Protection" icon="🛡️">
-          <p><strong>Layer 1 — Frontend workflow flag:</strong> <code className="text-[10px] bg-muted px-1 rounded">stepRequiresOtp(flow, nextStatus)</code> checks the requires_otp flag. If true, shows OTP dialog. Defaults to TRUE for terminal delivery steps if flow not loaded yet.</p>
-          <p><strong>Layer 2 — Frontend delivery gate:</strong> If a delivery_assignment exists AND the next status is terminal (delivered/completed), the OTP dialog is forced regardless of the requires_otp flag.</p>
-          <p><strong>Layer 3 — DB trigger:</strong> <code className="text-[10px] bg-muted px-1 rounded">enforce_delivery_otp_gate</code> blocks any direct status update to delivered/completed if a delivery_code exists and app.otp_verified is not set. If the frontend somehow bypasses layers 1 and 2, the DB rejects the update and the frontend auto-opens the OTP dialog.</p>
+          <p><strong>Layer 1 — Typed OTP intent:</strong> <code className="text-[10px] bg-muted px-1 rounded">getStepOtpType(flow, nextStatus)</code> checks the <code className="text-[10px] bg-muted px-1 rounded">otp_type</code> column. If <code className="text-[10px] bg-muted px-1 rounded">'delivery'</code>, the action bar shows the OTP dialog ONLY when a <code className="text-[10px] bg-muted px-1 rounded">deliveryAssignmentId</code> exists. If no delivery context, a normal advance button is shown (DB trigger is safety net).</p>
+          <p><strong>Layer 2 — Frontend delivery gate:</strong> If a delivery_assignment exists AND the next status is terminal (delivered/completed), the OTP dialog is forced regardless of the otp_type flag.</p>
+          <p><strong>Layer 3 — DB trigger:</strong> <code className="text-[10px] bg-muted px-1 rounded">enforce_delivery_otp_gate</code> blocks any direct status update to delivered/completed if a delivery_code exists and app.otp_verified is not set. The <code className="text-[10px] bg-muted px-1 rounded">requires_otp</code> boolean column is auto-synced from <code className="text-[10px] bg-muted px-1 rounded">otp_type</code> for backward compatibility with this trigger.</p>
         </DocInfoCard>
       </DocSection>
 

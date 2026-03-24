@@ -223,7 +223,7 @@ export function WorkflowFlowDiagram({ steps, transitions }: Props) {
               {step.is_transit && (
                 <Truck size={9} className="text-blue-500 shrink-0" />
               )}
-              {step.requires_otp && (
+              {(step as any).otp_type === 'delivery' && (
                 <KeyRound size={9} className="text-amber-500 shrink-0" />
               )}
               <span>{step.display_label || formatName(step.status_key)}</span>

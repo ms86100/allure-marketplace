@@ -1066,6 +1066,7 @@ export type Database = {
           notification_title: string | null
           notify_buyer: boolean | null
           notify_seller: boolean | null
+          otp_type: string | null
           parent_group: string
           requires_otp: boolean
           seller_hint: string | null
@@ -1096,6 +1097,7 @@ export type Database = {
           notification_title?: string | null
           notify_buyer?: boolean | null
           notify_seller?: boolean | null
+          otp_type?: string | null
           parent_group: string
           requires_otp?: boolean
           seller_hint?: string | null
@@ -1126,6 +1128,7 @@ export type Database = {
           notification_title?: string | null
           notify_buyer?: boolean | null
           notify_seller?: boolean | null
+          otp_type?: string | null
           parent_group?: string
           requires_otp?: boolean
           seller_hint?: string | null
