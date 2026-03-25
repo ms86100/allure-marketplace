@@ -246,15 +246,27 @@ export default function ProfilePage() {
         </div>
 
         {/* Accessibility */}
-        <div className="mx-4 mt-4 bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Type size={16} className="text-muted-foreground" />
-            <div>
-              <p className="text-sm font-medium">Larger Text</p>
-              <p className="text-[11px] text-muted-foreground">Easier to read</p>
+        <div className="mx-4 mt-4 bg-card border border-border rounded-xl divide-y divide-border">
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Type size={16} className="text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Larger Text</p>
+                <p className="text-[11px] text-muted-foreground">Easier to read</p>
+              </div>
             </div>
+            <Switch checked={largeFont} onCheckedChange={setLargeFont} />
           </div>
-          <Switch checked={largeFont} onCheckedChange={setLargeFont} />
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              {theme === 'dark' ? <Moon size={16} className="text-muted-foreground" /> : <Sun size={16} className="text-muted-foreground" />}
+              <div>
+                <p className="text-sm font-medium">Dark Mode</p>
+                <p className="text-[11px] text-muted-foreground">Switch appearance</p>
+              </div>
+            </div>
+            <Switch checked={theme === 'dark'} onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')} />
+          </div>
         </div>
 
         {/* Menu List */}
