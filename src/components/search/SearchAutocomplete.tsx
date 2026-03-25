@@ -36,14 +36,37 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
   const trimmed = query.trim();
   const lower = trimmed.toLowerCase();
 
-  // Match categories by slug or display name
-  const matchedCategories: CategoryMatch[] = useMemo(() => {
+  // Match categories by slug or display name — raw matches from config
+  const rawMatchedCategories: CategoryMatch[] = useMemo(() => {
     if (lower.length < 2) return [];
     return categoryConfigs
       .filter(c => c.category.toLowerCase().includes(lower) || c.displayName.toLowerCase().includes(lower))
       .slice(0, 3)
       .map(c => ({ slug: c.category, displayName: c.displayName, icon: c.icon }));
   }, [lower, categoryConfigs]);
+
+  // Check which matched categories actually have available products
+  const { data: categoriesWithProducts = [] } = useQuery({
+    queryKey: ['search-category-has-products', rawMatchedCategories.map(c => c.slug)],
+    queryFn: async () => {
+      const slugs = rawMatchedCategories.map(c => c.slug);
+      const { data } = await supabase
+        .from('products')
+        .select('category')
+        .eq('is_available', true)
+        .eq('approval_status', 'approved')
+        .in('category', slugs);
+      return [...new Set((data || []).map((d: any) => d.category as string))];
+    },
+    enabled: rawMatchedCategories.length > 0,
+    staleTime: 60_000,
+  });
+
+  // Only show categories that have at least one product
+  const matchedCategories = useMemo(
+    () => rawMatchedCategories.filter(c => categoriesWithProducts.includes(c.slug)),
+    [rawMatchedCategories, categoriesWithProducts]
+  );
 
   // Deep product search: name, description, category, tags, brand, ingredients
   const { data: productSuggestions = [] } = useQuery({
