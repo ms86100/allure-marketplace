@@ -379,7 +379,7 @@ export function DeliveryMapView({
     <div className="rounded-xl overflow-hidden border border-border h-[260px] relative shadow-sm">
       {/* ETA Overlay */}
       {roadEtaMinutes && (
-        <div className="absolute top-2.5 right-2.5 z-[500] bg-background/90 backdrop-blur-md border border-border rounded-xl px-3 py-2 shadow-md">
+        <div className="absolute bottom-2.5 right-2.5 z-[500] bg-background/90 backdrop-blur-md border border-border rounded-xl px-3 py-2 shadow-md">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
               <MapPin className="h-4 w-4 text-primary" />
