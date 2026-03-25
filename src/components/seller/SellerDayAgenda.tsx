@@ -8,19 +8,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Clock, User, CalendarCheck, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useFlowStepLabels } from '@/hooks/useFlowStepLabels';
 
 interface SellerDayAgendaProps {
   sellerId: string;
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  requested: 'bg-blue-100 text-blue-700',
-  confirmed: 'bg-emerald-100 text-emerald-700',
-  scheduled: 'bg-cyan-100 text-cyan-700',
-  in_progress: 'bg-amber-100 text-amber-700',
-  completed: 'bg-green-100 text-green-700',
-  rescheduled: 'bg-purple-100 text-purple-700',
-};
 
 export function SellerDayAgenda({ sellerId }: SellerDayAgendaProps) {
   const { data: bookings = [], isLoading } = useSellerServiceBookings(sellerId);

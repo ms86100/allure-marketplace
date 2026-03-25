@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { Calendar, Clock, MapPin, CalendarPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SERVICE_STATUS_LABELS } from '@/types/service';
+import { useFlowStepLabels } from '@/hooks/useFlowStepLabels';
 import { addToCalendar } from '@/lib/calendar';
 import { toast } from 'sonner';
 
@@ -22,8 +22,9 @@ const LOCATION_LABELS: Record<string, string> = {
 };
 
 export function AppointmentDetailsCard({ booking }: AppointmentDetailsCardProps) {
+  const { getFlowLabel } = useFlowStepLabels();
   const bookingDate = new Date(booking.booking_date + 'T00:00:00');
-  const statusConfig = SERVICE_STATUS_LABELS[booking.status];
+  const statusConfig = getFlowLabel(booking.status);
 
   const handleAddToCalendar = async () => {
     try {
