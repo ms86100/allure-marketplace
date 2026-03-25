@@ -45,7 +45,7 @@ export function RazorpayCheckout({
 }: RazorpayCheckoutProps) {
   const { createOrder, isLoading, isScriptLoaded, scriptError, retryLoadScript } = useRazorpay();
   const { formatPrice } = useCurrency();
-  const [status, setStatus] = useState<'pending' | 'processing' | 'verifying' | 'success' | 'failed'>('pending');
+  const [status, setStatus] = useState<'pending' | 'processing' | 'verifying' | 'success' | 'confirming' | 'failed'>('pending');
   const processingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const verifyTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
