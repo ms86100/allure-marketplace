@@ -286,11 +286,15 @@ export function useRazorpay() {
         const sweep = () => document.body.querySelectorAll<HTMLElement>(':scope > div').forEach((el) => {
           const z = parseInt(el.style.zIndex || '0', 10);
           if (z > 999 || el.querySelector('iframe[src*="razorpay"]') || el.classList.toString().includes('razorpay')) {
-            el.style.setProperty('top', '0', 'important');
-            el.style.setProperty('height', '100%', 'important');
-            el.style.setProperty('padding-top', 'env(safe-area-inset-top, 0px)', 'important');
+            el.style.setProperty('top', 'auto', 'important');
+            el.style.setProperty('bottom', '0', 'important');
+            el.style.setProperty('height', '88vh', 'important');
+            el.style.setProperty('max-height', '88vh', 'important');
+            el.style.setProperty('border-radius', '16px 16px 0 0', 'important');
+            el.style.setProperty('overflow', 'hidden', 'important');
+            el.style.setProperty('background-color', '#fff', 'important');
             el.style.setProperty('box-sizing', 'border-box', 'important');
-            el.style.setProperty('background-color', '#2D4A3E', 'important');
+            el.style.setProperty('padding-bottom', 'env(safe-area-inset-bottom, 0px)', 'important');
           }
         });
         setTimeout(sweep, 100);
