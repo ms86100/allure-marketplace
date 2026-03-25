@@ -102,10 +102,11 @@ Version 2.0.0 - Society Super-App
 
 ## Demo Account for App Review
 
-**Phone:** *(Provide a real Indian phone number for review)*
-**OTP:** *(Auto-verified — reviewer will receive OTP via SMS)*
+**Phone:** +91 0123456789
+**OTP:** 1234
 
-> ⚠️ **Important:** The app uses phone-based OTP login only (via MSG91). Email/password login is not supported. Provide a working phone number that can receive SMS OTP during the review period.
+> This is a dedicated demo account with auto-bypass OTP. No real SMS is sent — the OTP `1234` is hardcoded for this phone number only.
+> The app uses phone-based OTP login exclusively (via MSG91). Email/password login is not supported.
 
 **Notes for Reviewers:**
 - This account has buyer access and can view the full marketplace
