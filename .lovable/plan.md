@@ -1,62 +1,96 @@
 
 
-# Razorpay Checkout — Bottom-Sheet Layout Instead of Full-Screen
+# Research: Service Booking Workflow — Industry Best Practices
 
-## Problem
-The Razorpay SDK checkout opens as a full-screen overlay that crowds the system UI (Dynamic Island/battery area). The user wants it to feel like a bottom-sheet modal — similar to the second screenshot but slightly taller.
+## What the Research Shows
 
-## Technical Reality
-Razorpay's Standard Checkout (`checkout.js`) always renders full-screen. There is no SDK configuration for a "bottom sheet" mode. However, since the SDK injects a wrapper `div` with an `iframe`, we can **force the wrapper to render as a bottom-sheet** using CSS — setting a top offset, max-height, and border-radius.
+I studied appointment/booking systems across healthcare (OnSched, Practo, Zocdoc), salon/beauty (Fresha, Salon Booking System), home services (Urban Company, Housejoy), and education (tutoring platforms). Here's what I found:
 
-## Solution
-Override the Razorpay wrapper styles to render as a ~85% height bottom sheet with rounded top corners, a dimmed backdrop behind it, and clear distance from the status bar.
+### Industry-Standard Appointment Flows by Category
 
-### Files to change
-
-**1. `src/index.css`** — Restyle the Razorpay wrapper:
-- Change from `top: 0; height: 100%` to `top: auto; bottom: 0; height: 88vh; max-height: 88vh`
-- Add `border-radius: 16px 16px 0 0` for the bottom-sheet look
-- Replace the `::before` status-bar backdrop with a semi-transparent full-screen dimmer (`background: rgba(0,0,0,0.5)`)
-- Remove the `padding-top: env(safe-area-inset-top)` (no longer needed since it doesn't reach the top)
-- Keep `padding-bottom: env(safe-area-inset-bottom)` for the home indicator
-
-**2. `src/hooks/useRazorpay.ts`** — Update `patchNode` in MutationObserver:
-- Apply `bottom: 0; top: auto; height: 88vh; border-radius: 16px 16px 0 0` instead of the current full-screen styles
-- Remove the `padding-top` safe-area enforcement
-- Set `background-color: white` on the wrapper (Razorpay's content is white) and use the dimmer backdrop for the overlay area above
-- Update the delayed sweeps to apply the same bottom-sheet styles
-
-**3. `src/hooks/useRazorpay.ts`** — Separate backdrop vs. content container:
-- Detect the backdrop div (semi-transparent overlay) and keep it full-screen with `background: rgba(0,0,0,0.4)`
-- Detect the content container (has the iframe) and apply bottom-sheet positioning
-
-### Visual result
 ```text
-┌─────────────────────┐
-│  Status bar / DI    │  ← Clear, untouched
-│                     │
-│  Dimmed backdrop    │  ← Semi-transparent overlay
-│─────────────────────│  ← Rounded top corners (16px)
-│                     │
-│  Razorpay Checkout  │  ← ~88vh height
-│  (iframe content)   │
-│                     │
-│  Continue button    │
-│─────────────────────│
-│  Safe area bottom   │
-└─────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  TYPE A: Venue-Based (Doctor, Salon, Tutor, Events)            │
+│  ───────────────────────────────────────────────────            │
+│  Confirmed → In Progress → Completed                           │
+│                                                                 │
+│  Only 3 steps. The customer goes TO the provider.               │
+│  No "on the way" or "arrived" — irrelevant.                     │
+│  OnSched uses: Booked → Checked-In → Completed                 │
+│  Practo uses:  Confirmed → In Consultation → Done              │
+│  Fresha uses:  Confirmed → Started → Completed                 │
+├─────────────────────────────────────────────────────────────────┤
+│  TYPE B: Home Visit (Plumber, Electrician, Maid, Pet Grooming) │
+│  ──────────────────────────────────────────────────────────     │
+│  Confirmed → On the Way → Arrived → In Progress → Completed   │
+│                                                                 │
+│  5 steps. The provider TRAVELS to the customer.                 │
+│  "On the Way" and "Arrived" ARE relevant here — they give       │
+│  the customer real-time visibility of the service provider.     │
+│  Urban Company uses exactly this flow.                          │
+├─────────────────────────────────────────────────────────────────┤
+│  SIDE ACTIONS (not linear steps):                               │
+│  • Reschedule — action available on Confirmed state             │
+│  • Cancel — action available until In Progress                  │
+│  • No-Show — seller marks if buyer doesn't appear               │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Key CSS change
-```css
-body.razorpay-active > div[style*="z-index"]:last-of-type:not(#root) {
-  top: auto !important;
-  bottom: 0 !important;
-  height: 88vh !important;
-  max-height: 88vh !important;
-  border-radius: 16px 16px 0 0 !important;
-  overflow: hidden !important;
-  background: #fff !important;
-}
+### Key Insight: Your Platform Already Has Both Types
+
+Your `category_status_flows` table already differentiates by `parent_group`:
+
+| Parent Group | Current Active Steps | Correct? |
+|---|---|---|
+| `education_learning` | Confirmed → In Progress → Completed | **Yes — perfect** |
+| `events` | Confirmed → In Progress → Completed | **Yes — perfect** |
+| `home_services` | Confirmed → On the Way → Arrived → In Progress → Completed | **Yes — correct for home visits** |
+| `domestic_help` | Confirmed → On the Way → Arrived → In Progress → Completed | **Yes — correct** |
+| `personal_care` | Confirmed → On the Way → Arrived → In Progress → Completed | **Depends** — salon visit needs only 3 steps, home beauty needs 5 |
+| `professional` | Confirmed → On the Way → Arrived → In Progress → Completed | **Partially wrong** — online consultations don't need travel steps |
+| `pets` | Confirmed → On the Way → Arrived → In Progress → Completed | **Depends** — vet visit vs. home grooming |
+| `default` | Confirmed → Completed (only 2 active) | **Too minimal** — missing In Progress |
+
+### Your Specific Concern is Valid
+
+For **appointment-style bookings** (doctor, tutor, salon visit, music class), the steps "On the Way" and "Arrived" make no sense. Those are **delivery/home-visit concepts** being applied to venue-based appointments.
+
+## Recommended Changes
+
+### Database: Fix the `default` and venue-based parent_groups
+
+1. **`default` parent_group** — activate `in_progress` (currently deprecated). The default flow should be the simple 3-step: **Confirmed → In Progress → Completed**
+
+2. **`education_learning` and `events`** — already correct, no changes needed
+
+3. **`professional`** — deprecate `on_the_way` and `arrived` (most professional services are at-venue or online)
+
+4. **`personal_care`** — this is tricky. A salon visit doesn't need travel steps, but a home beauty service does. For now, deprecate `on_the_way` and `arrived` since most personal care in a society context is at-venue. Home visit variants can use the `home_services` parent_group instead.
+
+5. **`pets`** — deprecate `on_the_way` and `arrived` (vet visits are at-venue; home grooming should use `home_services`)
+
+6. **Keep `home_services` and `domestic_help` as-is** — the 5-step flow with travel tracking is correct for these.
+
+### Summary of Changes
+
+```text
+Parent Group         Before (active)                              After (active)
+─────────────────────────────────────────────────────────────────────────────────
+default              Confirmed → Completed                        Confirmed → In Progress → Completed
+education_learning   Confirmed → In Progress → Completed          (no change)
+events               Confirmed → In Progress → Completed          (no change)
+professional         Confirmed → OTW → Arrived → IP → Completed  Confirmed → In Progress → Completed
+personal_care        Confirmed → OTW → Arrived → IP → Completed  Confirmed → In Progress → Completed
+pets                 Confirmed → OTW → Arrived → IP → Completed  Confirmed → In Progress → Completed
+home_services        Confirmed → OTW → Arrived → IP → Completed  (no change — travel is correct)
+domestic_help        Confirmed → OTW → Arrived → IP → Completed  (no change — travel is correct)
 ```
+
+### Files to Change
+
+**1. Database migration** — Two SQL statements:
+- Deprecate `on_the_way` and `arrived` for `professional`, `personal_care`, `pets` parent_groups
+- Un-deprecate `in_progress` for `default` parent_group
+
+**2. No frontend changes needed** — The UI already filters out `is_deprecated = true` steps, so the stepper will automatically show fewer steps.
 
