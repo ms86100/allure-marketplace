@@ -31,9 +31,9 @@ export function TrendingInSociety({
           Trending near you
         </h3>
       </div>
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory">
+      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory items-stretch">
         {trending.map((product) => (
-          <div key={product.id} className="w-[155px] shrink-0 snap-start">
+          <div key={product.id} className="w-[155px] shrink-0 snap-start flex">
             <ProductListingCard
               product={product}
               onTap={onProductTap}

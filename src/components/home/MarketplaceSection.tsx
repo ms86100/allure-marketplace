@@ -226,20 +226,6 @@ function DiscoveryRow({
   badgeConfigs?: any[];
   socialProofMap?: Map<string, number>;
 }) {
-  const heroIdx = useMemo(() => {
-    const bsIdx = products.findIndex(p => p.is_bestseller);
-    if (bsIdx >= 0) return bsIdx;
-    if (products.length > 0) {
-      let maxIdx = 0;
-      let maxCount = (products[0] as any).completed_order_count || 0;
-      for (let i = 1; i < products.length; i++) {
-        const c = (products[i] as any).completed_order_count || 0;
-        if (c > maxCount) { maxCount = c; maxIdx = i; }
-      }
-      return maxCount > 0 ? maxIdx : -1;
-    }
-    return -1;
-  }, [products]);
 
   const firstProduct = products[0];
   const seeAllLink = firstProduct ? `/category/${(firstProduct as any).parentGroup || 'all'}` : null;
@@ -256,9 +242,9 @@ function DiscoveryRow({
           </Link>
         )}
       </div>
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory stagger-children">
+      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory stagger-children items-stretch">
         {products.map((product, i) => (
-          <div key={product.id} className={cn('shrink-0 snap-start card-hover', i === heroIdx ? 'w-[220px]' : 'w-[160px]')}>
+          <div key={product.id} className="shrink-0 snap-start card-hover w-[160px] flex">
             <ProductListingCard
               product={product}
               onTap={onProductTap}
