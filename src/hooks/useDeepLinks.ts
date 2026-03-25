@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import { App, URLOpenListenerEvent } from '@capacitor/app';
 
@@ -51,12 +50,15 @@ export function consumePendingDeepLink(): string | null {
  * Deep links are stored in sessionStorage so they survive auth hydration.
  */
 export function useDeepLinks() {
-  const navigate = useNavigate();
-
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) {
       return;
     }
+
+    // Guard: only process getLaunchUrl once per app session to prevent
+    // stale deep links from re-firing on effect re-runs.
+    const LAUNCH_PROCESSED_KEY = 'sociva_launch_url_processed';
+    const launchAlreadyProcessed = sessionStorage.getItem(LAUNCH_PROCESSED_KEY) === '1';
 
     const handleDeepLink = (event: URLOpenListenerEvent) => {
       console.log('Deep link received:', event.url);
@@ -93,11 +95,6 @@ export function useDeepLinks() {
           }
 
           console.log('Deep link path resolved:', path);
-
-          // Store as pending — the deferred consumer in AppRoutes will
-          // navigate after auth is fully hydrated. Do NOT navigate
-          // immediately to avoid double-push (which causes back-button
-          // loops where the user bounces between two identical entries).
           setPendingDeepLink(path);
         }
       } catch (error) {
@@ -106,20 +103,23 @@ export function useDeepLinks() {
       }
     };
 
-    // Listen for app URL open events
+    // Listen for app URL open events (warm/hot start deep links)
     const listenerPromise = App.addListener('appUrlOpen', handleDeepLink);
 
-    // Check if app was opened via deep link (cold start)
-    App.getLaunchUrl().then((launchUrl) => {
-      if (launchUrl?.url) {
-        console.log('App launched via deep link:', launchUrl.url);
-        handleDeepLink({ url: launchUrl.url });
-      }
-    });
+    // Check if app was opened via deep link (cold start) — only once per session
+    if (!launchAlreadyProcessed) {
+      App.getLaunchUrl().then((launchUrl) => {
+        if (launchUrl?.url) {
+          console.log('App launched via deep link:', launchUrl.url);
+          sessionStorage.setItem(LAUNCH_PROCESSED_KEY, '1');
+          handleDeepLink({ url: launchUrl.url });
+        }
+      });
+    }
 
     // Cleanup listener on unmount
     return () => {
       listenerPromise.then((listener) => listener.remove());
     };
-  }, [navigate]);
+  }, []); // No dependencies — this effect must run exactly once
 }
