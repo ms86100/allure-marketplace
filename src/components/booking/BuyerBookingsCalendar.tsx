@@ -8,17 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Calendar, Clock, MapPin, Video, Home, Store, Zap } from 'lucide-react';
-
-const STATUS_COLORS: Record<string, string> = {
-  requested: 'bg-blue-100 text-blue-700',
-  confirmed: 'bg-emerald-100 text-emerald-700',
-  scheduled: 'bg-cyan-100 text-cyan-700',
-  rescheduled: 'bg-purple-100 text-purple-700',
-  on_the_way: 'bg-orange-100 text-orange-700',
-  arrived: 'bg-teal-100 text-teal-700',
-  in_progress: 'bg-amber-100 text-amber-700',
-  completed: 'bg-green-100 text-green-700',
-};
+import { useFlowStepLabels } from '@/hooks/useFlowStepLabels';
 
 const LOCATION_ICONS: Record<string, typeof MapPin> = {
   home_visit: Home,
@@ -45,6 +35,7 @@ function getCountdownText(booking: BuyerBooking): string | null {
 export function BuyerBookingsCalendar() {
   const { user } = useAuth();
   const { data: bookings = [], isLoading } = useBuyerServiceBookings(user?.id);
+  const { getFlowLabel } = useFlowStepLabels();
   const [selectedDate, setSelectedDate] = useState(startOfToday());
 
   const bookingDates = useMemo(() => {
@@ -187,8 +178,8 @@ export function BuyerBookingsCalendar() {
                           )}
                         </div>
                       </div>
-                      <Badge variant="secondary" className={cn('text-[9px] shrink-0', STATUS_COLORS[booking.status] || '')}>
-                        {booking.status}
+                      <Badge variant="secondary" className={cn('text-[9px] shrink-0', getFlowLabel(booking.status).color)}>
+                        {getFlowLabel(booking.status).label}
                       </Badge>
                     </div>
                   </div>

@@ -64,28 +64,3 @@ export interface ServiceBooking {
   updated_at: string;
 }
 
-export const SERVICE_BOOKING_STATUSES = [
-  'requested',
-  'confirmed',
-  'rescheduled',
-  'scheduled',
-  'on_the_way',
-  'arrived',
-  'in_progress',
-  'completed',
-  'no_show',
-  'cancelled',
-] as const;
-
-export const SERVICE_STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  requested: { label: 'Requested', color: 'bg-blue-100 text-blue-800' },
-  confirmed: { label: 'Confirmed', color: 'bg-emerald-100 text-emerald-800' },
-  rescheduled: { label: 'Rescheduled', color: 'bg-purple-100 text-purple-800' },
-  scheduled: { label: 'Scheduled', color: 'bg-cyan-100 text-cyan-800' },
-  on_the_way: { label: 'On The Way', color: 'bg-orange-100 text-orange-800' },
-  arrived: { label: 'Arrived', color: 'bg-teal-100 text-teal-800' },
-  in_progress: { label: 'In Progress', color: 'bg-amber-100 text-amber-800' },
-  completed: { label: 'Completed', color: 'bg-green-100 text-green-800' },
-  no_show: { label: 'No Show', color: 'bg-red-100 text-red-800' },
-  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-800' },
-};
