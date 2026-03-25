@@ -21,8 +21,8 @@ export function LandingNav() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 glass border-b border-border">
-      <div className="container mx-auto flex items-center justify-between h-16 px-4 lg:px-8">
+    <nav className="sticky z-50 glass border-b border-border" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
+      <div className="container mx-auto flex items-center justify-between h-14 px-4 lg:px-8">
         <Link to="/" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <span className="text-primary-foreground font-bold text-sm">{platformName.charAt(0)}</span>
