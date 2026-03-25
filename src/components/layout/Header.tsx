@@ -113,7 +113,7 @@ function HeaderInner({
                   className="inline-flex items-center gap-1.5 rounded-full bg-secondary/80 border border-border/60 px-3 py-1.5 group active:scale-[0.98] transition-transform"
                 >
                   <MapPin size={13} className="text-primary shrink-0" />
-                  <span className="text-[12px] font-semibold text-foreground truncate max-w-[55vw] min-[375px]:max-w-[60vw] sm:max-w-[50vw]">
+                  <span className="text-[12px] font-semibold text-foreground truncate max-w-[48vw] min-[375px]:max-w-[52vw] sm:max-w-[50vw]">
                     {browsingLocation?.label || displaySociety?.name || 'Set location'}
                   </span>
                   {stats && (stats.sellers > 0 || stats.orders > 0) && (
@@ -142,7 +142,7 @@ function HeaderInner({
             </div>
 
             <div className="flex items-center gap-0.5">
-              <span className="hidden min-[400px]:inline-flex"><ThemeToggle /></span>
+              <span className="hidden sm:inline-flex"><ThemeToggle /></span>
               {isBuilderMember && (
                 <Link to="/builder">
                   <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
