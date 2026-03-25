@@ -168,6 +168,6 @@ https://www.sociva.in/terms
 - Does the app contain drug references? **No**
 - Does the app allow user-generated content? **Yes** (reviews and chat)
 - Does the app share location? **Yes** (for delivery tracking and society membership verification)
-- Does the app allow purchases? **Yes** (in-app purchases for services and products)
+- Does the app allow purchases? **Yes** (purchases for physical goods and services via external payment processor — not Apple IAP)
 
 **Recommended Rating:** 4+ (iOS) / Everyone (Android)

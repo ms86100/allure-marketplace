@@ -52,7 +52,8 @@ Deno.serve(async (req) => {
       { table: 'security_staff', column: 'user_id' },
       // Bug 2: Previously missing tables
       { table: 'chat_messages', column: 'sender_id' },
-      { table: 'chat_messages', column: 'receiver_id' },
+      // Note: receiver_id messages are NOT deleted — they belong to other users.
+      // Sender info is anonymized by the profile deletion (cascade/nullify).
       { table: 'delivery_addresses', column: 'user_id' },
       { table: 'delivery_locations', column: 'partner_id' },
       { table: 'user_notifications', column: 'user_id' },

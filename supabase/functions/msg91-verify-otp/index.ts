@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 import { getCredential } from "../_shared/credentials.ts";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rate-limiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,6 +26,22 @@ Deno.serve(async (req) => {
 
   try {
     const { reqId, otp, phone, country_code = "91" } = await req.json();
+
+    // Rate limit: 10 verify attempts per reqId per 10 min (brute-force protection)
+    if (reqId) {
+      const rl = await checkRateLimit(`otp-verify:${reqId}`, 10, 600);
+      if (!rl.allowed) {
+        return new Response(
+          JSON.stringify({ error: "Too many verification attempts. Please request a new OTP." }),
+          { status: 429, headers: jsonHeaders }
+        );
+      }
+    }
+
+    // Also rate limit by IP: 30 verify attempts per 10 min
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const ipRl = await checkRateLimit(`otp-verify-ip:${clientIp}`, 30, 600);
+    if (!ipRl.allowed) return rateLimitResponse(corsHeaders);
 
     if (!reqId) {
       return new Response(JSON.stringify({ error: "Please go back and re-enter your phone number." }), { status: 400, headers: jsonHeaders });

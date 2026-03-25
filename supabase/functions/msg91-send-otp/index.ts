@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 import { getCredential } from "../_shared/credentials.ts";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rate-limiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +15,17 @@ Deno.serve(async (req) => {
 
   try {
     const { phone, country_code = "91", resend = false, reqId } = await req.json();
+
+    // Rate limit by phone (5 OTPs per phone per 10 min) and by IP (20 per 10 min)
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    
+    if (!resend && phone) {
+      const phoneRl = await checkRateLimit(`otp-send:${country_code}${phone}`, 5, 600);
+      if (!phoneRl.allowed) return rateLimitResponse(corsHeaders);
+    }
+    
+    const ipRl = await checkRateLimit(`otp-send-ip:${clientIp}`, 20, 600);
+    if (!ipRl.allowed) return rateLimitResponse(corsHeaders);
 
     if (resend && !reqId) {
       return new Response(
