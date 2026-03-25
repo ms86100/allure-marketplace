@@ -121,7 +121,7 @@ export function TimeSlotPicker({
           <CalendarDays size={16} className="text-muted-foreground" />
           <span className="text-sm font-medium">Select Date</span>
         </div>
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-1 px-1">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
           {quickDates.map(({ date, label, dateLabel }) => {
             const isSelected = selectedDate && isSameDay(date, selectedDate);
             const isDisabled = isDateDisabled(date);
