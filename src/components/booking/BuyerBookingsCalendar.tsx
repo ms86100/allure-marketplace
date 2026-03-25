@@ -35,6 +35,7 @@ function getCountdownText(booking: BuyerBooking): string | null {
 export function BuyerBookingsCalendar() {
   const { user } = useAuth();
   const { data: bookings = [], isLoading } = useBuyerServiceBookings(user?.id);
+  const { getFlowLabel } = useFlowStepLabels();
   const [selectedDate, setSelectedDate] = useState(startOfToday());
 
   const bookingDates = useMemo(() => {
@@ -177,8 +178,8 @@ export function BuyerBookingsCalendar() {
                           )}
                         </div>
                       </div>
-                      <Badge variant="secondary" className={cn('text-[9px] shrink-0', STATUS_COLORS[booking.status] || '')}>
-                        {booking.status}
+                      <Badge variant="secondary" className={cn('text-[9px] shrink-0', getFlowLabel(booking.status).color)}>
+                        {getFlowLabel(booking.status).label}
                       </Badge>
                     </div>
                   </div>

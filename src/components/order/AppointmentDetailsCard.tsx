@@ -67,11 +67,9 @@ export function AppointmentDetailsCard({ booking }: AppointmentDetailsCardProps)
         <span>{LOCATION_LABELS[booking.location_type] || booking.location_type}</span>
       </div>
 
-      {statusConfig && (
-        <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full font-medium mt-2 ${statusConfig.color}`}>
-          {statusConfig.label}
-        </span>
-      )}
+      <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full font-medium mt-2 ${statusConfig.color}`}>
+        {statusConfig.label}
+      </span>
 
       <div className="mt-3">
         <Button variant="outline" size="sm" className="text-xs h-8" onClick={handleAddToCalendar}>
