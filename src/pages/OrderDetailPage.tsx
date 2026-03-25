@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ReviewForm } from '@/components/review/ReviewForm';
 import { OrderChat } from '@/components/chat/OrderChat';
 import { OrderCancellation } from '@/components/order/OrderCancellation';
+import { BuyerCancelBooking } from '@/components/booking/BuyerCancelBooking';
 import { ReorderButton } from '@/components/order/ReorderButton';
 import { UrgentOrderTimer } from '@/components/order/UrgentOrderTimer';
 import { OrderRejectionDialog } from '@/components/order/OrderRejectionDialog';
@@ -690,7 +691,11 @@ export default function OrderDetailPage() {
           <div className="px-4 py-3 flex gap-3">
             {/* Cancel button: strictly from DB transitions */}
             {o.canBuyerCancel && (
-              <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => o.fetchOrder()} canCancel={true} />
+              serviceBooking ? (
+                <BuyerCancelBooking bookingId={serviceBooking.id} orderId={order.id} slotId={serviceBooking.slot_id} status={serviceBooking.status} />
+              ) : (
+                <OrderCancellation orderId={order.id} orderStatus={order.status} onCancelled={() => o.fetchOrder()} canCancel={true} />
+              )
             )}
             {o.buyerNextStatus && (() => {
               const buyerNextOtpType = getStepOtpType(o.flow, o.buyerNextStatus);

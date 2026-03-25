@@ -28,8 +28,8 @@ export function AppointmentDetailsCard({ booking }: AppointmentDetailsCardProps)
 
   const handleAddToCalendar = async () => {
     try {
-      const start = new Date(`${booking.booking_date}T${booking.start_time}`);
-      const end = new Date(`${booking.booking_date}T${booking.end_time}`);
+      const start = new Date(`${booking.booking_date}T${booking.start_time}+05:30`);
+      const end = new Date(`${booking.booking_date}T${booking.end_time}+05:30`);
       await addToCalendar({
         title: 'Appointment',
         startDate: start,

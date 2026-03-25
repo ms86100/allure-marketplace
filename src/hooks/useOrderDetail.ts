@@ -55,7 +55,7 @@ export function useOrderDetail(id: string | undefined) {
   const effectiveParentGroup = sellerPrimaryGroup || derivedParentGroup;
   const resolvedParentGroup = effectiveParentGroup || 'default';
   const isEnquiryOrder = (order as any)?.order_type === 'enquiry';
-  const orderFulfillmentType = (order as any)?.fulfillment_type || 'self_pickup';
+  const orderFulfillmentType = (order as any)?.fulfillment_type || null;
   const deliveryHandledBy = (order as any)?.delivery_handled_by || null;
   const storedTransactionType = (order as any)?.transaction_type || null;
   const { flow, isLoading: isFlowLoading } = useCategoryStatusFlow(effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType, storedTransactionType);
