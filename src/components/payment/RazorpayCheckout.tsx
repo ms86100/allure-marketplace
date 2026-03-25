@@ -7,7 +7,7 @@ import {
   DrawerTitle,
   DrawerDescription,
 } from '@/components/ui/drawer';
-import { Loader2, CreditCard, CheckCircle, XCircle, RefreshCw, WifiOff } from 'lucide-react';
+import { Loader2, CreditCard, CheckCircle, XCircle, RefreshCw, WifiOff, Clock } from 'lucide-react';
 import { useRazorpay } from '@/hooks/useRazorpay';
 import { useCurrency } from '@/hooks/useCurrency';
 import { supabase } from '@/integrations/supabase/client';
@@ -69,11 +69,11 @@ export function RazorpayCheckout({
     }
 
     if (attempt >= MAX_ATTEMPTS) {
-      // Backend hasn't confirmed — show pending state, don't fake success
-      console.warn('[Payment] Backend verification timed out after 20s');
-      setStatus('success');
-      // Still proceed — user can check order status page for real-time updates
-      setTimeout(() => onPaymentSuccess(paymentId), 1200);
+      // Backend hasn't confirmed yet — show confirming state, not false success
+      console.warn('[Payment] Backend verification timed out after 20s — showing confirming state');
+      setStatus('confirming');
+      // Still proceed after delay — order page has real-time subscription for updates
+      setTimeout(() => onPaymentSuccess(paymentId), 3000);
       return;
     }
 
@@ -253,6 +253,20 @@ export function RazorpayCheckout({
                 <p className="font-semibold text-success">Payment Successful!</p>
                 <p className="text-sm text-muted-foreground">
                   Your order is confirmed
+                </p>
+              </div>
+            </div>
+          )}
+
+          {status === 'confirming' && (
+            <div className="text-center space-y-4 py-8">
+              <div className="w-20 h-20 mx-auto rounded-full bg-warning/10 flex items-center justify-center">
+                <Clock className="text-warning" size={48} />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">Payment Received</p>
+                <p className="text-sm text-muted-foreground">
+                  We're confirming your order — check your orders page for updates
                 </p>
               </div>
             </div>

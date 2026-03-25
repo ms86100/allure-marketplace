@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rate-limiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,8 @@ const corsHeaders = {
  * 1. Purges all user/listing data while keeping admin user + config tables
  * 2. Seeds realistic end-to-end data for Food, Coaching, Yoga, Electronics
  * 3. Records execution results to test_results table
+ *
+ * SECURITY: Blocked in production unless ALLOW_TEST_FUNCTIONS is set.
  */
 
 
