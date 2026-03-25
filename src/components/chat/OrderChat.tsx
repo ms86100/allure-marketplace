@@ -175,102 +175,105 @@ export function OrderChat({
     pointerEvents: 'auto' as const,
   };
 
-  return createPortal(
-    <div className="fixed inset-x-0 z-[60] bg-background flex flex-col overflow-hidden" style={containerStyle}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <MessageCircle className="text-primary" size={20} />
+  return (
+    <>
+      {createPortal(
+        <div className="fixed inset-x-0 z-[60] bg-background flex flex-col overflow-hidden" style={containerStyle}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b bg-card shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <MessageCircle className="text-primary" size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold truncate">{otherUserName}</p>
+                <p className="text-xs text-muted-foreground">Order #{orderId.slice(0, 8)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <Button variant="ghost" size="icon" onClick={() => setReportOpen(true)} className="text-muted-foreground" aria-label="Report user">
+                <Flag size={16} />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
+                <X size={20} />
+              </Button>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="font-semibold truncate">{otherUserName}</p>
-            <p className="text-xs text-muted-foreground">Order #{orderId.slice(0, 8)}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <Button variant="ghost" size="icon" onClick={() => setReportOpen(true)} className="text-muted-foreground" aria-label="Report user">
-            <Flag size={16} />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
-            <X size={20} />
-          </Button>
-        </div>
-      </div>
 
-      {/* Messages */}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 overscroll-contain">
-        {messages.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <MessageCircle className="mx-auto mb-2" size={32} />
-            <p className="text-sm">No messages yet</p>
-            <p className="text-xs">Start a conversation about this order</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {messages.map((msg) => {
-              const isMine = msg.sender_id === user?.id;
-              return (
-                <div key={msg.id} className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
-                  <div
-                    className={cn(
-                      'max-w-[80%] rounded-2xl px-4 py-2',
-                      isMine ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted rounded-bl-sm',
-                    )}
-                  >
-                    <p className="text-sm">{msg.message_text}</p>
-                    <div className={cn('flex items-center gap-1 mt-1', isMine ? 'justify-end' : 'justify-start')}>
-                      <span className={cn('text-[10px]', isMine ? 'text-primary-foreground/70' : 'text-muted-foreground')}>
-                        {format(new Date(msg.created_at), 'h:mm a')}
-                      </span>
-                      {isMine &&
-                        (msg.read_status ? (
-                          <CheckCheck size={12} className="text-primary-foreground/70" />
-                        ) : (
-                          <Check size={12} className="text-primary-foreground/70" />
-                        ))}
+          {/* Messages */}
+          <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 overscroll-contain">
+            {messages.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <MessageCircle className="mx-auto mb-2" size={32} />
+                <p className="text-sm">No messages yet</p>
+                <p className="text-xs">Start a conversation about this order</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {messages.map((msg) => {
+                  const isMine = msg.sender_id === user?.id;
+                  return (
+                    <div key={msg.id} className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
+                      <div
+                        className={cn(
+                          'max-w-[80%] rounded-2xl px-4 py-2',
+                          isMine ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted rounded-bl-sm',
+                        )}
+                      >
+                        <p className="text-sm">{msg.message_text}</p>
+                        <div className={cn('flex items-center gap-1 mt-1', isMine ? 'justify-end' : 'justify-start')}>
+                          <span className={cn('text-[10px]', isMine ? 'text-primary-foreground/70' : 'text-muted-foreground')}>
+                            {format(new Date(msg.created_at), 'h:mm a')}
+                          </span>
+                          {isMine &&
+                            (msg.read_status ? (
+                              <CheckCheck size={12} className="text-primary-foreground/70" />
+                            ) : (
+                              <Check size={12} className="text-primary-foreground/70" />
+                            ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Input — pinned above keyboard */}
-      <div className="sticky bottom-0 px-3 pt-3 border-t bg-card shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] z-10">
-        {disabled ? (
-          <p className="text-center text-sm text-muted-foreground">Chat is disabled for completed orders</p>
-        ) : (
-          <div className="flex items-end gap-2">
-            <Textarea
-              ref={textareaRef}
-              placeholder="Type a message..."
-              value={newMessage}
-              onChange={(e) => handleTextChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              onFocus={() => {
-                setTimeout(scrollToBottom, 200);
-              }}
-              rows={1}
-              className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl text-base md:text-sm py-2.5"
-              maxLength={1000}
-            />
-            <Button size="icon" className="shrink-0 h-10 w-10 rounded-xl" onClick={sendMessage} disabled={!newMessage.trim() || isSending} aria-label="Send message">
-              <Send size={16} />
-            </Button>
+          {/* Input — pinned above keyboard */}
+          <div className="sticky bottom-0 px-3 pt-3 border-t bg-card shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] z-10">
+            {disabled ? (
+              <p className="text-center text-sm text-muted-foreground">Chat is disabled for completed orders</p>
+            ) : (
+              <div className="flex items-end gap-2">
+                <Textarea
+                  ref={textareaRef}
+                  placeholder="Type a message..."
+                  value={newMessage}
+                  onChange={(e) => handleTextChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
+                  onFocus={() => {
+                    setTimeout(scrollToBottom, 200);
+                  }}
+                  rows={1}
+                  className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl text-base md:text-sm py-2.5"
+                  maxLength={1000}
+                />
+                <Button size="icon" className="shrink-0 h-10 w-10 rounded-xl" onClick={sendMessage} disabled={!newMessage.trim() || isSending} aria-label="Send message">
+                  <Send size={16} />
+                </Button>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    </div>,
-    document.body,
-  ),
-  <ReportSheet key="report" open={reportOpen} onOpenChange={setReportOpen} targetType="user" targetId={otherUserId} targetName={otherUserName} />,
-  ];
+        </div>,
+        document.body,
+      )}
+      <ReportSheet open={reportOpen} onOpenChange={setReportOpen} targetType="user" targetId={otherUserId} targetName={otherUserName} />
+    </>
+  );
 }
