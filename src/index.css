@@ -526,12 +526,16 @@ body.razorpay-active::before {
   pointer-events: none;
 }
 
-/* Push the entire Razorpay wrapper div below status bar */
+/* Push the entire Razorpay wrapper div below status bar —
+   broad selectors to catch SDK-injected overlays regardless of class/attr */
 body.razorpay-active > div[style*="z-index"],
 body.razorpay-active > div[style*="position: fixed"],
+body.razorpay-active > div[style*="position:fixed"],
 body.razorpay-active .razorpay-checkout-frame,
 body.razorpay-active .razorpay-container,
-body.razorpay-active > div[class*="razorpay"] {
+body.razorpay-active > div[class*="razorpay"],
+body.razorpay-active > .razorpay-backdrop,
+body.razorpay-active > div:last-of-type:not(#root):not(#__next) {
   top: env(safe-area-inset-top, 0px) !important;
   height: calc(100% - env(safe-area-inset-top, 0px)) !important;
   bottom: auto !important;

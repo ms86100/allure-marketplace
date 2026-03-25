@@ -9,6 +9,50 @@ declare global {
   }
 }
 
+/** MutationObserver ref — disconnected on payment end */
+let razorpayDomObserver: MutationObserver | null = null;
+
+/** Watch for Razorpay-injected overlays and push them below the iOS safe area */
+function startSafeAreaObserver() {
+  stopSafeAreaObserver();
+
+  const patchNode = (node: HTMLElement) => {
+    const zIndex = parseInt(node.style.zIndex || '0', 10);
+    const isRazorpayContainer =
+      zIndex > 999 ||
+      node.querySelector('iframe[src*="razorpay"]') ||
+      node.querySelector('iframe[src*="api.razorpay"]') ||
+      node.classList.toString().includes('razorpay');
+
+    if (isRazorpayContainer) {
+      node.style.setProperty('top', 'env(safe-area-inset-top, 0px)', 'important');
+      node.style.setProperty('height', 'calc(100% - env(safe-area-inset-top, 0px))', 'important');
+    }
+  };
+
+  razorpayDomObserver = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      for (const added of m.addedNodes) {
+        if (added instanceof HTMLElement) {
+          patchNode(added);
+        }
+      }
+    }
+  });
+
+  razorpayDomObserver.observe(document.body, { childList: true, subtree: true });
+
+  // Also patch any already-present high z-index children (race condition guard)
+  document.body.querySelectorAll<HTMLElement>(':scope > div').forEach(patchNode);
+}
+
+function stopSafeAreaObserver() {
+  if (razorpayDomObserver) {
+    razorpayDomObserver.disconnect();
+    razorpayDomObserver = null;
+  }
+}
+
 interface RazorpayOptions {
   orderId: string;
   orderIds?: string[];
@@ -25,6 +69,7 @@ interface RazorpayOptions {
 
 /** Restore body scroll position and remove the lock class */
 function unlockBodyScroll() {
+  stopSafeAreaObserver();
   document.body.classList.remove('razorpay-active');
   document.body.style.removeProperty('top');
   const savedY = parseInt(document.body.dataset.scrollY || '0', 10);
@@ -216,6 +261,8 @@ export function useRazorpay() {
       // non-interactive flash on iOS WebView
       requestAnimationFrame(() => {
         razorpay.open();
+        // Start observing for Razorpay's injected DOM and patch safe-area
+        startSafeAreaObserver();
       });
     } catch (error: any) {
       console.error('Razorpay error:', error);
