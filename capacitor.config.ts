@@ -80,7 +80,7 @@ const config: CapacitorConfig = {
       NSCameraUsageDescription: 'Sociva needs camera access to let you photograph products for listing and upload profile pictures.',
       NSPhotoLibraryUsageDescription: 'Sociva needs photo library access to let you select images for product listings and your profile.',
       NSPhotoLibraryAddUsageDescription: 'Sociva needs permission to save images to your photo library.',
-      NSLocationAlwaysAndWhenInUseUsageDescription: 'Sociva uses your location to verify your residential society membership and show nearby sellers, even in the background.',
+      NSLocationAlwaysAndWhenInUseUsageDescription: 'Sociva uses your location in the background to provide real-time delivery tracking when you are making deliveries as a seller.',
     },
   },
 
