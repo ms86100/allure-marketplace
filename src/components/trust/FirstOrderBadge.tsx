@@ -15,8 +15,8 @@ export function FirstOrderBadge({ className, variant = 'inline' }: FirstOrderBad
       )}>
         <ShieldCheck size={18} className="text-success shrink-0" />
         <div>
-          <p className="text-xs font-bold text-success">🛡 First Order Protected</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Instant refund if something goes wrong</p>
+        <p className="text-xs font-bold text-success">🛡 Buyer Protection</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Raise a dispute if something goes wrong</p>
         </div>
       </div>
     );
@@ -28,7 +28,7 @@ export function FirstOrderBadge({ className, variant = 'inline' }: FirstOrderBad
       className
     )}>
       <ShieldCheck size={8} />
-      First Order Protected
+      Buyer Protected
     </span>
   );
 }

@@ -21,7 +21,7 @@ function validateRefundTier(data: unknown): RefundTier | null {
 }
 
 function getFallbackTier(amount: number): RefundTier {
-  if (amount < 200) return { tier: 'instant', label: 'Instant Refund', description: 'Processed immediately' };
+  if (amount < 200) return { tier: 'instant', label: 'Quick Resolution', description: 'Fast-tracked dispute review' };
   if (amount <= 1000) return { tier: '24h', label: '24h Review', description: 'Reviewed within 24 hours' };
   return { tier: 'mediation', label: 'Dispute Mediation', description: 'Handled by community committee' };
 }
@@ -47,7 +47,7 @@ export function RefundTierBadge({ amount }: Props) {
     return (
       <div className="flex items-center gap-1.5 text-[10px] text-success">
         <Zap size={10} />
-        <span>Instant refund eligible</span>
+        <span>Fast-tracked dispute resolution</span>
       </div>
     );
   }
@@ -56,7 +56,7 @@ export function RefundTierBadge({ amount }: Props) {
     return (
       <div className="flex items-center gap-1.5 text-[10px] text-primary">
         <Clock size={10} />
-        <span>24h refund review</span>
+        <span>24h dispute review</span>
       </div>
     );
   }
@@ -64,7 +64,7 @@ export function RefundTierBadge({ amount }: Props) {
   return (
     <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
       <Scale size={10} />
-      <span>Dispute mediation for refunds</span>
+      <span>Community dispute mediation</span>
     </div>
   );
 }
