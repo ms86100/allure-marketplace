@@ -261,6 +261,8 @@ export function useRazorpay() {
       // non-interactive flash on iOS WebView
       requestAnimationFrame(() => {
         razorpay.open();
+        // Start observing for Razorpay's injected DOM and patch safe-area
+        startSafeAreaObserver();
       });
     } catch (error: any) {
       console.error('Razorpay error:', error);
