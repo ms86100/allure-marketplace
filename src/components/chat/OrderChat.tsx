@@ -32,6 +32,7 @@ export function OrderChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const lastSentRef = useRef<number>(0);
   const { viewportHeight, viewportTop, keyboardInset } = useChatViewport(isOpen);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -108,6 +109,9 @@ export function OrderChat({
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !user || isSending || disabled) return;
+    const now = Date.now();
+    if (now - lastSentRef.current < 1500) return; // 1.5s throttle
+    lastSentRef.current = now;
 
     setIsSending(true);
     try {
@@ -249,6 +253,7 @@ export function OrderChat({
               }}
               rows={1}
               className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-xl text-base md:text-sm py-2.5"
+              maxLength={1000}
             />
             <Button size="icon" className="shrink-0 h-10 w-10 rounded-xl" onClick={sendMessage} disabled={!newMessage.trim() || isSending} aria-label="Send message">
               <Send size={16} />

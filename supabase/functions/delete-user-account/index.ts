@@ -61,6 +61,12 @@ Deno.serve(async (req) => {
       { table: 'authorized_persons', column: 'resident_id' },
       { table: 'call_feedback', column: 'buyer_id' },
       { table: 'seller_conversation_messages', column: 'sender_id' },
+      // Bug 9: Additional tables for complete data deletion
+      { table: 'collective_buy_requests', column: 'created_by' },
+      { table: 'construction_milestones', column: 'posted_by' },
+      { table: 'builder_announcements', column: 'posted_by' },
+      { table: 'builder_members', column: 'user_id' },
+      { table: 'coupon_redemptions', column: 'user_id' },
     ];
 
     // Continue-on-error: track failures but never abort — auth user MUST be deleted
