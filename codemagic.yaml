@@ -95,6 +95,7 @@ workflows:
             capacitor_pods
             pod 'FirebaseCore'
             pod 'FirebaseMessaging'
+            pod 'FirebaseCrashlytics'
           end
 
           post_install do |installer|
@@ -286,8 +287,8 @@ workflows:
             /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Sociva needs camera access to let you photograph products for listing and upload profile pictures.'" App/Info.plist
           /usr/libexec/PlistBuddy -c "Set :NSLocationWhenInUseUsageDescription 'Sociva uses your location to verify your residential society membership and show nearby sellers.'" App/Info.plist 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string 'Sociva uses your location to verify your residential society membership and show nearby sellers.'" App/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :NSLocationAlwaysAndWhenInUseUsageDescription 'Sociva uses your location to verify your residential society membership and show nearby sellers, even in the background.'" App/Info.plist 2>/dev/null || \
-            /usr/libexec/PlistBuddy -c "Add :NSLocationAlwaysAndWhenInUseUsageDescription string 'Sociva uses your location to verify your residential society membership and show nearby sellers, even in the background.'" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :NSLocationAlwaysAndWhenInUseUsageDescription 'Sociva uses your location in the background to provide real-time delivery tracking when you are making deliveries as a seller.'" App/Info.plist 2>/dev/null || \
+            /usr/libexec/PlistBuddy -c "Add :NSLocationAlwaysAndWhenInUseUsageDescription string 'Sociva uses your location in the background to provide real-time delivery tracking when you are making deliveries as a seller.'" App/Info.plist
           echo "=== Privacy strings injected ==="
 
       - name: Copy GoogleService-Info.plist
