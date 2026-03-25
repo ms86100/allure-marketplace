@@ -251,9 +251,9 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
       await BackgroundGeolocation.ready({
         desiredAccuracy: BackgroundGeolocation.DESIRED_ACCURACY_HIGH,
         distanceFilter: 10,
-        stopOnTerminate: false,
+        stopOnTerminate: true,
         startOnBoot: false,
-        preventSuspend: true,
+        preventSuspend: false,
         heartbeatInterval: 60,
         isMoving: true,
         stopTimeout: 3,
@@ -263,7 +263,7 @@ export function useBackgroundLocationTracking(assignmentId: string | null) {
         stationaryRadius: 25,
         disableMotionActivityUpdates: false,
         disableStopDetection: false,
-        locationAuthorizationRequest: 'WhenInUse',
+        locationAuthorizationRequest: 'Always',
         debug: false,
         logLevel: BackgroundGeolocation.LOG_LEVEL_WARNING,
       });

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rate-limiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,8 @@ const corsHeaders = {
  * 1. Purges all user/listing data while keeping admin user + config tables
  * 2. Seeds realistic end-to-end data for Food, Coaching, Yoga, Electronics
  * 3. Records execution results to test_results table
+ *
+ * SECURITY: Blocked in production unless ALLOW_TEST_FUNCTIONS is set.
  */
 
 
@@ -328,6 +331,11 @@ Deno.serve(async (req) => {
       { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
+
+  // Rate limit — 2 per hour
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const { allowed } = await checkRateLimit(`reset-seed:${clientIp}`, 2, 3600);
+  if (!allowed) return rateLimitResponse(corsHeaders);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

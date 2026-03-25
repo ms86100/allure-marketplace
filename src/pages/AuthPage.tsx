@@ -164,8 +164,8 @@ export default function AuthPage() {
                     <div>
                       <label htmlFor="age-confirm" className="text-xs text-muted-foreground leading-snug">
                         I confirm that I am <strong>18 years of age or older</strong> and agree to the{' '}
-                        <a href="https://www.sociva.in/terms" target="_blank" rel="noopener noreferrer" className="text-primary underline">Terms & Conditions</a> and{' '}
-                        <a href="https://www.sociva.in/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary underline">Privacy Policy</a>.
+                        <span className="text-primary underline cursor-pointer" onClick={() => window.open('https://www.sociva.in/#/terms', '_blank', 'noopener,noreferrer')}>Terms & Conditions</span> and{' '}
+                        <span className="text-primary underline cursor-pointer" onClick={() => window.open('https://www.sociva.in/#/privacy-policy', '_blank', 'noopener,noreferrer')}>Privacy Policy</span>.
                       </label>
                     </div>
                   </div>

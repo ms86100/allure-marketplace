@@ -19,6 +19,14 @@ app.post("/", async (c) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+    // Security: Only allow invocation via service role key or cron
+    const authHeader = c.req.header("Authorization") || "";
+    const isServiceRole = authHeader === `Bearer ${supabaseServiceKey}`;
+    const isCron = c.req.header("x-cron-secret") === Deno.env.get("CRON_SECRET");
+    if (!isServiceRole && !isCron) {
+      return c.json({ error: "Unauthorized" }, 401, corsHeaders);
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // --- DB-driven: resolve cancellable statuses from category_status_transitions ---
