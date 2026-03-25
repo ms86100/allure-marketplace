@@ -124,7 +124,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
       ref={cardRef}
       onClick={handleCardClick}
       className={cn(
-        'bg-card rounded-2xl cursor-pointer flex flex-col h-full relative',
+        'bg-card rounded-2xl cursor-pointer flex flex-col relative',
         'border border-border/70 shadow-card',
         'transition-all duration-150',
         'hover:shadow-elevated hover:border-border',
@@ -209,7 +209,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
 
       {/* Content — fixed-height section for uniform cards */}
       <div className={cn(
-        "flex flex-col",
+        "flex flex-col flex-1",
         compact ? "px-2.5 pb-2.5" : "px-3 pb-3",
         !viewOnly && !isOutOfStock ? "pt-6" : "pt-3"
       )}>
@@ -225,7 +225,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
           <span className="text-[10px] font-medium text-muted-foreground mt-0.5">{variantText}</span>
         )}
 
-        <h4 className="font-semibold leading-snug text-foreground text-[12px] line-clamp-1 mt-1">{product.name}</h4>
+        <h4 className="font-semibold leading-snug text-foreground text-[12px] line-clamp-2 mt-1 min-h-[2lh]">{product.name}</h4>
 
         {product.seller_name && !compact && (
           <div className="flex items-center gap-1 mt-1 overflow-hidden">
