@@ -188,7 +188,7 @@ export default function BecomeSellerPage() {
     const isPendingReview = (existingSeller as any).verification_status === 'pending';
     return (
       <AppLayout showHeader={false} showNav={false}>
-        <div className="p-4 safe-top">
+        <div className="p-4">
           <Link to="/" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0 mb-6"><ArrowLeft size={18} /></Link>
           <div className="text-center py-12">
             {isRejected ? (
@@ -251,7 +251,7 @@ export default function BecomeSellerPage() {
 
   return (
     <AppLayout showHeader={false} showNav={false}>
-      <div className="p-4 pb-24 safe-top">
+      <div className="p-4 pb-24">
         {/* Top Bar */}
         <div className="flex items-center justify-between mb-6">
           <Link to="/" className="flex items-center gap-2 text-muted-foreground"><span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></span><span>Back</span></Link>
