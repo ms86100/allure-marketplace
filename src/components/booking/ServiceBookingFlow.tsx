@@ -223,7 +223,7 @@ export function ServiceBookingFlow({
           payment_status: 'pending',
           notes: notes.trim().slice(0, MAX_NOTES_LENGTH) || null,
           delivery_address: needsAddress && buyerAddress.trim() ? buyerAddress.trim().slice(0, MAX_ADDRESS_LENGTH) : null,
-          fulfillment_type: resolvedLocationType,
+          fulfillment_type: resolvedLocation || locationType || 'at_seller',
         })
         .select('id')
         .single();
@@ -244,7 +244,7 @@ export function ServiceBookingFlow({
         throw itemErr;
       }
 
-      const resolvedLocationType = locationType || 'at_seller';
+      const effectiveLocationType = resolvedLocation || locationType || 'at_seller';
       const { data: bookResult, error: bookErr } = await supabase
         .rpc('book_service_slot', {
           _slot_id: slot.id,
@@ -255,7 +255,7 @@ export function ServiceBookingFlow({
           _booking_date: dateStr,
           _start_time: slot.start_time,
           _end_time: slot.end_time,
-          _location_type: resolvedLocationType,
+          _location_type: effectiveLocationType,
           _buyer_address: buyerAddress.trim().slice(0, MAX_ADDRESS_LENGTH) || null,
           _notes: notes.trim().slice(0, MAX_NOTES_LENGTH) || null,
         });
