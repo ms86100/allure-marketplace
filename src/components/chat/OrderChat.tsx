@@ -188,9 +188,14 @@ export function OrderChat({
             <p className="text-xs text-muted-foreground">Order #{orderId.slice(0, 8)}</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0" aria-label="Close chat">
-          <X size={20} />
-        </Button>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button variant="ghost" size="icon" onClick={() => setReportOpen(true)} className="text-muted-foreground" aria-label="Report user">
+            <Flag size={16} />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close chat">
+            <X size={20} />
+          </Button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -265,5 +270,7 @@ export function OrderChat({
       </div>
     </div>,
     document.body,
-  );
+  ),
+  <ReportSheet key="report" open={reportOpen} onOpenChange={setReportOpen} targetType="user" targetId={otherUserId} targetName={otherUserName} />,
+  ];
 }
