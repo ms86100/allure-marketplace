@@ -102,8 +102,10 @@ Version 2.0.0 - Society Super-App
 
 ## Demo Account for App Review
 
-**Email:** demo@sociva.app
-**Password:** DemoReview2026!
+**Phone:** *(Provide a real Indian phone number for review)*
+**OTP:** *(Auto-verified — reviewer will receive OTP via SMS)*
+
+> ⚠️ **Important:** The app uses phone-based OTP login only (via MSG91). Email/password login is not supported. Provide a working phone number that can receive SMS OTP during the review period.
 
 **Notes for Reviewers:**
 - This account has buyer access and can view the full marketplace
@@ -165,7 +167,7 @@ https://www.sociva.in/terms
 - Does the app contain profanity? **No**
 - Does the app contain drug references? **No**
 - Does the app allow user-generated content? **Yes** (reviews and chat)
-- Does the app share location? **No**
+- Does the app share location? **Yes** (for delivery tracking and society membership verification)
 - Does the app allow purchases? **Yes** (in-app purchases for services and products)
 
 **Recommended Rating:** 4+ (iOS) / Everyone (Android)
