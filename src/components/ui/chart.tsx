@@ -65,31 +65,30 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null;
   }
 
-  // D4: Build CSS string from trusted internal config only (no user input)
-  const cssContent = Object.entries(THEMES)
-    .map(
-      ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
-    // Sanitize: only allow CSS color values (hex, hsl, rgb, named colors)
-    if (color && /^[a-zA-Z0-9#(),.\s/%]+$/.test(color)) {
-      return `  --color-${key.replace(/[^a-zA-Z0-9-_]/g, '')}: ${color};`;
+  // D4: Build CSS variables via style element — sanitized keys and values only
+  const cssRules: string[] = [];
+  for (const [theme, prefix] of Object.entries(THEMES)) {
+    const vars = colorConfig
+      .map(([key, itemConfig]) => {
+        const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
+        const safeKey = key.replace(/[^a-zA-Z0-9\-_]/g, '');
+        if (color && /^[a-zA-Z0-9#(),.\s/%]+$/.test(color)) {
+          return `  --color-${safeKey}: ${color};`;
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .join("\n");
+    if (vars) {
+      cssRules.push(`${prefix} [data-chart=${id}] {\n${vars}\n}`);
     }
-    return null;
-  })
-  .filter(Boolean)
-  .join("\n")}
-}
-`,
-    )
-    .join("\n");
+  }
 
+  if (!cssRules.length) return null;
+
+  // Use a <style> element with textContent instead of dangerouslySetInnerHTML
   return (
-    <style
-      dangerouslySetInnerHTML={{ __html: cssContent }}
-    />
+    <style>{cssRules.join("\n")}</style>
   );
 };
 

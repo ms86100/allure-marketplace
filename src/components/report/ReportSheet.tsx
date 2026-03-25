@@ -12,7 +12,7 @@ import { Loader2, Flag } from 'lucide-react';
 interface ReportSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  targetType: 'product' | 'seller' | 'post';
+  targetType: 'product' | 'seller' | 'post' | 'user';
   targetId: string;
   targetName?: string;
 }
@@ -52,6 +52,8 @@ export function ReportSheet({ open, onOpenChange, targetType, targetId, targetNa
         insertData.reported_product_id = targetId;
       } else if (targetType === 'post') {
         insertData.reported_post_id = targetId;
+      } else if (targetType === 'user') {
+        insertData.reported_user_id = targetId;
       }
 
       const { error } = await supabase.from('reports').insert(insertData as any);
@@ -75,7 +77,7 @@ export function ReportSheet({ open, onOpenChange, targetType, targetId, targetNa
         <DrawerHeader className="text-left pb-4">
           <DrawerTitle className="flex items-center gap-2">
             <Flag size={18} className="text-destructive" />
-            Report {targetType === 'post' ? 'Post' : targetType === 'product' ? 'Product' : 'Seller'}
+            Report {targetType === 'post' ? 'Post' : targetType === 'product' ? 'Product' : targetType === 'user' ? 'User' : 'Seller'}
           </DrawerTitle>
           <DrawerDescription>
             {targetName && <span>Reporting: {targetName}</span>}
