@@ -332,6 +332,11 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Rate limit — 2 per hour
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const { allowed } = await checkRateLimit(`reset-seed:${clientIp}`, 2, 3600);
+  if (!allowed) return rateLimitResponse(corsHeaders);
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const sb = createClient(supabaseUrl, serviceKey, {
