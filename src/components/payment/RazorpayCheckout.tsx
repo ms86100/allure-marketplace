@@ -226,6 +226,18 @@ export function RazorpayCheckout({
             </div>
           )}
 
+          {status === 'verifying' && (
+            <div className="text-center space-y-4 py-8">
+              <Loader2 className="mx-auto animate-spin text-primary" size={48} />
+              <div>
+                <p className="font-semibold">Verifying Payment…</p>
+                <p className="text-sm text-muted-foreground">
+                  Confirming with payment server
+                </p>
+              </div>
+            </div>
+          )}
+
           {status === 'success' && (
             <div className="text-center space-y-4 py-8">
               <div className="w-20 h-20 mx-auto rounded-full bg-success/10 flex items-center justify-center">
