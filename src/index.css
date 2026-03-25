@@ -500,7 +500,7 @@ html.large-font a {
   right: 0 !important;
 }
 
-/* Razorpay safe area fix — status bar backdrop + full-viewport iframe */
+/* Razorpay bottom-sheet layout — renders as a modal pinned to the bottom */
 
 /* Hide ALL app-level sticky/fixed elements behind Razorpay */
 body.razorpay-active header,
@@ -513,22 +513,20 @@ body.razorpay-active [style*="position: sticky"] {
   pointer-events: none !important;
 }
 
-/* Solid backdrop behind the iOS status bar so text stays readable over Razorpay */
+/* Dimmed backdrop covering the full screen above the bottom sheet */
 body.razorpay-active::before {
   content: '';
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: env(safe-area-inset-top, 0px);
-  background: #2D4A3E;
-  z-index: 2147483647;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2147483646;
   pointer-events: none;
 }
 
-/* Push Razorpay wrapper below status bar using padding-top approach —
-   padding-top + box-sizing: border-box shrinks the content area so the
-   cross-origin iframe naturally starts below the Dynamic Island / notch */
+/* Razorpay wrapper — bottom-sheet style: pinned to bottom, 88vh tall, rounded top */
 body.razorpay-active > div[style*="z-index"],
 body.razorpay-active > div[style*="position: fixed"],
 body.razorpay-active > div[style*="position:fixed"],
@@ -537,34 +535,32 @@ body.razorpay-active .razorpay-container,
 body.razorpay-active > div[class*="razorpay"],
 body.razorpay-active > .razorpay-backdrop,
 body.razorpay-active > div:last-of-type:not(#root):not(#__next) {
-  top: 0 !important;
+  top: auto !important;
+  bottom: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  height: 100% !important;
+  height: 88vh !important;
+  max-height: 88vh !important;
   width: 100% !important;
-  bottom: auto !important;
-  padding-top: env(safe-area-inset-top, 0px) !important;
+  border-radius: 16px 16px 0 0 !important;
+  overflow: hidden !important;
+  background-color: #fff !important;
   box-sizing: border-box !important;
-  background-color: #2D4A3E !important;
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
   z-index: 2147483647 !important;
   touch-action: auto !important;
   pointer-events: auto !important;
   -webkit-overflow-scrolling: touch !important;
 }
 
-/* Ensure bottom safe area for home indicator */
-body.razorpay-active .razorpay-container,
-body.razorpay-active .razorpay-checkout-frame {
-  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
-}
-
-/* iframe inside the wrapper — fill the padded content area */
+/* iframe inside the wrapper — fill the bottom-sheet content area */
 body.razorpay-active iframe[src*="razorpay"],
 body.razorpay-active iframe[src*="api.razorpay"],
 body.razorpay-active iframe[src*="checkout.razorpay"] {
   width: 100% !important;
   height: 100% !important;
   border: none !important;
+  border-radius: 16px 16px 0 0 !important;
   touch-action: auto !important;
   pointer-events: auto !important;
   -webkit-overflow-scrolling: touch !important;

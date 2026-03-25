@@ -25,14 +25,18 @@ function startSafeAreaObserver() {
       node.classList.toString().includes('razorpay');
 
     if (isRazorpayContainer) {
-      node.style.setProperty('top', '0', 'important');
+      node.style.setProperty('top', 'auto', 'important');
+      node.style.setProperty('bottom', '0', 'important');
       node.style.setProperty('left', '0', 'important');
       node.style.setProperty('right', '0', 'important');
-      node.style.setProperty('height', '100%', 'important');
+      node.style.setProperty('height', '88vh', 'important');
+      node.style.setProperty('max-height', '88vh', 'important');
       node.style.setProperty('width', '100%', 'important');
-      node.style.setProperty('padding-top', 'env(safe-area-inset-top, 0px)', 'important');
+      node.style.setProperty('border-radius', '16px 16px 0 0', 'important');
+      node.style.setProperty('overflow', 'hidden', 'important');
+      node.style.setProperty('background-color', '#fff', 'important');
       node.style.setProperty('box-sizing', 'border-box', 'important');
-      node.style.setProperty('background-color', '#2D4A3E', 'important');
+      node.style.setProperty('padding-bottom', 'env(safe-area-inset-bottom, 0px)', 'important');
     }
   };
 
