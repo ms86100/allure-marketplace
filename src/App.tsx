@@ -434,7 +434,7 @@ function AppRoutes() {
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/refund-policy" element={<RefundPolicyPage />} />
-        <Route path="/help" element={<ProtectedRoute><HelpPage /></ProtectedRoute>} />
+        <Route path="/help" element={<HelpPage />} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
          <Route path="/community-rules" element={<CommunityRulesPage />} />
         <Route path="/push-debug" element={<ProtectedRoute><PushDebugPage /></ProtectedRoute>} />

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Drawer,
@@ -10,6 +10,7 @@ import {
 import { Loader2, CreditCard, CheckCircle, XCircle, RefreshCw, WifiOff } from 'lucide-react';
 import { useRazorpay } from '@/hooks/useRazorpay';
 import { useCurrency } from '@/hooks/useCurrency';
+import { supabase } from '@/integrations/supabase/client';
 
 interface RazorpayCheckoutProps {
   isOpen: boolean;
@@ -44,8 +45,35 @@ export function RazorpayCheckout({
 }: RazorpayCheckoutProps) {
   const { createOrder, isLoading, isScriptLoaded, scriptError, retryLoadScript } = useRazorpay();
   const { formatPrice } = useCurrency();
-  const [status, setStatus] = useState<'pending' | 'processing' | 'success' | 'failed'>('pending');
+  const [status, setStatus] = useState<'pending' | 'processing' | 'verifying' | 'success' | 'failed'>('pending');
   const processingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const verifyTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Poll backend to confirm payment was captured by webhook
+  const verifyPaymentBackend = useCallback(async (paymentId: string, attempt = 0): Promise<void> => {
+    const MAX_ATTEMPTS = 6; // ~12s total (2s intervals)
+    const { data } = await supabase
+      .from('orders')
+      .select('payment_status')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (data?.payment_status === 'paid') {
+      setStatus('success');
+      setTimeout(() => onPaymentSuccess(paymentId), 1200);
+      return;
+    }
+
+    if (attempt >= MAX_ATTEMPTS) {
+      // Backend hasn't confirmed yet — trust SDK and proceed
+      console.warn('[Payment] Backend verification timed out, proceeding with SDK success');
+      setStatus('success');
+      setTimeout(() => onPaymentSuccess(paymentId), 1200);
+      return;
+    }
+
+    verifyTimeoutRef.current = setTimeout(() => verifyPaymentBackend(paymentId, attempt + 1), 2000);
+  }, [orderId, onPaymentSuccess]);
 
   useEffect(() => {
     if (isOpen) {
@@ -53,6 +81,7 @@ export function RazorpayCheckout({
     }
     return () => {
       if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
+      if (verifyTimeoutRef.current) clearTimeout(verifyTimeoutRef.current);
     };
   }, [isOpen]);
 
@@ -75,11 +104,12 @@ export function RazorpayCheckout({
       businessName: sellerName,
       onSuccess: (paymentId, razorpayOrderId) => {
         if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
-        setStatus('success');
         if (razorpayOrderId) {
           console.log('[Payment] Razorpay order_id for reconciliation:', razorpayOrderId);
         }
-        setTimeout(() => onPaymentSuccess(paymentId), 1500);
+        // Enter verification phase — poll backend before confirming
+        setStatus('verifying');
+        verifyPaymentBackend(paymentId);
       },
       onFailure: () => {
         if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
@@ -99,6 +129,7 @@ export function RazorpayCheckout({
 
   const handleClose = () => {
     if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
+    if (verifyTimeoutRef.current) clearTimeout(verifyTimeoutRef.current);
     if (status === 'success') {
       // Success — do nothing extra
     } else if (status === 'pending') {
@@ -191,6 +222,18 @@ export function RazorpayCheckout({
                 <p className="font-semibold">Opening Payment</p>
                 <p className="text-sm text-muted-foreground">
                   Complete payment in the popup
+                </p>
+              </div>
+            </div>
+          )}
+
+          {status === 'verifying' && (
+            <div className="text-center space-y-4 py-8">
+              <Loader2 className="mx-auto animate-spin text-primary" size={48} />
+              <div>
+                <p className="font-semibold">Verifying Payment…</p>
+                <p className="text-sm text-muted-foreground">
+                  Confirming with payment server
                 </p>
               </div>
             </div>
