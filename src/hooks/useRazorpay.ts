@@ -69,6 +69,7 @@ interface RazorpayOptions {
 
 /** Restore body scroll position and remove the lock class */
 function unlockBodyScroll() {
+  stopSafeAreaObserver();
   document.body.classList.remove('razorpay-active');
   document.body.style.removeProperty('top');
   const savedY = parseInt(document.body.dataset.scrollY || '0', 10);
