@@ -320,7 +320,7 @@ export default function SellerSettingsPage() {
           {/* Bank Details */}
           <div className="space-y-3">
             <div className="flex items-center gap-2"><Building2 size={16} className="text-muted-foreground" /><Label>Bank Account for Payouts</Label></div>
-            <p className="text-xs text-muted-foreground">Payments will be settled to this bank account</p>
+            <p className="text-xs text-muted-foreground">Payouts will be processed to this bank account</p>
             <div className="space-y-3 bg-muted rounded-lg p-4">
               <div className="space-y-2"><Label htmlFor="bank_account_holder" className="text-xs">Account Holder Name</Label><Input id="bank_account_holder" placeholder="As per bank records" value={formData.bank_account_holder} onChange={(e) => setFormData({ ...formData, bank_account_holder: e.target.value })} /></div>
               <div className="space-y-2"><Label htmlFor="bank_account_number" className="text-xs">Account Number</Label><Input id="bank_account_number" placeholder="Enter bank account number" value={formData.bank_account_number} onChange={(e) => setFormData({ ...formData, bank_account_number: e.target.value })} /></div>
