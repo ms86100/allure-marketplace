@@ -62,15 +62,24 @@ Deno.serve(async (req) => {
       { table: 'seller_conversation_messages', column: 'sender_id' },
     ];
 
+    // Continue-on-error: track failures but never abort — auth user MUST be deleted
+    const failures: string[] = [];
+
     for (const { table, column } of cleanupTables) {
-      await supabaseAdmin.from(table).delete().eq(column, userId);
+      const { error } = await supabaseAdmin.from(table).delete().eq(column, userId);
+      if (error) {
+        console.error(`[delete-account] Failed to clean ${table}.${column}:`, error.message);
+        failures.push(`${table}.${column}`);
+      }
     }
 
     // Anonymize orders (financial records must be retained) — nullify buyer personal data
-    await supabaseAdmin.from('orders').update({ delivery_address: null, notes: null }).eq('buyer_id', userId);
+    const { error: orderErr } = await supabaseAdmin.from('orders').update({ delivery_address: null, notes: null }).eq('buyer_id', userId);
+    if (orderErr) { console.error('[delete-account] Failed to anonymize orders:', orderErr.message); failures.push('orders.anonymize'); }
 
     // Delete service bookings
-    await supabaseAdmin.from('service_bookings').delete().eq('buyer_id', userId);
+    const { error: bookErr } = await supabaseAdmin.from('service_bookings').delete().eq('buyer_id', userId);
+    if (bookErr) { console.error('[delete-account] Failed to delete service_bookings:', bookErr.message); failures.push('service_bookings'); }
 
     // Clean up seller data if exists
     const { data: sellerProfile } = await supabaseAdmin
@@ -80,14 +89,24 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (sellerProfile) {
-      await supabaseAdmin.from('products').delete().eq('seller_id', sellerProfile.id);
-      await supabaseAdmin.from('reviews').delete().eq('seller_id', sellerProfile.id);
-      await supabaseAdmin.from('favorites').delete().eq('seller_id', sellerProfile.id);
-      await supabaseAdmin.from('seller_profiles').delete().eq('id', sellerProfile.id);
+      for (const t of ['products', 'reviews', 'favorites'] as const) {
+        const col = t === 'products' ? 'seller_id' : t === 'reviews' ? 'seller_id' : 'seller_id';
+        const { error } = await supabaseAdmin.from(t).delete().eq(col, sellerProfile.id);
+        if (error) { console.error(`[delete-account] Failed to clean seller ${t}:`, error.message); failures.push(`seller.${t}`); }
+      }
+      const { error: spErr } = await supabaseAdmin.from('seller_profiles').delete().eq('id', sellerProfile.id);
+      if (spErr) { console.error('[delete-account] Failed to delete seller_profiles:', spErr.message); failures.push('seller_profiles'); }
     }
 
-    await supabaseAdmin.from('user_roles').delete().eq('user_id', userId);
-    await supabaseAdmin.from('profiles').delete().eq('id', userId);
+    const { error: rolesErr } = await supabaseAdmin.from('user_roles').delete().eq('user_id', userId);
+    if (rolesErr) { console.error('[delete-account] Failed to delete user_roles:', rolesErr.message); failures.push('user_roles'); }
+
+    const { error: profErr } = await supabaseAdmin.from('profiles').delete().eq('id', userId);
+    if (profErr) { console.error('[delete-account] Failed to delete profiles:', profErr.message); failures.push('profiles'); }
+
+    if (failures.length > 0) {
+      console.warn(`[delete-account] ${failures.length} cleanup failures for user ${userId}:`, failures.join(', '));
+    }
 
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
     if (deleteError) {

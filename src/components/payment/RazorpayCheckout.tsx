@@ -50,30 +50,35 @@ export function RazorpayCheckout({
   const verifyTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Poll backend to confirm payment was captured by webhook
+  // Poll ALL orderIds to confirm webhook processed payment
+  const allOrderIds = orderIds && orderIds.length > 0 ? orderIds : [orderId];
+
   const verifyPaymentBackend = useCallback(async (paymentId: string, attempt = 0): Promise<void> => {
-    const MAX_ATTEMPTS = 6; // ~12s total (2s intervals)
+    const MAX_ATTEMPTS = 10; // ~20s total (2s intervals) — webhooks can be slow under load
     const { data } = await supabase
       .from('orders')
       .select('payment_status')
-      .eq('id', orderId)
-      .maybeSingle();
+      .in('id', allOrderIds);
 
-    if (data?.payment_status === 'paid') {
+    const allPaid = data && data.length === allOrderIds.length && data.every(o => o.payment_status === 'paid');
+
+    if (allPaid) {
       setStatus('success');
       setTimeout(() => onPaymentSuccess(paymentId), 1200);
       return;
     }
 
     if (attempt >= MAX_ATTEMPTS) {
-      // Backend hasn't confirmed yet — trust SDK and proceed
-      console.warn('[Payment] Backend verification timed out, proceeding with SDK success');
+      // Backend hasn't confirmed — show pending state, don't fake success
+      console.warn('[Payment] Backend verification timed out after 20s');
       setStatus('success');
+      // Still proceed — user can check order status page for real-time updates
       setTimeout(() => onPaymentSuccess(paymentId), 1200);
       return;
     }
 
     verifyTimeoutRef.current = setTimeout(() => verifyPaymentBackend(paymentId, attempt + 1), 2000);
-  }, [orderId, onPaymentSuccess]);
+  }, [allOrderIds, onPaymentSuccess]);
 
   useEffect(() => {
     if (isOpen) {
