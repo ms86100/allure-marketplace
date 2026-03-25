@@ -331,20 +331,22 @@ export default function OrderDetailPage() {
               </div>
             )}
             {order.status !== 'cancelled' && !o.isFlowLoading && (
-              <div className="flex items-center justify-between mt-4 gap-1">
-                {displayStatuses.map((status, index) => {
-                  const statusIndex = o.statusOrder.indexOf(status as OrderStatus);
-                  const isCompleted = statusIndex <= o.currentStatusIndex;
-                  const isCurrent = statusIndex === o.currentStatusIndex;
-                  return (
-                    <div key={status} className="flex flex-col items-center flex-1">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold ${isCompleted ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground'} ${isCurrent ? 'ring-2 ring-accent ring-offset-1 ring-offset-background' : ''}`}>
-                        {isCompleted ? <Check size={14} /> : index + 1}
+              <div className="overflow-x-auto -mx-4 px-4 scrollbar-hide">
+                <div className={`flex items-center mt-4 gap-1 ${displayStatuses.length <= 5 ? 'justify-between' : ''}`} style={{ minWidth: displayStatuses.length > 5 ? `${displayStatuses.length * 64}px` : undefined }}>
+                  {displayStatuses.map((status, index) => {
+                    const statusIndex = o.statusOrder.indexOf(status as OrderStatus);
+                    const isCompleted = statusIndex <= o.currentStatusIndex;
+                    const isCurrent = statusIndex === o.currentStatusIndex;
+                    return (
+                      <div key={status} className="flex flex-col items-center flex-1 min-w-[56px]">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${isCompleted ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground'} ${isCurrent ? 'ring-2 ring-accent ring-offset-1 ring-offset-background' : ''}`}>
+                          {isCompleted ? <Check size={14} /> : index + 1}
+                        </div>
+                        <span className="text-[9px] text-center mt-1 text-muted-foreground leading-tight whitespace-nowrap">{o.getFlowStepLabel(status as string).label}</span>
                       </div>
-                      <span className="text-[9px] text-center mt-1 text-muted-foreground leading-tight">{o.getFlowStepLabel(status as string).label}</span>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
             {order.status !== 'cancelled' && o.isBuyerView && (() => {
