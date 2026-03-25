@@ -1,90 +1,62 @@
 
 
-# Fix Razorpay Checkout Overlapping iOS Dynamic Island / Status Bar
+# Razorpay Checkout — Bottom-Sheet Layout Instead of Full-Screen
 
 ## Problem
-From the screenshot: Razorpay's checkout header ("Fresh Mart Express", back arrow) renders behind the Dynamic Island and status bar, making the back button untappable. This is an App Store rejection risk.
+The Razorpay SDK checkout opens as a full-screen overlay that crowds the system UI (Dynamic Island/battery area). The user wants it to feel like a bottom-sheet modal — similar to the second screenshot but slightly taller.
 
-## Root Cause
-The current approach pushes the Razorpay **wrapper div** down with `top: env(safe-area-inset-top)`. However, the Razorpay SDK renders its content inside a **cross-origin iframe** — its internal layout always starts at `top: 0` within the iframe. The wrapper is shorter but the iframe content doesn't know about the safe area, so Razorpay's own header still renders at the very top of the iframe, which is now clipped or misaligned.
+## Technical Reality
+Razorpay's Standard Checkout (`checkout.js`) always renders full-screen. There is no SDK configuration for a "bottom sheet" mode. However, since the SDK injects a wrapper `div` with an `iframe`, we can **force the wrapper to render as a bottom-sheet** using CSS — setting a top offset, max-height, and border-radius.
 
-The fundamental issue: **you cannot style content inside a cross-origin iframe**. The wrapper offset approach doesn't work because Razorpay's internal UI doesn't adapt.
-
-## Solution: Padding-based approach instead of top offset
-
-Instead of pushing the wrapper down (which clips/misaligns the iframe content), we need to keep the wrapper at `top: 0` and `height: 100%` but add **padding-top** equal to the safe area. This way the iframe gets a smaller available area and Razorpay's internal layout naturally avoids the status bar region.
-
-However, since the iframe has `position: absolute; top: 0; height: 100%` inside the wrapper, padding won't affect it. The correct approach is:
-
-**Use a combination of keeping the wrapper full-screen but inserting a blocking element at the top** — the `::before` pseudo-element already exists but only as a backdrop. We need to make it **interactive-blocking and visually solid**, and ensure the iframe starts below it.
-
-### Revised approach — wrapper with top offset + iframe internal offset
-
-Since we can't control iframe internals, the only reliable approach is:
-
-1. **Keep the wrapper at full viewport** (`top: 0, height: 100%`)
-2. **Apply `padding-top: env(safe-area-inset-top)` to the wrapper** so the iframe is positioned below the safe area within the wrapper's content box
-3. **Set `box-sizing: border-box`** on the wrapper so padding reduces the content area
-4. **Remove the `top` offset** from the wrapper (it causes the iframe to be clipped at the bottom)
-5. **Strengthen the MutationObserver** to also apply padding-top (not just top offset) and handle attribute mutations (Razorpay may modify styles after initial injection)
+## Solution
+Override the Razorpay wrapper styles to render as a ~85% height bottom sheet with rounded top corners, a dimmed backdrop behind it, and clear distance from the status bar.
 
 ### Files to change
 
-**1. `src/index.css`** — Update Razorpay safe area rules:
-- Change wrapper selectors from `top: env(safe-area-inset-top)` + `height: calc(100% - safe-area)` to `top: 0` + `height: 100%` + `padding-top: env(safe-area-inset-top)` + `box-sizing: border-box`
-- Keep the `::before` solid backdrop at z-index max
-- Remove `position: absolute; top: 0; height: 100%` from iframe rules (let it flow with padding)
+**1. `src/index.css`** — Restyle the Razorpay wrapper:
+- Change from `top: 0; height: 100%` to `top: auto; bottom: 0; height: 88vh; max-height: 88vh`
+- Add `border-radius: 16px 16px 0 0` for the bottom-sheet look
+- Replace the `::before` status-bar backdrop with a semi-transparent full-screen dimmer (`background: rgba(0,0,0,0.5)`)
+- Remove the `padding-top: env(safe-area-inset-top)` (no longer needed since it doesn't reach the top)
+- Keep `padding-bottom: env(safe-area-inset-bottom)` for the home indicator
 
 **2. `src/hooks/useRazorpay.ts`** — Update `patchNode` in MutationObserver:
-- Apply `padding-top` instead of `top` offset
-- Add `box-sizing: border-box`
-- Also observe **attribute** mutations (not just childList) since Razorpay may re-set inline styles after injection
-- Add a secondary sweep with `requestAnimationFrame` + `setTimeout(500ms)` to catch late-injected elements
+- Apply `bottom: 0; top: auto; height: 88vh; border-radius: 16px 16px 0 0` instead of the current full-screen styles
+- Remove the `padding-top` safe-area enforcement
+- Set `background-color: white` on the wrapper (Razorpay's content is white) and use the dimmer backdrop for the overlay area above
+- Update the delayed sweeps to apply the same bottom-sheet styles
 
-**3. `src/hooks/useRazorpay.ts`** — Add `background: #2D4A3E` (matching the status bar backdrop) to the top padding area of the wrapper so the safe area region has a solid color behind it, not transparent
+**3. `src/hooks/useRazorpay.ts`** — Separate backdrop vs. content container:
+- Detect the backdrop div (semi-transparent overlay) and keep it full-screen with `background: rgba(0,0,0,0.4)`
+- Detect the content container (has the iframe) and apply bottom-sheet positioning
 
-### Technical detail
+### Visual result
+```text
+┌─────────────────────┐
+│  Status bar / DI    │  ← Clear, untouched
+│                     │
+│  Dimmed backdrop    │  ← Semi-transparent overlay
+│─────────────────────│  ← Rounded top corners (16px)
+│                     │
+│  Razorpay Checkout  │  ← ~88vh height
+│  (iframe content)   │
+│                     │
+│  Continue button    │
+│─────────────────────│
+│  Safe area bottom   │
+└─────────────────────┘
+```
 
+### Key CSS change
 ```css
-/* Wrapper: full viewport with top padding */
-body.razorpay-active > div[style*="z-index"],
-... {
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: 100% !important;
-  width: 100% !important;
-  padding-top: env(safe-area-inset-top, 0px) !important;
-  box-sizing: border-box !important;
-  background-color: #2D4A3E !important; /* matches status bar */
-}
-
-/* iframe fills the padded content area */
-body.razorpay-active iframe[src*="razorpay"] {
-  width: 100% !important;
-  height: 100% !important;
-  border: none !important;
+body.razorpay-active > div[style*="z-index"]:last-of-type:not(#root) {
+  top: auto !important;
+  bottom: 0 !important;
+  height: 88vh !important;
+  max-height: 88vh !important;
+  border-radius: 16px 16px 0 0 !important;
+  overflow: hidden !important;
+  background: #fff !important;
 }
 ```
-
-```typescript
-// In patchNode:
-node.style.setProperty('padding-top', 'env(safe-area-inset-top, 0px)', 'important');
-node.style.setProperty('box-sizing', 'border-box', 'important');
-node.style.setProperty('top', '0', 'important');
-node.style.setProperty('height', '100%', 'important');
-node.style.setProperty('background-color', '#2D4A3E', 'important');
-```
-
-MutationObserver config update:
-```typescript
-razorpayDomObserver.observe(document.body, { 
-  childList: true, 
-  subtree: true, 
-  attributes: true, 
-  attributeFilter: ['style'] 
-});
-```
-
-Plus delayed re-sweeps at 100ms, 500ms, and 1000ms after `razorpay.open()` to catch late DOM injections.
 
