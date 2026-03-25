@@ -36,12 +36,15 @@ import { NotificationHealthCheck } from '@/components/notifications/Notification
 import { toast } from 'sonner';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { getFlag, setFlag, getString, removeKey } from '@/lib/persistent-kv';
+import { useTheme } from 'next-themes';
+import { Moon, Sun } from 'lucide-react';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const { user, profile, society, isSeller, isAdmin, isBuilderMember, signOut, refreshProfile } = useAuth();
   const { isFeatureEnabled } = useEffectiveFeatures();
   const settings = useSystemSettings();
+  const { theme, setTheme } = useTheme();
   const [largeFont, setLargeFont] = useState(() => getFlag('app_large_font'));
   const [isEditingAvatar, setIsEditingAvatar] = useState(false);
   const [showOnboardingFeedback, setShowOnboardingFeedback] = useState(false);
@@ -243,15 +246,27 @@ export default function ProfilePage() {
         </div>
 
         {/* Accessibility */}
-        <div className="mx-4 mt-4 bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Type size={16} className="text-muted-foreground" />
-            <div>
-              <p className="text-sm font-medium">Larger Text</p>
-              <p className="text-[11px] text-muted-foreground">Easier to read</p>
+        <div className="mx-4 mt-4 bg-card border border-border rounded-xl divide-y divide-border">
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Type size={16} className="text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Larger Text</p>
+                <p className="text-[11px] text-muted-foreground">Easier to read</p>
+              </div>
             </div>
+            <Switch checked={largeFont} onCheckedChange={setLargeFont} />
           </div>
-          <Switch checked={largeFont} onCheckedChange={setLargeFont} />
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              {theme === 'dark' ? <Moon size={16} className="text-muted-foreground" /> : <Sun size={16} className="text-muted-foreground" />}
+              <div>
+                <p className="text-sm font-medium">Dark Mode</p>
+                <p className="text-[11px] text-muted-foreground">Switch appearance</p>
+              </div>
+            </div>
+            <Switch checked={theme === 'dark'} onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')} />
+          </div>
         </div>
 
         {/* Menu List */}
