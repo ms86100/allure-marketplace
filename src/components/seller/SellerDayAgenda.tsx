@@ -16,6 +16,7 @@ interface SellerDayAgendaProps {
 
 export function SellerDayAgenda({ sellerId }: SellerDayAgendaProps) {
   const { data: bookings = [], isLoading } = useSellerServiceBookings(sellerId);
+  const { getFlowLabel } = useFlowStepLabels();
   const navigate = useNavigate();
   const today = useMemo(() => startOfToday(), []);
 
