@@ -330,8 +330,9 @@ export default function WelcomeCarousel() {
         </div>
       </div>
 
-      {/* Dot Indicators — fixed position with safe spacing */}
-      <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+64px)] left-0 right-0 z-50 flex justify-center pt-3 pointer-events-none">
+      {/* Bottom fixed area: dots + legal links */}
+      <div className="fixed bottom-[env(safe-area-inset-bottom,0px)] left-0 right-0 z-50 flex flex-col items-center gap-2 pb-3 pointer-events-none">
+        {/* Dot Indicators */}
         <div className="flex gap-2 bg-card/90 backdrop-blur-md px-5 py-3 rounded-full border border-border shadow-lg pointer-events-auto">
           {slides.map((_, i) => (
             <button
@@ -344,24 +345,15 @@ export default function WelcomeCarousel() {
             />
           ))}
         </div>
-      </div>
 
-      {/* Top-right Sign In */}
-      <div className="fixed top-4 right-4 z-50">
-        <Link to="/auth">
-          <Button size="sm" variant="secondary" className="font-medium shadow-lg rounded-xl">
-            Sign In
-          </Button>
-        </Link>
-      </div>
-
-      {/* Legal Footer — above dots */}
-      <div className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+60px)] left-0 right-0 z-40 flex justify-center gap-4 text-[10px] text-muted-foreground/60">
-        <Link to="/privacy-policy" className="hover:text-foreground transition-colors">Privacy</Link>
-        <span>·</span>
-        <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-        <span>·</span>
-        <Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
+        {/* Legal links below dots */}
+        <div className="flex gap-4 text-[10px] text-muted-foreground/60 pointer-events-auto">
+          <Link to="/privacy-policy" className="hover:text-foreground transition-colors">Privacy</Link>
+          <span>·</span>
+          <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+          <span>·</span>
+          <Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
+        </div>
       </div>
     </div>
   );
