@@ -115,10 +115,10 @@ describe('Deep Link Parsing', () => {
     } catch { return ''; }
   };
 
-  it('TC-DL001: Hash fragment → path', () => { expect(parseDeepLink('https://sociva.app/#/orders/123')).toBe('/orders/123'); });
+  it('TC-DL001: Hash fragment → path', () => { expect(parseDeepLink('https://www.sociva.in/#/orders/123')).toBe('/orders/123'); });
   it('TC-DL002: Custom scheme', () => { expect(parseDeepLink('sociva://orders/123')).toContain('123'); });
   it('TC-DL003: Query params preserved', () => { expect(parseDeepLink('sociva://search?q=samosa')).toContain('q=samosa'); });
-  it('TC-DL004: Standard path', () => { expect(parseDeepLink('https://sociva.app/orders/123')).toBe('/orders/123'); });
+  it('TC-DL004: Standard path', () => { expect(parseDeepLink('https://www.sociva.in/orders/123')).toBe('/orders/123'); });
   it('TC-DL005: Invalid URL → empty', () => { expect(parseDeepLink('not-a-url')).toBe(''); });
 });
 

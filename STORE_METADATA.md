@@ -115,10 +115,10 @@ Version 2.0.0 - Society Super-App
 ---
 
 ## Privacy Policy URL
-https://sociva.app/privacy-policy
+https://www.sociva.in/privacy-policy
 
 ## Terms of Service URL
-https://sociva.app/terms
+https://www.sociva.in/terms
 
 ---
 
@@ -154,7 +154,7 @@ https://sociva.app/terms
 ## Support Information
 
 **Support Email:** support@sociva.app
-**Support URL:** https://sociva.app/profile
+**Support URL:** https://www.sociva.in/help
 
 ---
 

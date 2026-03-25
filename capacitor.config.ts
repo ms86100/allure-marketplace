@@ -15,30 +15,30 @@ import type { CapacitorConfig } from '@capacitor/cli';
  *   - Splash auto-hides as safety net
  */
 
-const isProduction = process.env.CAPACITOR_ENV === 'production';
+const isDev = process.env.CAPACITOR_ENV === 'development';
 
 const config: CapacitorConfig = {
   appId: 'app.sociva.community',
   appName: 'Sociva',
   webDir: 'dist',
 
-  // Dev server only when NOT in production
-  ...(!isProduction && {
+  // Dev server only when explicitly in development
+  ...(isDev && {
     server: {
       url: 'https://b3f6efce-9b8e-4071-b39d-b038b9b1adf4.lovableproject.com?forceHideBadge=true',
       cleartext: true,
-      hostname: 'sociva.app',
+      hostname: 'www.sociva.in',
       androidScheme: 'https',
     },
   }),
 
   // Production: minimal server config with allowNavigation for Supabase/app domains
-  ...(isProduction && {
+  ...(!isDev && {
     server: {
       androidScheme: 'https',
       allowNavigation: [
-        'rvvctaikytfeyzkwoqxg.supabase.co',
-        'block-eats.lovable.app',
+        'ywhlqsgvbkvcvqlsniad.supabase.co',
+        'www.sociva.in',
         '*.razorpay.com',
         '*.razorpay.in',
       ],
@@ -86,9 +86,9 @@ const config: CapacitorConfig = {
 
   // Android-specific configuration
   android: {
-    allowMixedContent: !isProduction,
+    allowMixedContent: isDev,
     captureInput: true,
-    webContentsDebuggingEnabled: !isProduction,
+    webContentsDebuggingEnabled: isDev,
     // Allow UPI intent:// and upi:// deep links from Razorpay
     allowIntentUrls: true,
   },
