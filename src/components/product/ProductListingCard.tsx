@@ -134,9 +134,9 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
         className
       )}
     >
-      {/* Image */}
+      {/* Image — fixed 4:5 aspect ratio for uniform grid */}
       <div className="relative">
-        <div className="relative aspect-square rounded-t-2xl overflow-hidden product-image-bg">
+        <div className="relative aspect-[4/5] rounded-t-2xl overflow-hidden product-image-bg">
           {product.image_url ? (
             <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
           ) : (
@@ -207,79 +207,36 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
         )}
       </div>
 
-      {/* Content */}
+      {/* Content — fixed-height section for uniform cards */}
       <div className={cn(
-        "flex flex-col flex-1",
+        "flex flex-col",
         compact ? "px-2.5 pb-2.5" : "px-3 pb-3",
         !viewOnly && !isOutOfStock ? "pt-6" : "pt-3"
       )}>
-        {variantText && (
-          <span className="text-[10px] font-medium text-muted-foreground mb-0.5">{variantText}</span>
-        )}
-
-        <h4 className={cn("font-semibold leading-snug text-foreground", compact ? "text-[12px] line-clamp-1" : "text-[13px] line-clamp-2")}>{product.name}</h4>
-
-        {product.seller_name && !compact && (
-          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-            <span className="text-[11px] text-muted-foreground truncate">{product.seller_name}</span>
-            {product.seller_id && <SellerTrustBadge sellerId={product.seller_id} size="sm" />}
-            {activityLabel && <span className="text-[9px] text-muted-foreground/70">· {activityLabel}</span>}
-            {isSellerInactive && (
-              <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-warning bg-warning/10 rounded-full px-1.5 py-0.5">
-                <AlertTriangle size={8} />Inactive
-              </span>
-            )}
-          </div>
-        )}
-
-        {!compact && (product as any).on_time_delivery_pct != null && (product as any).completed_order_count > onTimeBadgeMinOrders && (
-          <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-primary bg-primary/8 rounded-full px-2 py-0.5 w-fit mt-1.5">
-            {ml.label('label_on_time_format').replace('{pct}', String((product as any).on_time_delivery_pct))}
-          </span>
-        )}
-
-        {!compact && socialProofCount != null && socialProofCount > 0 && (
-          <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-muted-foreground bg-secondary rounded-full px-2 py-0.5 w-fit mt-1">
-            <Users size={9} className="shrink-0" />
-            {ml.label('label_social_proof_format').replace('{count}', String(socialProofCount)).replace('{unit}', socialProofCount === 1 ? ml.label('label_social_proof_singular') : ml.label('label_social_proof_plural'))}
-          </span>
-        )}
-
-        {!compact && deliveryText && (
-          <div className="flex items-center gap-1 mt-1.5">
-            <Clock size={10} className="text-muted-foreground" />
-            <span className="text-[10px] font-medium text-muted-foreground">{deliveryText}</span>
-          </div>
-        )}
-
-        {!compact && product.lead_time_hours != null && product.lead_time_hours > 0 && (
-          <div className="flex items-center gap-1 mt-1">
-            <Clock size={9} className="text-muted-foreground" />
-            <span className="text-[9px] font-medium text-muted-foreground">Order {product.lead_time_hours}h ahead</span>
-          </div>
-        )}
-
-        {!compact && product.accepts_preorders && (
-          <span className="inline-block bg-primary/8 text-primary text-[8px] font-bold px-2 py-0.5 rounded-full w-fit mt-1">Pre-order</span>
-        )}
-
-        <div className="flex-1 min-h-0" />
-
-        {/* Price row */}
-        <div className="flex items-end gap-2 mt-2">
+        {/* Price row — always first for scannability */}
+        <div className="flex items-baseline gap-1.5">
           <span className="font-bold text-[15px] text-foreground leading-none tracking-tight tabular-nums">{formatPrice(product.price)}</span>
           {hasDiscount && (
             <span className="text-[11px] text-muted-foreground line-through leading-none tabular-nums">{formatPrice(product.mrp!)}</span>
           )}
         </div>
 
-        {!compact && product.price_per_unit && (
-          <span className="text-[10px] text-muted-foreground leading-none mt-0.5">{product.price_per_unit}</span>
+        {variantText && (
+          <span className="text-[10px] font-medium text-muted-foreground mt-0.5">{variantText}</span>
         )}
 
-        {!compact && (locationLabel || (product as any).is_same_society !== false) && (
+        <h4 className="font-semibold leading-snug text-foreground text-[12px] line-clamp-1 mt-1">{product.name}</h4>
+
+        {product.seller_name && !compact && (
+          <div className="flex items-center gap-1 mt-1 overflow-hidden">
+            <span className="text-[10px] text-muted-foreground truncate">{product.seller_name}</span>
+            {product.seller_id && <SellerTrustBadge sellerId={product.seller_id} size="sm" />}
+          </div>
+        )}
+
+        {!compact && locationLabel && (
           <div
-            className={cn("flex items-center gap-1 mt-1.5", (product as any).seller_latitude && (product as any).seller_longitude && "cursor-pointer hover:text-primary transition-colors")}
+            className={cn("flex items-center gap-1 mt-1", (product as any).seller_latitude && (product as any).seller_longitude && "cursor-pointer hover:text-primary transition-colors")}
             onClick={(e) => {
               const lat = (product as any).seller_latitude;
               const lng = (product as any).seller_longitude;
@@ -291,9 +248,9 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
             }}
             title={(product as any).seller_latitude ? "Open in Google Maps" : undefined}
           >
-            <MapPin size={10} className="shrink-0 text-muted-foreground" />
+            <MapPin size={9} className="shrink-0 text-muted-foreground" />
             <span className="text-[10px] font-medium text-muted-foreground leading-tight truncate">
-              {locationLabel || ml.label('label_in_your_society')}
+              {locationLabel}
             </span>
           </div>
         )}
