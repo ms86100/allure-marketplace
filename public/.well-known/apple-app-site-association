@@ -3,14 +3,14 @@
     "apps": [],
     "details": [
       {
-        "appID": "TEAM_ID.app.sociva.community",
+        "appID": "6HBR38JB8Z.app.sociva.community",
         "paths": ["/*"]
       }
     ]
   },
   "webcredentials": {
     "apps": [
-      "TEAM_ID.app.sociva.community"
+      "6HBR38JB8Z.app.sociva.community"
     ]
   }
 }
