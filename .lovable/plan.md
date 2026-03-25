@@ -1,22 +1,21 @@
 
+# Server-Side Coupon Validation — DONE
 
-# Fix: Booking Sheet Layout Spacing
+## What Changed
+Migration added a server-side coupon validation block to `create_multi_vendor_orders` RPC, inserted right after `_resolved_coupon_id` is resolved.
 
-## Problem
-The `ServiceBookingFlow` drawer content has no horizontal padding. The `DrawerHeader` has `p-4` but the main content `div` (line 363) has only `space-y-6` with zero `px`. The `TimeSlotPicker` date row uses `-mx-1 px-1` — nearly edge-to-edge.
+## Validations Added (in order)
+1. Coupon exists and `is_active = true`
+2. Not expired (`expires_at >= now()`)
+3. Started (`starts_at <= now()`)
+4. Global usage limit not exceeded
+5. Coupon belongs to a seller in the current order
+6. Per-user redemption limit not exceeded
+7. Minimum order amount met
+8. **Discount recalculated server-side** — client `_coupon_discount` is completely ignored
 
-## Changes
+## Failure Mode
+Invalid coupon → silently removed (`_resolved_coupon_id := NULL`, `_coupon_discount := 0`). Order proceeds without discount. No cart flow disruption.
 
-### 1. `ServiceBookingFlow.tsx` — Add `px-4` to content wrapper
-- Line 363: Change `className="space-y-6 overflow-y-auto pb-6"` to `className="space-y-6 overflow-y-auto pb-6 px-4"`
-- Same for the review step content and the bottom CTA button area
-
-### 2. `TimeSlotPicker.tsx` — Fix date scroll row to bleed correctly
-- Line 124: Change `-mx-1 px-1` to `-mx-4 px-4` so the scrollable date row extends to the drawer edges while the rest of the content respects the `px-4` padding. This gives the date cards breathing room from the visible boundary while allowing natural horizontal scroll.
-
-### 3. `BookingSheet.tsx` — Apply same `px-4` pattern
-- The other booking sheet uses the same `TimeSlotPicker` and likely has the same edge-to-edge issue. Add `px-4` to its content wrapper for consistency.
-
-## Result
-All content inside the booking drawer gets consistent 16px left/right margins. Scrollable rows (date selector) still scroll naturally but start/end with proper inset. Matches the `DrawerHeader` padding.
-
+## Impact: Zero
+No client-side changes. No schema changes. Same function signature. All downstream consumers (payment_records, coupon_redemptions, order totals, Razorpay, settlements) use the same `_coupon_discount` variable which is now server-validated.
