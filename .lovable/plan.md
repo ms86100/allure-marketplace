@@ -1,61 +1,48 @@
 
 
-# Fix: Delivery Proximity Notification Spam (Race Condition)
+# Fix: Content Bleeding Into Status Bar on iOS
 
 ## Problem
 
-The screenshots show **4+ identical "Driver arriving now!" push notifications** firing simultaneously on the buyer's device. This is caused by a TOCTOU (Time-of-Check, Time-of-Use) race condition in the `update-delivery-location` edge function.
+The screenshot shows the featured banner carousel bleeding into the iOS status bar area (time "1:53", "TestFlight" text visible over the banner). The current approach uses `padding-top: env(safe-area-inset-top)` on `#root`, but since `#root` has `overflow-y: auto`, when content scrolls, it becomes visible through the transparent status bar gap.
 
-**How it happens**: The rider's device sends location updates every 2-3 seconds. Multiple concurrent edge function invocations all execute `SELECT count(*)` from `notification_queue` simultaneously, all see count = 0 (no recent notification), and all proceed to `INSERT` — producing duplicate notifications.
+The padding just pushes content down initially — it doesn't create an opaque barrier. Scrolled content rises into the safe-area gap.
 
-The existing dedup logic (lines 496-503 and 526-533 in the edge function) uses a time-window SELECT check which is inherently racy under concurrent writes.
+## Fix
 
-## Fix (2 changes)
+### 1. Add a fixed opaque status bar backdrop (`src/index.css`)
 
-### 1. Database migration: Add partial unique index
+Add a `::before` pseudo-element on `#root` that creates a solid, fixed background behind the status bar — matching the app's background color:
 
-Enforce deduplication at the database level so duplicates are physically impossible:
-
-```sql
-CREATE UNIQUE INDEX IF NOT EXISTS uq_proximity_notif_per_order
-ON public.notification_queue (user_id, type, reference_path)
-WHERE type IN ('delivery_proximity_imminent', 'delivery_proximity')
-  AND is_read = false;
-```
-
-This guarantees only ONE unread proximity notification per user per order can exist, regardless of how many concurrent inserts race.
-
-### 2. Edge function: Replace SELECT-then-INSERT with UPDATE-then-INSERT + conflict handling
-
-In `supabase/functions/update-delivery-location/index.ts`, for both proximity tiers (imminent at line ~495 and nearby at line ~525):
-
-**Before each insert**, mark any existing unread notification as read (opens the unique index slot):
-```ts
-await supabase
-  .from('notification_queue')
-  .update({ is_read: true })
-  .eq('user_id', buyerId)
-  .eq('type', 'delivery_proximity_imminent')
-  .eq('reference_path', `/orders/${assignment.order_id}`)
-  .eq('is_read', false);
-```
-
-**Replace the SELECT count check + INSERT** with a simple INSERT that silently handles duplicate key conflicts:
-```ts
-const { error: insertErr } = await supabase.from('notification_queue').insert({...});
-if (insertErr && !insertErr.message?.includes('duplicate key')) {
-  console.error('Proximity notification insert error:', insertErr);
+```css
+#root::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: hsl(var(--background));
+  z-index: 9999;
+  pointer-events: none;
 }
 ```
 
-Remove the `SELECT count` dedup checks entirely (lines 496-503 and 526-533) — the unique index now handles this atomically.
+This ensures nothing can ever show through the status bar area, regardless of scroll position. The pseudo-element inherits the theme's background color, so it works in both light and dark mode.
+
+### 2. Keep existing `padding-top` on `#root`
+
+The `padding-top: env(safe-area-inset-top)` stays — it correctly offsets content so it starts below the status bar. The new `::before` just adds an opaque shield on top.
+
+### 3. Society name truncation
+
+The location pill text max-width was recently set to `max-w-[48vw]` — the screenshot shows "Shriram Greenfield Phase-2 M..." which is just CSS truncation working correctly for a very long name. This is acceptable behavior. No change needed.
 
 ## Summary
 
-| Change | File |
+| File | Change |
 |---|---|
-| Add partial unique index on `notification_queue` | Database migration (1 SQL statement) |
-| Replace racy SELECT+INSERT with UPDATE+INSERT + conflict handling | `supabase/functions/update-delivery-location/index.ts` (~20 lines changed in 2 places) |
+| `src/index.css` | Add `#root::before` fixed pseudo-element as opaque status bar shield (~8 lines) |
 
-This eliminates the race condition at the database level, making duplicate proximity notifications impossible regardless of concurrent location updates.
+1 file, ~8 lines added. Zero risk to existing layout — purely additive.
 
