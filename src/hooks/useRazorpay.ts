@@ -25,8 +25,14 @@ function startSafeAreaObserver() {
       node.classList.toString().includes('razorpay');
 
     if (isRazorpayContainer) {
-      node.style.setProperty('top', 'env(safe-area-inset-top, 0px)', 'important');
-      node.style.setProperty('height', 'calc(100% - env(safe-area-inset-top, 0px))', 'important');
+      node.style.setProperty('top', '0', 'important');
+      node.style.setProperty('left', '0', 'important');
+      node.style.setProperty('right', '0', 'important');
+      node.style.setProperty('height', '100%', 'important');
+      node.style.setProperty('width', '100%', 'important');
+      node.style.setProperty('padding-top', 'env(safe-area-inset-top, 0px)', 'important');
+      node.style.setProperty('box-sizing', 'border-box', 'important');
+      node.style.setProperty('background-color', '#2D4A3E', 'important');
     }
   };
 
@@ -37,10 +43,19 @@ function startSafeAreaObserver() {
           patchNode(added);
         }
       }
+      // Also re-patch if Razorpay SDK resets inline styles
+      if (m.type === 'attributes' && m.target instanceof HTMLElement) {
+        patchNode(m.target);
+      }
     }
   });
 
-  razorpayDomObserver.observe(document.body, { childList: true, subtree: true });
+  razorpayDomObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style'],
+  });
 
   // Also patch any already-present high z-index children (race condition guard)
   document.body.querySelectorAll<HTMLElement>(':scope > div').forEach(patchNode);
@@ -263,6 +278,20 @@ export function useRazorpay() {
         razorpay.open();
         // Start observing for Razorpay's injected DOM and patch safe-area
         startSafeAreaObserver();
+        // Delayed re-sweeps to catch late-injected elements
+        const sweep = () => document.body.querySelectorAll<HTMLElement>(':scope > div').forEach((el) => {
+          const z = parseInt(el.style.zIndex || '0', 10);
+          if (z > 999 || el.querySelector('iframe[src*="razorpay"]') || el.classList.toString().includes('razorpay')) {
+            el.style.setProperty('top', '0', 'important');
+            el.style.setProperty('height', '100%', 'important');
+            el.style.setProperty('padding-top', 'env(safe-area-inset-top, 0px)', 'important');
+            el.style.setProperty('box-sizing', 'border-box', 'important');
+            el.style.setProperty('background-color', '#2D4A3E', 'important');
+          }
+        });
+        setTimeout(sweep, 100);
+        setTimeout(sweep, 500);
+        setTimeout(sweep, 1000);
       });
     } catch (error: any) {
       console.error('Razorpay error:', error);
