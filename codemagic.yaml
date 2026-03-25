@@ -482,7 +482,7 @@ workflows:
             settings['SWIFT_OPTIMIZATION_LEVEL'] = '-O' if config.name == 'Release'
             settings['MACH_O_TYPE'] = 'mh_execute'
             settings['EXECUTABLE_NAME'] = 'LiveDeliveryWidgetExtension'
-            settings['TARGETED_DEVICE_FAMILY'] = '1,2'
+            settings['TARGETED_DEVICE_FAMILY'] = '1'
             settings['GENERATE_INFOPLIST_FILE'] = 'NO'
             settings['CURRENT_PROJECT_VERSION'] = '1'
             settings['MARKETING_VERSION'] = '1.0'
@@ -547,6 +547,8 @@ workflows:
               settings = config.build_settings
               settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.1'
               settings['DEVELOPMENT_TEAM'] = TEAM_ID
+
+              settings['TARGETED_DEVICE_FAMILY'] = '1'
 
               case target.name
               when 'App'
@@ -1227,7 +1229,7 @@ workflows:
             settings['CODE_SIGN_ENTITLEMENTS'] = 'LiveDeliveryWidgetExtension/LiveDeliveryWidgetExtension.entitlements'
             settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.1'
             settings['SWIFT_VERSION'] = '5.0'
-            settings['TARGETED_DEVICE_FAMILY'] = '1,2'
+            settings['TARGETED_DEVICE_FAMILY'] = '1'
             settings['GENERATE_INFOPLIST_FILE'] = 'NO'
             settings['CURRENT_PROJECT_VERSION'] = '1'
             settings['MARKETING_VERSION'] = '1.0'
@@ -1289,6 +1291,8 @@ workflows:
               settings = config.build_settings
               settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.1'
               settings['DEVELOPMENT_TEAM'] = TEAM_ID
+
+              settings['TARGETED_DEVICE_FAMILY'] = '1'
 
               case target.name
               when 'App'
