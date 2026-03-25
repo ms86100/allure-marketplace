@@ -1,177 +1,160 @@
 
 
-# Buyer-Side Service Booking — 10 Critical Bugs
+# App Store Rejection Risks & Trust-Breaking Bugs — Honest Audit
 
-## Bug 1: `BuyerCancelBooking` Component Is Never Used
+## Dimension 1: App Store Policy Violations
 
-**Description:** The `BuyerCancelBooking` component exists in `src/components/booking/BuyerCancelBooking.tsx` but is never imported or rendered anywhere. The `OrderDetailPage` uses `OrderCancellation` for buyer cancellation (line 693), which is a generic order cancellation — it does NOT release the service slot or update the `service_bookings` record.
+### Bug 1: "First Order Protected — Instant Refund" Promise with No Backend Implementation
+**Severity: App Store Rejection Risk (Guideline 2.3.1 — Misleading)**
 
-**Why Critical:** When a buyer cancels a service booking via `OrderCancellation`, the order gets cancelled but the service slot `booked_count` is never decremented, and the `service_bookings` row status remains unchanged. The slot is permanently "consumed" — other buyers can't book it.
+`FirstOrderBadge.tsx` displays "🛡 First Order Protected" + "Instant refund if something goes wrong" to buyers. But:
+- No automated refund mechanism exists anywhere in the codebase
+- `process-settlements` has a TODO: "Integrate Razorpay Route transfer here" — settlements don't actually transfer money
+- `RefundPolicyPage.tsx` explicitly says the platform "does not guarantee refunds on behalf of individual sellers"
 
-**Where:** `OrderDetailPage.tsx` line 693, `BuyerCancelBooking.tsx` (dead code)
+This is a **legally misleading claim** shown in the buyer UI. Apple reviews flag promises the app cannot fulfill.
 
-**Impact:** Slot inventory leak. Every cancelled booking permanently reduces available capacity. Over time sellers appear to have no availability.
+**Impact if fixed:** Must also update `RefundTierBadge.tsx` which says "Instant refund eligible" for orders under ₹200. Both components reference a non-existent refund engine.
 
-**Fix Risk:** Low. Replacing `OrderCancellation` with `BuyerCancelBooking` for service orders is surgical. Must verify `buyer_cancel_order` RPC + `release_service_slot` RPC are both called.
-
-**Mitigation:** For service bookings (`serviceBooking` is truthy), render `BuyerCancelBooking` instead of `OrderCancellation` in the buyer action bar. The component already handles slot release + booking status update + seller notification.
-
----
-
-## Bug 2: `fulfillment_type` Uses Prop `locationType` Instead of `resolvedLocation`
-
-**Description:** In `ServiceBookingFlow.tsx` line 223, the order insert uses `locationType` (the raw prop from `ProductDetailSheet`) for `fulfillment_type`, but line 244 uses the correct `resolvedLocationType` (from `service_listings` DB lookup) for the booking RPC. This creates a mismatch — the order record may say `at_seller` while the booking says `home_visit`.
-
-**Why Critical:** Workflow resolution depends on `fulfillment_type` on the order. Wrong fulfillment type → wrong workflow → wrong status steps shown to buyer and seller. For home visit services, buyer address info and delivery flow logic break.
-
-**Where:** `ServiceBookingFlow.tsx` line 223
-
-**Impact:** Workflow engine, fulfillment card on `OrderDetailPage`, delivery/pickup labels all display incorrectly.
-
-**Fix Risk:** Minimal — single line change from `locationType` to `resolvedLocationType` (already computed on line 244).
-
-**Mitigation:** Replace `fulfillment_type: locationType || 'at_seller'` with `fulfillment_type: resolvedLocationType`.
+**Fix:** Either (A) remove the badge entirely, or (B) change text to "Satisfaction guaranteed — raise a dispute for resolution" which matches the actual capability (dispute system exists).
 
 ---
 
-## Bug 3: `orderFulfillmentType` Defaults to `'self_pickup'` Before Order Loads
+### Bug 2: Chat Has No Content Moderation, No Block User, No Message Length Limit
+**Severity: App Store Rejection Risk (Guideline 1.2 — UGC without moderation)**
 
-**Description:** In `useOrderDetail.ts` line 58: `const orderFulfillmentType = (order as any)?.fulfillment_type || 'self_pickup'`. Before the order loads, this resolves to `'self_pickup'`, which causes `useCategoryStatusFlow` to resolve the wrong workflow on first render.
+`OrderChat.tsx` accepts unlimited-length messages with no sanitization, no profanity filter, no report/block functionality. Apple requires apps with UGC/chat to provide:
+- Ability to block abusive users
+- Ability to report objectionable content
+- Content filtering/moderation
 
-**Why Critical:** This violates the documented resolution-gating pattern. The workflow hook fires with `self_pickup` → fetches the wrong flow → UI briefly shows cart_purchase timeline steps instead of service_booking steps. Although it corrects on re-render, this causes a visible flash of wrong steps.
+The chat has none of these. The Textarea has no `maxLength` prop. A user could send a 1MB message string.
 
-**Where:** `useOrderDetail.ts` line 58
+**Impact if fixed:** Need to add a `ReportSheet` integration for chat messages + a block mechanism. The `reports` table already supports `reported_user_id` — the chat just needs to wire into it.
 
-**Impact:** Brief flash of incorrect workflow timeline for every service booking order detail load. Confuses buyers.
-
-**Fix Risk:** Low. Change default to `null` and gate `useCategoryStatusFlow` on order being loaded.
-
-**Mitigation:** Default to `null` instead of `'self_pickup'`. The memory doc `workflow-resolution-gating` explicitly states this pattern.
-
----
-
-## Bug 4: `nextBooking` Filter Uses Deprecated Statuses
-
-**Description:** In `BuyerBookingsCalendar.tsx` line 60, the "Next Appointment" highlight filters by `['requested', 'confirmed', 'scheduled', 'rescheduled'].includes(b.status)`. But `requested`, `scheduled`, and `rescheduled` are deprecated in the workflow — bookings now start at `confirmed`. This filter is partially dead code, but more critically, it won't match `in_progress` bookings that are still active.
-
-**Why Critical:** An `in_progress` appointment (e.g., buyer is currently at the doctor) won't show as "Next Appointment". The buyer loses visibility of their active booking.
-
-**Where:** `BuyerBookingsCalendar.tsx` line 60
-
-**Impact:** "Next Appointment" card goes blank during active appointments.
-
-**Fix Risk:** Low. Should filter by non-terminal statuses dynamically instead of a hardcoded list.
-
-**Mitigation:** Use workflow-driven terminal status check: `if (isTerminalStatus(flow, b.status)) return false;` or simply check `!['completed', 'cancelled', 'no_show'].includes(b.status)` as a minimal fix.
+**Fix:** Add `maxLength={1000}` to chat textarea. Add a "Report" option on long-press of received messages. Add client-side profanity check or lean on the existing `ai-auto-review` edge function.
 
 ---
 
-## Bug 5: Notification Payload Says `'requested'` But Booking Is `'confirmed'`
+### Bug 3: Bulletin Posts Have No Content Moderation Gate
+**Severity: App Store Rejection Risk (Guideline 1.2)**
 
-**Description:** In `ServiceBookingFlow.tsx` line 315, the notification sent to the seller says `payload: { orderId: order.id, status: 'requested', type: 'order' }`. But the booking is auto-confirmed (status = `'confirmed'`). The notification title also says "New Booking Request" implying it needs acceptance.
+`BulletinPage.tsx` and `CreatePostSheet` allow users to post text + images to the community board. While the `ai-auto-review` function exists, bulletin posts go live immediately before review. There's no pre-publish moderation, no profanity filter, and posts with images bypass content checking.
 
-**Why Critical:** Seller receives misleading notification suggesting action is needed to "accept" the booking. In reality the booking is already confirmed. This creates confusion and unnecessary seller anxiety.
+Apple requires UGC apps to filter objectionable content before or immediately after publishing.
 
-**Where:** `ServiceBookingFlow.tsx` lines 312-316
-
-**Impact:** Seller trust. Every booking notification is misleading.
-
-**Fix Risk:** Minimal — change `status: 'requested'` to `status: 'confirmed'` and update title from "Request" to "Booking Confirmed".
-
-**Mitigation:** Update notification text and payload to reflect auto-confirmed status.
+**Impact if fixed:** Must coordinate with `ai-auto-review` edge function to either queue posts for review or run synchronous content check before publishing.
 
 ---
 
-## Bug 6: Buyer Can Book Their Own Service (Race Condition)
+## Dimension 2: Trust-Breaking Bugs (Buyer & Seller)
 
-**Description:** In `ServiceBookingFlow.tsx` lines 191-202, the self-booking check fetches `seller_profiles.user_id` and compares to `user.id`. But this check happens AFTER the order is already created (line 211-226). If the check fails, the order exists as an orphan with no booking.
+### Bug 4: Settlements Never Actually Transfer Money
+**Severity: P0 — Seller Trust Destruction**
 
-**Why Critical:** The order is created before validation. Even though self-booking is caught, the cleanup uses `buyer_cancel_order` RPC — but only if `itemErr` triggers it. The self-booking path returns early WITHOUT cleaning up the order.
+`process-settlements/index.ts` lines 147-163: The settlement flow marks records as "processing" → "settled" without actually transferring money. The Razorpay Route transfer is commented out as TODO. Sellers see "Settled" in their earnings dashboard but never receive funds.
 
-**Where:** `ServiceBookingFlow.tsx` lines 197-202
+This is the single most trust-destroying bug in the system. A seller who fulfills orders and sees "Settled" will expect money in their bank account.
 
-**Impact:** Orphan orders in database from self-booking attempts.
+**Impact if fixed:** Requires Razorpay Route API integration. Must also handle: transfer failures, partial settlements, and retry logic. The `seller_profiles.razorpay_account_id` field already exists for linked accounts.
 
-**Fix Risk:** Low. Move the self-booking check BEFORE order creation.
-
-**Mitigation:** Relocate the seller profile fetch and self-check to before the order insert statement.
-
----
-
-## Bug 7: Price ≤ 0 Check Creates Orphan Order
-
-**Description:** Same pattern as Bug 6. The `price <= 0` check at line 204 happens AFTER the order is already inserted. If price is invalid, the function returns early without cleaning up the order.
-
-**Where:** `ServiceBookingFlow.tsx` lines 204-208
-
-**Impact:** Orphan order records in the database.
-
-**Fix Risk:** Minimal — move the check before order creation or add cleanup on early return.
-
-**Mitigation:** Move price validation before the order insert, or add `buyer_cancel_order` cleanup on the return path.
+**Fix:** Either (A) implement Razorpay Route transfers, or (B) change "Settled" label to "Eligible for Payout" and add a manual payout workflow for admins, or (C) hide the earnings dashboard entirely until automated payouts are implemented.
 
 ---
 
-## Bug 8: `addToCalendar` Uses Local Timezone But Bookings Are IST
+### Bug 5: Seller Can See Buyer's Residential Address for ALL Order Types
+**Severity: P1 — Privacy Violation / Trust**
 
-**Description:** `AppointmentDetailsCard.tsx` line 31-32 creates calendar dates as `new Date('2026-03-25T09:00')` without timezone offset. But `BuyerBookingsCalendar.tsx` explicitly parses booking times as IST (`+05:30`). This inconsistency means the calendar export creates events at the wrong time for users outside IST.
+The memory doc says "Buyer residential details (block and flat number) are only visible to sellers for delivery fulfillment types." But this needs verification — if the `OrderDetailPage` shows `delivery_address` for service bookings (which are at_seller/home_visit), buyers' home addresses could be exposed unnecessarily for venue-based appointments.
 
-**Why Critical:** Buyer adds appointment to their phone calendar → event shows at wrong time → buyer misses appointment.
-
-**Where:** `AppointmentDetailsCard.tsx` lines 31-32
-
-**Impact:** Missed appointments for any user not in IST timezone.
-
-**Fix Risk:** Low. Append `+05:30` to the date string construction to match `BuyerBookingsCalendar`.
-
-**Mitigation:** Change to `new Date(\`${booking.booking_date}T${booking.start_time}+05:30\`)`.
+**Impact if fixed:** Must audit `OrderDetailPage` address card rendering conditions. The `DeliveryStatusCard` and address display should be gated on `fulfillment_type === 'delivery'` or `home_visit`.
 
 ---
 
-## Bug 9: Booking Notes Not Passed to `book_service_slot` RPC
+### Bug 6: No Rate Limiting on Client-Side Chat Messages
+**Severity: P1 — Abuse / Spam**
 
-**Description:** `ServiceBookingFlow.tsx` line 246-257 calls `book_service_slot` RPC but does NOT pass `_notes`. The notes are saved on the `orders` table (line 221), but the `service_bookings` table has a `notes` column that stays `null`. The RPC accepts `_notes` as a parameter (see migration line 17).
+`OrderChat.tsx` has no rate limiting. A malicious user can spam hundreds of messages per second by holding Enter. Each message also triggers `process-notification-queue`, meaning the recipient gets flooded with push notifications.
 
-**Why Critical:** Seller sees the appointment in `SellerDayAgenda` which queries `service_bookings` — buyer's special requests are invisible. Seller must navigate to the order detail to see notes.
-
-**Where:** `ServiceBookingFlow.tsx` lines 246-257
-
-**Impact:** Seller misses critical buyer instructions (allergies, preferences, access codes for home visits).
-
-**Fix Risk:** Minimal — add `_notes: notes.trim() || null` to the RPC call.
-
-**Mitigation:** Add the missing `_notes` parameter to the `book_service_slot` RPC call.
+**Impact if fixed:** Must add client-side throttle (e.g., 1 message per second) AND server-side rate limiting on `chat_messages` insert (via RLS or trigger).
 
 ---
 
-## Bug 10: Slot Freshness Check Uses `start_time` String Match — Timezone Mismatch Risk
+### Bug 7: `dangerouslySetInnerHTML` in Chart Component Without Full Sanitization  
+**Severity: P2 — XSS Risk**
 
-**Description:** `ServiceBookingFlow.tsx` line 177 queries `service_slots` with `.eq('start_time', selectedTime)`. The `selectedTime` is a string like `"09:00"` from the picker, but DB `start_time` is a `time` type which may store as `"09:00:00"`. The PostgREST equality check works because Supabase casts, BUT if `selectedTime` comes with seconds (e.g., from a different flow), the match silently fails → `freshSlots` is null → booking shows "slot no longer available" error.
+`src/components/ui/chart.tsx` line 91 uses `dangerouslySetInnerHTML` with CSS content derived from theme configuration. While there's a regex sanitizer (`/^[a-zA-Z0-9#(),.\s/%]+$/`), the key names come from chart config which could be user-influenced in admin dashboards. This is a low-probability but high-impact XSS vector.
 
-**Why Critical:** Silent booking failure. Buyer sees "slot no longer available" when the slot IS available. No error logged server-side.
-
-**Where:** `ServiceBookingFlow.tsx` line 177
-
-**Impact:** Intermittent booking failures that are very hard to debug.
-
-**Fix Risk:** Low. Normalize `selectedTime` to HH:MM:SS format before the query.
-
-**Mitigation:** Append `:00` if selectedTime is in `HH:MM` format: `.eq('start_time', selectedTime.length === 5 ? selectedTime + ':00' : selectedTime)`.
+**Impact if fixed:** Replace `dangerouslySetInnerHTML` with CSS custom properties set via `style` prop, or tighten the sanitization to reject all non-alphanumeric key names.
 
 ---
 
-## Priority Order
+## Dimension 3: Silent Data/Financial Integrity Issues
 
-| # | Bug | Severity | Effort |
-|---|-----|----------|--------|
-| 1 | Slot not released on cancel | **P0** | Medium |
-| 2 | Wrong fulfillment_type on order | **P0** | Trivial |
-| 5 | Misleading notification | **P1** | Trivial |
-| 6 | Self-booking orphan order | **P1** | Low |
-| 7 | Price check orphan order | **P1** | Low |
-| 9 | Notes not passed to RPC | **P1** | Trivial |
-| 4 | Next Appointment misses in_progress | **P1** | Low |
-| 8 | Calendar timezone mismatch | **P2** | Low |
-| 3 | Flash of wrong workflow | **P2** | Low |
-| 10 | Slot time format mismatch | **P3** | Trivial |
+### Bug 8: Auto-Cancel Orders Function May Cancel Paid Orders
+**Severity: P0 — Financial Loss**
+
+`auto-cancel-orders` cancels orders that haven't been accepted within a timeout. But if a Razorpay webhook is delayed (common under load), an order could be `payment_status: 'pending'` at the time of auto-cancel, then receive a successful payment webhook AFTER cancellation. The webhook handler checks `is('razorpay_payment_id', null)` but doesn't check if the order is already cancelled.
+
+**Impact if fixed:** The `razorpay-webhook` handler must check `order.status !== 'cancelled'` before updating payment status. The `auto-cancel-orders` function should skip orders with `payment_type !== 'cod'` that are still awaiting payment confirmation.
+
+---
+
+### Bug 9: Delete Account Doesn't Clean Up All Tables
+**Severity: P1 — GDPR/Privacy Compliance**
+
+`delete-user-account/index.ts` cleans specific tables but misses several:
+- `bulletin_posts` (user's community posts remain with author_id pointing to deleted user)
+- `bulletin_votes` 
+- `help_requests`
+- `chat_messages` (messages remain readable by the other party)
+- `device_tokens` (push tokens linger)
+- `notification_queue` / `notifications`
+
+Apple and GDPR require complete data deletion upon request.
+
+**Impact if fixed:** Must enumerate ALL tables with user_id/buyer_id/author_id foreign keys and add cleanup. Chat messages should be anonymized (not deleted) to preserve conversation context for the other party.
+
+---
+
+### Bug 10: Coupon Can Be Applied After Cart Total Changes Below Minimum
+**Severity: P2 — Financial Loss**
+
+The memory doc mentions coupons are "re-validated dynamically when the cart total changes" but if the validation only removes the coupon visually without recalculating the order total sent to the backend, a buyer could place an order with an invalid discount.
+
+**Impact if fixed:** Must verify `create_multi_vendor_orders` RPC validates coupon eligibility server-side, not just client-side.
+
+---
+
+## Priority Matrix
+
+| # | Bug | App Store Risk | Trust Risk | Effort |
+|---|-----|---------------|------------|--------|
+| 1 | False refund promise | **REJECTION** | **P0** | Trivial (text change) |
+| 2 | Chat no moderation | **REJECTION** | P1 | Medium |
+| 3 | Bulletin no pre-moderation | **REJECTION** | P1 | Medium |
+| 4 | Settlements don't transfer money | — | **P0** | High |
+| 8 | Auto-cancel vs delayed payment | — | **P0** | Low |
+| 6 | Chat spam/no rate limit | — | P1 | Low |
+| 9 | Incomplete account deletion | **RISK** | P1 | Medium |
+| 5 | Address privacy leak | — | P1 | Low |
+| 7 | Chart XSS vector | — | P2 | Trivial |
+| 10 | Coupon server validation | — | P2 | Low |
+
+## Dependency Map
+
+```text
+Fix Bug 1 (refund badge) ──→ Must also fix RefundTierBadge.tsx
+Fix Bug 2 (chat moderation) ──→ Needs ReportSheet wiring + block user RPC
+Fix Bug 3 (bulletin) ──→ Needs ai-auto-review synchronous mode OR post queuing
+Fix Bug 4 (settlements) ──→ Needs Razorpay Route API + retry logic + seller payout dashboard update
+Fix Bug 8 (auto-cancel) ──→ Must also update razorpay-webhook to check order status
+Fix Bug 9 (delete account) ──→ Must audit ALL tables with user references
+```
+
+## Recommendation
+
+**For immediate App Store submission:** Fix bugs 1, 2, 3 (rejection risks). Bug 1 is a 5-minute text change. Bugs 2 and 3 require moderate work but are Apple's most enforced UGC rules.
+
+**For seller trust:** Bug 4 (fake settlements) must either be implemented or the UI must be changed to not show "Settled" status. Showing sellers they've been paid when they haven't is the fastest way to lose every seller on the platform.
 
