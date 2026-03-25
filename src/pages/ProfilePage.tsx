@@ -36,6 +36,8 @@ import { NotificationHealthCheck } from '@/components/notifications/Notification
 import { toast } from 'sonner';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { getFlag, setFlag, getString, removeKey } from '@/lib/persistent-kv';
+import { useTheme } from 'next-themes';
+import { Moon, Sun } from 'lucide-react';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
