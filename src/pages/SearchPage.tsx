@@ -73,7 +73,7 @@ export default function SearchPage() {
         <div className="sticky top-0 z-40 bg-background overflow-visible">
           <div className="px-4 pt-3 pb-2">
             <div className="flex items-center gap-2">
-              <button onClick={() => window.history.back()} className="shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center"><ArrowLeft size={18} className="text-foreground" /></button>
+              <button onClick={() => s.navigate('/')} className="shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center"><ArrowLeft size={18} className="text-foreground" /></button>
               <div className="flex-1 relative">
                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
                 {!s.query && <div className="absolute left-9 top-1/2 -translate-y-1/2 pointer-events-none pr-16 overflow-hidden whitespace-nowrap max-w-[calc(100%-4rem)]"><TypewriterPlaceholder context="search" /></div>}
