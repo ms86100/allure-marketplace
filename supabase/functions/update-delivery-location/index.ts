@@ -492,65 +492,67 @@ serve(async (req) => {
         }
 
         // MUTUALLY EXCLUSIVE tiers: <200m = imminent ONLY, 200-500m = nearby ONLY
+        // Dedup enforced by partial unique index uq_proximity_notif_per_order
         if (distanceMeters < 200) {
-          const threeMinAgoImm = new Date(Date.now() - 3 * 60_000).toISOString();
-          const { count: imminentCount } = await supabase
+          // Mark any existing pending proximity_imminent as processed to open the unique slot
+          await supabase
             .from('notification_queue')
-            .select('id', { count: 'exact', head: true })
+            .update({ status: 'sent' })
             .eq('user_id', buyerId)
             .eq('type', 'delivery_proximity_imminent')
             .eq('reference_path', `/orders/${assignment.order_id}`)
-            .gte('created_at', threeMinAgoImm);
+            .eq('status', 'pending');
 
-          if (!imminentCount || imminentCount === 0) {
-            await supabase.from('notification_queue').insert({
-              user_id: buyerId,
-              title: '🏃 Driver arriving now!',
-              body: 'Your delivery partner is almost at your doorstep. Please get ready to receive your order.',
+          const { error: insertErr } = await supabase.from('notification_queue').insert({
+            user_id: buyerId,
+            title: '🏃 Driver arriving now!',
+            body: 'Your delivery partner is almost at your doorstep. Please get ready to receive your order.',
+            type: 'delivery_proximity_imminent',
+            reference_path: `/orders/${assignment.order_id}`,
+            payload: {
               type: 'delivery_proximity_imminent',
-              reference_path: `/orders/${assignment.order_id}`,
-              payload: {
-                type: 'delivery_proximity_imminent',
-                entity_type: 'order',
-                entity_id: assignment.order_id,
-                workflow_status: 'at_doorstep',
-                action: 'View Tracking',
-                distance: distanceMeters,
-                eta: etaMinutes,
-                driver_name: assignment.rider_name ?? null,
-                vehicle_type: vehicleType,
-              },
-            });
+              entity_type: 'order',
+              entity_id: assignment.order_id,
+              workflow_status: 'at_doorstep',
+              action: 'View Tracking',
+              distance: distanceMeters,
+              eta: etaMinutes,
+              driver_name: assignment.rider_name ?? null,
+              vehicle_type: vehicleType,
+            },
+          });
+          if (insertErr && !insertErr.message?.includes('duplicate key')) {
+            console.error('Proximity imminent insert error:', insertErr);
           }
         } else if (distanceMeters < 500) {
-          const threeMinAgo = new Date(Date.now() - 3 * 60_000).toISOString();
-          const { count } = await supabase
+          await supabase
             .from('notification_queue')
-            .select('id', { count: 'exact', head: true })
+            .update({ status: 'sent' })
             .eq('user_id', buyerId)
             .eq('type', 'delivery_proximity')
             .eq('reference_path', `/orders/${assignment.order_id}`)
-            .gte('created_at', threeMinAgo);
+            .eq('status', 'pending');
 
-          if (!count || count === 0) {
-            await supabase.from('notification_queue').insert({
-              user_id: buyerId,
-              title: '📍 Almost there!',
-              body: 'Your delivery partner is nearby and arriving soon!',
+          const { error: insertErr } = await supabase.from('notification_queue').insert({
+            user_id: buyerId,
+            title: '📍 Almost there!',
+            body: 'Your delivery partner is nearby and arriving soon!',
+            type: 'delivery_proximity',
+            reference_path: `/orders/${assignment.order_id}`,
+            payload: {
               type: 'delivery_proximity',
-              reference_path: `/orders/${assignment.order_id}`,
-              payload: {
-                type: 'delivery_proximity',
-                entity_type: 'order',
-                entity_id: assignment.order_id,
-                workflow_status: 'arriving',
-                action: 'View Tracking',
-                distance: distanceMeters,
-                eta: etaMinutes,
-                driver_name: assignment.rider_name ?? null,
-                vehicle_type: vehicleType,
-              },
-            });
+              entity_type: 'order',
+              entity_id: assignment.order_id,
+              workflow_status: 'arriving',
+              action: 'View Tracking',
+              distance: distanceMeters,
+              eta: etaMinutes,
+              driver_name: assignment.rider_name ?? null,
+              vehicle_type: vehicleType,
+            },
+          });
+          if (insertErr && !insertErr.message?.includes('duplicate key')) {
+            console.error('Proximity insert error:', insertErr);
           }
         }
       }
