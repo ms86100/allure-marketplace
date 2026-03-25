@@ -133,7 +133,7 @@ npx cap open ios
 ### 5.4 Add Required Capabilities
 Click "+ Capability" and add:
 - **Push Notifications** - Required for FCM
-- **Associated Domains** - Add: `applinks:sociva.app`
+- **Associated Domains** - Add: `applinks:www.sociva.in`
 - **Background Modes** - Check "Remote notifications"
 
 ### 5.5 Build Archive
@@ -269,7 +269,7 @@ Configure in Admin Panel → Settings → API Configuration:
 
 ### Deep links not working
 - Verify AASA/assetlinks.json are accessible via HTTPS
-- Test: `curl https://sociva.app/.well-known/apple-app-site-association`
+- Test: `curl https://www.sociva.in/.well-known/apple-app-site-association`
 - Check Team ID and SHA256 fingerprints are correct
 - Wait up to 24 hours for Apple/Google to cache files
 - For testing, use: `npx uri-scheme open "sociva://orders" --ios`

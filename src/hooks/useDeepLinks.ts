@@ -41,8 +41,8 @@ export function consumePendingDeepLink(): string | null {
  *
  * Supports:
  * - Custom URL scheme: sociva://orders/123
- * - Universal Links (iOS): https://sociva.app/#/orders/123
- * - App Links (Android): https://sociva.app/#/orders/123
+ * - Universal Links (iOS): https://www.sociva.in/#/orders/123
+ * - App Links (Android): https://www.sociva.in/#/orders/123
  *
  * Since the app uses HashRouter, deep link paths are extracted from:
  * 1. The hash fragment (e.g., /#/orders/123 -> /orders/123)

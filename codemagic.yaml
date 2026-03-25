@@ -237,7 +237,7 @@ workflows:
               <string>production</string>
               <key>com.apple.developer.associated-domains</key>
               <array>
-                  <string>applinks:block-eats.lovable.app</string>
+                  <string>applinks:www.sociva.in</string>
               </array>
           </dict>
           </plist>
@@ -983,7 +983,7 @@ workflows:
               <string>production</string>
               <key>com.apple.developer.associated-domains</key>
               <array>
-                  <string>applinks:block-eats.lovable.app</string>
+                  <string>applinks:www.sociva.in</string>
               </array>
           </dict>
           </plist>

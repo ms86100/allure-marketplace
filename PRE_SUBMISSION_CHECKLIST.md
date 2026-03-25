@@ -65,7 +65,7 @@ Download platform config files from your Firebase project:
 **In Xcode:**
 - [ ] Set Team in Signing & Capabilities
 - [ ] Add capability: **Push Notifications**
-- [ ] Add capability: **Associated Domains** → `applinks:block-eats.lovable.app`
+- [ ] Add capability: **Associated Domains** → `applinks:www.sociva.in`
 - [ ] Add capability: **Background Modes** → Remote notifications
 
 ---
