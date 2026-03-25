@@ -34,6 +34,7 @@ export function OrderChat({
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const lastSentRef = useRef<number>(0);
+  const [reportOpen, setReportOpen] = useState(false);
   const { viewportHeight, viewportTop, keyboardInset } = useChatViewport(isOpen);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
