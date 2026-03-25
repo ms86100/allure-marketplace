@@ -104,11 +104,12 @@ export function RazorpayCheckout({
       businessName: sellerName,
       onSuccess: (paymentId, razorpayOrderId) => {
         if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
-        setStatus('success');
         if (razorpayOrderId) {
           console.log('[Payment] Razorpay order_id for reconciliation:', razorpayOrderId);
         }
-        setTimeout(() => onPaymentSuccess(paymentId), 1500);
+        // Enter verification phase — poll backend before confirming
+        setStatus('verifying');
+        verifyPaymentBackend(paymentId);
       },
       onFailure: () => {
         if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
