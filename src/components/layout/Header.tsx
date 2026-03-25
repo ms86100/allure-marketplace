@@ -96,7 +96,7 @@ function HeaderInner({
         'sticky top-0 z-40 bg-[hsl(var(--header-bg))] backdrop-blur-2xl backdrop-saturate-150 border-b border-[hsl(var(--nav-border))]',
         className
       )}>
-        <div className="px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 space-y-1">
+        <div className="px-4 pt-3 pb-2 space-y-1">
           {/* Brand + tagline */}
           <div>
             <h1 className="text-lg font-black text-foreground tracking-tight leading-tight italic"><span className="text-primary">S</span>oci<span className="text-primary">v</span>a</h1>
@@ -113,7 +113,7 @@ function HeaderInner({
                   className="inline-flex items-center gap-1.5 rounded-full bg-secondary/80 border border-border/60 px-3 py-1.5 group active:scale-[0.98] transition-transform"
                 >
                   <MapPin size={13} className="text-primary shrink-0" />
-                  <span className="text-[12px] font-semibold text-foreground truncate max-w-[40vw] min-[375px]:max-w-[50vw] sm:max-w-[40vw]">
+                  <span className="text-[12px] font-semibold text-foreground truncate max-w-[55vw] min-[375px]:max-w-[60vw] sm:max-w-[50vw]">
                     {browsingLocation?.label || displaySociety?.name || 'Set location'}
                   </span>
                   {stats && (stats.sellers > 0 || stats.orders > 0) && (
@@ -142,33 +142,33 @@ function HeaderInner({
             </div>
 
             <div className="flex items-center gap-0.5">
-              <span className="hidden min-[375px]:inline-flex"><ThemeToggle /></span>
+              <span className="hidden min-[400px]:inline-flex"><ThemeToggle /></span>
               {isBuilderMember && (
                 <Link to="/builder">
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
-                    <Building2 size={17} />
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                    <Building2 size={16} />
                   </Button>
                 </Link>
               )}
               {isAdmin && (
                 <Link to="/admin">
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
-                    <ShieldCheck size={17} />
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                    <ShieldCheck size={16} />
                   </Button>
                 </Link>
               )}
               {isSeller && (
                 <Link to="/seller">
-                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
-                    <Store size={17} />
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                    <Store size={16} />
                   </Button>
                 </Link>
               )}
               {user && (
                 <>
                   <Link to="/notifications/inbox">
-                    <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-full">
-                      <Bell size={17} />
+                    <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full">
+                      <Bell size={16} />
                       {unreadCount > 0 && (
                         <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
                           {unreadCount > 9 ? '9+' : unreadCount}
@@ -177,7 +177,7 @@ function HeaderInner({
                     </Button>
                   </Link>
                   <Link to="/profile">
-                    <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[11px] font-bold cursor-pointer hover:opacity-90 transition-opacity">
+                    <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[11px] font-bold cursor-pointer hover:opacity-90 transition-opacity">
                       {initials}
                     </div>
                   </Link>
