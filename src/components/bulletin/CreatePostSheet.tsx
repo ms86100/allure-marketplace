@@ -123,6 +123,22 @@ export function CreatePostSheet({ open, onOpenChange, onCreated }: CreatePostShe
         postData.poll_deadline = pollDeadline || null;
       }
 
+      // Bug 3 fix: Synchronous content moderation before publishing
+      const contentToCheck = `${title.trim()} ${body.trim()}`;
+      try {
+        const { data: reviewResult } = await supabase.functions.invoke('ai-auto-review', {
+          body: { target_type: 'bulletin_post', content: contentToCheck, society_id: profile.society_id },
+        });
+        if (reviewResult?.decision === 'reject') {
+          toast.error(reviewResult?.reason || 'Your post was flagged for inappropriate content. Please revise and try again.');
+          setLoading(false);
+          return;
+        }
+      } catch (reviewErr) {
+        // If moderation service is down, allow post through (fail-open) but log
+        console.warn('[CreatePostSheet] Content moderation unavailable, allowing post:', reviewErr);
+      }
+
       const { error } = await supabase.from('bulletin_posts').insert(postData);
       if (error) throw error;
 
