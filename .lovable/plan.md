@@ -1,130 +1,160 @@
 
 
-# App Store / Play Store Production Readiness Audit — Round 3
+# App Store / Play Store Production Readiness Audit — Round 4
 
-## Issue 1: Auth Page Legal Links Use `href="#/terms"` — Broken in Native WebView
+## Issue 1: `reset-and-seed-scenario` Edge Function is Publicly Callable — Full Database Wipe
+
+**Severity: P0 — Critical Security / Data Destruction**
+
+**Evidence** — `supabase/config.toml` line 57-58:
+```toml
+[functions.reset-and-seed-scenario]
+verify_jwt = false
+```
+
+`supabase/functions/reset-and-seed-scenario/index.ts` lines 1-22: No `withAuth`, no `getUser`, no authorization check whatsoever. The function uses the service role key to **purge all user data, listings, orders, and related records** then seeds test data.
+
+**Exact Scenario**: Anyone with knowledge of the Supabase project URL can call:
+```
+POST https://ywhlqsgvbkvcvqlsniad.supabase.co/functions/v1/reset-and-seed-scenario
+```
+No token needed. The function executes with service role privileges and destroys all production data.
+
+**Root Cause**: `verify_jwt = false` + zero in-code auth. The function was built for dev/test and never gated for production.
+
+**User Impact**: Complete data loss — all users, orders, seller profiles, financial records wiped and replaced with seed data.
+
+**App Store Risk**: Not a rejection cause directly, but a catastrophic production incident that would destroy the business and all user trust.
+
+**Recommended Fix**: Add `withAuth` + admin role check (like `manage-cron-jobs` does), or remove the function entirely from production deployment.
+
+---
+
+## Issue 2: `auto-cancel-orders` Edge Function Has No Authentication — Public Invocation
+
+**Severity: P0 — Security**
+
+**Evidence** — `supabase/config.toml` line 3-4:
+```toml
+[functions.auto-cancel-orders]
+verify_jwt = false
+```
+
+`supabase/functions/auto-cancel-orders/index.ts` lines 17-22: No auth check. Uses service role key. Designed to be called by a cron job, but anyone can invoke it at any time.
+
+**Exact Scenario**: Attacker calls the endpoint repeatedly → all orders in cancellable statuses with `auto_cancel_at` set are cancelled immediately, even if the timeout hasn't actually elapsed. Wait — the function does check `lt('auto_cancel_at', now)`, so timing isn't bypassable. However, the function also cancels "orphaned UPI orders" older than 30 minutes with `payment_status = pending`. An attacker can trigger this on-demand to sweep any pending-payment order that's 30+ minutes old, even if the buyer is still in the payment flow.
+
+**Root Cause**: Cron-invoked functions should still validate the caller is the cron service or an admin. Compare with `process-settlements` which correctly checks for service-role authorization.
+
+**User Impact**: Orders cancelled prematurely or maliciously. Buyers who paid but webhook is delayed lose their order.
+
+**Recommended Fix**: Add service-role-key check like `process-settlements` does (line 15-16).
+
+---
+
+## Issue 3: Auth Page Legal Links Open External Browser with `www.sociva.in` — Content May Not Exist
 
 **Severity: P0 — Rejection Risk**
 
 **Evidence** — `src/pages/AuthPage.tsx` lines 167-168:
 ```tsx
-<a href="#/terms" target="_blank" className="text-primary underline">Terms & Conditions</a>
-<a href="#/privacy-policy" target="_blank" className="text-primary underline">Privacy Policy</a>
+<a href="https://www.sociva.in/terms" target="_blank" ...>Terms & Conditions</a>
+<a href="https://www.sociva.in/privacy-policy" target="_blank" ...>Privacy Policy</a>
 ```
 
-These links use `href="#/terms"` with `target="_blank"`. In a Capacitor WebView, `target="_blank"` opens the system browser, but `#/terms` is a hash-based URL — it resolves to the **current page URL + #/terms**, NOT to the app's `/terms` route (which uses React Router's `BrowserRouter`, not `HashRouter`).
+The app uses `HashRouter` (`src/App.tsx` line 491). All in-app routes are hash-based: `/#/terms`, `/#/privacy-policy`. The links point to `https://www.sociva.in/terms` — a **non-hash URL**. This will only work if the web server at `www.sociva.in` is configured with a catch-all redirect to `index.html` (SPA fallback). If it isn't (e.g., static hosting without rewrite rules, or if only `/#/terms` works), the link returns a 404.
 
-**Scenario**: User taps "Terms & Conditions" on the auth page → system browser opens with `https://www.sociva.in/#/terms` → 404 or blank page (the web host doesn't serve hash routes). Apple reviewer sees broken legal links on the signup page.
+Additionally, `target="_blank"` on a native Capacitor WebView opens the **system browser**, taking the user completely outside the app. Even if the URL resolves, the user leaves the registration flow.
 
-**App Store Risk**: Guideline 5.1.2 requires accessible Terms and Privacy links during registration. Broken links = rejection.
+**Exact Scenario**: Apple reviewer on the signup page taps "Terms & Conditions" → system browser opens → if `www.sociva.in` isn't deployed with SPA fallback, shows 404 → **rejection** (Guideline 5.1.2).
 
-**Root Cause**: Mixing hash-based href with a non-hash router. Should use React Router `<Link>` or proper absolute URLs.
+**Root Cause**: External absolute URLs used instead of in-app `<Link to="/terms">` navigation (which would use `/#/terms` via HashRouter).
+
+**Recommended Fix**: Use React Router `<Link>` or navigate programmatically to `/terms` within the app. Alternatively, use `https://www.sociva.in/#/terms` if external browser is intentional.
 
 ---
 
-## Issue 2: OTP Edge Functions Have No Rate Limiting — SMS Abuse Vector
-
-**Severity: P1 — Security / Financial Risk**
-
-**Evidence**: `supabase/functions/msg91-send-otp/index.ts` has zero rate limiting. No `checkRateLimit` import. No IP or phone-based throttling. The function accepts unauthenticated requests (no JWT required — it's the login flow).
-
-Compare with `delete-user-account/index.ts` which correctly imports `checkRateLimit` (line 2) and enforces 3/hour.
-
-**Scenario**: Attacker scripts POST requests to `msg91-send-otp` with random phone numbers → thousands of SMS sent → MSG91 bill spikes to hundreds of dollars → potential account suspension by MSG91 → all users locked out of auth.
-
-**App Store Risk**: Not a direct rejection cause, but a production stability risk. If MSG91 suspends the account during Apple review, reviewers can't log in → rejection.
-
-**Root Cause**: Rate limiting was added to other edge functions but missed on OTP endpoints.
-
----
-
-## Issue 3: Store Metadata Says "In-App Purchases" but App Uses External Razorpay Payment
-
-**Severity: P0 — Rejection Risk (Apple Guideline 3.1.1)**
-
-**Evidence** — `STORE_METADATA.md` line 171:
-```
-- Does the app allow purchases? **Yes** (in-app purchases for services and products)
-```
-
-The term "in-app purchases" has a specific meaning to Apple — it refers to Apple's IAP system (StoreKit). Sociva uses Razorpay (external payment processor) for physical goods and services. This is LEGAL under Guideline 3.1.3(e) (physical goods/services), but the metadata wording "in-app purchases" may trigger automated flagging.
-
-Additionally, `CartPage.tsx` line 333 correctly states: "Payments are processed by third-party providers and are not covered by Apple" — but the age rating questionnaire contradicts this by calling them "in-app purchases."
-
-**Scenario**: Apple's automated system flags the "in-app purchases" declaration → reviewer checks for StoreKit integration → finds none → flags as circumventing IAP → rejection or inquiry.
-
-**App Store Risk**: Guideline 3.1.1 violation if Apple interprets "in-app purchases" literally. Should be reworded to "purchases for physical goods and services."
-
----
-
-## Issue 4: `delete-user-account` Deletes `chat_messages` by Both `sender_id` AND `receiver_id` — Destroys Other Users' Chat History
-
-**Severity: P1 — Data Integrity / GDPR Compliance**
-
-**Evidence** — `supabase/functions/delete-user-account/index.ts` lines 54-55:
-```ts
-{ table: 'chat_messages', column: 'sender_id' },
-{ table: 'chat_messages', column: 'receiver_id' },
-```
-
-When User A deletes their account, ALL chat messages where they are the receiver are deleted. This includes messages SENT by User B (the seller or buyer). User B loses their copy of the conversation.
-
-**Scenario**: Buyer deletes account → all seller's messages to that buyer vanish → seller loses order communication records → potential dispute evidence destroyed.
-
-**Root Cause**: Deletion uses `receiver_id` match, which sweeps messages authored by OTHER users.
-
-**Consequence**: Data integrity violation. Seller's own messages disappear without consent. Under GDPR, you should anonymize rather than delete data authored by other parties.
-
----
-
-## Issue 5: `msg91-verify-otp` Creates User with Hardcoded `name: "User"` and Empty `flat_number`/`block`
-
-**Severity: P2 — UX / Data Quality**
-
-**Evidence** — `supabase/functions/msg91-verify-otp/index.ts` lines 116-117:
-```ts
-{ id: userId, email: syntheticEmail, phone: fullPhone, name: "User", flat_number: "", block: "" }
-```
-
-Every new user starts with `name: "User"`. If the onboarding flow doesn't force a name update, sellers see orders from "User" with no identifiable name. The `flat_number: ""` and `block: ""` may also cause issues with delivery address validation or society verification flows that check for non-empty values.
-
-**Scenario**: New user registers → skips profile editing → places order → seller sees "User" as buyer name → confusion, potential delivery failure.
-
-**Root Cause**: Profile bootstrapping uses placeholder values without enforcing completion.
-
----
-
-## Issue 6: `msg91-verify-otp` Uses `generateLink({ type: "magiclink" })` — Token Reuse Window
-
-**Severity: P1 — Security Risk**
-
-**Evidence** — `supabase/functions/msg91-verify-otp/index.ts` lines 130-141:
-```ts
-const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
-  type: "magiclink",
-  email: userEmail,
-});
-```
-
-The magic link token hash is returned directly to the client (line 144). If an attacker intercepts this response (MITM, compromised network), they can use the `token_hash` to establish a session for that user. The token doesn't expire immediately — it has a configurable lifespan (default: 1 hour in Supabase).
-
-Unlike a standard OTP flow where the secret stays server-side, here the session token is transmitted to the client in plaintext JSON. While HTTPS protects in transit, any client-side logging, analytics, or error tracking that captures response bodies would leak this token.
-
-**App Store Risk**: Not a rejection cause, but a security architecture concern for production.
-
----
-
-## Issue 7: No OTP Attempt Limiting on Verify Endpoint — Brute Force Possible
+## Issue 4: `seed-test-data` Edge Function Also Has No Auth — Publicly Callable
 
 **Severity: P1 — Security**
 
-**Evidence**: `supabase/functions/msg91-verify-otp/index.ts` has no rate limiting. With 4-digit OTPs, there are only 10,000 possible values. An attacker can brute-force by sending rapid requests with the same `reqId` and all possible OTP values.
+**Evidence** — `supabase/config.toml` line 45-46: `verify_jwt = false`. `supabase/functions/seed-test-data/index.ts`: Only imports for CORS headers visible, no `withAuth` or `getUser` call.
 
-MSG91's own API may have rate limiting, but the edge function doesn't enforce it independently. If MSG91's limit is generous (e.g., 10 attempts), it may not be enough for a 4-digit code space.
+**Exact Scenario**: Anyone can inject test data into the production database by calling this function endpoint.
 
-**Scenario**: Attacker obtains a victim's phone number → triggers `send-otp` → brute-forces `verify-otp` with all 4-digit combinations → gains account access.
+**Root Cause**: Same pattern as `reset-and-seed-scenario` — dev/test function deployed to production without auth gate.
 
-**Root Cause**: No rate limiting on the verify endpoint. MSG91 may return error code 707 ("max attempt") but this depends on MSG91's internal limits, not application-level enforcement.
+**Recommended Fix**: Add admin auth check or exclude from production deployment.
+
+---
+
+## Issue 5: `locationAuthorizationRequest: 'WhenInUse'` Combined with `stopOnTerminate: false` and `preventSuspend: true`
+
+**Severity: P1 — Apple Review Scrutiny**
+
+**Evidence** — `src/hooks/useBackgroundLocationTracking.ts` lines 254-266:
+```ts
+stopOnTerminate: false,    // Continue after app killed
+preventSuspend: true,      // Keep app alive
+locationAuthorizationRequest: 'WhenInUse',  // Only "When In Use" permission
+```
+
+And `capacitor.config.ts` declares `NSLocationAlwaysAndWhenInUseUsageDescription` (line 83) — which is the string for "Always" permission. But the code only requests "When In Use". This creates a contradiction:
+
+1. The plist declares an "Always" usage description (required for the "Always" permission prompt)
+2. The code only requests "WhenInUse" permission
+3. But configures `stopOnTerminate: false` + `preventSuspend: true` which are "Always"-level behaviors
+
+On iOS, `stopOnTerminate: false` with "When In Use" permission is effectively ignored — the OS kills the process. But Apple's automated review may flag the declared "Always" usage description as unused (no code path requests "Always" permission), or flag the contradiction between declared capability and actual permission level.
+
+**Exact Scenario**: Apple automated scan sees `NSLocationAlwaysAndWhenInUseUsageDescription` in plist → checks entitlements for `UIBackgroundModes: location` → checks code never calls `requestAlwaysAuthorization` → flags as unused privacy declaration or excessive permission declaration → rejection or follow-up inquiry.
+
+**Root Cause**: Permission request level doesn't match plist declaration or background behavior configuration.
+
+**Recommended Fix**: Either request `'Always'` permission (if delivery tracking truly needs it) or remove `NSLocationAlwaysAndWhenInUseUsageDescription` from plist and set `stopOnTerminate: true`.
+
+---
+
+## Issue 6: `config.toml` Has Wrong `project_id` — Mismatched Supabase Reference
+
+**Severity: P1 — Deployment / Routing Risk**
+
+**Evidence** — `supabase/config.toml` line 1:
+```toml
+project_id = "rvvctaikytfeyzkwoqxg"
+```
+
+But the actual Supabase project ref (from `.env`) is `ywhlqsgvbkvcvqlsniad`. The `config.toml` references a completely different project.
+
+**Exact Scenario**: If any tooling uses `config.toml`'s `project_id` for deployment targeting (e.g., `supabase deploy` CLI commands), edge functions could be deployed to the wrong project. Lovable Cloud may handle this differently, but it's a configuration inconsistency that could cause issues with local dev, CI/CD, or any tooling that reads `config.toml`.
+
+**Root Cause**: The `project_id` was never updated when the project was migrated or reconnected.
+
+**Recommended Fix**: This is auto-managed by Lovable — verify it doesn't cause issues. If using any external Supabase CLI, this will route to the wrong project.
+
+---
+
+## Issue 7: Payment Verification Still Shows "Success" After Timeout — False Confirmation
+
+**Severity: P1 — Financial Integrity**
+
+**Evidence** — `src/components/payment/RazorpayCheckout.tsx` lines 71-77:
+```tsx
+if (attempt >= MAX_ATTEMPTS) {
+  console.warn('[Payment] Backend verification timed out after 20s');
+  setStatus('success');      // ← Still shows "Payment Successful!"
+  setTimeout(() => onPaymentSuccess(paymentId), 1200);
+  return;
+}
+```
+
+After 20s of polling (10 attempts), if the webhook hasn't confirmed payment, the UI **still shows "Payment Successful!"** and calls `onPaymentSuccess`. The comment says "Still proceed" but the user sees a definitive green checkmark with "Payment Successful! Your order is confirmed."
+
+**Exact Scenario**: Razorpay webhook is delayed 25s (common under load or network issues) → polling times out → UI shows "Payment Successful!" → user navigates to orders → order still shows `payment_pending` → auto-cancel cron fires 30 min later → order cancelled → user paid but lost their order.
+
+**Root Cause**: The timeout fallback still uses `setStatus('success')` instead of showing an intermediate "Payment received, confirmation pending" state.
+
+**Recommended Fix**: Show a different state on timeout — e.g., "Payment received — we're confirming your order" with a link to the orders page, not a green success checkmark.
 
 ---
 
@@ -132,13 +162,13 @@ MSG91's own API may have rate limiting, but the edge function doesn't enforce it
 
 | # | Issue | Severity | Type | Action |
 |---|---|---|---|---|
-| 1 | Auth page legal links use `#/terms` — broken in native | **P0** | Code fix | Use `<Link>` or absolute URL |
-| 2 | OTP send/verify endpoints have no rate limiting | **P1** | Code fix | Add `checkRateLimit` |
-| 3 | Metadata says "in-app purchases" — Apple IAP flag risk | **P0** | Metadata fix | Reword to "physical goods purchases" |
-| 4 | Account deletion destroys other users' chat messages | **P1** | Code fix | Anonymize instead of delete by receiver_id |
-| 5 | New users created with `name: "User"` placeholder | **P2** | UX review | Force name during onboarding |
-| 6 | Magic link token returned to client — interception window | **P1** | Architecture | Review token handling |
-| 7 | No brute-force protection on OTP verify endpoint | **P1** | Code fix | Add rate limiting |
+| 1 | `reset-and-seed-scenario` publicly callable — wipes database | **P0** | Security | Add auth or remove from prod |
+| 2 | `auto-cancel-orders` no auth — can be triggered externally | **P0** | Security | Add service-role check |
+| 3 | Auth page legal links may 404 in native WebView | **P0** | Code fix | Use in-app navigation |
+| 4 | `seed-test-data` publicly callable | **P1** | Security | Add auth |
+| 5 | Location permission request vs plist declaration mismatch | **P1** | Config | Align permission level |
+| 6 | `config.toml` has wrong `project_id` | **P1** | Config | Verify/update |
+| 7 | Payment timeout still shows "Success" green checkmark | **P1** | Code fix | Show pending state |
 
-Items 1, 2, 3, 4, 7 are directly fixable. Items 5 and 6 require architectural decisions.
+Items 1, 2, 3, 4, 7 are code-fixable. Items 5, 6 require configuration review.
 
