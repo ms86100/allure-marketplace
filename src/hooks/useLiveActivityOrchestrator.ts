@@ -111,6 +111,7 @@ export function useLiveActivityOrchestrator(): void {
 
       if (terminalStatusesCache.has(newStatus)) {
         activeOrderIdsRef.current.delete(orderId);
+        lastProcessedEvents.delete(orderId);
         if (isNative) await LiveActivityManager.end(orderId);
         return;
       }

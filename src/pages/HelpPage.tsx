@@ -107,7 +107,7 @@ export default function HelpPage({ sections: customSections }: HelpPageProps) {
 
   return (
     <AppLayout showHeader={false} showNav={false}>
-      <div className="pb-8 safe-top">
+      <div className="pb-8">
         {/* Sticky header with proper touch target */}
         <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 flex items-center gap-3">
           <Link to="/profile" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0">

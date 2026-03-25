@@ -186,7 +186,7 @@ export default function CategoriesPage() {
   return (
     <AppLayout showHeader={false}>
       {/* Header */}
-      <div className="sticky top-0 z-40 safe-top bg-background/95 backdrop-blur-sm">
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm">
         <div className="px-4 pt-3 pb-1">
           <h1 className="text-lg font-bold text-foreground">{ml.label('label_categories_page_title')}</h1>
           <p className="text-xs text-muted-foreground mb-1">{ml.label('label_categories_page_subtitle')}</p>

@@ -114,7 +114,7 @@ export default function SellerEarningsPage() {
 
   return (
     <AppLayout showHeader={false}>
-      <div className="p-4 safe-top">
+      <div className="p-4">
         <Link to="/seller" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0 mb-4">
           <ArrowLeft size={18} className="text-foreground" />
         </Link>

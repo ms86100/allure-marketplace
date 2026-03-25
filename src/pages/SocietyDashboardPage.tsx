@@ -225,7 +225,7 @@ export default function SocietyDashboardPage() {
   return (
     <AppLayout showHeader={false}>
       {/* Custom Society Header */}
-      <div className="sticky top-0 z-40 safe-top bg-background border-b border-border">
+      <div className="sticky top-0 z-40 bg-background border-b border-border">
         <div className="px-3 pt-2.5 pb-2">
           <div className="flex items-center gap-2 mb-2">
             <Button

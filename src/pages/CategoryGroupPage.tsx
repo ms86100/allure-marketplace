@@ -208,7 +208,7 @@ export default function CategoryGroupPage() {
   return (
     <AppLayout showHeader={false}>
       {/* Sticky Header */}
-      <div className="sticky top-0 z-30 bg-background safe-top">
+      <div className="sticky top-0 z-30 bg-background">
         <div className="px-4 pt-1 pb-2">
           <div className="flex items-center gap-2.5 mb-2.5">
             <button onClick={() => navigate(-1)} className="h-10 w-10 rounded-full bg-muted flex items-center justify-center shrink-0">
