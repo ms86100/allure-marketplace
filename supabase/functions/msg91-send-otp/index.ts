@@ -41,6 +41,15 @@ Deno.serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      // Apple reviewer bypass: skip MSG91 for demo phone, return synthetic reqId
+      if (phone === "0123456789" && country_code === "91") {
+        console.log("Apple reviewer demo phone — returning bypass reqId");
+        return new Response(
+          JSON.stringify({ success: true, message: "OTP sent", reqId: "apple-review-bypass" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Create admin client for DB credential lookup

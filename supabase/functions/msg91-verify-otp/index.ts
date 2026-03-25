@@ -70,20 +70,27 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "OTP service is temporarily unavailable. Please try again later." }), { status: 500, headers: jsonHeaders });
     }
 
-    // ─── 1. Verify OTP via Widget API ───
-    const verifyRes = await fetch("https://api.msg91.com/api/v5/widget/verifyOtp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reqId, otp, widgetId, tokenAuth, authkey: authKey }),
-    });
-    const verifyData = await verifyRes.json();
-    console.log("MSG91 verify response type:", verifyData.type, "code:", verifyData.code);
+    // ─── 1. Verify OTP ───
+    // Apple reviewer bypass: demo phone + fixed OTP + bypass reqId
+    const isAppleReviewBypass = phone === "0123456789" && reqId === "apple-review-bypass" && otp === "1234";
 
-    if (verifyData.type !== "success") {
-      return new Response(
-        JSON.stringify({ error: getFriendlyError(verifyData.code, verifyData.message) }),
-        { status: 400, headers: jsonHeaders }
-      );
+    if (!isAppleReviewBypass) {
+      const verifyRes = await fetch("https://api.msg91.com/api/v5/widget/verifyOtp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reqId, otp, widgetId, tokenAuth, authkey: authKey }),
+      });
+      const verifyData = await verifyRes.json();
+      console.log("MSG91 verify response type:", verifyData.type, "code:", verifyData.code);
+
+      if (verifyData.type !== "success") {
+        return new Response(
+          JSON.stringify({ error: getFriendlyError(verifyData.code, verifyData.message) }),
+          { status: 400, headers: jsonHeaders }
+        );
+      }
+    } else {
+      console.log("Apple reviewer bypass — skipping MSG91 verification for demo phone");
     }
 
     const mobile = `${country_code}${phone}`;
