@@ -1,151 +1,130 @@
 
 
-# App Store / Play Store Production Readiness Audit — Round 2
+# App Store / Play Store Production Readiness Audit — Round 3
 
-## Issue 1: STORE_METADATA Age Rating Says "Location Sharing = No" — Incorrect
-
-**Severity: P0 — Rejection Risk**
-
-**Evidence** — `STORE_METADATA.md` line 168:
-```
-- Does the app share location? **No**
-```
-
-But the app:
-- Has `NSLocationAlwaysAndWhenInUseUsageDescription` (background location)
-- Uses `useBackgroundLocationTracking.ts` with `stopOnTerminate: false`
-- Broadcasts GPS coordinates to other users via delivery tracking
-- Uses location for society membership verification
-
-**Scenario**: Apple reviewer sees background location permission + delivery tracking GPS broadcasting → checks age rating questionnaire → "location sharing = No" → **metadata rejection** (Guideline 2.3.1).
-
-**Root Cause**: `STORE_METADATA.md` was never updated when delivery tracking was added.
-
-**Recommended Fix**: Change line 168 to `**Yes** (for delivery tracking and society verification)`.
-
----
-
-## Issue 2: Demo Account Uses Email/Password but App Uses Phone OTP
+## Issue 1: Auth Page Legal Links Use `href="#/terms"` — Broken in Native WebView
 
 **Severity: P0 — Rejection Risk**
 
-**Evidence** — `STORE_METADATA.md` lines 105-106:
+**Evidence** — `src/pages/AuthPage.tsx` lines 167-168:
+```tsx
+<a href="#/terms" target="_blank" className="text-primary underline">Terms & Conditions</a>
+<a href="#/privacy-policy" target="_blank" className="text-primary underline">Privacy Policy</a>
 ```
-Email: demo@sociva.app
-Password: DemoReview2026!
-```
 
-The app uses MSG91 phone OTP login exclusively (memory confirms "unified phone-based OTP login"). There is no email/password login flow in the app.
+These links use `href="#/terms"` with `target="_blank"`. In a Capacitor WebView, `target="_blank"` opens the system browser, but `#/terms` is a hash-based URL — it resolves to the **current page URL + #/terms**, NOT to the app's `/terms` route (which uses React Router's `BrowserRouter`, not `HashRouter`).
 
-**Scenario**: Apple reviewer opens app → sees phone number input → tries email/password credentials → cannot log in → **immediate rejection** (Guideline 2.1).
+**Scenario**: User taps "Terms & Conditions" on the auth page → system browser opens with `https://www.sociva.in/#/terms` → 404 or blank page (the web host doesn't serve hash routes). Apple reviewer sees broken legal links on the signup page.
 
-**Root Cause**: Demo credentials predate the switch to phone-only OTP.
+**App Store Risk**: Guideline 5.1.2 requires accessible Terms and Privacy links during registration. Broken links = rejection.
 
-**Recommended Fix**: Either provide a phone number with auto-bypass OTP for Apple review, or implement a hidden email/password path for the demo account only. This is a manual/product decision.
+**Root Cause**: Mixing hash-based href with a non-hash router. Should use React Router `<Link>` or proper absolute URLs.
 
 ---
 
-## Issue 3: `delete-user-account` Has No Transaction — Partial Deletion on Failure
+## Issue 2: OTP Edge Functions Have No Rate Limiting — SMS Abuse Vector
 
-**Severity: P1 — GDPR / App Store Compliance Risk**
+**Severity: P1 — Security / Financial Risk**
 
-**Evidence** — `supabase/functions/delete-user-account/index.ts` lines 65-92:
+**Evidence**: `supabase/functions/msg91-send-otp/index.ts` has zero rate limiting. No `checkRateLimit` import. No IP or phone-based throttling. The function accepts unauthenticated requests (no JWT required — it's the login flow).
 
-The function iterates through 25+ tables sequentially with individual `DELETE` calls. If table 15 fails (network timeout, RLS error), tables 1-14 are already deleted but tables 16-25 still have data. The auth user is NOT deleted (line 92 never reached).
+Compare with `delete-user-account/index.ts` which correctly imports `checkRateLimit` (line 2) and enforces 3/hour.
 
+**Scenario**: Attacker scripts POST requests to `msg91-send-otp` with random phone numbers → thousands of SMS sent → MSG91 bill spikes to hundreds of dollars → potential account suspension by MSG91 → all users locked out of auth.
+
+**App Store Risk**: Not a direct rejection cause, but a production stability risk. If MSG91 suspends the account during Apple review, reviewers can't log in → rejection.
+
+**Root Cause**: Rate limiting was added to other edge functions but missed on OTP endpoints.
+
+---
+
+## Issue 3: Store Metadata Says "In-App Purchases" but App Uses External Razorpay Payment
+
+**Severity: P0 — Rejection Risk (Apple Guideline 3.1.1)**
+
+**Evidence** — `STORE_METADATA.md` line 171:
+```
+- Does the app allow purchases? **Yes** (in-app purchases for services and products)
+```
+
+The term "in-app purchases" has a specific meaning to Apple — it refers to Apple's IAP system (StoreKit). Sociva uses Razorpay (external payment processor) for physical goods and services. This is LEGAL under Guideline 3.1.3(e) (physical goods/services), but the metadata wording "in-app purchases" may trigger automated flagging.
+
+Additionally, `CartPage.tsx` line 333 correctly states: "Payments are processed by third-party providers and are not covered by Apple" — but the age rating questionnaire contradicts this by calling them "in-app purchases."
+
+**Scenario**: Apple's automated system flags the "in-app purchases" declaration → reviewer checks for StoreKit integration → finds none → flags as circumventing IAP → rejection or inquiry.
+
+**App Store Risk**: Guideline 3.1.1 violation if Apple interprets "in-app purchases" literally. Should be reworded to "purchases for physical goods and services."
+
+---
+
+## Issue 4: `delete-user-account` Deletes `chat_messages` by Both `sender_id` AND `receiver_id` — Destroys Other Users' Chat History
+
+**Severity: P1 — Data Integrity / GDPR Compliance**
+
+**Evidence** — `supabase/functions/delete-user-account/index.ts` lines 54-55:
 ```ts
-for (const { table, column } of cleanupTables) {
-  await supabaseAdmin.from(table).delete().eq(column, userId);
-}
-// ... then later:
-const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+{ table: 'chat_messages', column: 'sender_id' },
+{ table: 'chat_messages', column: 'receiver_id' },
 ```
 
-No rollback mechanism. User's account is partially wiped — they can still log in but with broken data state.
+When User A deletes their account, ALL chat messages where they are the receiver are deleted. This includes messages SENT by User B (the seller or buyer). User B loses their copy of the conversation.
 
-**Scenario**: User requests account deletion → deletion fails at `chat_messages` table → favorites, reviews, cart items already deleted → user logs back in to find partial data → confused, submits App Store complaint.
+**Scenario**: Buyer deletes account → all seller's messages to that buyer vanish → seller loses order communication records → potential dispute evidence destroyed.
 
-**App Store Risk**: Apple requires account deletion to work reliably (Guideline 5.1.1(v)). A broken partial deletion violates this requirement. Google Play has similar requirements since 2023.
+**Root Cause**: Deletion uses `receiver_id` match, which sweeps messages authored by OTHER users.
 
-**Recommended Fix**: Wrap cleanup in a database function (single transaction), or at minimum catch per-table errors and continue, then delete auth user regardless. Log failures for manual cleanup.
-
----
-
-## Issue 4: No Crash Reporting / Monitoring in Production
-
-**Severity: P1 — Production Stability**
-
-**Evidence**: Searched for `Sentry`, `crashlytics`, `crash.*report` — zero matches in any integration code. Only `ErrorBoundary` components exist, which catch React render errors but don't report them externally.
-
-**Scenario**: App crashes on specific device/OS combination → no telemetry → users leave 1-star reviews → you discover the issue weeks later from App Store reviews.
-
-**App Store Risk**: Not a direct rejection cause, but Apple's automated testing flags ANRs and crashes. Without monitoring, you're blind to issues that could trigger removal.
-
-**Recommended Fix**: Integrate Firebase Crashlytics (already have Firebase for push). Native integration required in Xcode/Android Studio.
+**Consequence**: Data integrity violation. Seller's own messages disappear without consent. Under GDPR, you should anonymize rather than delete data authored by other parties.
 
 ---
 
-## Issue 5: `TEAM_ID` and `SHA256_FINGERPRINT_PLACEHOLDER` Still in Production Files
+## Issue 5: `msg91-verify-otp` Creates User with Hardcoded `name: "User"` and Empty `flat_number`/`block`
 
-**Severity: P0 — Rejection Risk (Universal Links / App Links)**
+**Severity: P2 — UX / Data Quality**
 
-**Evidence**:
-- `public/.well-known/apple-app-site-association`: `TEAM_ID.app.sociva.community`
-- `public/.well-known/assetlinks.json`: `SHA256_FINGERPRINT_PLACEHOLDER`
-
-These are served by `www.sociva.in`. Apple validates AASA during review. Google validates assetlinks for App Links.
-
-**Scenario**: Apple review bot fetches AASA → sees literal `TEAM_ID` → universal links fail → Associated Domains entitlement is unjustified → rejection or universal links silently broken.
-
-**Recommended Fix**: Replace with real values before deploying web assets to `www.sociva.in`. This is a manual action — you need your Apple Team ID and your Android signing key SHA256 fingerprint.
-
----
-
-## Issue 6: Payment Verification Falls Back to "Trust SDK" After Timeout
-
-**Severity: P1 — Financial Integrity**
-
-**Evidence** — `RazorpayCheckout.tsx` lines 67-72:
-```tsx
-if (attempt >= MAX_ATTEMPTS) {
-  // Backend hasn't confirmed yet — trust SDK and proceed
-  console.warn('[Payment] Backend verification timed out, proceeding with SDK success');
-  setStatus('success');
-  setTimeout(() => onPaymentSuccess(paymentId), 1200);
-  return;
-}
+**Evidence** — `supabase/functions/msg91-verify-otp/index.ts` lines 116-117:
+```ts
+{ id: userId, email: syntheticEmail, phone: fullPhone, name: "User", flat_number: "", block: "" }
 ```
 
-After 12s of polling, if the webhook hasn't confirmed payment, the UI shows "Success" anyway. The user navigates away believing payment is confirmed. If webhook eventually fails or is delayed beyond 12s, the order stays `payment_pending` in the DB → gets auto-cancelled → user is confused.
+Every new user starts with `name: "User"`. If the onboarding flow doesn't force a name update, sellers see orders from "User" with no identifiable name. The `flat_number: ""` and `block: ""` may also cause issues with delivery address validation or society verification flows that check for non-empty values.
 
-**Scenario**: Webhook is delayed 20s (common under load) → UI says success → user sees order → 30 minutes later order is auto-cancelled → user paid but order cancelled.
+**Scenario**: New user registers → skips profile editing → places order → seller sees "User" as buyer name → confusion, potential delivery failure.
 
-**Root Cause**: Optimistic trust of client-side SDK callback without backend confirmation.
-
-**Recommended Fix**: Instead of falling through to success, show a "Payment received — confirming with your bank" intermediate state with a longer background poll, or link to the orders page where real-time subscription will update when webhook processes.
+**Root Cause**: Profile bootstrapping uses placeholder values without enforcing completion.
 
 ---
 
-## Issue 7: Razorpay Checkout Polls Single `orderId` but Payment May Cover Multiple Orders
+## Issue 6: `msg91-verify-otp` Uses `generateLink({ type: "magiclink" })` — Token Reuse Window
 
-**Severity: P1 — Multi-Vendor Payment Desync**
+**Severity: P1 — Security Risk**
 
-**Evidence** — `RazorpayCheckout.tsx` lines 55-59:
-```tsx
-const { data } = await supabase
-  .from('orders')
-  .select('payment_status')
-  .eq('id', orderId)    // Only checks FIRST order
-  .maybeSingle();
+**Evidence** — `supabase/functions/msg91-verify-otp/index.ts` lines 130-141:
+```ts
+const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+  type: "magiclink",
+  email: userEmail,
+});
 ```
 
-Props accept `orderIds?: string[]` (line 19), but verification only polls the first `orderId`. In a multi-vendor cart, the webhook updates ALL orders, but the UI only checks one.
+The magic link token hash is returned directly to the client (line 144). If an attacker intercepts this response (MITM, compromised network), they can use the `token_hash` to establish a session for that user. The token doesn't expire immediately — it has a configurable lifespan (default: 1 hour in Supabase).
 
-**Scenario**: Multi-vendor order (3 sellers) → webhook processes order 2 first → poll on order 1 hasn't updated yet → 6 attempts pass → falls back to "trust SDK" → shows success but order 1 might still be pending.
+Unlike a standard OTP flow where the secret stays server-side, here the session token is transmitted to the client in plaintext JSON. While HTTPS protects in transit, any client-side logging, analytics, or error tracking that captures response bodies would leak this token.
 
-**Root Cause**: Verification logic doesn't account for multi-order payments.
+**App Store Risk**: Not a rejection cause, but a security architecture concern for production.
 
-**Recommended Fix**: Poll using `.in('id', orderIds || [orderId])` and check that ALL orders are `paid`.
+---
+
+## Issue 7: No OTP Attempt Limiting on Verify Endpoint — Brute Force Possible
+
+**Severity: P1 — Security**
+
+**Evidence**: `supabase/functions/msg91-verify-otp/index.ts` has no rate limiting. With 4-digit OTPs, there are only 10,000 possible values. An attacker can brute-force by sending rapid requests with the same `reqId` and all possible OTP values.
+
+MSG91's own API may have rate limiting, but the edge function doesn't enforce it independently. If MSG91's limit is generous (e.g., 10 attempts), it may not be enough for a 4-digit code space.
+
+**Scenario**: Attacker obtains a victim's phone number → triggers `send-otp` → brute-forces `verify-otp` with all 4-digit combinations → gains account access.
+
+**Root Cause**: No rate limiting on the verify endpoint. MSG91 may return error code 707 ("max attempt") but this depends on MSG91's internal limits, not application-level enforcement.
 
 ---
 
@@ -153,13 +132,13 @@ Props accept `orderIds?: string[]` (line 19), but verification only polls the fi
 
 | # | Issue | Severity | Type | Action |
 |---|---|---|---|---|
-| 1 | Age rating "location = No" is wrong | **P0** | Metadata fix | Update STORE_METADATA.md |
-| 2 | Demo account email/password vs phone OTP | **P0** | Manual | Provide phone-based demo |
-| 3 | Partial account deletion on failure | **P1** | Code fix | Wrap in transaction or continue-on-error |
-| 4 | No crash monitoring | **P1** | Manual | Add Crashlytics |
-| 5 | AASA/assetlinks placeholders | **P0** | Manual | Replace before deploy |
-| 6 | Payment verification falls back to trust SDK | **P1** | Code fix | Show intermediate state |
-| 7 | Multi-order payment polls single order | **P1** | Code fix | Poll all orderIds |
+| 1 | Auth page legal links use `#/terms` — broken in native | **P0** | Code fix | Use `<Link>` or absolute URL |
+| 2 | OTP send/verify endpoints have no rate limiting | **P1** | Code fix | Add `checkRateLimit` |
+| 3 | Metadata says "in-app purchases" — Apple IAP flag risk | **P0** | Metadata fix | Reword to "physical goods purchases" |
+| 4 | Account deletion destroys other users' chat messages | **P1** | Code fix | Anonymize instead of delete by receiver_id |
+| 5 | New users created with `name: "User"` placeholder | **P2** | UX review | Force name during onboarding |
+| 6 | Magic link token returned to client — interception window | **P1** | Architecture | Review token handling |
+| 7 | No brute-force protection on OTP verify endpoint | **P1** | Code fix | Add rate limiting |
 
-Items 1, 3, 6, 7 are code-fixable. Items 2, 4, 5 require manual action. Want me to fix the code-level issues?
+Items 1, 2, 3, 4, 7 are directly fixable. Items 5 and 6 require architectural decisions.
 
