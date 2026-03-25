@@ -169,25 +169,7 @@ export function ServiceBookingFlow({
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
-      const { data: freshSlots } = await supabase
-        .from('service_slots')
-        .select('*')
-        .eq('product_id', productId)
-        .eq('slot_date', dateStr)
-        .eq('start_time', selectedTime)
-        .eq('is_blocked', false)
-        .maybeSingle();
-
-      if (!freshSlots || freshSlots.booked_count >= freshSlots.max_capacity) {
-        toast.error('Selected slot is no longer available. Refreshing...');
-        refetchSlots();
-        setIsLoading(false);
-        isSubmittingRef.current = false;
-        return;
-      }
-
-      const slot = freshSlots;
-
+      // Pre-flight validations BEFORE creating any DB records
       const { data: sellerProfile } = await supabase
         .from('seller_profiles')
         .select('user_id')
@@ -208,6 +190,27 @@ export function ServiceBookingFlow({
         return;
       }
 
+      const normalizedTime = selectedTime.length === 5 ? selectedTime + ':00' : selectedTime;
+
+      const { data: freshSlots } = await supabase
+        .from('service_slots')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('slot_date', dateStr)
+        .eq('start_time', normalizedTime)
+        .eq('is_blocked', false)
+        .maybeSingle();
+
+      if (!freshSlots || freshSlots.booked_count >= freshSlots.max_capacity) {
+        toast.error('Selected slot is no longer available. Refreshing...');
+        refetchSlots();
+        setIsLoading(false);
+        isSubmittingRef.current = false;
+        return;
+      }
+
+      const slot = freshSlots;
+
       const { data: order, error: orderErr } = await supabase
         .from('orders')
         .insert({
@@ -220,7 +223,7 @@ export function ServiceBookingFlow({
           payment_status: 'pending',
           notes: notes.trim().slice(0, MAX_NOTES_LENGTH) || null,
           delivery_address: needsAddress && buyerAddress.trim() ? buyerAddress.trim().slice(0, MAX_ADDRESS_LENGTH) : null,
-          fulfillment_type: locationType || 'at_seller',
+          fulfillment_type: resolvedLocationType,
         })
         .select('id')
         .single();
@@ -254,6 +257,7 @@ export function ServiceBookingFlow({
           _end_time: slot.end_time,
           _location_type: resolvedLocationType,
           _buyer_address: buyerAddress.trim().slice(0, MAX_ADDRESS_LENGTH) || null,
+          _notes: notes.trim().slice(0, MAX_NOTES_LENGTH) || null,
         });
 
       if (bookErr) throw bookErr;
@@ -309,10 +313,10 @@ export function ServiceBookingFlow({
         await supabase.from('notification_queue').insert({
           user_id: sellerProfile.user_id,
           type: 'order',
-          title: '🆕 New Booking Request',
-          body: `${user.user_metadata?.name || 'A customer'} requested ${productName} on ${dateStr} at ${slot.start_time.slice(0, 5)}`,
+          title: '✅ New Booking Confirmed',
+          body: `${user.user_metadata?.name || 'A customer'} booked ${productName} on ${dateStr} at ${slot.start_time.slice(0, 5)}`,
           reference_path: `/orders/${order.id}`,
-          payload: { orderId: order.id, status: 'requested', type: 'order' },
+          payload: { orderId: order.id, status: 'confirmed', type: 'order' },
         });
       }
 

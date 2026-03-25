@@ -57,7 +57,7 @@ export function BuyerBookingsCalendar() {
   const nextBooking = useMemo(() => {
     const now = new Date();
     return bookings.find((b) => {
-      if (!['requested', 'confirmed', 'scheduled', 'rescheduled'].includes(b.status)) return false;
+      if (['completed', 'cancelled', 'no_show'].includes(b.status)) return false;
       // Parse as IST since booking times are stored in IST
       const apptTime = new Date(`${b.booking_date}T${b.start_time}+05:30`);
       return apptTime > now;
