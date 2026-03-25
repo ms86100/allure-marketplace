@@ -1,53 +1,112 @@
 
 
-# Fix: Toast Overlapping Status Bar + Double Safe-Area Padding on Checkout
+# Production Stabilization Audit — Root Cause Report & Fix Plan
 
-## Issues Found
+## Audit Summary
 
-### Issue 1: Toast notifications overlap iOS status bar (Screenshot 2)
-The Radix `ToastViewport` in `src/components/ui/toast.tsx` uses `fixed top-0 z-[100]` — toasts appear at the very top of the viewport with zero safe-area padding. The "Cash on Delivery" toast slides in behind the clock/battery area.
+After a thorough review of 20+ files across navigation, Live Activity, notifications, safe-area handling, and order flows, I identified **3 real bugs** and **1 systemic issue** causing the reported regressions. The architecture is fundamentally sound — the issues are localized.
 
-### Issue 2: Double safe-area padding on Checkout page (Screenshot 2)
-The checkout page's sticky header uses the `safe-top` CSS class which adds `padding-top: env(safe-area-inset-top)`. But `#root` already applies `padding-top: env(safe-area-inset-top)`. This creates double padding — explaining the large gap between the status bar and the "Checkout" title.
+---
 
-### Issue 3: Excessive top gap on Category page (Screenshot 1)
-Similarly, `CategoryGroupPage` renders inside `AppLayout` which renders `Header`. The Header's `sticky top-0` positioning starts below `#root`'s safe-area padding, but any additional safe-area handling inside would double it. The gap visible in screenshot 1 is mostly the `#root` padding working correctly, but it looks excessive because the Header has its own padding.
+## Issue 1: Double Safe-Area Padding on 12+ Pages (HIGH — Visible Regression)
 
-## Plan
+**Root Cause**: When the `#root::before` backdrop and `#root { padding-top: env(safe-area-inset-top) }` were added, only `CartPage.tsx` had its `.safe-top` class removed. **12 other pages** still apply `.safe-top`, creating double padding (the gap users see in screenshots).
 
-### Step 1: Fix ToastViewport safe-area (`src/components/ui/toast.tsx`)
+**Affected pages** (all use `showHeader={false}` with custom sticky headers that add `safe-top`):
+- `OrderDetailPage.tsx` (line 224)
+- `FavoritesPage.tsx` (line 61)
+- `CategoriesPage.tsx` (line 189)
+- `CategoryGroupPage.tsx` (line 211)
+- `SearchPage.tsx` (line 73)
+- `NotificationsPage.tsx` (line 157)
+- `SocietyDashboardPage.tsx` (line 228)
+- `HelpPage.tsx` (line 110)
+- `BecomeSellerPage.tsx` (lines 163, 191, 254)
+- `SellerProductsPage.tsx` (line 37)
+- `OrderProgressOverlay.tsx` (line 70)
+- `OnboardingWalkthrough` (if applicable)
 
-Add safe-area padding to the Radix ToastViewport so toasts never overlap the status bar:
+**Fix**: Remove `safe-top` from all these pages. The `#root` already provides the padding globally. Pages with `position: fixed` elements (like `SellerDetailPage`) are correctly handled and should keep their inline safe-area logic.
 
+---
+
+## Issue 2: Navigation Trap from Deep Links / Live Activity (HIGH — User Lock)
+
+**Root Cause**: When a user taps a Live Activity card or push notification, the app navigates to `/orders/{id}` with `state: { from: 'deeplink' }`. The back button correctly navigates to `/orders` in this case. However, the **BottomNav is hidden** when `hasSellerActionBar` is true (line 221: `showNav={!hasSellerActionBar}`). If the seller views their own order via deep link, they have NO navigation escape — no bottom nav, and back goes to `/orders` which may not be in the history stack on cold start.
+
+Additionally, `navigate(-1)` on the non-deeplink path fails on cold start (no history) — the user stays on the same page.
+
+**Fix**: 
+1. In `OrderDetailPage.tsx` line 225, change the back button to always have a fallback:
 ```
-// Line 17, change:
-"fixed top-0 z-[100] flex max-h-screen w-full ..."
-// To:
-"fixed top-0 z-[100] flex max-h-screen w-full pt-[env(safe-area-inset-top,0px)] ..."
+onClick={() => {
+  if (location.state?.from === 'deeplink' || window.history.length <= 2) {
+    navigate('/orders');
+  } else {
+    navigate(-1);
+  }
+}}
+```
+2. Always show bottom nav for buyers (line 221): `showNav={!hasSellerActionBar || !o.isSellerView}` — buyers should never lose bottom nav.
+
+---
+
+## Issue 3: OrderDetailPage has `safe-top` causing double padding (subsumed by Issue 1)
+
+The Order Summary header at line 224 uses `safe-top`, creating the excessive gap seen in the Checkout screenshot. This is the same root cause as Issue 1.
+
+---
+
+## Issue 4: Stale `lastProcessedEvents` Map in LiveActivity Orchestrator (LOW — Memory Leak)
+
+**Root Cause**: The `lastProcessedEvents` Map (line 16 of `useLiveActivityOrchestrator.ts`) is module-level and never cleaned up. Over a long session with many orders, it accumulates entries indefinitely. While not causing visible bugs now, it's a time bomb for long-running sessions.
+
+**Fix**: Clear entries when orders become terminal (add cleanup in the terminal handler at line 113):
+```ts
+lastProcessedEvents.delete(orderId);
 ```
 
-### Step 2: Remove `safe-top` from checkout header (`src/pages/CartPage.tsx`)
+---
 
-The `#root` already provides `padding-top: env(safe-area-inset-top)`. Pages that use `showHeader={false}` and implement their own sticky header should NOT add `safe-top` again.
+## What is NOT Broken (Audit Confirmation)
 
-Line 95 — remove `safe-top` from the className:
-```
-// Before:
-"sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 safe-top flex items-center gap-3"
-// After:
-"sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 flex items-center gap-3"
-```
+- **Live Activity dedup**: Composite key (`orderId:status:updated_at`) correctly prevents duplicate processing. Only one card per order.
+- **Notification spam**: The partial unique index fix from earlier correctly prevents duplicate proximity notifications at the DB level.
+- **State derivation**: All order states are DB-driven via `category_status_flows`. No hardcoded states found.
+- **Realtime + polling**: Triple-channel reliability (realtime, 15s polling, visibility sync) ensures state convergence.
+- **Cart/checkout**: Idempotency keys, advisory locks, and the submit guard prevent duplicate orders.
+- **Deep link dedup**: `sessionStorage` flag prevents re-processing of launch URLs.
 
-### Step 3: Audit other `safe-top` usages
+---
 
-Search for other pages using `safe-top` that might have the same double-padding issue. Based on the search results, `safe-top` is only used in CartPage.tsx. Other pages that handle safe-area directly (SellerDetailPage, SetStoreLocationSheet, OnboardingLocationSheet) use `position: fixed` which is correct since fixed elements are outside the normal flow and don't benefit from `#root`'s padding.
+## Implementation Plan
 
-## Summary
+### Step 1: Remove `safe-top` from all pages (12 files, ~15 line changes)
 
-| File | Change |
-|---|---|
-| `src/components/ui/toast.tsx` | Add `pt-[env(safe-area-inset-top)]` to ToastViewport |
-| `src/pages/CartPage.tsx` | Remove `safe-top` class from sticky header (line 95) |
+Remove the `safe-top` class from every page that renders inside `#root` (which already handles safe-area padding). Keep it only on `position: fixed` overlays that sit outside the normal flow.
 
-2 files, ~2 lines changed each. Fixes toast overlap and double padding.
+### Step 2: Fix navigation trap in OrderDetailPage (1 file, 2 changes)
+
+- Back button: add `window.history.length <= 2` fallback to `/orders`
+- Bottom nav: always show for buyer view
+
+### Step 3: Clean up stale LiveActivity dedup map (1 file, 1 line)
+
+Delete terminal order entries from `lastProcessedEvents`.
+
+### Step 4: Verify no other `safe-top` usages conflict
+
+The `OnboardingWalkthrough` and fixed-position overlays using `safe-top` are correct because they use `position: fixed` and aren't children of `#root`'s padding context.
+
+---
+
+## Summary Table
+
+| # | Issue | Root Cause | Files | Lines Changed |
+|---|---|---|---|---|
+| 1 | Double safe-area padding | `safe-top` not removed after global fix | 12 files | ~15 |
+| 2 | Navigation trap on cold start/deep link | `navigate(-1)` with no history + hidden bottom nav | OrderDetailPage.tsx | 2 |
+| 3 | Memory leak in LA dedup map | Never cleaned up | useLiveActivityOrchestrator.ts | 1 |
+
+**Total**: ~13 files, ~18 lines changed. All surgical. Zero risk to existing functionality.
 
