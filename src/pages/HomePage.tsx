@@ -7,6 +7,7 @@ import { MarketplaceSection } from '@/components/home/MarketplaceSection';
 import { SocietyQuickLinks } from '@/components/home/SocietyQuickLinks';
 
 import { CommunityTeaser } from '@/components/home/CommunityTeaser';
+import { LazySection } from '@/components/home/LazySection';
 import { HomeNotificationBanner } from '@/components/notifications/HomeNotificationBanner';
 import { ActiveOrderStrip } from '@/components/home/ActiveOrderStrip';
 import { ForYouSection } from '@/components/home/ForYouSection';
@@ -130,34 +131,34 @@ export default function HomePage() {
         })()}
 
         {/* Personalized */}
-        <div className="reveal-on-scroll">
+        <LazySection className="reveal-on-scroll">
           <ForYouSection />
-        </div>
+        </LazySection>
 
         {/* Recently viewed */}
-        <div className="reveal-on-scroll">
+        <LazySection className="reveal-on-scroll">
           <RecentlyViewedRow />
-        </div>
+        </LazySection>
 
         {/* Plan #18: Dormant user re-engagement */}
-        <div className="reveal-on-scroll">
+        <LazySection className="reveal-on-scroll">
           <WhatsNewSection />
-        </div>
+        </LazySection>
 
         {/* Society links */}
-        <div className="reveal-on-scroll">
+        <LazySection className="reveal-on-scroll">
           <SocietyQuickLinks />
-        </div>
+        </LazySection>
 
         {/* Leaderboard */}
-        <div className="mt-6 reveal-on-scroll">
+        <LazySection className="mt-6 reveal-on-scroll">
           <SocietyLeaderboard />
-        </div>
+        </LazySection>
 
         {/* Community */}
-        <div className="reveal-on-scroll">
+        <LazySection className="reveal-on-scroll">
           <CommunityTeaser />
-        </div>
+        </LazySection>
       </div>
     </AppLayout>
   );

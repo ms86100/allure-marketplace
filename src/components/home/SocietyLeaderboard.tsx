@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCurrency } from '@/hooks/useCurrency';
 import { cn } from '@/lib/utils';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
+import { jitteredStaleTime } from '@/lib/query-utils';
 
 interface TopSeller {
   id: string;
@@ -40,43 +41,29 @@ export function SocietyLeaderboard() {
   const navigate = useNavigate();
   const { formatPrice } = useCurrency();
   const ml = useMarketplaceLabels();
-  const [topSellers, setTopSellers] = useState<TopSeller[]>([]);
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!effectiveSocietyId) {
-      setLoading(false);
-      return;
-    }
-    fetchLeaderboard();
-  }, [effectiveSocietyId]);
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ['society-leaderboard', effectiveSocietyId],
+    queryFn: async () => {
+      const [sellersRes, productsRes] = await Promise.all([
+        supabase
+          .from('seller_profiles')
+          .select('id, business_name, profile_image_url, rating, completed_order_count')
+          .eq('society_id', effectiveSocietyId!)
+          .eq('verification_status', 'approved')
+          .gt('completed_order_count', 0)
+          .order('completed_order_count', { ascending: false })
+          .limit(5),
+        supabase.rpc('get_society_top_products', {
+          _society_id: effectiveSocietyId!,
+          _limit: 5,
+        }),
+      ]);
 
-  const fetchLeaderboard = async () => {
-    setLoading(true);
-    const sellersPromise = supabase
-      .from('seller_profiles')
-      .select('id, business_name, profile_image_url, rating, completed_order_count')
-      .eq('society_id', effectiveSocietyId!)
-      .eq('verification_status', 'approved')
-      .gt('completed_order_count', 0)
-      .order('completed_order_count', { ascending: false })
-      .limit(5);
-
-    const productsPromise = supabase.rpc('get_society_top_products', {
-      _society_id: effectiveSocietyId!,
-      _limit: 5,
-    });
-
-    const [sellersRes, productsRes] = await Promise.all([sellersPromise, productsPromise]);
-    setTopSellers((sellersRes.data || []) as TopSeller[]);
-
-    if (productsRes.error) {
-      console.warn('[Leaderboard] RPC error:', productsRes.error.message);
-      setTopProducts([]);
-    } else {
-      setTopProducts(
-        (productsRes.data || []).map((p: any) => ({
+      const sellers = (sellersRes.data || []) as TopSeller[];
+      let products: TopProduct[] = [];
+      if (!productsRes.error) {
+        products = (productsRes.data || []).map((p: any) => ({
           product_id: p.product_id,
           product_name: p.product_name,
           image_url: p.image_url,
@@ -84,11 +71,16 @@ export function SocietyLeaderboard() {
           seller_name: p.seller_name || '',
           seller_id: p.seller_id || '',
           price: p.price || 0,
-        }))
-      );
-    }
-    setLoading(false);
-  };
+        }));
+      }
+      return { sellers, products };
+    },
+    enabled: !!effectiveSocietyId,
+    staleTime: jitteredStaleTime(10 * 60_000),
+  });
+
+  const topSellers = data?.sellers ?? [];
+  const topProducts = data?.products ?? [];
 
   if (loading) {
     return (

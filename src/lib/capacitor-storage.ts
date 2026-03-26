@@ -70,6 +70,68 @@ class CapacitorStorage implements SupportedStorage {
 /** Singleton — used by Supabase client */
 export const capacitorStorage = new CapacitorStorage();
 
+const AUTH_SESSION_KEY = 'sb-auth-session-backup';
+
+/**
+ * Persist the current auth session to native Preferences.
+ * Called on every onAuthStateChange so the token survives iOS localStorage purges.
+ */
+export function persistAuthSession(session: { access_token: string; refresh_token: string } | null): void {
+  if (!Capacitor.isNativePlatform()) return;
+  if (session) {
+    mirrorToNative('set', AUTH_SESSION_KEY, JSON.stringify({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    }));
+  } else {
+    mirrorToNative('remove', AUTH_SESSION_KEY);
+  }
+}
+
+/**
+ * Restore auth session from native Preferences → Supabase localStorage key.
+ * Must be called BEFORE supabase.auth.getSession() on cold boot.
+ */
+export async function restoreAuthSession(): Promise<boolean> {
+  if (!Capacitor.isNativePlatform()) return false;
+  const prefs = await getPrefs();
+  if (!prefs) return false;
+
+  try {
+    const { value } = await prefs.get({ key: AUTH_SESSION_KEY });
+    if (!value) return false;
+
+    // Check if any sb- key already exists in localStorage (session intact)
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith('sb-') && k.endsWith('-auth-token')) {
+        return false; // localStorage session exists, no need to restore
+      }
+    }
+
+    // localStorage was purged — restore the session
+    const parsed = JSON.parse(value);
+    if (parsed?.access_token && parsed?.refresh_token) {
+      // Find the correct localStorage key pattern: sb-<ref>-auth-token
+      // We write to a generic key that Supabase SDK will pick up
+      const url = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+      const ref = url.replace('https://', '').split('.')[0];
+      if (ref) {
+        const storageKey = `sb-${ref}-auth-token`;
+        localStorage.setItem(storageKey, JSON.stringify({
+          access_token: parsed.access_token,
+          refresh_token: parsed.refresh_token,
+        }));
+        console.log('[Auth] Restored session from native Preferences');
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn('[Auth] Failed to restore session from Preferences:', e);
+  }
+  return false;
+}
+
 /**
  * One-time migration: copy any existing sb-* keys from native Preferences
  * into localStorage so the session survives the storage-swap.

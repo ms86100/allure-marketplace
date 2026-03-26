@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Profile, UserRole, SellerProfile, Society, SocietyAdmin } from '@/types/database';
 import { AuthState, initialAuthState } from './types';
 import { toast } from 'sonner';
+import { persistAuthSession, restoreAuthSession } from '@/lib/capacitor-storage';
+import { hideSplashScreen } from '@/lib/capacitor';
 
 export function useAuthState() {
   const [state, setState] = useState<AuthState>(initialAuthState);
@@ -155,6 +157,9 @@ export function useAuthState() {
       (event, session) => {
         setPartial({ session, user: session?.user ?? null, isLoading: false });
 
+        // Persist session to native storage (survives iOS app updates)
+        persistAuthSession(session ? { access_token: session.access_token, refresh_token: session.refresh_token } : null);
+
         if (session?.user) {
           if (profileFetchedFor.current !== session.user.id) {
             profileFetchedFor.current = session.user.id;
@@ -174,12 +179,17 @@ export function useAuthState() {
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setPartial({ session, user: session?.user ?? null, isLoading: false, isSessionRestored: true });
-      if (session?.user && profileFetchedFor.current !== session.user.id) {
-        profileFetchedFor.current = session.user.id;
-        fetchProfile(session.user.id);
-      }
+    // Restore session from native storage before reading — handles iOS localStorage purge
+    restoreAuthSession().finally(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setPartial({ session, user: session?.user ?? null, isLoading: false, isSessionRestored: true });
+        // Hide splash screen now that session is resolved
+        hideSplashScreen();
+        if (session?.user && profileFetchedFor.current !== session.user.id) {
+          profileFetchedFor.current = session.user.id;
+          fetchProfile(session.user.id);
+        }
+      });
     });
 
     return () => subscription.unsubscribe();
