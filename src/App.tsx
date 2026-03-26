@@ -225,8 +225,9 @@ function PageLoadingFallback() {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
-  if (isLoading) {
+  const { user, isLoading, isSessionRestored } = useAuth();
+  // Wait for session restoration before deciding — prevents flash redirect to /auth
+  if (isLoading || !isSessionRestored) {
     return (
       <div className="min-h-[100dvh] flex items-center justify-center bg-background">
         <Skeleton className="h-6 w-32 rounded-lg" />

@@ -15,21 +15,24 @@ export function WhatsNewSection() {
   const { user } = useAuth();
   const { browsingLocation } = useBrowsingLocation();
 
-  const { data: lastOrderDate } = useQuery({
-    queryKey: ['last-order-date', user?.id],
+  // Reuse the same query key as WelcomeBackStrip to avoid duplicate DB calls
+  const { data: lastOrderCtx } = useQuery({
+    queryKey: ['last-order-context', user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('orders')
-        .select('created_at')
+        .select('id, status, created_at, seller:seller_profiles!orders_seller_id_fkey(business_name)')
         .eq('buyer_id', user!.id)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      return data?.created_at ?? null;
+      return data as { id: string; status: string; created_at: string; seller: { business_name: string } | null } | null;
     },
     enabled: !!user?.id,
-    staleTime: jitteredStaleTime(10 * 60_000),
+    staleTime: jitteredStaleTime(5 * 60_000),
   });
+
+  const lastOrderDate = lastOrderCtx?.created_at ?? null;
 
   const twoWeeksAgo = new Date();
   twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);

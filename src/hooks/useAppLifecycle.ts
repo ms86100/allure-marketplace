@@ -40,6 +40,8 @@ export function useAppLifecycle() {
         const listener = await App.addListener('appStateChange', ({ isActive }) => {
           if (isActive) {
             // Invalidate critical queries so they refetch with fresh data
+            // Only invalidate lightweight queries — skip heavy ones like products-by-category
+            // which has its own staleTime and can be refreshed via pull-to-refresh
             queryClient.invalidateQueries({ queryKey: ['featured-banners'] });
             queryClient.invalidateQueries({ queryKey: ['system-settings-raw'] });
             queryClient.invalidateQueries({ queryKey: ['system-settings-core'] });
@@ -48,7 +50,6 @@ export function useAppLifecycle() {
             queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
             queryClient.invalidateQueries({ queryKey: ['notifications'] });
             queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
-            queryClient.invalidateQueries({ queryKey: ['products-by-category'] });
             queryClient.invalidateQueries({ queryKey: ['seller-orders'] });
             queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats'] });
             queryClient.invalidateQueries({ queryKey: ['orders'] });

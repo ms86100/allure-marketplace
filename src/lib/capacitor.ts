@@ -36,11 +36,7 @@ export async function initializeCapacitorPlugins() {
     console.error('Error configuring keyboard:', error);
   }
 
-  try {
-    await SplashScreen.hide();
-  } catch (error) {
-    console.error('Error hiding splash screen:', error);
-  }
+  // SplashScreen.hide() is deferred — called by auth layer after session restore
 }
 
 export function isNativePlatform(): boolean {
@@ -49,4 +45,16 @@ export function isNativePlatform(): boolean {
 
 export function getPlatform(): 'ios' | 'android' | 'web' {
   return Capacitor.getPlatform() as 'ios' | 'android' | 'web';
+}
+
+/** Hide splash screen — call after auth session is restored */
+let splashHidden = false;
+export async function hideSplashScreen() {
+  if (splashHidden || !Capacitor.isNativePlatform()) return;
+  splashHidden = true;
+  try {
+    await SplashScreen.hide();
+  } catch (e) {
+    console.error('Error hiding splash screen:', e);
+  }
 }
