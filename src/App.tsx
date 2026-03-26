@@ -161,7 +161,7 @@ function isAuthSessionError(error: unknown): boolean {
   ];
   if (authPatterns.some(p => msg.toLowerCase().includes(p.toLowerCase()))) return true;
   if ((error as any)?.code === 'PGRST301') return true;
-  if ((error as any)?.status === 401 || (error as any)?.status === 403) return true;
+  if ((error as any)?.status === 401) return true;
   return false;
 }
 

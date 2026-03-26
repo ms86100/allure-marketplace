@@ -191,10 +191,17 @@ export function useAuthState() {
     const INTERVAL = 5 * 60 * 1000; // 5 minutes
     const interval = setInterval(async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
         if (error || !session) {
-          console.warn('[Auth] Session expired during idle, clearing state');
-          clearAuthState();
+          // Don't immediately clear — verify with server first
+          // getSession() reads from localStorage which can be transiently unavailable (iOS WebView purge)
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            console.warn('[Auth] Session truly expired (server confirmed), clearing state');
+            clearAuthState();
+          } else {
+            console.log('[Auth] Local session missing but server session valid, skipping clear');
+          }
           return;
         }
         // If session exists but is close to expiry (< 10 min), proactively refresh
@@ -203,7 +210,11 @@ export function useAuthState() {
           const expiresIn = expiresAt * 1000 - Date.now();
           if (expiresIn < 10 * 60 * 1000) {
             console.log('[Auth] Proactively refreshing session');
-            await supabase.auth.refreshSession();
+            const { error: refreshError } = await supabase.auth.refreshSession();
+            if (refreshError) {
+              console.warn('[Auth] Proactive refresh failed, will retry next interval:', refreshError.message);
+              // Do NOT clear state — the current JWT is still valid until expiry
+            }
           }
         }
       } catch (e) {
