@@ -225,6 +225,9 @@ export function ServiceBookingFlow({
 
       const slot = freshSlots;
 
+      // Bug 4 fix: deterministic idempotency key prevents duplicate booking orders
+      const idempotencyKey = `booking_${user.id}_${productId}_${dateStr}_${normalizedTime}`;
+
       const { data: order, error: orderErr } = await supabase
         .from('orders')
         .insert({
@@ -236,12 +239,31 @@ export function ServiceBookingFlow({
           payment_type: 'cod',
           payment_status: 'pending',
           transaction_type: 'service_booking',
+          idempotency_key: idempotencyKey,
           notes: notes.trim().slice(0, MAX_NOTES_LENGTH) || null,
           delivery_address: needsAddress && buyerAddress.trim() ? buyerAddress.trim().slice(0, MAX_ADDRESS_LENGTH) : null,
           fulfillment_type: resolvedLocation || locationType || 'at_seller',
         } as any)
         .select('id')
         .single();
+
+      // If duplicate key conflict, find existing order and navigate to it
+      if (orderErr && (orderErr.code === '23505' || orderErr.message?.includes('duplicate'))) {
+        const { data: existingOrder } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('buyer_id', user.id)
+          .eq('idempotency_key' as any, idempotencyKey)
+          .eq('order_type', 'booking')
+          .single();
+        if (existingOrder) {
+          toast.info('This booking already exists.');
+          onOpenChange(false);
+          navigate(`/orders/${existingOrder.id}`);
+          return;
+        }
+        throw orderErr;
+      }
 
       if (orderErr || !order) throw orderErr || new Error('Failed to create order');
 
