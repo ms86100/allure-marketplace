@@ -3,20 +3,34 @@ import { resolveNotificationRoute } from '@/lib/notification-routes';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
-import { Bell, CheckCheck, Inbox, RefreshCw, Package, Users, Truck, MessageCircle } from 'lucide-react';
+import { Bell, CheckCheck, Inbox, RefreshCw, Package, Users, Truck, MessageCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '@/hooks/queries/useNotifications';
+import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead, type UserNotification } from '@/hooks/queries/useNotifications';
 import { RichNotificationCard } from '@/components/notifications/RichNotificationCard';
+import { useMemo } from 'react';
 
 export default function NotificationInboxPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { data: notifications = [], isLoading, refetch, isFetching } = useNotifications(user?.id);
+  const {
+    data,
+    isLoading,
+    refetch,
+    isFetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useNotifications(user?.id);
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
 
-  const handleTap = (n: typeof notifications[0]) => {
+  const notifications = useMemo(() => {
+    if (!data?.pages) return [];
+    return data.pages.flat();
+  }, [data]);
+
+  const handleTap = (n: UserNotification) => {
     if (!n.is_read) markRead.mutate(n.id);
     const path = n.reference_path || resolveNotificationRoute(n.type, (n as any).payload);
     if (path && path.startsWith('/')) {
@@ -100,6 +114,19 @@ export default function NotificationInboxPage() {
                 </button>
               );
             })}
+
+            {hasNextPage && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-sm gap-1 mt-2"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? <Loader2 size={14} className="animate-spin" /> : null}
+                {isFetchingNextPage ? 'Loading...' : 'Load more'}
+              </Button>
+            )}
           </div>
         )}
       </div>

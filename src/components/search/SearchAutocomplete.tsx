@@ -87,7 +87,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
 
       const { data } = await supabase
         .from('products')
-        .select('id, name, price, image_url, seller_id, category, is_veg, description, is_available')
+        .select('id, name, price, image_url, seller_id, category, is_veg, description, is_available, action_type')
         .eq('is_available', true)
         .eq('approval_status', 'approved')
         .or(orConditions)
@@ -211,6 +211,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
                   description: product.description,
                   seller_id: product.seller_id,
                   is_available: product.is_available,
+                  action_type: product.action_type,
                   seller_name: '',
                   seller_rating: 0,
                   seller_reviews: 0,

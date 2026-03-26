@@ -367,9 +367,11 @@ export function usePushNotificationsInternal() {
         }
 
         // Suppress self-action: if buyer is viewing this order page, skip sound/toast
+        // but still dispatch a refetch event so the detail page updates immediately
         const currentPath = window.location.hash || window.location.pathname;
         if (orderId && currentPath.includes(`/orders/${orderId}`)) {
           pushLog('info', 'FOREGROUND_SUPPRESSED_SELF_ACTION', { orderId });
+          window.dispatchEvent(new CustomEvent('order-detail-refetch', { detail: { orderId } }));
           return;
         }
 

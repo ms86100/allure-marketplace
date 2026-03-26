@@ -12,8 +12,19 @@ import { getTransitStatuses } from '@/lib/visibilityEngine';
 
 const TAG = '[LiveActivityOrchestrator]';
 
-/** Composite event dedup: orderId → "orderId:status:updated_at" */
-const lastProcessedEvents = new Map<string, string>();
+/** Composite event dedup: orderId → { key, ts } */
+const lastProcessedEvents = new Map<string, { key: string; ts: number }>();
+
+/** Periodic cleanup of stale entries (older than 10 minutes) */
+function cleanupStaleEvents() {
+  const now = Date.now();
+  const STALE_MS = 10 * 60 * 1000;
+  for (const [orderId, entry] of lastProcessedEvents) {
+    if (now - entry.ts > STALE_MS) {
+      lastProcessedEvents.delete(orderId);
+    }
+  }
+}
 
 /** DB-backed terminal statuses — loaded once at init. No hardcoded fallbacks. */
 let terminalStatusesCache: Set<string> = new Set();
@@ -62,6 +73,16 @@ export function useLiveActivityOrchestrator(): void {
     await syncActiveOrders(userId);
   }, [userId]);
 
+  // ── Clear dedup map on user change + periodic cleanup ──
+  useEffect(() => {
+    lastProcessedEvents.clear();
+  }, [userId]);
+
+  useEffect(() => {
+    const interval = setInterval(cleanupStaleEvents, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // ── Initial sync + diagnostics ──
   useEffect(() => {
     if (!userId) return;
@@ -104,8 +125,8 @@ export function useLiveActivityOrchestrator(): void {
 
       // Composite dedup: skip if we already processed this exact state
       const eventKey = `${orderId}:${newStatus}:${row?.updated_at}`;
-      if (lastProcessedEvents.get(orderId) === eventKey) return;
-      lastProcessedEvents.set(orderId, eventKey);
+      if (lastProcessedEvents.get(orderId)?.key === eventKey) return;
+      lastProcessedEvents.set(orderId, { key: eventKey, ts: Date.now() });
 
       console.log(TAG, `Order ${orderId} status → ${newStatus}`);
 

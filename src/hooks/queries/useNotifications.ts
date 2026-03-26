@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 // Seller-only notification types that should not appear in buyer inbox
@@ -33,59 +33,83 @@ export interface UserNotification {
   payload: NotificationPayload | null;
 }
 
+const PAGE_SIZE = 30;
+
+/**
+ * Fire-and-forget stale cleanup — never throws, never blocks reads.
+ */
+async function cleanupStaleDeliveryNotifications(notifications: UserNotification[]) {
+  try {
+    const deliveryTypes = new Set(['delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent']);
+    const unreadDeliveryNotifs: UserNotification[] = [];
+    const orderIds = new Set<string>();
+    for (const n of notifications) {
+      if (!n.is_read && deliveryTypes.has(n.type)) {
+        const oid = (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
+        if (oid) {
+          orderIds.add(oid);
+          unreadDeliveryNotifs.push(n);
+        }
+      }
+    }
+    if (orderIds.size === 0) return;
+
+    const { data: terminalOrders } = await supabase
+      .from('orders')
+      .select('id')
+      .in('id', [...orderIds])
+      .in('status', ['delivered', 'completed', 'cancelled', 'no_show']);
+    if (!terminalOrders || terminalOrders.length === 0) return;
+
+    const terminalSet = new Set(terminalOrders.map((o: any) => o.id));
+    const staleIds = unreadDeliveryNotifs
+      .filter(n => {
+        const oid = (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
+        return oid && terminalSet.has(oid);
+      })
+      .map(n => n.id);
+    if (staleIds.length > 0) {
+      await supabase.from('user_notifications').update({ is_read: true }).in('id', staleIds);
+    }
+  } catch (e) {
+    console.warn('[useNotifications] Stale cleanup failed (non-blocking):', e);
+  }
+}
+
 export function useNotifications(userId: string | undefined) {
-  return useQuery({
+  const queryClient = useQueryClient();
+
+  return useInfiniteQuery({
     queryKey: ['notifications', userId],
-    queryFn: async () => {
-      const { data } = await supabase
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      let query = supabase
         .from('user_notifications')
         .select('id, title, body, type, reference_path, is_read, created_at, payload')
         .eq('user_id', userId!)
         .not('type', 'in', SELLER_ONLY_FILTER)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(PAGE_SIZE);
 
-      const notifications = (data as unknown as UserNotification[]) || [];
-
-      // Auto-cleanup: mark delivery notifications for terminal orders as read
-      const deliveryTypes = new Set(['delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent']);
-      const unreadDeliveryNotifs: UserNotification[] = [];
-      const orderIds = new Set<string>();
-      for (const n of notifications) {
-        if (!n.is_read && deliveryTypes.has(n.type)) {
-          const oid = (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
-          if (oid) {
-            orderIds.add(oid);
-            unreadDeliveryNotifs.push(n);
-          }
-        }
+      if (pageParam) {
+        query = query.lt('created_at', pageParam);
       }
 
-      if (orderIds.size > 0) {
-        const { data: terminalOrders } = await supabase
-          .from('orders')
-          .select('id')
-          .in('id', [...orderIds])
-          .in('status', ['delivered', 'completed', 'cancelled', 'no_show']);
-        if (terminalOrders && terminalOrders.length > 0) {
-          const terminalSet = new Set(terminalOrders.map((o: any) => o.id));
-          const staleIds = unreadDeliveryNotifs
-            .filter(n => {
-              const oid = (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
-              return oid && terminalSet.has(oid);
-            })
-            .map(n => n.id);
-          if (staleIds.length > 0) {
-            await supabase.from('user_notifications').update({ is_read: true }).in('id', staleIds);
-            // Mark locally so UI reflects immediately
-            for (const n of notifications) {
-              if (staleIds.includes(n.id)) n.is_read = true;
-            }
-          }
-        }
+      const { data } = await query;
+      const notifications = (data as unknown as UserNotification[]) || [];
+
+      // Fire-and-forget cleanup — only on first page
+      if (!pageParam && notifications.length > 0) {
+        cleanupStaleDeliveryNotifications(notifications).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
+        }).catch(() => {});
       }
 
       return notifications;
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => {
+      if (lastPage.length < PAGE_SIZE) return undefined;
+      return lastPage[lastPage.length - 1]?.created_at;
     },
     enabled: !!userId,
     staleTime: 0,
@@ -109,7 +133,7 @@ export function useLatestActionNotification(userId: string | undefined) {
       const notifications = (data as unknown as UserNotification[]) || [];
       if (notifications.length === 0) return null;
 
-      // Collect ALL order-linked notifications (not just delivery types)
+      // Collect ALL order-linked notifications
       const orderLinkedNotifs: UserNotification[] = [];
       const orderIds = new Set<string>();
       for (const n of notifications) {
@@ -133,7 +157,7 @@ export function useLatestActionNotification(userId: string | undefined) {
         }
       }
 
-      // Batch-mark stale notifications for terminal orders as read
+      // Fire-and-forget stale marking — don't block or throw
       const staleIds: string[] = [];
       for (const n of orderLinkedNotifs) {
         const oid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
@@ -142,18 +166,19 @@ export function useLatestActionNotification(userId: string | undefined) {
         }
       }
       if (staleIds.length > 0) {
-        await supabase
-          .from('user_notifications')
-          .update({ is_read: true })
-          .in('id', staleIds);
+        try {
+          await supabase
+            .from('user_notifications')
+            .update({ is_read: true })
+            .in('id', staleIds);
+        } catch { /* non-blocking */ }
       }
 
-      // Return first valid notification (with action or actionable reference_path)
+      // Return first valid notification
       const staleSet = new Set(staleIds);
       for (const n of notifications) {
         if (staleSet.has(n.id)) continue;
         if (n?.payload?.action) return n;
-        // Fallback: treat order-linked notifications as actionable even without explicit action
         if (n.reference_path?.startsWith('/orders/')) {
           return {
             ...n,
