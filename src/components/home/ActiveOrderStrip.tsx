@@ -10,17 +10,26 @@ import { jitteredStaleTime } from '@/lib/query-utils';
 import { compactETA } from '@/lib/etaEngine';
 import { getTransitStatuses } from '@/lib/visibilityEngine';
 
-function CompactCountdown({ autoCancelAt }: { autoCancelAt: string }) {
+function CompactCountdown({ autoCancelAt, onExpire }: { autoCancelAt: string; onExpire?: () => void }) {
   const calc = useCallback(() => {
     const diff = new Date(autoCancelAt).getTime() - Date.now();
     return Math.max(0, Math.floor(diff / 1000));
   }, [autoCancelAt]);
   const [secs, setSecs] = useState(calc);
+  const expiredRef = useRef(false);
   useEffect(() => {
     setSecs(calc());
-    const t = setInterval(() => setSecs(calc()), 1000);
+    expiredRef.current = false;
+    const t = setInterval(() => {
+      const v = calc();
+      setSecs(v);
+      if (v <= 0 && !expiredRef.current) {
+        expiredRef.current = true;
+        onExpire?.();
+      }
+    }, 1000);
     return () => clearInterval(t);
-  }, [calc]);
+  }, [calc, onExpire]);
   if (secs <= 0) return <span className="text-[10px] font-bold text-destructive whitespace-nowrap">Expired</span>;
   const m = Math.floor(secs / 60);
   const s = secs % 60;
@@ -210,7 +219,7 @@ export function ActiveOrderStrip() {
                 {/* ETA / countdown / count */}
                 <div className="shrink-0 flex items-center gap-1">
                   {order.auto_cancel_at && order.status === 'placed' ? (
-                    <CompactCountdown autoCancelAt={order.auto_cancel_at} />
+                    <CompactCountdown autoCancelAt={order.auto_cancel_at} onExpire={() => queryClient.invalidateQueries({ queryKey: ['active-orders-strip'] })} />
                   ) : etaText ? (
                     <span className="text-[10px] font-bold text-primary whitespace-nowrap">
                       {etaText}
