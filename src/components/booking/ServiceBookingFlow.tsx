@@ -192,6 +192,20 @@ export function ServiceBookingFlow({
 
       const normalizedTime = selectedTime.length === 5 ? selectedTime + ':00' : selectedTime;
 
+      // Bug 7 fix: Validate product is still available before booking
+      const { data: freshProduct } = await supabase
+        .from('products')
+        .select('is_available, approval_status')
+        .eq('id', productId)
+        .single();
+
+      if (!freshProduct || !freshProduct.is_available || freshProduct.approval_status !== 'approved') {
+        toast.error('This service is no longer available.');
+        setIsLoading(false);
+        isSubmittingRef.current = false;
+        return;
+      }
+
       const { data: freshSlots } = await supabase
         .from('service_slots')
         .select('*')
@@ -221,10 +235,11 @@ export function ServiceBookingFlow({
           status: 'confirmed',
           payment_type: 'cod',
           payment_status: 'pending',
+          transaction_type: 'service_booking',
           notes: notes.trim().slice(0, MAX_NOTES_LENGTH) || null,
           delivery_address: needsAddress && buyerAddress.trim() ? buyerAddress.trim().slice(0, MAX_ADDRESS_LENGTH) : null,
           fulfillment_type: resolvedLocation || locationType || 'at_seller',
-        })
+        } as any)
         .select('id')
         .single();
 

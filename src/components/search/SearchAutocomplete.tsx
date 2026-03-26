@@ -8,6 +8,7 @@ import { Store, Package, Tag } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { useNavigate } from 'react-router-dom';
 import { useMemo } from 'react';
+import { escapePostgrestFilter } from '@/lib/query-utils';
 
 interface Props {
   query: string;
@@ -77,15 +78,16 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
         .filter(c => c.category.toLowerCase().includes(lower) || c.displayName.toLowerCase().includes(lower))
         .map(c => c.category);
 
-      // Build OR conditions for deep search
-      let orConditions = `name.ilike.%${trimmed}%,description.ilike.%${trimmed}%,brand.ilike.%${trimmed}%,ingredients.ilike.%${trimmed}%`;
+      // Build OR conditions for deep search — sanitize user input
+      const safe = escapePostgrestFilter(trimmed);
+      let orConditions = `name.ilike.%${safe}%,description.ilike.%${safe}%,brand.ilike.%${safe}%,ingredients.ilike.%${safe}%`;
       if (matchingSlugs.length > 0) {
         orConditions += `,category.in.(${matchingSlugs.join(',')})`;
       }
 
       const { data } = await supabase
         .from('products')
-        .select('id, name, price, image_url, seller_id, category, is_veg, description')
+        .select('id, name, price, image_url, seller_id, category, is_veg, description, is_available')
         .eq('is_available', true)
         .eq('approval_status', 'approved')
         .or(orConditions)
@@ -104,7 +106,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
         .from('seller_profiles')
         .select('id, business_name, description, profile_image_url, categories')
         .eq('verification_status', 'approved')
-        .or(`business_name.ilike.%${trimmed}%,description.ilike.%${trimmed}%,categories.cs.{${lower}}`)
+        .or(`business_name.ilike.%${escapePostgrestFilter(trimmed)}%,description.ilike.%${escapePostgrestFilter(trimmed)}%,categories.cs.{${escapePostgrestFilter(lower)}}`)
         .limit(3);
       return (data || []).map((d: any) => ({
         id: d.id,

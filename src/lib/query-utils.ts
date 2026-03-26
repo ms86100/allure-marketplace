@@ -53,6 +53,23 @@ export function handleApiError(
  *   staleTime: jitteredStaleTime(60_000), // 48_000–72_000ms
  * });
  */
+/**
+ * Escapes special characters for PostgREST filter strings.
+ * Prevents filter injection when user input is interpolated into .or() / .ilike() strings.
+ * Characters escaped: backslash, percent, underscore, comma, parentheses, period, colon
+ */
+export function escapePostgrestFilter(input: string): string {
+  return input
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_')
+    .replace(/,/g, '')
+    .replace(/\(/g, '')
+    .replace(/\)/g, '')
+    .replace(/\./g, '')
+    .replace(/:/g, '');
+}
+
 export function jitteredStaleTime(baseMs: number): number {
   const jitter = 0.2; // ±20%
   const min = baseMs * (1 - jitter);
