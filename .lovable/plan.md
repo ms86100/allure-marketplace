@@ -1,91 +1,172 @@
 
+What I learned from the screenshot, video evidence, and the startup code:
 
-# Mobile Performance & Session Reliability
+## What the evidence shows
 
-## Problem Summary
+1. The app is not reaching the visible UI on mobile.
+   - Your screenshot is almost entirely black.
+   - I can see the iPhone/TestFlight status bar at the top and the iOS home indicator at the bottom.
+   - That means the native shell is alive, but the web app content is not becoming visible.
 
-Two distinct issues causing poor mobile experience:
+2. This does not look like a normal route/page bug.
+   - If a page component crashed after load, I would expect one of your in-app fallbacks:
+     - the global “Something went wrong” error UI
+     - the bootstrap HTML fallback
+     - or at least a skeleton/loading state
+   - None of that is visible in the screenshot.
 
-1. **Slow page loads** — Every page triggers a waterfall of sequential/parallel DB calls, many of which are redundant or could be cached. The home page alone fires 10+ queries on mount.
-2. **Session loss on app update / cold start** — iOS WebView purges localStorage on app updates, killing the auth token. The app then shows a loading screen requiring 2-3 taps to recover.
+3. The failure is happening extremely early in startup.
+   - Either before React renders anything meaningful,
+   - or React is mounted but still hidden behind the native splash/blank shell.
 
----
+## What the code says, step by step
 
-## Part A: Performance — Reduce Page Load Latency
+### 1) `main.tsx` waits for native initialization before React mounts
+`bootstrap()` first does:
+- `await initializeCapacitorPlugins()`
+- then imports `react-dom/client`
+- then imports `App.tsx`
+- then renders `<App />`
 
-### Fix 1: SocietyLeaderboard uses raw `useEffect` + `setState` instead of React Query
-The leaderboard fires 2 DB calls on every mount with no caching. Converting to `useQuery` with a 10-minute staleTime means it loads from cache on subsequent visits.
+So if native boot blocks or stalls, the app can appear frozen before the React UI even shows.
 
-### Fix 2: Header stats use raw `useEffect` + `setState`
-Lines 60-83 of `Header.tsx` fire two `COUNT` queries (sellers + orders) on every mount. Convert to a single `useQuery` with 15-minute staleTime — header renders on every page, so this saves 2 DB calls per navigation.
+### 2) Splash hiding is deferred until auth restore completes
+In `src/lib/capacitor.ts`:
+- `SplashScreen.hide()` is intentionally not called during native init.
 
-### Fix 3: Duplicate "last order" queries
-`WelcomeBackStrip` and `WhatsNewSection` both query `orders` for the user's last order independently. Share a single query key (`last-order-date`) that both consume.
+In `src/contexts/auth/useAuthState.ts`:
+- splash is hidden only after:
+  - `restoreAuthSession().finally(...)`
+  - then `supabase.auth.getSession()`
+  - then `setPartial(... isSessionRestored: true ...)`
+  - then `hideSplashScreen()`
 
-### Fix 4: `mergeProductFlags` secondary query
-After the main RPC (`search_sellers_by_location`), `useProductsByCategory` fires a second query to fetch `is_bestseller/is_recommended/is_urgent` flags from the `products` table. This is a sequential waterfall. Move these flags into the RPC response or inline them in the initial select to eliminate the second round-trip.
+This creates a critical dependency chain:
+```text
+native app starts
+→ wait for auth restore path
+→ wait for getSession()
+→ only then hide splash
+```
 
-### Fix 5: Below-fold sections fetch eagerly
-`SocietyLeaderboard`, `CommunityTeaser`, `WhatsNewSection`, `RecentlyViewedRow` all fetch on mount even though they're below the fold. Wrap them in an intersection-observer trigger so queries only fire when the section scrolls into view.
+If any part of that chain hangs, delays, or never reaches the final callback on mobile, the user can be stuck on a black screen.
 
-### Fix 6: Seller dashboard prefetching
-When a seller taps the seller icon, the dashboard page fires 4-5 queries sequentially. Add route-aware prefetching — when `isSeller` is true, prefetch seller stats and orders in the background during idle time.
+### 3) The screenshot matches a splash-not-hidden / launch-overlay symptom
+The black screen with only system chrome visible is consistent with:
+- splash screen still covering the app, or
+- webview background showing before content paints, with no successful visible mount.
 
----
+### 4) There is a second startup fragility: app-mounted signal is weak
+`main.tsx` considers the app mounted only if `#root` gets `data-app-mounted`.
 
-## Part B: Cold Start — Eliminate Multi-Tap Lag
+But that attribute is only set in `src/components/ErrorBoundary.tsx` constructor.
 
-### Fix 7: Splash screen hides before auth is ready
-`SplashScreen.hide()` fires during `initializeCapacitorPlugins()` — before React even mounts. The user sees a white screen while auth hydrates. **Fix:** Move `SplashScreen.hide()` to after `isSessionRestored` becomes true.
+So currently:
+- successful normal app render does not explicitly mark mounted
+- only the error boundary constructor does
 
-### Fix 8: `ProtectedRoute` redirects to `/auth` during loading
-When `isLoading` is false but profile hasn't loaded yet, `ProtectedRoute` sees `!user` and redirects to `/auth`. By the time the session restores (milliseconds later), the user is already on the auth page. **Fix:** Gate on `isSessionRestored` — show skeleton until session restoration completes, only then decide to redirect.
+That is risky because:
+- the 10-second mount watchdog may misclassify a slow boot
+- boot and fallback logic are coupled to error boundary timing
+- if the tree never reaches that constructor path cleanly, startup state can become ambiguous
 
-### Fix 9: `appStateChange` invalidates `products-by-category` on every resume
-This is the heaviest query in the app (RPC + flag merge). Invalidating it on every app resume forces a full re-fetch. **Fix:** Remove it from the invalidation list — it has a 10-minute staleTime and the user can pull-to-refresh if needed.
+### 5) Auth gating can make startup feel like “multiple taps needed”
+`ProtectedRoute` blocks until:
+- `isLoading === false`
+- and `isSessionRestored === true`
 
----
+That is correct in principle, but combined with delayed splash hiding it means:
+- the user sees nothing usable until auth restore fully settles
+- any mobile delay in local storage/native preferences/session hydration looks like an app freeze
 
-## Part C: Session Persistence Across App Updates
+This matches your “2–3 clicks then home screen” complaint from earlier.
 
-### Fix 10: Auth token lost on iOS app updates
-iOS purges WebView localStorage on binary updates. The existing `migrateLocalStorageToPreferences` runs but doesn't specifically handle the auth token. **Fix:**
+## Most likely root cause
 
-1. On every `onAuthStateChange` event, persist the session token to Capacitor `Preferences` (native key-value store that survives updates)
-2. On cold boot, before calling `getSession()`, check `Preferences` for a stored token and restore it to Supabase's local storage if missing
-3. This ensures the app always has a valid session after an update
+The most likely real issue is:
 
----
+### The native launch UI depends too heavily on the auth/session restore path.
+If session restoration or `getSession()` is slow, inconsistent, or hangs on device startup/update/resume, the splash never hides and the user sees a black screen instead of a recoverable loading UI.
 
-## Impact Analysis
+That is the strongest conclusion from both:
+- the actual screenshot
+- and the startup/auth code flow
 
-| Fix | Pages Affected | DB Calls Saved | Risk |
-|-----|---------------|----------------|------|
-| 1 | Home | 2 per mount | Zero — same data, cached |
-| 2 | Every page | 2 per navigation | Zero — memo'd Header |
-| 3 | Home | 1 duplicate | Zero — shared key |
-| 4 | Home | 1 sequential call | Low — need RPC change or flag inlining |
-| 5 | Home | 4+ deferred | Zero — lazy load |
-| 6 | Seller dashboard | Prefetch only | Zero — background |
-| 7 | Cold start | N/A | Zero — timing change |
-| 8 | Cold start | N/A | Zero — gate change |
-| 9 | Resume | 1 heavy query | Zero — still cacheable |
-| 10 | App update | N/A | Low — Preferences API |
+## Secondary risk I found
 
-## Files to Change
+There is also a structural startup weakness:
 
-| File | Fixes |
-|------|-------|
-| `src/components/home/SocietyLeaderboard.tsx` | 1 |
-| `src/components/layout/Header.tsx` | 2 |
-| `src/components/home/WhatsNewSection.tsx` | 3 |
-| `src/hooks/queries/useProductFlags.ts` | 4 |
-| `src/hooks/queries/useProductsByCategory.ts` | 4 |
-| `src/pages/HomePage.tsx` | 5 |
-| `src/contexts/auth/AuthProvider.tsx` | 6 |
-| `src/lib/capacitor.ts` | 7 |
-| `src/App.tsx` | 7, 8 |
-| `src/hooks/useAppLifecycle.ts` | 9 |
-| `src/contexts/auth/useAuthState.ts` | 10 |
-| `src/lib/capacitor-storage.ts` (or new file) | 10 |
+### The app does not mark a successful mount directly.
+`data-app-mounted` is not set by the normal app shell after first paint; it is only set in the global error boundary constructor.
+That means your mount watchdog is not using a reliable success signal.
 
+## What I do NOT think this is
+
+Based on the code and evidence, I do not think the primary issue is:
+- a seller-only or buyer-only page bug
+- a normal navigation bug inside one screen
+- the previous toast/hook queue crash alone
+- a simple chunk-load failure, because you would likely hit the HTML fallback/reload path
+
+## My confidence ranking of causes
+
+### Highest confidence
+1. Splash screen remains visible too long or indefinitely because it is tied to auth restore completion.
+2. Cold-start auth/session restore is too fragile on native mobile.
+
+### Medium confidence
+3. Successful mount is not signaled robustly, so startup recovery logic is brittle.
+4. A blank pre-route state is shown instead of a guaranteed visible launch shell.
+
+### Lower confidence
+5. A route-level crash after mount.
+6. A chunk import failure.
+7. A hook-order crash as the main current cause of this exact black screen.
+
+## Bulletproof fix direction I would take
+
+### 1) Decouple splash hiding from full auth/profile restoration
+Show a guaranteed lightweight launch shell quickly, then continue auth hydration behind it.
+
+### 2) Add a hard timeout fail-open for splash
+If auth restore has not completed within a short threshold, force-hide splash and render a safe loading shell instead of keeping the screen black.
+
+### 3) Mark app mount from the real app shell
+Set `data-app-mounted="true"` from the top-level mounted app, not only from the error boundary constructor.
+
+### 4) Add a visible native-safe boot screen in React
+Even before profile/user is fully resolved, render a branded loading screen so the user never sees a dead black screen.
+
+### 5) Guard every async startup step
+Specifically:
+- `restoreAuthSession`
+- `getSession`
+- profile fetch follow-up
+- splash hide path
+
+Each should be timeout-protected and non-blocking for first paint.
+
+## In plain words
+
+What I learned is:
+- the app is not really “opening and then crashing on a page”
+- it is getting stuck during the very first launch sequence
+- the biggest culprit is the startup design that waits too long to hide the mobile splash until auth restoration finishes
+- so on phone, if session restore is slow or flaky, users experience a black screen and think the app is dead
+
+## Recommended implementation scope
+
+I would fix this in these files:
+- `src/main.tsx`
+- `src/contexts/auth/useAuthState.ts`
+- `src/lib/capacitor.ts`
+- `src/App.tsx`
+- `src/components/ErrorBoundary.tsx`
+
+## Safe outcome we want
+
+After the fix, even if auth/session restore is slow:
+- the app should always become visible quickly
+- the user should see a loading shell, not a black screen
+- the splash should never be able to trap the app indefinitely
+- session recovery should continue in the background
