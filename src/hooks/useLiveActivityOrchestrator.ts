@@ -115,8 +115,8 @@ export function useLiveActivityOrchestrator(): void {
 
       // Composite dedup: skip if we already processed this exact state
       const eventKey = `${orderId}:${newStatus}:${row?.updated_at}`;
-      if (lastProcessedEvents.get(orderId) === eventKey) return;
-      lastProcessedEvents.set(orderId, eventKey);
+      if (lastProcessedEvents.get(orderId)?.key === eventKey) return;
+      lastProcessedEvents.set(orderId, { key: eventKey, ts: Date.now() });
 
       console.log(TAG, `Order ${orderId} status → ${newStatus}`);
 
