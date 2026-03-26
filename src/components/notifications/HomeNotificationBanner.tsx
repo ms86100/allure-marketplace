@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLatestActionNotification, useMarkNotificationRead } from '@/hooks/queries/useNotifications';
 import { RichNotificationCard } from './RichNotificationCard';
@@ -31,6 +32,7 @@ function addDismissedId(id: string) {
 
 export function HomeNotificationBanner() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data: notification } = useLatestActionNotification(user?.id);
   const markRead = useMarkNotificationRead();
   const [localDismissed, setLocalDismissed] = useState<Set<string>>(getDismissedIds);
@@ -42,13 +44,12 @@ export function HomeNotificationBanner() {
 
   const handleDismiss = useCallback(() => {
     if (!notification) return;
-    // 1. Persist to localStorage immediately (survives unmount)
     addDismissedId(notification.id);
-    // 2. Update local state to hide instantly
     setLocalDismissed(prev => new Set(prev).add(notification.id));
-    // 3. Mark as read in DB (async — belt & suspenders)
     markRead.mutate(notification.id);
-  }, [notification, markRead]);
+    // Bug 8 fix: immediately invalidate so next actionable notification surfaces
+    queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
+  }, [notification, markRead, queryClient]);
 
   if (!notification || localDismissed.has(notification.id)) return null;
 

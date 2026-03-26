@@ -166,12 +166,12 @@ export function useLatestActionNotification(userId: string | undefined) {
         }
       }
       if (staleIds.length > 0) {
-        supabase
-          .from('user_notifications')
-          .update({ is_read: true })
-          .in('id', staleIds)
-          .then(() => {})
-          .catch(() => {});
+        try {
+          await supabase
+            .from('user_notifications')
+            .update({ is_read: true })
+            .in('id', staleIds);
+        } catch { /* non-blocking */ }
       }
 
       // Return first valid notification
