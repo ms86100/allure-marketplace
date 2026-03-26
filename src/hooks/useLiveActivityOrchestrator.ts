@@ -73,6 +73,16 @@ export function useLiveActivityOrchestrator(): void {
     await syncActiveOrders(userId);
   }, [userId]);
 
+  // ── Clear dedup map on user change + periodic cleanup ──
+  useEffect(() => {
+    lastProcessedEvents.clear();
+  }, [userId]);
+
+  useEffect(() => {
+    const interval = setInterval(cleanupStaleEvents, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // ── Initial sync + diagnostics ──
   useEffect(() => {
     if (!userId) return;
