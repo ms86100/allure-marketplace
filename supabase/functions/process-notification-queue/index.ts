@@ -135,6 +135,28 @@ Deno.serve(async (req) => {
 
         const silentPush = item.payload?.silent_push === true;
 
+        // C5: Dedup check — skip if same (user_id, type, reference_path) exists within last 60s
+        if (item.reference_path) {
+          const sixtySecsAgo = new Date(Date.now() - 60_000).toISOString();
+          const { data: existing } = await supabase
+            .from("user_notifications")
+            .select("id")
+            .eq("user_id", item.user_id)
+            .eq("type", item.type)
+            .eq("reference_path", item.reference_path)
+            .gte("created_at", sixtySecsAgo)
+            .limit(1);
+          if (existing && existing.length > 0) {
+            console.log(`[Queue][${item.id}] Duplicate notification skipped (same type+reference within 60s)`);
+            await supabase
+              .from("notification_queue")
+              .update({ status: "processed", processed_at: new Date().toISOString() })
+              .eq("id", item.id);
+            processed++;
+            continue;
+          }
+        }
+
         // C5: Insert into user_notifications with queue_item_id to deduplicate on retry
         const { error: insertError } = await supabase
           .from("user_notifications")
