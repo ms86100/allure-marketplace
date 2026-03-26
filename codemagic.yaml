@@ -121,6 +121,38 @@ workflows:
           # deterministic resolver on clean CI nodes
           pod install --repo-update
 
+      - name: Generate App Icon from source
+        script: |
+          ICON_SRC="$(pwd)/public/app-icon-1024x1024.png"
+          ICON_DIR="ios/App/App/Assets.xcassets/AppIcon.appiconset"
+          rm -rf "$ICON_DIR"
+          mkdir -p "$ICON_DIR"
+          sips -z 40 40 "$ICON_SRC" --out "$ICON_DIR/icon-20@2x.png"
+          sips -z 60 60 "$ICON_SRC" --out "$ICON_DIR/icon-20@3x.png"
+          sips -z 58 58 "$ICON_SRC" --out "$ICON_DIR/icon-29@2x.png"
+          sips -z 87 87 "$ICON_SRC" --out "$ICON_DIR/icon-29@3x.png"
+          sips -z 80 80 "$ICON_SRC" --out "$ICON_DIR/icon-40@2x.png"
+          sips -z 120 120 "$ICON_SRC" --out "$ICON_DIR/icon-40@3x.png"
+          sips -z 120 120 "$ICON_SRC" --out "$ICON_DIR/icon-60@2x.png"
+          sips -z 180 180 "$ICON_SRC" --out "$ICON_DIR/icon-60@3x.png"
+          sips -z 1024 1024 "$ICON_SRC" --out "$ICON_DIR/icon-1024.png"
+          cat > "$ICON_DIR/Contents.json" << 'ICONJSON'
+          {
+            "images": [
+              {"idiom":"iphone","scale":"2x","size":"20x20","filename":"icon-20@2x.png"},
+              {"idiom":"iphone","scale":"3x","size":"20x20","filename":"icon-20@3x.png"},
+              {"idiom":"iphone","scale":"2x","size":"29x29","filename":"icon-29@2x.png"},
+              {"idiom":"iphone","scale":"3x","size":"29x29","filename":"icon-29@3x.png"},
+              {"idiom":"iphone","scale":"2x","size":"40x40","filename":"icon-40@2x.png"},
+              {"idiom":"iphone","scale":"3x","size":"40x40","filename":"icon-40@3x.png"},
+              {"idiom":"iphone","scale":"2x","size":"60x60","filename":"icon-60@2x.png"},
+              {"idiom":"iphone","scale":"3x","size":"60x60","filename":"icon-60@3x.png"},
+              {"idiom":"ios-marketing","scale":"1x","size":"1024x1024","filename":"icon-1024.png"}
+            ],
+            "info":{"version":1,"author":"xcode"}
+          }
+          ICONJSON
+
       - name: Patch AppDelegate for Firebase + Capacitor + LiveActivity
         script: |
           APPDELEGATE="ios/App/App/AppDelegate.swift"
@@ -901,6 +933,38 @@ workflows:
           echo "=== Final Podfile ==="
           cat Podfile
           pod install --repo-update
+
+      - name: Generate App Icon from source
+        script: |
+          ICON_SRC="$(pwd)/public/app-icon-1024x1024.png"
+          ICON_DIR="ios/App/App/Assets.xcassets/AppIcon.appiconset"
+          rm -rf "$ICON_DIR"
+          mkdir -p "$ICON_DIR"
+          sips -z 40 40 "$ICON_SRC" --out "$ICON_DIR/icon-20@2x.png"
+          sips -z 60 60 "$ICON_SRC" --out "$ICON_DIR/icon-20@3x.png"
+          sips -z 58 58 "$ICON_SRC" --out "$ICON_DIR/icon-29@2x.png"
+          sips -z 87 87 "$ICON_SRC" --out "$ICON_DIR/icon-29@3x.png"
+          sips -z 80 80 "$ICON_SRC" --out "$ICON_DIR/icon-40@2x.png"
+          sips -z 120 120 "$ICON_SRC" --out "$ICON_DIR/icon-40@3x.png"
+          sips -z 120 120 "$ICON_SRC" --out "$ICON_DIR/icon-60@2x.png"
+          sips -z 180 180 "$ICON_SRC" --out "$ICON_DIR/icon-60@3x.png"
+          sips -z 1024 1024 "$ICON_SRC" --out "$ICON_DIR/icon-1024.png"
+          cat > "$ICON_DIR/Contents.json" << 'ICONJSON'
+          {
+            "images": [
+              {"idiom":"iphone","scale":"2x","size":"20x20","filename":"icon-20@2x.png"},
+              {"idiom":"iphone","scale":"3x","size":"20x20","filename":"icon-20@3x.png"},
+              {"idiom":"iphone","scale":"2x","size":"29x29","filename":"icon-29@2x.png"},
+              {"idiom":"iphone","scale":"3x","size":"29x29","filename":"icon-29@3x.png"},
+              {"idiom":"iphone","scale":"2x","size":"40x40","filename":"icon-40@2x.png"},
+              {"idiom":"iphone","scale":"3x","size":"40x40","filename":"icon-40@3x.png"},
+              {"idiom":"iphone","scale":"2x","size":"60x60","filename":"icon-60@2x.png"},
+              {"idiom":"iphone","scale":"3x","size":"60x60","filename":"icon-60@3x.png"},
+              {"idiom":"ios-marketing","scale":"1x","size":"1024x1024","filename":"icon-1024.png"}
+            ],
+            "info":{"version":1,"author":"xcode"}
+          }
+          ICONJSON
 
       - name: Patch AppDelegate for Firebase + Capacitor + LiveActivity
         script: |
