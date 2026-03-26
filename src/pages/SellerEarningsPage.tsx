@@ -74,7 +74,12 @@ export default function SellerEarningsPage() {
       const weekStart = startOfWeek(new Date());
       const monthStart = startOfMonth(new Date());
 
-      const paidPayments = paymentList.filter((p: PaymentRecord) => p.payment_status === 'paid' || (p.payment_status === 'pending' && (p as any).order?.status === 'completed'));
+      const excludedOrderStatuses = ['cancelled', 'returned', 'no_show'];
+      const paidPayments = paymentList.filter((p: PaymentRecord) => {
+        const orderStatus = (p as any).order?.status;
+        if (orderStatus && excludedOrderStatuses.includes(orderStatus)) return false;
+        return p.payment_status === 'paid' || (p.payment_status === 'pending' && orderStatus === 'completed');
+      });
       const todayPayments = paidPayments.filter((p: PaymentRecord) => 
         isAfter(parseISO(p.created_at), today)
       );

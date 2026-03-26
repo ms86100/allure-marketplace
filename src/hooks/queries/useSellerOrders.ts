@@ -84,7 +84,8 @@ export function useSellerOrderStats(sellerId: string | null) {
           case 'cancelled':
           case 'returned':
           case 'no_show':
-            // Terminal non-earning statuses — exclude from counts
+          case 'payment_pending':
+            // Terminal / non-actionable statuses — exclude from counts
             break;
           case 'on_the_way':
           case 'at_gate':
@@ -165,7 +166,7 @@ export function useSellerOrdersInfinite(sellerId: string | null, filter: string 
           query = query.in('status', ['enquired', 'quoted']);
           break;
         case 'pending':
-          query = query.in('status', ['placed', 'accepted']);
+          query = query.in('status', ['placed', 'accepted', 'confirmed', 'requested', 'scheduled']);
           break;
         case 'preparing':
           query = query.eq('status', 'preparing');

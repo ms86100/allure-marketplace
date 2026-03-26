@@ -94,6 +94,16 @@ export function SellerDayAgenda({ sellerId }: SellerDayAgendaProps) {
                     <User size={10} /> {booking.buyer_name || 'Customer'}
                   </p>
                   <div className="flex gap-1.5 mt-1.5">
+                    {isPending && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="h-6 text-[10px] px-2 gap-1"
+                        onClick={() => navigate(`/orders/${booking.order_id}`)}
+                      >
+                        <CalendarCheck size={10} /> Accept
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"

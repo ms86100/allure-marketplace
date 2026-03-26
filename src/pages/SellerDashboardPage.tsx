@@ -51,9 +51,12 @@ export default function SellerDashboardPage() {
   }, [user, sellerProfiles, activeSellerId, currentSellerId]);
 
   useEffect(() => {
-    // Reset profile immediately on store switch to prevent data mismatch
+    // Reset profile and clear stale query cache on store switch
     setSellerProfile(null);
     setIsLoadingProfile(true);
+    queryClient.removeQueries({ queryKey: ['seller-dashboard-stats'] });
+    queryClient.removeQueries({ queryKey: ['seller-orders'] });
+    queryClient.removeQueries({ queryKey: ['seller-order-filter-counts'] });
     if (user && activeSellerId) {
       fetchSellerProfile(activeSellerId);
     } else {
