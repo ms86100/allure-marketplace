@@ -276,7 +276,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     addItemLocksRef.current.add(product.id);
 
     try {
-      const pActionType = (product as any).action_type;
+      let pActionType = (product as any).action_type;
+      if (!pActionType) {
+        const { data: actionLookup } = await supabase.from('products').select('action_type').eq('id', product.id).maybeSingle();
+        pActionType = actionLookup?.action_type;
+      }
       if (pActionType && !['add_to_cart', 'buy_now'].includes(pActionType)) { toast.error('This item cannot be added to cart', { id: 'cart-not-allowed' }); return; }
 
       const inlineAvailability = getInlineSellerAvailability(product);

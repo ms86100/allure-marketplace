@@ -18,6 +18,7 @@ interface BuyAgainProduct {
   seller_name: string;
   order_count: number;
   category: string;
+  action_type: string | null;
 }
 
 interface GroupedCategory {
@@ -51,6 +52,7 @@ export function BuyAgainRow() {
           seller_name: r.seller_name || '',
           order_count: Number(r.order_count) || 0,
           category: r.category || '',
+          action_type: r.action_type || null,
         }));
       }
 
@@ -60,7 +62,7 @@ export function BuyAgainRow() {
         .from('order_items')
         .select(`
           product_id, quantity,
-          product:products!inner(id, name, price, image_url, is_available, seller_id, category,
+          product:products!inner(id, name, price, image_url, is_available, seller_id, category, action_type,
             seller:seller_profiles!products_seller_id_fkey(business_name)
           ),
           order:orders!inner(buyer_id, status)
@@ -87,6 +89,7 @@ export function BuyAgainRow() {
             seller_name: p.seller?.business_name || '',
             order_count: 0,
             category: p.category || '',
+            action_type: p.action_type || null,
             count: 0,
           };
         }
@@ -102,10 +105,16 @@ export function BuyAgainRow() {
     staleTime: 5 * 60_000,
   });
 
+  // Filter out bookable/non-cart products — they don't belong in "Buy Again"
+  const cartableProducts = useMemo(() =>
+    products.filter(p => !p.action_type || ['add_to_cart', 'buy_now'].includes(p.action_type)),
+    [products]
+  );
+
   // Group products by category
   const grouped = useMemo((): GroupedCategory[] => {
     const map: Record<string, BuyAgainProduct[]> = {};
-    for (const p of products) {
+    for (const p of cartableProducts) {
       const cat = p.category || 'Other';
       if (!map[cat]) map[cat] = [];
       map[cat].push(p);
@@ -118,9 +127,9 @@ export function BuyAgainRow() {
       }))
       .sort((a, b) => b.totalOrders - a.totalOrders)
       .slice(0, 8);
-  }, [products]);
+  }, [cartableProducts]);
 
-  if (products.length === 0) return null;
+  if (cartableProducts.length === 0) return null;
 
   const isInCart = (productId: string) => items.some(i => i.product_id === productId);
 
