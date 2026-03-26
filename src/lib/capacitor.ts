@@ -36,7 +36,9 @@ export async function initializeCapacitorPlugins() {
     console.error('Error configuring keyboard:', error);
   }
 
-  // SplashScreen.hide() is deferred — called by auth layer after session restore
+  // Schedule a hard timeout to force-hide splash if auth layer never calls hideSplashScreen()
+  // This prevents permanent black screen if session restore hangs
+  scheduleSplashTimeout();
 }
 
 export function isNativePlatform(): boolean {
@@ -57,4 +59,19 @@ export async function hideSplashScreen() {
   } catch (e) {
     console.error('Error hiding splash screen:', e);
   }
+}
+
+/**
+ * Hard timeout fail-safe: force-hide splash after 4 seconds no matter what.
+ * Prevents permanent black screen if auth restore hangs on mobile.
+ */
+let splashTimeoutId: ReturnType<typeof setTimeout> | null = null;
+function scheduleSplashTimeout() {
+  if (splashTimeoutId) return;
+  splashTimeoutId = setTimeout(() => {
+    if (!splashHidden) {
+      console.warn('[Capacitor] Splash screen timeout — force-hiding after 4s');
+      hideSplashScreen();
+    }
+  }, 4000);
 }

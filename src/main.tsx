@@ -82,6 +82,9 @@ async function bootstrap() {
 
   createRoot(rootElement).render(<App />);
 
+  // Signal mount immediately after render call — used by watchdog
+  rootElement.setAttribute('data-app-mounted', 'true');
+
   sessionStorage.removeItem('boot-fails');
 
   window.setTimeout(() => {

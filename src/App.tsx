@@ -229,8 +229,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   // Wait for session restoration before deciding — prevents flash redirect to /auth
   if (isLoading || !isSessionRestored) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-background">
-        <Skeleton className="h-6 w-32 rounded-lg" />
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background gap-3">
+        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+        <span className="text-sm text-muted-foreground">Loading...</span>
       </div>
     );
   }

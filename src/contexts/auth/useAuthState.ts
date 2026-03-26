@@ -180,7 +180,16 @@ export function useAuthState() {
     );
 
     // Restore session from native storage before reading — handles iOS localStorage purge
-    restoreAuthSession().finally(() => {
+    // Wrapped in a 3-second timeout to prevent hanging if Preferences is slow/broken
+    const restoreWithTimeout = Promise.race([
+      restoreAuthSession(),
+      new Promise<boolean>(resolve => setTimeout(() => {
+        console.warn('[Auth] Session restore timed out after 3s');
+        resolve(false);
+      }, 3000)),
+    ]);
+
+    restoreWithTimeout.finally(() => {
       supabase.auth.getSession().then(({ data: { session } }) => {
         setPartial({ session, user: session?.user ?? null, isLoading: false, isSessionRestored: true });
         // Hide splash screen now that session is resolved
@@ -189,6 +198,10 @@ export function useAuthState() {
           profileFetchedFor.current = session.user.id;
           fetchProfile(session.user.id);
         }
+      }).catch((e) => {
+        console.error('[Auth] getSession failed:', e);
+        setPartial({ isLoading: false, isSessionRestored: true });
+        hideSplashScreen();
       });
     });
 
