@@ -1,27 +1,36 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 /**
  * Intercepts `?reorder=<suggestion_id>` query param (set by push notification deep-link)
- * and auto-triggers the quick-reorder flow without touching frozen push files.
+ * and auto-triggers the quick-reorder flow without introducing extra stateful hooks
+ * into the app shell render path.
  */
 export function useReorderInterceptor() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const processing = useRef(false);
+  const suggestionId = searchParams.get('reorder');
+
+  const clearedParams = useMemo(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('reorder');
+    return next;
+  }, [searchParams]);
 
   useEffect(() => {
-    const suggestionId = searchParams.get('reorder');
     if (!suggestionId || processing.current) return;
 
     processing.current = true;
 
-    (async () => {
+    const clearReorderParam = () => {
+      setSearchParams(clearedParams, { replace: true });
+    };
+
+    void (async () => {
       try {
-        // Fetch the suggestion to get product_id
         const { data: suggestion } = await supabase
           .from('order_suggestions')
           .select('id, product_id, seller_id')
@@ -29,14 +38,10 @@ export function useReorderInterceptor() {
           .maybeSingle();
 
         if (!suggestion) {
-          // Clear param and bail
-          searchParams.delete('reorder');
-          setSearchParams(searchParams, { replace: true });
-          processing.current = false;
+          clearReorderParam();
           return;
         }
 
-        // Find most recent order with this product
         const { data: recentOrders } = await supabase
           .from('order_items')
           .select('order_id')
@@ -50,7 +55,6 @@ export function useReorderInterceptor() {
           });
 
           if (!error && !data?.error && data?.orders?.[0]) {
-            // Mark suggestion as acted on
             await supabase
               .from('order_suggestions')
               .update({ acted_on: true })
@@ -58,20 +62,17 @@ export function useReorderInterceptor() {
 
             toast({ title: '✅ Order placed!', description: 'Your reorder has been created successfully.' });
             navigate(`/orders/${data.orders[0]}`, { replace: true });
-            processing.current = false;
             return;
           }
         }
 
-        // Fallback: navigate to product page
         navigate(`/product/${suggestion.product_id}`, { replace: true });
-      } catch {
-        // Silent fail — clear param
+      } catch (error) {
+        console.error('[useReorderInterceptor] Failed to process reorder:', error);
       } finally {
-        searchParams.delete('reorder');
-        setSearchParams(searchParams, { replace: true });
+        clearReorderParam();
         processing.current = false;
       }
     })();
-  }, [searchParams, setSearchParams, navigate, toast]);
+  }, [suggestionId, clearedParams, setSearchParams, navigate]);
 }
