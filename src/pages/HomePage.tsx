@@ -7,6 +7,7 @@ import { MarketplaceSection } from '@/components/home/MarketplaceSection';
 import { SocietyQuickLinks } from '@/components/home/SocietyQuickLinks';
 
 import { CommunityTeaser } from '@/components/home/CommunityTeaser';
+import { LazySection } from '@/components/home/LazySection';
 import { HomeNotificationBanner } from '@/components/notifications/HomeNotificationBanner';
 import { ActiveOrderStrip } from '@/components/home/ActiveOrderStrip';
 import { ForYouSection } from '@/components/home/ForYouSection';

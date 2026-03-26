@@ -1,4 +1,5 @@
-import { useState, useCallback, memo, useMemo, useEffect } from 'react';
+import { useState, useCallback, memo, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Bell, Building2, ShieldCheck, Store, MapPin, ChevronDown, Search } from 'lucide-react';
 
 import { Link, useNavigate, useLocation } from 'react-router-dom';
