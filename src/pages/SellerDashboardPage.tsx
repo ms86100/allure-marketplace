@@ -38,6 +38,7 @@ import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCount
 
 export default function SellerDashboardPage() {
   const { user, sellerProfiles = [], currentSellerId } = useAuth();
+  const queryClient = useQueryClient();
   const settings = useSystemSettings();
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
