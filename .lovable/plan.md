@@ -1,66 +1,78 @@
 
 
-# Fix: Apple Rejection — Placeholder App Icon (Guideline 2.3.8)
+# Fix: BuyAgainRow Allows Bookable Services Into Cart
 
 ## Root Cause
 
-The Codemagic build pipeline runs `npx cap sync ios` which creates the default Capacitor placeholder AppIcon. The pipeline never replaces it with the actual Sociva icon from `public/app-icon-1024x1024.png`. Apple's reviewer saw the Capacitor default icon and rejected for "placeholder icons."
+The bug has **two layers**:
 
-## Fix
+1. **BuyAgainRow never fetches `action_type`** — The `BuyAgainProduct` interface has no `action_type` field. Neither the RPC (`get_user_frequent_products`) nor the fallback query fetches it from the `products` table. So every product from "Buy Again" is treated as a cart product.
 
-Add a new build step in `codemagic.yaml` — immediately after `cap sync ios` in both the `ios-release` and `release-all` workflows — that generates the full `AppIcon.appiconset` from the existing `public/app-icon-1024x1024.png`.
+2. **useCart guard is bypassed** — `useCart.tsx` line 279 checks `(product as any).action_type`, but since `BuyAgainRow` never passes `action_type`, this is always `undefined`, which passes the `if (pActionType && ...)` check (falsy skips the guard entirely).
 
-### New Step: "Generate App Icon from source"
+Result: A bookable service (e.g. `action_type = 'book'`) gets added to the cart, proceeds through checkout, and creates a regular cart order instead of a booking — breaking the entire workflow.
 
-Insert after the `cap sync ios` + SPM cleanup step (after line 66 for `ios-release`, after line 855 for `release-all`):
+## Fix (Two-Part)
 
-```yaml
-- name: Generate App Icon
-  script: |
-    ICON_SRC="$(pwd)/public/app-icon-1024x1024.png"
-    ICON_DIR="ios/App/App/Assets.xcassets/AppIcon.appiconset"
-    rm -rf "$ICON_DIR"
-    mkdir -p "$ICON_DIR"
+### Part 1: Fetch `action_type` in BuyAgainRow
 
-    # Generate all required sizes using sips
-    sips -z 40 40 "$ICON_SRC" --out "$ICON_DIR/icon-20@2x.png"
-    sips -z 60 60 "$ICON_SRC" --out "$ICON_DIR/icon-20@3x.png"
-    sips -z 58 58 "$ICON_SRC" --out "$ICON_DIR/icon-29@2x.png"
-    sips -z 87 87 "$ICON_SRC" --out "$ICON_DIR/icon-29@3x.png"
-    sips -z 80 80 "$ICON_SRC" --out "$ICON_DIR/icon-40@2x.png"
-    sips -z 120 120 "$ICON_SRC" --out "$ICON_DIR/icon-40@3x.png"
-    sips -z 120 120 "$ICON_SRC" --out "$ICON_DIR/icon-60@2x.png"
-    sips -z 180 180 "$ICON_SRC" --out "$ICON_DIR/icon-60@3x.png"
-    sips -z 1024 1024 "$ICON_SRC" --out "$ICON_DIR/icon-1024.png"
+**`src/components/home/BuyAgainRow.tsx`**
 
-    # Write Contents.json
-    cat > "$ICON_DIR/Contents.json" << 'ICONJSON'
-    {
-      "images": [
-        {"idiom":"iphone","scale":"2x","size":"20x20","filename":"icon-20@2x.png"},
-        {"idiom":"iphone","scale":"3x","size":"20x20","filename":"icon-20@3x.png"},
-        {"idiom":"iphone","scale":"2x","size":"29x29","filename":"icon-29@2x.png"},
-        {"idiom":"iphone","scale":"3x","size":"29x29","filename":"icon-29@3x.png"},
-        {"idiom":"iphone","scale":"2x","size":"40x40","filename":"icon-40@2x.png"},
-        {"idiom":"iphone","scale":"3x","size":"40x40","filename":"icon-40@3x.png"},
-        {"idiom":"iphone","scale":"2x","size":"60x60","filename":"icon-60@2x.png"},
-        {"idiom":"iphone","scale":"3x","size":"60x60","filename":"icon-60@3x.png"},
-        {"idiom":"ios-marketing","scale":"1x","size":"1024x1024","filename":"icon-1024.png"}
-      ],
-      "info":{"version":1,"author":"xcode"}
-    }
-    ICONJSON
+- Add `action_type` to the `BuyAgainProduct` interface
+- In the **fallback query** (line 62): add `action_type` to the `products` select fields
+- In the **RPC mapping** (line 45): map `r.action_type` (if the RPC returns it)
+- In the **fallback mapping** (line 80): map `p.action_type`
+
+### Part 2: Filter out non-cart products from Buy Again
+
+In the `useMemo` or right after data fetch, filter out products whose `action_type` is not cart-compatible:
+
+```typescript
+const cartableProducts = products.filter(p => 
+  !p.action_type || ['add_to_cart', 'buy_now'].includes(p.action_type)
+);
 ```
 
-### Files Changed
+This is the **primary defense** — bookable services simply won't appear in "Buy Again." They belong in a "Book Again" section (future feature), not in a cart-based reorder flow.
+
+### Part 3: Harden the useCart guard (belt-and-suspenders)
+
+**`src/hooks/useCart.tsx`** line 279-280
+
+If `action_type` is still missing (e.g. from other callers), do a quick DB lookup before allowing the add:
+
+```typescript
+let pActionType = (product as any).action_type;
+if (!pActionType) {
+  const { data } = await supabase
+    .from('products')
+    .select('action_type')
+    .eq('id', product.id)
+    .maybeSingle();
+  pActionType = data?.action_type;
+}
+if (pActionType && !['add_to_cart', 'buy_now'].includes(pActionType)) {
+  toast.error('This item cannot be added to cart');
+  return;
+}
+```
+
+This ensures that even if any future component forgets to pass `action_type`, the cart itself rejects non-cart products.
+
+## Impact Analysis
+
+| Component | Impact | Risk |
+|-----------|--------|------|
+| BuyAgainRow | Bookable services no longer appear — **intended** | Zero |
+| useCart.tsx | Extra DB call only when `action_type` is missing — rare path | Zero |
+| ProductListingCard / MarketplaceSection | Already pass `action_type` — unaffected | Zero |
+| Quick Reorder edge function | Uses `create_multi_vendor_orders` directly, not `addItem` — unaffected | Zero |
+| Checkout flow | No change — only the entry point (addItem) is hardened | Zero |
+
+## Files Changed
 
 | File | Change |
 |------|--------|
-| `codemagic.yaml` | Add "Generate App Icon" step in **two places**: after line ~66 (`ios-release`) and after line ~855 (`release-all`) |
-
-### Impact Analysis
-
-- **Zero risk** — this only replaces image files in the build output. No code changes, no dependency changes.
-- The source icon `public/app-icon-1024x1024.png` already exists in the repo.
-- The widget extension icon (SocivaIcon) is already handled separately and is unaffected.
+| `src/components/home/BuyAgainRow.tsx` | Add `action_type` to interface, fetch it, filter non-cart products |
+| `src/hooks/useCart.tsx` | Add DB fallback lookup for missing `action_type` |
 
