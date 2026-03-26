@@ -18,7 +18,7 @@ export function RecentlyViewedRow() {
       if (recentIds.length === 0) return [];
       const { data } = await supabase
         .from('products')
-        .select('id, name, price, image_url, seller_id, is_available, is_veg, category, is_bestseller, is_recommended, is_urgent, description, created_at, updated_at')
+        .select('id, name, price, image_url, seller_id, is_available, is_veg, category, is_bestseller, is_recommended, is_urgent, description, created_at, updated_at, action_type')
         .in('id', recentIds)
         .eq('is_available', true)
         .eq('approval_status', 'approved');
@@ -31,7 +31,10 @@ export function RecentlyViewedRow() {
     staleTime: 2 * 60_000,
   });
 
-  if (products.length === 0) return null;
+  // Filter out bookable services — only cart-compatible products
+  const cartProducts = products.filter(p => (p as any).action_type !== 'book');
+
+  if (cartProducts.length === 0) return null;
 
   const isInCart = (id: string) => items.some(i => i.product_id === id);
 
@@ -44,7 +47,7 @@ export function RecentlyViewedRow() {
         <h3 className="section-header">Recently Viewed</h3>
       </div>
       <div className="flex gap-2.5 overflow-x-auto scrollbar-hide px-4 pb-2">
-        {products.map((product, i) => {
+        {cartProducts.map((product, i) => {
           const inCart = isInCart(product.id);
           return (
             <motion.button
