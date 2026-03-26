@@ -249,12 +249,12 @@ export function ServiceBookingFlow({
 
       // If duplicate key conflict, find existing order and navigate to it
       if (orderErr && (orderErr.code === '23505' || orderErr.message?.includes('duplicate'))) {
-        const { data: existingOrder } = await supabase
+        const { data: existingOrder } = await (supabase
           .from('orders')
           .select('id')
           .eq('buyer_id', user.id)
-          .eq('idempotency_key' as any, idempotencyKey)
-          .eq('order_type', 'booking')
+          .eq('order_type', 'booking') as any)
+          .eq('idempotency_key', idempotencyKey)
           .single();
         if (existingOrder) {
           toast.info('This booking already exists.');
