@@ -210,6 +210,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
                   category: product.category,
                   description: product.description,
                   seller_id: product.seller_id,
+                  is_available: product.is_available,
                   seller_name: '',
                   seller_rating: 0,
                   seller_reviews: 0,
