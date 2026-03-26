@@ -152,12 +152,12 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
       if (schedErr) throw schedErr;
 
       // 2. Get service products for this seller to determine duration
+      // Fetch ALL service products regardless of approval/availability — slots are pre-generated;
+      // buyer-facing queries filter by approval_status at read time.
       const { data: products } = await supabase
         .from('products')
         .select('id, category')
-        .eq('seller_id', sellerId)
-        .eq('is_available', true)
-        .eq('approval_status', 'approved');
+        .eq('seller_id', sellerId);
 
       if (!products || products.length === 0) {
         toast.success('Schedule saved. Slots will be generated once your services are approved.');
@@ -232,10 +232,10 @@ export function ServiceAvailabilityManager({ sellerId }: ServiceAvailabilityMana
       if (slotsToInsert.length > 0) {
         // Delete future unbooked slots that have no active booking references
         const todayStr = format(today, 'yyyy-MM-dd');
+        // Protect ALL slots ever referenced by any booking (including cancelled) to avoid dangling FKs
         const { data: referencedSlotIds } = await supabase
           .from('service_bookings')
-          .select('slot_id')
-          .not('status', 'in', '(cancelled,no_show)');
+          .select('slot_id');
         const safeSlotIds = new Set((referencedSlotIds || []).map((r: any) => r.slot_id));
 
         // First get candidate slots, then filter out referenced ones

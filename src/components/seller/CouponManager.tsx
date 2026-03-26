@@ -84,6 +84,9 @@ export function CouponManager() {
       toast.error('Percentage discount cannot exceed 100%');
       return;
     }
+    if (formData.discount_type === 'fixed' && discountVal > 1000 && !formData.max_discount_amount) {
+      toast.warning('High fixed discount (₹' + discountVal + ') without a max cap. Consider setting a "Max Discount Amount" to avoid confusion.');
+    }
 
     const { error } = await supabase.from('coupons').insert({
       seller_id: currentSellerId,

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -37,6 +38,7 @@ import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCount
 
 export default function SellerDashboardPage() {
   const { user, sellerProfiles = [], currentSellerId } = useAuth();
+  const queryClient = useQueryClient();
   const settings = useSystemSettings();
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
@@ -51,9 +53,12 @@ export default function SellerDashboardPage() {
   }, [user, sellerProfiles, activeSellerId, currentSellerId]);
 
   useEffect(() => {
-    // Reset profile immediately on store switch to prevent data mismatch
+    // Reset profile and clear stale query cache on store switch
     setSellerProfile(null);
     setIsLoadingProfile(true);
+    queryClient.removeQueries({ queryKey: ['seller-dashboard-stats'] });
+    queryClient.removeQueries({ queryKey: ['seller-orders'] });
+    queryClient.removeQueries({ queryKey: ['seller-order-filter-counts'] });
     if (user && activeSellerId) {
       fetchSellerProfile(activeSellerId);
     } else {
