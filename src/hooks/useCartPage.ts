@@ -700,5 +700,6 @@ export function useCartPage() {
     // Pre-order
     hasPreorderItems, maxLeadTimeHours, preorderMissingSchedule,
     scheduledDate, setScheduledDate, scheduledTime, setScheduledTime,
+    preorderCutoffTime, preorderSellerIds,
   };
 }
