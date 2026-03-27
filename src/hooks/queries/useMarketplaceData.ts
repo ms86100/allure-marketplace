@@ -1,13 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
-import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
-import { useAuth } from '@/contexts/AuthContext';
-import { jitteredStaleTime } from '@/lib/query-utils';
+import { useMemo } from 'react';
+import { useMarketplaceSellers, MarketplaceSeller } from './useMarketplaceSellers';
+import { useMarketplaceProducts, MarketplaceProduct } from './useMarketplaceProducts';
 
 /**
- * Raw seller row from search_sellers_by_location RPC.
- * Single source of truth — called ONCE, consumed by all marketplace hooks.
+ * Raw seller row shape — backward compatible with all consumer hooks.
+ * Now composed from two lightweight RPCs instead of one monolithic RPC.
  */
 export interface RpcSellerRow {
   seller_id: string;
@@ -33,40 +30,92 @@ export interface RpcSellerRow {
 }
 
 /**
- * Single RPC call for ALL marketplace data. Every other hook
- * (useProductsByCategory, useNearbyProducts, useStoreDiscovery,
- *  usePopularProducts, useTrendingProducts) derives from this cache.
+ * Backward-compatible marketplace data hook.
+ * Composes useMarketplaceSellers + useMarketplaceProducts into the
+ * same RpcSellerRow[] shape that all consumer hooks expect.
  *
- * No society exclusion at RPC level — consumers filter client-side if needed.
- * This eliminates the former useMarketplaceDataFull duplicate.
+ * Phase 1 (sellers) loads instantly (~1KB total).
+ * Phase 2 (products) loads in parallel once seller IDs are known.
+ *
+ * Consumer hooks see no change — they still get RpcSellerRow[].
  */
 export function useMarketplaceData() {
-  const { browsingLocation } = useBrowsingLocation();
-  const { profile } = useAuth();
+  const {
+    data: sellers,
+    isLoading: sellersLoading,
+    error: sellersError,
+  } = useMarketplaceSellers();
 
-  const lat = browsingLocation?.lat;
-  const lng = browsingLocation?.lng;
-  const radiusKm = profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM;
+  const sellerIds = useMemo(
+    () => (sellers || []).map((s) => s.seller_id),
+    [sellers]
+  );
 
-  return useQuery({
-    queryKey: ['marketplace-data', lat, lng, radiusKm],
-    queryFn: async (): Promise<RpcSellerRow[]> => {
-      if (!lat || !lng) return [];
+  const {
+    data: products,
+    isLoading: productsLoading,
+    error: productsError,
+  } = useMarketplaceProducts(sellerIds);
 
-      const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
-        _lat: lat,
-        _lng: lng,
-        _radius_km: radiusKm,
-      });
+  // Combine sellers + products into backward-compatible shape
+  const data = useMemo((): RpcSellerRow[] => {
+    if (!sellers || sellers.length === 0) return [];
 
-      if (error) {
-        console.error('Marketplace data RPC error:', error);
-        return [];
+    // Group products by seller_id for O(1) lookup
+    const productsBySeller = new Map<string, any[]>();
+    if (products) {
+      for (const p of products) {
+        const list = productsBySeller.get(p.seller_id) || [];
+        list.push({
+          id: p.product_id,
+          name: p.product_name,
+          price: p.price,
+          image_url: p.image_url,
+          category: p.category,
+          is_veg: p.is_veg,
+          is_available: p.is_available,
+          is_bestseller: p.is_bestseller,
+          is_recommended: p.is_recommended,
+          is_urgent: p.is_urgent,
+          action_type: p.action_type,
+          contact_phone: p.contact_phone,
+          mrp: p.mrp,
+          discount_percentage: p.discount_percentage,
+        });
+        productsBySeller.set(p.seller_id, list);
       }
+    }
 
-      return (data || []) as RpcSellerRow[];
-    },
-    enabled: !!(lat && lng),
-    staleTime: jitteredStaleTime(10 * 60 * 1000),
-  });
+    return sellers.map((s): RpcSellerRow => ({
+      seller_id: s.seller_id,
+      user_id: s.user_id,
+      business_name: s.business_name,
+      description: s.description,
+      categories: s.categories,
+      primary_group: s.primary_group,
+      cover_image_url: s.cover_image_url,
+      profile_image_url: s.profile_image_url,
+      is_available: s.is_available,
+      is_featured: s.is_featured,
+      rating: s.rating,
+      total_reviews: s.total_reviews,
+      matching_products: productsBySeller.get(s.seller_id) || [],
+      distance_km: s.distance_km,
+      society_name: s.society_name,
+      availability_start: s.availability_start,
+      availability_end: s.availability_end,
+      seller_latitude: s.seller_latitude,
+      seller_longitude: s.seller_longitude,
+      operating_days: s.operating_days,
+    }));
+  }, [sellers, products]);
+
+  return {
+    data,
+    isLoading: sellersLoading || productsLoading,
+    error: sellersError || productsError,
+    // Expose sellers-only loading for progressive rendering
+    sellersReady: !sellersLoading && !!sellers,
+    sellers,
+  };
 }
