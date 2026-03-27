@@ -71,23 +71,16 @@ export default function HomePage() {
     return <OnboardingWalkthrough onComplete={completeOnboarding} />;
   }
 
-  // No full-page profile gate — render shell immediately.
-  // Profile-dependent sections handle their own loading states.
-
   return (
     <AppLayout>
       <div className="pb-6 space-y-0">
-        {/* Active order tracking */}
-        <ActiveOrderStrip />
-
-        {/* Plan #15: Welcome back context when no active orders */}
-        <WelcomeBackStrip />
-
-        {/* Notification banner */}
+        {/* ── P0: Notification banner (static, no data dep) ── */}
         <HomeNotificationBanner />
 
+        {/* ── P1: Active orders — sticky delayed bar, doesn't block above-fold ── */}
+        <ActiveOrderStrip />
 
-        {/* ═══ MARKETPLACE — primary shopping surface ═══ */}
+        {/* ═══ P1-P2: MARKETPLACE — primary shopping surface ═══ */}
         <MarketplaceSection />
 
         {/* Profile completion — below marketplace */}
@@ -117,6 +110,13 @@ export default function HomePage() {
           );
         })()}
 
+        {/* ── P3: Deferred sections ── */}
+
+        {/* Welcome back context */}
+        <LazySection className="reveal-on-scroll">
+          <WelcomeBackStrip />
+        </LazySection>
+
         {/* Personalized */}
         <LazySection className="reveal-on-scroll">
           <ForYouSection />
@@ -127,7 +127,7 @@ export default function HomePage() {
           <RecentlyViewedRow />
         </LazySection>
 
-        {/* Plan #18: Dormant user re-engagement */}
+        {/* Dormant user re-engagement */}
         <LazySection className="reveal-on-scroll">
           <WhatsNewSection />
         </LazySection>

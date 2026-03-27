@@ -24,6 +24,20 @@ import { useBadgeConfig } from '@/hooks/useBadgeConfig';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { cn } from '@/lib/utils';
 
+/* ── Fade-in wrapper for progressive reveal ── */
+function FadeIn({ children, className, delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, delay, ease: 'easeOut' }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 /* ── Section spacer ── */
 function SectionDivider() {
   return <div className="my-4" />;
@@ -44,9 +58,6 @@ export function MarketplaceSection() {
 
   const { data: localCategories = [], isLoading: loadingLocal } = useProductsByCategory(80);
   const { parentGroupInfos } = useParentGroups();
-
-  // Banner count is no longer needed — FeaturedBanners self-hides when empty
-  // (including when all banners link to categories with no nearby products)
 
   const allProducts = useMemo(() => localCategories.flatMap(c => c.products), [localCategories]);
   const allProductIds = useMemo(() => allProducts.map(p => p.id), [allProducts]);
@@ -121,31 +132,56 @@ export function MarketplaceSection() {
 
   return (
     <div className="pb-2 section-reveal">
-      {/* ── Hero: Featured Banners (self-hides when empty) + Auto-Highlights as supplement ── */}
-      <FeaturedBanners />
-      <AutoHighlightStrip />
+      {/* ── P1: Featured Banners — independent, renders its own skeleton ── */}
+      <FadeIn>
+        <FeaturedBanners />
+      </FadeIn>
 
-      {/* ── Icon-forward Category Tabs ── */}
-      <div className="pt-4 pb-5">
-        <ParentGroupTabs activeGroup={activeGroup} onGroupChange={setActiveGroup} activeParentGroups={activeParentGroupSet} />
-      </div>
+      {/* ── P1: Auto-Highlights — independent ── */}
+      <FadeIn delay={0.05}>
+        <AutoHighlightStrip />
+      </FadeIn>
 
-      {/* ── Frequently Bought ── */}
-      {!activeGroup && <BuyAgainRow />}
+      {/* ── P1: Icon-forward Category Tabs — renders own skeleton ── */}
+      <FadeIn delay={0.1}>
+        <div className="pt-4 pb-5">
+          <ParentGroupTabs activeGroup={activeGroup} onGroupChange={setActiveGroup} activeParentGroups={activeParentGroupSet} />
+        </div>
+      </FadeIn>
 
-      {/* ── Category Image Grids ── */}
-      {activeParentGroups.map((group) => (
-        <CategoryImageGrid
-          key={group.value}
-          parentGroup={group.value}
-          title={group.label}
-          activeCategories={activeCategorySet}
-        />
-      ))}
-
-      {/* ── Discovery Rows ── */}
-      {!activeGroup && popularNearYou.length > (discoveryMinProducts || 3) && (
+      {/* ── P2: Category Image Grids — each group independent ── */}
+      {loadingLocal ? (
+        <div className="px-4 mt-2">
+          <div className="grid grid-cols-3 gap-3">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <Skeleton key={i} className="aspect-[4/3] rounded-2xl" />
+            ))}
+          </div>
+        </div>
+      ) : (
         <>
+          {/* Frequently Bought */}
+          {!activeGroup && (
+            <FadeIn delay={0.15}>
+              <BuyAgainRow />
+            </FadeIn>
+          )}
+
+          {activeParentGroups.map((group, i) => (
+            <FadeIn key={group.value} delay={0.15 + i * 0.05}>
+              <CategoryImageGrid
+                parentGroup={group.value}
+                title={group.label}
+                activeCategories={activeCategorySet}
+              />
+            </FadeIn>
+          ))}
+        </>
+      )}
+
+      {/* ── P2-P3: Discovery Rows ── */}
+      {!activeGroup && popularNearYou.length > (discoveryMinProducts || 3) && (
+        <FadeIn delay={0.3}>
           <SectionDivider />
           <DiscoveryRow
             title={browsingLocation?.label ? `${ml.label('label_discovery_popular')} · ${browsingLocation.label}` : ml.label('label_discovery_popular')}
@@ -159,11 +195,11 @@ export function MarketplaceSection() {
             badgeConfigs={badgeConfigs}
             socialProofMap={socialProofMap}
           />
-        </>
+        </FadeIn>
       )}
 
       {!activeGroup && newThisWeek.length > 0 && (
-        <>
+        <FadeIn delay={0.35}>
           <SectionDivider />
           <DiscoveryRow
             title={ml.label('label_discovery_new')}
@@ -177,18 +213,20 @@ export function MarketplaceSection() {
             badgeConfigs={badgeConfigs}
             socialProofMap={socialProofMap}
           />
-        </>
+        </FadeIn>
       )}
 
       <SectionDivider />
 
-      {/* ── Store Discovery ── */}
-      <div className="py-6 mt-4">
-        <div className="flex items-center gap-2 px-4 mb-3">
-          <h3 className="font-extrabold text-lg text-foreground tracking-tight">{ml.label('label_section_store_discovery')}</h3>
+      {/* ── P3: Store Discovery ── */}
+      <FadeIn delay={0.4}>
+        <div className="py-6 mt-4">
+          <div className="flex items-center gap-2 px-4 mb-3">
+            <h3 className="font-extrabold text-lg text-foreground tracking-tight">{ml.label('label_section_store_discovery')}</h3>
+          </div>
+          <ShopByStoreDiscovery />
         </div>
-        <ShopByStoreDiscovery />
-      </div>
+      </FadeIn>
 
       <ProductDetailSheet
         product={selectedProduct}
@@ -338,7 +376,7 @@ function ProductListings({
           <span>{ml.label('label_empty_marketplace_hint')}</span>
         </motion.div>
 
-        {/* Plan #16: Actionable CTAs for empty marketplace */}
+        {/* Actionable CTAs for empty marketplace */}
         <motion.div
           initial={{ y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

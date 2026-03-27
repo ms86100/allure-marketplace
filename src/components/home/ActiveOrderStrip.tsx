@@ -165,10 +165,23 @@ export function ActiveOrderStrip() {
     return () => window.removeEventListener('order-terminal-push', handler);
   }, [queryClient]);
 
-  if (activeOrders.length === 0) return null;
+  // Delayed appearance — don't block above-fold marketplace content
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (activeOrders.length === 0) { setVisible(false); return; }
+    const t = setTimeout(() => setVisible(true), 500);
+    return () => clearTimeout(t);
+  }, [activeOrders.length]);
+
+  if (activeOrders.length === 0 || !visible) return null;
 
   return (
-    <div className="mt-2 px-4">
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      className="mt-2 px-4"
+    >
       {activeOrders.length > 1 && (
         <p className="text-[10px] text-muted-foreground mb-1 font-medium">{activeOrders.length} active orders</p>
       )}
@@ -237,6 +250,6 @@ export function ActiveOrderStrip() {
           })}
         </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 }

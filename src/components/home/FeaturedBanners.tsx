@@ -166,8 +166,8 @@ export function FeaturedBanners() {
   if (isLoading) {
     return (
       <div className="px-4 my-4">
-        {/* Gap #6: Reduced skeleton height */}
-        <Skeleton className="h-36 rounded-2xl" />
+        {/* Fixed aspect-ratio skeleton to prevent CLS */}
+        <Skeleton className="w-full aspect-[2.5/1] rounded-2xl" />
       </div>
     );
   }
