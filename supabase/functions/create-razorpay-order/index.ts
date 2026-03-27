@@ -61,20 +61,17 @@ serve(async (req) => {
       );
     }
 
-    // C7: Use anon-key client for auth validation (service role bypasses JWT verification)
     const { withAuth } = await import("../_shared/auth.ts");
     const authResult = await withAuth(req, corsHeaders);
     if (authResult instanceof Response) return authResult;
     const user = { id: authResult.userId };
 
-    // Phase 2: Rate limit — 10/min
     const { allowed } = await checkRateLimit(`order:${user.id}`, 10, 60);
     if (!allowed) return rateLimitResponse(corsHeaders);
 
     const body: CreateOrderRequest = await req.json();
     const { amount, sellerId, customerName, customerEmail, customerPhone } = body;
 
-    // Bug 1 fix: Support array of orderIds for multi-vendor carts
     const allOrderIds: string[] = body.orderIds?.length ? body.orderIds : (body.orderId ? [body.orderId] : []);
     if (allOrderIds.length === 0) {
       return new Response(
@@ -88,7 +85,7 @@ serve(async (req) => {
     // Validate ALL orders belong to buyer, are not cancelled, and have payment_status: 'pending'
     const { data: orders, error: orderError } = await supabase
       .from('orders')
-      .select('id, buyer_id, status, payment_status')
+      .select('id, buyer_id, status, payment_status, razorpay_order_id')
       .in('id', allOrderIds)
       .eq('buyer_id', user.id)
       .neq('status', 'cancelled')
@@ -104,6 +101,39 @@ serve(async (req) => {
       );
     }
 
+    // ── Idempotency: reuse existing Razorpay order if still valid ──
+    const existingRzpId = orders[0]?.razorpay_order_id;
+    if (existingRzpId) {
+      const razorpayAuth = btoa(`${razorpayKeys.keyId}:${razorpayKeys.keySecret}`);
+      try {
+        const fetchRes = await fetch(`https://api.razorpay.com/v1/orders/${existingRzpId}`, {
+          headers: { 'Authorization': `Basic ${razorpayAuth}` },
+        });
+        if (fetchRes.ok) {
+          const existingOrder = await fetchRes.json();
+          // Reuse if still open (created or attempted)
+          if (existingOrder.status === 'created' || existingOrder.status === 'attempted') {
+            console.log('Reusing existing Razorpay order:', existingRzpId, 'status:', existingOrder.status);
+            return new Response(
+              JSON.stringify({
+                razorpay_order_id: existingOrder.id,
+                razorpay_key_id: razorpayKeys.keyId,
+                amount: existingOrder.amount,
+                currency: existingOrder.currency,
+                prefill: { name: customerName, email: customerEmail, contact: customerPhone },
+                notes: existingOrder.notes,
+                reused: true,
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          console.log('Existing Razorpay order', existingRzpId, 'has status', existingOrder.status, '— creating new one');
+        }
+      } catch (e) {
+        console.warn('Failed to fetch existing Razorpay order, creating new one:', e);
+      }
+    }
+
     const { data: seller } = await supabase
       .from('seller_profiles')
       .select('razorpay_account_id, business_name')
@@ -115,16 +145,15 @@ serve(async (req) => {
     const orderPayload: any = {
       amount: Math.round(amount * 100),
       currency: 'INR',
-      receipt: allOrderIds[0], // Razorpay limits receipt to 40 chars
+      receipt: allOrderIds[0],
       notes: {
-        order_id: allOrderIds[0], // backward compat
-        order_ids: JSON.stringify(allOrderIds), // multi-vendor support
+        order_id: allOrderIds[0],
+        order_ids: JSON.stringify(allOrderIds),
         seller_id: sellerId,
         buyer_id: user.id,
       },
     };
 
-    // Only add transfers for single-order, single-seller payments with razorpay_account_id
     if (allOrderIds.length === 1 && seller?.razorpay_account_id) {
       orderPayload.transfers = [
         {
@@ -160,7 +189,6 @@ serve(async (req) => {
     const razorpayOrder = await razorpayResponse.json();
     console.log('Razorpay order created:', razorpayOrder.id, 'for', allOrderIds.length, 'orders');
 
-    // Update ALL orders with the razorpay_order_id
     for (const oid of allOrderIds) {
       await supabase
         .from('orders')

@@ -282,6 +282,24 @@ export function useRazorpay() {
         razorpay.open();
         // Start observing for Razorpay's injected DOM and patch safe-area
         startSafeAreaObserver();
+
+        // ── Popup-blocked detection ──
+        // If the SDK fails to inject its modal (e.g. inside an iframe sandbox),
+        // detect it after 2s and fire onFailure with a specific error type.
+        setTimeout(() => {
+          const hasRazorpayModal = document.querySelector('.razorpay-container') ||
+            document.querySelector('iframe[src*="razorpay"]') ||
+            document.querySelector('iframe[src*="api.razorpay"]') ||
+            Array.from(document.body.querySelectorAll<HTMLElement>(':scope > div')).some(
+              (el) => parseInt(el.style.zIndex || '0', 10) > 999
+            );
+          if (!hasRazorpayModal) {
+            console.warn('[Razorpay] Popup not detected after 2s — likely blocked by iframe sandbox');
+            unlockBodyScroll();
+            options.onFailure({ code: 'POPUP_BLOCKED', description: 'Payment window could not open. Try on the published app.' });
+          }
+        }, 2000);
+
         // Delayed re-sweeps to catch late-injected elements
         const sweep = () => document.body.querySelectorAll<HTMLElement>(':scope > div').forEach((el) => {
           const z = parseInt(el.style.zIndex || '0', 10);
