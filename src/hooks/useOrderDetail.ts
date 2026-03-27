@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-// trackingConfig import removed — transit detection is now DB-driven via is_transit flag
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
@@ -11,46 +11,87 @@ import { resolveTransactionType } from '@/lib/resolveTransactionType';
 import { Order, OrderStatus } from '@/types/database';
 import { toast } from 'sonner';
 
+async function fetchOrderData(id: string) {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`*, seller:seller_profiles(id, business_name, user_id, primary_group, profile:profiles!seller_profiles_user_id_fkey(name, phone, block, flat_number)), buyer:profiles!orders_buyer_id_fkey(name, phone, block, flat_number), items:order_items(*, product:products(category, listing_type))`)
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  // Derive parent_group inline from the first item's product category
+  let parentGroup: string | null = null;
+  let listingType: string | null = null;
+  const sellerPg = (data as any)?.seller?.primary_group;
+  const firstItem = (data as any)?.items?.[0];
+  const product = firstItem?.product;
+
+  if (product) {
+    listingType = product.listing_type || null;
+    if (!sellerPg && product.category) {
+      const { data: catConfig } = await supabase
+        .from('category_config')
+        .select('parent_group')
+        .eq('category', product.category as any)
+        .single();
+      parentGroup = catConfig?.parent_group || null;
+    }
+  }
+
+  return { order: data as any, derivedParentGroup: parentGroup, derivedListingType: listingType };
+}
+
 export function useOrderDetail(id: string | undefined) {
   const { user, isSeller, sellerProfiles, currentSellerId } = useAuth();
   const { getOrderStatus, getPaymentStatus, getItemStatus } = useStatusLabels();
   const { formatPrice } = useCurrency();
-  const [order, setOrder] = useState<Order | null>(null);
-  const [hasReview, setHasReview] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [isRejectionDialogOpen, setIsRejectionDialogOpen] = useState(false);
 
+  // Main order query with React Query caching
+  const { data: orderData, isLoading } = useQuery({
+    queryKey: ['order-detail', id],
+    queryFn: () => fetchOrderData(id!),
+    enabled: !!id,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
+
+  const order = orderData?.order as Order | null ?? null;
+  const derivedParentGroup = orderData?.derivedParentGroup ?? null;
+  const derivedListingType = orderData?.derivedListingType ?? null;
+
+  // Review check as separate cached query
+  const { data: hasReviewData } = useQuery({
+    queryKey: ['order-review', id],
+    queryFn: async () => {
+      const { data } = await supabase.from('reviews').select('id').eq('order_id', id!).maybeSingle();
+      return !!data;
+    },
+    enabled: !!id && !!order,
+    staleTime: 60_000,
+  });
+  const hasReview = hasReviewData ?? false;
+
   const seller = (order as any)?.seller;
 
-  // Robust seller ownership: match order.seller_id against currentSellerId or any of the user's seller profiles
-  // This avoids depending on the nested seller relation being fully hydrated
   const isSellerView = useMemo(() => {
     if (!order || !user) return false;
     const orderSellerId = order.seller_id;
     if (!orderSellerId) return false;
-    // Primary: match against current seller context
     if (currentSellerId && orderSellerId === currentSellerId) return true;
-    // Fallback: match against any seller profile the current user owns
     if (sellerProfiles.some(sp => sp.id === orderSellerId)) return true;
-    // Legacy fallback: nested relation check (kept for edge cases)
     if (seller?.user_id === user.id) return true;
     return false;
   }, [order?.seller_id, user?.id, currentSellerId, sellerProfiles, seller?.user_id]);
 
   const hasAutoCancelAt = !!order?.auto_cancel_at;
-
   const sellerPrimaryGroup = seller?.primary_group;
   const orderType = (order as any)?.order_type;
-  const [derivedParentGroup, setDerivedParentGroup] = useState<string | null>(null);
-  const [derivedListingType, setDerivedListingType] = useState<string | null>(null);
-
-  // Derive parent_group inside fetchOrder to avoid an extra render-cycle waterfall.
-  // The useEffect fallback is kept ONLY for edge cases where seller.primary_group is null
-  // AND fetchOrder didn't resolve it (shouldn't happen, but defensive).
-  const derivedParentGroupRef = { current: derivedParentGroup };
 
   const effectiveParentGroup = sellerPrimaryGroup || derivedParentGroup;
   const resolvedParentGroup = effectiveParentGroup || 'default';
@@ -70,7 +111,6 @@ export function useOrderDetail(id: string | undefined) {
     return () => clearTimeout(timer);
   }, [order?.auto_cancel_at]);
 
-  // Urgent only while auto_cancel_at is in the future AND order is on the first flow step
   const isUrgentOrder = useMemo(() => {
     if (!hasAutoCancelAt || !order?.status || !order?.auto_cancel_at) return false;
     if (!isFirstFlowStep(flow, order.status)) return false;
@@ -83,7 +123,6 @@ export function useOrderDetail(id: string | undefined) {
 
   useUrgentOrderSound(!!isUrgentSellerView);
 
-  // Load transitions for accurate next-status and cancellation checks
   const resolvedTxnType = useMemo(
     () => resolveTransactionType(effectiveParentGroup || 'default', orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType, storedTransactionType),
     [effectiveParentGroup, orderType, orderFulfillmentType, deliveryHandledBy, derivedListingType, storedTransactionType]
@@ -92,7 +131,6 @@ export function useOrderDetail(id: string | undefined) {
 
   const timelineSteps = useMemo(() => getTimelineSteps(flow, order?.status), [flow, order?.status]);
 
-  // Status order derived entirely from DB flow — no hardcoded fallbacks
   const statusOrder = useMemo(() => {
     if (flow.length > 0) return flow.map(s => s.status_key as OrderStatus);
     return [] as OrderStatus[];
@@ -104,9 +142,6 @@ export function useOrderDetail(id: string | undefined) {
     if (!order) return null;
     if (isTerminalStatus(flow, order.status)) return null;
     if (flow.length > 0) {
-      // Bug 3 fix: Always start with 'seller'. The transitions table is the source of truth —
-      // if no seller transition exists, getNextStatusForActor returns null.
-      // Only add 'delivery' actor if the seller is explicitly handling delivery for this order.
       const actors: string[] = ['seller'];
       if (deliveryHandledBy && deliveryHandledBy !== 'platform') {
         actors.push('delivery');
@@ -117,7 +152,6 @@ export function useOrderDetail(id: string | undefined) {
     return null;
   };
 
-  // Buyer's next allowed action — DB-driven via transitions
   const buyerNextStatus = useMemo((): OrderStatus | null => {
     if (!order || isTerminalStatus(flow, order.status)) return null;
     if (flow.length === 0 || transitions.length === 0) return null;
@@ -125,95 +159,65 @@ export function useOrderDetail(id: string | undefined) {
     return next as OrderStatus | null;
   }, [order?.status, flow, transitions]);
 
-  // Check if seller can reject (transition to cancelled exists for seller)
   const canSellerReject = useMemo(() => {
     if (!order || !isSellerView) return false;
     return canActorCancel(transitions, order.status, 'seller');
   }, [order?.status, isSellerView, transitions]);
 
-  // Check if buyer can cancel (transition to cancelled exists for buyer)
   const canBuyerCancel = useMemo(() => {
     if (!order) return false;
     return canActorCancel(transitions, order.status, 'buyer');
   }, [order?.status, transitions]);
 
-  // Re-fetch when app resumes (Deep link from Dynamic Island) or visibility changes
-  const [refetchTick, setRefetchTick] = useState(0);
+  // Invalidate cache helper
+  const invalidateOrder = () => {
+    queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
+    queryClient.invalidateQueries({ queryKey: ['order-review', id] });
+  };
 
-  useEffect(() => {
-    const onResume = () => setRefetchTick(t => t + 1);
-    const onVisibility = () => { if (document.visibilityState === 'visible') setRefetchTick(t => t + 1); };
-    const onTerminalPush = () => setRefetchTick(t => t + 1);
-    window.addEventListener('order-detail-refetch', onResume);
-    window.addEventListener('order-terminal-push', onTerminalPush);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      window.removeEventListener('order-detail-refetch', onResume);
-      window.removeEventListener('order-terminal-push', onTerminalPush);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, []);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { let cancelled = false; if (id) { fetchOrder(cancelled); fetchUnreadCount(); } return () => { cancelled = true; }; }, [id, refetchTick]);
-
+  // Realtime subscription — invalidates cache instead of manual fetch
   useEffect(() => {
     if (!id) return;
-    const channel = supabase.channel(`order-${id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `id=eq.${id}` }, () => { fetchOrder(); }).subscribe();
+    const channel = supabase.channel(`order-${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `id=eq.${id}` }, () => {
+        invalidateOrder();
+      })
+      .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [id]);
 
-  // Reliability fallback: heartbeat polling while order is active so timeout-driven
-  // state changes always reconcile even if realtime delivery is delayed.
+  // Custom events that should trigger refetch
+  useEffect(() => {
+    const onRefetch = () => invalidateOrder();
+    window.addEventListener('order-detail-refetch', onRefetch);
+    window.addEventListener('order-terminal-push', onRefetch);
+    return () => {
+      window.removeEventListener('order-detail-refetch', onRefetch);
+      window.removeEventListener('order-terminal-push', onRefetch);
+    };
+  }, [id]);
+
+  // Heartbeat polling only for active orders — 45s (was 15s), as a reliability fallback
   useEffect(() => {
     if (!id || !order || isTerminalStatus(flow, order.status)) return;
-    const interval = window.setInterval(() => {
-      fetchOrder();
-    }, 15000);
+    const interval = window.setInterval(() => invalidateOrder(), 45_000);
     return () => window.clearInterval(interval);
   }, [id, order?.status, flow]);
 
-  const fetchOrder = async (cancelled = false) => {
-    try {
-      const { data, error } = await supabase.from('orders').select(`*, seller:seller_profiles(id, business_name, user_id, primary_group, profile:profiles!seller_profiles_user_id_fkey(name, phone, block, flat_number)), buyer:profiles!orders_buyer_id_fkey(name, phone, block, flat_number), items:order_items(*)`).eq('id', id).maybeSingle();
-      if (error) throw error;
-      if (!data) { setOrder(null); return; }
-      if (cancelled) return;
-
-      // Derive parent_group and listing_type inline — avoids extra render cycle
-      const sellerPg = (data as any)?.seller?.primary_group;
-      const firstItem = (data as any)?.items?.[0];
-      if (firstItem?.product_id && (!sellerPg || !derivedListingType)) {
-        const { data: product } = await supabase.from('products').select('category, listing_type').eq('id', firstItem.product_id).single();
-        if (!cancelled && product) {
-          // Set listing_type for workflow resolution (critical for contact_only)
-          if (product.listing_type && !derivedListingType) {
-            setDerivedListingType(product.listing_type);
-          }
-          // Derive parent_group if seller doesn't have one
-          if (!sellerPg && !derivedParentGroupRef.current && product.category) {
-            const { data: catConfig } = await supabase.from('category_config').select('parent_group').eq('category', product.category as any).single();
-            if (catConfig?.parent_group && !cancelled) {
-              setDerivedParentGroup(catConfig.parent_group);
-            }
-          }
-        }
-      }
-
-      setOrder(data as any);
-      // Always check for review if flow says terminal-success, OR if flow isn't loaded yet (fallback: check anyway to avoid stale hasReview)
-      if (data?.status && (flow.length === 0 || isSuccessfulTerminal(flow, data.status))) {
-        const { data: reviewData } = await supabase.from('reviews').select('id').eq('order_id', id).maybeSingle();
-        if (!cancelled) setHasReview(!!reviewData);
-      } else {
-        // Bug 4 fix: Never reset hasReview to false once it's been confirmed true — prevents flash
-        if (!cancelled && !hasReview) setHasReview(false);
-      }
-    } catch (error) { console.error('Error fetching order:', error); }
-    finally { if (!cancelled) setIsLoading(false); }
+  const fetchUnreadCount = async () => {
+    if (!user || !id) return;
+    const { count } = await supabase.from('chat_messages').select('id', { count: 'exact', head: true }).eq('order_id', id).eq('receiver_id', user.id).eq('read_status', false);
+    setUnreadMessages(count || 0);
   };
 
-  /** Buyer-safe status advance via SECURITY DEFINER RPC — bypasses RLS correctly */
+  // Fetch unread on mount + visibility
+  useEffect(() => {
+    if (id && user) fetchUnreadCount();
+  }, [id, user?.id]);
+
+  // Legacy fetchOrder for optimistic update reconciliation
+  const fetchOrder = async () => { invalidateOrder(); };
+
   const buyerAdvanceOrder = async (newStatus: OrderStatus) => {
     if (!order || !user) return;
     setIsUpdating(true);
@@ -223,24 +227,21 @@ export function useOrderDetail(id: string | undefined) {
         _new_status: newStatus,
       });
       if (error) throw error;
-      setOrder({ ...order, status: newStatus });
+      // Optimistic update via cache
+      queryClient.setQueryData(['order-detail', id], (old: any) =>
+        old ? { ...old, order: { ...old.order, status: newStatus } } : old
+      );
+      invalidateOrder();
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus });
     } catch (error: any) {
       console.error('Buyer advance order failed:', error);
       const errMsg = error?.message || error?.details || '';
       toast.error(errMsg.includes('Invalid buyer transition') ? 'This action is no longer available' : `Failed to update order: ${errMsg || 'Unknown error'}`, { id: `order-${order.id}-error` });
-      fetchOrder(); // Re-fetch to get real state
+      invalidateOrder();
     } finally { setIsUpdating(false); }
   };
 
-  const fetchUnreadCount = async () => {
-    if (!user || !id) return;
-    const { count } = await supabase.from('chat_messages').select('id', { count: 'exact', head: true }).eq('order_id', id).eq('receiver_id', user.id).eq('read_status', false);
-    setUnreadMessages(count || 0);
-  };
-
-  /** Seller-safe status advance via SECURITY DEFINER RPC — enforces actor */
   const updateOrderStatus = async (newStatus: OrderStatus, rejectionReason?: string) => {
     if (!order || !user) return;
     setIsUpdating(true);
@@ -248,7 +249,6 @@ export function useOrderDetail(id: string | undefined) {
       const previousOrder = order;
 
       if (isSellerView) {
-        // Use seller RPC to enforce app.acting_as = 'seller'
         const { error } = await supabase.rpc('seller_advance_order', {
           _order_id: order.id,
           _new_status: newStatus,
@@ -256,7 +256,6 @@ export function useOrderDetail(id: string | undefined) {
         });
         if (error) throw error;
       } else {
-        // Buyer path — use buyer RPC (already enforced)
         const { error } = await supabase.rpc('buyer_advance_order', {
           _order_id: order.id,
           _new_status: newStatus,
@@ -264,16 +263,17 @@ export function useOrderDetail(id: string | undefined) {
         if (error) throw error;
       }
 
-      // Optimistic update, then reconcile
-      setOrder({ ...previousOrder, status: newStatus } as Order);
-      void fetchOrder();
+      // Optimistic update
+      queryClient.setQueryData(['order-detail', id], (old: any) =>
+        old ? { ...old, order: { ...old.order, status: newStatus } } : old
+      );
+      invalidateOrder();
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus, rejection_reason: rejectionReason });
     } catch (error: any) {
       console.error('Error updating order:', error, JSON.stringify(error));
       const errMsg = error?.message || error?.details || '';
 
-      // Bulletproof OTP gate: if DB rejects with OTP requirement, emit event to auto-open OTP dialog
       if (errMsg.includes('Delivery OTP verification required') || errMsg.includes('otp')) {
         window.dispatchEvent(new CustomEvent('delivery-otp-required', { detail: { orderId: order.id } }));
         toast.info('OTP verification required — please enter the delivery code', { id: `order-${order.id}-otp` });
@@ -287,16 +287,14 @@ export function useOrderDetail(id: string | undefined) {
           { id: `order-${order.id}-error` }
         );
       }
-      fetchOrder(); // Re-fetch to get real state
+      invalidateOrder();
     } finally { setIsUpdating(false); }
   };
 
   const handleReject = async (reason: string) => { await updateOrderStatus('cancelled', reason); };
   const handleTimeout = () => {
-    // Proactively trigger the auto-cancel edge function so we don't wait for cron
     supabase.functions.invoke('auto-cancel-orders', { method: 'POST', body: {} }).catch(() => {});
-    // Then re-fetch to pick up the cancellation
-    setTimeout(() => fetchOrder(), 2000);
+    setTimeout(() => invalidateOrder(), 2000);
   };
 
   const isBuyerView = order ? order.buyer_id === user?.id : false;
@@ -306,7 +304,6 @@ export function useOrderDetail(id: string | undefined) {
   const canReorder = isBuyerView && order ? isSuccessfulTerminal(flow, order.status) : false;
   let chatRecipientId = isSellerView ? order?.buyer_id : seller?.user_id;
   let chatRecipientName = isSellerView ? (order as any)?.buyer?.name : seller?.business_name;
-  // Guard: if recipient resolved to self (dual-role user edge case), flip to the other party
   if (chatRecipientId && user?.id && chatRecipientId === user.id) {
     chatRecipientId = isSellerView ? seller?.user_id : order?.buyer_id;
     chatRecipientName = isSellerView ? seller?.business_name : (order as any)?.buyer?.name;
@@ -314,11 +311,9 @@ export function useOrderDetail(id: string | undefined) {
 
   const copyOrderId = () => { if (!order) return; navigator.clipboard.writeText(order.id.slice(0, 8)); toast.success('Order ID copied', { id: 'order-id-copied' }); };
 
-  // Display statuses derived entirely from DB flow
   const displayStatuses = useMemo(() => {
     if (timelineSteps.length === 0) return [];
     const steps = timelineSteps.map(s => s.status_key);
-    // Only hide 'completed' when 'delivered' is itself a terminal step (i.e. they are redundant)
     if (steps.includes('delivered') && steps.includes('completed')) {
       const deliveredStep = timelineSteps.find(s => s.status_key === 'delivered');
       if (deliveredStep?.is_terminal) {
@@ -328,7 +323,6 @@ export function useOrderDetail(id: string | undefined) {
     return steps;
   }, [timelineSteps]);
 
-  // Helper: get label from flow step if available, else fall back to useStatusLabels
   const getFlowStepLabel = (statusKey: string): { label: string; color: string } => {
     const step = flow.find(s => s.status_key === statusKey);
     if (step?.display_label) {
@@ -337,31 +331,39 @@ export function useOrderDetail(id: string | undefined) {
     return getOrderStatus(statusKey);
   };
 
-  // Helper: get buyer hint from flow step
   const getBuyerHint = (statusKey: string): string | null => {
     const step = flow.find(s => s.status_key === statusKey);
     return step?.buyer_hint || null;
   };
 
-  // Helper: get seller hint from flow step
   const getSellerHint = (statusKey: string): string | null => {
     const step = flow.find(s => s.status_key === statusKey);
     return (step as any)?.seller_hint || null;
   };
 
-  // DB-driven transit detection via is_transit flag on workflow steps
   const isInTransit = useMemo(() => {
     if (!order) return false;
     const step = flow.find(s => s.status_key === order.status);
     return step?.is_transit === true;
   }, [order?.status, flow]);
 
-  // Workflow-driven: expose current step's actor(s) for actor-based tracking decisions
   const currentStepActor = useMemo(() => {
     if (!order) return '';
     const step = flow.find(s => s.status_key === order.status);
     return step?.actor || '';
   }, [order?.status, flow]);
+
+  // Provide setOrder and setHasReview as no-ops for backward compat
+  const setOrder = (o: any) => {
+    if (o && id) {
+      queryClient.setQueryData(['order-detail', id], (old: any) =>
+        old ? { ...old, order: o } : { order: o, derivedParentGroup: null, derivedListingType: null }
+      );
+    }
+  };
+  const setHasReview = (v: boolean) => {
+    if (id) queryClient.setQueryData(['order-review', id], v);
+  };
 
   return {
     order, setOrder, isLoading, isUpdating, hasReview, setHasReview,

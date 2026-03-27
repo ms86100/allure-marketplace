@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,15 +9,12 @@ import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
 import { RecurringBookingsList } from '@/components/booking/RecurringBookingsList';
 import { BuyerBookingsCalendar } from '@/components/booking/BuyerBookingsCalendar';
 import { useAuth } from '@/contexts/AuthContext';
-import { Order } from '@/types/database';
-import { useStatusLabels } from '@/hooks/useStatusLabels';
-import { useTerminalStatuses } from '@/hooks/useCategoryStatusFlow';
+import { useOrdersList } from '@/hooks/useOrdersList';
 import { useFlowStepLabels } from '@/hooks/useFlowStepLabels';
-import { Package, ChevronRight, Loader2, ArrowLeft, CheckCircle, Truck } from 'lucide-react';
-import { format } from 'date-fns';
 import { useCurrency } from '@/hooks/useCurrency';
-
-const PAGE_SIZE = 20;
+import { Order } from '@/types/database';
+import { Package, ChevronRight, Loader2, CheckCircle, Truck } from 'lucide-react';
+import { format } from 'date-fns';
 
 function OrderCard({ order, type, successTerminals }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string> }) {
   const { getFlowLabel } = useFlowStepLabels();
@@ -121,98 +117,8 @@ function EmptyState({ message, type }: { message: string; type?: 'buyer' | 'sell
 }
 
 function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userId: string; sellerId?: string }) {
-  const { successSet, terminalSet } = useTerminalStatuses();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [buyerFilter, setBuyerFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
-
-  const fetchOrders = useCallback(async (cursor?: string, filter?: 'all' | 'active' | 'completed' | 'cancelled') => {
-    const isInitial = !cursor;
-    if (isInitial) setIsLoading(true);
-    else setIsLoadingMore(true);
-
-    const activeFilter = filter ?? buyerFilter;
-
-    try {
-      let query;
-      if (type === 'buyer') {
-        query = supabase
-          .from('orders')
-          .select(`*, seller:seller_profiles(business_name, cover_image_url), items:order_items(*)`)
-          .eq('buyer_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(PAGE_SIZE);
-
-        // Apply server-side filter so pagination is consistent
-        if (activeFilter === 'active' && terminalSet.size > 0) {
-          const terminalArr = [...terminalSet, 'payment_pending'];
-          query = query.not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`);
-        } else if (activeFilter === 'completed' && successSet.size > 0) {
-          query = query.in('status', [...successSet] as any);
-        } else if (activeFilter === 'cancelled' && terminalSet.size > 0 && successSet.size > 0) {
-          const cancelledStatuses = [...terminalSet].filter(s => !successSet.has(s));
-          if (cancelledStatuses.length > 0) query = query.in('status', cancelledStatuses as any);
-        }
-      } else {
-        query = supabase
-          .from('orders')
-          .select(`*, buyer:profiles!orders_buyer_id_fkey(name, block, flat_number, phone), items:order_items(*)`)
-          .eq('seller_id', sellerId!)
-          .order('created_at', { ascending: false })
-          .limit(PAGE_SIZE);
-      }
-
-      if (cursor) {
-        query = query.lt('created_at', cursor);
-      }
-
-      const { data } = await query;
-      const results = (data as any) || [];
-
-      if (isInitial) setOrders(results);
-      else setOrders(prev => [...prev, ...results]);
-      setHasMore(results.length === PAGE_SIZE);
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-    } finally {
-      setIsLoading(false);
-      setIsLoadingMore(false);
-    }
-  }, [type, userId, sellerId, buyerFilter, terminalSet, successSet]);
-
-  const location = useLocation();
-  const prevKeyRef = useRef(location.key);
-
-  useEffect(() => {
-    fetchOrders(undefined, buyerFilter);
-    prevKeyRef.current = location.key;
-  }, [type, userId, sellerId, location.key, buyerFilter]);
-
-  // Refresh order list when tab becomes visible or after status-change alerts
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') fetchOrders(undefined, buyerFilter);
-    };
-    const handleRefetchEvent = () => fetchOrders(undefined, buyerFilter);
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('order-detail-refetch', handleRefetchEvent);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('order-detail-refetch', handleRefetchEvent);
-    };
-  }, [fetchOrders, buyerFilter]);
-
-  const loadMore = () => {
-    if (orders.length > 0 && hasMore) {
-      const lastOrder = orders[orders.length - 1];
-      fetchOrders(lastOrder.created_at, buyerFilter);
-    }
-  };
-
-  // With server-side filtering, we can pass orders directly
-  const filteredOrders = orders;
+  const { orders, isLoading, hasMore, isLoadingMore, loadMore, successSet } = useOrdersList(type, userId, sellerId, buyerFilter);
 
   if (isLoading) {
     return (
@@ -222,13 +128,12 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
     );
   }
 
-  if (orders.length === 0) {
+  if (orders.length === 0 && buyerFilter === 'all') {
     return <EmptyState message={type === 'buyer' ? "You haven't placed any orders yet" : "No orders received yet"} type={type} />;
   }
 
   return (
     <div>
-      {/* Buyer filter chips */}
       {type === 'buyer' && (
         <div className="flex gap-2 mb-3 overflow-x-auto scrollbar-hide">
           {(['all', 'active', 'completed', 'cancelled'] as const).map(f => (
@@ -246,14 +151,14 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
           ))}
         </div>
       )}
-      {filteredOrders.length === 0 ? (
+      {orders.length === 0 ? (
         <div className="text-center py-8 text-sm text-muted-foreground">No {buyerFilter} orders</div>
       ) : (
-        filteredOrders.map(order => <OrderCard key={order.id} order={order} type={type} successTerminals={successSet} />)
+        orders.map(order => <OrderCard key={order.id} order={order} type={type} successTerminals={successSet} />)
       )}
       {hasMore && (
         <div className="flex justify-center py-4">
-          <Button variant="secondary" size="default" className="w-full" onClick={loadMore} disabled={isLoadingMore}>
+          <Button variant="secondary" size="default" className="w-full" onClick={() => loadMore()} disabled={isLoadingMore}>
             {isLoadingMore ? <><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Loading...</> : 'Load More'}
           </Button>
         </div>
