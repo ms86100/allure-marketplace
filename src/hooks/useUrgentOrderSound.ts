@@ -1,65 +1,39 @@
 import { useEffect, useRef, useCallback } from 'react';
 
-// Simple beep sound using Web Audio API
-function createBeepSound(audioContext: AudioContext) {
-  const oscillator = audioContext.createOscillator();
-  const gainNode = audioContext.createGain();
-
-  oscillator.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-
-  oscillator.frequency.value = 800; // Frequency in Hz
-  oscillator.type = 'sine';
-
-  gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-
-  oscillator.start(audioContext.currentTime);
-  oscillator.stop(audioContext.currentTime + 0.5);
-
-  return oscillator;
-}
-
 export function useUrgentOrderSound(isActive: boolean) {
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const playBeep = useCallback(() => {
     try {
-      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (!audioRef.current) {
+        audioRef.current = new Audio('/sounds/gate_bell.mp3');
       }
-
-      if (audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume();
-      }
-
-      createBeepSound(audioContextRef.current);
-    } catch (e) {
+      audioRef.current.loop = true;
+      audioRef.current.volume = 1.0;
+      audioRef.current.play().catch(() => {});
+    } catch {
       console.log('Could not play notification sound');
     }
   }, []);
-
-  const startRinging = useCallback(() => {
-    // Play immediately
-    playBeep();
-
-    // Then repeat every 5 seconds
-    intervalRef.current = setInterval(() => {
-      playBeep();
-    }, 5000);
-  }, [playBeep]);
 
   const stopRinging = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.loop = false;
+      }
+    } catch {}
   }, []);
 
   useEffect(() => {
     if (isActive) {
-      startRinging();
+      playBeep();
     } else {
       stopRinging();
     }
@@ -67,7 +41,7 @@ export function useUrgentOrderSound(isActive: boolean) {
     return () => {
       stopRinging();
     };
-  }, [isActive, startRinging, stopRinging]);
+  }, [isActive, playBeep, stopRinging]);
 
   return { playBeep, stopRinging };
 }

@@ -6,23 +6,6 @@ import { hapticVibrate, hapticNotification } from '@/lib/haptics';
 const ACTIONABLE_STATUSES = ['placed', 'enquired', 'quoted'] as const;
 const ACTIONABLE_STATUSES_INSERT = ['placed', 'enquired', 'quoted', 'confirmed'] as const;
 
-function createAlarmSound(audioContext: AudioContext) {
-  const now = audioContext.currentTime;
-  for (let i = 0; i < 3; i++) {
-    const osc = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    osc.connect(gain);
-    gain.connect(audioContext.destination);
-    osc.frequency.value = i % 2 === 0 ? 880 : 660;
-    osc.type = 'square';
-    const start = now + i * 0.2;
-    gain.gain.setValueAtTime(0.25, start);
-    gain.gain.exponentialRampToValueAtTime(0.01, start + 0.18);
-    osc.start(start);
-    osc.stop(start + 0.2);
-  }
-}
-
 export interface NewOrder {
   id: string;
   status: string;
@@ -41,7 +24,7 @@ const SNOOZE_MS = 60000;
 export function useNewOrderAlert(sellerIds: string[]) {
   const queryClient = useQueryClient();
   const [pendingAlerts, setPendingAlerts] = useState<NewOrder[]>([]);
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSeenAtRef = useRef<string | null>(null);
   const pollDelayRef = useRef(MIN_POLL_MS);
@@ -52,7 +35,6 @@ export function useNewOrderAlert(sellerIds: string[]) {
   const dismissedIdsRef = useRef<Set<string>>(new Set());
   const snoozedUntilRef = useRef<Record<string, number>>({});
 
-  // Stable reference for sellerIds to use in callbacks
   const sellerIdsRef = useRef<Set<string>>(new Set());
   useMemo(() => {
     sellerIdsRef.current = new Set(sellerIds);
@@ -78,12 +60,10 @@ export function useNewOrderAlert(sellerIds: string[]) {
     }
     pollDelayRef.current = MIN_POLL_MS;
     setPendingAlerts(prev => [...prev, order]);
-    // Invalidate queries for the specific seller this order belongs to
     if (order.seller_id) {
       queryClient.invalidateQueries({ queryKey: ['seller-orders', order.seller_id] });
       queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats', order.seller_id] });
     } else {
-      // Fallback: invalidate all seller queries
       for (const sid of sellerIdsRef.current) {
         queryClient.invalidateQueries({ queryKey: ['seller-orders', sid] });
         queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats', sid] });
@@ -97,9 +77,10 @@ export function useNewOrderAlert(sellerIds: string[]) {
       intervalRef.current = null;
     }
     try {
-      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
-        audioCtxRef.current.close();
-        audioCtxRef.current = null;
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current.loop = false;
       }
     } catch {}
   }, []);
@@ -108,23 +89,26 @@ export function useNewOrderAlert(sellerIds: string[]) {
     if (intervalRef.current) return;
     hapticNotification('warning');
     try {
-      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (!audioRef.current) {
+        audioRef.current = new Audio('/sounds/gate_bell.mp3');
       }
-      if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume();
-      }
-      createAlarmSound(audioCtxRef.current);
+      const audio = audioRef.current;
+      audio.loop = true;
+      audio.volume = 1.0;
+      audio.play().then(() => {
+        // Prevent OS media controls from pausing the alarm
+        if ('mediaSession' in navigator) {
+          navigator.mediaSession.metadata = new MediaMetadata({ title: 'New Order Alert' });
+          navigator.mediaSession.setActionHandler('pause', null);
+          navigator.mediaSession.setActionHandler('stop', null);
+        }
+      }).catch(() => {});
     } catch (e) {
       console.warn('[OrderAlert] Sound failed:', e);
     }
+    // Haptic fallback every 3s
     intervalRef.current = setInterval(() => {
       hapticVibrate(500);
-      try {
-        if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
-          createAlarmSound(audioCtxRef.current);
-        }
-      } catch {}
     }, 3000);
   }, []);
 
@@ -138,7 +122,6 @@ export function useNewOrderAlert(sellerIds: string[]) {
     });
   }, [stopBuzzing]);
 
-  // Bug 5: Dismiss ALL pending alerts at once (used when seller taps "View Order")
   const dismissAll = useCallback(() => {
     setPendingAlerts(prev => {
       prev.forEach(o => dismissedIdsRef.current.add(o.id));
@@ -159,8 +142,7 @@ export function useNewOrderAlert(sellerIds: string[]) {
     });
   }, [stopBuzzing]);
 
-  // ── Realtime subscription (primary, instant) ──
-  // Subscribe without seller_id filter; check membership client-side
+  // ── Realtime subscription ──
   useEffect(() => {
     if (!enabled) return;
 
@@ -168,46 +150,29 @@ export function useNewOrderAlert(sellerIds: string[]) {
       .channel('seller-new-orders-multi')
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'orders',
-        },
+        { event: 'INSERT', schema: 'public', table: 'orders' },
         (payload) => {
           const n = payload.new as any;
           if (!sellerIdsRef.current.has(n.seller_id)) return;
-          // Bug 8: Include 'confirmed' for INSERT events (service bookings)
           if (!ACTIONABLE_STATUSES_INSERT.includes(n.status)) return;
           handleNewOrder({
-            id: n.id,
-            status: n.status,
-            created_at: n.created_at,
-            total_amount: n.total_amount,
-            seller_id: n.seller_id,
-            fulfillment_type: n.fulfillment_type,
-            delivery_handled_by: n.delivery_handled_by,
+            id: n.id, status: n.status, created_at: n.created_at,
+            total_amount: n.total_amount, seller_id: n.seller_id,
+            fulfillment_type: n.fulfillment_type, delivery_handled_by: n.delivery_handled_by,
           });
         }
       )
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'orders',
-        },
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
         (payload) => {
           const n = payload.new as any;
           if (!sellerIdsRef.current.has(n.seller_id)) return;
           if (ACTIONABLE_STATUSES.includes(n.status)) {
             handleNewOrder({
-              id: n.id,
-              status: n.status,
-              created_at: n.created_at,
-              total_amount: n.total_amount,
-              seller_id: n.seller_id,
-              fulfillment_type: n.fulfillment_type,
-              delivery_handled_by: n.delivery_handled_by,
+              id: n.id, status: n.status, created_at: n.created_at,
+              total_amount: n.total_amount, seller_id: n.seller_id,
+              fulfillment_type: n.fulfillment_type, delivery_handled_by: n.delivery_handled_by,
             });
           }
         }
@@ -217,7 +182,7 @@ export function useNewOrderAlert(sellerIds: string[]) {
     return () => { supabase.removeChannel(channel); };
   }, [enabled, handleNewOrder]);
 
-  // ── Polling fallback — uses .in() for multiple seller IDs ──
+  // ── Polling fallback ──
   useEffect(() => {
     if (!enabled) return;
 
@@ -248,9 +213,7 @@ export function useNewOrderAlert(sellerIds: string[]) {
         } else {
           pollDelayRef.current = Math.min(pollDelayRef.current * BACKOFF_FACTOR, MAX_POLL_MS);
         }
-      } catch {
-        // Silently ignore poll errors
-      }
+      } catch {}
 
       if (!cancelled) {
         pollTimerRef.current = setTimeout(poll, pollDelayRef.current);
