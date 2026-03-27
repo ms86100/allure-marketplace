@@ -368,6 +368,12 @@ export function useCartPage() {
     if (fulfillmentType === 'delivery' && !selectedDeliveryAddress) { toast.error('Please select a delivery address before placing your order.', { id: 'checkout-no-address' }); return; }
     if (fulfillmentType === 'delivery' && selectedDeliveryAddress && !selectedDeliveryAddress.latitude) { toast.error('Your selected address has no location coordinates. Please update it with a precise location.', { id: 'checkout-no-coords' }); return; }
 
+    // GUARD: Pre-order items MUST have a scheduled date/time — cannot bypass via race condition
+    if (hasPreorderItems && (!scheduledDate || !scheduledTime)) {
+      toast.error('Please select a delivery date & time for pre-order items.', { id: 'checkout-preorder-missing' });
+      return;
+    }
+
     // GUARD: Server-side fulfillment validation — prevent sending self_pickup when seller only does delivery (and vice versa)
     for (const group of sellerGroups) {
       const sellerMode = (group.items[0]?.product?.seller as any)?.fulfillment_mode;

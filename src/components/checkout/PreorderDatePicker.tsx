@@ -13,13 +13,22 @@ interface PreorderDatePickerProps {
   selectedTime: string | null;
   onDateChange: (date: Date | null) => void;
   onTimeChange: (time: string | null) => void;
+  /** Optional cutoff time (e.g. "18:00") — slots after this are filtered out */
+  cutoffTime?: string | null;
 }
 
-export function PreorderDatePicker({ leadTimeHours, selectedDate, selectedTime, onDateChange, onTimeChange }: PreorderDatePickerProps) {
+export function PreorderDatePicker({ leadTimeHours, selectedDate, selectedTime, onDateChange, onTimeChange, cutoffTime }: PreorderDatePickerProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   const earliestDate = useMemo(() => addHours(new Date(), leadTimeHours), [leadTimeHours]);
   const earliestDay = startOfDay(earliestDate);
+
+  // Parse cutoff time once
+  const cutoffHour = useMemo(() => {
+    if (!cutoffTime) return null;
+    const [h, m] = cutoffTime.split(':').map(Number);
+    return { h, m: m || 0 };
+  }, [cutoffTime]);
 
   // Generate time slots in 30-min intervals from 6am to 10pm
   const timeSlots = useMemo(() => {
@@ -29,20 +38,29 @@ export function PreorderDatePicker({ leadTimeHours, selectedDate, selectedTime, 
       if (h < 22) slots.push(`${String(h).padStart(2, '0')}:30`);
     }
 
-    if (!selectedDate) return slots;
+    // Apply cutoff time filter — remove slots at or after the cutoff
+    let filtered = slots;
+    if (cutoffHour) {
+      filtered = filtered.filter(slot => {
+        const [h, m] = slot.split(':').map(Number);
+        return h < cutoffHour.h || (h === cutoffHour.h && m < cutoffHour.m);
+      });
+    }
+
+    if (!selectedDate) return filtered;
 
     // Filter out times that are before the earliest allowed time on the selected day
     const selectedDay = startOfDay(selectedDate);
     if (selectedDay.getTime() === earliestDay.getTime()) {
       const earliestHour = earliestDate.getHours();
       const earliestMin = earliestDate.getMinutes();
-      return slots.filter(slot => {
+      return filtered.filter(slot => {
         const [h, m] = slot.split(':').map(Number);
         return h > earliestHour || (h === earliestHour && m >= earliestMin);
       });
     }
-    return slots;
-  }, [selectedDate, earliestDate, earliestDay]);
+    return filtered;
+  }, [selectedDate, earliestDate, earliestDay, cutoffHour]);
 
   return (
     <div className="bg-accent/5 border border-accent/20 rounded-xl p-4 space-y-3">
