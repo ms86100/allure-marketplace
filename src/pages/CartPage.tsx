@@ -236,6 +236,7 @@ export default function CartPage() {
               selectedTime={c.scheduledTime}
               onDateChange={c.setScheduledDate}
               onTimeChange={c.setScheduledTime}
+              cutoffTime={c.preorderCutoffTime}
             />
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -224,6 +224,29 @@ export function useCartPage() {
   }, 0);
   const preorderMissingSchedule = hasPreorderItems && (!scheduledDate || !scheduledTime);
 
+  // Derive cutoff time from pre-order items (use the earliest cutoff across all pre-order products)
+  const preorderCutoffTime = useMemo(() => {
+    let earliest: string | null = null;
+    for (const item of items) {
+      const p = item.product as any;
+      if (!p?.accepts_preorders) continue;
+      const cutoff = p.preorder_cutoff_time;
+      if (cutoff && (!earliest || cutoff < earliest)) earliest = cutoff;
+    }
+    return earliest;
+  }, [items]);
+
+  // Track which sellers have pre-order items (for mixed-cart handling - Gap 7)
+  const preorderSellerIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const item of items) {
+      if ((item.product as any)?.accepts_preorders) {
+        ids.add(item.product?.seller_id || '');
+      }
+    }
+    return ids;
+  }, [items]);
+
   const createOrdersForAllSellers = async (paymentStatus: 'pending' | 'paid', transactionRef?: string) => {
     if (!user || !profile || sellerGroups.length === 0) return [];
 
@@ -367,6 +390,12 @@ export function useCartPage() {
     if (!navigator.onLine) { toast.error("You're offline. Please check your connection and try again.", { id: 'checkout-offline' }); return; }
     if (fulfillmentType === 'delivery' && !selectedDeliveryAddress) { toast.error('Please select a delivery address before placing your order.', { id: 'checkout-no-address' }); return; }
     if (fulfillmentType === 'delivery' && selectedDeliveryAddress && !selectedDeliveryAddress.latitude) { toast.error('Your selected address has no location coordinates. Please update it with a precise location.', { id: 'checkout-no-coords' }); return; }
+
+    // GUARD: Pre-order items MUST have a scheduled date/time — cannot bypass via race condition
+    if (hasPreorderItems && (!scheduledDate || !scheduledTime)) {
+      toast.error('Please select a delivery date & time for pre-order items.', { id: 'checkout-preorder-missing' });
+      return;
+    }
 
     // GUARD: Server-side fulfillment validation — prevent sending self_pickup when seller only does delivery (and vice versa)
     for (const group of sellerGroups) {
@@ -671,5 +700,6 @@ export function useCartPage() {
     // Pre-order
     hasPreorderItems, maxLeadTimeHours, preorderMissingSchedule,
     scheduledDate, setScheduledDate, scheduledTime, setScheduledTime,
+    preorderCutoffTime, preorderSellerIds,
   };
 }

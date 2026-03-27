@@ -79,6 +79,7 @@ export function ProductGridCard({ product, behavior, onTap, className, viewOnly 
           {isOutOfStock && (<div className="absolute inset-0 bg-background/60 flex items-center justify-center rounded-[10px]"><span className="text-[9px] font-bold text-muted-foreground uppercase">Out of stock</span></div>)}
           {isStoreClosed && !isOutOfStock && (<div className="absolute inset-0 bg-background/40 flex items-center justify-center rounded-[10px]"><span className="text-[8px] font-bold text-muted-foreground bg-muted/90 px-1.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1"><Clock size={8} />{storeClosedMessage || 'Closed'}</span></div>)}
           {product.is_bestseller && (<Badge className="absolute top-1 left-1 bg-badge-new text-primary-foreground text-[8px] px-1.5 py-0.5 font-bold shadow-sm rounded border-0">Bestseller</Badge>)}
+          {(product as any).accepts_preorders && !product.is_bestseller && (<Badge className="absolute top-1 left-1 bg-accent/90 text-accent-foreground text-[8px] px-1.5 py-0.5 font-bold shadow-sm rounded border-0">Pre-order{(product as any).lead_time_hours ? ` • ${(product as any).lead_time_hours}hr` : ''}</Badge>)}
           <div className="absolute top-1 right-1"><VegBadge isVeg={product.is_veg} size="sm" /></div>
         </div>
         {!viewOnly && !isOutOfStock && !isStoreClosed && (

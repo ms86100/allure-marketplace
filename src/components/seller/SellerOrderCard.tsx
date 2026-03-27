@@ -24,6 +24,8 @@ interface SellerOrderCardOrder {
   payment_type?: string | null;
   fulfillment_type?: string | null;
   order_type?: string | null;
+  scheduled_date?: string | null;
+  scheduled_time_start?: string | null;
   buyer?: { name: string; block: string; flat_number: string };
   items?: OrderItemWithStatus[];
 }
@@ -97,6 +99,17 @@ export function SellerOrderCard({ order }: SellerOrderCardProps) {
               </div>
             </div>
           </div>
+
+          {/* Scheduled Pre-order Indicator */}
+          {order.scheduled_date && (
+            <div className="flex items-center gap-1.5 mb-2 bg-accent/10 border border-accent/20 rounded-lg px-2.5 py-1.5 text-xs">
+              <CalendarDays size={12} className="text-accent shrink-0" />
+              <span className="text-accent font-medium">
+                📅 Scheduled: {format(new Date(order.scheduled_date), 'MMM d')}
+                {order.scheduled_time_start && ` at ${order.scheduled_time_start.slice(0, 5)}`}
+              </span>
+            </div>
+          )}
 
           {/* Order Details Grid */}
           <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
