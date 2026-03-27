@@ -191,26 +191,59 @@ workflows:
               sips -z 512 1024 "$SPLASH_IMAGESET/splash-logo@3x.png"
 
               cat > "$SPLASH_IMAGESET/Contents.json" << 'LOGOJSON'
-            {
-              "images": [
-                {"idiom":"universal","scale":"1x","filename":"splash-logo@1x.png"},
-                {"idiom":"universal","scale":"2x","filename":"splash-logo@2x.png"},
-                {"idiom":"universal","scale":"3x","filename":"splash-logo@3x.png"}
-              ],
-              "info":{"version":1,"author":"xcode"}
-            }
-            LOGOJSON
+          {
+            "images": [
+              {"idiom":"universal","scale":"1x","filename":"splash-logo@1x.png"},
+              {"idiom":"universal","scale":"2x","filename":"splash-logo@2x.png"},
+              {"idiom":"universal","scale":"3x","filename":"splash-logo@3x.png"}
+            ],
+            "info":{"version":1,"author":"xcode"}
+          }
+          LOGOJSON
               echo "=== SplashLogo imageset created ==="
             else
               echo "WARNING: ios-config/splash-logo.png not found, skipping splash logo"
             fi
 
-            # 7. Inject imageView + constraints into storyboard for centered logo
-            # Insert after the closing </view> of the main background view, before </subviews> or </viewController>
-            sed -i '' 's|</view>|<subviews><imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="SplashLogo" translatesAutoresizingMaskIntoConstraints="NO" id="splashLogoView"><rect key="frame" x="0" y="0" width="200" height="100"/></imageView></subviews><constraints><constraint firstItem="splashLogoView" firstAttribute="centerX" secondItem="GJd-Yh-RWb" secondAttribute="centerX" id="splashCX"/><constraint firstItem="splashLogoView" firstAttribute="centerY" secondItem="GJd-Yh-RWb" secondAttribute="centerY" id="splashCY"/><constraint firstItem="splashLogoView" firstAttribute="width" constant="200" id="splashW"/><constraint firstItem="splashLogoView" firstAttribute="height" constant="100" id="splashH"/></constraints></view>|' "$STORYBOARD"
-
-            # 8. Add image resource reference at the end of the storyboard
-            sed -i '' 's|</document>|<resources><image name="SplashLogo" width="341" height="171"/></resources></document>|' "$STORYBOARD"
+            # 7. Write the complete patched LaunchScreen storyboard directly
+            # This avoids fragile sed replacements on complex XML
+            cat > "$STORYBOARD" << 'STORYBOARDXML'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="17701" targetRuntime="AppleSDK" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
+            <scenes>
+              <scene sceneID="EHf-IW-A2E">
+                <objects>
+                  <viewController id="01J-lp-oVM" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="GJd-Yh-RWb">
+                      <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
+                      <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                      <subviews>
+                        <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="SplashLogo" translatesAutoresizingMaskIntoConstraints="NO" id="splashLogoView">
+                          <rect key="frame" x="107" y="398" width="200" height="100"/>
+                          <constraints>
+                            <constraint firstAttribute="width" constant="200" id="splashW"/>
+                            <constraint firstAttribute="height" constant="100" id="splashH"/>
+                          </constraints>
+                        </imageView>
+                      </subviews>
+                      <color key="backgroundColor" red="0.10196078431372549" green="0.10196078431372549" blue="0.18039215686274512" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                      <constraints>
+                        <constraint firstItem="splashLogoView" firstAttribute="centerX" secondItem="GJd-Yh-RWb" secondAttribute="centerX" id="splashCX"/>
+                        <constraint firstItem="splashLogoView" firstAttribute="centerY" secondItem="GJd-Yh-RWb" secondAttribute="centerY" id="splashCY"/>
+                      </constraints>
+                      <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
+                    </view>
+                  </viewController>
+                  <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
+                </objects>
+                <point key="canvasLocation" x="52.173913043478265" y="375"/>
+              </scene>
+            </scenes>
+            <resources>
+              <image name="SplashLogo" width="341" height="171"/>
+            </resources>
+          </document>
+          STORYBOARDXML
 
             echo "=== After patch ==="
             cat "$STORYBOARD"
