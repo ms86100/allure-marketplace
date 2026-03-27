@@ -35,6 +35,7 @@ const config: CapacitorConfig = {
   // Production: minimal server config with allowNavigation for Supabase/app domains
   ...(!isDev && {
     server: {
+      hostname: 'www.sociva.in',
       androidScheme: 'https',
       allowNavigation: [
         'ywhlqsgvbkvcvqlsniad.supabase.co',
