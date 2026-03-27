@@ -1,47 +1,31 @@
 
 
-# Fix LaunchScreen: Remove Capacitor Logo + Apply Dark Navy Background
+# Blinkit-Style Category Cards for CategoryImageGrid
 
-## Problem
+## What changes
 
-The current `codemagic.yaml` sed patch only changes the background color in the storyboard XML, but **does not remove the Capacitor splash image** (`imageView` element). Capacitor's default `LaunchScreen.storyboard` contains an `<imageView>` referencing a "Splash" asset — that's the blue "X" logo you're seeing on a white screen.
+The `CategoryImageGrid` component gets a visual upgrade to match the Blinkit "Frequently bought" card pattern from the reference screenshot.
 
-The background color sed replacements may also not be matching because the actual XML uses a different color format than expected.
+### Design principles from the reference
+- **Colored card background**: Each category card has a distinct tinted background (using the category's `color` from DB)
+- **2-image layout inside card**: Two product images side by side with rounded corners and padding inside the card
+- **"+X more" badge**: A count badge overlaid at the bottom of the image area showing remaining items
+- **Larger card size**: 3-column grid (not 4) — gives each card more breathing room and makes images scannable
+- **Label below**: Bold, centered, multi-line text below the card
+- **Consistent padding and rounded corners**: ~12px padding inside card, 2xl border radius
 
-## Fix
+### Changes to `src/components/home/CategoryImageGrid.tsx`
 
-Update the "Patch LaunchScreen" step in `codemagic.yaml` to:
+1. **Grid**: Change from `grid-cols-4` to `grid-cols-3` on mobile (keep `md:grid-cols-4 lg:grid-cols-5`)
+2. **Card background**: Use `cat.color` with low opacity as a gradient background (same pattern already used in `MarketplaceSection` line 375: `linear-gradient(160deg, ${catColor}18 ...)`)
+3. **Image layout**: Always show 2 images side-by-side (instead of 2×2 grid) — simpler, more like the reference. Images get `rounded-xl` with a small gap
+4. **"+X more" badge**: Show `+${meta.count - 2} more` as a small pill overlaid on the bottom-center of the image area when count > 2
+5. **Aspect ratio**: Change from `aspect-[4/3]` to `aspect-square` for the card — taller cards like the reference
+6. **Label styling**: Slightly larger text (`text-xs` instead of `text-[11px]`), with `mt-2` spacing
 
-1. **Remove the imageView entirely** — use `sed` to delete lines containing the Capacitor splash imageView (the `<imageView` through its closing tag)
-2. **Force the background color** — instead of trying to match exact color strings, use a more aggressive pattern that catches any `backgroundColor` element and replaces it
-3. **Delete the Splash image asset** — remove `ios/App/App/Assets.xcassets/Splash.imageset/` so Xcode doesn't even have the image available
-
-### Concrete sed approach
-
-```bash
-# Delete the imageView block (splash logo)
-sed -i '' '/<imageView.*image="Splash"/,/<\/imageView>/d' "$STORYBOARD"
-
-# Also remove any standalone imageView reference
-sed -i '' '/image="Splash"/d' "$STORYBOARD"
-
-# Force background color by replacing ANY backgroundColor element
-sed -i '' 's|<color key="backgroundColor"[^/]*/> |<color key="backgroundColor" red="0.102" green="0.102" blue="0.180" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>|g' "$STORYBOARD"
-
-# Remove the Splash image asset entirely
-rm -rf ios/App/App/Assets.xcassets/Splash.imageset/
-```
-
-## Result
-
-After this fix:
-- Launch screen = solid dark navy (#1a1a2e) with no logo — clean, matches the app icon background
-- No Capacitor branding visible
-- No toolsVersion mismatch (we're still patching, not replacing)
-
-## File
+### Files
 
 | File | Change |
 |------|--------|
-| `codemagic.yaml` | Rewrite the "Patch LaunchScreen" step to remove imageView + force color + delete Splash asset |
+| `src/components/home/CategoryImageGrid.tsx` | Restyle cards to Blinkit pattern |
 
