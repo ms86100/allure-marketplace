@@ -295,12 +295,19 @@ export function useRazorpay() {
         },
         handler: function (response: any) {
           console.log('Payment successful:', response);
+          successFired = true; // Prevent ondismiss from resetting state
           settleAttempt();
           unlockBodyScroll();
           options.onSuccess(response.razorpay_payment_id, response.razorpay_order_id);
         },
         modal: {
           ondismiss: function () {
+            // Race-proof: Razorpay fires ondismiss AFTER handler in some SDK versions.
+            // If success already fired, skip dismiss entirely to prevent state reset.
+            if (successFired) {
+              console.log('[Razorpay] ondismiss suppressed — success already fired');
+              return;
+            }
             console.log('Payment modal closed');
             settleAttempt();
             unlockBodyScroll();

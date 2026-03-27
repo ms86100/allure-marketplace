@@ -46,36 +46,12 @@ export function RazorpayCheckout({
   const { createOrder, isLoading, isScriptLoaded, scriptError, retryLoadScript } = useRazorpay();
   const { formatPrice } = useCurrency();
   const [status, setStatus] = useState<'pending' | 'processing' | 'verifying' | 'success' | 'confirming' | 'failed' | 'blocked'>('pending');
+  const statusRef = useRef(status);
   const processingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const verifyTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const paymentInFlightRef = useRef(false);
 
-  const allOrderIds = orderIds && orderIds.length > 0 ? orderIds : [orderId];
-
-  const verifyPaymentBackend = useCallback(async (paymentId: string, attempt = 0): Promise<void> => {
-    const MAX_ATTEMPTS = 10;
-    const { data } = await supabase
-      .from('orders')
-      .select('payment_status')
-      .in('id', allOrderIds);
-
-    const allPaid = data && data.length === allOrderIds.length && data.every(o => o.payment_status === 'paid');
-
-    if (allPaid) {
-      setStatus('success');
-      setTimeout(() => onPaymentSuccess(paymentId), 1200);
-      return;
-    }
-
-    if (attempt >= MAX_ATTEMPTS) {
-      console.warn('[Payment] Backend verification timed out after 20s — showing confirming state');
-      setStatus('confirming');
-      setTimeout(() => onPaymentSuccess(paymentId), 3000);
-      return;
-    }
-
-    verifyTimeoutRef.current = setTimeout(() => verifyPaymentBackend(paymentId, attempt + 1), 2000);
-  }, [allOrderIds, onPaymentSuccess]);
+  // Keep statusRef in sync for use in callbacks that close over stale state
+  useEffect(() => { statusRef.current = status; }, [status]);
 
   useEffect(() => {
     if (isOpen) {
@@ -84,7 +60,6 @@ export function RazorpayCheckout({
     }
     return () => {
       if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
-      if (verifyTimeoutRef.current) clearTimeout(verifyTimeoutRef.current);
     };
   }, [isOpen]);
 
@@ -115,8 +90,9 @@ export function RazorpayCheckout({
         if (razorpayOrderId) {
           console.log('[Payment] Razorpay order_id for reconciliation:', razorpayOrderId);
         }
-        setStatus('verifying');
-        verifyPaymentBackend(paymentId);
+        // Instant success UI — no polling here. Parent handles verification + navigation.
+        setStatus('success');
+        setTimeout(() => onPaymentSuccess(paymentId), 800);
       },
       onFailure: (error) => {
         if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
@@ -131,6 +107,11 @@ export function RazorpayCheckout({
       onDismiss: () => {
         if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
         paymentInFlightRef.current = false;
+        // Guard: if payment already succeeded, don't reset to pending
+        if (['verifying', 'success', 'confirming'].includes(statusRef.current)) {
+          console.log('[Payment] onDismiss suppressed — status is', statusRef.current);
+          return;
+        }
         setStatus('pending');
       },
     });

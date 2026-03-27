@@ -484,45 +484,49 @@ export function useCartPage() {
 
   const handleRazorpaySuccess = async (paymentId: string) => {
     setShowRazorpayCheckout(false);
-    const targetOrderId = pendingOrderIds[0];
+    const orderIds = [...pendingOrderIds];
+    const targetOrderId = orderIds[0];
 
-    // Bug 5 fix: Immediately store payment ID server-side before polling
-    if (targetOrderId && user?.id) {
-      try {
-        for (const oid of pendingOrderIds) {
+    try {
+      // Store payment ID server-side (best-effort, non-blocking for navigation)
+      if (targetOrderId && user?.id) {
+        for (const oid of orderIds) {
           await supabase.from('orders')
             .update({ razorpay_payment_id: paymentId } as any)
             .eq('id', oid)
             .eq('buyer_id', user.id)
             .eq('payment_status', 'pending');
         }
-      } catch (err) { console.error('Failed to store payment ID client-side:', err); }
-    }
-
-    // Security: Do NOT transition status to 'placed' client-side — that's the webhook's job.
-    // Client only stores razorpay_payment_id (done above) to aid reconciliation.
-
-    if (targetOrderId) {
-      let confirmed = false;
-      for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1500)); const { data } = await supabase.from('orders').select('payment_status').eq('id', targetOrderId).single(); if (data?.payment_status === 'paid') { confirmed = true; break; } }
-      if (!confirmed) {
-        toast.info('Payment is being verified. Your order will update shortly.', { id: 'razorpay-verifying' });
-        clearPaymentSession();
-        setPendingOrderIds([]);
-        navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
-        // Background: clear cart (non-blocking)
-        clearCartAndCache().catch(() => {});
-        return;
       }
-      toast.success('Payment successful! Order placed.', { id: 'razorpay-success' });
+
+      // Quick poll — 5 attempts, 1s apart (5s max). Webhook usually confirms within 2-3s.
+      let confirmed = false;
+      if (targetOrderId) {
+        for (let i = 0; i < 5; i++) {
+          await new Promise(r => setTimeout(r, 1000));
+          const { data } = await supabase.from('orders')
+            .select('payment_status').eq('id', targetOrderId).single();
+          if (data?.payment_status === 'paid') { confirmed = true; break; }
+        }
+      }
+
+      if (confirmed) {
+        toast.success('Payment successful! Order placed.', { id: 'razorpay-success' });
+      } else {
+        toast.info('Payment received — confirming your order.', { id: 'razorpay-verifying' });
+      }
+    } catch (err) {
+      console.error('[handleRazorpaySuccess] Error during post-payment:', err);
+      toast.info('Payment received. Check your orders for status.', { id: 'razorpay-fallback' });
+    } finally {
+      // ALWAYS navigate + clean up — no matter what
+      clearPaymentSession();
+      const dest = orderIds.length === 1 ? `/orders/${orderIds[0]}` : '/orders';
+      navigate(dest);
+      setPendingOrderIds([]);
+      clearCartAndCache().catch(() => {});
+      supabase.functions.invoke('process-notification-queue').catch(() => {});
     }
-    clearPaymentSession();
-    // Navigate FIRST — don't block on cart clear
-    navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
-    setPendingOrderIds([]);
-    // Background: clear cart + trigger notifications (non-blocking)
-    clearCartAndCache().catch(() => {});
-    supabase.functions.invoke('process-notification-queue').catch(() => {});
   };
 
   const handleRazorpayFailed = async () => {
