@@ -150,15 +150,30 @@ export function useAuthState() {
 
   // Fix #8: Guard against double fetchProfile on mount
   const profileFetchedFor = useRef<string | null>(null);
+  // Perf: track previous user ID to skip redundant setPartial calls
+  const prevUserIdRef = useRef<string | undefined>();
 
   // Auth state listener
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setPartial({ session, user: session?.user ?? null, isLoading: false });
+        const newUserId = session?.user?.id;
 
         // Persist session to native storage (survives iOS app updates)
         persistAuthSession(session ? { access_token: session.access_token, refresh_token: session.refresh_token } : null);
+
+        // Perf: Skip redundant state updates if user ID hasn't changed
+        if (newUserId && newUserId === prevUserIdRef.current) {
+          // TOKEN_REFRESHED: update session reference only (preserves user object stability)
+          if (event === 'TOKEN_REFRESHED') {
+            setPartial({ session });
+          }
+          // For other same-user events, skip entirely to avoid re-renders
+          return;
+        }
+        prevUserIdRef.current = newUserId;
+
+        setPartial({ session, user: session?.user ?? null, isLoading: false });
 
         if (session?.user) {
           if (profileFetchedFor.current !== session.user.id) {
