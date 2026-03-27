@@ -156,5 +156,6 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
       </div>
     </div>
   );
+}
 
 export const CategoryImageGrid = memo(CategoryImageGridInner);
