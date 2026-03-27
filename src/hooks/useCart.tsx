@@ -171,6 +171,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     staleTime: 5 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const { data: fallbackItemCount = 0 } = useQuery({
@@ -302,7 +303,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const { data: stockCheck } = await supabase.from('products').select('stock_quantity').eq('id', product.id).maybeSingle();
         if (stockCheck?.stock_quantity != null) maxQty = stockCheck.stock_quantity;
       }
-      const existingQty = items.find(i => i.product_id === product.id)?.quantity || 0;
+      // Read current items from cache (avoids stale closure — items is not in deps)
+      const currentItems = queryClient.getQueryData(cartKey()) as (CartItem & { product: Product })[] | undefined;
+      const existingQty = (currentItems || []).find(i => i.product_id === product.id)?.quantity || 0;
       if (maxQty <= 0) {
         toast.error('This item is out of stock', { id: 'stock-limit' });
         return;
