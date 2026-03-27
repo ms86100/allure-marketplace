@@ -24,9 +24,23 @@ export interface MarketplaceProduct {
   description: string | null;
 }
 
+const BATCH_SIZE = 25;
+
+/**
+ * Chunk an array into batches of a given size.
+ */
+function chunk<T>(arr: T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    result.push(arr.slice(i, i + size));
+  }
+  return result;
+}
+
 /**
  * Phase 2: Fetch products for given seller IDs.
- * Called after sellers are loaded — can be paginated or filtered by category.
+ * Batches seller IDs (max 25 per call) to prevent payload overflows
+ * and fires parallel RPCs, merging results.
  */
 export function useMarketplaceProducts(
   sellerIds: string[],
@@ -41,19 +55,29 @@ export function useMarketplaceProducts(
     queryFn: async (): Promise<MarketplaceProduct[]> => {
       if (sellerIds.length === 0) return [];
 
-      const { data, error } = await supabase.rpc('get_products_for_sellers' as any, {
-        _seller_ids: sellerIds,
-        _category: category ?? null,
-        _limit: limit,
-        _offset: offset,
-      });
+      const batches = chunk(sellerIds, BATCH_SIZE);
 
-      if (error) {
-        console.error('Marketplace products RPC error:', error);
-        return [];
-      }
+      // Fire all batches in parallel
+      const batchResults = await Promise.all(
+        batches.map(async (batchIds) => {
+          const { data, error } = await supabase.rpc('get_products_for_sellers' as any, {
+            _seller_ids: batchIds,
+            _category: category ?? null,
+            _limit: limit,
+            _offset: offset,
+          });
 
-      return (data || []) as MarketplaceProduct[];
+          if (error) {
+            console.error('Marketplace products RPC error (batch):', error);
+            return [] as MarketplaceProduct[];
+          }
+
+          return (data || []) as MarketplaceProduct[];
+        })
+      );
+
+      // Merge all batch results into a single flat array
+      return batchResults.flat();
     },
     enabled: sellerIds.length > 0,
     staleTime: jitteredStaleTime(10 * 60 * 1000),
