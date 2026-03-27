@@ -1,10 +1,10 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMarketplaceData, useMarketplaceDataFull, RpcSellerRow } from './useMarketplaceData';
 
 export interface TopProduct {
   id: string;
@@ -75,146 +75,115 @@ function parseTopProducts(raw: any): TopProduct[] {
       mrp: p.mrp ?? null,
       discount_percentage: p.discount_percentage ?? null,
     }));
-  // Sort by price ascending, take top 3
   products.sort((a, b) => a.price - b.price);
   return products.slice(0, 3);
 }
 
-/**
- * Coordinate-based "local" sellers within ~2 km of browsingLocation.
- */
-export function useLocalSellers() {
-  const { browsingLocation } = useBrowsingLocation();
-  const { profile, effectiveSocietyId } = useAuth();
-  const lat = browsingLocation?.lat;
-  const lng = browsingLocation?.lng;
-  const radiusKm = Math.min(profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM, MARKETPLACE_RADIUS_KM);
+function mapToLocalSeller(seller: RpcSellerRow): LocalSeller {
+  return {
+    id: seller.seller_id,
+    business_name: seller.business_name,
+    profile_image_url: seller.profile_image_url,
+    cover_image_url: seller.cover_image_url || null,
+    description: seller.description || null,
+    rating: seller.rating || 0,
+    total_reviews: seller.total_reviews || 0,
+    primary_group: seller.primary_group,
+    categories: seller.categories,
+    is_featured: seller.is_featured || false,
+    topProducts: parseTopProducts(seller.matching_products),
+  };
+}
 
-  return useQuery({
-    queryKey: ['store-discovery', 'local', lat, lng, radiusKm, effectiveSocietyId],
-    queryFn: async () => {
-      if (!lat || !lng) return {};
-
-      const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
-        _lat: lat,
-        _lng: lng,
-        _radius_km: radiusKm,
-      });
-
-      if (error) {
-        console.error('Local sellers error:', error);
-        return {};
-      }
-
-      const grouped: Record<string, LocalSeller[]> = {};
-      for (const seller of (data || []) as any[]) {
-        const group = seller.primary_group || 'Other';
-        if (!grouped[group]) grouped[group] = [];
-        grouped[group].push({
-          id: seller.seller_id,
-          business_name: seller.business_name,
-          profile_image_url: seller.profile_image_url,
-          cover_image_url: seller.cover_image_url || null,
-          description: seller.description || null,
-          rating: seller.rating || 0,
-          total_reviews: seller.total_reviews || 0,
-          primary_group: seller.primary_group,
-          categories: seller.categories,
-          is_featured: seller.is_featured || false,
-          topProducts: parseTopProducts(seller.matching_products),
-        });
-      }
-      return grouped;
-    },
-    enabled: !!(lat && lng),
-    staleTime: jitteredStaleTime(10 * 60_000),
-  });
+function mapToNearbySeller(seller: RpcSellerRow): NearbySeller {
+  return {
+    seller_id: seller.seller_id,
+    business_name: seller.business_name,
+    profile_image_url: seller.profile_image_url,
+    cover_image_url: seller.cover_image_url || null,
+    description: seller.description || null,
+    rating: seller.rating || 0,
+    total_reviews: seller.total_reviews || 0,
+    primary_group: seller.primary_group,
+    categories: seller.categories,
+    society_name: seller.society_name || '',
+    distance_km: seller.distance_km,
+    is_featured: seller.is_featured || false,
+    topProducts: parseTopProducts(seller.matching_products),
+  };
 }
 
 /**
- * Coordinate-based nearby sellers grouped by distance band.
+ * Local sellers grouped by primary_group.
+ * Derives from shared marketplace data — zero additional RPC calls.
+ */
+export function useLocalSellers() {
+  const { data: sellers, isLoading, error } = useMarketplaceDataFull();
+
+  const data = useMemo(() => {
+    if (!sellers || sellers.length === 0) return {};
+    const grouped: Record<string, LocalSeller[]> = {};
+    for (const seller of sellers) {
+      const group = seller.primary_group || 'Other';
+      if (!grouped[group]) grouped[group] = [];
+      grouped[group].push(mapToLocalSeller(seller));
+    }
+    return grouped;
+  }, [sellers]);
+
+  return { data, isLoading, error };
+}
+
+/**
+ * Nearby sellers grouped by distance band.
+ * Derives from shared marketplace data — zero additional RPC calls.
  */
 export function useNearbySocietySellers(radiusKm: number = MARKETPLACE_RADIUS_KM, enabled: boolean = true) {
-  const { browsingLocation } = useBrowsingLocation();
-  const { effectiveSocietyId, effectiveSociety } = useAuth();
-  const lat = browsingLocation?.lat;
-  const lng = browsingLocation?.lng;
+  const { effectiveSociety } = useAuth();
   const hasSociety = !!effectiveSociety;
+  const { data: sellers, isLoading, error } = useMarketplaceData();
 
-  return useQuery({
-    queryKey: ['store-discovery', 'nearby', lat, lng, radiusKm, effectiveSocietyId],
-    queryFn: async () => {
-      if (!lat || !lng) return [];
+  const data = useMemo((): DistanceBand[] => {
+    if (!sellers || sellers.length === 0) return [];
 
-      const rpcParams: any = {
-        _lat: lat,
-        _lng: lng,
-        _radius_km: radiusKm,
-      };
-      if (effectiveSocietyId) {
-        rpcParams._exclude_society_id = effectiveSocietyId;
-      }
+    const nearbySellers = sellers.map(mapToNearbySeller);
 
-      const { data, error } = await supabase.rpc('search_sellers_by_location' as any, rpcParams);
+    const ALL_BANDS: { label: string; minKm: number; maxKm: number }[] = [
+      { label: 'Within 2 km', minKm: 0, maxKm: 2 },
+      { label: 'Within 5 km', minKm: 2, maxKm: 5 },
+      { label: 'Within 10 km', minKm: 5, maxKm: 10 },
+    ];
+    const BANDS = ALL_BANDS.filter(b => b.minKm < radiusKm);
 
-      if (error) {
-        console.error('Nearby sellers error:', error);
-        return [];
-      }
+    const bands: DistanceBand[] = BANDS.map(band => {
+      const bandSellers = nearbySellers.filter(
+        s => s.distance_km >= band.minKm && s.distance_km < band.maxKm
+      );
 
-      const sellers: NearbySeller[] = ((data as any[]) || []).map((s: any) => ({
-        seller_id: s.seller_id,
-        business_name: s.business_name,
-        profile_image_url: s.profile_image_url,
-        cover_image_url: s.cover_image_url || null,
-        description: s.description || null,
-        rating: s.rating || 0,
-        total_reviews: s.total_reviews || 0,
-        primary_group: s.primary_group,
-        categories: s.categories,
-        society_name: s.society_name,
-        distance_km: s.distance_km,
-        is_featured: s.is_featured || false,
-        topProducts: parseTopProducts(s.matching_products),
-      }));
-
-      const ALL_BANDS: { label: string; minKm: number; maxKm: number }[] = [
-        { label: 'Within 2 km', minKm: 0, maxKm: 2 },
-        { label: 'Within 5 km', minKm: 2, maxKm: 5 },
-        { label: 'Within 10 km', minKm: 5, maxKm: 10 },
-      ];
-      const BANDS = ALL_BANDS.filter(b => b.minKm < radiusKm);
-
-      const bands: DistanceBand[] = BANDS.map(band => {
-        const bandSellers = sellers.filter(
-          s => s.distance_km >= band.minKm && s.distance_km < band.maxKm
-        );
-
-        const societyMap: Record<string, { distanceKm: number; sellers: NearbySeller[] }> = {};
-        for (const s of bandSellers) {
-          const key = s.society_name || (hasSociety ? 'Near Your Society' : 'Nearby Stores');
-          if (!societyMap[key]) {
-            societyMap[key] = { distanceKm: s.distance_km, sellers: [] };
-          }
-          societyMap[key].sellers.push(s);
+      const societyMap: Record<string, { distanceKm: number; sellers: NearbySeller[] }> = {};
+      for (const s of bandSellers) {
+        const key = s.society_name || (hasSociety ? 'Near Your Society' : 'Nearby Stores');
+        if (!societyMap[key]) {
+          societyMap[key] = { distanceKm: s.distance_km, sellers: [] };
         }
+        societyMap[key].sellers.push(s);
+      }
 
-        const societies: SocietyGroup[] = Object.entries(societyMap).map(([name, info]) => {
-          const sellersByGroup: Record<string, NearbySeller[]> = {};
-          for (const seller of info.sellers) {
-            const group = seller.primary_group || 'Other';
-            if (!sellersByGroup[group]) sellersByGroup[group] = [];
-            sellersByGroup[group].push(seller);
-          }
-          return { societyName: name, distanceKm: info.distanceKm, sellersByGroup };
-        });
+      const societies: SocietyGroup[] = Object.entries(societyMap).map(([name, info]) => {
+        const sellersByGroup: Record<string, NearbySeller[]> = {};
+        for (const seller of info.sellers) {
+          const group = seller.primary_group || 'Other';
+          if (!sellersByGroup[group]) sellersByGroup[group] = [];
+          sellersByGroup[group].push(seller);
+        }
+        return { societyName: name, distanceKm: info.distanceKm, sellersByGroup };
+      });
 
-        return { ...band, societies };
-      }).filter(band => band.societies.length > 0);
+      return { ...band, societies };
+    }).filter(band => band.societies.length > 0);
 
-      return bands;
-    },
-    enabled: !!(lat && lng) && enabled,
-    staleTime: jitteredStaleTime(10 * 60_000),
-  });
+    return bands;
+  }, [sellers, radiusKm, hasSociety]);
+
+  return { data, isLoading, error };
 }
