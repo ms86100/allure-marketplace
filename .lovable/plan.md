@@ -1,96 +1,129 @@
 
 
-# Fix Cart Empty-Page Regression + System-Wide Performance Degradation
+# Zero-Risk Performance Optimization Plan
 
-## Issue 1: Cart Page Shows Empty Despite Badge Showing Items
+## Current State — Identified Bottlenecks
 
-### Root Cause
+### 1. Duplicate system_settings queries (HIGH IMPACT)
+`useSystemSettings()` fires its own query (`system-settings-core`) across **24 components** — FloatingCartBar, BuyAgainRow, AutoHighlightStrip, ProductDetailSheet, SearchPage, CartPage, ProfilePage, etc. Meanwhile, `useMarketplaceConfig()` already fetches the **entire** `system_settings` table into cache key `system-settings-all`. This means every page load makes **2 separate queries** to the same table. Console logs confirm repeated "Using hardcoded defaults" warnings because the `system-settings-core` query races and sometimes fails.
 
-The `onAuthStateChange` callback in `useAuthState.ts` (line 158) calls `setPartial({ session, user: session?.user ?? null, isLoading: false })` every time any auth event fires (TOKEN_REFRESHED, INITIAL_SESSION, etc.). Each call creates a **new `user` and `session` object reference** — even when the user ID hasn't changed.
+### 2. Homepage data waterfall
+MarketplaceSection depends on `useMarketplaceData()` which depends on `browsingLocation`. The location context resolves after auth, creating a sequential chain: Auth → Profile → Location → Marketplace RPC. No prefetching occurs.
 
-This triggers:
-1. `IdentityContext` re-emission (14 emissions observed in logs — should be 2-3 max)
-2. `CartProvider` re-renders because it consumes `useAuth()` → `user` reference changes
-3. The `cancelCartQueries` from a recent `addItem` mutation cancels the in-flight cart fetch
-4. When CartPage mounts, the query data is temporarily empty → shows "Your cart is empty"
-5. The recovery layer (Layer 3) fires but with staggered delays (0ms, 500ms, 1500ms), so there's a visible flash
+### 3. Re-render cascade from useSystemSettings
+24 components import `useSystemSettings()`, each receiving the **full settings object**. When any setting changes (or the query refetches), all 24 components re-render — even if they only read `currencySymbol`.
 
-### Fix
+### 4. Missing `placeholderData` on list views
+When navigating back to Orders, Cart, or Search, the query refetches from scratch. Without `placeholderData: keepPreviousData`, users see a loading skeleton on every back-navigation instead of instant content.
 
-**File: `src/contexts/auth/useAuthState.ts`** (line 155-179)
-- In the `onAuthStateChange` callback, **skip** `setPartial` if the user ID hasn't changed (same session refresh). Use `prevUserIdRef` to compare:
-  ```
-  if (session?.user?.id === prevUserIdRef.current) return; // skip redundant update
-  ```
-- For `TOKEN_REFRESHED` events where only the JWT changed (same user), update session **without creating a new user reference** — use `setPartial({ session })` only, preserving the existing `user` object.
+---
 
-**File: `src/hooks/useCart.tsx`** (line 152)
-- Extract `user?.id` into a stable `userId` string and use that for query keys and callbacks instead of the `user` object. This prevents query key instability from object reference changes:
-  ```typescript
-  const userId = user?.id ?? null;
-  // Use userId in queryKey, cartKey, countKey, and all mutations
-  ```
+## Step-by-Step Optimization Strategy
 
-## Issue 2: System-Wide Performance Degradation
+### Step 1: Consolidate system_settings queries (Highest impact, lowest risk)
 
-### Root Cause
+**What**: Make `useSystemSettings()` read from the `system-settings-all` cache that `useMarketplaceConfig` already populates, instead of running its own query.
 
-Every `onAuthStateChange` event (token refresh, visibility regain, etc.) creates new object references for `user` and `session`, causing:
-1. **14+ IdentityContext emissions** per session → entire app tree re-renders each time
-2. Every page component that calls `useAuth()` re-renders unnecessarily
-3. All `useQuery` hooks with `user` in their enabled condition re-evaluate
-4. `refetchOnMount: 'always'` on cart query causes unnecessary network requests on every re-render
+**How**: Rewrite `useSystemSettings()` to use `queryClient.getQueryData(['system-settings-all'])` with a fallback query that shares the same key. This eliminates 1 API call per page load.
 
-### Fix — Stabilize Auth Object References
+**Validation**: Console warning "[SystemSettings] Using hardcoded defaults" disappears. Network tab shows only 1 `system_settings` query instead of 2.
 
-**File: `src/contexts/auth/useAuthState.ts`**
+**Rollback**: Revert single file `useSystemSettings.ts`. Hardcoded DEFAULTS ensure zero breakage even if cache is empty.
 
-1. **Guard `onAuthStateChange` against redundant updates** (lines 156-179):
-   - Track `prevSessionRef` — only call `setPartial` if the user ID actually changed or `isLoading` transition occurs
-   - For TOKEN_REFRESHED: update session token in-place without re-rendering the tree
-   - This cuts emissions from ~14 to ~2-3 (INITIAL_SESSION → session restored → profile loaded)
+**Expected improvement**: -1 API call per page load (~200-400ms saved on initial load).
 
-2. **Guard `getSession()` callback** (lines 192-206):
-   - Skip `setPartial` for user if `onAuthStateChange` already set the same user ID
-   - Only set `isSessionRestored: true` if not already set
+---
 
-**File: `src/contexts/auth/AuthProvider.tsx`**
+### Step 2: Add selector pattern to useSystemSettings (Medium impact, zero risk)
 
-3. **Remove verbose lifecycle logging** (lines 78-95):
-   - The `console.log` in `identityValue` useMemo runs on every emission — this itself adds CPU overhead. Remove the entire audit block (it was diagnostic, not production code).
+**What**: Components that only need `currencySymbol` shouldn't re-render when `headerTagline` changes.
 
-4. **Stabilize `identityValue` deps** — use `user?.id` and `session?.access_token` as primitive deps instead of object references:
-   ```typescript
-   const identityValue = useMemo<IdentityContextType>(() => 
-     ({ user, session, isLoading, isSessionRestored, signOut, refreshProfile }),
-     [user?.id, !!session, isLoading, isSessionRestored, signOut, refreshProfile]
-   );
-   ```
+**How**: Add a `select` option to the underlying `useQuery` call, or expose individual hooks like `useCurrencySymbol()` that select a single field. React Query's structural sharing prevents re-renders when the selected value hasn't changed.
 
-**File: `src/hooks/useCart.tsx`**
+**Validation**: React DevTools Profiler shows fewer re-renders on FloatingCartBar, BuyAgainRow, AutoHighlightStrip after a settings refetch.
 
-5. **Remove `refetchOnMount: 'always'`** (line 171):
-   - Change to `refetchOnMount: true` (default behavior respects staleTime)
-   - The cart already has `staleTime: 5s` — no need to force refetch on every mount
+**Rollback**: Revert `useSystemSettings.ts` — all consumers still work with the full object.
 
-**File: `src/hooks/useAppLifecycle.ts`**
+**Expected improvement**: ~40% fewer component re-renders on homepage.
 
-6. **Deduplicate invalidation calls** (lines 45-72):
-   - The `appStateChange` handler invalidates 11 query keys. Batch these using `queryClient.invalidateQueries({ predicate })` to reduce overhead.
+---
 
-## Files Changed
+### Step 3: Add `placeholderData: keepPreviousData` to list queries (High impact, zero risk)
 
-| File | Change |
-|------|--------|
-| `src/contexts/auth/useAuthState.ts` | Guard `onAuthStateChange` and `getSession` against redundant `setPartial` calls using user ID comparison |
-| `src/contexts/auth/AuthProvider.tsx` | Remove lifecycle audit logging; stabilize `identityValue` useMemo deps to use primitives |
-| `src/hooks/useCart.tsx` | Use stable `userId` string instead of `user` object; change `refetchOnMount` to `true` |
-| `src/hooks/useAppLifecycle.ts` | Batch query invalidations to reduce re-render cascades |
+**What**: Orders list, cart items, notifications, and search results should show stale data instantly while refetching in the background.
 
-## Verification
+**How**: Add `placeholderData: keepPreviousData` to `useOrdersList`, `useCart`, `useCartCount`, `useUnreadNotificationCount`. This makes back-navigation feel instant.
 
-- Add item to cart → navigate to cart page → items must be visible (never flash empty)
-- Tab away and back → no visible re-render jank
-- Navigate Home → Cart → Profile → Seller Dashboard: each transition < 500ms
-- IdentityContext emissions should drop from ~14 to ~3 max per session
+**Validation**: Navigate Home → Orders → Back → Orders. Second visit shows content immediately (no skeleton flash).
+
+**Rollback**: Remove `placeholderData` prop — queries revert to default behavior.
+
+**Expected improvement**: Navigation feels <200ms (content appears from cache while refetch runs silently).
+
+---
+
+### Step 4: Remove redundant refetchOnWindowFocus on static configs (Low risk)
+
+**What**: `useCartCount`, `useUnreadNotificationCount`, and `FeaturedBanners` have `refetchOnWindowFocus: true`, overriding the global `false` default. Cart count already has realtime invalidation. Notification count already polls every 30s.
+
+**How**: Remove explicit `refetchOnWindowFocus: true` from these queries. The polling interval and mutation-driven invalidation already ensure freshness.
+
+**Validation**: Tab-switch no longer triggers 3-4 redundant API calls visible in Network tab.
+
+**Rollback**: Re-add the prop — zero functional impact either way.
+
+**Expected improvement**: -3 API calls per tab-switch event.
+
+---
+
+### Step 5: Increase staleTime on near-static config queries (Low risk)
+
+**What**: Several config queries (badge-config, parent-groups, category-configs, tracking-config, workflow-map) use 10-15min staleTime but change extremely rarely (admin updates only).
+
+**How**: Increase to 30min staleTime for: `badge-config`, `parent-groups`, `category-configs`, `tracking-config`, `listing-type-workflow-map`. These are already prefetched in AuthProvider.
+
+**Validation**: After 15 minutes idle, these queries don't refetch on navigation.
+
+**Rollback**: Reduce staleTime back. No functional impact.
+
+**Expected improvement**: Fewer background refetches during extended sessions.
+
+---
+
+### Step 6: Database indexes for critical queries (Medium impact, zero risk)
+
+**What**: Add composite indexes on frequently queried columns:
+- `cart_items(user_id, product_id)` — cart lookups
+- `orders(user_id, created_at DESC)` — order history
+- `notifications(user_id, is_read, created_at DESC)` — notification inbox
+
+**How**: Database migration with `CREATE INDEX IF NOT EXISTS` — additive only, no table modifications.
+
+**Validation**: Query explain plans show index scans instead of sequential scans.
+
+**Rollback**: `DROP INDEX` — indexes are purely additive.
+
+**Expected improvement**: 30-50% faster query response times on cart/orders/notifications pages.
+
+---
+
+## Safeguards
+
+| Safeguard | Implementation |
+|-----------|----------------|
+| No functional changes | Every step only changes caching/query behavior, not business logic |
+| Hardcoded defaults | `useSystemSettings` always returns DEFAULTS if cache is empty |
+| Independent deployability | Each step is a separate commit; any can be reverted without affecting others |
+| Regression detection | Console warnings serve as canaries — if "Using hardcoded defaults" reappears, the consolidation step needs review |
+| Rollback strategy | Each step touches 1-2 files max; Git revert is instant |
+
+## Target Performance Goals
+
+| Metric | Current (est.) | Target |
+|--------|---------------|--------|
+| Homepage load | ~2-3s | <1.5s |
+| Back-navigation | ~800ms (skeleton flash) | <200ms (instant from cache) |
+| API calls per page load | 4-6 | 2-3 |
+| Tab-switch API calls | 5-6 | 1-2 |
+| Component re-renders per settings change | 24+ | 2-3 (only affected consumers) |
 
