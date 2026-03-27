@@ -1,128 +1,121 @@
 
 
-# Stock Quantity Enforcement — Bulletproof Fix
+# Replace Seller Alert Sound with Persistent gate_bell.mp3
 
-## Root Cause
+## What Changes
 
-**Zero stock validation exists anywhere in the buying flow.** The system tracks `stock_quantity` on the `products` table and has triggers that decrement stock *after* order placement, but nothing prevents a buyer from adding more items than available stock. The cap is hardcoded to `99` everywhere.
+Two sound systems exist for sellers:
 
-Specifically:
-- `useCart.tsx` → `addItem()` caps at `Math.min(..., 99)` — no stock check
-- `useCart.tsx` → `updateQuantity()` caps at `Math.min(quantity, 99)` — no stock check
-- `ProductCard.tsx` → increment button has no upper bound besides the 99 cap
-- `create_multi_vendor_orders` RPC → inserts `order_items` without checking if requested quantity ≤ available stock
-- No database constraint on `cart_items` prevents exceeding stock
+1. **`useNewOrderAlert.ts`** — `startBuzzing()` / `stopBuzzing()` using Web Audio API oscillators (square wave beeps every 3s). This drives the full-screen `NewOrderAlertOverlay`.
+2. **`useUrgentOrderSound.ts`** — `playBeep()` using Web Audio API sine wave, repeating every 5s. Used in `useOrderDetail.ts` when a seller views an urgent order.
 
-## Fix Strategy — 4 Layers of Defense
+Both use synthesized beeps. The plan replaces them with the uploaded `gate_bell.mp3` played via an `<audio>` element configured to behave as an alarm, not media.
 
-### Layer 1: Client-side enforcement (addItem + updateQuantity)
+## Implementation
 
-**File: `src/hooks/useCart.tsx`**
+### Step 1: Copy the sound file
+Copy `user-uploads://gate_bell.mp3` → `public/sounds/gate_bell.mp3`
 
-In `addItem()` (line 273): Before the optimistic update, fetch the product's `stock_quantity`. If `stock_quantity` is not null (tracking enabled), cap the total cart quantity at `stock_quantity` instead of 99:
+Using `public/` ensures it's served as a static asset and can be loaded by `new Audio()` without bundler interference.
 
-```typescript
-// After action_type check, before optimistic update:
-let maxQty = 99;
-if (product.stock_quantity != null) {
-  maxQty = product.stock_quantity;
-} else {
-  const { data: stockCheck } = await supabase
-    .from('products').select('stock_quantity').eq('id', product.id).maybeSingle();
-  if (stockCheck?.stock_quantity != null) maxQty = stockCheck.stock_quantity;
-}
-const existingQty = optimisticItemsRef.current.find(i => i.product_id === product.id)?.quantity || 0;
-if (existingQty >= maxQty) {
-  toast.error(`Only ${maxQty} available`, { id: 'stock-limit' });
-  return;
-}
-quantity = Math.min(quantity, maxQty - existingQty);
-```
+### Step 2: Rewrite `useNewOrderAlert.ts` buzzing logic
 
-In `updateQuantity()` (line 360): Same pattern — fetch stock_quantity and use it as the ceiling instead of 99.
-
-### Layer 2: UI enforcement (ProductCard + ProductDetailSheet)
-
-**File: `src/components/product/ProductCard.tsx`**
-
-The `+` increment button should be disabled when `quantity >= product.stock_quantity` (if stock tracking is enabled). The product object already carries `stock_quantity` from the query.
+Replace `createAlarmSound()` + `AudioContext` with an `Audio` element approach:
 
 ```typescript
-const stockLimit = product.stock_quantity != null ? product.stock_quantity : 99;
-const canIncrement = quantity < stockLimit;
-// Disable + button when !canIncrement
-// Show "Max X" label when at limit
+const audioRef = useRef<HTMLAudioElement | null>(null);
+
+const startBuzzing = useCallback(() => {
+  if (intervalRef.current) return;
+  hapticNotification('warning');
+  try {
+    if (!audioRef.current) {
+      audioRef.current = new Audio('/sounds/gate_bell.mp3');
+    }
+    const audio = audioRef.current;
+    audio.loop = true;
+    audio.volume = 1.0;
+    // Prevent media session controls from pausing it
+    audio.play().catch(() => {});
+  } catch (e) {
+    console.warn('[OrderAlert] Sound failed:', e);
+  }
+  // Haptic fallback every 3s
+  intervalRef.current = setInterval(() => {
+    hapticVibrate(500);
+  }, 3000);
+}, []);
+
+const stopBuzzing = useCallback(() => {
+  if (intervalRef.current) {
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  }
+  try {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current.loop = false;
+    }
+  } catch {}
+}, []);
 ```
 
-Apply the same logic in `ProductListingCard.tsx` and `ProductDetailSheet` (via `useProductDetail.ts`).
+Key behaviors:
+- `loop = true` — sound rings continuously until stopped
+- No `AudioContext` — uses `HTMLAudioElement` which is simpler and more reliable across browsers
+- Sound stops only when `stopBuzzing()` is called (dismiss, dismissAll, or snooze)
+- Haptic vibration continues as a parallel attention channel
 
-### Layer 3: Server-side validation in RPC (last line of defense)
+Remove the `audioCtxRef`, `createAlarmSound` function, and all `AudioContext` references.
 
-**Database migration: Update `create_multi_vendor_orders`**
+### Step 3: Rewrite `useUrgentOrderSound.ts`
 
-Before inserting `order_items`, validate stock for every item:
+Same approach — replace Web Audio oscillator with `gate_bell.mp3`:
 
-```sql
--- Inside the item loop, before INSERT INTO order_items:
-DECLARE _available_stock integer;
+```typescript
+const audioRef = useRef<HTMLAudioElement | null>(null);
 
-SELECT stock_quantity INTO _available_stock
-FROM products WHERE id = (_item->>'product_id')::uuid FOR UPDATE;
+const playBeep = useCallback(() => {
+  try {
+    if (!audioRef.current) {
+      audioRef.current = new Audio('/sounds/gate_bell.mp3');
+    }
+    audioRef.current.loop = true;
+    audioRef.current.volume = 1.0;
+    audioRef.current.play().catch(() => {});
+  } catch {}
+}, []);
 
-IF _available_stock IS NOT NULL AND (_item->>'quantity')::int > _available_stock THEN
-  RETURN json_build_object(
-    'success', false,
-    'error', 'insufficient_stock',
-    'product_name', _item->>'product_name',
-    'available', _available_stock,
-    'requested', (_item->>'quantity')::int
-  );
-END IF;
+const stopRinging = useCallback(() => {
+  if (audioRef.current) {
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+    audioRef.current.loop = false;
+  }
+  // clear interval too
+}, []);
 ```
 
-The `FOR UPDATE` row lock prevents concurrent overselling — two simultaneous checkouts will serialize on the same product row.
+### Step 4: Prevent media session hijack
 
-### Layer 4: Database trigger on cart_items (safety net)
+Add `navigator.mediaSession` metadata so the OS doesn't show a "pause" button for regular media:
 
-**Database migration: Create trigger**
-
-```sql
-CREATE OR REPLACE FUNCTION enforce_cart_stock_limit()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-DECLARE _stock integer;
-BEGIN
-  SELECT stock_quantity INTO _stock FROM products WHERE id = NEW.product_id;
-  IF _stock IS NOT NULL AND NEW.quantity > _stock THEN
-    NEW.quantity := _stock;
-  END IF;
-  IF NEW.quantity <= 0 THEN
-    RETURN NULL; -- prevent zero/negative qty rows
-  END IF;
-  RETURN NEW;
-END; $$;
-
-CREATE TRIGGER trg_enforce_cart_stock
-  BEFORE INSERT OR UPDATE ON cart_items
-  FOR EACH ROW EXECUTE FUNCTION enforce_cart_stock_limit();
+```typescript
+if ('mediaSession' in navigator) {
+  navigator.mediaSession.metadata = new MediaMetadata({ title: 'New Order Alert' });
+  navigator.mediaSession.setActionHandler('pause', null);
+  navigator.mediaSession.setActionHandler('stop', null);
+}
 ```
 
-This silently caps cart quantity at available stock even if the client-side check is bypassed.
+This is added inside `startBuzzing` after `audio.play()` succeeds.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/hooks/useCart.tsx` | Stock ceiling in `addItem()` and `updateQuantity()` using `stock_quantity` |
-| `src/components/product/ProductCard.tsx` | Disable `+` button at stock limit; show "Max X" indicator |
-| `src/components/product/ProductListingCard.tsx` | Same stock limit on increment |
-| `src/hooks/useProductDetail.ts` | Cap quantity at stock limit in `handleAdd` |
-| Migration SQL | Update `create_multi_vendor_orders` with `FOR UPDATE` stock check |
-| Migration SQL | Add `trg_enforce_cart_stock` trigger on `cart_items` |
-
-## Safeguards
-
-- Products with `stock_quantity = NULL` (tracking disabled) keep the existing 99-unit cap — zero behavioral change for non-tracked products
-- `FOR UPDATE` lock in RPC prevents race conditions between concurrent buyers
-- Cart trigger is a silent safety net — it caps, never errors
-- All changes are additive; rollback = revert files + drop trigger + revert RPC
+| `public/sounds/gate_bell.mp3` | Copy uploaded file |
+| `src/hooks/useNewOrderAlert.ts` | Replace `AudioContext`/oscillator buzzing with `Audio` element playing `gate_bell.mp3` on loop; nullify media session controls |
+| `src/hooks/useUrgentOrderSound.ts` | Replace Web Audio beep with `gate_bell.mp3` on loop; stop only on explicit `stopRinging()` |
 
