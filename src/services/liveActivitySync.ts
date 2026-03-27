@@ -112,7 +112,7 @@ export async function syncActiveOrders(userId: string): Promise<number> {
     const [deliveriesResult, sellersResult, itemCountsResult, flowEntries] = await Promise.all([
       supabase
         .from('delivery_assignments')
-        .select('order_id, eta_minutes, distance_meters, rider_name')
+        .select('order_id, eta_minutes, distance_meters, rider_name, rider_id')
         .in('order_id', orderIds)
         .not('status', 'in', deliveryTerminalFilter),
       sellerIds.length > 0
@@ -127,6 +127,23 @@ export async function syncActiveOrders(userId: string): Promise<number> {
         .in('order_id', orderIds),
       getStatusFlowEntries(),
     ]);
+
+    // Bug 4 fix: fetch vehicle_type from rider pool for assigned riders
+    const riderIds = [...new Set(
+      (deliveriesResult.data ?? []).map((d: any) => d.rider_id).filter(Boolean)
+    )];
+    let riderVehicleMap = new Map<string, string | null>();
+    if (riderIds.length > 0) {
+      try {
+        const { data: riders } = await supabase
+          .from('delivery_partner_pool')
+          .select('id, vehicle_type')
+          .in('id', riderIds);
+        for (const r of (riders ?? [])) {
+          riderVehicleMap.set(r.id, r.vehicle_type);
+        }
+      } catch { /* best-effort */ }
+    }
 
     const deliveryMap = new Map(
       (deliveriesResult.data ?? []).map((d: any) => [d.order_id, d])
