@@ -29,7 +29,6 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
   const cartItem = isCartAction ? items.find((item) => item.product_id === product.id) : null;
   const quantity = cartItem?.quantity || 0;
   const stockLimit = (product as any).stock_quantity != null ? (product as any).stock_quantity : 99;
-  const canIncrement = quantity < stockLimit && !isStoreClosed;
 
   const seller = (product as any)?.seller;
   const storeAvailability = useMemo(() => {
@@ -45,6 +44,7 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
   const isStoreClosed = storeAvailability.status !== 'open';
   const storeClosedMessage = isStoreClosed ? formatStoreClosedMessage(storeAvailability) : '';
   const isDisabled = !product.is_available || isStoreClosed;
+  const canIncrement = quantity < stockLimit && !isStoreClosed;
 
   const handleAdd = () => {
     if (!isCartAction) { hapticSelection(); if (onTap) onTap(product); return; }
