@@ -1,12 +1,10 @@
 import { memo, useState, useEffect } from 'react';
 import { CheckCircle, ShoppingCart, CreditCard, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 
 interface OrderProgressOverlayProps {
   isVisible: boolean;
   step: 'validating' | 'creating' | 'confirming';
-  onCancel?: () => void;
 }
 
 const STEPS = [
@@ -15,11 +13,13 @@ const STEPS = [
   { key: 'confirming', icon: CreditCard, label: 'Confirming payment…' },
 ] as const;
 
-const TIMEOUT_MS = 30_000;
 const RING_SIZE = 56;
 const RING_STROKE = 4;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+// Delay showing overlay to prevent flash on fast connections
+const SHOW_DELAY_MS = 400;
 
 function ProgressRing({ progress }: { progress: number }) {
   const offset = RING_CIRCUMFERENCE - (progress / 100) * RING_CIRCUMFERENCE;
@@ -49,19 +49,20 @@ function ProgressRing({ progress }: { progress: number }) {
   );
 }
 
-function OrderProgressOverlayInner({ isVisible, step, onCancel }: OrderProgressOverlayProps) {
-  const [showTimeout, setShowTimeout] = useState(false);
+function OrderProgressOverlayInner({ isVisible, step }: OrderProgressOverlayProps) {
+  const [shouldRender, setShouldRender] = useState(false);
 
   useEffect(() => {
     if (!isVisible) {
-      setShowTimeout(false);
+      setShouldRender(false);
       return;
     }
-    const timer = setTimeout(() => setShowTimeout(true), TIMEOUT_MS);
+    // Delay showing to prevent flash on fast requests
+    const timer = setTimeout(() => setShouldRender(true), SHOW_DELAY_MS);
     return () => clearTimeout(timer);
   }, [isVisible]);
 
-  if (!isVisible) return null;
+  if (!shouldRender) return null;
 
   const currentIdx = STEPS.findIndex(s => s.key === step);
   const progress = ((currentIdx + 1) / STEPS.length) * 100;
@@ -72,7 +73,7 @@ function OrderProgressOverlayInner({ isVisible, step, onCancel }: OrderProgressO
         <div className="flex items-center justify-center mb-5">
           <ProgressRing progress={progress} />
         </div>
-        <h3 className="text-base font-bold text-center mb-4">Placing your order</h3>
+        <h3 className="text-base font-bold text-center mb-4">Processing payment</h3>
         <div className="space-y-3">
           {STEPS.map((s, idx) => {
             const Icon = s.icon;
@@ -102,20 +103,9 @@ function OrderProgressOverlayInner({ isVisible, step, onCancel }: OrderProgressO
             );
           })}
         </div>
-        {showTimeout ? (
-          <div className="mt-4 text-center space-y-2">
-            <p className="text-xs text-warning font-medium">This is taking longer than expected.</p>
-            {onCancel && (
-              <Button variant="outline" size="sm" onClick={onCancel}>
-                Go Back
-              </Button>
-            )}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground text-center mt-4">
-            Please don't close this screen
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground text-center mt-4">
+          Please don't close this screen
+        </p>
       </div>
     </div>
   );

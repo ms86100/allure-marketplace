@@ -16,7 +16,7 @@ import { hapticImpact, hapticNotification, hapticSelection } from '@/lib/haptics
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
-import { computeStoreStatus, formatStoreClosedMessage } from '@/lib/store-availability';
+// Store status validation now handled server-side in create_multi_vendor_orders RPC
 
 /** Simple deterministic hash for idempotency keys */
 function simpleHash(str: string): string {
@@ -256,12 +256,7 @@ export function useCartPage() {
       items: group.items.map((item) => ({ product_id: item.product_id, product_name: item.product?.name || 'Unknown', quantity: item.quantity, unit_price: item.product?.price || 0 })),
     }));
 
-    const { data: freshPrices } = await supabase.from('products').select('id, price').in('id', items.map(i => i.product_id));
-    const priceMismatch = items.find(item => {
-      const fresh = freshPrices?.find(p => p.id === item.product_id);
-      return fresh && Math.abs(fresh.price - (item.product?.price || 0)) > 0.01;
-    });
-    if (priceMismatch) { toast.error('Some item prices have changed. Refreshing your cart...', { id: 'checkout-price-mismatch' }); await refresh(); throw new Error('Price mismatch detected'); }
+    // Price + availability validation is now handled server-side in the RPC
 
     const deliveryAddressText = fulfillmentType === 'delivery' && selectedDeliveryAddress
       ? [selectedDeliveryAddress.flat_number && `Flat ${selectedDeliveryAddress.flat_number}`, selectedDeliveryAddress.block && `Block ${selectedDeliveryAddress.block}`, selectedDeliveryAddress.building_name, selectedDeliveryAddress.landmark].filter(Boolean).join(', ')
@@ -299,9 +294,12 @@ export function useCartPage() {
       throw error;
     }
 
-    const result = data as { success: boolean; order_ids?: string[]; order_count?: number; error?: string; unavailable_items?: string[]; closed_sellers?: string[]; out_of_range_sellers?: string[]; deduplicated?: boolean };
+    const result = data as { success: boolean; order_ids?: string[]; order_count?: number; error?: string; unavailable_items?: string[]; price_changed_items?: string[]; stock_insufficient?: string[]; closed_sellers?: string[]; out_of_range_sellers?: string[]; deduplicated?: boolean };
     if (!result?.success) {
       idempotencyKeyRef.current = null;
+      if (result?.error === 'unavailable_items' && result?.unavailable_items) { await refresh(); throw new Error(`Some items are unavailable:\n• ${result.unavailable_items.join('\n• ')}`); }
+      if (result?.error === 'price_changed' && result?.price_changed_items) { await refresh(); throw new Error(`Prices have changed:\n• ${result.price_changed_items.join('\n• ')}\nYour cart has been refreshed.`); }
+      if (result?.error === 'insufficient_stock' && result?.stock_insufficient) { await refresh(); throw new Error(`Insufficient stock:\n• ${result.stock_insufficient.join('\n• ')}`); }
       if (result?.error === 'stock_validation_failed' && result?.unavailable_items) throw new Error(`Some items are unavailable:\n• ${result.unavailable_items.join('\n• ')}`);
       if (result?.error === 'store_closed') { const sellers = result.closed_sellers?.join(', '); throw new Error(sellers ? `Store closed: ${sellers}` : 'Store is currently closed. Please try again later.'); }
       if (result?.error === 'delivery_out_of_range') { const sellers = result.out_of_range_sellers?.join('\n• '); throw new Error(sellers ? `Delivery not possible:\n• ${sellers}` : 'Delivery address is out of range for one or more sellers.'); }
@@ -424,56 +422,15 @@ export function useCartPage() {
     }
 
     setIsPlacingOrder(true);
-    setOrderStep('validating');
     hapticImpact('medium');
-    try {
-      const productIds = items.map(i => i.product_id);
-      const { data: freshProducts, error: freshError } = await supabase.from('products').select('id, is_available, approval_status, seller_id').in('id', productIds);
-      if (freshError) throw freshError;
 
-      const unavailable = items.filter(item => { const fresh = freshProducts?.find(p => p.id === item.product_id); return !fresh || !fresh.is_available || fresh.approval_status !== 'approved'; });
-      if (unavailable.length > 0) { toast.error(`Some items are no longer available: ${unavailable.map(i => i.product?.name || 'Unknown').join(', ')}. Please remove them and try again.`, { id: 'checkout-unavailable' }); await refresh(); setIsPlacingOrder(false); return; }
-
-      const closedSellers: string[] = [];
-      for (const group of sellerGroups) {
-        const seller = group.items[0]?.product?.seller as any;
-        if (seller) {
-          const availability = computeStoreStatus(seller.availability_start, seller.availability_end, seller.operating_days, seller.is_available ?? true);
-          if (availability.status !== 'open') closedSellers.push(`${group.sellerName} (${formatStoreClosedMessage(availability) || 'closed'})`);
-        }
-      }
-      if (closedSellers.length > 0) { toast.error(`Cannot place order — ${closedSellers.join(', ')} ${closedSellers.length === 1 ? 'is' : 'are'} currently closed. Please remove those items or try again later.`, { id: 'checkout-closed' }); setIsPlacingOrder(false); return; }
-
-      // Bug 5 fix: Validate delivery distance before proceeding
-      if (fulfillmentType === 'delivery' && selectedDeliveryAddress?.latitude && selectedDeliveryAddress?.longitude) {
-        const outOfRangeSellers: string[] = [];
-        for (const group of sellerGroups) {
-          const seller = group.items[0]?.product?.seller as any;
-          if (!seller?.latitude || !seller?.longitude) continue;
-          const radiusKm = seller.delivery_radius_km;
-          if (!radiusKm) continue; // No radius set = unlimited delivery
-          const toRad = (d: number) => (d * Math.PI) / 180;
-          const dLat = toRad(selectedDeliveryAddress.latitude - seller.latitude);
-          const dLng = toRad(selectedDeliveryAddress.longitude - seller.longitude);
-          const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(seller.latitude)) * Math.cos(toRad(selectedDeliveryAddress.latitude)) * Math.sin(dLng / 2) ** 2;
-          const dist = 6371 * 2 * Math.asin(Math.sqrt(a));
-          if (dist > radiusKm + 0.5) { // +0.5km buffer to avoid false rejects
-            outOfRangeSellers.push(group.sellerName);
-          }
-        }
-        if (outOfRangeSellers.length > 0) {
-          toast.error(`Delivery address is out of range for: ${outOfRangeSellers.join(', ')}. Please select a closer address or switch to self-pickup.`, { id: 'checkout-out-of-range' });
-          setIsPlacingOrder(false);
-          return;
-        }
-      }
-    } catch (err) { console.error('Pre-checkout validation failed:', err); toast.error('Could not verify item availability. Please try again.', { id: 'checkout-validation' }); setIsPlacingOrder(false); return; }
+    // All product availability, price, store status, and delivery range checks
+    // are now handled server-side in the RPC for atomicity and speed.
 
     if (paymentMethod === 'cod' && !acceptsCod) { toast.error('This seller does not accept Cash on Delivery. Please select UPI.', { id: 'checkout-no-cod' }); setIsPlacingOrder(false); return; }
 
     if (paymentMethod === 'upi') {
       if (!acceptsUpi) { toast.error('Online payment not available', { id: 'upi-unavailable' }); setIsPlacingOrder(false); return; }
-      // Pre-validate seller UPI ID only for direct UPI mode (not Razorpay)
       if (!paymentMode.isRazorpay) {
         const firstSeller = sellerGroups[0]?.items[0]?.product?.seller as any;
         if (!firstSeller?.upi_id) { toast.error('This seller is not accepting UPI payments right now', { id: 'upi-no-id' }); setIsPlacingOrder(false); return; }
@@ -506,8 +463,7 @@ export function useCartPage() {
       return;
     }
 
-    // COD flow — order is confirmed immediately
-    setOrderStep('creating');
+    // COD flow — order is confirmed immediately, no overlay needed
     try {
       const orderIds = await createOrdersForAllSellers('pending');
       if (orderIds.length === 0) throw new Error('Failed to create orders');
