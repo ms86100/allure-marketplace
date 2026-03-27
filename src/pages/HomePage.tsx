@@ -71,21 +71,8 @@ export default function HomePage() {
     return <OnboardingWalkthrough onComplete={completeOnboarding} />;
   }
 
-  if (!profile) {
-    return (
-      <AppLayout>
-        <div className="px-4 py-6 space-y-4">
-          <div className="h-12 rounded-2xl bg-secondary animate-pulse" />
-          <div className="h-32 rounded-2xl bg-secondary animate-pulse" />
-          <div className="grid grid-cols-2 gap-3">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="aspect-square rounded-2xl bg-secondary animate-pulse" />
-            ))}
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
+  // No full-page profile gate — render shell immediately.
+  // Profile-dependent sections handle their own loading states.
 
   return (
     <AppLayout>
