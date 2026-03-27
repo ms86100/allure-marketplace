@@ -1,100 +1,129 @@
 
 
-# World-Class Home UX — Production-Grade Implementation Plan
+# Scale-Ready Architecture — Consolidated 5-Session Plan (With All Conditions Met)
 
-## Current State Assessment
+## Session 1: Kill Legacy RPC + Batching Protection
 
-The previous performance optimization already achieved:
-- Shell renders instantly (no profile gate)
-- `LazySection` defers below-fold content
-- Social proof deferred by 2 seconds
-- Marketplace data prefetched in AuthProvider
+### What
+- Replace `search_sellers_by_location` in `useSearchPage.ts` (line 195) with `search_products_fts` for category-only browsing
+- Update e2e test `marketplace-society-separation-e2e.test.ts` to use `search_sellers_paginated`
+- Add composite index: `products(seller_id, is_available, approval_status)`
+- **NEW:** Add seller ID batching in `useMarketplaceProducts` — max 25 seller IDs per `get_products_for_sellers` call, merge results
 
-**What's missing for Blinkit/Swiggy-level UX:**
-
-1. **No structured above-fold skeletons** — sections just appear when data arrives, causing layout shift
-2. **Section ordering is wrong** — ActiveOrderStrip + WelcomeBackStrip fire queries that block above-fold space before categories appear
-3. **MarketplaceSection renders all-or-nothing** — categories, banners, discovery rows all wait together
-4. **No progressive reveal animations** — content just pops in
-5. **FeaturedBanners shows skeleton while loading** — but it's sized wrong, causing CLS
-
-## Plan
-
-### 1. Reorder above-fold for instant value
-**File:** `src/pages/HomePage.tsx`
-
-Current order: ActiveOrderStrip → WelcomeBackStrip → NotificationBanner → MarketplaceSection
-
-New order:
-```
-P0 (instant):    Header + Search (already done)
-P1 (< 500ms):   ParentGroupTabs + FeaturedBanners (move OUT of MarketplaceSection into HomePage directly)
-P2 (< 1.5s):    CategoryImageGrid + Discovery rows
-P3 (deferred):  ActiveOrderStrip, WelcomeBackStrip, BuyAgain, ForYou, etc.
-```
-
-Move `ActiveOrderStrip` and `WelcomeBackStrip` below the marketplace content — they're important but not the first thing users need to see. Categories and products are.
-
-### 2. Add structured skeleton placeholders for P1/P2 zones
-**File:** `src/pages/HomePage.tsx`
-
-Add inline skeleton components that match the exact layout of:
-- Category tabs: 4-column icon grid (already exists in `ParentGroupTabs`)
-- Banner: single full-width rounded rectangle
-- Category grid: 3x2 grid of rounded cards
-
-These render immediately with zero data dependency, then get replaced progressively.
-
-### 3. Break MarketplaceSection into independently-loading pieces
-**File:** `src/components/home/MarketplaceSection.tsx`
-
-Currently one monolithic component. Split into:
-- `FeaturedBanners` + `AutoHighlightStrip` → render independently (already separate, just need to not block each other)
-- `ParentGroupTabs` → render independently with its own skeleton
-- `CategoryImageGrid` blocks → render each group independently
-- `DiscoveryRows` (Popular + New) → render as a deferred block
-
-Each section shows its own skeleton → replaces with content. No section blocks another.
-
-### 4. Add smooth fade-in transitions for progressive content
-**Files:** `src/components/home/MarketplaceSection.tsx`, `src/pages/HomePage.tsx`
-
-Wrap data-dependent sections in a simple fade-in animation (opacity 0→1, translateY 4px→0, 200ms) when they load. This makes progressive rendering feel intentional rather than janky.
-
-### 5. Move ActiveOrderStrip to a sticky notification bar pattern
-**File:** `src/pages/HomePage.tsx`
-
-Instead of taking up above-fold space and blocking categories, show active orders as a compact sticky bar at the top (below header) that slides in after a 500ms delay. This follows Swiggy's pattern where the order tracker doesn't displace the browse experience.
-
-### 6. Ensure FeaturedBanners has fixed aspect-ratio skeleton
-**File:** `src/components/home/FeaturedBanners.tsx`
-
-The banner skeleton must match the actual banner's aspect ratio to prevent Cumulative Layout Shift. Use `aspect-[2.5/1]` on the skeleton container.
-
-## Files Changed
-
+### Files
 | File | Change |
 |------|--------|
-| `src/pages/HomePage.tsx` | Reorder sections: P1 content first, defer ActiveOrderStrip/WelcomeBack; add structured skeletons |
-| `src/components/home/MarketplaceSection.tsx` | Progressive rendering — each sub-section independent with fade-in |
-| `src/components/home/FeaturedBanners.tsx` | Fixed-ratio skeleton to prevent CLS |
-| `src/components/home/ActiveOrderStrip.tsx` | Compact sticky variant with delayed appearance |
+| `src/hooks/useSearchPage.ts` | Replace line 192-204 category-only path with `search_products_fts` RPC (already works for category-only when `_query` is empty/null) |
+| `src/hooks/queries/useMarketplaceProducts.ts` | Chunk `sellerIds` into batches of 25, fire parallel RPCs, merge results |
+| `src/test/marketplace-society-separation-e2e.test.ts` | Replace `search_sellers_by_location` calls with `search_sellers_paginated` |
+| Migration SQL | `CREATE INDEX idx_products_seller_avail ON products(seller_id, is_available, approval_status)` |
 
-## Expected Timeline
+---
+
+## Session 2: Infinite Scroll + Hard Cap
+
+### What
+- Convert `useMarketplaceProducts` to `useInfiniteQuery` with 50 products/page
+- Convert `useMarketplaceSellers` to `useInfiniteQuery` with 50 sellers/page
+- Add `IntersectionObserver` trigger in `MarketplaceSection` discovery rows
+- **NEW:** Hard cap at 1000 total fetched items — `hasNextPage` returns false after cap
+
+### Files
+| File | Change |
+|------|--------|
+| `src/hooks/queries/useMarketplaceProducts.ts` | `useInfiniteQuery`, `getNextPageParam` based on returned count vs limit, stop at 1000 |
+| `src/hooks/queries/useMarketplaceSellers.ts` | `useInfiniteQuery` with 50/page |
+| `src/hooks/queries/useMarketplaceData.ts` | Compose infinite pages into flat `RpcSellerRow[]` for backward compat |
+| `src/components/home/MarketplaceSection.tsx` | Add sentinel `<div ref={observerRef}>` at bottom of discovery rows |
+
+---
+
+## Session 3: Image Optimization + Lazy Loading
+
+### What
+- Create `src/utils/imageHelpers.ts` with `optimizedImageUrl(url, { width, quality, format })` that appends Supabase Storage transform params
+- Apply to all product/seller image renders (~15 components)
+- Add `srcSet` for responsive sizes on product grid cards
+- **NEW:** Add `decoding="async"` to all `<img>` tags (already have `loading="lazy"` in most places)
+
+### Files
+| File | Change |
+|------|--------|
+| `src/utils/imageHelpers.ts` | New file — `optimizedImageUrl()` helper |
+| `src/components/product/ProductCard.tsx` | Use helper + add `decoding="async"` + `srcSet` |
+| `src/components/product/ProductListingCard.tsx` | Same |
+| `src/components/home/CategoryImageGrid.tsx` | Same |
+| `src/components/home/ShopByStoreDiscovery.tsx` | Same |
+| `src/components/home/FeaturedBanners.tsx` | Same |
+| `src/components/home/AutoHighlightStrip.tsx` | Same |
+| ~8 other image-rendering components | Same pattern |
+
+---
+
+## Session 4: Search Hardening + Proper Geo Index
+
+### What
+- **Replace composite geo index with GIST earthdistance:**
+  ```sql
+  CREATE EXTENSION IF NOT EXISTS cube;
+  CREATE EXTENSION IF NOT EXISTS earthdistance;
+  CREATE INDEX idx_seller_geo ON seller_profiles 
+    USING GIST (ll_to_earth(latitude, longitude));
+  ```
+  Update `search_sellers_paginated` to use `earth_box` + `earth_distance` instead of bounding-box math
+- **Replace prefix tsquery with pg_trgm trigram index:**
+  ```sql
+  CREATE EXTENSION IF NOT EXISTS pg_trgm;
+  CREATE INDEX idx_products_name_trgm ON products USING GIN (name gin_trgm_ops);
+  ```
+  Use trigram similarity for autocomplete (safer than `foo:*` tsquery at scale)
+- Add staleTime deduplication review across all search hooks
+- **NEW:** Add request throttling — max 3 concurrent search RPCs per session, debounce at 300ms (already exists partially)
+
+### Files
+| File | Change |
+|------|--------|
+| Migration SQL | GIST index + pg_trgm extension + trigram index |
+| `search_sellers_paginated` RPC | Use `earth_box`/`earth_distance` for geo filtering |
+| `search_products_fts` RPC | Add trigram fallback path for short queries (< 3 chars) |
+| `src/components/search/SearchAutocomplete.tsx` | Add concurrent request guard |
+| `src/hooks/useSearchPage.ts` | Verify debounce covers all paths |
+
+---
+
+## Session 5: Load Testing + Failure Simulation
+
+### What
+- Generate synthetic 300K product dataset, run `EXPLAIN ANALYZE` on all 4 RPCs
+- Add `performance.mark`/`performance.measure` wrappers to marketplace, search, and checkout hooks
+- **NEW:** Failure simulation — test with throttled network (3G), artificial DB latency, RPC timeout behavior
+- Document scale limits, when to add read replicas, connection pooling thresholds
+- Document CDN strategy (Cloudflare in front of Supabase Storage for image caching)
+
+### Files
+| File | Change |
+|------|--------|
+| `src/lib/perf-telemetry.ts` | New — `markStart`/`markEnd` wrappers |
+| Critical hooks | Wrap queryFn with telemetry |
+| `/mnt/documents/scale-playbook.md` | Architecture limits doc |
+| SQL scripts | EXPLAIN ANALYZE benchmarks |
+
+---
+
+## Execution Order
 
 ```text
-0ms     → Header + Search + Bottom Nav visible
-100ms   → Category tab skeletons visible
-300ms   → Category tabs populate (cached/prefetched)
-500ms   → Banner loads, category grids start appearing
-1000ms  → Product grids fully populated
-1200ms  → Discovery rows fade in
-1500ms  → Active orders slide in, deferred sections load
+Session 1 → Session 2 → Session 3 (parallel with 2) → Session 4 (parallel) → Session 5 (last)
 ```
 
-## Risk Controls
-- No data flow changes — same queries, same hooks, same RPC
-- Skeletons match exact layout dimensions — zero CLS
-- ActiveOrderStrip still renders, just delayed — no missed orders
-- Progressive fade-in is CSS-only, no re-render overhead
+## Scale Targets After All Sessions
+
+| Metric | Current | After |
+|--------|---------|-------|
+| Max sellers before timeout | ~500 | 10,000+ |
+| Product payload per page | 300KB+ | 30KB |
+| Image bandwidth per card | ~1MB | ~20KB |
+| Search latency at 300K rows | 2-10s | <100ms |
+| Geo query at 10K sellers | linear scan | GIST O(log n) |
+| Memory on low-end mobile | OOM at 5K products | Stable (hard cap 1000) |
 
