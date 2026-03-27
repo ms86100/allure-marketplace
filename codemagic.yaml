@@ -717,19 +717,58 @@ workflows:
           end
           RUBY
 
-      - name: Set export compliance & increment build number
+      - name: Set export compliance & stamp iOS version metadata
         script: |
           cd ios/App
           /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" App/Info.plist || \
             /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" App/Info.plist
           BUILD_NUMBER=$(date +%s)
-          echo "Setting build number to $BUILD_NUMBER"
-          agvtool new-version -all $BUILD_NUMBER
-          # Sync widget extension version with main app
-          MARKETING_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" App/Info.plist 2>/dev/null || echo "1.0.0")
-          echo "Syncing widget extension: version=$MARKETING_VERSION build=$BUILD_NUMBER"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" LiveDeliveryWidgetExtension/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MARKETING_VERSION" LiveDeliveryWidgetExtension/Info.plist
+          DEFAULT_MARKETING_VERSION="$(date -u +%Y).$((10#$(date -u +%m%d))).$((10#$(date -u +%H%M)))"
+          MARKETING_VERSION="${IOS_MARKETING_VERSION:-$DEFAULT_MARKETING_VERSION}"
+          echo "Stamping iOS version metadata: marketing=$MARKETING_VERSION build=$BUILD_NUMBER"
+
+          ruby - << 'RUBY'
+          require 'xcodeproj'
+
+          marketing_version = ENV.fetch('MARKETING_VERSION')
+          build_number = ENV.fetch('BUILD_NUMBER')
+
+          project = Xcodeproj::Project.open('App.xcodeproj')
+          project.targets.each do |target|
+            next unless %w[App LiveDeliveryWidgetExtension].include?(target.name)
+
+            target.build_configurations.each do |config|
+              settings = config.build_settings
+              settings['MARKETING_VERSION'] = marketing_version
+              settings['CURRENT_PROJECT_VERSION'] = build_number
+            end
+          end
+
+          project.save
+          puts "=== Xcode project stamped: marketing=#{marketing_version} build=#{build_number} ==="
+          RUBY
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MARKETING_VERSION" App/Info.plist || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $MARKETING_VERSION" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" App/Info.plist || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MARKETING_VERSION" LiveDeliveryWidgetExtension/Info.plist || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $MARKETING_VERSION" LiveDeliveryWidgetExtension/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" LiveDeliveryWidgetExtension/Info.plist || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" LiveDeliveryWidgetExtension/Info.plist
+
+          APP_MARKETING=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" App/Info.plist)
+          APP_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" App/Info.plist)
+          WIDGET_MARKETING=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" LiveDeliveryWidgetExtension/Info.plist)
+          WIDGET_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" LiveDeliveryWidgetExtension/Info.plist)
+
+          echo "App version: $APP_MARKETING ($APP_BUILD)"
+          echo "Widget version: $WIDGET_MARKETING ($WIDGET_BUILD)"
+
+          [[ "$APP_MARKETING" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "ERROR: Invalid marketing version format '$APP_MARKETING'"; exit 1; }
+          [ "$APP_MARKETING" != "1.0" ] || { echo "ERROR: Marketing version is still 1.0"; exit 1; }
+          [ "$APP_MARKETING" = "$WIDGET_MARKETING" ] || { echo "ERROR: App/widget marketing versions differ"; exit 1; }
+          [ "$APP_BUILD" = "$WIDGET_BUILD" ] || { echo "ERROR: App/widget build numbers differ"; exit 1; }
 
       - name: Verify push entitlement exists
         script: |
@@ -1486,15 +1525,58 @@ workflows:
           end
           RUBY
 
-      - name: Set export compliance & increment build number
+      - name: Set export compliance & stamp iOS version metadata
         script: |
           cd ios/App
           /usr/libexec/PlistBuddy -c "Set :ITSAppUsesNonExemptEncryption false" App/Info.plist || \
             /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" App/Info.plist
           BUILD_NUMBER=$(date +%s)
-          echo "Setting build number to $BUILD_NUMBER"
-          agvtool new-version -all $BUILD_NUMBER
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" LiveDeliveryWidgetExtension/Info.plist
+          DEFAULT_MARKETING_VERSION="$(date -u +%Y).$((10#$(date -u +%m%d))).$((10#$(date -u +%H%M)))"
+          MARKETING_VERSION="${IOS_MARKETING_VERSION:-$DEFAULT_MARKETING_VERSION}"
+          echo "Stamping iOS version metadata: marketing=$MARKETING_VERSION build=$BUILD_NUMBER"
+
+          ruby - << 'RUBY'
+          require 'xcodeproj'
+
+          marketing_version = ENV.fetch('MARKETING_VERSION')
+          build_number = ENV.fetch('BUILD_NUMBER')
+
+          project = Xcodeproj::Project.open('App.xcodeproj')
+          project.targets.each do |target|
+            next unless %w[App LiveDeliveryWidgetExtension].include?(target.name)
+
+            target.build_configurations.each do |config|
+              settings = config.build_settings
+              settings['MARKETING_VERSION'] = marketing_version
+              settings['CURRENT_PROJECT_VERSION'] = build_number
+            end
+          end
+
+          project.save
+          puts "=== Xcode project stamped: marketing=#{marketing_version} build=#{build_number} ==="
+          RUBY
+
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MARKETING_VERSION" App/Info.plist || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $MARKETING_VERSION" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" App/Info.plist || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" App/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $MARKETING_VERSION" LiveDeliveryWidgetExtension/Info.plist || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $MARKETING_VERSION" LiveDeliveryWidgetExtension/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" LiveDeliveryWidgetExtension/Info.plist || \
+            /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUILD_NUMBER" LiveDeliveryWidgetExtension/Info.plist
+
+          APP_MARKETING=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" App/Info.plist)
+          APP_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" App/Info.plist)
+          WIDGET_MARKETING=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" LiveDeliveryWidgetExtension/Info.plist)
+          WIDGET_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" LiveDeliveryWidgetExtension/Info.plist)
+
+          echo "App version: $APP_MARKETING ($APP_BUILD)"
+          echo "Widget version: $WIDGET_MARKETING ($WIDGET_BUILD)"
+
+          [[ "$APP_MARKETING" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "ERROR: Invalid marketing version format '$APP_MARKETING'"; exit 1; }
+          [ "$APP_MARKETING" != "1.0" ] || { echo "ERROR: Marketing version is still 1.0"; exit 1; }
+          [ "$APP_MARKETING" = "$WIDGET_MARKETING" ] || { echo "ERROR: App/widget marketing versions differ"; exit 1; }
+          [ "$APP_BUILD" = "$WIDGET_BUILD" ] || { echo "ERROR: App/widget build numbers differ"; exit 1; }
 
       - name: Verify push entitlement exists (release-all)
         script: |
