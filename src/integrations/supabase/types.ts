@@ -4489,6 +4489,7 @@ export type Database = {
           price_stable_since: string | null
           rejection_note: string | null
           rental_period_type: string | null
+          search_vector: unknown
           secondary_images: string[] | null
           seller_id: string
           service_duration_minutes: number | null
@@ -4547,6 +4548,7 @@ export type Database = {
           price_stable_since?: string | null
           rejection_note?: string | null
           rental_period_type?: string | null
+          search_vector?: unknown
           secondary_images?: string[] | null
           seller_id: string
           service_duration_minutes?: number | null
@@ -4605,6 +4607,7 @@ export type Database = {
           price_stable_since?: string | null
           rejection_note?: string | null
           rental_period_type?: string | null
+          search_vector?: unknown
           secondary_images?: string[] | null
           seller_id?: string
           service_duration_minutes?: number | null
@@ -8967,6 +8970,32 @@ export type Database = {
           unique_buyers: number
         }[]
       }
+      get_products_for_sellers: {
+        Args: {
+          _category?: string
+          _limit?: number
+          _offset?: number
+          _seller_ids: string[]
+        }
+        Returns: {
+          action_type: string
+          category: string
+          contact_phone: string
+          description: string
+          discount_percentage: number
+          image_url: string
+          is_available: boolean
+          is_bestseller: boolean
+          is_recommended: boolean
+          is_urgent: boolean
+          is_veg: boolean
+          mrp: number
+          price: number
+          product_id: string
+          product_name: string
+          seller_id: string
+        }[]
+      }
       get_refund_tier: { Args: { _amount: number }; Returns: Json }
       get_seller_delivery_score: {
         Args: { _seller_id: string }
@@ -9251,6 +9280,39 @@ export type Database = {
           user_id: string
         }[]
       }
+      search_products_fts: {
+        Args: {
+          _category?: string
+          _lat?: number
+          _limit?: number
+          _lng?: number
+          _offset?: number
+          _query: string
+          _radius_km?: number
+        }
+        Returns: {
+          action_type: string
+          brand: string
+          category: string
+          description: string
+          discount_percentage: number
+          distance_km: number
+          image_url: string
+          is_available: boolean
+          is_veg: boolean
+          mrp: number
+          price: number
+          product_id: string
+          product_name: string
+          rank: number
+          seller_id: string
+          seller_name: string
+          seller_profile_image: string
+          seller_rating: number
+          seller_total_reviews: number
+          society_name: string
+        }[]
+      }
       search_sellers_by_location: {
         Args: {
           _category?: string
@@ -9273,6 +9335,37 @@ export type Database = {
           matching_products: Json
           operating_days: string[]
           primary_group: string
+          profile_image_url: string
+          rating: number
+          seller_id: string
+          seller_latitude: number
+          seller_longitude: number
+          society_name: string
+          total_reviews: number
+          user_id: string
+        }[]
+      }
+      search_sellers_paginated: {
+        Args: {
+          _lat: number
+          _limit?: number
+          _lng: number
+          _offset?: number
+          _radius_km?: number
+        }
+        Returns: {
+          availability_end: string
+          availability_start: string
+          business_name: string
+          categories: string[]
+          cover_image_url: string
+          description: string
+          distance_km: number
+          is_available: boolean
+          is_featured: boolean
+          operating_days: string[]
+          primary_group: string
+          product_count: number
           profile_image_url: string
           rating: number
           seller_id: string
