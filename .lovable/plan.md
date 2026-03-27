@@ -1,49 +1,104 @@
 
 
-# Fix: Razorpay Popup Not Opening + Duplicate Order Creation
+# Home Page Performance Optimization — Bulletproof Plan
 
-## What's happening
+## Root Cause Analysis
 
-**Problem 1 — Popup blocked in preview iframe**: The Razorpay SDK injects its own iframe/modal overlay when `razorpay.open()` is called. Inside the Lovable preview (which itself runs in an iframe), the SDK's popup is silently blocked or immediately dismissed by browser security. The `modal.ondismiss` callback fires, resetting status to `'pending'` — which is why you see the spinner then back to Cancel/Pay Now with no error message.
+The home page currently takes 5–7 seconds because of a **4-level waterfall** where each step blocks the next:
 
-This is **not a code bug** — it's an iframe sandbox restriction. Razorpay will work correctly on your published site or in a standalone browser tab.
+```text
+Auth session restore (~800ms)
+  → fetchProfile RPC (~600ms)
+    → BrowsingLocation resolves (needs profile.society_id) (~100ms)
+      → useMarketplaceData RPC (needs lat/lng) (~1500ms)
+        → All child components render (CategoryImageGrid, DiscoveryRows, etc.)
+```
 
-**Problem 2 — Duplicate Razorpay orders**: The console logs show **4 separate Razorpay orders** created for the same internal order ID. Each "Pay Now" tap creates a new Razorpay order because the edge function doesn't check if one already exists. This wastes Razorpay API calls and creates orphaned payment records.
+On top of this waterfall, multiple independent queries fire **only after** the marketplace RPC completes:
+- `AutoHighlightStrip`: 3 parallel Supabase queries (products, sellers, coupons)
+- `BuyAgainRow`: RPC `get_user_frequent_products`
+- `ActiveOrderStrip`: orders query + status flow query (sequential — waits for `getTerminalStatuses()`)
+- `WelcomeBackStrip`: orders query
+- `FeaturedBanners`: featured_items query
+- `useSocialProof`: RPC `get_society_order_stats` (waits for ALL product IDs from marketplace data)
+- `useMarketplaceConfig` / `useMarketplaceLabels`: system_settings query
 
-**Problem 3 — Silent failure**: When the popup fails to open (or is dismissed immediately), the user gets no feedback — just back to the buttons. There should be a clear message explaining what happened.
+**The full-page skeleton gate** (`if (!profile) return skeleton`) means nothing renders until the entire auth chain completes — ~1.4 seconds of blank screen before a single query even starts.
 
 ## Plan
 
-### 1. Reuse existing Razorpay order instead of creating duplicates
-**File**: `supabase/functions/create-razorpay-order/index.ts`
+### 1. Break the full-page profile gate
+**File:** `src/pages/HomePage.tsx`
 
-Before creating a new Razorpay order, check if the order already has a valid `razorpay_order_id`. If it does, fetch the existing Razorpay order status from the API. If it's still `created` or `attempted`, return that order instead of creating a new one. Only create a fresh order if the previous one is expired or failed.
+Instead of returning a full skeleton when `profile` is null, render the AppLayout immediately with above-fold skeleton placeholders **inside** the real layout. This lets the shell (bottom nav, header) paint instantly. The MarketplaceSection and other data-dependent sections show their own loading states.
 
-### 2. Add iframe detection and user guidance
-**File**: `src/hooks/useRazorpay.ts`
+### 2. Start marketplace data fetch earlier — don't wait for BrowsingLocation context
+**File:** `src/hooks/queries/useMarketplaceData.ts`
 
-After `razorpay.open()`, set a short timeout (~2s) to check if the Razorpay SDK actually injected its modal into the DOM. If no Razorpay iframe/overlay is found, it means the popup was blocked. In that case, call `onFailure` with a specific error type instead of silently waiting for the 15s timeout.
+The BrowsingLocation context chains through: profile → defaultAddress/society → browsingLocation → marketplace RPC. The society coordinates are available from the auth context's `get_user_auth_context` RPC response before `BrowsingLocationContext` even resolves.
 
-### 3. Show actionable error when popup is blocked
-**File**: `src/components/payment/RazorpayCheckout.tsx`
+Change: Allow `useMarketplaceData` to accept coordinates directly as optional params, and in AuthProvider's prefetch block, fire `search_sellers_by_location` as a prefetch using the society coordinates from the auth context response — before `BrowsingLocationContext` mounts. This eliminates one full round-trip of waiting.
 
-Add a new status state `'blocked'` that shows a message like: "Payment window couldn't open. Please try on the published app or open in a new tab." with a button to copy the published URL or retry.
+### 3. Consolidate AutoHighlightStrip's 3 parallel queries into the prefetch block
+**File:** `src/components/home/AutoHighlightStrip.tsx`, `src/contexts/auth/AuthProvider.tsx`
 
-### 4. Disable Pay Now button while processing
-**File**: `src/components/payment/RazorpayCheckout.tsx`
+AutoHighlightStrip fires 3 separate queries (bestsellers, top sellers, coupons) using `Promise.all`. Move this into a single prefetch in AuthProvider alongside the existing config prefetches — so by the time the component mounts, data is already cached.
 
-The `handlePayment` function doesn't guard against double-taps. Add a guard so clicking "Pay Now" while already processing is ignored — preventing the 4x duplicate order creation seen in logs.
+### 4. Fix ActiveOrderStrip's sequential waterfall
+**File:** `src/components/home/ActiveOrderStrip.tsx`
 
-## Files changed
+Currently: `getTerminalStatuses()` (async) → `useState` → query enabled. The terminal statuses are fetched, stored in state, and only then does the orders query fire. Fix: fetch terminal statuses and orders in parallel inside the queryFn, or prefetch terminal statuses in AuthProvider.
+
+### 5. Defer social proof — it's not above-fold critical
+**File:** `src/components/home/MarketplaceSection.tsx`
+
+`useSocialProof` fires a heavy RPC that depends on ALL product IDs being ready. It's only used for small badge counts on product cards. Defer this query with a 2-second delay or make it lazy (only fire after initial paint completes via `requestIdleCallback`).
+
+### 6. Move BuyAgainRow rendering to LazySection
+**File:** `src/pages/HomePage.tsx`, `src/components/home/ForYouSection.tsx`
+
+BuyAgainRow appears in **two places**: inside `MarketplaceSection` (line 126) AND inside `ForYouSection` (line 19). The duplicate inside ForYouSection fires a second identical query. Remove the duplicate. The one inside MarketplaceSection should stay but only render after the category grids (not before them).
+
+### 7. Instant shell with staggered content reveal
+**File:** `src/pages/HomePage.tsx`
+
+Instead of waiting for all data before painting, use a priority-based render:
+- **P0 (instant):** AppLayout shell + header + bottom nav + skeleton placeholders
+- **P1 (< 500ms):** FeaturedBanners + ParentGroupTabs (from prefetched cache)
+- **P2 (< 1.5s):** CategoryImageGrid + DiscoveryRows (marketplace data)
+- **P3 (deferred):** SocialProof, Leaderboard, Community, WhatsNew
+
+## Files Changed
 
 | File | Change |
 |------|--------|
-| `supabase/functions/create-razorpay-order/index.ts` | Check for existing valid Razorpay order before creating new one |
-| `src/hooks/useRazorpay.ts` | Detect popup-blocked after `open()`, fire failure instead of silent reset |
-| `src/components/payment/RazorpayCheckout.tsx` | Add `blocked` state with guidance message; guard against double-tap |
+| `src/pages/HomePage.tsx` | Remove full-page profile gate; render shell immediately with inline skeletons |
+| `src/contexts/auth/AuthProvider.tsx` | Add marketplace data + highlights prefetch using society coords |
+| `src/hooks/queries/useMarketplaceData.ts` | Accept optional coord override for prefetch compatibility |
+| `src/components/home/ActiveOrderStrip.tsx` | Parallel fetch terminal statuses + orders |
+| `src/components/home/MarketplaceSection.tsx` | Defer `useSocialProof` to post-paint; reorder BuyAgainRow below grids |
+| `src/components/home/ForYouSection.tsx` | Remove duplicate BuyAgainRow |
+| `src/components/home/AutoHighlightStrip.tsx` | Move query to prefetch in AuthProvider |
 
-## Risk assessment
-- **Reusing Razorpay orders**: Safe — Razorpay API supports fetching order status. If the order expired, we create a new one as fallback.
-- **Iframe detection**: Uses DOM presence check, not a hack. If Razorpay changes its DOM structure, worst case is the old 15s timeout behavior (no regression).
-- **Double-tap guard**: Pure UI guard, zero backend risk.
+## Risk Controls
+
+- **No data accuracy regression:** All queries return the same data — only the timing/ordering changes
+- **No auth regression:** Profile gate is replaced with per-section skeletons, not removed
+- **No cart regression:** BrowsingLocation context and cart logic are untouched
+- **No marketplace data regression:** useMarketplaceData still uses the same RPC, just starts earlier
+- **Backward compatible:** If prefetch misses (cache miss), components fall back to their own queries as today
+
+## Expected Result
+
+```text
+Before (waterfall):
+  Auth (800ms) → Profile (600ms) → Location (100ms) → Marketplace RPC (1500ms) → Render
+  Total: ~3000ms minimum before first content, 5-7s total
+
+After (parallel + prefetch):
+  Auth (800ms) → Profile + Marketplace RPC in parallel (1500ms) → Render
+  Shell visible: instant
+  First content: ~1200ms
+  Full page: ~1500ms
+```
 
