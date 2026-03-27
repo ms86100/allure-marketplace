@@ -9,8 +9,7 @@ import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useMarketplaceConfig } from '@/hooks/useMarketplaceConfig';
 import { useBadgeConfig } from '@/hooks/useBadgeConfig';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
-import { useQuery } from '@tanstack/react-query';
-import { jitteredStaleTime } from '@/lib/query-utils';
+import { useMarketplaceData } from '@/hooks/queries/useMarketplaceData';
 import { useCurrency } from '@/hooks/useCurrency';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 
@@ -114,26 +113,22 @@ export function useSearchPage() {
   const setBrowseBeyond = useCallback((val: boolean) => { setBrowseBeyondLocal(val); persistPreference('browse_beyond_community', val); }, [persistPreference]);
   const setSearchRadius = useCallback((val: number) => { setSearchRadiusLocal(val); persistPreference('search_radius_km', val); }, [persistPreference]);
 
-  // Popular products — coordinate-based via search_sellers_by_location RPC
-  const { data: popularProducts = [], isLoading: isLoadingPopular } = useQuery({
-    queryKey: ['search-popular-products', lat, lng, browseBeyond, searchRadius],
-    queryFn: async (): Promise<ProductSearchResult[]> => {
-      const radius = browseBeyond ? searchRadius : 2;
-      const { data, error } = await supabase.rpc('search_sellers_by_location', {
-        _lat: lat!, _lng: lng!, _radius_km: radius,
-      });
-      if (error || !data) return [];
-      const mapped: ProductSearchResult[] = [];
-      (data as any[]).forEach((seller) => {
-        mapSellerRpcProducts(seller).forEach((p) => {
-          if (!mapped.some(x => x.product_id === p.product_id)) mapped.push(p);
-        });
-      });
-      return mapped;
-    },
-    enabled: hasCoords,
-    staleTime: jitteredStaleTime(3 * 60 * 1000),
-  });
+  // Popular products — derived from shared marketplace cache (zero additional RPC)
+  const { data: marketplaceSellers, isLoading: isLoadingPopular } = useMarketplaceData();
+  const popularProducts = useMemo((): ProductSearchResult[] => {
+    if (!marketplaceSellers || marketplaceSellers.length === 0) return [];
+    const mapped: ProductSearchResult[] = [];
+    const seen = new Set<string>();
+    for (const seller of marketplaceSellers) {
+      for (const p of mapSellerRpcProducts(seller)) {
+        if (!seen.has(p.product_id)) {
+          seen.add(p.product_id);
+          mapped.push(p);
+        }
+      }
+    }
+    return mapped;
+  }, [marketplaceSellers]);
 
   useEffect(() => { const sort = searchParams.get('sort'); if (sort === 'rating') handlePresetSelect('top_rated', { minRating: 4, sortBy: 'rating' }); }, []);
 

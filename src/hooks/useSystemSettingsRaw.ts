@@ -1,35 +1,23 @@
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { jitteredStaleTime } from '@/lib/query-utils';
+import { useQueryClient } from '@tanstack/react-query';
+import { useMarketplaceConfig } from '@/hooks/useMarketplaceConfig';
 
 /**
  * Fetch arbitrary system_settings keys by their raw key name.
- * Returns a getter function for flexible, dynamic key lookup.
+ * Now reads from the shared ['system-settings-all'] cache populated by useMarketplaceConfig.
+ * Zero additional network calls.
  */
 export function useSystemSettingsRaw(keys: string[]) {
-  const { data: settingsMap = {} } = useQuery({
-    queryKey: ['system-settings-raw', ...keys],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('system_settings')
-        .select('key, value')
-        .in('key', keys);
-      if (error) {
-        console.error('Error fetching system settings:', error);
-        return {};
-      }
-      const map: Record<string, string> = {};
-      for (const row of data || []) {
-        if (row.key && row.value) map[row.key] = row.value;
-      }
-      return map;
-    },
-    staleTime: jitteredStaleTime(15 * 60 * 1000),
-    enabled: keys.length > 0,
-  });
+  // Ensure the shared settings cache is populated
+  useMarketplaceConfig();
+
+  const queryClient = useQueryClient();
+
+  // Read from the shared cache
+  const cached = queryClient.getQueryData<{ sysMap: Record<string, string> }>(['system-settings-all']);
+  const sysMap = cached?.sysMap || {};
 
   return {
-    getSetting: (key: string) => settingsMap[key] || '',
-    settingsMap,
+    getSetting: (key: string) => sysMap[key] || '',
+    settingsMap: sysMap,
   };
 }

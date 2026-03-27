@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { useMarketplaceData } from './useMarketplaceData';
+import { useAuth } from '@/contexts/AuthContext';
 import { mapProduct } from './useNearbyProducts';
 
 interface CategoryGroup {
@@ -19,6 +19,7 @@ interface CategoryGroup {
  */
 export function useProductsByCategory(limit = 50) {
   const { data: sellers, isLoading, error } = useMarketplaceData();
+  const { effectiveSocietyId } = useAuth();
   const queryClient = useQueryClient();
 
   const data = useMemo((): CategoryGroup[] => {
