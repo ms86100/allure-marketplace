@@ -106,7 +106,8 @@ export default function TestResultsPage() {
   return (
     <div className="min-h-[100dvh] bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
+      <SafeHeader>
+      <div className="px-4 pb-3 flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
