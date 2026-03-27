@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { UserNotification } from '@/hooks/queries/useNotifications';
 import { useMarkNotificationRead } from '@/hooks/queries/useNotifications';
+import { resolveNotificationRoute } from '@/lib/notification-routes';
 
 function getIcon(type: string) {
   switch (type) {
@@ -52,8 +53,11 @@ export function RichNotificationCard({ notification, onDismiss }: Props) {
 
   const handleAction = () => {
     if (!notification.is_read) markRead.mutate(notification.id);
-    if (referencePath?.startsWith('/')) {
-      navigate(referencePath);
+    const target = referencePath?.startsWith('/')
+      ? referencePath
+      : resolveNotificationRoute(notification.type, notification.payload as Record<string, any>);
+    if (target?.startsWith('/')) {
+      navigate(target);
     }
     onDismiss?.();
   };
