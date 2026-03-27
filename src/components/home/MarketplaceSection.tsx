@@ -362,51 +362,59 @@ function ProductListings({
       <div className="grid grid-cols-3 gap-3">
         {categories.map((cat) => {
           const catConfig = categoryConfigs?.find((c: any) => c.category === cat.category);
-          const catColor = catConfig?.color || 'hsl(var(--primary))';
-          const topProducts = cat.products.slice(0, 4);
+          const catColor = catConfig?.color || null;
+          const topProducts = cat.products.slice(0, 2);
+          const pastelColor = getCategoryPastel(cat.category, catColor);
 
           return (
             <button
               key={cat.category}
               type="button"
               onClick={() => navigate(`/category/${cat.parentGroup}?sub=${cat.category}`)}
-              className="rounded-2xl border border-border/50 bg-card overflow-hidden text-left active:scale-[0.97] transition-transform flex flex-col"
-              style={{
-                background: `linear-gradient(160deg, ${catColor}18 0%, ${catColor}08 100%)`,
-              }}
+              className="rounded-2xl overflow-hidden text-left active:scale-[0.97] transition-transform flex flex-col shadow-sm"
+              style={{ backgroundColor: pastelColor }}
             >
-              {/* Product image grid */}
-              <div className="grid grid-cols-2 gap-0.5 p-2 flex-1">
-                {topProducts.length > 0 ? (
-                  topProducts.map((p) => (
-                    <div key={p.id} className="aspect-square rounded-xl overflow-hidden bg-secondary/50">
-                      {p.image_url ? (
-                        <img
-                          src={p.image_url}
-                          alt={p.name}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <DynamicIcon name={cat.icon} size={20} className="text-muted-foreground" />
-                        </div>
-                      )}
+              {/* Product image row — fixed height */}
+              <div className="relative p-2.5">
+                <div className="flex gap-1.5 h-20">
+                  {topProducts.length > 0 ? (
+                    topProducts.map((p) => (
+                      <div key={p.id} className="flex-1 h-full rounded-xl overflow-hidden bg-white/40">
+                        {p.image_url ? (
+                          <img
+                            src={p.image_url}
+                            alt={p.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <DynamicIcon name={cat.icon} size={20} className="text-gray-400" />
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex-1 h-full flex items-center justify-center rounded-xl bg-white/40">
+                      <DynamicIcon name={cat.icon} size={32} className="text-gray-400" />
                     </div>
-                  ))
-                ) : (
-                  <div className="col-span-2 aspect-square flex items-center justify-center">
-                    <DynamicIcon name={cat.icon} size={32} className="text-muted-foreground" />
+                  )}
+                </div>
+
+                {/* "+X more" badge */}
+                {cat.products.length > 2 && (
+                  <div className="absolute bottom-3 right-3 bg-black/60 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                    +{cat.products.length - 2} more
                   </div>
                 )}
               </div>
 
               {/* Category label */}
-              <div className="px-2 pb-2.5 pt-0.5">
-                <p className="text-[11px] font-bold text-foreground leading-tight line-clamp-2">
+              <div className="px-2.5 pb-2.5">
+                <p className="text-[13px] font-medium text-gray-900 leading-tight line-clamp-2">
                   {cat.displayName}
                 </p>
-                <p className="text-[9px] text-muted-foreground mt-0.5">
+                <p className="text-[10px] text-gray-600 mt-0.5">
                   {cat.products.length} item{cat.products.length !== 1 ? 's' : ''}
                 </p>
               </div>

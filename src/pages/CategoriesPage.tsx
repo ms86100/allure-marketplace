@@ -324,7 +324,10 @@ export default function CategoriesPage() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {group.categories.map((cat, catIdx) => {
                     const meta = metaMap[cat.category] || { count: 0, sellerCount: 0, minPrice: null, collageImages: [], hasBestseller: false };
-                    const catColor = cat.color || null;
+                    const pastelColor = getCategoryPastel(cat.category, cat.color);
+                    const images = meta.collageImages.length > 0
+                      ? meta.collageImages
+                      : cat.imageUrl ? [cat.imageUrl] : [];
                     return (
                       <motion.div
                         key={cat.category}
@@ -334,64 +337,61 @@ export default function CategoriesPage() {
                       >
                         <Link
                           to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-                          className="block rounded-2xl overflow-hidden shadow-sm active:scale-[0.97] transition-all duration-200 group bg-card border border-border hover:shadow-md"
-                          style={{ borderLeftWidth: '4px', borderLeftColor: catColor || 'hsl(var(--primary))' }}
-                          onMouseEnter={(e) => {
-                            if (catColor) (e.currentTarget as HTMLElement).style.borderColor = `${catColor}60`;
-                          }}
-                          onMouseLeave={(e) => {
-                            (e.currentTarget as HTMLElement).style.borderColor = '';
-                            (e.currentTarget as HTMLElement).style.borderLeftColor = catColor || 'hsl(var(--primary))';
-                          }}
+                          className="block rounded-2xl overflow-hidden shadow-sm active:scale-[0.97] transition-all duration-200 group"
+                          style={{ backgroundColor: pastelColor }}
                         >
                           {/* Image area */}
-                          <div className="relative aspect-[3/2] overflow-hidden">
-                            <ImageCollage
-                              images={meta.collageImages}
-                              fallbackIcon={cat.icon}
-                              fallbackUrl={cat.imageUrl}
-                              alt={cat.displayName}
-                              color={cat.color}
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+                          <div className="relative p-3">
+                            <div className="flex gap-1.5 h-24">
+                              {images.length >= 2 ? (
+                                images.slice(0, 2).map((src, i) => (
+                                  <div key={i} className="flex-1 h-full rounded-xl overflow-hidden bg-white/40">
+                                    <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                  </div>
+                                ))
+                              ) : images.length === 1 ? (
+                                <div className="flex-1 h-full rounded-xl overflow-hidden bg-white/40">
+                                  <img src={images[0]} alt={cat.displayName} className="w-full h-full object-cover" loading="lazy" />
+                                </div>
+                              ) : (
+                                <div className="flex-1 h-full flex items-center justify-center rounded-xl bg-white/40">
+                                  <DynamicIcon name={cat.icon} size={36} className="text-gray-400" />
+                                </div>
+                              )}
+                            </div>
 
                             {meta.count > 0 && (
-                              <div className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded-full bg-primary/90 text-primary-foreground text-[9px] font-bold shadow-sm">
-                                {meta.count} {ml.label('label_item_count')}
+                              <div className="absolute bottom-4 right-4 bg-black/60 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                                +{meta.count} items
                               </div>
                             )}
 
                             {meta.hasBestseller && (
-                              <div className="absolute top-1.5 left-1.5 w-6 h-6 rounded-full bg-warning/90 flex items-center justify-center shadow-sm">
-                                <Star size={12} className="text-primary-foreground fill-primary-foreground" />
+                              <div className="absolute top-4 left-4 w-6 h-6 rounded-full bg-amber-400 flex items-center justify-center shadow-sm">
+                                <Star size={12} className="text-white fill-white" />
                               </div>
                             )}
-
-                            <div className="absolute bottom-0 left-0 right-0 p-2.5">
-                              <span className="text-sm font-bold text-primary-foreground leading-tight line-clamp-2 drop-shadow-lg">
-                                {cat.displayName}
-                              </span>
-                            </div>
                           </div>
 
-                          {/* Metadata row */}
-                          <div className="flex items-center gap-2 px-2.5 py-2 text-[10px] text-muted-foreground">
-                            <DynamicIcon name={cat.icon} size={10} className="shrink-0 text-muted-foreground/60" />
-                            {meta.sellerCount > 0 && (
-                              <span className="inline-flex items-center gap-0.5">
-                                <Users size={10} className="shrink-0" />
-                                {meta.sellerCount} {meta.sellerCount === 1 ? ml.label('label_seller_count_singular') : ml.label('label_seller_count_plural')}
-                              </span>
-                            )}
-                            {meta.minPrice !== null && (
-                              <span className="inline-flex items-center gap-0.5">
-                                <Tag size={10} className="shrink-0" />
-                                From {formatPrice(meta.minPrice)}
-                              </span>
-                            )}
-                            {meta.sellerCount === 0 && meta.minPrice === null && (
-                              <span className="text-muted-foreground/60">{ml.label('label_explore_cta')}</span>
-                            )}
+                          {/* Info section */}
+                          <div className="px-3 pb-3">
+                            <span className="text-[13px] font-semibold text-gray-900 leading-tight line-clamp-2">
+                              {cat.displayName}
+                            </span>
+                            <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-600">
+                              {meta.sellerCount > 0 && (
+                                <span className="inline-flex items-center gap-0.5">
+                                  <Users size={10} className="shrink-0" />
+                                  {meta.sellerCount} {meta.sellerCount === 1 ? ml.label('label_seller_count_singular') : ml.label('label_seller_count_plural')}
+                                </span>
+                              )}
+                              {meta.minPrice !== null && (
+                                <span className="inline-flex items-center gap-0.5">
+                                  <Tag size={10} className="shrink-0" />
+                                  From {formatPrice(meta.minPrice)}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </Link>
                       </motion.div>

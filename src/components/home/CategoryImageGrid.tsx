@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { ChevronRight } from 'lucide-react';
+import { getCategoryPastel } from '@/lib/category-pastels';
 
 interface CategoryImageGridProps {
   parentGroup: string;
@@ -17,30 +18,6 @@ interface CategoryMeta {
   count: number;
   images: string[];
 }
-
-const CATEGORY_PASTELS: Record<string, string> = {
-  home_food: '#E8F5E9',
-  bakery: '#FFF3E0',
-  snacks: '#FFF8E1',
-  groceries: '#E3F2FD',
-  beverages: '#E0F2F1',
-  dairy: '#FFF8E1',
-  fruits: '#E8F5E9',
-  vegetables: '#E8F5E9',
-  sweets: '#FFF3E0',
-  meat: '#FFEBEE',
-  seafood: '#E0F7FA',
-  pet_supplies: '#F3E5F5',
-  stationery: '#E8EAF6',
-  electronics: '#E3F2FD',
-  clothing: '#FCE4EC',
-  beauty: '#FDE0DC',
-  health: '#E0F2F1',
-  home_services: '#E8F5E9',
-  cleaning: '#E0F7FA',
-  repairs: '#FFF8E1',
-};
-const DEFAULT_PASTEL = '#F5F5F5';
 
 function buildCategoryMeta(
   productCategories: { category: string; products: any[] }[],
@@ -115,7 +92,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
           const images = meta.images.length > 0
             ? meta.images
             : cat.imageUrl ? [cat.imageUrl] : [];
-          const pastelColor = CATEGORY_PASTELS[cat.category] || DEFAULT_PASTEL;
+          const pastelColor = getCategoryPastel(cat.category, cat.color);
 
           return (
             <Link
