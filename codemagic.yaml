@@ -177,6 +177,41 @@ workflows:
             rm -rf ios/App/App/Assets.xcassets/Splash.imageset/
             echo "=== Splash.imageset removed ==="
 
+            # 6. Create SplashLogo imageset from committed PNG
+            ASSETS_DIR="ios/App/App/Assets.xcassets"
+            SPLASH_IMAGESET="$ASSETS_DIR/SplashLogo.imageset"
+            mkdir -p "$SPLASH_IMAGESET"
+
+            # Resize the committed splash-logo.png to 1x/2x/3x
+            LOGO_SRC="ios-config/splash-logo.png"
+            if [ -f "$LOGO_SRC" ]; then
+              sips -z 171 341 "$LOGO_SRC" --out "$SPLASH_IMAGESET/splash-logo@1x.png"
+              sips -z 341 682 "$LOGO_SRC" --out "$SPLASH_IMAGESET/splash-logo@2x.png"
+              cp "$LOGO_SRC" "$SPLASH_IMAGESET/splash-logo@3x.png"
+              sips -z 512 1024 "$SPLASH_IMAGESET/splash-logo@3x.png"
+
+              cat > "$SPLASH_IMAGESET/Contents.json" << 'LOGOJSON'
+            {
+              "images": [
+                {"idiom":"universal","scale":"1x","filename":"splash-logo@1x.png"},
+                {"idiom":"universal","scale":"2x","filename":"splash-logo@2x.png"},
+                {"idiom":"universal","scale":"3x","filename":"splash-logo@3x.png"}
+              ],
+              "info":{"version":1,"author":"xcode"}
+            }
+            LOGOJSON
+              echo "=== SplashLogo imageset created ==="
+            else
+              echo "WARNING: ios-config/splash-logo.png not found, skipping splash logo"
+            fi
+
+            # 7. Inject imageView + constraints into storyboard for centered logo
+            # Insert after the closing </view> of the main background view, before </subviews> or </viewController>
+            sed -i '' 's|</view>|<subviews><imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="SplashLogo" translatesAutoresizingMaskIntoConstraints="NO" id="splashLogoView"><rect key="frame" x="0" y="0" width="200" height="100"/></imageView></subviews><constraints><constraint firstItem="splashLogoView" firstAttribute="centerX" secondItem="GJd-Yh-RWb" secondAttribute="centerX" id="splashCX"/><constraint firstItem="splashLogoView" firstAttribute="centerY" secondItem="GJd-Yh-RWb" secondAttribute="centerY" id="splashCY"/><constraint firstItem="splashLogoView" firstAttribute="width" constant="200" id="splashW"/><constraint firstItem="splashLogoView" firstAttribute="height" constant="100" id="splashH"/></constraints></view>|' "$STORYBOARD"
+
+            # 8. Add image resource reference at the end of the storyboard
+            sed -i '' 's|</document>|<resources><image name="SplashLogo" width="341" height="171"/></resources></document>|' "$STORYBOARD"
+
             echo "=== After patch ==="
             cat "$STORYBOARD"
           else
