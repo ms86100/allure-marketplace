@@ -51,9 +51,10 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
   }, [lower, categoryConfigs]);
 
   // Full-text search for products — uses GIN-indexed tsvector
+  // Short queries (< 3 chars) use staleTime to prevent rapid re-fetches
   const { data: productSuggestions = [] } = useQuery({
     queryKey: ['search-fts', trimmed, lat, lng, radiusKm],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const { data, error } = await supabase.rpc('search_products_fts' as any, {
         _query: trimmed,
         _lat: lat ?? null,
@@ -62,6 +63,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
         _limit: 8,
         _offset: 0,
       });
+      if (signal?.aborted) return [];
       if (error) {
         console.error('FTS search error:', error);
         return [];
