@@ -155,19 +155,30 @@ workflows:
 
       - name: Patch LaunchScreen to match app icon branding
         script: |
-          # Use sed to patch the existing Capacitor-generated LaunchScreen.storyboard
-          # instead of replacing it entirely (avoids toolsVersion mismatch)
           STORYBOARD="ios/App/App/Base.lproj/LaunchScreen.storyboard"
 
           if [ -f "$STORYBOARD" ]; then
-            # Replace the background color to dark navy #1a1a2e (r=0.102, g=0.102, b=0.180)
-            # Capacitor's default storyboard has a white background color element
-            sed -i '' 's|<color key="backgroundColor" systemColor="systemBackgroundColor"/>|<color key="backgroundColor" red="0.10196078431372549" green="0.10196078431372549" blue="0.18039215686274512" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>|g' "$STORYBOARD"
-            # Also handle the cocoaTouchSystemColor variant
-            sed -i '' 's|<color key="backgroundColor" cocoaTouchSystemColor="systemBackgroundColor"/>|<color key="backgroundColor" red="0.10196078431372549" green="0.10196078431372549" blue="0.18039215686274512" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>|g' "$STORYBOARD"
-            # Handle plain white background
-            sed -i '' 's|<color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>|<color key="backgroundColor" red="0.10196078431372549" green="0.10196078431372549" blue="0.18039215686274512" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>|g' "$STORYBOARD"
-            echo "=== LaunchScreen background patched to dark navy #1a1a2e ==="
+            echo "=== Before patch ==="
+            cat "$STORYBOARD"
+
+            # 1. Remove the Capacitor splash imageView block entirely
+            sed -i '' '/<imageView/,/<\/imageView>/d' "$STORYBOARD"
+
+            # 2. Remove any standalone image="Splash" references
+            sed -i '' '/image="Splash"/d' "$STORYBOARD"
+
+            # 3. Remove any constraint referencing the now-deleted imageView
+            sed -i '' '/imageView/d' "$STORYBOARD"
+
+            # 4. Force ALL backgroundColor elements to dark navy #1a1a2e
+            sed -i '' 's|<color key="backgroundColor"[^/]*/>|<color key="backgroundColor" red="0.10196078431372549" green="0.10196078431372549" blue="0.18039215686274512" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>|g' "$STORYBOARD"
+
+            # 5. Delete the Splash image asset so Xcode can't reference it
+            rm -rf ios/App/App/Assets.xcassets/Splash.imageset/
+            echo "=== Splash.imageset removed ==="
+
+            echo "=== After patch ==="
+            cat "$STORYBOARD"
           else
             echo "WARNING: LaunchScreen.storyboard not found at $STORYBOARD"
           fi
