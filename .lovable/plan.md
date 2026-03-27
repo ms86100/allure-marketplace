@@ -1,129 +1,128 @@
 
 
-# Zero-Risk Performance Optimization Plan
+# Stock Quantity Enforcement — Bulletproof Fix
 
-## Current State — Identified Bottlenecks
+## Root Cause
 
-### 1. Duplicate system_settings queries (HIGH IMPACT)
-`useSystemSettings()` fires its own query (`system-settings-core`) across **24 components** — FloatingCartBar, BuyAgainRow, AutoHighlightStrip, ProductDetailSheet, SearchPage, CartPage, ProfilePage, etc. Meanwhile, `useMarketplaceConfig()` already fetches the **entire** `system_settings` table into cache key `system-settings-all`. This means every page load makes **2 separate queries** to the same table. Console logs confirm repeated "Using hardcoded defaults" warnings because the `system-settings-core` query races and sometimes fails.
+**Zero stock validation exists anywhere in the buying flow.** The system tracks `stock_quantity` on the `products` table and has triggers that decrement stock *after* order placement, but nothing prevents a buyer from adding more items than available stock. The cap is hardcoded to `99` everywhere.
 
-### 2. Homepage data waterfall
-MarketplaceSection depends on `useMarketplaceData()` which depends on `browsingLocation`. The location context resolves after auth, creating a sequential chain: Auth → Profile → Location → Marketplace RPC. No prefetching occurs.
+Specifically:
+- `useCart.tsx` → `addItem()` caps at `Math.min(..., 99)` — no stock check
+- `useCart.tsx` → `updateQuantity()` caps at `Math.min(quantity, 99)` — no stock check
+- `ProductCard.tsx` → increment button has no upper bound besides the 99 cap
+- `create_multi_vendor_orders` RPC → inserts `order_items` without checking if requested quantity ≤ available stock
+- No database constraint on `cart_items` prevents exceeding stock
 
-### 3. Re-render cascade from useSystemSettings
-24 components import `useSystemSettings()`, each receiving the **full settings object**. When any setting changes (or the query refetches), all 24 components re-render — even if they only read `currencySymbol`.
+## Fix Strategy — 4 Layers of Defense
 
-### 4. Missing `placeholderData` on list views
-When navigating back to Orders, Cart, or Search, the query refetches from scratch. Without `placeholderData: keepPreviousData`, users see a loading skeleton on every back-navigation instead of instant content.
+### Layer 1: Client-side enforcement (addItem + updateQuantity)
 
----
+**File: `src/hooks/useCart.tsx`**
 
-## Step-by-Step Optimization Strategy
+In `addItem()` (line 273): Before the optimistic update, fetch the product's `stock_quantity`. If `stock_quantity` is not null (tracking enabled), cap the total cart quantity at `stock_quantity` instead of 99:
 
-### Step 1: Consolidate system_settings queries (Highest impact, lowest risk)
+```typescript
+// After action_type check, before optimistic update:
+let maxQty = 99;
+if (product.stock_quantity != null) {
+  maxQty = product.stock_quantity;
+} else {
+  const { data: stockCheck } = await supabase
+    .from('products').select('stock_quantity').eq('id', product.id).maybeSingle();
+  if (stockCheck?.stock_quantity != null) maxQty = stockCheck.stock_quantity;
+}
+const existingQty = optimisticItemsRef.current.find(i => i.product_id === product.id)?.quantity || 0;
+if (existingQty >= maxQty) {
+  toast.error(`Only ${maxQty} available`, { id: 'stock-limit' });
+  return;
+}
+quantity = Math.min(quantity, maxQty - existingQty);
+```
 
-**What**: Make `useSystemSettings()` read from the `system-settings-all` cache that `useMarketplaceConfig` already populates, instead of running its own query.
+In `updateQuantity()` (line 360): Same pattern — fetch stock_quantity and use it as the ceiling instead of 99.
 
-**How**: Rewrite `useSystemSettings()` to use `queryClient.getQueryData(['system-settings-all'])` with a fallback query that shares the same key. This eliminates 1 API call per page load.
+### Layer 2: UI enforcement (ProductCard + ProductDetailSheet)
 
-**Validation**: Console warning "[SystemSettings] Using hardcoded defaults" disappears. Network tab shows only 1 `system_settings` query instead of 2.
+**File: `src/components/product/ProductCard.tsx`**
 
-**Rollback**: Revert single file `useSystemSettings.ts`. Hardcoded DEFAULTS ensure zero breakage even if cache is empty.
+The `+` increment button should be disabled when `quantity >= product.stock_quantity` (if stock tracking is enabled). The product object already carries `stock_quantity` from the query.
 
-**Expected improvement**: -1 API call per page load (~200-400ms saved on initial load).
+```typescript
+const stockLimit = product.stock_quantity != null ? product.stock_quantity : 99;
+const canIncrement = quantity < stockLimit;
+// Disable + button when !canIncrement
+// Show "Max X" label when at limit
+```
 
----
+Apply the same logic in `ProductListingCard.tsx` and `ProductDetailSheet` (via `useProductDetail.ts`).
 
-### Step 2: Add selector pattern to useSystemSettings (Medium impact, zero risk)
+### Layer 3: Server-side validation in RPC (last line of defense)
 
-**What**: Components that only need `currencySymbol` shouldn't re-render when `headerTagline` changes.
+**Database migration: Update `create_multi_vendor_orders`**
 
-**How**: Add a `select` option to the underlying `useQuery` call, or expose individual hooks like `useCurrencySymbol()` that select a single field. React Query's structural sharing prevents re-renders when the selected value hasn't changed.
+Before inserting `order_items`, validate stock for every item:
 
-**Validation**: React DevTools Profiler shows fewer re-renders on FloatingCartBar, BuyAgainRow, AutoHighlightStrip after a settings refetch.
+```sql
+-- Inside the item loop, before INSERT INTO order_items:
+DECLARE _available_stock integer;
 
-**Rollback**: Revert `useSystemSettings.ts` — all consumers still work with the full object.
+SELECT stock_quantity INTO _available_stock
+FROM products WHERE id = (_item->>'product_id')::uuid FOR UPDATE;
 
-**Expected improvement**: ~40% fewer component re-renders on homepage.
+IF _available_stock IS NOT NULL AND (_item->>'quantity')::int > _available_stock THEN
+  RETURN json_build_object(
+    'success', false,
+    'error', 'insufficient_stock',
+    'product_name', _item->>'product_name',
+    'available', _available_stock,
+    'requested', (_item->>'quantity')::int
+  );
+END IF;
+```
 
----
+The `FOR UPDATE` row lock prevents concurrent overselling — two simultaneous checkouts will serialize on the same product row.
 
-### Step 3: Add `placeholderData: keepPreviousData` to list queries (High impact, zero risk)
+### Layer 4: Database trigger on cart_items (safety net)
 
-**What**: Orders list, cart items, notifications, and search results should show stale data instantly while refetching in the background.
+**Database migration: Create trigger**
 
-**How**: Add `placeholderData: keepPreviousData` to `useOrdersList`, `useCart`, `useCartCount`, `useUnreadNotificationCount`. This makes back-navigation feel instant.
+```sql
+CREATE OR REPLACE FUNCTION enforce_cart_stock_limit()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+DECLARE _stock integer;
+BEGIN
+  SELECT stock_quantity INTO _stock FROM products WHERE id = NEW.product_id;
+  IF _stock IS NOT NULL AND NEW.quantity > _stock THEN
+    NEW.quantity := _stock;
+  END IF;
+  IF NEW.quantity <= 0 THEN
+    RETURN NULL; -- prevent zero/negative qty rows
+  END IF;
+  RETURN NEW;
+END; $$;
 
-**Validation**: Navigate Home → Orders → Back → Orders. Second visit shows content immediately (no skeleton flash).
+CREATE TRIGGER trg_enforce_cart_stock
+  BEFORE INSERT OR UPDATE ON cart_items
+  FOR EACH ROW EXECUTE FUNCTION enforce_cart_stock_limit();
+```
 
-**Rollback**: Remove `placeholderData` prop — queries revert to default behavior.
+This silently caps cart quantity at available stock even if the client-side check is bypassed.
 
-**Expected improvement**: Navigation feels <200ms (content appears from cache while refetch runs silently).
+## Files Changed
 
----
-
-### Step 4: Remove redundant refetchOnWindowFocus on static configs (Low risk)
-
-**What**: `useCartCount`, `useUnreadNotificationCount`, and `FeaturedBanners` have `refetchOnWindowFocus: true`, overriding the global `false` default. Cart count already has realtime invalidation. Notification count already polls every 30s.
-
-**How**: Remove explicit `refetchOnWindowFocus: true` from these queries. The polling interval and mutation-driven invalidation already ensure freshness.
-
-**Validation**: Tab-switch no longer triggers 3-4 redundant API calls visible in Network tab.
-
-**Rollback**: Re-add the prop — zero functional impact either way.
-
-**Expected improvement**: -3 API calls per tab-switch event.
-
----
-
-### Step 5: Increase staleTime on near-static config queries (Low risk)
-
-**What**: Several config queries (badge-config, parent-groups, category-configs, tracking-config, workflow-map) use 10-15min staleTime but change extremely rarely (admin updates only).
-
-**How**: Increase to 30min staleTime for: `badge-config`, `parent-groups`, `category-configs`, `tracking-config`, `listing-type-workflow-map`. These are already prefetched in AuthProvider.
-
-**Validation**: After 15 minutes idle, these queries don't refetch on navigation.
-
-**Rollback**: Reduce staleTime back. No functional impact.
-
-**Expected improvement**: Fewer background refetches during extended sessions.
-
----
-
-### Step 6: Database indexes for critical queries (Medium impact, zero risk)
-
-**What**: Add composite indexes on frequently queried columns:
-- `cart_items(user_id, product_id)` — cart lookups
-- `orders(user_id, created_at DESC)` — order history
-- `notifications(user_id, is_read, created_at DESC)` — notification inbox
-
-**How**: Database migration with `CREATE INDEX IF NOT EXISTS` — additive only, no table modifications.
-
-**Validation**: Query explain plans show index scans instead of sequential scans.
-
-**Rollback**: `DROP INDEX` — indexes are purely additive.
-
-**Expected improvement**: 30-50% faster query response times on cart/orders/notifications pages.
-
----
+| File | Change |
+|------|--------|
+| `src/hooks/useCart.tsx` | Stock ceiling in `addItem()` and `updateQuantity()` using `stock_quantity` |
+| `src/components/product/ProductCard.tsx` | Disable `+` button at stock limit; show "Max X" indicator |
+| `src/components/product/ProductListingCard.tsx` | Same stock limit on increment |
+| `src/hooks/useProductDetail.ts` | Cap quantity at stock limit in `handleAdd` |
+| Migration SQL | Update `create_multi_vendor_orders` with `FOR UPDATE` stock check |
+| Migration SQL | Add `trg_enforce_cart_stock` trigger on `cart_items` |
 
 ## Safeguards
 
-| Safeguard | Implementation |
-|-----------|----------------|
-| No functional changes | Every step only changes caching/query behavior, not business logic |
-| Hardcoded defaults | `useSystemSettings` always returns DEFAULTS if cache is empty |
-| Independent deployability | Each step is a separate commit; any can be reverted without affecting others |
-| Regression detection | Console warnings serve as canaries — if "Using hardcoded defaults" reappears, the consolidation step needs review |
-| Rollback strategy | Each step touches 1-2 files max; Git revert is instant |
-
-## Target Performance Goals
-
-| Metric | Current (est.) | Target |
-|--------|---------------|--------|
-| Homepage load | ~2-3s | <1.5s |
-| Back-navigation | ~800ms (skeleton flash) | <200ms (instant from cache) |
-| API calls per page load | 4-6 | 2-3 |
-| Tab-switch API calls | 5-6 | 1-2 |
-| Component re-renders per settings change | 24+ | 2-3 (only affected consumers) |
+- Products with `stock_quantity = NULL` (tracking disabled) keep the existing 99-unit cap — zero behavioral change for non-tracked products
+- `FOR UPDATE` lock in RPC prevents race conditions between concurrent buyers
+- Cart trigger is a silent safety net — it caps, never errors
+- All changes are additive; rollback = revert files + drop trigger + revert RPC
 
