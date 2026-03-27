@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { optimizedImageUrl } from '@/utils/imageHelpers';
 import { supabase } from '@/integrations/supabase/client';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { useCart } from '@/hooks/useCart';

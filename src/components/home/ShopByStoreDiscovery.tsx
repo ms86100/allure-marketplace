@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { optimizedImageUrl } from '@/utils/imageHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   useLocalSellers,
