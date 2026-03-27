@@ -56,3 +56,26 @@ export function imageSrcSet(
     `${optimizedImageUrl(url, { width: 600, quality })} 600w`,
   ].join(', ');
 }
+
+/**
+ * onError handler for optimized images.
+ * First fallback: try the original (non-transformed) URL.
+ * Second fallback: hide the image and show its sibling fallback.
+ */
+export function handleImageError(e: React.SyntheticEvent<HTMLImageElement>) {
+  const img = e.currentTarget;
+  const src = img.src;
+
+  // If currently using /render/image/, fall back to /object/public/ (original)
+  if (src.includes('/render/image/public/')) {
+    const original = src
+      .replace('/render/image/public/', '/object/public/')
+      .replace(/[?&](width|quality|format)=[^&]*/g, '')
+      .replace(/\?$/, '');
+    img.src = original;
+    return;
+  }
+
+  // Final fallback: hide broken image, show parent's fallback content
+  img.style.display = 'none';
+}

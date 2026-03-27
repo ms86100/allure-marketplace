@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import { optimizedImageUrl } from '@/utils/imageHelpers';
+import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { Link } from 'react-router-dom';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
@@ -124,6 +124,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                           className="w-full h-full object-cover"
                           loading="lazy"
                           decoding="async"
+                          onError={handleImageError}
                         />
                       </div>
                     ))
@@ -135,6 +136,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                         className="w-full h-full object-cover"
                         loading="lazy"
                         decoding="async"
+                        onError={handleImageError}
                       />
                     </div>
                   ) : (

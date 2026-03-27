@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
@@ -75,7 +76,7 @@ export function WhatsNewSection() {
           >
             <div className="w-28 h-28 rounded-xl bg-muted overflow-hidden">
               {s.cover_image_url ? (
-                <img src={s.cover_image_url} alt={s.business_name} className="w-full h-full object-cover" loading="lazy" />
+                <img src={optimizedImageUrl(s.cover_image_url, { width: 200, quality: 70 })} alt={s.business_name} className="w-full h-full object-cover" loading="lazy" onError={handleImageError} />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-2xl">🏪</div>
               )}

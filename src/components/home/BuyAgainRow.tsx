@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { optimizedImageUrl } from '@/utils/imageHelpers';
+import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -199,6 +199,7 @@ export function BuyAgainRow() {
                             className="w-full h-full object-cover"
                             loading="lazy"
                             decoding="async"
+                            onError={handleImageError}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-lg">🛒</div>
