@@ -220,32 +220,22 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
     );
   }
 
-  // Step 2: Drawer for map confirmation (no keyboard needed)
+  if (!coords || !mapsLoaded) return null;
+
   return (
-    <Drawer open={true} onOpenChange={(val) => { if (!val) handleBack(); }}>
-      <DrawerContent className="max-h-[85vh] overflow-y-auto">
-        <DrawerHeader className="pb-2 shrink-0">
-          <DrawerTitle className="text-base">Confirm Location</DrawerTitle>
-          <p className="text-xs text-muted-foreground">Drag the pin to adjust the exact location</p>
-        </DrawerHeader>
-        <div className="px-4 pb-6">
-          {coords && mapsLoaded && (
-            <GoogleMapConfirm
-              latitude={coords.lat}
-              longitude={coords.lng}
-              name={selectedPlaceName || 'Store Location'}
-              onConfirm={(lat, lng) => handleConfirm(lat, lng)}
-              onBack={handleBack}
-            />
-          )}
-          {coords && !mapsLoaded && (
-            <div className="py-10 text-center text-muted-foreground text-sm">Loading map…</div>
-          )}
-          {saving && (
-            <div className="pt-3 text-center text-xs text-muted-foreground">Saving location…</div>
-          )}
+    <>
+      <GoogleMapConfirm
+        latitude={coords.lat}
+        longitude={coords.lng}
+        name={selectedPlaceName || 'Store Location'}
+        onConfirm={(lat, lng) => handleConfirm(lat, lng)}
+        onBack={handleBack}
+      />
+      {saving && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] bg-background/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg border border-border text-xs text-muted-foreground">
+          Saving location…
         </div>
-      </DrawerContent>
-    </Drawer>
+      )}
+    </>
   );
 }

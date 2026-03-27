@@ -186,25 +186,15 @@ export function OnboardingLocationSheet({ open, onOpenChange, onConfirm }: Onboa
     );
   }
 
+  if (!coords || !mapsLoaded) return null;
+
   return (
-    <Drawer open={true} onOpenChange={(val) => { if (!val) handleBack(); }}>
-      <DrawerContent className="max-h-[85vh] overflow-y-auto">
-        <DrawerHeader className="pb-2">
-          <DrawerTitle className="text-base">Confirm Location</DrawerTitle>
-          <p className="text-xs text-muted-foreground">Drag the pin to adjust the exact location</p>
-        </DrawerHeader>
-        <div className="px-4 pb-6">
-          {coords && mapsLoaded && (
-            <GoogleMapConfirm
-              latitude={coords.lat}
-              longitude={coords.lng}
-              name={selectedPlaceName || 'Store Location'}
-              onConfirm={(lat, lng, updatedName, _formattedAddress) => onConfirm(lat, lng, updatedName)}
-              onBack={handleBack}
-            />
-          )}
-        </div>
-      </DrawerContent>
-    </Drawer>
+    <GoogleMapConfirm
+      latitude={coords.lat}
+      longitude={coords.lng}
+      name={selectedPlaceName || 'Store Location'}
+      onConfirm={(lat, lng, updatedName, _formattedAddress) => onConfirm(lat, lng, updatedName)}
+      onBack={handleBack}
+    />
   );
 }
