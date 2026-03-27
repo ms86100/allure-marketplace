@@ -11,6 +11,7 @@ import { UpiDeepLinkCheckout } from '@/components/payment/UpiDeepLinkCheckout';
 import { CouponInput } from '@/components/cart/CouponInput';
 import { FulfillmentSelector } from '@/components/delivery/FulfillmentSelector';
 import { OrderProgressOverlay } from '@/components/checkout/OrderProgressOverlay';
+import { PreorderDatePicker } from '@/components/checkout/PreorderDatePicker';
 import { useCartPage } from '@/hooks/useCartPage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
