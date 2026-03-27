@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
+import { hasRazorpayCheckout, isLikelyRazorpayNode } from '@/lib/razorpay-checkout-dom';
 
 declare global {
   interface Window {
@@ -13,18 +14,14 @@ declare global {
 let razorpayDomObserver: MutationObserver | null = null;
 
 /** Watch for Razorpay-injected overlays and push them below the iOS safe area */
-function startSafeAreaObserver() {
+function startSafeAreaObserver(onDetected?: () => void) {
   stopSafeAreaObserver();
 
   const patchNode = (node: HTMLElement) => {
-    const zIndex = parseInt(node.style.zIndex || '0', 10);
-    const isRazorpayContainer =
-      zIndex > 999 ||
-      node.querySelector('iframe[src*="razorpay"]') ||
-      node.querySelector('iframe[src*="api.razorpay"]') ||
-      node.classList.toString().includes('razorpay');
+    const isRazorpayContainer = isLikelyRazorpayNode(node);
 
     if (isRazorpayContainer) {
+      onDetected?.();
       node.style.setProperty('top', 'auto', 'important');
       node.style.setProperty('bottom', '0', 'important');
       node.style.setProperty('left', '0', 'important');
@@ -103,6 +100,29 @@ export function useRazorpay() {
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [scriptError, setScriptError] = useState(false);
   const retryCountRef = useRef(0);
+  const popupCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeAttemptRef = useRef(0);
+  const paymentSettledRef = useRef(false);
+  const pageHiddenDuringOpenRef = useRef(false);
+  const visibilityCleanupRef = useRef<(() => void) | null>(null);
+
+  const clearPopupCheck = useCallback(() => {
+    if (popupCheckTimeoutRef.current) {
+      clearTimeout(popupCheckTimeoutRef.current);
+      popupCheckTimeoutRef.current = null;
+    }
+  }, []);
+
+  const cleanupOpenAttempt = useCallback(() => {
+    clearPopupCheck();
+    visibilityCleanupRef.current?.();
+    visibilityCleanupRef.current = null;
+  }, [clearPopupCheck]);
+
+  const settleAttempt = useCallback(() => {
+    paymentSettledRef.current = true;
+    cleanupOpenAttempt();
+  }, [cleanupOpenAttempt]);
 
   // Load Razorpay script with retry
   const loadScript = useCallback(() => {
@@ -146,11 +166,12 @@ export function useRazorpay() {
   // Cleanup: ensure body scroll lock is released if hook unmounts mid-payment
   useEffect(() => {
     return () => {
+      cleanupOpenAttempt();
       if (document.body.classList.contains('razorpay-active')) {
         unlockBodyScroll();
       }
     };
-  }, []);
+  }, [cleanupOpenAttempt]);
 
   const createOrder = useCallback(async (options: RazorpayOptions) => {
     if (!isScriptLoaded) {
@@ -193,6 +214,36 @@ export function useRazorpay() {
       }
 
       console.log('Razorpay order created:', data);
+
+      const attemptId = activeAttemptRef.current + 1;
+      activeAttemptRef.current = attemptId;
+      paymentSettledRef.current = false;
+      pageHiddenDuringOpenRef.current = false;
+
+      const markModalDetected = () => {
+        if (activeAttemptRef.current !== attemptId || paymentSettledRef.current) return;
+        clearPopupCheck();
+      };
+
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          pageHiddenDuringOpenRef.current = true;
+          clearPopupCheck();
+        } else if (!paymentSettledRef.current && activeAttemptRef.current === attemptId && !hasRazorpayCheckout(document)) {
+          popupCheckTimeoutRef.current = setTimeout(() => {
+            if (paymentSettledRef.current || activeAttemptRef.current !== attemptId) return;
+            if (hasRazorpayCheckout(document) || pageHiddenDuringOpenRef.current) return;
+            unlockBodyScroll();
+            settleAttempt();
+            options.onFailure({ code: 'POPUP_BLOCKED', description: 'Payment window could not open. Try again from the published app.' });
+          }, 1500);
+        }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      visibilityCleanupRef.current = () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
 
       // Open Razorpay checkout
       const razorpayOptions = {
@@ -244,12 +295,14 @@ export function useRazorpay() {
         },
         handler: function (response: any) {
           console.log('Payment successful:', response);
+          settleAttempt();
           unlockBodyScroll();
           options.onSuccess(response.razorpay_payment_id, response.razorpay_order_id);
         },
         modal: {
           ondismiss: function () {
             console.log('Payment modal closed');
+            settleAttempt();
             unlockBodyScroll();
             setIsLoading(false);
             options.onDismiss?.();
@@ -265,6 +318,7 @@ export function useRazorpay() {
       
       razorpay.on('payment.failed', function (response: any) {
         console.error('Payment failed:', response.error);
+        settleAttempt();
         unlockBodyScroll();
         options.onFailure(response.error);
       });
@@ -279,31 +333,43 @@ export function useRazorpay() {
       // before the SDK injects its overlay, preventing the brief
       // non-interactive flash on iOS WebView
       requestAnimationFrame(() => {
-        razorpay.open();
-        // Start observing for Razorpay's injected DOM and patch safe-area
-        startSafeAreaObserver();
+        // Start observing before open so slow or early DOM injection never misses detection
+        startSafeAreaObserver(markModalDetected);
+
+        try {
+          razorpay.open();
+        } catch (openError) {
+          settleAttempt();
+          unlockBodyScroll();
+          throw openError;
+        }
 
         // ── Popup-blocked detection ──
-        // If the SDK fails to inject its modal (e.g. inside an iframe sandbox),
-        // detect it after 2s and fire onFailure with a specific error type.
-        setTimeout(() => {
-          const hasRazorpayModal = document.querySelector('.razorpay-container') ||
-            document.querySelector('iframe[src*="razorpay"]') ||
-            document.querySelector('iframe[src*="api.razorpay"]') ||
-            Array.from(document.body.querySelectorAll<HTMLElement>(':scope > div')).some(
-              (el) => parseInt(el.style.zIndex || '0', 10) > 999
-            );
-          if (!hasRazorpayModal) {
-            console.warn('[Razorpay] Popup not detected after 2s — likely blocked by iframe sandbox');
-            unlockBodyScroll();
-            options.onFailure({ code: 'POPUP_BLOCKED', description: 'Payment window could not open. Try on the published app.' });
+        // Only fire if the page stayed visible and no Razorpay DOM ever appeared.
+        clearPopupCheck();
+        popupCheckTimeoutRef.current = setTimeout(() => {
+          if (paymentSettledRef.current || activeAttemptRef.current !== attemptId) return;
+
+          if (hasRazorpayCheckout(document)) {
+            markModalDetected();
+            return;
           }
-        }, 2000);
+
+          if (document.hidden || pageHiddenDuringOpenRef.current) {
+            console.info('[Razorpay] Skipping popup-blocked fallback because payment triggered an app/browser handoff');
+            return;
+          }
+
+          console.warn('[Razorpay] Popup not detected after guarded open check');
+          unlockBodyScroll();
+          settleAttempt();
+          options.onFailure({ code: 'POPUP_BLOCKED', description: 'Payment window could not open. Try again from the published app.' });
+        }, 3500);
 
         // Delayed re-sweeps to catch late-injected elements
         const sweep = () => document.body.querySelectorAll<HTMLElement>(':scope > div').forEach((el) => {
-          const z = parseInt(el.style.zIndex || '0', 10);
-          if (z > 999 || el.querySelector('iframe[src*="razorpay"]') || el.classList.toString().includes('razorpay')) {
+          if (isLikelyRazorpayNode(el)) {
+            markModalDetected();
             el.style.setProperty('top', 'auto', 'important');
             el.style.setProperty('bottom', '0', 'important');
             el.style.setProperty('height', '88vh', 'important');
@@ -321,6 +387,8 @@ export function useRazorpay() {
       });
     } catch (error: any) {
       console.error('Razorpay error:', error);
+      settleAttempt();
+      unlockBodyScroll();
       toast.error(friendlyError(error));
       options.onFailure(error);
     } finally {
