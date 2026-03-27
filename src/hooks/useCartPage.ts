@@ -99,6 +99,7 @@ export function useCartPage() {
   const [selectedDeliveryAddress, setSelectedDeliveryAddress] = useState<any>(null);
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
   const [scheduledTime, setScheduledTime] = useState<string | null>(null);
+  const [wantsScheduledDelivery, setWantsScheduledDelivery] = useState(false);
   const settings = useSystemSettings();
   const { formatPrice, currencySymbol } = useCurrency();
   const { addresses, defaultAddress, isLoading: addressesLoading } = useDeliveryAddresses();
@@ -706,5 +707,6 @@ export function useCartPage() {
     hasPreorderItems, maxLeadTimeHours, preorderMissingSchedule,
     scheduledDate, setScheduledDate, scheduledTime, setScheduledTime,
     preorderCutoffTime, preorderSellerIds,
+    wantsScheduledDelivery, setWantsScheduledDelivery,
   };
 }

@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { AlertCircle } from 'lucide-react';
 import { AddressPicker } from '@/components/profile/AddressPicker';
+import { Switch } from '@/components/ui/switch';
 
 export default function CartPage() {
   const c = useCartPage();
@@ -178,7 +179,13 @@ export default function CartPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       {item.product ? (<>
-                        <div className="flex items-center gap-1.5"><VegBadge isVeg={item.product.is_veg ?? true} size="sm" /><h4 className="text-sm font-medium truncate">{item.product.name}</h4></div>
+                        <div className="flex items-center gap-1.5">
+                          <VegBadge isVeg={item.product.is_veg ?? true} size="sm" />
+                          <h4 className="text-sm font-medium truncate">{item.product.name}</h4>
+                          {(item.product as any)?.accepts_preorders && (
+                            <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-accent/15 text-accent text-[10px] font-semibold"><Clock size={9} />Pre-order</span>
+                          )}
+                        </div>
                         <p className="text-sm font-bold mt-0.5">{c.formatPrice(item.product.price * item.quantity)}</p>
                         <p className="text-[11px] text-muted-foreground">{c.formatPrice(item.product.price)} × {item.quantity}</p>
                       </>) : (<p className="text-sm text-muted-foreground italic">Item unavailable</p>)}
@@ -227,7 +234,7 @@ export default function CartPage() {
           )}
         </div>
 
-        {/* Pre-order scheduling */}
+        {/* Pre-order scheduling (mandatory) */}
         {c.hasPreorderItems && (
           <div className="mt-5 px-4">
             <PreorderDatePicker
@@ -238,6 +245,32 @@ export default function CartPage() {
               onTimeChange={c.setScheduledTime}
               cutoffTime={c.preorderCutoffTime}
             />
+            <p className="text-[11px] text-destructive mt-1 font-medium">* Scheduling is required for pre-order items</p>
+          </div>
+        )}
+
+        {/* Optional scheduling for non-pre-order carts */}
+        {!c.hasPreorderItems && (
+          <div className="mt-5 px-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Schedule for later?</p>
+                <p className="text-[11px] text-muted-foreground">Choose a preferred delivery date & time</p>
+              </div>
+              <Switch checked={c.wantsScheduledDelivery} onCheckedChange={c.setWantsScheduledDelivery} />
+            </div>
+            {c.wantsScheduledDelivery && (
+              <div className="mt-3">
+                <PreorderDatePicker
+                  leadTimeHours={0}
+                  selectedDate={c.scheduledDate}
+                  selectedTime={c.scheduledTime}
+                  onDateChange={c.setScheduledDate}
+                  onTimeChange={c.setScheduledTime}
+                  cutoffTime={null}
+                />
+              </div>
+            )}
           </div>
         )}
 
