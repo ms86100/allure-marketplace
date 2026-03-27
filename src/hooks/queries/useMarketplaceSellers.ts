@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
@@ -32,10 +32,12 @@ export interface MarketplaceSeller {
   product_count: number;
 }
 
+const PAGE_SIZE = 50;
+const HARD_CAP = 1000;
+
 /**
  * Phase 1: Fetch nearby sellers WITHOUT products.
- * Lightweight payload (~500 bytes/seller vs ~5KB with products).
- * Products are fetched separately via useMarketplaceProducts.
+ * Uses infinite scroll with 50 sellers/page and hard cap at 1000.
  */
 export function useMarketplaceSellers() {
   const { browsingLocation } = useBrowsingLocation();
@@ -45,17 +47,17 @@ export function useMarketplaceSellers() {
   const lng = browsingLocation?.lng;
   const radiusKm = profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM;
 
-  return useQuery({
+  const query = useInfiniteQuery({
     queryKey: ['marketplace-sellers', lat, lng, radiusKm],
-    queryFn: async (): Promise<MarketplaceSeller[]> => {
+    queryFn: async ({ pageParam = 0 }): Promise<MarketplaceSeller[]> => {
       if (!lat || !lng) return [];
 
       const { data, error } = await supabase.rpc('search_sellers_paginated' as any, {
         _lat: lat,
         _lng: lng,
         _radius_km: radiusKm,
-        _limit: 200,
-        _offset: 0,
+        _limit: PAGE_SIZE,
+        _offset: pageParam as number,
       });
 
       if (error) {
@@ -65,7 +67,22 @@ export function useMarketplaceSellers() {
 
       return (data || []) as MarketplaceSeller[];
     },
+    getNextPageParam: (lastPage, allPages) => {
+      const totalFetched = allPages.reduce((sum, page) => sum + page.length, 0);
+      if (totalFetched >= HARD_CAP) return undefined;
+      if (lastPage.length < PAGE_SIZE) return undefined;
+      return totalFetched;
+    },
+    initialPageParam: 0,
     enabled: !!(lat && lng),
     staleTime: jitteredStaleTime(10 * 60 * 1000),
   });
+
+  // Flatten all pages for backward compatibility
+  const allSellers = query.data?.pages.flat() ?? [];
+
+  return {
+    ...query,
+    data: allSellers,
+  };
 }

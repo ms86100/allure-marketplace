@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { jitteredStaleTime } from '@/lib/query-utils';
 
@@ -25,10 +25,9 @@ export interface MarketplaceProduct {
 }
 
 const BATCH_SIZE = 25;
+const PAGE_SIZE = 50;
+const HARD_CAP = 1000;
 
-/**
- * Chunk an array into batches of a given size.
- */
 function chunk<T>(arr: T[], size: number): T[][] {
   const result: T[][] = [];
   for (let i = 0; i < arr.length; i += size) {
@@ -38,33 +37,33 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 /**
- * Phase 2: Fetch products for given seller IDs.
- * Batches seller IDs (max 25 per call) to prevent payload overflows
- * and fires parallel RPCs, merging results.
+ * Phase 2: Fetch products for given seller IDs with infinite scroll.
+ * - Batches seller IDs (max 25 per call)
+ * - Paginates with 50 products per page
+ * - Hard cap at 1000 total items to protect mobile memory
  */
 export function useMarketplaceProducts(
   sellerIds: string[],
-  options?: { category?: string; limit?: number; offset?: number }
+  options?: { category?: string }
 ) {
-  const { category, limit = 500, offset = 0 } = options ?? {};
+  const { category } = options ?? {};
   const sortedIds = [...sellerIds].sort();
   const idsKey = sortedIds.join(',');
 
-  return useQuery({
-    queryKey: ['marketplace-products', idsKey, category ?? 'all', limit, offset],
-    queryFn: async (): Promise<MarketplaceProduct[]> => {
+  const query = useInfiniteQuery({
+    queryKey: ['marketplace-products', idsKey, category ?? 'all'],
+    queryFn: async ({ pageParam = 0 }): Promise<MarketplaceProduct[]> => {
       if (sellerIds.length === 0) return [];
 
       const batches = chunk(sellerIds, BATCH_SIZE);
 
-      // Fire all batches in parallel
       const batchResults = await Promise.all(
         batches.map(async (batchIds) => {
           const { data, error } = await supabase.rpc('get_products_for_sellers' as any, {
             _seller_ids: batchIds,
             _category: category ?? null,
-            _limit: limit,
-            _offset: offset,
+            _limit: PAGE_SIZE,
+            _offset: pageParam as number,
           });
 
           if (error) {
@@ -76,10 +75,26 @@ export function useMarketplaceProducts(
         })
       );
 
-      // Merge all batch results into a single flat array
       return batchResults.flat();
     },
+    getNextPageParam: (lastPage, allPages) => {
+      const totalFetched = allPages.reduce((sum, page) => sum + page.length, 0);
+      // Hard cap: stop fetching after 1000 items
+      if (totalFetched >= HARD_CAP) return undefined;
+      // If last page returned fewer than expected, we've reached the end
+      if (lastPage.length < PAGE_SIZE) return undefined;
+      return totalFetched;
+    },
+    initialPageParam: 0,
     enabled: sellerIds.length > 0,
     staleTime: jitteredStaleTime(10 * 60 * 1000),
   });
+
+  // Flatten all pages into a single array for backward compatibility
+  const allProducts = query.data?.pages.flat() ?? [];
+
+  return {
+    ...query,
+    data: allProducts,
+  };
 }
