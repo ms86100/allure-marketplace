@@ -52,7 +52,7 @@ export function useAppLifecycle() {
           if (isActive) {
             // Perf: batch-invalidate lightweight queries in a single pass
             const resumeKeys = new Set([
-              'featured-banners', 'system-settings-raw', 'system-settings-core',
+              'featured-banners', 'system-settings-raw', 'system-settings-all',
               'cart-count', 'cart-items', 'unread-notifications', 'notifications',
               'latest-action-notification', 'seller-orders', 'seller-dashboard-stats', 'orders',
             ]);

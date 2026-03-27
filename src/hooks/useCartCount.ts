@@ -26,7 +26,6 @@ export function useCartCount() {
     },
     enabled: isSessionRestored && !!user,
     staleTime: 5 * 1000,
-    refetchOnWindowFocus: true,
   });
 
   return itemCount;

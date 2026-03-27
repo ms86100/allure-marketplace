@@ -126,7 +126,7 @@ export function PlatformSettingsManager() {
         }
       }
       setOriginal({ ...values });
-      queryClient.invalidateQueries({ queryKey: ['system-settings-core'] });
+      queryClient.invalidateQueries({ queryKey: ['system-settings-all'] });
       toast.success(`${changedKeys.length} setting(s) updated`);
     } catch {
       toast.error('Failed to save settings');

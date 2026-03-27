@@ -31,7 +31,7 @@ export function useTrackingConfig(): TrackingConfig {
   const { data } = useQuery({
     queryKey: ['tracking-config'],
     queryFn: getTrackingConfig,
-    staleTime: jitteredStaleTime(10 * 60 * 1000),
+    staleTime: jitteredStaleTime(30 * 60 * 1000),
   });
   return data ?? DEFAULTS;
 }
