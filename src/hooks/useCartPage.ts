@@ -97,6 +97,9 @@ export function useCartPage() {
   const [fulfillmentType, setFulfillmentType] = useState<'self_pickup' | 'delivery'>('self_pickup');
   const [orderStep, setOrderStep] = useState<'validating' | 'creating' | 'confirming'>('validating');
   const [selectedDeliveryAddress, setSelectedDeliveryAddress] = useState<any>(null);
+  const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
+  const [scheduledTime, setScheduledTime] = useState<string | null>(null);
+  const [selectedDeliveryAddress, setSelectedDeliveryAddress] = useState<any>(null);
   const settings = useSystemSettings();
   const { formatPrice, currencySymbol } = useCurrency();
   const { addresses, defaultAddress, isLoading: addressesLoading } = useDeliveryAddresses();
@@ -213,6 +216,14 @@ export function useCartPage() {
     const pt = (item.product as any)?.prep_time_minutes;
     return pt && pt > max ? pt : max;
   }, 0);
+
+  // Pre-order detection: check if any cart item requires pre-ordering
+  const hasPreorderItems = items.some(item => (item.product as any)?.accepts_preorders === true);
+  const maxLeadTimeHours = items.reduce((max, item) => {
+    const lt = (item.product as any)?.lead_time_hours;
+    return (item.product as any)?.accepts_preorders && lt && lt > max ? lt : max;
+  }, 0);
+  const preorderMissingSchedule = hasPreorderItems && (!scheduledDate || !scheduledTime);
 
   const createOrdersForAllSellers = async (paymentStatus: 'pending' | 'paid', transactionRef?: string) => {
     if (!user || !profile || sellerGroups.length === 0) return [];
