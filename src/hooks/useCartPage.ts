@@ -224,6 +224,29 @@ export function useCartPage() {
   }, 0);
   const preorderMissingSchedule = hasPreorderItems && (!scheduledDate || !scheduledTime);
 
+  // Derive cutoff time from pre-order items (use the earliest cutoff across all pre-order products)
+  const preorderCutoffTime = useMemo(() => {
+    let earliest: string | null = null;
+    for (const item of items) {
+      const p = item.product as any;
+      if (!p?.accepts_preorders) continue;
+      const cutoff = p.preorder_cutoff_time;
+      if (cutoff && (!earliest || cutoff < earliest)) earliest = cutoff;
+    }
+    return earliest;
+  }, [items]);
+
+  // Track which sellers have pre-order items (for mixed-cart handling - Gap 7)
+  const preorderSellerIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const item of items) {
+      if ((item.product as any)?.accepts_preorders) {
+        ids.add(item.product?.seller_id || '');
+      }
+    }
+    return ids;
+  }, [items]);
+
   const createOrdersForAllSellers = async (paymentStatus: 'pending' | 'paid', transactionRef?: string) => {
     if (!user || !profile || sellerGroups.length === 0) return [];
 
