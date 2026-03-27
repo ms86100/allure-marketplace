@@ -200,7 +200,7 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
   }, [latitude, longitude, resolveLabel]);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 bg-background flex flex-col" style={{ touchAction: 'manipulation', overscrollBehavior: 'contain' }}>
+    <div className="fixed inset-0 z-50 bg-background flex flex-col" style={{ overscrollBehavior: 'contain' }}>
       {/* Header */}
       <div className="shrink-0 flex items-center gap-3 px-4 pt-[max(env(safe-area-inset-top,0px),12px)] pb-3 bg-background/95 backdrop-blur-sm z-10">
         <button
@@ -214,14 +214,9 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       </div>
 
       {/* Map container — fills remaining space */}
-      <div
-        className="flex-1 relative"
-        onTouchStart={(e) => e.stopPropagation()}
-        onTouchMove={(e) => e.stopPropagation()}
-        onTouchEnd={(e) => e.stopPropagation()}
-      >
+      <div className="flex-1 relative" style={{ touchAction: 'none' }}>
         {/* Map */}
-        <div ref={mapRef} className="absolute inset-0" style={{ touchAction: 'none' }} />
+        <div ref={mapRef} className="absolute inset-0" />
 
         {/* CSS center pin overlay */}
         <div ref={pinRef} className="absolute left-1/2 top-1/2 -translate-x-1/2 pointer-events-none z-10 flex flex-col items-center map-pin-container">
