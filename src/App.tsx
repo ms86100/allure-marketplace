@@ -374,27 +374,27 @@ function AppRoutes() {
         <Route path="/landing" element={user && profile ? <Navigate to="/" replace /> : <LandingPage />} />
         <Route path="/auth" element={user && profile ? <Navigate to="/" replace /> : <RouteErrorBoundary sectionName="Authentication"><AuthPage /></RouteErrorBoundary>} />
         <Route path="/reset-password" element={<RouteErrorBoundary sectionName="Reset Password"><ResetPasswordPage /></RouteErrorBoundary>} />
-        <Route path="/" element={user ? <ProtectedRoute><HomePage /></ProtectedRoute> : <Navigate to="/landing" replace />} />
-        <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
-        <Route path="/community" element={<ProtectedRoute><BulletinPage /></ProtectedRoute>} />
-        <Route path="/categories" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
-        <Route path="/category/:category" element={<ProtectedRoute><CategoryGroupPage /></ProtectedRoute>} />
-        <Route path="/seller/:id" element={<ProtectedRoute><SellerDetailPage /></ProtectedRoute>} />
+        <Route path="/" element={user ? <ProtectedRoute><RouteErrorBoundary sectionName="Home"><HomePage /></RouteErrorBoundary></ProtectedRoute> : <Navigate to="/landing" replace />} />
+        <Route path="/search" element={<ProtectedRoute><RouteErrorBoundary sectionName="Search"><SearchPage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/community" element={<ProtectedRoute><RouteErrorBoundary sectionName="Community"><BulletinPage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/categories" element={<ProtectedRoute><RouteErrorBoundary sectionName="Categories"><CategoriesPage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/category/:category" element={<ProtectedRoute><RouteErrorBoundary sectionName="Category"><CategoryGroupPage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/seller/:id" element={<ProtectedRoute><RouteErrorBoundary sectionName="Seller Store"><SellerDetailPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/cart" element={<ProtectedRoute><RouteErrorBoundary sectionName="Cart"><CartPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><RouteErrorBoundary sectionName="Orders"><OrdersPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/orders/:id" element={<ProtectedRoute><RouteErrorBoundary sectionName="Order Details"><OrderDetailPage /></RouteErrorBoundary></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-        <Route path="/profile/edit" element={<ProtectedRoute><ProfileEditPage /></ProtectedRoute>} />
-        <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
-        <Route path="/subscriptions" element={<ProtectedRoute><MySubscriptionsPage /></ProtectedRoute>} />
-        <Route path="/directory" element={<ProtectedRoute><TrustDirectoryPage /></ProtectedRoute>} />
-        <Route path="/disputes" element={<ProtectedRoute><DisputesPage /></ProtectedRoute>} />
-        <Route path="/group-buys" element={<ProtectedRoute><CollectiveBuyPage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><RouteErrorBoundary sectionName="Profile"><ProfilePage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/profile/edit" element={<ProtectedRoute><RouteErrorBoundary sectionName="Profile Edit"><ProfileEditPage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/favorites" element={<ProtectedRoute><RouteErrorBoundary sectionName="Favorites"><FavoritesPage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/subscriptions" element={<ProtectedRoute><RouteErrorBoundary sectionName="Subscriptions"><MySubscriptionsPage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/directory" element={<ProtectedRoute><RouteErrorBoundary sectionName="Directory"><TrustDirectoryPage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/disputes" element={<ProtectedRoute><RouteErrorBoundary sectionName="Disputes"><DisputesPage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/group-buys" element={<ProtectedRoute><RouteErrorBoundary sectionName="Group Buys"><CollectiveBuyPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/society/finances" element={<ProtectedRoute><RouteErrorBoundary sectionName="Society Finances"><SocietyFinancesPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/society/progress" element={<ProtectedRoute><RouteErrorBoundary sectionName="Construction Progress"><SocietyProgressPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/society/snags" element={<ProtectedRoute><RouteErrorBoundary sectionName="Snag List"><SnagListPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/society" element={<ProtectedRoute><RouteErrorBoundary sectionName="Society Dashboard"><SocietyDashboardPage /></RouteErrorBoundary></ProtectedRoute>} />
-        <Route path="/notifications/inbox" element={<ProtectedRoute><NotificationInboxPage /></ProtectedRoute>} />
+        <Route path="/notifications/inbox" element={<ProtectedRoute><RouteErrorBoundary sectionName="Notifications"><NotificationInboxPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/maintenance" element={<ProtectedRoute><RouteErrorBoundary sectionName="Maintenance"><MaintenancePage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/society/reports" element={<ProtectedRoute><RouteErrorBoundary sectionName="Society Reports"><SocietyReportPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/society/admin" element={<ProtectedRoute><SocietyAdminRoute><RouteErrorBoundary sectionName="Society Admin"><SocietyAdminPage /></RouteErrorBoundary></SocietyAdminRoute></ProtectedRoute>} />
@@ -430,7 +430,7 @@ function AppRoutes() {
         <Route path="/seller/products" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Products"><SellerProductsPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
         <Route path="/seller/settings" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Seller Settings"><SellerSettingsPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
         <Route path="/seller/earnings" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Earnings"><SellerEarningsPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
-        <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminPage /></AdminRoute></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><AdminRoute><RouteErrorBoundary sectionName="Admin"><AdminPage /></RouteErrorBoundary></AdminRoute></ProtectedRoute>} />
         <Route path="/test-results" element={<ProtectedRoute><AdminRoute><TestResultsPage /></AdminRoute></ProtectedRoute>} />
         <Route path="/api-docs" element={<ProtectedRoute><AdminRoute><ApiDocsPage /></AdminRoute></ProtectedRoute>} />
         <Route path="/docs" element={<ProtectedRoute><DocumentationPage /></ProtectedRoute>} />
@@ -439,7 +439,7 @@ function AppRoutes() {
         <Route path="/pricing" element={<PricingPage />} />
         <Route path="/refund-policy" element={<RefundPolicyPage />} />
         <Route path="/help" element={<HelpPage />} />
-        <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><RouteErrorBoundary sectionName="Notifications"><NotificationsPage /></RouteErrorBoundary></ProtectedRoute>} />
          <Route path="/community-rules" element={<CommunityRulesPage />} />
         <Route path="/push-debug" element={<ProtectedRoute><PushDebugPage /></ProtectedRoute>} />
         <Route path="/la-debug" element={<ProtectedRoute><LiveActivityDebugPage /></ProtectedRoute>} />
