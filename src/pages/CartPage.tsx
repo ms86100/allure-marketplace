@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { AlertCircle } from 'lucide-react';
 import { AddressPicker } from '@/components/profile/AddressPicker';
+import { Switch } from '@/components/ui/switch';
 
 export default function CartPage() {
   const c = useCartPage();
