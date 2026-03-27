@@ -57,10 +57,15 @@ function OrderProgressOverlayInner({ isVisible, step }: OrderProgressOverlayProp
       setShouldRender(false);
       return;
     }
+    // Show instantly for payment confirmation — no delay after Razorpay closes
+    if (step === 'confirming') {
+      setShouldRender(true);
+      return;
+    }
     // Delay showing to prevent flash on fast requests
     const timer = setTimeout(() => setShouldRender(true), SHOW_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [isVisible]);
+  }, [isVisible, step]);
 
   if (!shouldRender) return null;
 

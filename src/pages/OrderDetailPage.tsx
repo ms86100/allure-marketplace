@@ -39,13 +39,47 @@ import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { getString, setString } from '@/lib/persistent-kv';
 
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { LiveActivityManager } from '@/services/LiveActivityManager';
 import { Capacitor } from '@capacitor/core';
 
 // Gap 10: Lazy-load map to avoid bundling Leaflet for non-delivery orders
 const DeliveryMapView = lazy(() => import('@/components/delivery/DeliveryMapView').then(m => ({ default: m.DeliveryMapView })));
+
+function PaymentConfirmingBanner() {
+  const [showTimeout, setShowTimeout] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setShowTimeout(true), 15000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200">
+      <div className="flex items-center gap-2">
+        <Loader2 size={14} className="animate-spin text-amber-600 shrink-0" />
+        <p className="text-xs text-amber-800">
+          <span className="font-semibold">Payment received!</span>{' '}
+          {showTimeout
+            ? 'Your payment is safe. We\'re still confirming with the bank.'
+            : 'Confirming your order — this usually takes a few seconds.'}
+        </p>
+      </div>
+      {showTimeout && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
+          onClick={() => window.location.reload()}
+        >
+          <RefreshCw size={12} className="mr-1" />
+          Refresh status
+        </Button>
+      )}
+    </div>
+  );
+}
 
 function CelebrationBanner({ order, isBuyerView, flow }: { order: any; isBuyerView: boolean; flow: any }) {
   const show = isBuyerView && isSuccessfulTerminal(flow, order.status) && !getString(`celebration_${order.id}`);
@@ -293,6 +327,11 @@ export default function OrderDetailPage() {
                 }
               </p>
             </div>
+          )}
+
+          {/* Payment confirmation banner for buyer — shown during payment_pending */}
+          {o.isBuyerView && order.status === 'payment_pending' && (
+            <PaymentConfirmingBanner />
           )}
 
           {/* Seller-side urgent timer — BULLETPROOF: show whenever auto_cancel_at is set */}

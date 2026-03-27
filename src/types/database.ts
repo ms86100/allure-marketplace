@@ -342,6 +342,7 @@ const ORDER_STATUS_MAP: Record<string, { label: string; color: string }> = {
   rescheduled: { label: 'Rescheduled', color: 'bg-orange-100 text-orange-800' },
   no_show: { label: 'No Show', color: 'bg-red-100 text-red-800' },
   at_gate: { label: 'At Gate', color: 'bg-cyan-100 text-cyan-800' },
+  payment_pending: { label: 'Confirming Payment…', color: 'bg-amber-100 text-amber-800' },
 };
 
 const UNKNOWN_STATUS = { label: 'Unknown', color: 'bg-gray-100 text-gray-600' };
