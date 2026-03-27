@@ -410,7 +410,18 @@ class _LiveActivityManager {
   async end(entityId: string): Promise<void> {
     const entry = this.active.get(entityId);
     if (!entry) {
-      console.log(TAG, `END SKIP — no active entry for ${entityId}`);
+      console.log(TAG, `END — no active entry for ${entityId}, trying native fallback`);
+      // Bug 2 fix: fallback to native layer for cold-restart desync
+      try {
+        const { activities } = await LiveActivity.getActiveActivities();
+        const match = activities.find(a => a.entityId === entityId);
+        if (match) {
+          console.log(TAG, `END NATIVE FALLBACK — found native activity ${match.activityId} for ${entityId}`);
+          await LiveActivity.endLiveActivity({ activityId: match.activityId });
+          this.deleteTokenFromBackend(entityId);
+          addOpsEntry({ timestamp: Date.now(), action: 'end', entityId, success: true, activityId: match.activityId });
+        }
+      } catch { /* best-effort */ }
       return;
     }
 
@@ -439,6 +450,7 @@ class _LiveActivityManager {
     const ids = Array.from(this.active.keys());
     await Promise.all(ids.map((id) => this.end(id)));
     this.clearPersistedMap();
+    this.tokenSaved.clear();
   }
 
   /** Force re-hydration (e.g. on app resume). Skips if hydration is currently running. */
@@ -448,6 +460,7 @@ class _LiveActivityManager {
       return;
     }
     this.hydrationPromise = null;
+    this.tokenSaved.clear();
   }
 
   /** Check if a Live Activity is currently tracking the given entity */
