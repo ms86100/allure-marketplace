@@ -1,6 +1,6 @@
-import { memo } from 'react';
+import { memo, useCallback, useTransition } from 'react';
 import { Home, Building2, LayoutGrid, ShoppingCart, User, Shield, ClipboardList, Briefcase, ListChecks } from 'lucide-react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { hapticSelection } from '@/lib/haptics';
 import { useEffectiveFeatures } from '@/hooks/useEffectiveFeatures';
@@ -30,9 +30,16 @@ const workerNavItems: { to: string; icon: typeof Briefcase; label: string }[] = 
 
 function BottomNavInner() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [isPending, startTransition] = useTransition();
   const { features, isFeatureEnabled, isLoading } = useEffectiveFeatures();
   const { isAdmin, isSocietyAdmin, isBuilderMember, roles, isSecurityOfficer, isWorker } = useAuth();
   const itemCount = useCartCount();
+
+  const handleNav = useCallback((to: string) => {
+    hapticSelection();
+    startTransition(() => { navigate(to); });
+  }, [navigate, startTransition]);
 
   const isPrimaryRoleUser = isAdmin || isSocietyAdmin || isBuilderMember;
   const navItems = !isPrimaryRoleUser && isSecurityOfficer
@@ -63,10 +70,10 @@ function BottomNavInner() {
           const showCartBadge = to === '/cart' && itemCount > 0 && location.pathname !== '/cart';
           
           return (
-            <NavLink
+            <button
               key={to}
-              to={to}
-              onClick={() => hapticSelection()}
+              type="button"
+              onClick={() => handleNav(to)}
               className={cn(
                 'flex flex-col items-center justify-center gap-1 px-3 py-1 rounded-2xl transition-all duration-200 min-w-[52px] relative',
                 isActive
@@ -95,7 +102,7 @@ function BottomNavInner() {
               )}>
                 {label}
               </span>
-            </NavLink>
+            </button>
           );
         })}
       </div>
