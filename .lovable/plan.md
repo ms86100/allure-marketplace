@@ -1,35 +1,71 @@
 
+# Rework Category Cards with a New Visual Direction
 
-# Restyle Category Cards: Square Images + Glassmorphism
+## Why the current version still feels wrong
+The card still uses a large `aspect-[4/3]` image block with edge-to-edge `object-cover` photos. Even with reduced corner radius, that makes the image feel tall, glossy, and “mirror-like.”
 
-## Problem
-The category card images use `rounded-2xl` on both the outer card and inner image containers, making them look like rounded ovals/mirrors instead of clean squares like the Blinkit reference.
+## New implementation approach
+Instead of trying to tweak the current layout again, I would change the card structure in `src/components/home/CategoryImageGrid.tsx`:
 
-## Changes — `src/components/home/CategoryImageGrid.tsx`
+### 1. Replace the tall image area with a short media strip
+- Remove the `aspect-[4/3]` image block
+- Use a fixed shallow height like `h-20` / `h-22`
+- This immediately reduces the oversized image feel
 
-1. **Reduce image rounding** — Change inner image containers from `rounded-2xl` to `rounded-xl` so product images appear more square/rectangular (matching the Blinkit reference)
+### 2. Stop using full-bleed images
+- Do **not** let photos fill the whole card area
+- Render 1–2 product thumbnails inside smaller “glass capsules” or tiles
+- Use `object-contain` or tightly framed thumbnail boxes instead of large `object-cover` panels
+- This avoids the mirror/oval visual completely
 
-2. **Add glassmorphism to the card** — Replace the solid `backgroundColor` with a semi-transparent version + `backdrop-blur`:
-   - Card gets `backdrop-blur-xl` and `bg-white/10` (dark mode) or `bg-black/5` (light mode) layered with the teal tint
-   - Add a subtle inner glow border: `border border-white/15`
-   - The "+X more" badge keeps its current style
+### 3. Keep glassmorphism on the outer card only
+- Outer tile stays frosted/glass:
+  - tinted pastel background
+  - `backdrop-blur`
+  - soft highlight border
+  - subtle glow/shadow
+- Inner thumbnails should look like floating content inside the glass card, not like the card itself is an image frame
 
-3. **Keep the teal tint** — The glassmorphism sits on top of the existing card background color but at reduced opacity (~70%), giving a frosted teal look that matches the brand
+### 4. Move emphasis to label + category identity
+- Make the bottom of the card the focus:
+  - category name
+  - optional product count / “Explore”
+- Let the imagery become supporting decoration, not the dominant block
 
-## Visual Result
+### 5. Improve visual proportions
+Planned proportions:
 ```text
 ┌─────────────────────┐
-│  ┌────┐  ┌────┐     │  ← Square-ish images (rounded-xl)
-│  │ img│  │ img│     │
-│  └────┘  └────┘     │  ← Frosted glass card bg
-│      +14 more       │
-│     Home Food       │
+│  [thumb]  [thumb]   │  ← short media strip
+│                     │
+│  Home Food          │
+│  24 items     >     │
 └─────────────────────┘
 ```
 
-## Files Changed
+This will feel more like a compact discovery tile and less like a photo card.
 
-| File | Change |
-|------|--------|
-| `src/components/home/CategoryImageGrid.tsx` | Reduce image rounding to `rounded-xl`, add glassmorphism (`backdrop-blur-xl`, semi-transparent bg, `border-white/15`) |
+## File to update
+- `src/components/home/CategoryImageGrid.tsx`
 
+## Exact code-level changes
+- Replace `aspect-[4/3]` media wrapper with a short fixed-height row
+- Remove edge-to-edge image rendering
+- Wrap thumbnails in smaller rounded containers (`rounded-lg` / `rounded-xl`)
+- Keep frosted glass only on the card shell
+- Shift text into a dedicated lower content area
+- Update skeleton state to match the new shorter card height
+
+## Result
+- Less image height
+- No “mirror” look
+- Stronger glassmorphism
+- Cleaner, more premium category tiles
+- Better match for a compact marketplace discovery UI
+
+## Validation
+I would verify:
+- cards look shorter on desktop and mobile
+- images no longer dominate the tile
+- fallback icon still looks good when no product image exists
+- category names remain readable with long labels
