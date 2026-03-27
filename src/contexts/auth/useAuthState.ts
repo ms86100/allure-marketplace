@@ -206,7 +206,15 @@ export function useAuthState() {
 
     restoreWithTimeout.finally(() => {
       supabase.auth.getSession().then(({ data: { session } }) => {
-        setPartial({ session, user: session?.user ?? null, isLoading: false, isSessionRestored: true });
+        const newUserId = session?.user?.id;
+        // Perf: skip user/session update if onAuthStateChange already set same user
+        if (newUserId && newUserId === prevUserIdRef.current) {
+          // Only mark session as restored (no new user/session refs)
+          setPartial({ isSessionRestored: true });
+        } else {
+          prevUserIdRef.current = newUserId;
+          setPartial({ session, user: session?.user ?? null, isLoading: false, isSessionRestored: true });
+        }
         // Hide splash screen now that session is resolved
         hideSplashScreen();
         if (session?.user && profileFetchedFor.current !== session.user.id) {
