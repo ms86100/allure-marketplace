@@ -56,7 +56,7 @@ function PaymentConfirmingBanner() {
   }, []);
 
   return (
-    <div className="flex flex-col gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200">
+    <div className="flex flex-col gap-2 px-3 py-2.5 rounded-lg bg-warning/10 border border-warning/20">
       <div className="flex items-center gap-2">
         <Loader2 size={14} className="animate-spin text-amber-600 shrink-0" />
         <p className="text-xs text-amber-800">
