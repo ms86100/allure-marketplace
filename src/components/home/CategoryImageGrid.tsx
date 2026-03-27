@@ -18,6 +18,30 @@ interface CategoryMeta {
   images: string[];
 }
 
+const CATEGORY_PASTELS: Record<string, string> = {
+  home_food: '#E8F5E9',
+  bakery: '#FFF3E0',
+  snacks: '#FFF8E1',
+  groceries: '#E3F2FD',
+  beverages: '#E0F2F1',
+  dairy: '#FFF8E1',
+  fruits: '#E8F5E9',
+  vegetables: '#E8F5E9',
+  sweets: '#FFF3E0',
+  meat: '#FFEBEE',
+  seafood: '#E0F7FA',
+  pet_supplies: '#F3E5F5',
+  stationery: '#E8EAF6',
+  electronics: '#E3F2FD',
+  clothing: '#FCE4EC',
+  beauty: '#FDE0DC',
+  health: '#E0F2F1',
+  home_services: '#E8F5E9',
+  cleaning: '#E0F7FA',
+  repairs: '#FFF8E1',
+};
+const DEFAULT_PASTEL = '#F5F5F5';
+
 function buildCategoryMeta(
   productCategories: { category: string; products: any[] }[],
 ): Record<string, CategoryMeta> {
@@ -41,15 +65,12 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
   const ml = useMarketplaceLabels();
 
   const allCategories = groupedConfigs[parentGroup] || [];
-  // Only show categories that have actual products nearby (activeCategories gate)
-  // AND have at least 1 real product in the metaMap
   const metaMap = useMemo(() => buildCategoryMeta(productCategories), [productCategories]);
 
   const categories = useMemo(() => {
     const filtered = activeCategories
       ? allCategories.filter(c => activeCategories.has(c.category))
       : allCategories;
-    // CORE FIX: Hide categories with zero products — prevents clickable empty states
     return filtered.filter(c => {
       const meta = metaMap[c.category];
       return meta && meta.count > 0;
@@ -63,7 +84,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
         <div className="grid grid-cols-3 gap-3">
           {[1, 2, 3].map(i => (
             <div key={i} className="flex flex-col items-center gap-2">
-              <Skeleton className="aspect-square w-full rounded-2xl" />
+              <Skeleton className="w-full rounded-2xl h-28" />
               <Skeleton className="h-3 w-14 rounded" />
             </div>
           ))}
@@ -87,14 +108,14 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
         </Link>
       </div>
 
-      {/* 3-column tile grid — Blinkit style: colored card + 2 images + label below */}
+      {/* 3-column tile grid — Blinkit style: pastel card + 2 images + label */}
       <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 stagger-children">
         {categories.slice(0, 9).map((cat) => {
           const meta = metaMap[cat.category] || { count: 0, images: [] };
           const images = meta.images.length > 0
             ? meta.images
             : cat.imageUrl ? [cat.imageUrl] : [];
-          const catColor = cat.color || 'hsl(var(--muted))';
+          const pastelColor = CATEGORY_PASTELS[cat.category] || DEFAULT_PASTEL;
 
           return (
             <Link
@@ -102,54 +123,58 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
               to={`/category/${cat.parentGroup}?sub=${cat.category}`}
               className="flex flex-col items-center group active:scale-[0.96] transition-transform duration-150"
             >
-              {/* Colored card tile */}
+              {/* Pastel card tile */}
               <div
-                className="w-full aspect-square rounded-2xl overflow-hidden relative p-2.5 border border-border/30"
-                style={{
-                  background: `linear-gradient(160deg, ${catColor}20 0%, ${catColor}10 60%, hsl(var(--card)) 100%)`,
-                }}
+                className="w-full rounded-2xl overflow-hidden relative p-3 shadow-sm"
+                style={{ backgroundColor: pastelColor }}
               >
-                {images.length >= 2 ? (
-                  <div className="grid grid-cols-2 w-full h-full gap-1.5">
-                    {images.slice(0, 2).map((src, i) => (
+                {/* Image area — fixed height */}
+                <div className="relative">
+                  {images.length >= 2 ? (
+                    <div className="flex gap-1.5 h-20">
+                      {images.slice(0, 2).map((src, i) => (
+                        <div key={i} className="flex-1 h-full">
+                          <img
+                            src={src}
+                            alt=""
+                            className="w-full h-full object-cover rounded-xl"
+                            loading="lazy"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : images.length === 1 ? (
+                    <div className="h-20">
                       <img
-                        key={i}
-                        src={src}
-                        alt=""
+                        src={images[0]}
+                        alt={cat.displayName}
                         className="w-full h-full object-cover rounded-xl"
                         loading="lazy"
                       />
-                    ))}
-                  </div>
-                ) : images.length === 1 ? (
-                  <img
-                    src={images[0]}
-                    alt={cat.displayName}
-                    className="w-full h-full object-cover rounded-xl"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center rounded-xl bg-muted/50">
-                    <DynamicIcon
-                      name={cat.icon}
-                      size={36}
-                      className="text-muted-foreground"
-                    />
-                  </div>
-                )}
+                    </div>
+                  ) : (
+                    <div className="h-20 flex items-center justify-center rounded-xl bg-white/50">
+                      <DynamicIcon
+                        name={cat.icon}
+                        size={32}
+                        className="text-gray-500"
+                      />
+                    </div>
+                  )}
 
-                {/* "+X more" badge */}
-                {meta.count > 2 && (
-                  <div className="absolute bottom-2 right-2 bg-background/80 backdrop-blur-sm text-foreground text-[9px] font-bold px-2 py-0.5 rounded-full border border-border/40">
-                    +{meta.count - 2} more
-                  </div>
-                )}
+                  {/* "+X more" badge */}
+                  {meta.count > 2 && (
+                    <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                      +{meta.count - 2} more
+                    </div>
+                  )}
+                </div>
+
+                {/* Label inside card */}
+                <p className="text-[13px] font-medium text-gray-900 text-center leading-tight mt-2 line-clamp-2">
+                  {cat.displayName}
+                </p>
               </div>
-
-              {/* Label below card */}
-              <span className="text-xs font-bold text-foreground text-center leading-tight mt-2 line-clamp-2 px-0.5">
-                {cat.displayName}
-              </span>
             </Link>
           );
         })}
