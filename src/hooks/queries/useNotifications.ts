@@ -110,27 +110,6 @@ export function useNotifications(userId: string | undefined) {
   });
 }
 
-/**
- * One-time stale cleanup hook — runs once after first successful inbox fetch.
- * Must be called from the NotificationInboxPage component, not inside a query.
- */
-export function useStaleNotificationCleanup(
-  userId: string | undefined,
-  notifications: UserNotification[],
-  isSuccess: boolean,
-) {
-  const queryClient = useQueryClient();
-  const cleanupRanRef = { current: false };
-
-  if (isSuccess && notifications.length > 0 && !cleanupRanRef.current && userId) {
-    cleanupRanRef.current = true;
-    cleanupStaleDeliveryNotifications(notifications).then(() => {
-      queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
-      queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
-    }).catch(() => {});
-  }
-}
 
 export function useLatestActionNotification(userId: string | undefined) {
   return useQuery({
