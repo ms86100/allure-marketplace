@@ -1,106 +1,49 @@
 
-Fix checkout RPC drift instead of patching the next visible error.
 
-What I found
-- `order_items.product_name` is `NOT NULL` in the database.
-- The current checkout RPC in `supabase/migrations/20260327135608_94f2ff1f-0781-4af9-b0c8-21aada2cd4f5.sql` inserts into `order_items` with only:
-  - `order_id`
-  - `product_id`
-  - `quantity`
-  - `unit_price`
-  and does not write `product_name`.
-- There are still 2 live `create_multi_vendor_orders` RPC signatures in the database:
-  1. the newer 20-parameter checkout version
-  2. an older `uuid, uuid, json, ...` overload
-- The older overload also inserts `order_items` without `product_name`.
-- This is why you keep seeing “a different error every time”: the flow has been patched in pieces, but the DB contract is still fragmented across multiple RPC versions.
+# Fix: Razorpay Popup Not Opening + Duplicate Order Creation
 
-Root cause
-- The order creation path was optimized for performance, but the `order_items` insert no longer matches the table schema.
-- On top of that, multiple active RPC overloads mean one fix can miss another live path.
+## What's happening
 
-Bulletproof implementation plan
+**Problem 1 — Popup blocked in preview iframe**: The Razorpay SDK injects its own iframe/modal overlay when `razorpay.open()` is called. Inside the Lovable preview (which itself runs in an iframe), the SDK's popup is silently blocked or immediately dismissed by browser security. The `modal.ondismiss` callback fires, resetting status to `'pending'` — which is why you see the spinner then back to Cancel/Pay Now with no error message.
 
-1. Rebuild `create_multi_vendor_orders` as one authoritative DB contract
-- Keep one real implementation only.
-- Make every active signature delegate to the same internal logic or drop obsolete overloads safely.
-- Stop having multiple independently maintained order-creation bodies.
+This is **not a code bug** — it's an iframe sandbox restriction. Razorpay will work correctly on your published site or in a standalone browser tab.
 
-2. Fix `order_items` snapshot writes at the source
-- During validation, fetch authoritative product snapshot fields from `products`:
-  - `name`
-  - `price`
-  - `seller_id`
-  - availability/approval/stock fields
-- Store `product_name` from database product data, not client payload.
-- Also use server price consistently for `unit_price`.
-- This removes both the null error and client-tampering risk.
+**Problem 2 — Duplicate Razorpay orders**: The console logs show **4 separate Razorpay orders** created for the same internal order ID. Each "Pay Now" tap creates a new Razorpay order because the edge function doesn't check if one already exists. This wastes Razorpay API calls and creates orphaned payment records.
 
-3. Eliminate overload drift completely
-- Audit all frontend and function callers of `create_multi_vendor_orders`.
-- Standardize them on the canonical signature.
-- For backward compatibility, keep temporary wrappers only if another live path still depends on the old signature.
-- If wrappers remain, they must forward into the same shared implementation, not duplicate logic.
+**Problem 3 — Silent failure**: When the popup fails to open (or is dismissed immediately), the user gets no feedback — just back to the buttons. There should be a clear message explaining what happened.
 
-4. Normalize all fragile typed inputs in one place
-- Centralize casting for:
-  - `scheduled_date`
-  - `scheduled_time_start`
-  - payment/status fields
-- Use safe `NULLIF(..., '')::date` / `::time` handling only in the canonical implementation.
-- This prevents the recurring “text vs date/time” regressions from resurfacing in another overload.
+## Plan
 
-5. Add hard failure messages that map to real business cases
-- Return structured errors for:
-  - unavailable item
-  - price changed
-  - insufficient stock
-  - seller mismatch
-  - store closed
-  - delivery out of range
-  - invalid scheduling payload
-  - invalid product snapshot
-- The client should only translate these; it should not re-implement checkout truth.
+### 1. Reuse existing Razorpay order instead of creating duplicates
+**File**: `supabase/functions/create-razorpay-order/index.ts`
 
-6. Add a schema-alignment safety pass for checkout inserts
-- Verify every insert into:
-  - `orders`
-  - `order_items`
-  - `payment_records`
-  writes all required non-null columns explicitly or via defaults.
-- This closes the current class of “one missing column after another” bugs.
+Before creating a new Razorpay order, check if the order already has a valid `razorpay_order_id`. If it does, fetch the existing Razorpay order status from the API. If it's still `created` or `attempted`, return that order instead of creating a new one. Only create a fresh order if the previous one is expired or failed.
 
-Files / areas to change
-- `supabase/migrations/...`
-  - create one migration that:
-    - fixes `product_name` insertion
-    - consolidates or wraps both live RPC signatures
-    - removes duplicated insert logic
-- `src/hooks/useCartPage.ts`
-  - verify only the canonical RPC is called
-  - keep client thin and error handling mapped to structured backend errors
-- Any other caller still using the old overload
-  - update to canonical contract or temporary wrapper
+### 2. Add iframe detection and user guidance
+**File**: `src/hooks/useRazorpay.ts`
 
-Risk controls
-- No schema guesswork: use the current live table contract as source of truth.
-- No client trust for financial/order snapshots.
-- No breaking old paths silently: compatibility wrapper first, removal second.
-- No more piecemeal fixes: one migration must address both live signatures together.
+After `razorpay.open()`, set a short timeout (~2s) to check if the Razorpay SDK actually injected its modal into the DOM. If no Razorpay iframe/overlay is found, it means the popup was blocked. In that case, call `onFailure` with a specific error type instead of silently waiting for the 15s timeout.
 
-Validation before closing
-1. COD single-seller checkout creates orders successfully.
-2. COD multi-seller checkout creates all orders successfully.
-3. `order_items.product_name` is populated for every inserted row.
-4. Online payment flow still creates pending orders correctly.
-5. Pre-order scheduling still works with valid date/time.
-6. Empty scheduling values do not crash inserts.
-7. Stale caller path cannot hit the old broken insert anymore.
-8. Duplicate taps still deduplicate correctly.
-9. Stock and price validation still block invalid orders.
-10. No checkout path can create partial order rows.
+### 3. Show actionable error when popup is blocked
+**File**: `src/components/payment/RazorpayCheckout.tsx`
 
-Expected result
-- This stops the current `product_name` failure.
-- It also addresses the larger issue causing repeated new checkout errors: RPC drift and schema-contract mismatch.
-- After this, checkout becomes one stable backend path instead of multiple half-fixed versions.
+Add a new status state `'blocked'` that shows a message like: "Payment window couldn't open. Please try on the published app or open in a new tab." with a button to copy the published URL or retry.
+
+### 4. Disable Pay Now button while processing
+**File**: `src/components/payment/RazorpayCheckout.tsx`
+
+The `handlePayment` function doesn't guard against double-taps. Add a guard so clicking "Pay Now" while already processing is ignored — preventing the 4x duplicate order creation seen in logs.
+
+## Files changed
+
+| File | Change |
+|------|--------|
+| `supabase/functions/create-razorpay-order/index.ts` | Check for existing valid Razorpay order before creating new one |
+| `src/hooks/useRazorpay.ts` | Detect popup-blocked after `open()`, fire failure instead of silent reset |
+| `src/components/payment/RazorpayCheckout.tsx` | Add `blocked` state with guidance message; guard against double-tap |
+
+## Risk assessment
+- **Reusing Razorpay orders**: Safe — Razorpay API supports fetching order status. If the order expired, we create a new one as fallback.
+- **Iframe detection**: Uses DOM presence check, not a hack. If Razorpay changes its DOM structure, worst case is the old 15s timeout behavior (no regression).
+- **Double-tap guard**: Pure UI guard, zero backend risk.
+
