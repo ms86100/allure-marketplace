@@ -9,8 +9,7 @@ import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useMarketplaceConfig } from '@/hooks/useMarketplaceConfig';
 import { useBadgeConfig } from '@/hooks/useBadgeConfig';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
-import { useQuery } from '@tanstack/react-query';
-import { jitteredStaleTime } from '@/lib/query-utils';
+import { useMarketplaceData } from '@/hooks/queries/useMarketplaceData';
 import { useCurrency } from '@/hooks/useCurrency';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 

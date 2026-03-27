@@ -19,6 +19,7 @@ interface CategoryGroup {
  */
 export function useProductsByCategory(limit = 50) {
   const { data: sellers, isLoading, error } = useMarketplaceData();
+  const { effectiveSocietyId } = useAuth();
   const queryClient = useQueryClient();
 
   const data = useMemo((): CategoryGroup[] => {
@@ -64,7 +65,7 @@ export function useProductsByCategory(limit = 50) {
     }
 
     return result;
-  }, [sellers, effectiveSocietyId, queryClient, limit]);
+  }, [sellers, queryClient, limit]);
 
   return {
     data,
