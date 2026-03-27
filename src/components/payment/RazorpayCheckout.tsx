@@ -62,8 +62,12 @@ export function RazorpayCheckout({
       }
       paymentInFlightRef.current = false;
     } else {
-      // Reset the terminal guard when drawer fully closes
-      successFinalRef.current = false;
+      // Delay reset of terminal guard to ensure close lifecycle completes first.
+      // This prevents handleClose from running after successFinalRef is cleared.
+      const timer = setTimeout(() => {
+        successFinalRef.current = false;
+      }, 500);
+      return () => clearTimeout(timer);
     }
     return () => {
       if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
