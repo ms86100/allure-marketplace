@@ -62,8 +62,12 @@ export function RazorpayCheckout({
       }
       paymentInFlightRef.current = false;
     } else {
-      // Reset the terminal guard when drawer fully closes
-      successFinalRef.current = false;
+      // Delay reset of terminal guard to ensure close lifecycle completes first.
+      // This prevents handleClose from running after successFinalRef is cleared.
+      const timer = setTimeout(() => {
+        successFinalRef.current = false;
+      }, 500);
+      return () => clearTimeout(timer);
     }
     return () => {
       if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
@@ -116,8 +120,8 @@ export function RazorpayCheckout({
         if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
         paymentInFlightRef.current = false;
         // Guard: if payment already succeeded, don't reset to pending
-        if (['verifying', 'success', 'confirming'].includes(statusRef.current)) {
-          console.log('[Payment] onDismiss suppressed — status is', statusRef.current);
+        if (successFinalRef.current || ['verifying', 'success', 'confirming'].includes(statusRef.current)) {
+          console.log('[Payment] onDismiss suppressed — successFinal:', successFinalRef.current, 'status:', statusRef.current);
           return;
         }
         setStatus('pending');
@@ -132,11 +136,17 @@ export function RazorpayCheckout({
 
   const handleClose = () => {
     if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
-    
     paymentInFlightRef.current = false;
-    if (status === 'success') {
-      // Success — do nothing extra
-    } else if (status === 'pending' || status === 'blocked') {
+
+    // CRITICAL: If success already fired, NEVER call onPaymentFailed or onDismiss.
+    // The drawer close lifecycle must not undo a successful payment.
+    if (successFinalRef.current || status === 'success') {
+      // Silent close — parent already handled success
+      onClose();
+      return;
+    }
+
+    if (status === 'pending' || status === 'blocked') {
       if (onDismiss) {
         onDismiss();
         setStatus('pending');
