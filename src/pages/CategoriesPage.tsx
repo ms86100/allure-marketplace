@@ -14,6 +14,7 @@ import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { cn } from '@/lib/utils';
 import { useSearchPlaceholder } from '@/hooks/useSearchPlaceholder';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
+import { getCategoryPastel } from '@/lib/category-pastels';
 
 /* ── Helpers ─────────────────────────────────────────────── */
 

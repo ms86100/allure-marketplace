@@ -12,6 +12,7 @@ import { AutoHighlightStrip } from '@/components/home/AutoHighlightStrip';
 import { BuyAgainRow } from '@/components/home/BuyAgainRow';
 import { ShopByStoreDiscovery } from '@/components/home/ShopByStoreDiscovery';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
+import { getCategoryPastel } from '@/lib/category-pastels';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronRight, ShoppingBag, Sparkles, Clock, TrendingUp, Flame, Store } from 'lucide-react';
