@@ -1,31 +1,60 @@
 
 
-# Blinkit-Style Category Cards for CategoryImageGrid
+# Fix Category Cards: Light Pastel Backgrounds + Correct Image Proportions
 
-## What changes
+## Problems
 
-The `CategoryImageGrid` component gets a visual upgrade to match the Blinkit "Frequently bought" card pattern from the reference screenshot.
+1. **Dark card backgrounds**: The gradient uses `${catColor}20` (8% opacity overlay on dark card background) — on dark theme this is barely visible, losing all visual separation
+2. **Images too tall**: `aspect-square` card with images filling `h-full` makes them vertically stretched
+3. **No visual grouping**: Cards blend into the dark background without distinct colored containers
 
-### Design principles from the reference
-- **Colored card background**: Each category card has a distinct tinted background (using the category's `color` from DB)
-- **2-image layout inside card**: Two product images side by side with rounded corners and padding inside the card
-- **"+X more" badge**: A count badge overlaid at the bottom of the image area showing remaining items
-- **Larger card size**: 3-column grid (not 4) — gives each card more breathing room and makes images scannable
-- **Label below**: Bold, centered, multi-line text below the card
-- **Consistent padding and rounded corners**: ~12px padding inside card, 2xl border radius
+## Fix — Single file change: `CategoryImageGrid.tsx`
 
-### Changes to `src/components/home/CategoryImageGrid.tsx`
+### 1. Category color map (light pastels)
+Add a mapping from category slug → pastel background color. These are always light regardless of theme:
 
-1. **Grid**: Change from `grid-cols-4` to `grid-cols-3` on mobile (keep `md:grid-cols-4 lg:grid-cols-5`)
-2. **Card background**: Use `cat.color` with low opacity as a gradient background (same pattern already used in `MarketplaceSection` line 375: `linear-gradient(160deg, ${catColor}18 ...)`)
-3. **Image layout**: Always show 2 images side-by-side (instead of 2×2 grid) — simpler, more like the reference. Images get `rounded-xl` with a small gap
-4. **"+X more" badge**: Show `+${meta.count - 2} more` as a small pill overlaid on the bottom-center of the image area when count > 2
-5. **Aspect ratio**: Change from `aspect-[4/3]` to `aspect-square` for the card — taller cards like the reference
-6. **Label styling**: Slightly larger text (`text-xs` instead of `text-[11px]`), with `mt-2` spacing
+```typescript
+const CATEGORY_PASTELS: Record<string, string> = {
+  home_food: '#E8F5E9',
+  bakery: '#FFF3E0',
+  snacks: '#FFF8E1',
+  groceries: '#E3F2FD',
+  beverages: '#E0F2F1',
+};
+const DEFAULT_PASTEL = '#F5F5F5';
+```
 
-### Files
+### 2. Card background
+Replace the dark gradient with a solid light pastel + subtle shadow:
+- `backgroundColor: pastelColor`
+- Add `shadow-sm` for depth
+- Keep `rounded-2xl` and `p-3`
+
+### 3. Fix image proportions
+- Change image container from `h-full` (fills square) to a fixed height: `h-20` (80px)
+- Images use `object-cover` with `rounded-xl` and `aspect-square` constraint
+- This prevents the tall/stretched look
+
+### 4. "+X more" badge
+- Dark overlay style: `bg-black/60 text-white text-[10px]`
+
+### 5. Title styling
+- `text-[13px] font-medium text-gray-900` (always dark text on light pastel card — not theme-dependent)
+
+### Card structure after fix:
+```text
+┌─────────────────────────┐  ← pastel bg, rounded-2xl, p-3, shadow-sm
+│  ┌──────┐  ┌──────┐     │
+│  │ IMG1 │  │ IMG2 │     │  ← h-20, object-cover, rounded-xl
+│  └──────┘  └──────┘     │
+│                  +8 more │
+│   Category Name          │  ← 13px, medium weight, dark text
+└─────────────────────────┘
+```
+
+## File
 
 | File | Change |
 |------|--------|
-| `src/components/home/CategoryImageGrid.tsx` | Restyle cards to Blinkit pattern |
+| `src/components/home/CategoryImageGrid.tsx` | Pastel backgrounds, fixed image height, dark-on-light text, badge restyle |
 
