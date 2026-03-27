@@ -302,7 +302,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const { data: stockCheck } = await supabase.from('products').select('stock_quantity').eq('id', product.id).maybeSingle();
         if (stockCheck?.stock_quantity != null) maxQty = stockCheck.stock_quantity;
       }
-      const existingQty = optimisticItemsRef.current.find(i => i.product_id === product.id)?.quantity || 0;
+      const existingQty = items.find(i => i.product_id === product.id)?.quantity || 0;
       if (maxQty <= 0) {
         toast.error('This item is out of stock', { id: 'stock-limit' });
         return;
