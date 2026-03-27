@@ -5510,6 +5510,8 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           low_stock_alert_threshold: number | null
+          manual_override: string | null
+          manual_override_until: string | null
           minimum_order_amount: number | null
           on_time_delivery_pct: number | null
           operating_days: string[] | null
@@ -5564,6 +5566,8 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           low_stock_alert_threshold?: number | null
+          manual_override?: string | null
+          manual_override_until?: string | null
           minimum_order_amount?: number | null
           on_time_delivery_pct?: number | null
           operating_days?: string[] | null
@@ -5618,6 +5622,8 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           low_stock_alert_threshold?: number | null
+          manual_override?: string | null
+          manual_override_until?: string | null
           minimum_order_amount?: number | null
           on_time_delivery_pct?: number | null
           operating_days?: string[] | null
