@@ -292,31 +292,35 @@ export function useLiveActivityOrchestrator(): void {
 
         console.log(TAG, `Delivery ${payload.eventType} for order ${order.id}: eta=${row.eta_minutes}, distance=${row.distance_meters}`);
 
+        // Bug 4 fix: read vehicle_type from rider pool if rider_id is present
+        let vehicleType: string | null = null;
+        if (row?.rider_id) {
+          try {
+            const { data: rider } = await supabase
+              .from('delivery_partner_pool')
+              .select('vehicle_type')
+              .eq('id', row.rider_id)
+              .maybeSingle();
+            vehicleType = rider?.vehicle_type ?? null;
+          } catch { /* best-effort */ }
+        }
+
         const data = buildLiveActivityData(order, {
           eta_minutes: row?.eta_minutes,
           distance_meters: row?.distance_meters,
           rider_name: row?.rider_name,
-          vehicle_type: null,
+          vehicle_type: vehicleType,
         }, sellerName, itemCountRes.count ?? null, flowEntriesRef.current, sellerLogoUrl, row?.eta_minutes ?? null);
         if (isNative) await LiveActivityManager.push(data);
       } catch { /* best-effort */ }
     };
 
     const subscribe = () => {
-      const activeIds = [...activeOrderIdsRef.current];
-      // Use eq filter when single active order to reduce server fan-out; otherwise client-side filter
-      const filter = activeIds.length === 1
-        ? `order_id=eq.${activeIds[0]}`
-        : undefined;
-
-      console.log(TAG, `Subscribing to delivery assignment INSERT+UPDATE (attempt ${retryCount + 1}, filter=${filter ?? 'none, client-side'})`);
+      // Bug 1 fix: always subscribe without server-side filter to avoid stale filter locking out new orders
+      console.log(TAG, `Subscribing to delivery assignment INSERT+UPDATE (attempt ${retryCount + 1}, no server filter — client-side filtering)`);
 
       const insertOpts: any = { event: 'INSERT', schema: 'public', table: 'delivery_assignments' };
       const updateOpts: any = { event: 'UPDATE', schema: 'public', table: 'delivery_assignments' };
-      if (filter) {
-        insertOpts.filter = filter;
-        updateOpts.filter = filter;
-      }
 
       const channel = supabase
         .channel(`la-delivery-${userId}`)
@@ -370,6 +374,26 @@ export function useLiveActivityOrchestrator(): void {
     const POLL_INTERVAL_MS = 15_000; // 15 seconds — tighter safety net
     /** Last-known statuses to avoid redundant processing */
     const lastKnownRef = new Map<string, string>();
+
+    // Bug 5 fix: seed lastKnownRef from current active orders to prevent redundant first-tick sync
+    const seedLastKnown = async () => {
+      try {
+        const terminalArr = [...terminalStatusesCache];
+        const { data } = await supabase
+          .from('orders')
+          .select('id, status')
+          .eq('buyer_id', userId)
+          .not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`);
+        if (data) {
+          for (const order of data) {
+            lastKnownRef.set(order.id, order.status);
+          }
+        }
+      } catch { /* best-effort */ }
+    };
+
+    // Seed before starting interval
+    seedLastKnown();
 
     const poll = async () => {
       if (!mountedRef.current) return;
