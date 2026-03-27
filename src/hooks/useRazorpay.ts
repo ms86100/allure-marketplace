@@ -246,6 +246,7 @@ export function useRazorpay() {
       };
 
       // Open Razorpay checkout
+      let successFired = false;
       const razorpayOptions = {
         key: data.razorpay_key_id,
         amount: data.amount,

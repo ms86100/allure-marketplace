@@ -124,7 +124,7 @@ export function RazorpayCheckout({
 
   const handleClose = () => {
     if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
-    if (verifyTimeoutRef.current) clearTimeout(verifyTimeoutRef.current);
+    
     paymentInFlightRef.current = false;
     if (status === 'success') {
       // Success — do nothing extra
