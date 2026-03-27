@@ -16,12 +16,9 @@ import { ServiceCategory } from '@/types/categories';
 import { SORT_OPTIONS, SortKey } from '@/lib/marketplace-constants';
 import { ArrowLeft, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { useNearbyProducts } from '@/hooks/queries/useNearbyProducts';
-import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
-import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
+import { useMarketplaceData } from '@/hooks/queries/useMarketplaceData';
 
 export default function CategoryGroupPage() {
   const { category } = useParams<{ category: string }>();
