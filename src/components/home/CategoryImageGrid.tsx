@@ -112,7 +112,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                   {images.length >= 2 ? (
                     <div className="grid grid-cols-2 gap-1.5 h-full">
                       {images.slice(0, 2).map((src, i) => (
-                        <div key={i} className="relative w-full h-full overflow-hidden rounded-xl">
+                        <div key={i} className="relative w-full h-full overflow-hidden rounded-2xl">
                           <img
                             src={src}
                             alt=""
@@ -126,11 +126,11 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                     <img
                       src={images[0]}
                       alt={cat.displayName}
-                      className="w-full h-full object-cover rounded-lg"
+                      className="w-full h-full object-cover rounded-2xl"
                       loading="lazy"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center rounded-lg bg-white/50">
+                    <div className="w-full h-full flex items-center justify-center rounded-2xl bg-white/50">
                       <DynamicIcon
                         name={cat.icon}
                         size={32}
