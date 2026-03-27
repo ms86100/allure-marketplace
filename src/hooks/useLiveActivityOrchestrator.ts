@@ -61,11 +61,13 @@ export function useLiveActivityOrchestrator(): void {
     // Use DB-backed terminal statuses for filtering active orders
     const terminalArr = [...terminalStatusesCache];
     try {
+      // Exclude terminal + payment_pending from active set
+      const excludeStatuses = [...terminalArr, 'payment_pending'];
       const { data } = await supabase
         .from('orders')
         .select('id')
         .eq('buyer_id', userId)
-        .not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`);
+        .not('status', 'in', `(${excludeStatuses.map(s => `"${s}"`).join(',')})`);
       if (data) {
         activeOrderIdsRef.current = new Set(data.map(o => o.id));
       }

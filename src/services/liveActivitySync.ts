@@ -53,13 +53,17 @@ export async function syncActiveOrders(userId: string): Promise<number> {
       return 0;
     }
 
-    const terminalFilter = `(${terminalStatuses.map(s => `"${s}"`).join(',')})`;
+    // Exclude terminal + payment_pending; add 2-hour recency guard
+    const excludeStatuses = [...terminalStatuses, 'payment_pending'];
+    const excludeFilter = `(${excludeStatuses.map(s => `"${s}"`).join(',')})`;
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
     const { data: orders, error } = await supabase
       .from('orders')
       .select('id, status, seller_id')
       .eq('buyer_id', userId)
-      .not('status', 'in', terminalFilter);
+      .not('status', 'in', excludeFilter)
+      .gte('created_at', twoHoursAgo);
 
     if (error) {
       console.error(TAG, 'Failed to fetch active orders:', error.message);
@@ -102,8 +106,9 @@ export async function syncActiveOrders(userId: string): Promise<number> {
     const orderIds = orders.map((o) => o.id);
     const sellerIds = [...new Set(orders.map((o) => o.seller_id).filter(Boolean))];
 
-    // Reuse the terminal filter already computed above for delivery exclusion
-    const deliveryTerminalFilter = terminalFilter;
+    // Reuse the exclude filter for delivery exclusion (terminal statuses only for deliveries)
+    const deliveryTerminalFilter = `(${[...terminalStatuses].map(s => `"${s}"`).join(',')})`;
+
     const [deliveriesResult, sellersResult, itemCountsResult, flowEntries] = await Promise.all([
       supabase
         .from('delivery_assignments')

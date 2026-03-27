@@ -75,6 +75,9 @@ export function ActiveOrderStrip() {
       // Also exclude payment_pending — these are unpaid orders not yet visible to sellers
       const excludeStatuses = [...terminalArr, 'payment_pending'];
 
+      // 24-hour age cap — orders older than this are stale test data
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
       const { data, error } = await supabase
         .from('orders')
         .select(`
@@ -84,6 +87,7 @@ export function ActiveOrderStrip() {
         `)
         .eq('buyer_id', user.id)
         .not('status', 'in', `(${excludeStatuses.map(s => `"${s}"`).join(',')})`)
+        .gte('created_at', twentyFourHoursAgo)
         .order('created_at', { ascending: false })
         .limit(5);
 
