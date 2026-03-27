@@ -104,15 +104,18 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
             >
               {/* Pastel card tile */}
                 <div
-                  className="w-full rounded-2xl overflow-hidden relative p-3 shadow-sm backdrop-blur-xl border border-white/15"
-                  style={{ backgroundColor: `${cardBg}B3` }}
+                  className="w-full rounded-2xl overflow-hidden relative p-2.5 shadow-md backdrop-blur-2xl border border-white/20"
+                  style={{
+                    backgroundColor: `${cardBg}B3`,
+                    boxShadow: `0 4px 24px -4px ${cardBg}40, inset 0 1px 0 0 rgba(255,255,255,0.12)`,
+                  }}
                 >
                 {/* Image area */}
                 <div className="relative aspect-[4/3]">
                   {images.length >= 2 ? (
-                    <div className="grid grid-cols-2 gap-1.5 h-full">
+                    <div className="grid grid-cols-2 gap-1 h-full">
                       {images.slice(0, 2).map((src, i) => (
-                        <div key={i} className="relative w-full h-full overflow-hidden rounded-xl">
+                        <div key={i} className="relative w-full h-full overflow-hidden rounded-lg">
                           <img
                             src={src}
                             alt=""
@@ -126,11 +129,11 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                     <img
                       src={images[0]}
                       alt={cat.displayName}
-                      className="w-full h-full object-cover rounded-xl"
+                      className="w-full h-full object-cover rounded-lg"
                       loading="lazy"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center rounded-xl bg-white/50">
+                    <div className="w-full h-full flex items-center justify-center rounded-lg bg-white/50">
                       <DynamicIcon
                         name={cat.icon}
                         size={32}
