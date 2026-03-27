@@ -1,104 +1,100 @@
 
 
-# Home Page Performance Optimization — Bulletproof Plan
+# World-Class Home UX — Production-Grade Implementation Plan
 
-## Root Cause Analysis
+## Current State Assessment
 
-The home page currently takes 5–7 seconds because of a **4-level waterfall** where each step blocks the next:
+The previous performance optimization already achieved:
+- Shell renders instantly (no profile gate)
+- `LazySection` defers below-fold content
+- Social proof deferred by 2 seconds
+- Marketplace data prefetched in AuthProvider
 
-```text
-Auth session restore (~800ms)
-  → fetchProfile RPC (~600ms)
-    → BrowsingLocation resolves (needs profile.society_id) (~100ms)
-      → useMarketplaceData RPC (needs lat/lng) (~1500ms)
-        → All child components render (CategoryImageGrid, DiscoveryRows, etc.)
-```
+**What's missing for Blinkit/Swiggy-level UX:**
 
-On top of this waterfall, multiple independent queries fire **only after** the marketplace RPC completes:
-- `AutoHighlightStrip`: 3 parallel Supabase queries (products, sellers, coupons)
-- `BuyAgainRow`: RPC `get_user_frequent_products`
-- `ActiveOrderStrip`: orders query + status flow query (sequential — waits for `getTerminalStatuses()`)
-- `WelcomeBackStrip`: orders query
-- `FeaturedBanners`: featured_items query
-- `useSocialProof`: RPC `get_society_order_stats` (waits for ALL product IDs from marketplace data)
-- `useMarketplaceConfig` / `useMarketplaceLabels`: system_settings query
-
-**The full-page skeleton gate** (`if (!profile) return skeleton`) means nothing renders until the entire auth chain completes — ~1.4 seconds of blank screen before a single query even starts.
+1. **No structured above-fold skeletons** — sections just appear when data arrives, causing layout shift
+2. **Section ordering is wrong** — ActiveOrderStrip + WelcomeBackStrip fire queries that block above-fold space before categories appear
+3. **MarketplaceSection renders all-or-nothing** — categories, banners, discovery rows all wait together
+4. **No progressive reveal animations** — content just pops in
+5. **FeaturedBanners shows skeleton while loading** — but it's sized wrong, causing CLS
 
 ## Plan
 
-### 1. Break the full-page profile gate
+### 1. Reorder above-fold for instant value
 **File:** `src/pages/HomePage.tsx`
 
-Instead of returning a full skeleton when `profile` is null, render the AppLayout immediately with above-fold skeleton placeholders **inside** the real layout. This lets the shell (bottom nav, header) paint instantly. The MarketplaceSection and other data-dependent sections show their own loading states.
+Current order: ActiveOrderStrip → WelcomeBackStrip → NotificationBanner → MarketplaceSection
 
-### 2. Start marketplace data fetch earlier — don't wait for BrowsingLocation context
-**File:** `src/hooks/queries/useMarketplaceData.ts`
+New order:
+```
+P0 (instant):    Header + Search (already done)
+P1 (< 500ms):   ParentGroupTabs + FeaturedBanners (move OUT of MarketplaceSection into HomePage directly)
+P2 (< 1.5s):    CategoryImageGrid + Discovery rows
+P3 (deferred):  ActiveOrderStrip, WelcomeBackStrip, BuyAgain, ForYou, etc.
+```
 
-The BrowsingLocation context chains through: profile → defaultAddress/society → browsingLocation → marketplace RPC. The society coordinates are available from the auth context's `get_user_auth_context` RPC response before `BrowsingLocationContext` even resolves.
+Move `ActiveOrderStrip` and `WelcomeBackStrip` below the marketplace content — they're important but not the first thing users need to see. Categories and products are.
 
-Change: Allow `useMarketplaceData` to accept coordinates directly as optional params, and in AuthProvider's prefetch block, fire `search_sellers_by_location` as a prefetch using the society coordinates from the auth context response — before `BrowsingLocationContext` mounts. This eliminates one full round-trip of waiting.
+### 2. Add structured skeleton placeholders for P1/P2 zones
+**File:** `src/pages/HomePage.tsx`
 
-### 3. Consolidate AutoHighlightStrip's 3 parallel queries into the prefetch block
-**File:** `src/components/home/AutoHighlightStrip.tsx`, `src/contexts/auth/AuthProvider.tsx`
+Add inline skeleton components that match the exact layout of:
+- Category tabs: 4-column icon grid (already exists in `ParentGroupTabs`)
+- Banner: single full-width rounded rectangle
+- Category grid: 3x2 grid of rounded cards
 
-AutoHighlightStrip fires 3 separate queries (bestsellers, top sellers, coupons) using `Promise.all`. Move this into a single prefetch in AuthProvider alongside the existing config prefetches — so by the time the component mounts, data is already cached.
+These render immediately with zero data dependency, then get replaced progressively.
 
-### 4. Fix ActiveOrderStrip's sequential waterfall
-**File:** `src/components/home/ActiveOrderStrip.tsx`
-
-Currently: `getTerminalStatuses()` (async) → `useState` → query enabled. The terminal statuses are fetched, stored in state, and only then does the orders query fire. Fix: fetch terminal statuses and orders in parallel inside the queryFn, or prefetch terminal statuses in AuthProvider.
-
-### 5. Defer social proof — it's not above-fold critical
+### 3. Break MarketplaceSection into independently-loading pieces
 **File:** `src/components/home/MarketplaceSection.tsx`
 
-`useSocialProof` fires a heavy RPC that depends on ALL product IDs being ready. It's only used for small badge counts on product cards. Defer this query with a 2-second delay or make it lazy (only fire after initial paint completes via `requestIdleCallback`).
+Currently one monolithic component. Split into:
+- `FeaturedBanners` + `AutoHighlightStrip` → render independently (already separate, just need to not block each other)
+- `ParentGroupTabs` → render independently with its own skeleton
+- `CategoryImageGrid` blocks → render each group independently
+- `DiscoveryRows` (Popular + New) → render as a deferred block
 
-### 6. Move BuyAgainRow rendering to LazySection
-**File:** `src/pages/HomePage.tsx`, `src/components/home/ForYouSection.tsx`
+Each section shows its own skeleton → replaces with content. No section blocks another.
 
-BuyAgainRow appears in **two places**: inside `MarketplaceSection` (line 126) AND inside `ForYouSection` (line 19). The duplicate inside ForYouSection fires a second identical query. Remove the duplicate. The one inside MarketplaceSection should stay but only render after the category grids (not before them).
+### 4. Add smooth fade-in transitions for progressive content
+**Files:** `src/components/home/MarketplaceSection.tsx`, `src/pages/HomePage.tsx`
 
-### 7. Instant shell with staggered content reveal
+Wrap data-dependent sections in a simple fade-in animation (opacity 0→1, translateY 4px→0, 200ms) when they load. This makes progressive rendering feel intentional rather than janky.
+
+### 5. Move ActiveOrderStrip to a sticky notification bar pattern
 **File:** `src/pages/HomePage.tsx`
 
-Instead of waiting for all data before painting, use a priority-based render:
-- **P0 (instant):** AppLayout shell + header + bottom nav + skeleton placeholders
-- **P1 (< 500ms):** FeaturedBanners + ParentGroupTabs (from prefetched cache)
-- **P2 (< 1.5s):** CategoryImageGrid + DiscoveryRows (marketplace data)
-- **P3 (deferred):** SocialProof, Leaderboard, Community, WhatsNew
+Instead of taking up above-fold space and blocking categories, show active orders as a compact sticky bar at the top (below header) that slides in after a 500ms delay. This follows Swiggy's pattern where the order tracker doesn't displace the browse experience.
+
+### 6. Ensure FeaturedBanners has fixed aspect-ratio skeleton
+**File:** `src/components/home/FeaturedBanners.tsx`
+
+The banner skeleton must match the actual banner's aspect ratio to prevent Cumulative Layout Shift. Use `aspect-[2.5/1]` on the skeleton container.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/pages/HomePage.tsx` | Remove full-page profile gate; render shell immediately with inline skeletons |
-| `src/contexts/auth/AuthProvider.tsx` | Add marketplace data + highlights prefetch using society coords |
-| `src/hooks/queries/useMarketplaceData.ts` | Accept optional coord override for prefetch compatibility |
-| `src/components/home/ActiveOrderStrip.tsx` | Parallel fetch terminal statuses + orders |
-| `src/components/home/MarketplaceSection.tsx` | Defer `useSocialProof` to post-paint; reorder BuyAgainRow below grids |
-| `src/components/home/ForYouSection.tsx` | Remove duplicate BuyAgainRow |
-| `src/components/home/AutoHighlightStrip.tsx` | Move query to prefetch in AuthProvider |
+| `src/pages/HomePage.tsx` | Reorder sections: P1 content first, defer ActiveOrderStrip/WelcomeBack; add structured skeletons |
+| `src/components/home/MarketplaceSection.tsx` | Progressive rendering — each sub-section independent with fade-in |
+| `src/components/home/FeaturedBanners.tsx` | Fixed-ratio skeleton to prevent CLS |
+| `src/components/home/ActiveOrderStrip.tsx` | Compact sticky variant with delayed appearance |
 
-## Risk Controls
-
-- **No data accuracy regression:** All queries return the same data — only the timing/ordering changes
-- **No auth regression:** Profile gate is replaced with per-section skeletons, not removed
-- **No cart regression:** BrowsingLocation context and cart logic are untouched
-- **No marketplace data regression:** useMarketplaceData still uses the same RPC, just starts earlier
-- **Backward compatible:** If prefetch misses (cache miss), components fall back to their own queries as today
-
-## Expected Result
+## Expected Timeline
 
 ```text
-Before (waterfall):
-  Auth (800ms) → Profile (600ms) → Location (100ms) → Marketplace RPC (1500ms) → Render
-  Total: ~3000ms minimum before first content, 5-7s total
-
-After (parallel + prefetch):
-  Auth (800ms) → Profile + Marketplace RPC in parallel (1500ms) → Render
-  Shell visible: instant
-  First content: ~1200ms
-  Full page: ~1500ms
+0ms     → Header + Search + Bottom Nav visible
+100ms   → Category tab skeletons visible
+300ms   → Category tabs populate (cached/prefetched)
+500ms   → Banner loads, category grids start appearing
+1000ms  → Product grids fully populated
+1200ms  → Discovery rows fade in
+1500ms  → Active orders slide in, deferred sections load
 ```
+
+## Risk Controls
+- No data flow changes — same queries, same hooks, same RPC
+- Skeletons match exact layout dimensions — zero CLS
+- ActiveOrderStrip still renders, just delayed — no missed orders
+- Progressive fade-in is CSS-only, no re-render overhead
 
