@@ -88,6 +88,7 @@ export function useCartPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [showRazorpayCheckout, setShowRazorpayCheckout] = useState(false);
+  const razorpaySuccessHandledRef = useRef(false);
   const [showUpiDeepLink, setShowUpiDeepLink] = useState(false);
   const paymentMode = usePaymentMode();
   const [pendingOrderIds, setPendingOrderIds] = useState<string[]>([]);
@@ -123,6 +124,7 @@ export function useCartPage() {
     } else if (session.paymentMethod === 'razorpay') {
       // Bug 3 fix: Restore Razorpay checkout on app resume
       setPaymentMethod('upi'); // internal state for online payment
+      razorpaySuccessHandledRef.current = false;
       setTimeout(() => setShowRazorpayCheckout(true), 100);
     }
   }, []); // Only on mount
@@ -376,6 +378,7 @@ export function useCartPage() {
         if (paymentMethod === 'upi' && paymentMode.isUpiDeepLink) {
           setShowUpiDeepLink(true);
         } else if (paymentMode.isRazorpay) {
+          razorpaySuccessHandledRef.current = false;
           setShowRazorpayCheckout(true);
         }
         return;
@@ -456,6 +459,7 @@ export function useCartPage() {
         if (paymentMode.isUpiDeepLink) {
           setShowUpiDeepLink(true);
         } else {
+          razorpaySuccessHandledRef.current = false;
           setShowRazorpayCheckout(true);
         }
       } catch (error: any) { console.error('Error creating orders:', error); toast.error(friendlyError(error), { id: 'checkout-create-error' }); }
@@ -483,50 +487,37 @@ export function useCartPage() {
   const handlePlaceOrder = useSubmitGuard(handlePlaceOrderInner, 3000, 0);
 
   const handleRazorpaySuccess = async (paymentId: string) => {
+    // Double-invocation guard — Razorpay SDK can fire success twice in rare cases
+    if (razorpaySuccessHandledRef.current) return;
+    razorpaySuccessHandledRef.current = true;
+
     setShowRazorpayCheckout(false);
     const orderIds = [...pendingOrderIds];
-    const targetOrderId = orderIds[0];
 
-    try {
-      // Store payment ID server-side (best-effort, non-blocking for navigation)
-      if (targetOrderId && user?.id) {
-        for (const oid of orderIds) {
-          await supabase.from('orders')
-            .update({ razorpay_payment_id: paymentId } as any)
-            .eq('id', oid)
-            .eq('buyer_id', user.id)
-            .eq('payment_status', 'pending');
-        }
-      }
+    // Empty orderIds guard — fallback to orders list
+    if (!orderIds.length) {
+      navigate('/orders');
+      return;
+    }
 
-      // Quick poll — 5 attempts, 1s apart (5s max). Webhook usually confirms within 2-3s.
-      let confirmed = false;
-      if (targetOrderId) {
-        for (let i = 0; i < 5; i++) {
-          await new Promise(r => setTimeout(r, 1000));
-          const { data } = await supabase.from('orders')
-            .select('payment_status').eq('id', targetOrderId).single();
-          if (data?.payment_status === 'paid') { confirmed = true; break; }
-        }
-      }
+    // Instant overlay — user sees "Confirming payment…" immediately
+    setIsPlacingOrder(true);
+    setOrderStep('confirming');
 
-      if (confirmed) {
-        toast.success('Payment successful! Order placed.', { id: 'razorpay-success' });
-      } else {
-        toast.info('Payment received — confirming your order.', { id: 'razorpay-verifying' });
-      }
-    } catch (err) {
-      console.error('[handleRazorpaySuccess] Error during post-payment:', err);
-      toast.info('Payment received. Check your orders for status.', { id: 'razorpay-fallback' });
-    } finally {
-      // ALWAYS navigate + clean up — no matter what
+    // Navigate on next animation frame (deterministic, no magic delays)
+    const dest = orderIds.length === 1 ? `/orders/${orderIds[0]}` : '/orders';
+    await new Promise(r => requestAnimationFrame(r));
+    navigate(dest);
+
+    // Cleanup AFTER navigation — never lose context before route change
+    setTimeout(() => {
+      toast.success('Payment successful! Confirming your order.', { id: 'razorpay-success' });
       clearPaymentSession();
-      const dest = orderIds.length === 1 ? `/orders/${orderIds[0]}` : '/orders';
-      navigate(dest);
       setPendingOrderIds([]);
+      setIsPlacingOrder(false);
       clearCartAndCache().catch(() => {});
       supabase.functions.invoke('process-notification-queue').catch(() => {});
-    }
+    }, 0);
   };
 
   const handleRazorpayFailed = async () => {
@@ -640,6 +631,7 @@ export function useCartPage() {
 
   const retryPendingPayment = useCallback(() => {
     if (paymentMode.isRazorpay) {
+      razorpaySuccessHandledRef.current = false;
       setShowRazorpayCheckout(true);
     } else if (paymentMode.isUpiDeepLink) {
       setShowUpiDeepLink(true);
