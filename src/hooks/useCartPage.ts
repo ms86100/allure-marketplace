@@ -256,12 +256,7 @@ export function useCartPage() {
       items: group.items.map((item) => ({ product_id: item.product_id, product_name: item.product?.name || 'Unknown', quantity: item.quantity, unit_price: item.product?.price || 0 })),
     }));
 
-    const { data: freshPrices } = await supabase.from('products').select('id, price').in('id', items.map(i => i.product_id));
-    const priceMismatch = items.find(item => {
-      const fresh = freshPrices?.find(p => p.id === item.product_id);
-      return fresh && Math.abs(fresh.price - (item.product?.price || 0)) > 0.01;
-    });
-    if (priceMismatch) { toast.error('Some item prices have changed. Refreshing your cart...', { id: 'checkout-price-mismatch' }); await refresh(); throw new Error('Price mismatch detected'); }
+    // Price + availability validation is now handled server-side in the RPC
 
     const deliveryAddressText = fulfillmentType === 'delivery' && selectedDeliveryAddress
       ? [selectedDeliveryAddress.flat_number && `Flat ${selectedDeliveryAddress.flat_number}`, selectedDeliveryAddress.block && `Block ${selectedDeliveryAddress.block}`, selectedDeliveryAddress.building_name, selectedDeliveryAddress.landmark].filter(Boolean).join(', ')
