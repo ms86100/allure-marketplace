@@ -43,7 +43,9 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
   const [displayName, setDisplayName] = useState(name);
   const [formattedAddress, setFormattedAddress] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
-  const [isPanning, setIsPanning] = useState(false);
+  const isPanningRef = useRef(false);
+  const pinRef = useRef<HTMLDivElement>(null);
+  const panningTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const displayNameRef = useRef(name);
   const formattedAddressRef = useRef('');
@@ -127,21 +129,37 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
     geocoderRef.current = new google.maps.Geocoder();
     mapInitializedRef.current = true;
 
+    const setPanningActive = () => {
+      if (panningTimeoutRef.current) clearTimeout(panningTimeoutRef.current);
+      if (!isPanningRef.current) {
+        isPanningRef.current = true;
+        pinRef.current?.classList.add('is-panning');
+      }
+    };
+
+    const setPanningInactive = () => {
+      if (panningTimeoutRef.current) clearTimeout(panningTimeoutRef.current);
+      panningTimeoutRef.current = setTimeout(() => {
+        isPanningRef.current = false;
+        pinRef.current?.classList.remove('is-panning');
+      }, 300);
+    };
+
     // Track user interaction start
     const dragStartListener = map.addListener('dragstart', () => {
       hasUserInteractedRef.current = true;
-      setIsPanning(true);
+      setPanningActive();
     });
 
     const zoomListener = map.addListener('zoom_changed', () => {
       hasUserInteractedRef.current = true;
-      setIsPanning(true);
+      setPanningActive();
     });
 
     // On idle: read center, reverse geocode
     ignoreIdleUntilRef.current = Date.now() + 800;
     const idleListener = map.addListener('idle', () => {
-      setIsPanning(false);
+      setPanningInactive();
       if (Date.now() < ignoreIdleUntilRef.current) return;
       if (!hasUserInteractedRef.current) return;
       if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
@@ -162,6 +180,7 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       dragStartListener.remove();
       zoomListener.remove();
       idleListener.remove();
+      if (panningTimeoutRef.current) clearTimeout(panningTimeoutRef.current);
       if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
       mapInstanceRef.current = null;
       geocoderRef.current = null;
@@ -181,7 +200,7 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
   }, [latitude, longitude, resolveLabel]);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 bg-background flex flex-col">
+    <div className="fixed inset-0 z-50 bg-background flex flex-col" style={{ touchAction: 'manipulation', overscrollBehavior: 'contain' }}>
       {/* Header */}
       <div className="shrink-0 flex items-center gap-3 px-4 pt-[max(env(safe-area-inset-top,0px),12px)] pb-3 bg-background/95 backdrop-blur-sm z-10">
         <button
@@ -195,17 +214,18 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       </div>
 
       {/* Map container — fills remaining space */}
-      <div className="flex-1 relative">
+      <div
+        className="flex-1 relative"
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+      >
         {/* Map */}
-        <div ref={mapRef} className="absolute inset-0" />
+        <div ref={mapRef} className="absolute inset-0" style={{ touchAction: 'none' }} />
 
         {/* CSS center pin overlay */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 pointer-events-none z-10 flex flex-col items-center">
-          <div
-            className={`transition-transform duration-200 ease-out ${
-              isPanning ? '-translate-y-3 scale-110' : '-translate-y-0 scale-100'
-            }`}
-          >
+        <div ref={pinRef} className="absolute left-1/2 top-1/2 -translate-x-1/2 pointer-events-none z-10 flex flex-col items-center map-pin-container">
+          <div className="transition-transform duration-200 ease-out map-pin-icon">
             <MapPin
               size={40}
               className="text-primary drop-shadow-lg"
@@ -215,11 +235,7 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
             />
           </div>
           {/* Pin shadow dot */}
-          <div
-            className={`w-2 h-1 rounded-full bg-black/30 -mt-1 transition-all duration-200 ${
-              isPanning ? 'scale-75 opacity-50' : 'scale-100 opacity-100'
-            }`}
-          />
+          <div className="w-2 h-1 rounded-full bg-black/30 -mt-1 transition-all duration-200 map-pin-shadow" />
         </div>
 
         {/* Instruction chip */}

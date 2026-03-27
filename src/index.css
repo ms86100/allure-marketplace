@@ -302,6 +302,15 @@
   }
 }
 
+/* Map pin animation — driven by classList toggle, no React re-renders */
+.map-pin-container.is-panning .map-pin-icon {
+  transform: translateY(-12px) scale(1.1);
+}
+.map-pin-container.is-panning .map-pin-shadow {
+  transform: scale(0.75);
+  opacity: 0.5;
+}
+
 @layer utilities {
   .animate-slide-up {
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
