@@ -289,6 +289,7 @@ export function useCartPage() {
       _idempotency_key: idempotencyKeyRef.current,
       _scheduled_date: scheduledDateStr,
       _scheduled_time_start: scheduledTimeStr,
+      _preorder_seller_ids: preorderSellerIds.size > 0 ? Array.from(preorderSellerIds) : null,
     } as any);
     if (error) {
       // Do NOT reset idempotency key — retry must use the same key
