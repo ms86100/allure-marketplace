@@ -92,7 +92,7 @@ function HeaderInner({
         'sticky top-0 z-40 bg-[hsl(var(--header-bg))] backdrop-blur-2xl backdrop-saturate-150 border-b border-[hsl(var(--nav-border))]',
         className
       )}>
-        <div className="px-4 pt-3 pb-2 space-y-1">
+        <div className="px-4 pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-2 space-y-1">
           {/* Brand + tagline */}
           <div>
             <h1 className="text-lg font-black text-foreground tracking-tight leading-tight italic"><span className="text-primary">S</span>oci<span className="text-primary">v</span>a</h1>
