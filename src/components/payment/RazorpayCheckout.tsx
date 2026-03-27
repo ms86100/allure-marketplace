@@ -7,7 +7,7 @@ import {
   DrawerTitle,
   DrawerDescription,
 } from '@/components/ui/drawer';
-import { Loader2, CreditCard, CheckCircle, XCircle, RefreshCw, WifiOff, Clock } from 'lucide-react';
+import { Loader2, CreditCard, CheckCircle, XCircle, RefreshCw, WifiOff, Clock, ExternalLink } from 'lucide-react';
 import { useRazorpay } from '@/hooks/useRazorpay';
 import { useCurrency } from '@/hooks/useCurrency';
 import { supabase } from '@/integrations/supabase/client';
@@ -45,16 +45,15 @@ export function RazorpayCheckout({
 }: RazorpayCheckoutProps) {
   const { createOrder, isLoading, isScriptLoaded, scriptError, retryLoadScript } = useRazorpay();
   const { formatPrice } = useCurrency();
-  const [status, setStatus] = useState<'pending' | 'processing' | 'verifying' | 'success' | 'confirming' | 'failed'>('pending');
+  const [status, setStatus] = useState<'pending' | 'processing' | 'verifying' | 'success' | 'confirming' | 'failed' | 'blocked'>('pending');
   const processingTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const verifyTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const paymentInFlightRef = useRef(false);
 
-  // Poll backend to confirm payment was captured by webhook
-  // Poll ALL orderIds to confirm webhook processed payment
   const allOrderIds = orderIds && orderIds.length > 0 ? orderIds : [orderId];
 
   const verifyPaymentBackend = useCallback(async (paymentId: string, attempt = 0): Promise<void> => {
-    const MAX_ATTEMPTS = 10; // ~20s total (2s intervals) — webhooks can be slow under load
+    const MAX_ATTEMPTS = 10;
     const { data } = await supabase
       .from('orders')
       .select('payment_status')
@@ -69,10 +68,8 @@ export function RazorpayCheckout({
     }
 
     if (attempt >= MAX_ATTEMPTS) {
-      // Backend hasn't confirmed yet — show confirming state, not false success
       console.warn('[Payment] Backend verification timed out after 20s — showing confirming state');
       setStatus('confirming');
-      // Still proceed after delay — order page has real-time subscription for updates
       setTimeout(() => onPaymentSuccess(paymentId), 3000);
       return;
     }
@@ -83,6 +80,7 @@ export function RazorpayCheckout({
   useEffect(() => {
     if (isOpen) {
       setStatus('pending');
+      paymentInFlightRef.current = false;
     }
     return () => {
       if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
@@ -91,11 +89,15 @@ export function RazorpayCheckout({
   }, [isOpen]);
 
   const handlePayment = async () => {
+    // Double-tap guard
+    if (paymentInFlightRef.current) return;
+    paymentInFlightRef.current = true;
+
     setStatus('processing');
 
-    // Safety timeout: if Razorpay popup doesn't open within 15s, reset to pending
     processingTimeoutRef.current = setTimeout(() => {
       setStatus((prev) => (prev === 'processing' ? 'pending' : prev));
+      paymentInFlightRef.current = false;
     }, 15000);
 
     await createOrder({
@@ -109,36 +111,43 @@ export function RazorpayCheckout({
       businessName: sellerName,
       onSuccess: (paymentId, razorpayOrderId) => {
         if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
+        paymentInFlightRef.current = false;
         if (razorpayOrderId) {
           console.log('[Payment] Razorpay order_id for reconciliation:', razorpayOrderId);
         }
-        // Enter verification phase — poll backend before confirming
         setStatus('verifying');
         verifyPaymentBackend(paymentId);
       },
-      onFailure: () => {
+      onFailure: (error) => {
         if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
-        setStatus('failed');
+        paymentInFlightRef.current = false;
+        // Detect popup-blocked specific error
+        if (error?.code === 'POPUP_BLOCKED') {
+          setStatus('blocked');
+        } else {
+          setStatus('failed');
+        }
       },
       onDismiss: () => {
         if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
-        // Razorpay popup closed without completing — let user retry
+        paymentInFlightRef.current = false;
         setStatus('pending');
       },
     });
   };
 
   const handleRetry = () => {
+    paymentInFlightRef.current = false;
     setStatus('pending');
   };
 
   const handleClose = () => {
     if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
     if (verifyTimeoutRef.current) clearTimeout(verifyTimeoutRef.current);
+    paymentInFlightRef.current = false;
     if (status === 'success') {
       // Success — do nothing extra
-    } else if (status === 'pending') {
-      // User never attempted payment — just dismiss, don't cancel orders
+    } else if (status === 'pending' || status === 'blocked') {
       if (onDismiss) {
         onDismiss();
         setStatus('pending');
@@ -146,12 +155,13 @@ export function RazorpayCheckout({
         return;
       }
     } else {
-      // Failed status — actual payment failure
       onPaymentFailed();
     }
     setStatus('pending');
     onClose();
   };
+
+  const publishedUrl = 'https://sociva.lovable.app';
 
   return (
     <Drawer open={isOpen} onOpenChange={handleClose}>
@@ -180,7 +190,6 @@ export function RazorpayCheckout({
                 </div>
               </div>
 
-              {/* Script load error state */}
               {scriptError && !isScriptLoaded && (
                 <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 flex items-center gap-3">
                   <WifiOff size={18} className="text-destructive shrink-0" />
@@ -205,7 +214,7 @@ export function RazorpayCheckout({
                 <Button
                   className="flex-1 min-h-[48px]"
                   onClick={handlePayment}
-                  disabled={isLoading || !isScriptLoaded}
+                  disabled={isLoading || !isScriptLoaded || paymentInFlightRef.current}
                 >
                   {isLoading ? (
                     <>
@@ -268,6 +277,37 @@ export function RazorpayCheckout({
                 <p className="text-sm text-muted-foreground">
                   We're confirming your order — check your orders page for updates
                 </p>
+              </div>
+            </div>
+          )}
+
+          {status === 'blocked' && (
+            <div className="text-center space-y-6 py-4">
+              <div className="w-20 h-20 mx-auto rounded-full bg-warning/10 flex items-center justify-center">
+                <ExternalLink className="text-warning" size={40} />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">Payment window couldn't open</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your browser blocked the payment popup. Please open the app directly to complete payment.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="min-h-[48px] w-full"
+                onClick={() => window.open(publishedUrl, '_blank')}
+              >
+                <ExternalLink size={16} className="mr-2" />
+                Open App
+              </Button>
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1 min-h-[48px]" onClick={handleClose}>
+                  Cancel
+                </Button>
+                <Button className="flex-1 min-h-[48px]" onClick={handleRetry}>
+                  <RefreshCw size={16} className="mr-2" />
+                  Retry
+                </Button>
               </div>
             </div>
           )}
