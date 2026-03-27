@@ -1,134 +1,106 @@
 
-# Bulletproof fix plan: make checkout fast by removing duplicate work, not by repainting the overlay
+Fix checkout RPC drift instead of patching the next visible error.
 
-## What’s actually causing the delay
-The current COD/shared checkout path does too much before navigation:
+What I found
+- `order_items.product_name` is `NOT NULL` in the database.
+- The current checkout RPC in `supabase/migrations/20260327135608_94f2ff1f-0781-4af9-b0c8-21aada2cd4f5.sql` inserts into `order_items` with only:
+  - `order_id`
+  - `product_id`
+  - `quantity`
+  - `unit_price`
+  and does not write `product_name`.
+- There are still 2 live `create_multi_vendor_orders` RPC signatures in the database:
+  1. the newer 20-parameter checkout version
+  2. an older `uuid, uuid, json, ...` overload
+- The older overload also inserts `order_items` without `product_name`.
+- This is why you keep seeing “a different error every time”: the flow has been patched in pieces, but the DB contract is still fragmented across multiple RPC versions.
 
-1. Client product validation query
-2. Client seller-open / delivery-radius loops
-3. Second client product price query inside `createOrdersForAllSellers`
-4. RPC order creation
+Root cause
+- The order creation path was optimized for performance, but the `order_items` insert no longer matches the table schema.
+- On top of that, multiple active RPC overloads mean one fix can miss another live path.
 
-That means the buyer waits through multiple sequential checks before the app can move forward. The overlay is only showing that latency.
+Bulletproof implementation plan
 
-There is also one safety problem today: the overlay’s “Go Back” only hides the UI; it does not cancel the in-flight order creation request.
+1. Rebuild `create_multi_vendor_orders` as one authoritative DB contract
+- Keep one real implementation only.
+- Make every active signature delegate to the same internal logic or drop obsolete overloads safely.
+- Stop having multiple independently maintained order-creation bodies.
 
-## Robust implementation plan
+2. Fix `order_items` snapshot writes at the source
+- During validation, fetch authoritative product snapshot fields from `products`:
+  - `name`
+  - `price`
+  - `seller_id`
+  - availability/approval/stock fields
+- Store `product_name` from database product data, not client payload.
+- Also use server price consistently for `unit_price`.
+- This removes both the null error and client-tampering risk.
 
-### 1. Make order creation RPC the single source of truth
-**File:** new migration recreating `create_multi_vendor_orders`
+3. Eliminate overload drift completely
+- Audit all frontend and function callers of `create_multi_vendor_orders`.
+- Standardize them on the canonical signature.
+- For backward compatibility, keep temporary wrappers only if another live path still depends on the old signature.
+- If wrappers remain, they must forward into the same shared implementation, not duplicate logic.
 
-Rework the RPC so it validates everything authoritatively in one place using live database values:
+4. Normalize all fragile typed inputs in one place
+- Centralize casting for:
+  - `scheduled_date`
+  - `scheduled_time_start`
+  - payment/status fields
+- Use safe `NULLIF(..., '')::date` / `::time` handling only in the canonical implementation.
+- This prevents the recurring “text vs date/time” regressions from resurfacing in another overload.
 
-- product exists
-- product is available
-- product is approved
-- product belongs to the seller group being submitted
-- stock is sufficient
-- seller is open
-- delivery radius is valid
-- current price matches the cart snapshot
+5. Add hard failure messages that map to real business cases
+- Return structured errors for:
+  - unavailable item
+  - price changed
+  - insufficient stock
+  - seller mismatch
+  - store closed
+  - delivery out of range
+  - invalid scheduling payload
+  - invalid product snapshot
+- The client should only translate these; it should not re-implement checkout truth.
 
-Important hardening:
-- do not trust client `unit_price` for financial correctness
-- compute validation from database rows
-- return structured error codes for:
-  - `unavailable_items`
-  - `price_changed`
-  - `store_closed`
-  - `delivery_out_of_range`
-  - `insufficient_stock`
-  - `seller_mismatch`
+6. Add a schema-alignment safety pass for checkout inserts
+- Verify every insert into:
+  - `orders`
+  - `order_items`
+  - `payment_records`
+  writes all required non-null columns explicitly or via defaults.
+- This closes the current class of “one missing column after another” bugs.
 
-This removes duplicated client checks and closes the risk of stale or manipulated pricing.
+Files / areas to change
+- `supabase/migrations/...`
+  - create one migration that:
+    - fixes `product_name` insertion
+    - consolidates or wraps both live RPC signatures
+    - removes duplicated insert logic
+- `src/hooks/useCartPage.ts`
+  - verify only the canonical RPC is called
+  - keep client thin and error handling mapped to structured backend errors
+- Any other caller still using the old overload
+  - update to canonical contract or temporary wrapper
 
-### 2. Collapse checkout to one network-critical step for COD
-**File:** `src/hooks/useCartPage.ts`
+Risk controls
+- No schema guesswork: use the current live table contract as source of truth.
+- No client trust for financial/order snapshots.
+- No breaking old paths silently: compatibility wrapper first, removal second.
+- No more piecemeal fixes: one migration must address both live signatures together.
 
-Refactor `handlePlaceOrderInner` and `createOrdersForAllSellers` so the client only does:
+Validation before closing
+1. COD single-seller checkout creates orders successfully.
+2. COD multi-seller checkout creates all orders successfully.
+3. `order_items.product_name` is populated for every inserted row.
+4. Online payment flow still creates pending orders correctly.
+5. Pre-order scheduling still works with valid date/time.
+6. Empty scheduling values do not crash inserts.
+7. Stale caller path cannot hit the old broken insert anymore.
+8. Duplicate taps still deduplicate correctly.
+9. Stock and price validation still block invalid orders.
+10. No checkout path can create partial order rows.
 
-- fast local synchronous guards
-- pending-payment guard if needed
-- one RPC call to create the order(s)
-
-Remove from the client:
-- availability query
-- price freshness query
-- seller open-state loop
-- delivery distance loop
-
-Those become server-owned and atomic.
-
-Result:
-```text
-Before:
-client query -> client loop -> client query -> RPC -> navigate
-
-After:
-local guards -> RPC -> navigate
-```
-
-### 3. Make COD feel instant
-**Files:** `src/hooks/useCartPage.ts`, `src/pages/CartPage.tsx`
-
-For COD:
-- stop showing the full-screen progress overlay
-- keep the “Place Order” button in loading state
-- navigate immediately after the RPC succeeds
-- keep cart clear, notification trigger, push-permission request, and prefetch work in the background exactly as now
-
-This matches the existing instant-checkout architecture and removes the unnecessary blocking screen for successful COD orders.
-
-### 4. Keep a progress UI only where it is actually needed
-**Files:** `src/pages/CartPage.tsx`, `src/components/checkout/OrderProgressOverlay.tsx`
-
-For online payments only:
-- keep progress feedback during order creation / payment handoff
-- add a delayed show threshold so fast requests do not flash the overlay unnecessarily
-- remove the fake cancel/back behavior while a request is active
-
-If a request cannot be aborted, the UI must not pretend it was cancelled.
-
-### 5. Preserve current payment behavior, but make it safer
-**Files:** `src/hooks/useCartPage.ts`, payment components only if needed
-
-Do not change the successful downstream flows:
-- Razorpay session restore
-- UPI pending payment restore
-- background cart clearing after confirmed success
-- pending-payment lifecycle protections
-
-Only change the order-creation entry point so online flows also benefit from the faster single-RPC validation path.
-
-## Risk controls
-This plan is designed to eliminate both latency and re-report risk:
-
-- **No pricing regression:** server validates live price before order creation
-- **No stale availability regression:** server validates availability/approval in the same transaction
-- **No seller spoofing risk:** server verifies each product belongs to the submitted seller
-- **No false cancel UX:** remove overlay “Go Back” for active requests
-- **No duplicate order risk:** existing idempotency stays in place
-- **No payment flow regression:** payment sheets and pending-payment recovery stay intact
-
-## Validation checklist
-I would verify all of these before closing the fix:
-
-1. COD single-seller order navigates immediately after tap
-2. COD multi-seller order navigates immediately after tap
-3. Razorpay flow still creates pending orders and opens payment reliably
-4. UPI deep-link flow still restores correctly after app switch
-5. Price change is caught server-side and refreshes cart cleanly
-6. Unavailable item is caught server-side and shown cleanly
-7. Closed seller / out-of-range delivery still blocks correctly
-8. Pre-order and mixed pre-order carts still schedule correctly
-9. Duplicate taps still produce only one order batch
-10. No hidden in-flight request can be “cancelled” from the UI
-
-## Files expected to change
-- `supabase/migrations/...` — recreate `create_multi_vendor_orders` with authoritative validation
-- `src/hooks/useCartPage.ts` — remove duplicate preflight calls and simplify checkout flow
-- `src/pages/CartPage.tsx` — COD uses button loading; online-only progress UI
-- `src/components/checkout/OrderProgressOverlay.tsx` — remove unsafe cancel behavior / use only as delayed fallback for long online creation
-
-## Why this is the better plan
-This does not just make the loading screen prettier or shorter. It removes the duplicated work causing the wait, moves critical validation to the backend where it belongs, and hardens the flow so the same class of checkout bugs does not come back in another form.
+Expected result
+- This stops the current `product_name` failure.
+- It also addresses the larger issue causing repeated new checkout errors: RPC drift and schema-contract mismatch.
+- After this, checkout becomes one stable backend path instead of multiple half-fixed versions.
