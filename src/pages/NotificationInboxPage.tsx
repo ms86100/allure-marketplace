@@ -14,9 +14,11 @@ import { RichNotificationCard } from '@/components/notifications/RichNotificatio
 export default function NotificationInboxPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const {
     data,
     isLoading,
+    isSuccess,
     refetch,
     isFetching,
     fetchNextPage,
@@ -31,13 +33,31 @@ export default function NotificationInboxPage() {
     return data.pages.flat();
   }, [data]);
 
-  const handleTap = (n: UserNotification) => {
+  // Bug 1 fix: one-time stale cleanup on first successful fetch
+  const cleanupRanRef = useRef(false);
+  useEffect(() => {
+    if (isSuccess && notifications.length > 0 && !cleanupRanRef.current && user?.id) {
+      cleanupRanRef.current = true;
+      cleanupStaleDeliveryNotifications(notifications).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
+        queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
+        queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
+      }).catch(() => {});
+    }
+  }, [isSuccess, notifications, user?.id, queryClient]);
+
+  const handleTap = useCallback((n: UserNotification) => {
     if (!n.is_read) markRead.mutate(n.id);
     const path = n.reference_path || resolveNotificationRoute(n.type, (n as any).payload);
     if (path && path.startsWith('/')) {
       navigate(path);
     }
-  };
+  }, [markRead, navigate]);
+
+  // Bug 2 fix: provide onDismiss for actionable cards in inbox
+  const handleRichDismiss = useCallback((n: UserNotification) => {
+    if (!n.is_read) markRead.mutate(n.id);
+  }, [markRead]);
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
