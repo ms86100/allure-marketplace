@@ -96,8 +96,8 @@ describe.skipIf(skipIntegration)('Non-society buyer — marketplace journey', ()
   });
 
   it('handles null coordinates gracefully in RPC', async () => {
-    const { data, error } = await buyerClient.rpc('search_sellers_by_location', {
-      _lat: null as any, _lng: null as any,
+    const { data, error } = await buyerClient.rpc('search_sellers_paginated', {
+      _lat: null as any, _lng: null as any, _radius_km: 50, _limit: 50, _offset: 0,
     });
     expect(error).toBeNull();
     expect(data).toEqual([]);
