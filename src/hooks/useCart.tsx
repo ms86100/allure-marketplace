@@ -125,7 +125,7 @@ async function fetchCartItems(userId: string) {
       await new Promise(r => setTimeout(r, 300));
       const { data: retryData, error: retryError } = await supabase
         .from('cart_items')
-        .select(`*, product:products(*, seller:seller_profiles(*))`)
+        .select(`*, product:products(*, seller:seller_profiles(id, business_name, user_id, is_available, availability_start, availability_end, operating_days, profile_image_url, cover_image_url, primary_group))`)
         .eq('user_id', userId);
       if (!retryError && retryData) {
         const retryFiltered = (retryData as any as (CartItem & { product: Product })[])
