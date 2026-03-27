@@ -1,105 +1,117 @@
 
-Do I know what the issue is? Yes.
 
-The current “payment succeeded but buyer sees a crash/error page” is still happening because there is one remaining race the previous fixes did not remove:
+# System-Level Safe-Area Header Fix — Bulletproof for iOS + Android
 
-1. `RazorpayCheckout` still lets the drawer close lifecycle behave like a payment dismissal/failure path.
-2. After success, the parent closes the drawer immediately, but `Drawer onOpenChange` is wired to `handleClose()` without checking whether the close was a success handoff or a real user dismiss.
-3. That means a successful payment can still fall into cancel/failure cleanup, which explains why the latest online order for this buyer ended up as `status=cancelled, payment_status=pending`.
-4. Then the app navigates to `/orders/:id`, but the order page is being opened for a half-settled / inconsistent order state and the route-level boundary takes over.
+## Problem
+15+ pages use `showHeader={false}` and render custom `sticky top-0` headers that sit behind the device status bar. The current `#root::before` pseudo-element only paints a color over the status bar zone — it doesn't structurally push content below it. Only CartPage has a manual `pt-[max(env(safe-area-inset-top))]` fix; all others are broken.
 
-Latest evidence from the backend:
-- most recent online order: `07b6404d-d0b5-4d73-9657-32fa8db7d914`
-- state: `cancelled` + `pending`
-- that should never happen immediately after a genuine Razorpay success handoff
+## Architecture Decision
 
-Plan to make this bulletproof:
+The user is right that padding `<main>` alone is fragile. The correct fix is:
 
-1. Make Razorpay success terminal at the component level
-- Update `src/components/payment/RazorpayCheckout.tsx`
-- Replace the current “any close = handleClose” behavior with an explicit close-state handler.
-- Add a one-way attempt state machine:
-  - `idle`
-  - `opening`
-  - `awaiting_gateway`
-  - `success_handoff`
-  - `failed`
-  - `dismissed`
-- Once success fires, the component must:
-  - ignore all later `onOpenChange(false)`
-  - ignore later `ondismiss`
-  - never call `onPaymentFailed`
-  - never call `onDismiss`
-- Parent-driven close after success becomes a silent unmount only.
+1. **Create a shared `SafeHeader` component** that all custom headers use
+2. **Update `AppLayout`** to provide a safe-area spacer when header is hidden
+3. **Fix sticky positioning** to account for the safe-area inset
+4. **Keep the `#root::before`** — it serves a real purpose (painting the status bar background color), but stop relying on it as the only protection
 
-2. Separate success cleanup from unpaid-order cancellation
-- Update `src/hooks/useCartPage.ts`
-- Create two clearly separate paths:
-  - `finalizeSuccessfulOnlinePayment(orderIds)`
-  - `cancelUnpaidOnlineAttempt(orderIds)`
-- Any code path that calls `buyer_cancel_pending_orders` must first check whether success has already been handed off.
-- After success is marked, cancellation RPCs become impossible for that attempt.
+## Changes
 
-3. Move authority for post-success routing to a single guarded handoff
-- In `useCartPage.ts`, introduce a dedicated “payment submitted / settling” flag for the active attempt.
-- On success:
-  - mark the attempt as settling
-  - close the payment UI
-  - navigate with `replace` to the order destination
-  - defer only non-critical cleanup
-- Recovery, retry, dismiss, clear-cart, and back-navigation guards must all respect this settling state.
+### 1. New: `src/components/layout/SafeHeader.tsx`
 
-4. Harden recovery so stale local state can never override a settled attempt
-- Keep backend verification as the source of truth, but extend it:
-  - if order is paid, placed, accepted, preparing, ready, delivered, completed, or otherwise advanced: never reopen/cancel
-  - if order is cancelled: clear stale session and do not resume payment
-  - only true unpaid `payment_pending` orders may resume
-- Apply this same rule to:
-  - mount restore
-  - retry payment
-  - clear pending payment
-  - cart empty recovery state
+A reusable wrapper for all custom sticky headers that:
+- Applies `pt-[max(env(safe-area-inset-top,0px),0.75rem)]` to its own container
+- Uses `sticky top-0 z-30` positioning
+- Provides the standard background/border styling
+- Accepts `className` for per-page customization
 
-5. Make the order detail page resilient to half-settled payment states
-- Update `src/pages/OrderDetailPage.tsx` and `src/hooks/useOrderDetail.ts`
-- Prevent route-boundary crashes by guarding render paths when:
-  - the current order status is not yet present in the resolved workflow
-  - related joins are temporarily missing
-  - the order is cancelled while the page is opening
-- Use local safe fallbacks instead of letting render blow up:
-  - safe status chip
-  - safe payment card
-  - disable action bars when status is unresolved
-  - skip delivery widgets unless their data is valid
-- If the order is cancelled or missing after navigation, show a controlled payment-resolution state instead of a hard error boundary.
+```tsx
+// Simplified API:
+<SafeHeader>
+  <BackButton />
+  <h1>Page Title</h1>
+</SafeHeader>
+```
 
-6. Remove the final modal-close race entirely
-- Audit all close paths in:
-  - `src/components/payment/RazorpayCheckout.tsx`
-  - `src/pages/CartPage.tsx`
-  - `src/hooks/useCartPage.ts`
-- Ensure there is only one actor allowed to end an attempt:
-  - success handoff
-  - explicit failure
-  - explicit dismiss before success
-- Never let both modal lifecycle and parent lifecycle try to settle the same attempt.
+This replaces every inline `<div className="sticky top-0 z-30 bg-background ...">` across all pages with a single component that handles safe-area correctly.
 
-Files to update
-- `src/components/payment/RazorpayCheckout.tsx`
-- `src/hooks/useCartPage.ts`
-- `src/pages/CartPage.tsx`
-- `src/pages/OrderDetailPage.tsx`
-- `src/hooks/useOrderDetail.ts`
+### 2. Update: `src/components/layout/AppLayout.tsx`
 
-Expected outcome
-- Razorpay success can no longer be “undone” by a close callback
-- successful payment attempts cannot be cancelled by stale cleanup
-- buyer never sees “Pay Now” again for the same successful attempt
-- buyer lands on a stable order page with a safe confirming state, never the route crash screen
+Add a safe-area spacer `<div>` when `showHeader={false}`:
 
-Validation after implementation
-- Successful Razorpay payment: no cancel RPC fires afterward
-- Successful payment + immediate route change: order page loads without route boundary
-- Successful payment + app background/foreground: never reopens payment drawer
-- Failed/dismissed payment before success: still cancels unpaid pending orders correctly
-- Multi-order success: same terminal protection and safe redirect to `/orders`
+```tsx
+{!showHeader && (
+  <div 
+    className="sticky top-0 z-30 bg-background" 
+    style={{ height: 'env(safe-area-inset-top, 0px)', minHeight: 0 }} 
+  />
+)}
+```
+
+This ensures even pages that DON'T use `SafeHeader` still have the inset reserved. But ideally all pages migrate to `SafeHeader`.
+
+### 3. Update all 13 affected pages
+
+Replace each inline sticky header div with `<SafeHeader>`:
+
+| Page | Current Pattern | Fix |
+|------|----------------|-----|
+| FavoritesPage | `sticky top-0 z-30 ... py-3.5` | `<SafeHeader>` |
+| NotificationsPage | `sticky top-0 z-30 ... py-3.5` | `<SafeHeader>` |
+| OrderDetailPage | `sticky top-0 z-30 ... py-3.5` | `<SafeHeader>` |
+| HelpPage | `sticky top-0 z-30 ... py-3.5` | `<SafeHeader>` |
+| SearchPage | `sticky top-0 z-40 ...` | `<SafeHeader>` |
+| CategoriesPage | `sticky top-0 z-40 ...` | `<SafeHeader>` |
+| CategoryGroupPage | `sticky top-0 z-30 ...` | `<SafeHeader>` |
+| SocietyDashboardPage | `sticky top-0 z-40 ...` | `<SafeHeader>` |
+| AdminPage | `sticky top-0 z-30 ...` | `<SafeHeader>` |
+| SellerSettingsPage | inline back button, no sticky header | Wrap in `<SafeHeader>` |
+| SellerEarningsPage | inline back button | Wrap in `<SafeHeader>` |
+| BecomeSellerPage | inline back button | Wrap in `<SafeHeader>` |
+| TestResultsPage | `sticky top-0 z-10 ...` | `<SafeHeader>` |
+| CartPage | Already has safe-area `pt-[max(...)]` | Migrate to `<SafeHeader>` for consistency |
+
+### 4. Keep `#root::before` but make it non-structural
+
+The pseudo-element stays — it paints the status bar zone with the correct theme color. But it is NOT the layout mechanism. `SafeHeader`'s padding is the structural fix. The pseudo-element is purely cosmetic insurance.
+
+### 5. Android fallback
+
+`SafeHeader` uses `pt-[max(env(safe-area-inset-top,0px),0.75rem)]` — the `0.75rem` minimum ensures Android devices that return `0` for `env()` still get usable spacing. This is the same pattern the built-in `Header` already uses successfully.
+
+## Why this is bulletproof
+
+- **Single component** — new pages automatically get safe-area handling by using `<SafeHeader>`
+- **No page-level padding hacks** — the header itself owns its positioning
+- **Sticky works correctly** — header sticks to viewport top, safe-area padding is inside it
+- **iOS + Android** — `max(env(), fallback)` handles both platforms
+- **No regression on home page** — home uses `showHeader={true}` → existing `Header` component, untouched
+- **Pseudo-element kept** — cosmetic layer for status bar color, not structural
+
+## Technical Detail
+
+```text
+Before (broken on 13+ pages):
+┌──────────────────┐
+│   STATUS BAR     │  ← #root::before paints color
+│← Back  Title     │  ← hidden behind status bar (sticky top-0)
+│   Page content   │
+└──────────────────┘
+
+After (SafeHeader):
+┌──────────────────┐
+│   STATUS BAR     │  ← #root::before paints color
+│  ┌────────────┐  │  ← SafeHeader padding pushes content below
+│  │← Back Title│  │  ← always visible
+│  └────────────┘  │
+│   Page content   │
+└──────────────────┘
+```
+
+## Files Summary
+
+| File | Action |
+|------|--------|
+| `src/components/layout/SafeHeader.tsx` | **New** — shared safe-area header component |
+| `src/components/layout/AppLayout.tsx` | Add fallback spacer for pages without any header |
+| 13 page files | Replace inline sticky headers with `<SafeHeader>` |
+
