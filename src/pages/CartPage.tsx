@@ -428,7 +428,7 @@ export default function CartPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <OrderProgressOverlay isVisible={c.isPlacingOrder} step={c.orderStep} onCancel={() => { c.cancelPlacingOrder(); }} />
+      <OrderProgressOverlay isVisible={c.isPlacingOrder && c.paymentMethod !== 'cod'} step={c.orderStep} />
 
       {c.pendingOrderIds.length > 0 && c.paymentMode.isRazorpay && (
         <RazorpayCheckout isOpen={c.showRazorpayCheckout} onClose={() => {}} orderId={c.pendingOrderIds[0]} orderIds={c.pendingOrderIds} amount={c.finalAmount || c.sessionAmount} sellerId={c.sellerGroups[0]?.sellerId || ''} sellerName={c.sellerGroups[0]?.sellerName || c.sessionSellerName} customerName={c.profile?.name || ''} customerEmail={c.user?.email || ''} customerPhone={c.profile?.phone || ''} onPaymentSuccess={c.handleRazorpaySuccess} onPaymentFailed={c.handleRazorpayFailed} onDismiss={c.handleRazorpayDismiss} />
