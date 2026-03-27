@@ -16,7 +16,7 @@ import { hapticImpact, hapticNotification, hapticSelection } from '@/lib/haptics
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
-import { computeStoreStatus, formatStoreClosedMessage } from '@/lib/store-availability';
+// Store status validation now handled server-side in create_multi_vendor_orders RPC
 
 /** Simple deterministic hash for idempotency keys */
 function simpleHash(str: string): string {
