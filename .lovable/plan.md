@@ -1,114 +1,129 @@
 
 
-# Production-Grade Performance Overhaul
+# Full App Performance Overhaul — Phases 3-5 + New Pages
 
-## Diagnosis (Worse Than Originally Estimated)
+## Status Check
 
-The homepage fires **7-8 identical `search_sellers_by_location` RPC calls** — not 3 as initially identified:
+**Already done (Phases 1-2):**
+- ✅ Single `useMarketplaceData` shared hook — homepage consumer hooks derive from it
+- ✅ SQL migration with CTE + product flags in RPC JSON
+- ✅ Database indexes added
+- ✅ `mergeProductFlags` eliminated from homepage hooks
 
-```text
-Homepage cold load — all fire independently:
-1. useProductsByCategory     → search_sellers_by_location
-2. useNearbyProducts         → search_sellers_by_location  
-3. useLocalSellers           → search_sellers_by_location
-4. useNearbySocietySellers   → search_sellers_by_location
-5. usePopularProducts        → search_sellers_by_location (+ calls useNearbyProducts = +1)
-6. useTrendingProducts       → search_sellers_by_location
-7. mergeProductFlags ×3      → SELECT products WHERE id IN (...)
-8. useMarketplaceConfig      → SELECT * FROM system_settings
-9. useMarketplaceLabels      → SELECT * FROM system_settings WHERE key IN (54 keys)
-
-CategoryGroupPage is even worse:
-→ Loops search_sellers_by_location per category (up to 5× sequential!)
-```
-
-Each RPC call takes 300-600ms. With 7 parallel + 3 sequential follow-ups, that's **2-4 seconds of pure API time** before rendering.
+**Still calling `search_sellers_by_location` independently:**
+- `useMarketplaceDataFull` (2nd RPC call, no society exclusion — used by `useLocalSellers`)
+- `useSearchPage` line 118 (popular products — 3rd RPC call)
+- `useSearchPage` lines 170, 192 (active search — these are intentional, different params)
 
 ---
 
-## Fix Architecture
+## Remaining Work
 
-### Phase 1: Single RPC, Single Cache (Eliminates 6 duplicate calls)
+### 1. Eliminate `useMarketplaceDataFull` duplicate (homepage: 2 RPCs → 1)
 
-**New file: `src/hooks/queries/useMarketplaceData.ts`**
+`useStoreDiscovery` uses `useMarketplaceDataFull` which calls `search_sellers_by_location` *without* `_exclude_society_id`. This is a second identical RPC except for one param.
 
-One hook calls `search_sellers_by_location` once per unique `(lat, lng, radius, excludeSociety)` tuple. All other hooks become **derived views** reading from this cache:
+**Fix:** Add an optional `includeOwnSociety` param to `useMarketplaceData`. `useLocalSellers` passes `true`. Both share one cache entry when params match, or we merge the society sellers client-side from the excluded result + a small supplemental query.
 
-```text
-useMarketplaceData ── single RPC call ──┐
-   ├── useProductsByCategory  (groups by category)
-   ├── useNearbyProducts      (flat product list)
-   ├── useLocalSellers        (groups by seller)
-   ├── useNearbySocietySellers (groups by distance band)
-   ├── usePopularProducts     (sorts by order count)
-   └── useTrendingProducts    (sorts by recency)
-```
+**Simpler approach:** Remove exclusion from the main query entirely. Filter out own-society sellers *client-side* in `useProductsByCategory` (which is the only consumer that excludes). This way ONE RPC serves everything.
 
-Each derived hook uses `useQuery` with `queryFn` that reads from `queryClient.getQueryData(['marketplace-data', ...])` — zero network calls. They transform and slice the shared data in-memory.
+| File | Change |
+|------|--------|
+| `src/hooks/queries/useMarketplaceData.ts` | Remove `useMarketplaceDataFull`, make main hook NOT exclude society |
+| `src/hooks/queries/useProductsByCategory.ts` | Filter out own-society products client-side |
+| `src/hooks/queries/useStoreDiscovery.ts` | Use `useMarketplaceData` instead of `useMarketplaceDataFull` |
 
-### Phase 2: SQL Optimization (Migration)
+### 2. Consolidate system_settings queries (-150ms)
 
-**Update `search_sellers_by_location` RPC:**
+**Current:** `useMarketplaceConfig` does `SELECT * FROM system_settings` (full scan) + `SELECT * FROM admin_settings`. `useSystemSettingsRaw` (used by `useMarketplaceLabels` with 54 keys) does another `SELECT ... WHERE key IN (...)`.
 
-1. **CTE for haversine**: Compute distance once per seller row, filter and sort on the pre-computed value (currently computed 4× per row in WHERE + ORDER + subquery)
-2. **Include product flags**: Add `is_bestseller`, `is_recommended`, `is_urgent` to the JSON output inside `matching_products` — eliminates all `mergeProductFlags` secondary queries
-3. **Add indexes**:
-   - `products(seller_id, is_available, approval_status)` 
-   - `seller_profiles(latitude, longitude) WHERE verified AND available`
-   - `orders(buyer_id, status, created_at DESC)`
+**Fix:** Share a single `['system-settings-all']` cache. `useMarketplaceConfig` fetches all rows and caches them. `useSystemSettingsRaw` reads from the same cache.
 
-### Phase 3: Consolidate Settings Queries
+| File | Change |
+|------|--------|
+| `src/hooks/useMarketplaceConfig.ts` | Change queryKey to `['system-settings-all']`, export the raw map |
+| `src/hooks/useSystemSettingsRaw.ts` | Read from `['system-settings-all']` cache instead of independent query |
 
-Both `useMarketplaceConfig` and `useMarketplaceLabels` independently scan `system_settings`. Merge into a single prefetched query with shared cache key `['system-settings-all']`. Both hooks read from the same cached map.
+### 3. Search page popular products — derive from shared cache (-300ms)
 
-### Phase 4: Fix CategoryGroupPage N+1
+**Current:** `useSearchPage` line 118 fires its own `search_sellers_by_location` RPC for "popular products" shown before user types.
 
-Currently loops `search_sellers_by_location` per category (up to 5 sequential calls). Replace with a single call (no `_category` filter) + client-side category filtering.
+**Fix:** Import `useMarketplaceData`, derive popular products from cached data, map to `ProductSearchResult[]` format. The active search RPCs (lines 170, 192) stay — they have `_search_term` and `_category` params that differ.
 
-### Phase 5: Defer Non-Critical Queries
+| File | Change |
+|------|--------|
+| `src/hooks/useSearchPage.ts` | Replace `search-popular-products` useQuery with derivation from `useMarketplaceData()` |
 
-`useSocialProof` and `get_user_frequent_products` create serial dependencies. Make them render-deferred — product cards appear immediately, social proof badges animate in after data loads.
+### 4. Defer social proof from critical path (-200ms)
+
+**Current:** `useSocialProof(allProductIds)` in `MarketplaceSection` fires after `allProducts` is derived. The `socialProofMap` loading state doesn't block rendering, but the query creates a serial dependency chain.
+
+**Fix:** Verify `socialProofMap` isn't gating any loading skeleton. Wrap the social proof badges in a deferred rendering pattern so the initial paint shows product cards immediately.
+
+| File | Change |
+|------|--------|
+| `src/components/home/MarketplaceSection.tsx` | Ensure social proof loading doesn't block any section render |
+
+### 5. Order Detail Page — eliminate waterfall (-400ms)
+
+**Current problem (critical):**
+- `useOrderDetail` uses `useState` + `useEffect` (no React Query caching)
+- `fetchOrder` does a Supabase `.select()` with joins, then *sequentially* fetches `product.category` and `category_config` for parent_group derivation (lines 186-199)
+- No caching between visits — every navigation re-fetches
+- 15-second polling interval adds unnecessary load
+
+**Fix:**
+1. Convert `fetchOrder` to include product category in the initial select (add `order_items(*, product:products(category, listing_type))`)
+2. Convert to `useQuery` for automatic caching between navigations
+3. Keep realtime subscription for live updates, but remove the 15s polling (realtime handles it)
+
+| File | Change |
+|------|--------|
+| `src/hooks/useOrderDetail.ts` | Refactor to useQuery, inline product category in join, remove polling |
+
+### 6. Orders List Page — add caching (-300ms)
+
+**Current:** `OrderList` uses manual `useState`/`useEffect` with `fetchOrders`. No React Query = no caching. Every tab switch or back-navigation re-fetches.
+
+**Fix:** Convert to `useQuery` (or `useInfiniteQuery` for pagination). Cache persists across navigations.
+
+| File | Change |
+|------|--------|
+| `src/pages/OrdersPage.tsx` | Convert OrderList to useQuery with cursor-based pagination |
+
+### 7. Cart Page — already well-optimized (no major changes)
+
+The cart uses React Query with 5s staleTime, optimistic updates, 4-layer integrity checks, and `refetchOnMount: 'always'`. The `fetchCartItems` does a single `SELECT ... JOIN products JOIN seller_profiles`. This is already a single query pattern.
+
+**Minor fix:** The cart query joins `seller_profiles(*)` which fetches ALL seller columns. Trim to only needed fields.
+
+| File | Change |
+|------|--------|
+| `src/hooks/useCart.tsx` | Trim seller select to needed fields only |
 
 ---
 
 ## Implementation Order
 
-| Step | What | Impact | Risk |
-|------|------|--------|------|
-| 1 | SQL migration (CTE + flags + indexes) | -200ms per call, eliminates mergeProductFlags | Low — additive changes |
-| 2 | Create `useMarketplaceData` shared hook | Eliminates 6 duplicate RPC calls | Medium — careful refactor |
-| 3 | Refactor all 6 consumer hooks | Each becomes a derived view | Medium — must preserve all return shapes |
-| 4 | Consolidate system_settings | -150ms | Low |
-| 5 | Fix CategoryGroupPage loop | -1500ms on that page | Low |
-| 6 | Defer social proof | -200ms off critical path | Low |
+| Step | What | RPC calls eliminated | Risk |
+|------|------|---------------------|------|
+| 1 | Merge `useMarketplaceDataFull` into main hook | 1 | Low |
+| 2 | Consolidate system_settings | 1 query | Low |
+| 3 | Search popular products from cache | 1 RPC | Low |
+| 4 | Defer social proof | 0 (timing) | Low |
+| 5 | Order detail → useQuery + inline joins | 1-2 sequential queries | Medium |
+| 6 | Orders list → useQuery | 0 (caching) | Medium |
+| 7 | Cart seller select trim | 0 (payload) | Low |
 
 ## Expected Results
 
-| Metric | Current | After |
-|--------|---------|-------|
-| RPC calls on homepage | 7-8 | **1** |
-| Secondary queries (mergeProductFlags) | 3 | **0** |
-| system_settings scans | 2 | **1** |
-| CategoryGroupPage RPC calls | up to 5 | **1** |
-| Homepage cold load | 5-6s | **<2s** |
-| Homepage warm load | 2-3s | **<0.5s** |
-| Category page load | 3-5s | **<1.5s** |
-
-## Files Changed
-
-| File | Change |
-|------|--------|
-| New SQL migration | CTE optimization, product flags in JSON, indexes |
-| `src/hooks/queries/useMarketplaceData.ts` (new) | Single shared RPC hook |
-| `src/hooks/queries/useProductsByCategory.ts` | Derive from shared cache |
-| `src/hooks/queries/useNearbyProducts.ts` | Derive from shared cache |
-| `src/hooks/queries/useStoreDiscovery.ts` | Derive from shared cache |
-| `src/hooks/queries/usePopularProducts.ts` | Derive from shared cache |
-| `src/hooks/queries/useTrendingProducts.ts` | Derive from shared cache |
-| `src/hooks/queries/useProductFlags.ts` | Remove (flags come from RPC) |
-| `src/hooks/useMarketplaceConfig.ts` | Share cache with labels |
-| `src/hooks/useSystemSettingsRaw.ts` | Use shared settings cache |
-| `src/hooks/useMarketplaceLabels.ts` | Use shared settings cache |
-| `src/pages/CategoryGroupPage.tsx` | Single RPC + client filter |
-| `src/components/home/MarketplaceSection.tsx` | Defer social proof rendering |
+| Page | Current | After |
+|------|---------|-------|
+| Homepage (cold) | 5-6s | <2s |
+| Homepage (warm) | 2-3s | <0.5s |
+| Search | 3-4s | <1.5s |
+| Order Detail | 2-3s | <1s (cached: instant) |
+| Orders List | 2-3s | <1.5s (cached: instant) |
+| Cart | 1-2s | <1s |
+| Navigation | 1-2s | <500ms (cache hits) |
 
