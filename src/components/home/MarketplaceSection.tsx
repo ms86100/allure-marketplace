@@ -372,7 +372,7 @@ function ProductListings({
               key={cat.category}
               type="button"
               onClick={() => navigate(`/category/${cat.parentGroup}?sub=${cat.category}`)}
-              className="rounded-2xl overflow-hidden text-left active:scale-[0.97] transition-transform flex flex-col shadow-sm"
+              className="rounded-2xl overflow-hidden text-left active:scale-[0.97] transition-transform flex flex-col shadow-sm border border-black/[0.04]"
               style={{ backgroundColor: pastelColor }}
             >
               {/* Product image row — fixed height */}

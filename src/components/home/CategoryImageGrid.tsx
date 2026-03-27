@@ -101,10 +101,10 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
               className="flex flex-col items-center group active:scale-[0.96] transition-transform duration-150"
             >
               {/* Pastel card tile */}
-              <div
-                className="w-full rounded-2xl overflow-hidden relative p-3 shadow-sm"
-                style={{ backgroundColor: pastelColor }}
-              >
+                <div
+                 className="w-full rounded-2xl overflow-hidden relative p-3 shadow-sm border border-black/[0.04]"
+                 style={{ backgroundColor: pastelColor }}
+               >
                 {/* Image area — fixed height */}
                 <div className="relative">
                   {images.length >= 2 ? (
