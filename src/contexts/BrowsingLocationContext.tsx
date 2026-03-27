@@ -93,12 +93,7 @@ export function BrowsingLocationProvider({ children }: { children: React.ReactNo
   }, [user?.id]);
 
   const invalidateDiscovery = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['store-discovery'] });
-    queryClient.invalidateQueries({ queryKey: ['trending-products'] });
-    queryClient.invalidateQueries({ queryKey: ['popular-products'] });
-    queryClient.invalidateQueries({ queryKey: ['products-by-category'] });
-    queryClient.invalidateQueries({ queryKey: ['category-products'] });
-    queryClient.invalidateQueries({ queryKey: ['search-popular-products'] });
+    queryClient.invalidateQueries({ queryKey: ['marketplace-data'] });
     queryClient.invalidateQueries({ queryKey: ['location-stats'] });
   }, [queryClient]);
 
