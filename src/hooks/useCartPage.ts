@@ -510,13 +510,15 @@ export function useCartPage() {
     try {
       const orderIds = await createOrdersForAllSellers('pending');
       if (orderIds.length === 0) throw new Error('Failed to create orders');
-      // COD: await cart clear to ensure DB delete completes before navigating
-      await clearCartAndCache(); hapticNotification('success');
-      requestFullPermission().catch(() => {});
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
-      prefetchFlowData(); // Warm cache so order detail page loads instantly
+      hapticNotification('success');
+      prefetchFlowData();
+      // Navigate FIRST — don't block on cart clear or notifications
       if (orderIds.length === 1) { toast.success('Order placed successfully!', { id: 'order-placed' }); navigate(`/orders/${orderIds[0]}`); }
       else { toast.success(`${orderIds.length} orders placed successfully!`, { id: 'order-placed' }); navigate('/orders'); }
+      // Background: clear cart + trigger notifications (non-blocking)
+      clearCartAndCache().catch(() => {});
+      requestFullPermission().catch(() => {});
+      supabase.functions.invoke('process-notification-queue').catch(() => {});
     } catch (error: any) { console.error('Error placing order:', error); toast.error(friendlyError(error), { id: 'checkout-error' }); }
     finally { setIsPlacingOrder(false); }
   };
@@ -548,21 +550,22 @@ export function useCartPage() {
       for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 1500)); const { data } = await supabase.from('orders').select('payment_status').eq('id', targetOrderId).single(); if (data?.payment_status === 'paid') { confirmed = true; break; } }
       if (!confirmed) {
         toast.info('Payment is being verified. Your order will update shortly.', { id: 'razorpay-verifying' });
-        // Bug 3 fix: Clear cart + session even on unconfirmed — the order exists, webhook will confirm
-        await clearCartAndCache();
         clearPaymentSession();
         setPendingOrderIds([]);
         navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
+        // Background: clear cart (non-blocking)
+        clearCartAndCache().catch(() => {});
         return;
       }
       toast.success('Payment successful! Order placed.', { id: 'razorpay-success' });
     }
-    supabase.functions.invoke('process-notification-queue').catch(() => {});
-    // Clear cart ONLY after confirmed payment
-    await clearCartAndCache();
     clearPaymentSession();
+    // Navigate FIRST — don't block on cart clear
     navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
     setPendingOrderIds([]);
+    // Background: clear cart + trigger notifications (non-blocking)
+    clearCartAndCache().catch(() => {});
+    supabase.functions.invoke('process-notification-queue').catch(() => {});
   };
 
   const handleRazorpayFailed = async () => {
@@ -616,12 +619,13 @@ export function useCartPage() {
     // No direct .update() needed here — the RPC already ran before this callback fires.
 
     toast.success('Payment submitted! Seller will verify shortly.', { id: 'upi-confirmed' });
-    supabase.functions.invoke('process-notification-queue').catch(() => {});
-    // Clear cart and payment session ONLY after payment confirmation submitted
-    await clearCartAndCache();
     clearPaymentSession();
+    // Navigate FIRST — don't block on cart clear
     navigate(pendingOrderIds.length === 1 ? `/orders/${pendingOrderIds[0]}` : '/orders');
     setPendingOrderIds([]);
+    // Background: clear cart + trigger notifications (non-blocking)
+    clearCartAndCache().catch(() => {});
+    supabase.functions.invoke('process-notification-queue').catch(() => {});
   };
 
   const handleUpiDeepLinkFailed = async () => {
