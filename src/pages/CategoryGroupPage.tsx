@@ -23,6 +23,7 @@ import { useMarketplaceData } from '@/hooks/queries/useMarketplaceData';
 export default function CategoryGroupPage() {
   const { category } = useParams<{ category: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const subCategory = searchParams.get('sub') as ServiceCategory | null;
 
