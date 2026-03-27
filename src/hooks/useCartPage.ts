@@ -463,8 +463,7 @@ export function useCartPage() {
       return;
     }
 
-    // COD flow — order is confirmed immediately
-    setOrderStep('creating');
+    // COD flow — order is confirmed immediately, no overlay needed
     try {
       const orderIds = await createOrdersForAllSellers('pending');
       if (orderIds.length === 0) throw new Error('Failed to create orders');
