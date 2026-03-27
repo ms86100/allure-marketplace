@@ -153,31 +153,16 @@ workflows:
           }
           ICONJSON
 
-      - name: Patch LaunchScreen to match app icon branding
+      - name: Install robust branded LaunchScreen
         script: |
           STORYBOARD="ios/App/App/Base.lproj/LaunchScreen.storyboard"
 
           if [ -f "$STORYBOARD" ]; then
-            echo "=== Before patch ==="
-            cat "$STORYBOARD"
-
-            # 1. Remove the Capacitor splash imageView block entirely
-            sed -i '' '/<imageView/,/<\/imageView>/d' "$STORYBOARD"
-
-            # 2. Remove any standalone image="Splash" references
-            sed -i '' '/image="Splash"/d' "$STORYBOARD"
-
-            # 3. Remove any constraint referencing the now-deleted imageView
-            sed -i '' '/imageView/d' "$STORYBOARD"
-
-            # 4. Force ALL backgroundColor elements to dark navy #1a1a2e
-            sed -i '' 's|<color key="backgroundColor"[^/]*/>|<color key="backgroundColor" red="0.10196078431372549" green="0.10196078431372549" blue="0.18039215686274512" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>|g' "$STORYBOARD"
-
-            # 5. Delete the Splash image asset so Xcode can't reference it
+            # 1. Delete the Capacitor splash image asset so Xcode can't reference it
             rm -rf ios/App/App/Assets.xcassets/Splash.imageset/
             echo "=== Splash.imageset removed ==="
 
-            # 6. Create SplashLogo imageset from committed PNG
+            # 2. Create SplashLogo imageset from committed PNG
             ASSETS_DIR="ios/App/App/Assets.xcassets"
             SPLASH_IMAGESET="$ASSETS_DIR/SplashLogo.imageset"
             mkdir -p "$SPLASH_IMAGESET"
@@ -205,49 +190,14 @@ workflows:
               echo "WARNING: ios-config/splash-logo.png not found, skipping splash logo"
             fi
 
-            # 7. Write the complete patched LaunchScreen storyboard directly
-            # This avoids fragile sed replacements on complex XML
-            cat > "$STORYBOARD" << 'STORYBOARDXML'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="32106" targetRuntime="AppleSDK" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
-            <device id="retina6_12" orientation="portrait" appearance="light"/>
-            <scenes>
-              <scene sceneID="EHf-IW-A2E">
-                <objects>
-                  <viewController id="01J-lp-oVM" sceneMemberID="viewController">
-                    <view key="view" contentMode="scaleToFill" id="GJd-Yh-RWb">
-                      <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
-                      <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                      <subviews>
-                        <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="SplashLogo" translatesAutoresizingMaskIntoConstraints="NO" id="splashLogoView">
-                          <rect key="frame" x="96.5" y="376" width="200" height="100"/>
-                          <constraints>
-                            <constraint firstAttribute="width" constant="200" id="splashW"/>
-                            <constraint firstAttribute="height" constant="100" id="splashH"/>
-                          </constraints>
-                        </imageView>
-                      </subviews>
-                      <color key="backgroundColor" red="0.10196078431372549" green="0.10196078431372549" blue="0.18039215686274512" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                      <constraints>
-                        <constraint firstItem="splashLogoView" firstAttribute="centerX" secondItem="GJd-Yh-RWb" secondAttribute="centerX" id="splashCX"/>
-                        <constraint firstItem="splashLogoView" firstAttribute="centerY" secondItem="GJd-Yh-RWb" secondAttribute="centerY" id="splashCY"/>
-                      </constraints>
-                      <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
-                    </view>
-                  </viewController>
-                  <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
-                </objects>
-                <point key="canvasLocation" x="52.173913043478265" y="375"/>
-              </scene>
-            </scenes>
-            <resources>
-              <image name="SplashLogo" width="341" height="171"/>
-            </resources>
-          </document>
-          STORYBOARDXML
+            # 3. Install a committed storyboard template instead of generating XML inline.
+            cp ios-config/LaunchScreen.storyboard "$STORYBOARD"
 
-            echo "=== After patch ==="
-            cat "$STORYBOARD"
+            # 4. Validate the storyboard before the archive step.
+            xmllint --noout "$STORYBOARD"
+            xcrun ibtool --errors --warnings --notices --compile /tmp/LaunchScreen.storyboardc "$STORYBOARD"
+
+            echo "=== LaunchScreen storyboard installed and validated ==="
           else
             echo "WARNING: LaunchScreen.storyboard not found at $STORYBOARD"
           fi
