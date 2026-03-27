@@ -53,20 +53,22 @@ export function useMarketplaceSellers() {
     queryFn: async ({ pageParam = 0 }): Promise<MarketplaceSeller[]> => {
       if (!lat || !lng) return [];
 
-      const { data, error } = await supabase.rpc('search_sellers_paginated' as any, {
-        _lat: lat,
-        _lng: lng,
-        _radius_km: radiusKm,
-        _limit: PAGE_SIZE,
-        _offset: pageParam as number,
+      return withTelemetry('rpc:search_sellers_paginated', async () => {
+        const { data, error } = await supabase.rpc('search_sellers_paginated' as any, {
+          _lat: lat,
+          _lng: lng,
+          _radius_km: radiusKm,
+          _limit: PAGE_SIZE,
+          _offset: pageParam as number,
+        });
+
+        if (error) {
+          console.error('Marketplace sellers RPC error:', error);
+          return [];
+        }
+
+        return (data || []) as MarketplaceSeller[];
       });
-
-      if (error) {
-        console.error('Marketplace sellers RPC error:', error);
-        return [];
-      }
-
-      return (data || []) as MarketplaceSeller[];
     },
     getNextPageParam: (lastPage, allPages) => {
       const totalFetched = allPages.reduce((sum, page) => sum + page.length, 0);
