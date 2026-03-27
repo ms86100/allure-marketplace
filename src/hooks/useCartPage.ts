@@ -299,9 +299,12 @@ export function useCartPage() {
       throw error;
     }
 
-    const result = data as { success: boolean; order_ids?: string[]; order_count?: number; error?: string; unavailable_items?: string[]; closed_sellers?: string[]; out_of_range_sellers?: string[]; deduplicated?: boolean };
+    const result = data as { success: boolean; order_ids?: string[]; order_count?: number; error?: string; unavailable_items?: string[]; price_changed_items?: string[]; stock_insufficient?: string[]; closed_sellers?: string[]; out_of_range_sellers?: string[]; deduplicated?: boolean };
     if (!result?.success) {
       idempotencyKeyRef.current = null;
+      if (result?.error === 'unavailable_items' && result?.unavailable_items) { await refresh(); throw new Error(`Some items are unavailable:\n• ${result.unavailable_items.join('\n• ')}`); }
+      if (result?.error === 'price_changed' && result?.price_changed_items) { await refresh(); throw new Error(`Prices have changed:\n• ${result.price_changed_items.join('\n• ')}\nYour cart has been refreshed.`); }
+      if (result?.error === 'insufficient_stock' && result?.stock_insufficient) { await refresh(); throw new Error(`Insufficient stock:\n• ${result.stock_insufficient.join('\n• ')}`); }
       if (result?.error === 'stock_validation_failed' && result?.unavailable_items) throw new Error(`Some items are unavailable:\n• ${result.unavailable_items.join('\n• ')}`);
       if (result?.error === 'store_closed') { const sellers = result.closed_sellers?.join(', '); throw new Error(sellers ? `Store closed: ${sellers}` : 'Store is currently closed. Please try again later.'); }
       if (result?.error === 'delivery_out_of_range') { const sellers = result.out_of_range_sellers?.join('\n• '); throw new Error(sellers ? `Delivery not possible:\n• ${sellers}` : 'Delivery address is out of range for one or more sellers.'); }
