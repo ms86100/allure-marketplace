@@ -1,85 +1,105 @@
 
-Fix this as a recovery/state-authority bug, not just a UI patch.
+Do I know what the issue is? Yes.
 
-What’s actually happening
-- The app still treats `sessionStorage` as strong truth for Razorpay recovery.
-- In `src/hooks/useCartPage.ts` the mount restore effect blindly reopens Razorpay whenever a saved session exists (`loadPaymentSession()` → `setShowRazorpayCheckout(true)`), without first checking whether those orders are already paid/placed/cancelled.
-- In `src/components/payment/RazorpayCheckout.tsx`, success is delayed by `setTimeout(() => onPaymentSuccess(paymentId), 800)`, and the drawer can reset back to `pending` through its local close lifecycle.
-- Result: after a successful payment or delayed webhook, stale local session/UI state can resurrect the payment sheet and let the buyer see Pay Now again.
+The current “payment succeeded but buyer sees a crash/error page” is still happening because there is one remaining race the previous fixes did not remove:
 
-Implementation plan
+1. `RazorpayCheckout` still lets the drawer close lifecycle behave like a payment dismissal/failure path.
+2. After success, the parent closes the drawer immediately, but `Drawer onOpenChange` is wired to `handleClose()` without checking whether the close was a success handoff or a real user dismiss.
+3. That means a successful payment can still fall into cancel/failure cleanup, which explains why the latest online order for this buyer ended up as `status=cancelled, payment_status=pending`.
+4. Then the app navigates to `/orders/:id`, but the order page is being opened for a half-settled / inconsistent order state and the route-level boundary takes over.
 
-1. Make backend order state the only authority for recovery
-- Add a recovery check in `useCartPage.ts` before reopening any payment UI.
-- On mount / app resume / retry, load saved order IDs and fetch their real backend status.
-- If any order is already `paid` or no longer `payment_pending`, do not reopen Razorpay.
-- Instead, clear the saved payment session and navigate straight to the order page (single order) or orders list (multi-order).
+Latest evidence from the backend:
+- most recent online order: `07b6404d-d0b5-4d73-9657-32fa8db7d914`
+- state: `cancelled` + `pending`
+- that should never happen immediately after a genuine Razorpay success handoff
 
-2. Replace “blind reopen” with a guarded recovery state machine
-- Introduce a small recovery flow in `useCartPage.ts`:
-  - `no session` → do nothing
-  - `session + unpaid payment_pending orders` → allow resume
-  - `session + paid/placed/advanced orders` → clear stale session and navigate away
-  - `session + cancelled/missing orders` → clear stale session and do not reopen
-- Use this same guard for:
-  - initial mount
-  - app resume restoration
-  - retry pending payment
+Plan to make this bulletproof:
 
-3. Remove the success-delay race in RazorpayCheckout
-- In `src/components/payment/RazorpayCheckout.tsx`, stop delaying parent success with `setTimeout(..., 800)`.
-- Call `onPaymentSuccess` immediately after success.
-- Prevent the drawer’s local close/reset path from ever reverting UI back to `pending` after success has fired.
+1. Make Razorpay success terminal at the component level
+- Update `src/components/payment/RazorpayCheckout.tsx`
+- Replace the current “any close = handleClose” behavior with an explicit close-state handler.
+- Add a one-way attempt state machine:
+  - `idle`
+  - `opening`
+  - `awaiting_gateway`
+  - `success_handoff`
+  - `failed`
+  - `dismissed`
+- Once success fires, the component must:
+  - ignore all later `onOpenChange(false)`
+  - ignore later `ondismiss`
+  - never call `onPaymentFailed`
+  - never call `onDismiss`
+- Parent-driven close after success becomes a silent unmount only.
 
-4. Split “payment launcher” from “payment already submitted”
-- Do not reopen the pre-payment sheet after the SDK success callback has fired.
-- Add a one-way completion guard that survives rerenders/remounts for the active attempt.
-- Once success is seen, the only allowed next states are:
-  - navigate to order page
-  - show confirming state
-  - recover to order page from backend status
-- Never return to Pay Now for that attempt.
+2. Separate success cleanup from unpaid-order cancellation
+- Update `src/hooks/useCartPage.ts`
+- Create two clearly separate paths:
+  - `finalizeSuccessfulOnlinePayment(orderIds)`
+  - `cancelUnpaidOnlineAttempt(orderIds)`
+- Any code path that calls `buyer_cancel_pending_orders` must first check whether success has already been handed off.
+- After success is marked, cancellation RPCs become impossible for that attempt.
 
-5. Harden stale-session cleanup
-- Clear stored Razorpay session not only on local success cleanup, but also when backend recovery proves the order is already paid/advanced.
-- Clear stale session if fetched orders are older than the active attempt window or no longer belong to an unpaid recovery path.
-- Ensure `clearPendingPayment`, dismiss, failure, and success all use the same cleanup helper so there is one teardown path.
+3. Move authority for post-success routing to a single guarded handoff
+- In `useCartPage.ts`, introduce a dedicated “payment submitted / settling” flag for the active attempt.
+- On success:
+  - mark the attempt as settling
+  - close the payment UI
+  - navigate with `replace` to the order destination
+  - defer only non-critical cleanup
+- Recovery, retry, dismiss, clear-cart, and back-navigation guards must all respect this settling state.
 
-6. Guard against duplicate payment attempts
-- Before reopening Razorpay from recovery, check whether the saved orders already have a `razorpay_payment_id` / paid status.
-- If yes, block reopen completely.
-- Keep the existing double-success guard, but move the reset to “new attempt starts” only.
+4. Harden recovery so stale local state can never override a settled attempt
+- Keep backend verification as the source of truth, but extend it:
+  - if order is paid, placed, accepted, preparing, ready, delivered, completed, or otherwise advanced: never reopen/cancel
+  - if order is cancelled: clear stale session and do not resume payment
+  - only true unpaid `payment_pending` orders may resume
+- Apply this same rule to:
+  - mount restore
+  - retry payment
+  - clear pending payment
+  - cart empty recovery state
 
-7. Tighten user-facing recovery UX
-- If recovery finds payment already received but webhook is still settling, navigate to the order page and rely on the existing “Confirming Payment…” banner there.
-- Do not show the Razorpay launcher in that state.
-- If recovery finds a truly unpaid pending session, show a resume-state message instead of dropping straight back into a fresh-looking Pay Now sheet.
+5. Make the order detail page resilient to half-settled payment states
+- Update `src/pages/OrderDetailPage.tsx` and `src/hooks/useOrderDetail.ts`
+- Prevent route-boundary crashes by guarding render paths when:
+  - the current order status is not yet present in the resolved workflow
+  - related joins are temporarily missing
+  - the order is cancelled while the page is opening
+- Use local safe fallbacks instead of letting render blow up:
+  - safe status chip
+  - safe payment card
+  - disable action bars when status is unresolved
+  - skip delivery widgets unless their data is valid
+- If the order is cancelled or missing after navigation, show a controlled payment-resolution state instead of a hard error boundary.
+
+6. Remove the final modal-close race entirely
+- Audit all close paths in:
+  - `src/components/payment/RazorpayCheckout.tsx`
+  - `src/pages/CartPage.tsx`
+  - `src/hooks/useCartPage.ts`
+- Ensure there is only one actor allowed to end an attempt:
+  - success handoff
+  - explicit failure
+  - explicit dismiss before success
+- Never let both modal lifecycle and parent lifecycle try to settle the same attempt.
 
 Files to update
-- `src/hooks/useCartPage.ts`
-  - replace blind session restore with backend-verified recovery
-  - centralize stale-session teardown
-  - guard retry/reopen paths
 - `src/components/payment/RazorpayCheckout.tsx`
-  - remove delayed success callback
-  - prevent local drawer close/reset from reviving `pending`
-  - make success terminal for the current attempt
-- Possibly `src/pages/CartPage.tsx`
-  - if needed, conditionally render a recovery banner/state instead of immediately showing the launcher during session recovery
+- `src/hooks/useCartPage.ts`
+- `src/pages/CartPage.tsx`
+- `src/pages/OrderDetailPage.tsx`
+- `src/hooks/useOrderDetail.ts`
 
-Why this should stop it permanently
-- The bug keeps returning because local session restore can override real payment truth.
-- This fix removes that class of failure entirely: saved client state becomes advisory, backend order status becomes authoritative.
-- Even if callbacks race, the app reloads, the webhook is delayed, or the user resumes from background, the checkout UI cannot reopen once the backend says the payment/order has progressed.
+Expected outcome
+- Razorpay success can no longer be “undone” by a close callback
+- successful payment attempts cannot be cancelled by stale cleanup
+- buyer never sees “Pay Now” again for the same successful attempt
+- buyer lands on a stable order page with a safe confirming state, never the route crash screen
 
-Technical details
-- Main root cause: `useCartPage.ts` mount recovery currently reopens Razorpay from saved session without status verification.
-- Secondary race: `RazorpayCheckout.tsx` delays success propagation and allows local drawer state to fall back to `pending`.
-- Permanent fix pattern: backend-verified recovery + terminal success state + centralized session teardown.
-
-Validation to run after implementation
-- Pay successfully and confirm the user is never shown Pay Now again for that same attempt.
-- Refresh / background-resume immediately after payment success and confirm recovery goes to order page, not checkout.
-- Delay webhook and confirm user sees order confirmation state, not the payment launcher.
-- Multi-order Razorpay payment: if one session covers several orders, recovery should route to `/orders` and never reopen payment once any linked order is paid/advanced.
-- Failed payment and dismiss paths should still allow a clean fresh retry.
+Validation after implementation
+- Successful Razorpay payment: no cancel RPC fires afterward
+- Successful payment + immediate route change: order page loads without route boundary
+- Successful payment + app background/foreground: never reopens payment drawer
+- Failed/dismissed payment before success: still cancels unpaid pending orders correctly
+- Multi-order success: same terminal protection and safe redirect to `/orders`
