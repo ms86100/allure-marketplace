@@ -257,7 +257,7 @@ export default function SocietyDashboardPage() {
             )}
           </div>
         </div>
-      </div>
+      </SafeHeader>
 
       <div className="px-4 py-3 space-y-4">
         {/* Trust Badge - gated */}

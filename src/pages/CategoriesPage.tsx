@@ -205,7 +205,7 @@ export default function CategoriesPage() {
             </div>
           </Link>
         </div>
-      </div>
+      </SafeHeader>
 
       {/* Parent Group Pills */}
       {!isLoading && activeParentGroups.length > 0 && (

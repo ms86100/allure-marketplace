@@ -116,6 +116,7 @@ export default function TestResultsPage() {
           <p className="text-xs text-muted-foreground">{results.length} results across {runs.length} run(s)</p>
         </div>
       </div>
+      </SafeHeader>
 
       <div className="p-4 space-y-4 max-w-7xl mx-auto">
         {/* Stats Cards */}

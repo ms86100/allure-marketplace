@@ -287,7 +287,7 @@ export default function CategoryGroupPage() {
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
         </div>
-      </div>
+      </SafeHeader>
 
       {/* Product Grid */}
       <div className="p-4 pb-6">

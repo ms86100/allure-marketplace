@@ -277,6 +277,7 @@ export default function OrderDetailPage() {
             </Link>
           ) : null}
         </div>
+        </SafeHeader>
 
         <div className="px-4 pt-3 space-y-3">
           {/* Delivery completion celebration — shown once for delivered/completed orders */}

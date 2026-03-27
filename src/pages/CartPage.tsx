@@ -109,6 +109,7 @@ export default function CartPage() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
+        </SafeHeader>
 
         {/* Delivery Time — #4: show estimate for all fulfillment types */}
         {c.maxPrepTime > 0 && (
