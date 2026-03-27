@@ -25,7 +25,7 @@ export function useUnreadNotificationCount() {
       return count || 0;
     },
     enabled: !!user,
-    staleTime: 30_000, // 30s — matches previous polling interval
+    staleTime: 5_000, // 5s — fast sync with inbox state
     refetchInterval: 30_000,
   });
 

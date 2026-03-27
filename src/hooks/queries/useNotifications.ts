@@ -38,7 +38,7 @@ const PAGE_SIZE = 30;
 /**
  * Fire-and-forget stale cleanup — never throws, never blocks reads.
  */
-async function cleanupStaleDeliveryNotifications(notifications: UserNotification[]) {
+export async function cleanupStaleDeliveryNotifications(notifications: UserNotification[]) {
   try {
     // Extended to cover order_status and order_update types — not just delivery-specific
     const staleEligibleTypes = new Set([
@@ -81,8 +81,6 @@ async function cleanupStaleDeliveryNotifications(notifications: UserNotification
 }
 
 export function useNotifications(userId: string | undefined) {
-  const queryClient = useQueryClient();
-
   return useInfiniteQuery({
     queryKey: ['notifications', userId],
     queryFn: async ({ pageParam }: { pageParam?: string }) => {
@@ -99,16 +97,7 @@ export function useNotifications(userId: string | undefined) {
       }
 
       const { data } = await query;
-      const notifications = (data as unknown as UserNotification[]) || [];
-
-      // Fire-and-forget cleanup — only on first page
-      if (!pageParam && notifications.length > 0) {
-        cleanupStaleDeliveryNotifications(notifications).then(() => {
-          queryClient.invalidateQueries({ queryKey: ['notifications', userId] });
-        }).catch(() => {});
-      }
-
-      return notifications;
+      return (data as unknown as UserNotification[]) || [];
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => {
@@ -120,6 +109,7 @@ export function useNotifications(userId: string | undefined) {
     refetchInterval: 30_000,
   });
 }
+
 
 export function useLatestActionNotification(userId: string | undefined) {
   return useQuery({
@@ -137,18 +127,14 @@ export function useLatestActionNotification(userId: string | undefined) {
       const notifications = (data as unknown as UserNotification[]) || [];
       if (notifications.length === 0) return null;
 
-      // Collect ALL order-linked notifications
-      const orderLinkedNotifs: UserNotification[] = [];
+      // Collect order-linked notifications for recency gating (read-only check)
       const orderIds = new Set<string>();
       for (const n of notifications) {
         const oid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
-        if (oid) {
-          orderIds.add(oid);
-          orderLinkedNotifs.push(n);
-        }
+        if (oid) orderIds.add(oid);
       }
 
-      // Batch-fetch terminal order statuses + order age for recency gating
+      // Batch-fetch terminal + stale orders for filtering (read-only)
       let terminalOrderIds = new Set<string>();
       const staleOrderIds = new Set<string>();
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -156,7 +142,7 @@ export function useLatestActionNotification(userId: string | undefined) {
         const [terminalRes, ageRes] = await Promise.all([
           supabase
             .from('orders')
-            .select('id, status')
+            .select('id')
             .in('id', [...orderIds])
             .in('status', ['delivered', 'completed', 'cancelled', 'no_show']),
           supabase
@@ -173,30 +159,10 @@ export function useLatestActionNotification(userId: string | undefined) {
         }
       }
 
-      // Fire-and-forget stale marking — don't block or throw
-      const staleIds: string[] = [];
-      for (const n of orderLinkedNotifs) {
-        const oid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
-        if (oid && terminalOrderIds.has(oid)) {
-          staleIds.push(n.id);
-        }
-      }
-      if (staleIds.length > 0) {
-        try {
-          await supabase
-            .from('user_notifications')
-            .update({ is_read: true })
-            .in('id', staleIds);
-        } catch { /* non-blocking */ }
-      }
-
       // Return first valid notification — skip terminal + stale (>24h) orders
-      const skipSet = new Set(staleIds);
       for (const n of notifications) {
-        if (skipSet.has(n.id)) continue;
-        // Also skip notifications linked to orders older than 24 hours
         const linkedOid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
-        if (linkedOid && staleOrderIds.has(linkedOid)) continue;
+        if (linkedOid && (terminalOrderIds.has(linkedOid) || staleOrderIds.has(linkedOid))) continue;
         if (n?.payload?.action) return n;
         if (n.reference_path?.startsWith('/orders/')) {
           return {

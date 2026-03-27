@@ -51,23 +51,25 @@ export function HomeNotificationBanner() {
     queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
   }, [notification, markRead, queryClient]);
 
-  if (!notification || localDismissed.has(notification.id)) return null;
+  const showBanner = !!notification && !localDismissed.has(notification.id);
 
   return (
     <AnimatePresence>
-      <motion.div
-        key={notification.id}
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -12 }}
-        transition={{ duration: 0.3 }}
-        className="px-4 mt-3"
-      >
-        <RichNotificationCard
-          notification={notification}
-          onDismiss={handleDismiss}
-        />
-      </motion.div>
+      {showBanner && (
+        <motion.div
+          key={notification.id}
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.3 }}
+          className="px-4 mt-3"
+        >
+          <RichNotificationCard
+            notification={notification}
+            onDismiss={handleDismiss}
+          />
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 }
