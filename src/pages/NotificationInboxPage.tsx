@@ -1,4 +1,6 @@
+import { useCallback, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { resolveNotificationRoute } from '@/lib/notification-routes';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,9 +8,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { Bell, CheckCheck, Inbox, RefreshCw, Package, Users, Truck, MessageCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead, type UserNotification } from '@/hooks/queries/useNotifications';
+import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead, cleanupStaleDeliveryNotifications, type UserNotification } from '@/hooks/queries/useNotifications';
 import { RichNotificationCard } from '@/components/notifications/RichNotificationCard';
-import { useMemo } from 'react';
 
 export default function NotificationInboxPage() {
   const { user } = useAuth();
