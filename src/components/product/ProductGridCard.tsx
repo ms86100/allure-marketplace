@@ -45,6 +45,8 @@ export function ProductGridCard({ product, behavior, onTap, className, viewOnly 
 
   const cartItem = isCartAction ? items.find((item) => item.product_id === product.id) : null;
   const quantity = cartItem?.quantity || 0;
+  const stockLimit = (product as any).stock_quantity != null ? (product as any).stock_quantity : 99;
+  const canIncrement = quantity < stockLimit;
 
   const storeAvailability = useMemo(() => {
     return computeStoreStatus(
