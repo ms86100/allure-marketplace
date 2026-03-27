@@ -1,26 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
+import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCurrency } from '@/hooks/useCurrency';
-import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
+import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Store, Package, Tag } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { useNavigate } from 'react-router-dom';
 import { useMemo } from 'react';
-import { escapePostgrestFilter } from '@/lib/query-utils';
 
 interface Props {
   query: string;
   onSelect: (product: any) => void;
-}
-
-interface SellerSuggestion {
-  id: string;
-  business_name: string;
-  description: string | null;
-  profile_image_url: string | null;
-  categories: string[];
 }
 
 interface CategoryMatch {
@@ -30,16 +23,26 @@ interface CategoryMatch {
   parentGroup: string;
 }
 
+/**
+ * Search autocomplete using full-text search (tsvector/tsquery).
+ * Replaces former ILIKE pattern matching for dramatically better
+ * performance at scale (GIN index vs sequential scan).
+ */
 export function SearchAutocomplete({ query, onSelect }: Props) {
-  const { effectiveSocietyId } = useAuth();
+  const { profile } = useAuth();
   const { formatPrice } = useCurrency();
+  const { browsingLocation } = useBrowsingLocation();
   const navigate = useNavigate();
   const { configs: categoryConfigs } = useCategoryConfigs();
   const trimmed = query.trim();
   const lower = trimmed.toLowerCase();
 
-  // Match categories by slug or display name — raw matches from config
-  const rawMatchedCategories: CategoryMatch[] = useMemo(() => {
+  const lat = browsingLocation?.lat;
+  const lng = browsingLocation?.lng;
+  const radiusKm = profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM;
+
+  // Match categories by slug or display name
+  const matchedCategories: CategoryMatch[] = useMemo(() => {
     if (lower.length < 2) return [];
     return categoryConfigs
       .filter(c => c.category.toLowerCase().includes(lower) || c.displayName.toLowerCase().includes(lower))
@@ -47,67 +50,37 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
       .map(c => ({ slug: c.category, displayName: c.displayName, icon: c.icon, parentGroup: c.parentGroup }));
   }, [lower, categoryConfigs]);
 
-  // Check which matched categories actually have available products
-  const { data: categoriesWithProducts = [] } = useQuery({
-    queryKey: ['search-category-has-products', rawMatchedCategories.map(c => c.slug)],
-    queryFn: async () => {
-      const slugs = rawMatchedCategories.map(c => c.slug);
-      const { data } = await supabase
-        .from('products')
-        .select('category')
-        .eq('is_available', true)
-        .eq('approval_status', 'approved')
-        .in('category', slugs);
-      return [...new Set((data || []).map((d: any) => d.category as string))];
-    },
-    enabled: rawMatchedCategories.length > 0,
-    staleTime: 60_000,
-  });
-
-  // Only show categories that have at least one product
-  const matchedCategories = useMemo(
-    () => rawMatchedCategories.filter(c => categoriesWithProducts.includes(c.slug)),
-    [rawMatchedCategories, categoriesWithProducts]
-  );
-
-  // Deep product search: name, description, category, tags, brand, ingredients
+  // Full-text search for products — uses GIN-indexed tsvector
   const { data: productSuggestions = [] } = useQuery({
-    queryKey: ['search-autocomplete', trimmed, effectiveSocietyId],
+    queryKey: ['search-fts', trimmed, lat, lng, radiusKm],
     queryFn: async () => {
-      // Get matching category slugs for the search term
-      const matchingSlugs = categoryConfigs
-        .filter(c => c.category.toLowerCase().includes(lower) || c.displayName.toLowerCase().includes(lower))
-        .map(c => c.category);
-
-      // Build OR conditions for deep search — sanitize user input
-      const safe = escapePostgrestFilter(trimmed);
-      let orConditions = `name.ilike.%${safe}%,description.ilike.%${safe}%,brand.ilike.%${safe}%,ingredients.ilike.%${safe}%`;
-      if (matchingSlugs.length > 0) {
-        orConditions += `,category.in.(${matchingSlugs.join(',')})`;
+      const { data, error } = await supabase.rpc('search_products_fts' as any, {
+        _query: trimmed,
+        _lat: lat ?? null,
+        _lng: lng ?? null,
+        _radius_km: radiusKm,
+        _limit: 8,
+        _offset: 0,
+      });
+      if (error) {
+        console.error('FTS search error:', error);
+        return [];
       }
-
-      const { data } = await supabase
-        .from('products')
-        .select('id, name, price, image_url, seller_id, category, is_veg, description, is_available, action_type')
-        .eq('is_available', true)
-        .eq('approval_status', 'approved')
-        .or(orConditions)
-        .limit(8) as { data: any[] | null };
-      return data || [];
+      return (data || []) as any[];
     },
     enabled: trimmed.length >= 2,
     staleTime: 30_000,
   });
 
-  // Seller search: business name, description, categories overlap
+  // Seller search (lightweight — no product embedding)
   const { data: sellerSuggestions = [] } = useQuery({
     queryKey: ['search-autocomplete-sellers', trimmed],
-    queryFn: async (): Promise<SellerSuggestion[]> => {
+    queryFn: async () => {
       const { data } = await supabase
         .from('seller_profiles')
         .select('id, business_name, description, profile_image_url, categories')
         .eq('verification_status', 'approved')
-        .or(`business_name.ilike.%${escapePostgrestFilter(trimmed)}%,description.ilike.%${escapePostgrestFilter(trimmed)}%,categories.cs.{${escapePostgrestFilter(lower)}}`)
+        .ilike('business_name', `%${trimmed}%`)
         .limit(3);
       return (data || []).map((d: any) => ({
         id: d.id,
@@ -165,7 +138,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
               <Store size={11} className="text-muted-foreground" />
               <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Stores</span>
             </div>
-            {sellerSuggestions.map((seller) => (
+            {sellerSuggestions.map((seller: any) => (
               <button
                 key={seller.id}
                 onClick={() => navigate(`/seller/${seller.id}`)}
@@ -190,7 +163,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
           </div>
         )}
 
-        {/* Product results */}
+        {/* Product results — from FTS */}
         {productSuggestions.length > 0 && (
           <div>
             {(sellerSuggestions.length > 0 || matchedCategories.length > 0) && (
@@ -199,12 +172,12 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Products</span>
               </div>
             )}
-            {productSuggestions.map((product) => (
+            {productSuggestions.map((product: any) => (
               <button
-                key={product.id}
+                key={product.product_id}
                 onClick={() => onSelect({
-                  product_id: product.id,
-                  product_name: product.name,
+                  product_id: product.product_id,
+                  product_name: product.product_name,
                   price: product.price,
                   image_url: product.image_url,
                   is_veg: product.is_veg,
@@ -213,12 +186,12 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
                   seller_id: product.seller_id,
                   is_available: product.is_available,
                   action_type: product.action_type,
-                  seller_name: '',
-                  seller_rating: 0,
-                  seller_reviews: 0,
-                  society_name: null,
-                  distance_km: null,
-                  is_same_society: true,
+                  seller_name: product.seller_name || '',
+                  seller_rating: product.seller_rating || 0,
+                  seller_reviews: product.seller_total_reviews || 0,
+                  society_name: product.society_name || null,
+                  distance_km: product.distance_km || null,
+                  is_same_society: (product.distance_km ?? 99) < 0.5,
                 })}
                 className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 active:bg-muted transition-colors text-left border-b border-border last:border-0"
               >
@@ -230,9 +203,9 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium text-foreground truncate">{product.name}</p>
-                  {product.description && (
-                    <p className="text-[11px] text-muted-foreground truncate">{product.description}</p>
+                  <p className="text-[13px] font-medium text-foreground truncate">{product.product_name}</p>
+                  {product.seller_name && (
+                    <p className="text-[11px] text-muted-foreground truncate">{product.seller_name}</p>
                   )}
                 </div>
                 <span className="text-[12px] font-bold text-primary shrink-0">{formatPrice(product.price)}</span>
