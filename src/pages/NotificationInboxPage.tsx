@@ -92,7 +92,7 @@ export default function NotificationInboxPage() {
 
               if (hasAction) {
                 return (
-                  <RichNotificationCard key={n.id} notification={n} />
+                  <RichNotificationCard key={n.id} notification={n} onDismiss={() => handleRichDismiss(n)} />
                 );
               }
 
