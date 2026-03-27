@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Minus, Plus, Clock, Store, MapPin, Bell, ChevronRight, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { Button } from '@/components/ui/button';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { Textarea } from '@/components/ui/textarea';

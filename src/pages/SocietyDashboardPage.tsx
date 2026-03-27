@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { Input } from '@/components/ui/input';
 import { SocietyTrustBadge } from '@/components/trust/SocietyTrustBadge';
 import { useAuth } from '@/contexts/AuthContext';

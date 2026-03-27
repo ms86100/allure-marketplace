@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, CheckCircle2, XCircle, Clock, Search, Filter, BarChart3, FileText, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { format } from "date-fns";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";

@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useParentGroups } from '@/hooks/useParentGroups';
 import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';

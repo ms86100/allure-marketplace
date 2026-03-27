@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { SellerCard } from '@/components/seller/SellerCard';

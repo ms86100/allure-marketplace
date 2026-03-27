@@ -10,6 +10,7 @@ import { BadgeConfigRow } from '@/hooks/useBadgeConfig';
 import { ArrowLeft, Search as SearchIcon, X, Globe, ShoppingBag } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder';
 import { useCurrency } from '@/hooks/useCurrency';
