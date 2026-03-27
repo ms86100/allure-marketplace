@@ -92,7 +92,9 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
           const images = meta.images.length > 0
             ? meta.images
             : cat.imageUrl ? [cat.imageUrl] : [];
-          const pastelColor = getCategoryPastel(cat.category, cat.color);
+          const isFoodBev = parentGroup === 'food_beverages';
+          const cardBg = isFoodBev ? '#096161' : getCategoryPastel(cat.category, cat.color);
+          const labelColor = isFoodBev ? 'text-white' : 'text-gray-900';
 
           return (
             <Link
@@ -103,7 +105,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
               {/* Pastel card tile */}
                 <div
                  className="w-full rounded-2xl overflow-hidden relative p-3 shadow-sm border border-black/[0.04]"
-                 style={{ backgroundColor: pastelColor }}
+                 style={{ backgroundColor: cardBg }}
                >
                 {/* Image area — fixed height */}
                 <div className="relative">
@@ -148,7 +150,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                 </div>
 
                 {/* Label inside card */}
-                <p className="text-[13px] font-medium text-gray-900 text-center leading-tight mt-2 line-clamp-2">
+                <p className={`text-[13px] font-medium text-center leading-tight mt-2 line-clamp-2 ${labelColor}`}>
                   {cat.displayName}
                 </p>
               </div>
