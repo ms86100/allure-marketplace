@@ -1,80 +1,71 @@
 
 
-# Pre-Order Investigation Results
+# Fix LaunchScreen.storyboard Compilation Failure on Xcode 26.2
 
-## Current State — What Already Exists
+## Root Cause
 
-### Seller Side (Complete)
-The seller can configure pre-orders per product in the product form:
-- **"Hours in advance"** input → saves to `products.lead_time_hours`
-- **"Accept Pre-orders"** toggle → saves to `products.accepts_preorders`
-- Both fields persist correctly to the database
-- Category-level defaults also exist: `category_config.accepts_preorders`, `category_config.lead_time_hours`, `category_config.preorder_cutoff_time`
+The `CompileStoryboard` step fails because the generated storyboard XML uses `toolsVersion="17701"` (Xcode 15 era). Xcode 26.2 (`latest` in your Codemagic config) may reject or misinterpret older storyboard formats. Additionally, the storyboard is missing the `device` element that modern Xcode versions expect for proper compilation.
 
-### Buyer Side (NOT Implemented)
-**Pre-orders are completely non-functional for buyers.** Despite the seller configuring `accepts_preorders = true` and `lead_time_hours = 5`, the buyer experience is identical to a regular immediate order:
+## Fix
 
-| What's missing | Impact |
-|---|---|
-| No date/time picker in checkout | Buyer can't select a future delivery date |
-| No `lead_time_hours` enforcement | Buyer can place an order without required advance notice |
-| No pre-order indicator on product cards | Buyer doesn't know a product is pre-order only |
-| No `scheduled_date` / `scheduled_time` passed to `create_multi_vendor_orders` | Order has no scheduled fulfillment date |
-| No seller-side visibility of scheduled date on order detail | Seller doesn't know when to prepare |
+Update the storyboard XML template in `codemagic.yaml` (lines 210-246) with:
 
-### Database (Partially Ready)
-The `orders` table already has: `scheduled_date`, `scheduled_time_start`, `scheduled_time_end` — but these are never populated by the cart/checkout flow.
+1. **Higher `toolsVersion`** — use `"32106"` (Xcode 16+ compatible, forward-safe)
+2. **Add `systemVersion` attribute** to the `<document>` element
+3. **Add `<device>` element** inside `<scene>` — Xcode 26 expects this for proper storyboard compilation
+4. **Keep everything else identical** — same centered SplashLogo, same dark navy background, same Auto Layout constraints
 
----
+### Updated storyboard XML (replacing lines 211-245):
 
-## Implementation Plan (Zero Breaking Changes)
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="32106" targetRuntime="AppleSDK" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
+  <device id="retina6_12" orientation="portrait" appearance="light"/>
+  <scenes>
+    <scene sceneID="EHf-IW-A2E">
+      <objects>
+        <viewController id="01J-lp-oVM" sceneMemberID="viewController">
+          <view key="view" contentMode="scaleToFill" id="GJd-Yh-RWb">
+            <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+            <subviews>
+              <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="SplashLogo" translatesAutoresizingMaskIntoConstraints="NO" id="splashLogoView">
+                <rect key="frame" x="96.5" y="376" width="200" height="100"/>
+                <constraints>
+                  <constraint firstAttribute="width" constant="200" id="splashW"/>
+                  <constraint firstAttribute="height" constant="100" id="splashH"/>
+                </constraints>
+              </imageView>
+            </subviews>
+            <color key="backgroundColor" red="0.10196078431372549" green="0.10196078431372549" blue="0.18039215686274512" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+            <constraints>
+              <constraint firstItem="splashLogoView" firstAttribute="centerX" secondItem="GJd-Yh-RWb" secondAttribute="centerX" id="splashCX"/>
+              <constraint firstItem="splashLogoView" firstAttribute="centerY" secondItem="GJd-Yh-RWb" secondAttribute="centerY" id="splashCY"/>
+            </constraints>
+            <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
+          </view>
+        </viewController>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
+      </objects>
+      <point key="canvasLocation" x="52.173913043478265" y="375"/>
+    </scene>
+  </scenes>
+  <resources>
+    <image name="SplashLogo" width="341" height="171"/>
+  </resources>
+</document>
+```
 
-### Step 1: Pre-order indicator on product cards and detail sheet
-**Files:** `ProductListingCard.tsx`, `ProductDetailSheet.tsx`
-- If `product.accepts_preorders === true`, show a small badge like "Pre-order • 5hr advance"
-- Read `lead_time_hours` from the product row (already fetched in detail sheet via `useProductDetail`)
-- **Risk:** None — purely additive UI. No existing logic touched.
+Key differences from current:
+- `toolsVersion="32106"` (Xcode 16+ compatible)
+- Added `<device id="retina6_12" orientation="portrait" appearance="light"/>` at document level
+- Updated frame dimensions to iPhone 15 Pro defaults (393×852)
 
-### Step 2: Date/time picker in checkout for pre-order items
-**Files:** `CartPage.tsx`, `useCartPage.ts`, new component `PreorderDatePicker.tsx`
-- Detect if any cart item has `accepts_preorders = true`
-- If yes, show a date+time picker section in checkout between fulfillment and payment
-- Picker enforces `lead_time_hours` as minimum: earliest selectable time = `now + max(lead_time_hours)` across all pre-order items in cart
-- Store selected datetime in `useCartPage` state
-- **Risk:** Low — additive section in checkout. Existing immediate orders are unaffected (picker only appears when pre-order items are present).
+## File Changed
 
-### Step 3: Pass scheduled date to order creation
-**Files:** `useCartPage.ts`, possibly the `create_multi_vendor_orders` RPC
-- Add `_scheduled_date` and `_scheduled_time_start` parameters to the RPC call
-- The RPC already has `scheduled_date` / `scheduled_time_start` columns on `orders` — just needs to populate them
-- For non-pre-order carts, these remain `null` (no behavior change)
-- **Risk:** Medium — requires RPC modification. Must ensure backward compatibility (parameters default to `null`).
+| File | Change |
+|------|--------|
+| `codemagic.yaml` (lines 211-245) | Update storyboard XML template with Xcode 26-compatible attributes |
 
-### Step 4: Seller-side scheduled date visibility
-**Files:** Order detail components on seller side
-- Display the scheduled date/time on the seller's order detail when present
-- **Risk:** None — purely additive display logic.
-
----
-
-## Modules Potentially Impacted
-
-| Module | Impact | Risk Level |
-|---|---|---|
-| `CartPage.tsx` | New UI section for date picker | Low — additive only |
-| `useCartPage.ts` | New state + pass scheduled date to RPC | Low — additive state |
-| `create_multi_vendor_orders` RPC | New optional parameters | Medium — must default to null |
-| `ProductListingCard.tsx` | Pre-order badge | None — display only |
-| `ProductDetailSheet.tsx` / `useProductDetail.ts` | Pre-order badge + lead time display | None — display only |
-| Seller order detail | Show scheduled date | None — display only |
-| Notification system | No change needed initially | None |
-| Payment flow | No change | None |
-| Stock enforcement | No change | None |
-
-## Safeguards
-- All changes are additive; no existing behavior is modified
-- Pre-order picker only renders when `accepts_preorders` items are in cart
-- Non-pre-order orders continue to pass `null` for scheduled fields
-- RPC parameters default to `null` for backward compatibility
-- Each step can be implemented and tested independently
+No other files affected. Zero risk to app functionality — this only impacts the iOS launch screen displayed during cold start.
 
