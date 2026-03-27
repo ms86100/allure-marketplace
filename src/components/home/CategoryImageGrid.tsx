@@ -104,10 +104,9 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
             >
               {/* Glassmorphism outer card */}
               <div
-                className="w-full rounded-2xl overflow-hidden relative flex flex-col backdrop-blur-2xl border border-white/20"
+                className="w-full rounded-2xl overflow-hidden relative flex flex-col backdrop-blur-2xl shadow-lg"
                 style={{
                   backgroundColor: `${cardBg}B3`,
-                  boxShadow: `0 4px 24px -4px ${cardBg}40, inset 0 1px 0 0 rgba(255,255,255,0.12)`,
                 }}
               >
                 {/* Short media strip — thumbnails float inside */}
