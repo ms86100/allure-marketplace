@@ -381,7 +381,15 @@ export default function CartPage() {
         <p className="text-[10px] text-muted-foreground text-center pt-1 px-4">Payments are processed by third-party providers and are not covered by Apple. <Link to="/terms" className="underline">Refund & Cancellation Policy</Link></p>
         <div className="px-4 py-3">
           {c.fulfillmentType === 'delivery' && !c.selectedDeliveryAddress && (
-            <p className="text-xs text-destructive font-medium text-center mb-2">Please select a delivery address above</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mb-2 border-destructive text-destructive hover:bg-destructive/10"
+              onClick={() => navigate('/profile/addresses', { state: { returnTo: '/cart' } })}
+            >
+              <MapPin size={14} className="mr-1.5" />
+              Add a delivery address to continue
+            </Button>
           )}
           {c.preorderMissingSchedule && (
               <p className="text-xs text-destructive font-medium text-center mb-2">Please select a delivery date & time for pre-order items</p>

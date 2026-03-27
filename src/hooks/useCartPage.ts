@@ -388,7 +388,7 @@ export function useCartPage() {
     const selfSellerGroup = sellerGroups.find(g => { const sellerUserId = (g.items[0]?.product?.seller as any)?.user_id; return sellerUserId && sellerUserId === user.id; });
     if (selfSellerGroup) { toast.error("You cannot place an order from your own store.", { id: 'checkout-self-order' }); return; }
     if (!navigator.onLine) { toast.error("You're offline. Please check your connection and try again.", { id: 'checkout-offline' }); return; }
-    if (fulfillmentType === 'delivery' && !selectedDeliveryAddress) { toast.error('Please select a delivery address before placing your order.', { id: 'checkout-no-address' }); return; }
+    if (fulfillmentType === 'delivery' && !selectedDeliveryAddress) { toast.error('Please add a delivery address to continue.', { id: 'checkout-no-address' }); return; }
     if (fulfillmentType === 'delivery' && selectedDeliveryAddress && !selectedDeliveryAddress.latitude) { toast.error('Your selected address has no location coordinates. Please update it with a precise location.', { id: 'checkout-no-coords' }); return; }
 
     // GUARD: Pre-order items MUST have a scheduled date/time — cannot bypass via race condition
