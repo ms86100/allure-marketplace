@@ -129,7 +129,7 @@ export function PreorderDatePicker({ leadTimeHours, selectedDate, selectedTime, 
           </SelectTrigger>
           <SelectContent className="max-h-48">
             {timeSlots.map(slot => (
-              <SelectItem key={slot} value={slot}>{slot}</SelectItem>
+              <SelectItem key={slot} value={slot}>{formatTime12h(slot)}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -137,7 +137,7 @@ export function PreorderDatePicker({ leadTimeHours, selectedDate, selectedTime, 
 
       {selectedDate && selectedTime && (
         <p className="text-xs text-accent font-medium">
-          📅 Scheduled for {format(selectedDate, 'EEEE, MMM d')} at {selectedTime}
+          📅 Scheduled for {format(selectedDate, 'EEEE, MMM d')} at {formatTime12h(selectedTime)}
         </p>
       )}
     </div>
