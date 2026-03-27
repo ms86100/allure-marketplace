@@ -40,22 +40,16 @@ export interface RpcSellerRow {
  * Consumer hooks see no change — they still get RpcSellerRow[].
  */
 export function useMarketplaceData() {
-  const {
-    data: sellers,
-    isLoading: sellersLoading,
-    error: sellersError,
-  } = useMarketplaceSellers();
+  const sellersQuery = useMarketplaceSellers();
+  const sellers = sellersQuery.data;
 
   const sellerIds = useMemo(
     () => (sellers || []).map((s) => s.seller_id),
     [sellers]
   );
 
-  const {
-    data: products,
-    isLoading: productsLoading,
-    error: productsError,
-  } = useMarketplaceProducts(sellerIds);
+  const productsQuery = useMarketplaceProducts(sellerIds);
+  const products = productsQuery.data;
 
   // Combine sellers + products into backward-compatible shape
   const data = useMemo((): RpcSellerRow[] => {
@@ -112,10 +106,14 @@ export function useMarketplaceData() {
 
   return {
     data,
-    isLoading: sellersLoading || productsLoading,
-    error: sellersError || productsError,
-    // Expose sellers-only loading for progressive rendering
-    sellersReady: !sellersLoading && !!sellers,
+    isLoading: sellersQuery.isLoading || productsQuery.isLoading,
+    error: sellersQuery.error || productsQuery.error,
+    sellersReady: !sellersQuery.isLoading && !!sellers,
     sellers,
+    // Expose infinite scroll controls
+    fetchNextSellers: sellersQuery.fetchNextPage,
+    hasMoreSellers: sellersQuery.hasNextPage,
+    fetchNextProducts: productsQuery.fetchNextPage,
+    hasMoreProducts: productsQuery.hasNextPage,
   };
 }
