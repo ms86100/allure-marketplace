@@ -4,7 +4,7 @@ import { jitteredStaleTime } from '@/lib/query-utils';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMarketplaceData, useMarketplaceDataFull, RpcSellerRow } from './useMarketplaceData';
+import { useMarketplaceData, RpcSellerRow } from './useMarketplaceData';
 
 export interface TopProduct {
   id: string;
@@ -118,7 +118,7 @@ function mapToNearbySeller(seller: RpcSellerRow): NearbySeller {
  * Derives from shared marketplace data — zero additional RPC calls.
  */
 export function useLocalSellers() {
-  const { data: sellers, isLoading, error } = useMarketplaceDataFull();
+  const { data: sellers, isLoading, error } = useMarketplaceData();
 
   const data = useMemo(() => {
     if (!sellers || sellers.length === 0) return {};

@@ -1,10 +1,12 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
  * System-wide marketplace config from system_settings + admin_settings.
  * Single source of truth — no frontend defaults for business logic.
+ *
+ * Uses shared cache key ['system-settings-all'] so useSystemSettingsRaw
+ * and useMarketplaceLabels can read from the same cache — zero duplicate queries.
  */
 export interface MarketplaceConfig {
   lowStockThreshold: number;
@@ -14,7 +16,6 @@ export interface MarketplaceConfig {
   enableScarcity: boolean;
   enablePulseAnimation: boolean;
   fulfillmentLabels: Record<string, string>;
-  // UI labels — all DB-backed
   labels: {
     outOfStock: string;
     soldOut: string;
@@ -88,10 +89,61 @@ export const MARKETPLACE_FALLBACKS: MarketplaceConfig = {
   },
 };
 
+interface SettingsCacheData {
+  sysMap: Record<string, string>;
+  adminMap: Record<string, string>;
+  config: MarketplaceConfig;
+}
+
+function buildConfig(sysMap: Record<string, string>, adminMap: Record<string, string>): MarketplaceConfig {
+  let fulfillmentLabels = MARKETPLACE_FALLBACKS.fulfillmentLabels;
+  try { if (adminMap.fulfillment_labels) fulfillmentLabels = JSON.parse(adminMap.fulfillment_labels); } catch {}
+
+  let spiceEmojiMap = FALLBACK_SPICE;
+  try { if (sysMap.spice_emoji_map) spiceEmojiMap = JSON.parse(sysMap.spice_emoji_map); } catch {}
+
+  let itemConditionLabels = MARKETPLACE_FALLBACKS.itemConditionLabels;
+  try { if (sysMap.item_condition_labels) itemConditionLabels = JSON.parse(sysMap.item_condition_labels); } catch {}
+
+  let rentalPeriodLabels = MARKETPLACE_FALLBACKS.rentalPeriodLabels;
+  try { if (sysMap.rental_period_labels) rentalPeriodLabels = JSON.parse(sysMap.rental_period_labels); } catch {}
+
+  return {
+    lowStockThreshold: parseInt(sysMap.low_stock_threshold || '5', 10) || 5,
+    currencySymbol: sysMap.currency_symbol || '₹',
+    defaultCurrency: sysMap.default_currency || 'INR',
+    maxBadgesPerCard: parseInt(sysMap.max_badges_per_card || '2', 10) || 2,
+    enableScarcity: sysMap.enable_scarcity !== 'false',
+    enablePulseAnimation: sysMap.enable_pulse_animation !== 'false',
+    fulfillmentLabels,
+    labels: {
+      outOfStock: sysMap.label_out_of_stock || FALLBACK_LABELS.outOfStock,
+      soldOut: sysMap.label_sold_out || FALLBACK_LABELS.soldOut,
+      unavailable: sysMap.label_unavailable || FALLBACK_LABELS.unavailable,
+      contactForPrice: sysMap.label_contact_for_price || FALLBACK_LABELS.contactForPrice,
+      discountSuffix: sysMap.label_discount_suffix || FALLBACK_LABELS.discountSuffix,
+      minChargePrefix: sysMap.label_min_charge_prefix || FALLBACK_LABELS.minChargePrefix,
+      visitPrefix: sysMap.label_visit_prefix || FALLBACK_LABELS.visitPrefix,
+      ordersSuffix: sysMap.label_orders_suffix || FALLBACK_LABELS.ordersSuffix,
+      viewButton: sysMap.label_view_button || FALLBACK_LABELS.viewButton,
+      fallbackSeller: sysMap.label_fallback_seller || FALLBACK_LABELS.fallbackSeller,
+      durationSuffix: sysMap.label_duration_suffix || FALLBACK_LABELS.durationSuffix,
+      prepTimeFormat: sysMap.label_prep_time_format || FALLBACK_LABELS.prepTimeFormat,
+      defaultPlaceholderEmoji: sysMap.default_placeholder_emoji || FALLBACK_LABELS.defaultPlaceholderEmoji,
+      defaultButtonLabel: sysMap.default_button_label || FALLBACK_LABELS.defaultButtonLabel,
+    },
+    spiceEmojiMap,
+    itemConditionLabels,
+    rentalPeriodLabels,
+  };
+}
+
 export function useMarketplaceConfig(): MarketplaceConfig {
-  const { data: config = MARKETPLACE_FALLBACKS } = useQuery({
-    queryKey: ['marketplace-config-v3'],
-    queryFn: async (): Promise<MarketplaceConfig> => {
+  const queryClient = useQueryClient();
+
+  const { data } = useQuery({
+    queryKey: ['system-settings-all'],
+    queryFn: async (): Promise<SettingsCacheData> => {
       const [sysResult, adminResult] = await Promise.all([
         supabase.from('system_settings').select('key, value'),
         supabase
@@ -111,59 +163,11 @@ export function useMarketplaceConfig(): MarketplaceConfig {
         if (row.key && row.value) adminMap[row.key] = row.value;
       }
 
-      let fulfillmentLabels = MARKETPLACE_FALLBACKS.fulfillmentLabels;
-      try {
-        if (adminMap.fulfillment_labels) fulfillmentLabels = JSON.parse(adminMap.fulfillment_labels);
-      } catch { /* use fallbacks */ }
-
-      let spiceEmojiMap = FALLBACK_SPICE;
-      try {
-        if (sysMap.spice_emoji_map) spiceEmojiMap = JSON.parse(sysMap.spice_emoji_map);
-      } catch { /* use fallbacks */ }
-
-      let itemConditionLabels = MARKETPLACE_FALLBACKS.itemConditionLabels;
-      try {
-        if (sysMap.item_condition_labels) itemConditionLabels = JSON.parse(sysMap.item_condition_labels);
-      } catch { /* use fallbacks */ }
-
-      let rentalPeriodLabels = MARKETPLACE_FALLBACKS.rentalPeriodLabels;
-      try {
-        if (sysMap.rental_period_labels) rentalPeriodLabels = JSON.parse(sysMap.rental_period_labels);
-      } catch { /* use fallbacks */ }
-
-      return {
-        lowStockThreshold: parseInt(sysMap.low_stock_threshold || '5', 10) || 5,
-        currencySymbol: sysMap.currency_symbol || '₹',
-        defaultCurrency: sysMap.default_currency || 'INR',
-        maxBadgesPerCard: parseInt(sysMap.max_badges_per_card || '2', 10) || 2,
-        enableScarcity: sysMap.enable_scarcity !== 'false',
-        enablePulseAnimation: sysMap.enable_pulse_animation !== 'false',
-        fulfillmentLabels,
-        labels: {
-          outOfStock: sysMap.label_out_of_stock || FALLBACK_LABELS.outOfStock,
-          soldOut: sysMap.label_sold_out || FALLBACK_LABELS.soldOut,
-          unavailable: sysMap.label_unavailable || FALLBACK_LABELS.unavailable,
-          contactForPrice: sysMap.label_contact_for_price || FALLBACK_LABELS.contactForPrice,
-          discountSuffix: sysMap.label_discount_suffix || FALLBACK_LABELS.discountSuffix,
-          minChargePrefix: sysMap.label_min_charge_prefix || FALLBACK_LABELS.minChargePrefix,
-          visitPrefix: sysMap.label_visit_prefix || FALLBACK_LABELS.visitPrefix,
-          ordersSuffix: sysMap.label_orders_suffix || FALLBACK_LABELS.ordersSuffix,
-          viewButton: sysMap.label_view_button || FALLBACK_LABELS.viewButton,
-          fallbackSeller: sysMap.label_fallback_seller || FALLBACK_LABELS.fallbackSeller,
-          durationSuffix: sysMap.label_duration_suffix || FALLBACK_LABELS.durationSuffix,
-          prepTimeFormat: sysMap.label_prep_time_format || FALLBACK_LABELS.prepTimeFormat,
-          defaultPlaceholderEmoji: sysMap.default_placeholder_emoji || FALLBACK_LABELS.defaultPlaceholderEmoji,
-          defaultButtonLabel: sysMap.default_button_label || FALLBACK_LABELS.defaultButtonLabel,
-        },
-        spiceEmojiMap,
-        itemConditionLabels,
-        rentalPeriodLabels,
-      };
+      const config = buildConfig(sysMap, adminMap);
+      return { sysMap, adminMap, config };
     },
-    staleTime: 30 * 60 * 1000, // 30 min — system settings are near-static
+    staleTime: 30 * 60 * 1000,
   });
 
-  // Fix #6: useQuery already returns stable `data` reference when unchanged,
-  // but we memoize the final return to be explicit
-  return config;
+  return data?.config ?? MARKETPLACE_FALLBACKS;
 }

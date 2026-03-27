@@ -32,55 +32,15 @@ export interface RpcSellerRow {
   operating_days: string[] | null;
 }
 
-export interface MarketplaceDataParams {
-  lat: number | undefined;
-  lng: number | undefined;
-  radiusKm: number;
-  excludeSocietyId: string | null | undefined;
-}
-
 /**
  * Single RPC call for ALL marketplace data. Every other hook
  * (useProductsByCategory, useNearbyProducts, useStoreDiscovery,
  *  usePopularProducts, useTrendingProducts) derives from this cache.
+ *
+ * No society exclusion at RPC level — consumers filter client-side if needed.
+ * This eliminates the former useMarketplaceDataFull duplicate.
  */
 export function useMarketplaceData() {
-  const { browsingLocation } = useBrowsingLocation();
-  const { profile, effectiveSocietyId } = useAuth();
-
-  const lat = browsingLocation?.lat;
-  const lng = browsingLocation?.lng;
-  const radiusKm = profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM;
-
-  return useQuery({
-    queryKey: ['marketplace-data', lat, lng, radiusKm, effectiveSocietyId],
-    queryFn: async (): Promise<RpcSellerRow[]> => {
-      if (!lat || !lng) return [];
-
-      const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
-        _lat: lat,
-        _lng: lng,
-        _radius_km: radiusKm,
-        _exclude_society_id: effectiveSocietyId || undefined,
-      });
-
-      if (error) {
-        console.error('Marketplace data RPC error:', error);
-        return [];
-      }
-
-      return (data || []) as RpcSellerRow[];
-    },
-    enabled: !!(lat && lng),
-    staleTime: jitteredStaleTime(10 * 60 * 1000),
-  });
-}
-
-/**
- * Hook that returns the full-radius data (no society exclusion) for store discovery.
- * Uses a separate cache key since it has different params.
- */
-export function useMarketplaceDataFull() {
   const { browsingLocation } = useBrowsingLocation();
   const { profile } = useAuth();
 
@@ -89,7 +49,7 @@ export function useMarketplaceDataFull() {
   const radiusKm = profile?.search_radius_km ?? MARKETPLACE_RADIUS_KM;
 
   return useQuery({
-    queryKey: ['marketplace-data-full', lat, lng, radiusKm],
+    queryKey: ['marketplace-data', lat, lng, radiusKm],
     queryFn: async (): Promise<RpcSellerRow[]> => {
       if (!lat || !lng) return [];
 
@@ -100,7 +60,7 @@ export function useMarketplaceDataFull() {
       });
 
       if (error) {
-        console.error('Marketplace data full RPC error:', error);
+        console.error('Marketplace data RPC error:', error);
         return [];
       }
 

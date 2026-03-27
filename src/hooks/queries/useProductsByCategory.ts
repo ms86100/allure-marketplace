@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { useMarketplaceData } from './useMarketplaceData';
+import { useAuth } from '@/contexts/AuthContext';
 import { mapProduct } from './useNearbyProducts';
 
 interface CategoryGroup {
@@ -64,7 +64,7 @@ export function useProductsByCategory(limit = 50) {
     }
 
     return result;
-  }, [sellers, queryClient, limit]);
+  }, [sellers, effectiveSocietyId, queryClient, limit]);
 
   return {
     data,
