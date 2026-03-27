@@ -129,21 +129,37 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
     geocoderRef.current = new google.maps.Geocoder();
     mapInitializedRef.current = true;
 
+    const setPanningActive = () => {
+      if (panningTimeoutRef.current) clearTimeout(panningTimeoutRef.current);
+      if (!isPanningRef.current) {
+        isPanningRef.current = true;
+        pinRef.current?.classList.add('is-panning');
+      }
+    };
+
+    const setPanningInactive = () => {
+      if (panningTimeoutRef.current) clearTimeout(panningTimeoutRef.current);
+      panningTimeoutRef.current = setTimeout(() => {
+        isPanningRef.current = false;
+        pinRef.current?.classList.remove('is-panning');
+      }, 300);
+    };
+
     // Track user interaction start
     const dragStartListener = map.addListener('dragstart', () => {
       hasUserInteractedRef.current = true;
-      setIsPanning(true);
+      setPanningActive();
     });
 
     const zoomListener = map.addListener('zoom_changed', () => {
       hasUserInteractedRef.current = true;
-      setIsPanning(true);
+      setPanningActive();
     });
 
     // On idle: read center, reverse geocode
     ignoreIdleUntilRef.current = Date.now() + 800;
     const idleListener = map.addListener('idle', () => {
-      setIsPanning(false);
+      setPanningInactive();
       if (Date.now() < ignoreIdleUntilRef.current) return;
       if (!hasUserInteractedRef.current) return;
       if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
