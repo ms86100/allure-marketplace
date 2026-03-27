@@ -209,17 +209,18 @@ workflows:
             # This avoids fragile sed replacements on complex XML
             cat > "$STORYBOARD" << 'STORYBOARDXML'
           <?xml version="1.0" encoding="UTF-8"?>
-          <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="17701" targetRuntime="AppleSDK" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
+          <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="32106" targetRuntime="AppleSDK" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
+            <device id="retina6_12" orientation="portrait" appearance="light"/>
             <scenes>
               <scene sceneID="EHf-IW-A2E">
                 <objects>
                   <viewController id="01J-lp-oVM" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="GJd-Yh-RWb">
-                      <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
+                      <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                       <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                       <subviews>
                         <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="SplashLogo" translatesAutoresizingMaskIntoConstraints="NO" id="splashLogoView">
-                          <rect key="frame" x="107" y="398" width="200" height="100"/>
+                          <rect key="frame" x="96.5" y="376" width="200" height="100"/>
                           <constraints>
                             <constraint firstAttribute="width" constant="200" id="splashW"/>
                             <constraint firstAttribute="height" constant="100" id="splashH"/>
