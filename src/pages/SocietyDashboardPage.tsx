@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { Input } from '@/components/ui/input';
 import { SocietyTrustBadge } from '@/components/trust/SocietyTrustBadge';
 import { useAuth } from '@/contexts/AuthContext';
@@ -225,7 +226,7 @@ export default function SocietyDashboardPage() {
   return (
     <AppLayout showHeader={false}>
       {/* Custom Society Header */}
-      <div className="sticky top-0 z-40 bg-background border-b border-border">
+      <SafeHeader zIndex="z-40">
         <div className="px-3 pt-2.5 pb-2">
           <div className="flex items-center gap-2 mb-2">
             <Button
@@ -257,7 +258,7 @@ export default function SocietyDashboardPage() {
             )}
           </div>
         </div>
-      </div>
+      </SafeHeader>
 
       <div className="px-4 py-3 space-y-4">
         {/* Trust Badge - gated */}

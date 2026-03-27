@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, CheckCircle2, XCircle, Clock, Search, Filter, BarChart3, FileText, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { format } from "date-fns";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -106,7 +107,8 @@ export default function TestResultsPage() {
   return (
     <div className="min-h-[100dvh] bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 flex items-center gap-3">
+      <SafeHeader>
+      <div className="px-4 pb-3 flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
@@ -115,6 +117,7 @@ export default function TestResultsPage() {
           <p className="text-xs text-muted-foreground">{results.length} results across {runs.length} run(s)</p>
         </div>
       </div>
+      </SafeHeader>
 
       <div className="p-4 space-y-4 max-w-7xl mx-auto">
         {/* Stats Cards */}

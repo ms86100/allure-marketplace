@@ -1,5 +1,6 @@
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ReviewForm } from '@/components/review/ReviewForm';
@@ -256,7 +257,8 @@ export default function OrderDetailPage() {
     <AppLayout showHeader={false} showNav={!hasSellerActionBar || !o.isSellerView}>
       <div className="pb-56">
         {/* Header */}
-        <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 flex items-center gap-3">
+        <SafeHeader>
+        <div className="px-4 pb-3.5 flex items-center gap-3">
           <button onClick={() => { if (location.state?.from === 'deeplink' || window.history.length <= 2) { navigate('/orders'); } else { navigate(-1); } }} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></button>
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold">Order Summary</h1>
@@ -276,6 +278,7 @@ export default function OrderDetailPage() {
             </Link>
           ) : null}
         </div>
+        </SafeHeader>
 
         <div className="px-4 pt-3 space-y-3">
           {/* Delivery completion celebration — shown once for delivered/completed orders */}

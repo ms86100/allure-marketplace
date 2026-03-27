@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Minus, Plus, Clock, Store, MapPin, Bell, ChevronRight, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { Button } from '@/components/ui/button';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -94,7 +95,8 @@ export default function CartPage() {
     <AppLayout showHeader={false} showNav={false} showCart={false}>
       <div className="pb-[26rem]">
         {/* Sticky Header */}
-        <div className="sticky top-0 z-30 bg-background border-b border-border px-4 pt-[max(env(safe-area-inset-top,0px),0.875rem)] pb-3.5 flex items-center gap-3">
+        <SafeHeader>
+        <div className="px-4 pb-3.5 flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></button>
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold">Checkout</h1>
@@ -108,6 +110,7 @@ export default function CartPage() {
             </AlertDialogContent>
           </AlertDialog>
         </div>
+        </SafeHeader>
 
         {/* Delivery Time — #4: show estimate for all fulfillment types */}
         {c.maxPrepTime > 0 && (

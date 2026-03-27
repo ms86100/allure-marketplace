@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
@@ -108,13 +109,14 @@ export default function HelpPage({ sections: customSections }: HelpPageProps) {
   return (
     <AppLayout showHeader={false} showNav={false}>
       <div className="pb-8">
-        {/* Sticky header with proper touch target */}
-        <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 flex items-center gap-3">
+        <SafeHeader>
+          <div className="px-4 pb-3.5 flex items-center gap-3">
           <Link to="/profile" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0">
             <ArrowLeft size={18} />
           </Link>
           <h1 className="text-lg font-bold text-foreground">Help & Guide</h1>
-        </div>
+          </div>
+        </SafeHeader>
 
         <div className="text-center mb-6 px-4 pt-4">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">

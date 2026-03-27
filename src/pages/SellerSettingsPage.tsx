@@ -3,6 +3,7 @@ import { SetStoreLocationSheet } from '@/components/seller/SetStoreLocationSheet
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -108,11 +109,13 @@ export default function SellerSettingsPage() {
 
   return (
     <AppLayout showHeader={false} showNav={false}>
-      <div className="p-4 pb-44">
-        <div className="flex items-center gap-3 mb-6">
+      <SafeHeader>
+        <div className="px-4 pb-3 flex items-center gap-3">
           <Link to="/seller" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></Link>
           <h1 className="text-xl font-bold">Store Settings</h1>
         </div>
+      </SafeHeader>
+      <div className="p-4 pb-44">
 
         <div className="space-y-5">
           {/* Rejection / Pending status banner */}

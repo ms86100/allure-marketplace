@@ -10,6 +10,7 @@ import { BadgeConfigRow } from '@/hooks/useBadgeConfig';
 import { ArrowLeft, Search as SearchIcon, X, Globe, ShoppingBag } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder';
 import { useCurrency } from '@/hooks/useCurrency';
@@ -70,7 +71,7 @@ export default function SearchPage() {
     <AppLayout showHeader={false}>
       <div className="pb-24">
         {/* Sticky search header */}
-        <div className="sticky top-0 z-40 bg-background overflow-visible">
+        <SafeHeader zIndex="z-40" bordered={false} className="overflow-visible">
           <div className="px-4 pt-3 pb-2">
             <div className="flex items-center gap-2">
               <button onClick={() => s.navigate('/')} className="shrink-0 h-10 w-10 rounded-full bg-muted flex items-center justify-center"><ArrowLeft size={18} className="text-foreground" /></button>
@@ -110,6 +111,7 @@ export default function SearchPage() {
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </div>
+        </SafeHeader>
 
           {/* Community search suggestions */}
           {!s.isSearchActive && (
@@ -165,7 +167,6 @@ export default function SearchPage() {
             });
           }}
         />
-      </div>
     </AppLayout>
   );
 }

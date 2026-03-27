@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -155,8 +156,8 @@ export default function NotificationsPage() {
   return (
     <AppLayout showHeader={false} showNav={true}>
       <div>
-        {/* Sticky header */}
-        <div className="sticky top-0 z-30 bg-background border-b border-border px-4 py-3.5 flex items-center gap-3">
+        <SafeHeader>
+          <div className="px-4 pb-3.5 flex items-center gap-3">
           <Link to="/profile" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0 active:scale-95 transition-transform">
             <ArrowLeft size={18} />
           </Link>
@@ -164,7 +165,8 @@ export default function NotificationsPage() {
             <h1 className="text-lg font-bold">Notification Settings</h1>
             <p className="text-xs text-muted-foreground">Choose what notifications you want to receive</p>
           </div>
-        </div>
+          </div>
+        </SafeHeader>
 
         <div className="p-4">
 

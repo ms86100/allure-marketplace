@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useParentGroups } from '@/hooks/useParentGroups';
 import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
@@ -187,7 +188,7 @@ export default function CategoriesPage() {
   return (
     <AppLayout showHeader={false}>
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm">
+      <SafeHeader zIndex="z-40" blur bordered={false}>
         <div className="px-4 pt-3 pb-1">
           <h1 className="text-lg font-bold text-foreground">{ml.label('label_categories_page_title')}</h1>
           <p className="text-xs text-muted-foreground mb-1">{ml.label('label_categories_page_subtitle')}</p>
@@ -205,7 +206,7 @@ export default function CategoriesPage() {
             </div>
           </Link>
         </div>
-      </div>
+      </SafeHeader>
 
       {/* Parent Group Pills */}
       {!isLoading && activeParentGroups.length > 0 && (
