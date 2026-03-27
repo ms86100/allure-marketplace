@@ -9396,6 +9396,8 @@ export type Database = {
         Args: { p_lat: number; p_lng: number; p_source?: string }
         Returns: undefined
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       update_buyer_delivery_location: {
         Args: {
           _delivery_lat: number

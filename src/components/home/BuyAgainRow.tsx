@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { optimizedImageUrl } from '@/utils/imageHelpers';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -193,10 +194,11 @@ export function BuyAgainRow() {
                       >
                         {product.image_url ? (
                           <img
-                            src={product.image_url}
+                            src={optimizedImageUrl(product.image_url, { width: 150, quality: 70 })}
                             alt={product.name}
                             className="w-full h-full object-cover"
                             loading="lazy"
+                            decoding="async"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-lg">🛒</div>

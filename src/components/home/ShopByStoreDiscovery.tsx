@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { optimizedImageUrl } from '@/utils/imageHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   useLocalSellers,
@@ -364,10 +365,11 @@ function ProductMini({ product }: { product: TopProduct }) {
     <div className="flex-1 min-w-0 rounded-lg bg-muted/50 overflow-hidden">
       {product.image_url ? (
         <img
-          src={product.image_url}
+          src={optimizedImageUrl(product.image_url, { width: 150, quality: 70 })}
           alt={product.name}
           className="w-full h-12 object-cover"
           loading="lazy"
+          decoding="async"
         />
       ) : (
         <div className="w-full h-12 flex items-center justify-center bg-secondary">

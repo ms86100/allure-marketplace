@@ -190,16 +190,33 @@ export function useSearchPage() {
           });
         }
       } else if ((selectedCategory || effectiveCategories.length > 0) && hasCoords) {
-        // Category-only filter — use paginated products RPC
+        // Category-only filter — use search_products_fts with empty query
         const targetCategory = selectedCategory || effectiveCategories[0];
-        const { data: rpcData, error: rpcError } = await supabase.rpc('search_sellers_by_location', {
+        const { data: catData, error: catError } = await supabase.rpc('search_products_fts' as any, {
+          _query: '',
           _lat: lat!, _lng: lng!, _radius_km: radius,
           _category: targetCategory || null,
+          _limit: 50,
+          _offset: 0,
         });
 
-        if (!rpcError && rpcData) {
-          (rpcData as any[]).forEach((seller) => {
-            mapSellerRpcProducts(seller).forEach((p) => products.push(p));
+        if (!catError && catData) {
+          const existingIds = new Set(products.map(p => p.product_id));
+          (catData as any[]).forEach((p: any) => {
+            if (!existingIds.has(p.product_id)) {
+              existingIds.add(p.product_id);
+              products.push({
+                product_id: p.product_id, product_name: p.product_name, price: p.price,
+                image_url: p.image_url, is_veg: p.is_veg, category: p.category,
+                description: p.description, prep_time_minutes: null, fulfillment_mode: null,
+                delivery_note: null, action_type: p.action_type || 'add_to_cart',
+                contact_phone: null, mrp: p.mrp || null, discount_percentage: p.discount_percentage || null,
+                seller_id: p.seller_id, seller_name: p.seller_name || '',
+                seller_rating: p.seller_rating || 0, seller_reviews: p.seller_total_reviews || 0,
+                society_name: p.society_name || null, distance_km: p.distance_km || null,
+                is_same_society: (p.distance_km ?? 99) < 0.5,
+              });
+            }
           });
         }
       }

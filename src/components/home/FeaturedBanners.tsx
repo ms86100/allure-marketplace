@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, forwardRef } from 'react';
+import { optimizedImageUrl } from '@/utils/imageHelpers';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -229,7 +230,7 @@ const BannerContent = forwardRef<HTMLDivElement, { banner: any }>(
 
     if (template === 'image_only') {
       return image_url ? (
-        <img ref={ref as any} src={image_url} alt={title || 'Featured'} className="w-full h-36 object-cover" loading="lazy" />
+        <img ref={ref as any} src={optimizedImageUrl(image_url, { width: 600, quality: 80 })} alt={title || 'Featured'} className="w-full h-36 object-cover" loading="lazy" decoding="async" />
       ) : (
         <div ref={ref} className="w-full h-36 flex items-center justify-center p-6 bg-primary">
           <h3 className="text-lg font-bold text-primary-foreground text-center">{title || 'Featured'}</h3>
@@ -241,7 +242,7 @@ const BannerContent = forwardRef<HTMLDivElement, { banner: any }>(
       return (
         <div ref={ref} className="relative w-full h-36">
           {image_url ? (
-            <img src={image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+             <img src={optimizedImageUrl(image_url, { width: 600, quality: 80 })} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
           ) : (
             <div className="w-full h-full" style={{ backgroundColor: bg_color }} />
           )}
@@ -272,7 +273,7 @@ const BannerContent = forwardRef<HTMLDivElement, { banner: any }>(
           </div>
           {image_url && (
             <div className="w-2/5 shrink-0">
-              <img src={image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+              <img src={optimizedImageUrl(image_url, { width: 300, quality: 80 })} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
             </div>
           )}
         </div>

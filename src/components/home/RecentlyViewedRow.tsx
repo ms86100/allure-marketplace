@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { optimizedImageUrl } from '@/utils/imageHelpers';
 import { supabase } from '@/integrations/supabase/client';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { useCart } from '@/hooks/useCart';
@@ -79,7 +80,7 @@ export function RecentlyViewedRow() {
             >
               <div className="aspect-square bg-secondary relative overflow-hidden">
                 {product.image_url ? (
-                  <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                  <img src={optimizedImageUrl(product.image_url, { width: 200, quality: 70 })} alt={product.name} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-xl">📦</div>
                 )}

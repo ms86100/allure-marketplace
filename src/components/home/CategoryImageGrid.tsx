@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react';
+import { optimizedImageUrl } from '@/utils/imageHelpers';
 import { Link } from 'react-router-dom';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
@@ -118,20 +119,22 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                         className="w-14 h-14 rounded-lg overflow-hidden bg-white/30 flex-shrink-0 shadow-sm"
                       >
                         <img
-                          src={src}
+                          src={optimizedImageUrl(src, { width: 120, quality: 70 })}
                           alt=""
                           className="w-full h-full object-cover"
                           loading="lazy"
+                          decoding="async"
                         />
                       </div>
                     ))
                   ) : images.length === 1 ? (
                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-white/30 shadow-sm">
                       <img
-                        src={images[0]}
+                        src={optimizedImageUrl(images[0], { width: 120, quality: 70 })}
                         alt={cat.displayName}
                         className="w-full h-full object-cover"
                         loading="lazy"
+                        decoding="async"
                       />
                     </div>
                   ) : (
