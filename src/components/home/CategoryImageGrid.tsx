@@ -60,8 +60,8 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
     return (
       <div className="px-4 mb-6">
         <Skeleton className="h-5 w-40 mb-3" />
-        <div className="grid grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map(i => (
+        <div className="grid grid-cols-3 gap-3">
+          {[1, 2, 3].map(i => (
             <div key={i} className="flex flex-col items-center gap-2">
               <Skeleton className="aspect-square w-full rounded-2xl" />
               <Skeleton className="h-3 w-14 rounded" />
@@ -87,42 +87,36 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
         </Link>
       </div>
 
-      {/* 4-column tile grid — Blinkit style: dark card + 2×2 images + label below */}
-      <div className="grid grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-x-3 gap-y-4 stagger-children">
-        {categories.slice(0, 8).map((cat) => {
+      {/* 3-column tile grid — Blinkit style: colored card + 2 images + label below */}
+      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 stagger-children">
+        {categories.slice(0, 9).map((cat) => {
           const meta = metaMap[cat.category] || { count: 0, images: [] };
           const images = meta.images.length > 0
             ? meta.images
             : cat.imageUrl ? [cat.imageUrl] : [];
+          const catColor = cat.color || 'hsl(var(--muted))';
 
           return (
             <Link
               key={cat.category}
               to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-              className="flex flex-col items-center group active:scale-[0.96] transition-transform duration-150 card-hover max-w-[180px] mx-auto"
+              className="flex flex-col items-center group active:scale-[0.96] transition-transform duration-150"
             >
-              {/* Compact card tile */}
-              <div className="w-full aspect-[4/3] rounded-xl overflow-hidden bg-card border border-border img-zoom relative">
-                {images.length >= 4 ? (
-                  <div className="grid grid-cols-2 grid-rows-2 w-full h-full gap-[2px] p-[2px]">
-                    {images.slice(0, 4).map((src, i) => (
-                      <img
-                        key={i}
-                        src={src}
-                        alt=""
-                        className="w-full h-full object-cover rounded-lg"
-                        loading="lazy"
-                      />
-                    ))}
-                  </div>
-                ) : images.length >= 2 ? (
-                  <div className="grid grid-cols-2 w-full h-full gap-[2px] p-[2px]">
+              {/* Colored card tile */}
+              <div
+                className="w-full aspect-square rounded-2xl overflow-hidden relative p-2.5 border border-border/30"
+                style={{
+                  background: `linear-gradient(160deg, ${catColor}20 0%, ${catColor}10 60%, hsl(var(--card)) 100%)`,
+                }}
+              >
+                {images.length >= 2 ? (
+                  <div className="grid grid-cols-2 w-full h-full gap-1.5">
                     {images.slice(0, 2).map((src, i) => (
                       <img
                         key={i}
                         src={src}
                         alt=""
-                        className="w-full h-full object-cover rounded-lg"
+                        className="w-full h-full object-cover rounded-xl"
                         loading="lazy"
                       />
                     ))}
@@ -131,32 +125,36 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                   <img
                     src={images[0]}
                     alt={cat.displayName}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover rounded-xl"
                     loading="lazy"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-muted">
+                  <div className="w-full h-full flex items-center justify-center rounded-xl bg-muted/50">
                     <DynamicIcon
                       name={cat.icon}
-                      size={32}
+                      size={36}
                       className="text-muted-foreground"
                     />
                   </div>
                 )}
-                {/* Count badge removed — was misleading when category page results diverged */}
+
+                {/* "+X more" badge */}
+                {meta.count > 2 && (
+                  <div className="absolute bottom-2 right-2 bg-background/80 backdrop-blur-sm text-foreground text-[9px] font-bold px-2 py-0.5 rounded-full border border-border/40">
+                    +{meta.count - 2} more
+                  </div>
+                )}
               </div>
 
               {/* Label below card */}
-              <span className="text-[11px] font-bold text-foreground text-center leading-tight mt-1.5 line-clamp-2 px-0.5">
+              <span className="text-xs font-bold text-foreground text-center leading-tight mt-2 line-clamp-2 px-0.5">
                 {cat.displayName}
               </span>
-
             </Link>
           );
         })}
       </div>
     </div>
   );
-}
 
 export const CategoryImageGrid = memo(CategoryImageGridInner);
