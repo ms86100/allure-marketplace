@@ -27,6 +27,7 @@ interface CategoryMatch {
   slug: string;
   displayName: string;
   icon: string;
+  parentGroup: string;
 }
 
 export function SearchAutocomplete({ query, onSelect }: Props) {
