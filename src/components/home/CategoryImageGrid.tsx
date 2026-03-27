@@ -107,32 +107,30 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                  className="w-full rounded-2xl overflow-hidden relative p-3 shadow-sm border border-black/[0.04]"
                  style={{ backgroundColor: cardBg }}
                >
-                {/* Image area — fixed height */}
-                <div className="relative">
+                {/* Image area */}
+                <div className="relative aspect-[4/3]">
                   {images.length >= 2 ? (
-                    <div className="flex gap-1.5 aspect-square">
+                    <div className="grid grid-cols-2 gap-1.5 h-full">
                       {images.slice(0, 2).map((src, i) => (
-                        <div key={i} className="flex-1 h-full">
+                        <div key={i} className="relative w-full h-full overflow-hidden rounded-lg">
                           <img
                             src={src}
                             alt=""
-                            className="w-full h-full object-cover rounded-lg"
+                            className="absolute inset-0 w-full h-full object-cover"
                             loading="lazy"
                           />
                         </div>
                       ))}
                     </div>
                   ) : images.length === 1 ? (
-                    <div className="aspect-square">
-                      <img
-                        src={images[0]}
-                        alt={cat.displayName}
-                        className="w-full h-full object-cover rounded-lg"
-                        loading="lazy"
-                      />
-                    </div>
+                    <img
+                      src={images[0]}
+                      alt={cat.displayName}
+                      className="w-full h-full object-cover rounded-lg"
+                      loading="lazy"
+                    />
                   ) : (
-                    <div className="aspect-square flex items-center justify-center rounded-lg bg-white/50">
+                    <div className="w-full h-full flex items-center justify-center rounded-lg bg-white/50">
                       <DynamicIcon
                         name={cat.icon}
                         size={32}
