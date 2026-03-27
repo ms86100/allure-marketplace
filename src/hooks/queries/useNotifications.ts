@@ -38,7 +38,7 @@ const PAGE_SIZE = 30;
 /**
  * Fire-and-forget stale cleanup — never throws, never blocks reads.
  */
-async function cleanupStaleDeliveryNotifications(notifications: UserNotification[]) {
+export async function cleanupStaleDeliveryNotifications(notifications: UserNotification[]) {
   try {
     // Extended to cover order_status and order_update types — not just delivery-specific
     const staleEligibleTypes = new Set([
