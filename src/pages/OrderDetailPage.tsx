@@ -275,6 +275,7 @@ export default function OrderDetailPage() {
             </div>
           )}
 
+          {/* Buyer-side urgent countdown timer — BULLETPROOF: show whenever auto_cancel_at is set
               and buyer is viewing a non-terminal order. Does NOT depend on flow loading. */}
           {o.isBuyerView && order.auto_cancel_at && !isTerminalStatus(o.flow, order.status) && (
             <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} variant="buyer" />
