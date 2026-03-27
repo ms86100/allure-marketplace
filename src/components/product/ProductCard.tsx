@@ -28,6 +28,8 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
 
   const cartItem = isCartAction ? items.find((item) => item.product_id === product.id) : null;
   const quantity = cartItem?.quantity || 0;
+  const stockLimit = (product as any).stock_quantity != null ? (product as any).stock_quantity : 99;
+  const canIncrement = quantity < stockLimit && !isStoreClosed;
 
   const seller = (product as any)?.seller;
   const storeAvailability = useMemo(() => {
@@ -90,7 +92,7 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
               <div className="flex items-center justify-center gap-3 border border-primary rounded-md">
                 <Button size="sm" variant="ghost" className="h-10 w-10 p-0 text-primary" onClick={handleDecrement}><Minus size={16} /></Button>
                 <span className="font-semibold text-primary w-6 text-center tabular-nums">{quantity}</span>
-                <Button size="sm" variant="ghost" className="h-10 w-10 p-0 text-primary" onClick={handleIncrement}><Plus size={16} /></Button>
+                <Button size="sm" variant="ghost" className="h-10 w-10 p-0 text-primary" onClick={handleIncrement} disabled={!canIncrement}><Plus size={16} /></Button>
               </div>
             ) : (
               <Button variant="outline" className="w-full h-10 border-primary text-primary hover:bg-primary hover:text-primary-foreground font-bold" onClick={handleAdd} disabled={isDisabled}>
@@ -128,7 +130,7 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
           <div className="flex items-center gap-2 -mt-4 relative z-10 bg-primary rounded-md px-2 shadow-sm">
             <Button size="sm" variant="ghost" className="h-9 w-9 p-0 text-primary-foreground hover:bg-primary-foreground/20" onClick={handleDecrement}><Minus size={14} /></Button>
             <span className="font-semibold text-primary-foreground w-4 text-center tabular-nums">{quantity}</span>
-            <Button size="sm" variant="ghost" className="h-9 w-9 p-0 text-primary-foreground hover:bg-primary-foreground/20" onClick={handleIncrement}><Plus size={14} /></Button>
+            <Button size="sm" variant="ghost" className="h-9 w-9 p-0 text-primary-foreground hover:bg-primary-foreground/20" onClick={handleIncrement} disabled={!canIncrement}><Plus size={14} /></Button>
           </div>
         ) : (
           <Button variant="outline" className="w-full h-9 border-primary text-primary hover:bg-primary hover:text-primary-foreground -mt-4 relative z-10 bg-background shadow-sm font-bold" onClick={handleAdd} disabled={isDisabled}>
