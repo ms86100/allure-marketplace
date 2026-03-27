@@ -44,7 +44,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
     return categoryConfigs
       .filter(c => c.category.toLowerCase().includes(lower) || c.displayName.toLowerCase().includes(lower))
       .slice(0, 3)
-      .map(c => ({ slug: c.category, displayName: c.displayName, icon: c.icon }));
+      .map(c => ({ slug: c.category, displayName: c.displayName, icon: c.icon, parentGroup: c.parentGroup }));
   }, [lower, categoryConfigs]);
 
   // Check which matched categories actually have available products
@@ -143,7 +143,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
             {matchedCategories.map((cat) => (
               <button
                 key={cat.slug}
-                onClick={() => navigate(`/search?category=${cat.slug}`)}
+                onClick={() => navigate(`/category/${cat.parentGroup}?sub=${cat.slug}`)}
                 className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 active:bg-muted transition-colors text-left border-b border-border last:border-0"
               >
                 <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
