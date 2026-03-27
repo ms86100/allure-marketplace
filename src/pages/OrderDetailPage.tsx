@@ -261,7 +261,20 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* Buyer-side urgent countdown timer — BULLETPROOF: show whenever auto_cancel_at is set
+          {/* Scheduled delivery date — Pre-order */}
+          {(order as any).scheduled_date && (
+            <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 flex items-start gap-2.5">
+              <Clock size={16} className="text-accent shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">Scheduled Order</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  📅 {format(new Date((order as any).scheduled_date), 'EEEE, MMM d, yyyy')}
+                  {(order as any).scheduled_time_start && ` at ${(order as any).scheduled_time_start.slice(0, 5)}`}
+                </p>
+              </div>
+            </div>
+          )}
+
               and buyer is viewing a non-terminal order. Does NOT depend on flow loading. */}
           {o.isBuyerView && order.auto_cancel_at && !isTerminalStatus(o.flow, order.status) && (
             <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} variant="buyer" />
