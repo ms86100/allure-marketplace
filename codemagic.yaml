@@ -510,6 +510,9 @@ workflows:
           require 'xcodeproj'
 
           TEAM_ID = '6HBR38JB8Z'
+          default_marketing_version = Time.now.utc.strftime('%Y.%-m%d.%-H%M')
+          marketing_version = ENV['IOS_MARKETING_VERSION'].to_s.strip
+          marketing_version = default_marketing_version if marketing_version.empty?
 
           project = Xcodeproj::Project.open('App.xcodeproj')
           app_target = project.targets.find { |t| t.name == 'App' }
@@ -565,8 +568,8 @@ workflows:
             settings['EXECUTABLE_NAME'] = 'LiveDeliveryWidgetExtension'
             settings['TARGETED_DEVICE_FAMILY'] = '1'
             settings['GENERATE_INFOPLIST_FILE'] = 'NO'
-            settings['CURRENT_PROJECT_VERSION'] = '1'
-            settings['MARKETING_VERSION'] = '1.0'
+            settings['CURRENT_PROJECT_VERSION'] = Time.now.to_i.to_s
+            settings['MARKETING_VERSION'] = marketing_version
             settings['SKIP_INSTALL'] = 'YES'
             settings['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
             settings['DEFINES_MODULE'] = 'YES'
@@ -1307,7 +1310,7 @@ workflows:
               <key>CFBundlePackageType</key>
               <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
               <key>CFBundleShortVersionString</key>
-              <string>1.0</string>
+              <string>1.0.0</string>
               <key>CFBundleVersion</key>
               <string>1</string>
               <key>NSExtension</key>
@@ -1332,6 +1335,9 @@ workflows:
           require 'xcodeproj'
 
           TEAM_ID = '6HBR38JB8Z'
+          default_marketing_version = Time.now.utc.strftime('%Y.%-m%d.%-H%M')
+          marketing_version = ENV['IOS_MARKETING_VERSION'].to_s.strip
+          marketing_version = default_marketing_version if marketing_version.empty?
 
           project = Xcodeproj::Project.open('App.xcodeproj')
           app_target = project.targets.find { |t| t.name == 'App' }
@@ -1383,8 +1389,8 @@ workflows:
             settings['SWIFT_VERSION'] = '5.0'
             settings['TARGETED_DEVICE_FAMILY'] = '1'
             settings['GENERATE_INFOPLIST_FILE'] = 'NO'
-            settings['CURRENT_PROJECT_VERSION'] = '1'
-            settings['MARKETING_VERSION'] = '1.0'
+            settings['CURRENT_PROJECT_VERSION'] = Time.now.to_i.to_s
+            settings['MARKETING_VERSION'] = marketing_version
             settings['SKIP_INSTALL'] = 'YES'
             settings['APPLICATION_EXTENSION_API_ONLY'] = 'YES'
             settings['ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS'] = 'YES'
