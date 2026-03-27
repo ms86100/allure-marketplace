@@ -230,7 +230,7 @@ const BannerContent = forwardRef<HTMLDivElement, { banner: any }>(
 
     if (template === 'image_only') {
       return image_url ? (
-        <img ref={ref as any} src={optimizedImageUrl(image_url, { width: 600, quality: 80 })} alt={title || 'Featured'} className="w-full h-36 object-cover" loading="lazy" decoding="async" />
+        <img ref={ref as any} src={optimizedImageUrl(image_url, { width: 600, quality: 80 })} alt={title || 'Featured'} className="w-full h-36 object-cover" loading="lazy" decoding="async" onError={handleImageError} />
       ) : (
         <div ref={ref} className="w-full h-36 flex items-center justify-center p-6 bg-primary">
           <h3 className="text-lg font-bold text-primary-foreground text-center">{title || 'Featured'}</h3>
@@ -242,7 +242,7 @@ const BannerContent = forwardRef<HTMLDivElement, { banner: any }>(
       return (
         <div ref={ref} className="relative w-full h-36">
           {image_url ? (
-             <img src={optimizedImageUrl(image_url, { width: 600, quality: 80 })} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+             <img src={optimizedImageUrl(image_url, { width: 600, quality: 80 })} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" onError={handleImageError} />
           ) : (
             <div className="w-full h-full" style={{ backgroundColor: bg_color }} />
           )}
@@ -273,7 +273,7 @@ const BannerContent = forwardRef<HTMLDivElement, { banner: any }>(
           </div>
           {image_url && (
             <div className="w-2/5 shrink-0">
-              <img src={optimizedImageUrl(image_url, { width: 300, quality: 80 })} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+              <img src={optimizedImageUrl(image_url, { width: 300, quality: 80 })} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" onError={handleImageError} />
             </div>
           )}
         </div>
