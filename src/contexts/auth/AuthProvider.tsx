@@ -78,20 +78,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       staleTime: 15 * 60 * 1000,
     });
 
-    // Perf: Prefetch marketplace data using society coords immediately
+    // Perf: Prefetch sellers (lightweight) using society coords immediately
     // This runs in parallel with BrowsingLocationContext resolution
-    // The query key matches what useMarketplaceData uses, so it populates the same cache
+    // The query key matches what useMarketplaceSellers uses, so it populates the same cache
     if (societyLat && societyLng) {
       queryClient.prefetchQuery({
-        queryKey: ['marketplace-data', societyLat, societyLng, searchRadius],
+        queryKey: ['marketplace-sellers', societyLat, societyLng, searchRadius],
         queryFn: async () => {
-          const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
+          const { data, error } = await supabase.rpc('search_sellers_paginated' as any, {
             _lat: societyLat,
             _lng: societyLng,
             _radius_km: searchRadius,
+            _limit: 200,
+            _offset: 0,
           });
           if (error) {
-            console.error('Marketplace prefetch error:', error);
+            console.error('Marketplace sellers prefetch error:', error);
             return [];
           }
           return data || [];
