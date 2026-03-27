@@ -108,25 +108,74 @@ export function useCartPage() {
   // Keep ref in sync
   useEffect(() => { pendingOrderIdsRef.current = pendingOrderIds; }, [pendingOrderIds]);
 
-  // ── Restore payment session on mount (app resume / remount) ──
+  // ── Backend-verified payment session recovery on mount ──
   useEffect(() => {
     const session = loadPaymentSession();
     if (!session || session.orderIds.length === 0) return;
 
-    // Restore pending order IDs from session
-    setPendingOrderIds(session.orderIds);
+    // Verify backend state before reopening any payment UI
+    (async () => {
+      try {
+        const { data: orders } = await supabase
+          .from('orders')
+          .select('id, status, payment_status')
+          .in('id', session.orderIds);
 
-    // Re-open the correct payment UI
-    if (session.paymentMethod === 'upi') {
-      setPaymentMethod('upi');
-      // Small delay to allow component to mount with pendingOrderIds
-      setTimeout(() => setShowUpiDeepLink(true), 100);
-    } else if (session.paymentMethod === 'razorpay') {
-      // Bug 3 fix: Restore Razorpay checkout on app resume
-      setPaymentMethod('upi'); // internal state for online payment
-      razorpaySuccessHandledRef.current = false;
-      setTimeout(() => setShowRazorpayCheckout(true), 100);
-    }
+        if (!orders || orders.length === 0) {
+          // Orders don't exist — stale session
+          clearPaymentSession();
+          return;
+        }
+
+        const alreadyPaid = orders.some(o => 
+          o.payment_status === 'paid' || 
+          o.payment_status === 'buyer_confirmed' ||
+          (o.status !== 'payment_pending' && o.status !== 'cancelled')
+        );
+
+        if (alreadyPaid) {
+          // Payment already processed — navigate to order page, don't reopen payment
+          clearPaymentSession();
+          const dest = session.orderIds.length === 1 
+            ? `/orders/${session.orderIds[0]}` 
+            : '/orders';
+          navigate(dest);
+          return;
+        }
+
+        const allCancelled = orders.every(o => o.status === 'cancelled');
+        if (allCancelled) {
+          // All orders cancelled — stale session
+          clearPaymentSession();
+          return;
+        }
+
+        // Orders are genuinely unpaid and pending — allow resume
+        const unpaidIds = orders
+          .filter(o => o.status === 'payment_pending' && o.payment_status !== 'paid')
+          .map(o => o.id);
+
+        if (unpaidIds.length === 0) {
+          clearPaymentSession();
+          return;
+        }
+
+        setPendingOrderIds(unpaidIds);
+
+        if (session.paymentMethod === 'upi') {
+          setPaymentMethod('upi');
+          setTimeout(() => setShowUpiDeepLink(true), 100);
+        } else if (session.paymentMethod === 'razorpay') {
+          setPaymentMethod('upi'); // internal state for online payment
+          razorpaySuccessHandledRef.current = false;
+          setTimeout(() => setShowRazorpayCheckout(true), 100);
+        }
+      } catch (err) {
+        console.error('[Recovery] Failed to verify payment session:', err);
+        // On error, don't blindly reopen — clear stale session
+        clearPaymentSession();
+      }
+    })();
   }, []); // Only on mount
 
   // Bug 2 fix: Auto-remove coupon when cart drops below min_order_amount
@@ -629,14 +678,42 @@ export function useCartPage() {
     idempotencyKeyRef.current = null;
   }, []);
 
-  const retryPendingPayment = useCallback(() => {
+  const retryPendingPayment = useCallback(async () => {
+    // Backend-verify before reopening payment UI
+    const ids = pendingOrderIdsRef.current;
+    if (ids.length > 0) {
+      try {
+        const { data: orders } = await supabase
+          .from('orders')
+          .select('id, status, payment_status')
+          .in('id', ids);
+
+        const alreadyPaid = orders?.some(o =>
+          o.payment_status === 'paid' ||
+          o.payment_status === 'buyer_confirmed' ||
+          (o.status !== 'payment_pending' && o.status !== 'cancelled')
+        );
+
+        if (alreadyPaid) {
+          clearPaymentSession();
+          setPendingOrderIds([]);
+          const dest = ids.length === 1 ? `/orders/${ids[0]}` : '/orders';
+          toast.success('Payment already confirmed!', { id: 'retry-already-paid' });
+          navigate(dest);
+          return;
+        }
+      } catch (err) {
+        console.error('[Retry] Failed to verify order status:', err);
+      }
+    }
+
     if (paymentMode.isRazorpay) {
       razorpaySuccessHandledRef.current = false;
       setShowRazorpayCheckout(true);
     } else if (paymentMode.isUpiDeepLink) {
       setShowUpiDeepLink(true);
     }
-  }, [paymentMode]);
+  }, [paymentMode, navigate]);
 
   return {
     user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations,

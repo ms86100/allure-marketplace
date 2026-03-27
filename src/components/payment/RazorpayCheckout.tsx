@@ -52,10 +52,18 @@ export function RazorpayCheckout({
   // Keep statusRef in sync for use in callbacks that close over stale state
   useEffect(() => { statusRef.current = status; }, [status]);
 
+  const successFinalRef = useRef(false);
+
   useEffect(() => {
     if (isOpen) {
-      setStatus('pending');
+      // Only reset to pending if success hasn't already fired for this attempt
+      if (!successFinalRef.current) {
+        setStatus('pending');
+      }
       paymentInFlightRef.current = false;
+    } else {
+      // Reset the terminal guard when drawer fully closes
+      successFinalRef.current = false;
     }
     return () => {
       if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
@@ -89,9 +97,10 @@ export function RazorpayCheckout({
         if (razorpayOrderId) {
           console.log('[Payment] Razorpay order_id for reconciliation:', razorpayOrderId);
         }
-        // Instant success UI — no polling here. Parent handles verification + navigation.
+        // Mark success as terminal — prevents drawer lifecycle from reverting to 'pending'
+        successFinalRef.current = true;
         setStatus('success');
-        setTimeout(() => onPaymentSuccess(paymentId), 800);
+        onPaymentSuccess(paymentId);
       },
       onFailure: (error) => {
         if (processingTimeoutRef.current) clearTimeout(processingTimeoutRef.current);
