@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { motion } from 'framer-motion';
 import { ShoppingBag, X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';

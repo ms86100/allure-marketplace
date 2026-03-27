@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
