@@ -1,60 +1,23 @@
 
 
-# Fix Category Card Image Aspect Ratio — Blinkit Style
+# Make Category Card Images More Rounded
 
 ## Problem
-
-The 2-image side-by-side layout inside an `aspect-square` container makes each individual image extremely tall and narrow (~1:2 ratio). This looks unnatural — stretched, oval-shaped product photos.
-
-The Blinkit reference (image 2) uses: **single product image per card**, centered, with consistent square proportions and clean whitespace. Much cleaner.
+The current images use `rounded-xl` (12px border-radius). In the reference screenshot (image 1), the images have significantly more rounded corners — closer to 16–20px, giving a softer, pill-like look.
 
 ## Fix — `src/components/home/CategoryImageGrid.tsx`
 
-Replace the current 2-image split layout with a **single hero image** per card, matching Blinkit's clean proportions:
+Change image container corners from `rounded-xl` to `rounded-2xl` (16px) in three places:
 
-1. **Single image per card**: Show only the first image (not two side-by-side). This eliminates the narrow/stretched problem entirely.
+| Line | Current | New |
+|------|---------|-----|
+| 115 | `rounded-xl` (2-image grid items) | `rounded-2xl` |
+| 129 | `rounded-lg` (single image) | `rounded-2xl` |
+| 133 | `rounded-lg` (icon fallback) | `rounded-2xl` |
 
-2. **Fixed aspect ratio**: Use `aspect-square` on the single image container — one image filling a square, properly `object-cover`'d. No stretching possible.
-
-3. **Rounded corners**: Use `rounded-xl` on images for a clean, modern look matching the card's `rounded-2xl`.
-
-4. **Badge repositioned**: The "+X more" badge stays at bottom-right of the image.
-
-5. **Fallback icon**: No change needed — already uses `aspect-square`.
-
-### Code change (lines 111-142)
-
-```tsx
-{/* Image area */}
-<div className="relative aspect-square">
-  {images.length >= 1 ? (
-    <img
-      src={images[0]}
-      alt={cat.displayName}
-      className="w-full h-full object-cover rounded-xl"
-      loading="lazy"
-    />
-  ) : (
-    <div className="w-full h-full flex items-center justify-center rounded-xl bg-white/50">
-      <DynamicIcon name={cat.icon} size={32} className="text-gray-500" />
-    </div>
-  )}
-
-  {meta.count > 1 && (
-    <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-      +{meta.count - 1} more
-    </div>
-  )}
-</div>
-```
-
-### Why this is bulletproof
-
-- **One image = one aspect ratio**. No flex splitting, no half-width distortion.
-- `aspect-square` + `object-cover` guarantees the image always fills a perfect square regardless of the source image dimensions.
-- Works identically on every screen width — the grid column width determines the square size, the image just fills it.
+One file, three class swaps. That's it.
 
 | File | Change |
 |------|--------|
-| `src/components/home/CategoryImageGrid.tsx` | Replace 2-image split with single hero image; `aspect-square` + `object-cover` + `rounded-xl`; badge shows "+N more" based on total count minus 1 |
+| `src/components/home/CategoryImageGrid.tsx` | Replace `rounded-xl`/`rounded-lg` with `rounded-2xl` on all image containers |
 
