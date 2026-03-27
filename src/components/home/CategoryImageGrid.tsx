@@ -124,6 +124,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                           className="w-full h-full object-cover"
                           loading="lazy"
                           decoding="async"
+                          onError={handleImageError}
                         />
                       </div>
                     ))
@@ -135,6 +136,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                         className="w-full h-full object-cover"
                         loading="lazy"
                         decoding="async"
+                        onError={handleImageError}
                       />
                     </div>
                   ) : (

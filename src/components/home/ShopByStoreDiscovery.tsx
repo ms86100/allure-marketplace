@@ -277,10 +277,11 @@ function RichSellerCard({
       <div className="relative h-20 bg-muted overflow-hidden">
         {heroImage ? (
           <img
-            src={heroImage}
+            src={optimizedImageUrl(heroImage, { width: 300, quality: 70 })}
             alt={sanitized}
             className="w-full h-full object-cover"
             loading="lazy"
+            onError={handleImageError}
           />
         ) : (
           <div
@@ -370,6 +371,7 @@ function ProductMini({ product }: { product: TopProduct }) {
           className="w-full h-12 object-cover"
           loading="lazy"
           decoding="async"
+          onError={handleImageError}
         />
       ) : (
         <div className="w-full h-12 flex items-center justify-center bg-secondary">
