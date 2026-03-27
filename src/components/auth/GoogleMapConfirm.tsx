@@ -180,6 +180,7 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       dragStartListener.remove();
       zoomListener.remove();
       idleListener.remove();
+      if (panningTimeoutRef.current) clearTimeout(panningTimeoutRef.current);
       if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
       mapInstanceRef.current = null;
       geocoderRef.current = null;
@@ -199,7 +200,7 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
   }, [latitude, longitude, resolveLabel]);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 bg-background flex flex-col">
+    <div className="fixed inset-0 z-50 bg-background flex flex-col" style={{ touchAction: 'manipulation', overscrollBehavior: 'contain' }}>
       {/* Header */}
       <div className="shrink-0 flex items-center gap-3 px-4 pt-[max(env(safe-area-inset-top,0px),12px)] pb-3 bg-background/95 backdrop-blur-sm z-10">
         <button
@@ -213,17 +214,18 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       </div>
 
       {/* Map container — fills remaining space */}
-      <div className="flex-1 relative">
+      <div
+        className="flex-1 relative"
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+      >
         {/* Map */}
-        <div ref={mapRef} className="absolute inset-0" />
+        <div ref={mapRef} className="absolute inset-0" style={{ touchAction: 'none' }} />
 
         {/* CSS center pin overlay */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 pointer-events-none z-10 flex flex-col items-center">
-          <div
-            className={`transition-transform duration-200 ease-out ${
-              isPanning ? '-translate-y-3 scale-110' : '-translate-y-0 scale-100'
-            }`}
-          >
+        <div ref={pinRef} className="absolute left-1/2 top-1/2 -translate-x-1/2 pointer-events-none z-10 flex flex-col items-center map-pin-container">
+          <div className="transition-transform duration-200 ease-out map-pin-icon">
             <MapPin
               size={40}
               className="text-primary drop-shadow-lg"
@@ -233,11 +235,7 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
             />
           </div>
           {/* Pin shadow dot */}
-          <div
-            className={`w-2 h-1 rounded-full bg-black/30 -mt-1 transition-all duration-200 ${
-              isPanning ? 'scale-75 opacity-50' : 'scale-100 opacity-100'
-            }`}
-          />
+          <div className="w-2 h-1 rounded-full bg-black/30 -mt-1 transition-all duration-200 map-pin-shadow" />
         </div>
 
         {/* Instruction chip */}
