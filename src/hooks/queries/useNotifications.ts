@@ -40,11 +40,15 @@ const PAGE_SIZE = 30;
  */
 async function cleanupStaleDeliveryNotifications(notifications: UserNotification[]) {
   try {
-    const deliveryTypes = new Set(['delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent']);
+    // Extended to cover order_status and order_update types — not just delivery-specific
+    const staleEligibleTypes = new Set([
+      'delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent',
+      'order_status', 'order_update', 'order_placed', 'order_confirmed', 'order_preparing', 'order_ready',
+    ]);
     const unreadDeliveryNotifs: UserNotification[] = [];
     const orderIds = new Set<string>();
     for (const n of notifications) {
-      if (!n.is_read && deliveryTypes.has(n.type)) {
+      if (!n.is_read && staleEligibleTypes.has(n.type)) {
         const oid = (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
         if (oid) {
           orderIds.add(oid);
@@ -144,16 +148,28 @@ export function useLatestActionNotification(userId: string | undefined) {
         }
       }
 
-      // Batch-fetch terminal order statuses
+      // Batch-fetch terminal order statuses + order age for recency gating
       let terminalOrderIds = new Set<string>();
+      const staleOrderIds = new Set<string>();
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       if (orderIds.size > 0) {
-        const { data: orders } = await supabase
-          .from('orders')
-          .select('id, status')
-          .in('id', [...orderIds])
-          .in('status', ['delivered', 'completed', 'cancelled', 'no_show']);
-        if (orders) {
-          terminalOrderIds = new Set(orders.map((o: any) => o.id));
+        const [terminalRes, ageRes] = await Promise.all([
+          supabase
+            .from('orders')
+            .select('id, status')
+            .in('id', [...orderIds])
+            .in('status', ['delivered', 'completed', 'cancelled', 'no_show']),
+          supabase
+            .from('orders')
+            .select('id')
+            .in('id', [...orderIds])
+            .lt('created_at', twentyFourHoursAgo),
+        ]);
+        if (terminalRes.data) {
+          terminalOrderIds = new Set(terminalRes.data.map((o: any) => o.id));
+        }
+        if (ageRes.data) {
+          for (const o of ageRes.data) staleOrderIds.add(o.id);
         }
       }
 
@@ -174,10 +190,13 @@ export function useLatestActionNotification(userId: string | undefined) {
         } catch { /* non-blocking */ }
       }
 
-      // Return first valid notification
-      const staleSet = new Set(staleIds);
+      // Return first valid notification — skip terminal + stale (>24h) orders
+      const skipSet = new Set(staleIds);
       for (const n of notifications) {
-        if (staleSet.has(n.id)) continue;
+        if (skipSet.has(n.id)) continue;
+        // Also skip notifications linked to orders older than 24 hours
+        const linkedOid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
+        if (linkedOid && staleOrderIds.has(linkedOid)) continue;
         if (n?.payload?.action) return n;
         if (n.reference_path?.startsWith('/orders/')) {
           return {

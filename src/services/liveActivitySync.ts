@@ -53,13 +53,17 @@ export async function syncActiveOrders(userId: string): Promise<number> {
       return 0;
     }
 
-    const terminalFilter = `(${terminalStatuses.map(s => `"${s}"`).join(',')})`;
+    // Exclude terminal + payment_pending; add 2-hour recency guard
+    const excludeStatuses = [...terminalStatuses, 'payment_pending'];
+    const excludeFilter = `(${excludeStatuses.map(s => `"${s}"`).join(',')})`;
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
     const { data: orders, error } = await supabase
       .from('orders')
       .select('id, status, seller_id')
       .eq('buyer_id', userId)
-      .not('status', 'in', terminalFilter);
+      .not('status', 'in', excludeFilter)
+      .gte('created_at', twoHoursAgo);
 
     if (error) {
       console.error(TAG, 'Failed to fetch active orders:', error.message);

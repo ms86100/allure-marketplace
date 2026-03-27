@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Capacitor } from '@capacitor/core';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Listens for Capacitor appStateChange events and invalidates critical
@@ -10,6 +11,16 @@ import { Capacitor } from '@capacitor/core';
  */
 export function useAppLifecycle() {
   const queryClient = useQueryClient();
+  const autoCancelFiredRef = useRef(false);
+
+  // Trigger auto-cancel on cold start to sweep stale payment_pending orders
+  useEffect(() => {
+    if (autoCancelFiredRef.current) return;
+    autoCancelFiredRef.current = true;
+    supabase.functions.invoke('auto-cancel-orders').catch((e) => {
+      console.warn('[AppLifecycle] auto-cancel-orders cold-start sweep failed:', e);
+    });
+  }, []);
 
   // Push-driven sync: invalidate all critical queries on terminal order push
   useEffect(() => {
