@@ -570,6 +570,12 @@ export function useCartPage() {
   };
 
   const handleRazorpayFailed = async () => {
+    // CRITICAL: If success already handled, never cancel orders
+    if (razorpaySuccessHandledRef.current) {
+      console.log('[Payment] handleRazorpayFailed suppressed — success already handled');
+      setShowRazorpayCheckout(false);
+      return;
+    }
     setShowRazorpayCheckout(false);
     if (!user?.id) { toast.error('Session expired. Please sign in again.', { id: 'checkout-session' }); setPendingOrderIds([]); clearPaymentSession(); return; }
     if (pendingOrderIds.length > 0) {
@@ -593,6 +599,12 @@ export function useCartPage() {
 
   // Bug 1 fix: Dismiss handler — cancel pending orders so user isn't deadlocked
   const handleRazorpayDismiss = async () => {
+    // CRITICAL: If success already handled, never cancel orders on dismiss
+    if (razorpaySuccessHandledRef.current) {
+      console.log('[Payment] handleRazorpayDismiss suppressed — success already handled');
+      setShowRazorpayCheckout(false);
+      return;
+    }
     setShowRazorpayCheckout(false);
     if (pendingOrderIds.length > 0) {
       try {
