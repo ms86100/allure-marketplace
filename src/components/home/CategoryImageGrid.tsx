@@ -150,7 +150,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                 </div>
 
                 {/* Label inside card */}
-                <p className="text-[13px] font-medium text-gray-900 text-center leading-tight mt-2 line-clamp-2">
+                <p className={`text-[13px] font-medium text-center leading-tight mt-2 line-clamp-2 ${labelColor}`}>
                   {cat.displayName}
                 </p>
               </div>
