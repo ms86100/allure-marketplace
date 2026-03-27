@@ -8803,15 +8803,25 @@ export type Database = {
         Args: { _job_id: string; _worker_id: string }
         Returns: Json
       }
-      compute_store_status: {
-        Args: {
-          p_available?: boolean
-          p_days: string[]
-          p_end: string
-          p_start: string
-        }
-        Returns: Json
-      }
+      compute_store_status:
+        | {
+            Args: {
+              p_available?: boolean
+              p_days: string[]
+              p_end: string
+              p_start: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_end: string
+              p_manual_override: string
+              p_manual_override_until: string
+              p_start: string
+            }
+            Returns: Json
+          }
       confirm_cod_payment: { Args: { _order_id: string }; Returns: undefined }
       confirm_upi_payment: {
         Args: {
