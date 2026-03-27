@@ -16,16 +16,14 @@ import { ServiceCategory } from '@/types/categories';
 import { SORT_OPTIONS, SortKey } from '@/lib/marketplace-constants';
 import { ArrowLeft, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { useNearbyProducts } from '@/hooks/queries/useNearbyProducts';
-import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
-import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
+import { useMarketplaceData } from '@/hooks/queries/useMarketplaceData';
 
 export default function CategoryGroupPage() {
   const { category } = useParams<{ category: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const subCategory = searchParams.get('sub') as ServiceCategory | null;
 
@@ -71,7 +69,7 @@ export default function CategoryGroupPage() {
     category || null,
   );
 
-  const { data: nearbyProducts } = useNearbyProducts();
+  
 
   const activeCategorySet = useMemo(
     () => new Set(allProducts.map((p) => p.category)),
@@ -83,60 +81,48 @@ export default function CategoryGroupPage() {
   );
   const showAllTab = subCategories.length > 1;
 
-  const { browsingLocation } = useBrowsingLocation();
-  const lat = browsingLocation?.lat;
-  const lng = browsingLocation?.lng;
+  // Derive top sellers from shared marketplace data (no N+1 RPC loop)
+  const { data: marketplaceSellers } = useMarketplaceData();
+  const topSellers = useMemo(() => {
+    if (!marketplaceSellers || !category) return [];
+    const configs: any[] | undefined = queryClient.getQueryData(['category-configs']);
+    const categorySet = new Set(
+      (configs || [])
+        .filter((c: any) => (c.parent_group || c.parentGroup) === category)
+        .map((c: any) => c.category)
+    );
+    if (categorySet.size === 0) return [];
 
-  const { data: topSellers = [] } = useQuery({
-    queryKey: ['category-sellers', category, lat, lng],
-    queryFn: async () => {
-      if (!lat || !lng) return [];
-
-      const { data: cats } = await supabase
-        .from('category_config')
-        .select('category')
-        .eq('parent_group', category!);
-
-      const categoryList = (cats || []).map((c: any) => c.category);
-      if (categoryList.length === 0) return [];
-
-      // Use coordinate-based RPC for each category, then deduplicate
-      const allSellers = new Map<string, any>();
-      for (const cat of categoryList.slice(0, 5)) {
-        const { data: rpcData } = await supabase.rpc('search_sellers_by_location' as any, {
-          _lat: lat, _lng: lng, _radius_km: MARKETPLACE_RADIUS_KM, _category: cat,
+    const sellerMap = new Map<string, any>();
+    for (const s of marketplaceSellers) {
+      const items = s.matching_products;
+      if (!Array.isArray(items)) continue;
+      const hasCategory = items.some((p: any) => categorySet.has(p.category));
+      if (!hasCategory) continue;
+      if (!sellerMap.has(s.seller_id)) {
+        sellerMap.set(s.seller_id, {
+          id: s.seller_id,
+          business_name: s.business_name,
+          profile_image_url: s.profile_image_url,
+          cover_image_url: s.cover_image_url ?? null,
+          rating: s.rating,
+          total_reviews: s.total_reviews,
+          is_featured: s.is_featured,
+          categories: s.categories,
+          primary_group: s.primary_group,
+          distance_km: s.distance_km,
+          society_name: s.society_name,
+          is_available: s.is_available ?? true,
+          availability_start: s.availability_start ?? null,
+          availability_end: s.availability_end ?? null,
+          operating_days: s.operating_days ?? null,
         });
-        if (rpcData) {
-          (rpcData as any[]).forEach((s: any) => {
-            if (!allSellers.has(s.seller_id)) {
-              allSellers.set(s.seller_id, {
-                id: s.seller_id,
-                business_name: s.business_name,
-                profile_image_url: s.profile_image_url,
-                cover_image_url: s.cover_image_url ?? null,
-                rating: s.rating,
-                total_reviews: s.total_reviews,
-                is_featured: s.is_featured,
-                categories: s.categories,
-                primary_group: s.primary_group,
-                distance_km: s.distance_km,
-                society_name: s.society_name,
-                is_available: s.is_available ?? true,
-                availability_start: s.availability_start ?? null,
-                availability_end: s.availability_end ?? null,
-                operating_days: s.operating_days ?? null,
-              });
-            }
-          });
-        }
       }
-
-      return Array.from(allSellers.values())
-        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-        .slice(0, 10);
-    },
-    enabled: !!category && !!(lat && lng),
-  });
+    }
+    return Array.from(sellerMap.values())
+      .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+      .slice(0, 10);
+  }, [marketplaceSellers, category, queryClient]);
 
   const displayProducts = useMemo(() => {
     let filtered = activeSubCategory
