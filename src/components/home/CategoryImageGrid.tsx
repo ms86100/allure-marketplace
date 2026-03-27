@@ -110,29 +110,29 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                 {/* Image area — fixed height */}
                 <div className="relative">
                   {images.length >= 2 ? (
-                    <div className="flex gap-1.5 h-20">
+                    <div className="flex gap-1.5 aspect-square">
                       {images.slice(0, 2).map((src, i) => (
                         <div key={i} className="flex-1 h-full">
                           <img
                             src={src}
                             alt=""
-                            className="w-full h-full object-cover rounded-xl"
+                            className="w-full h-full object-cover rounded-lg"
                             loading="lazy"
                           />
                         </div>
                       ))}
                     </div>
                   ) : images.length === 1 ? (
-                    <div className="h-20">
+                    <div className="aspect-square">
                       <img
                         src={images[0]}
                         alt={cat.displayName}
-                        className="w-full h-full object-cover rounded-xl"
+                        className="w-full h-full object-cover rounded-lg"
                         loading="lazy"
                       />
                     </div>
                   ) : (
-                    <div className="h-20 flex items-center justify-center rounded-xl bg-white/50">
+                    <div className="aspect-square flex items-center justify-center rounded-lg bg-white/50">
                       <DynamicIcon
                         name={cat.icon}
                         size={32}
