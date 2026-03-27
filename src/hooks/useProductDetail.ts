@@ -40,23 +40,25 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
   const [reportOpen, setReportOpen] = useState(false);
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
   const [loadedSpecs, setLoadedSpecs] = useState<Record<string, any> | null>(null);
+  const [canonicalStockQty, setCanonicalStockQty] = useState<number | null>(null);
   const { formatPrice } = useCurrency();
 
   useEffect(() => {
     if (!product || !open) return;
     setLoadedSpecs(null);
+    setCanonicalStockQty(null);
 
     const fetchData = async () => {
-      const [specsRes, similarRes] = await Promise.all([
-        supabase.from('products').select('specifications').eq('id', product.product_id).maybeSingle(),
+      const [productRes, similarRes] = await Promise.all([
+        supabase.from('products').select('specifications, stock_quantity').eq('id', product.product_id).maybeSingle(),
         supabase.from('products')
-          .select('id, name, price, image_url, is_veg, seller_id, seller:seller_profiles!products_seller_id_fkey(business_name, society_id)')
+          .select('id, name, price, image_url, is_veg, seller_id, stock_quantity, seller:seller_profiles!products_seller_id_fkey(business_name, society_id)')
           .eq('category', product.category as string)
           .eq('is_available', true).eq('approval_status', 'approved')
           .neq('id', product.product_id).limit(6),
       ]);
-      setLoadedSpecs(specsRes.data?.specifications as Record<string, any> | null);
-      // Marketplace-open: show all similar products from approved sellers (RLS handles visibility)
+      setLoadedSpecs(productRes.data?.specifications as Record<string, any> | null);
+      setCanonicalStockQty(productRes.data?.stock_quantity ?? null);
       setSimilarProducts(similarRes.data || []);
     };
     fetchData();
@@ -68,7 +70,7 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
 
   const cartItem = items.find((item) => item.product_id === product?.product_id);
   const quantity = cartItem?.quantity || 0;
-  const stockLimit = product?.specifications?.stock_quantity ?? (loadedSpecs as any)?.stock_quantity ?? 99;
+  const stockLimit = canonicalStockQty ?? 99;
   const canIncrement = quantity < stockLimit;
 
   const navigate = useNavigate();
@@ -86,7 +88,8 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
       description: product.description || null,
       is_bestseller: false, is_recommended: false, is_urgent: false,
       created_at: '', updated_at: '',
-    });
+      stock_quantity: canonicalStockQty,
+    } as any);
     onOpenChange?.(false);
     navigate('/cart');
   }, [product, actionType, isCartAction, addItem, onOpenChange, navigate]);
