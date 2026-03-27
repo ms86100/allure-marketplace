@@ -131,7 +131,17 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
               <button onClick={() => onOpenChange(false)} className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center shadow-md border border-border/30" aria-label="Close"><X size={18} className="text-foreground" /></button>
             </div>
             <div className="p-4 space-y-3">
-              {product.prep_time_minutes && (<div className="flex items-center gap-1.5"><div className="flex items-center gap-1 bg-muted rounded-md px-2 py-1"><Clock size={12} className="text-muted-foreground" /><span className="text-[11px] font-bold text-muted-foreground uppercase">{product.prep_time_minutes} MINS</span></div></div>)}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {product.prep_time_minutes && (<div className="flex items-center gap-1 bg-muted rounded-md px-2 py-1"><Clock size={12} className="text-muted-foreground" /><span className="text-[11px] font-bold text-muted-foreground uppercase">{product.prep_time_minutes} MINS</span></div>)}
+                {(product as any).accepts_preorders && (
+                  <div className="flex items-center gap-1 bg-accent/10 border border-accent/20 rounded-md px-2 py-1">
+                    <Clock size={12} className="text-accent" />
+                    <span className="text-[11px] font-bold text-accent uppercase">
+                      Pre-order{(product as any).lead_time_hours ? ` · ${(product as any).lead_time_hours}hr advance` : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
               <div className="flex items-start gap-2">
                 {product.is_veg !== null && <VegBadge isVeg={product.is_veg} size="sm" className="mt-1" />}
                 <div className="flex-1 min-w-0">
