@@ -58,8 +58,8 @@ function PaymentConfirmingBanner() {
   return (
     <div className="flex flex-col gap-2 px-3 py-2.5 rounded-lg bg-warning/10 border border-warning/20">
       <div className="flex items-center gap-2">
-        <Loader2 size={14} className="animate-spin text-amber-600 shrink-0" />
-        <p className="text-xs text-amber-800">
+        <Loader2 size={14} className="animate-spin text-warning shrink-0" />
+        <p className="text-xs text-foreground">
           <span className="font-semibold">Payment received!</span>{' '}
           {showTimeout
             ? 'Your payment is safe. We\'re still confirming with the bank.'
@@ -70,7 +70,7 @@ function PaymentConfirmingBanner() {
         <Button
           variant="outline"
           size="sm"
-          className="self-start h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-100"
+          className="self-start h-7 text-xs border-warning/30 text-warning hover:bg-warning/10"
           onClick={() => window.location.reload()}
         >
           <RefreshCw size={12} className="mr-1" />
