@@ -171,7 +171,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     staleTime: 5 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
   });
 
   const { data: fallbackItemCount = 0 } = useQuery({
@@ -182,7 +181,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     },
     enabled: isSessionRestored && !!userId,
     staleTime: 5 * 1000,
-    refetchOnWindowFocus: true,
   });
 
   // ── Mutation helpers ──

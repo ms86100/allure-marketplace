@@ -71,7 +71,6 @@ export function useOrdersList(
     },
     enabled: !!userId && (type === 'buyer' || !!sellerId),
     staleTime: 30_000,
-    refetchOnWindowFocus: true,
   });
 
   const orders = result.data?.pages.flat() as Order[] ?? [];

@@ -25,7 +25,7 @@ export function useWorkflowMap() {
   const query = useQuery({
     queryKey: ['listing-type-workflow-map'],
     queryFn: fetchWorkflowMap,
-    staleTime: jitteredStaleTime(10 * 60 * 1000),
+    staleTime: jitteredStaleTime(30 * 60 * 1000),
   });
 
   return query;
