@@ -250,6 +250,6 @@ export function ActiveOrderStrip() {
           })}
         </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   );
 }
