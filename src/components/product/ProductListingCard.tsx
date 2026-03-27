@@ -182,6 +182,14 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
               <VegBadge isVeg={product.is_veg} size="sm" />
             </div>
           )}
+
+          {product.accepts_preorders && (
+            <div className="absolute bottom-2 left-2">
+              <span className="bg-accent/90 text-accent-foreground text-[8px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-1">
+                <Clock size={8} />Pre-order{product.lead_time_hours ? ` · ${product.lead_time_hours}hr` : ''}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Add button — overlapping image bottom */}

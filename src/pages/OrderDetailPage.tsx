@@ -34,7 +34,7 @@ import { PaymentProofReadonly } from '@/components/payment/PaymentProofReadonly'
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
 import { isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, stepRequiresOtp, getStepOtpType } from '@/hooks/useCategoryStatusFlow';
-import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck, Loader2, AlertTriangle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { getString, setString } from '@/lib/persistent-kv';
@@ -258,6 +258,20 @@ export default function OrderDetailPage() {
                   Estimated delivery: {format(new Date((order as any).estimated_delivery_at), 'h:mm a')}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Scheduled delivery date — Pre-order */}
+          {(order as any).scheduled_date && (
+            <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 flex items-start gap-2.5">
+              <Clock size={16} className="text-accent shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">Scheduled Order</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  📅 {format(new Date((order as any).scheduled_date), 'EEEE, MMM d, yyyy')}
+                  {(order as any).scheduled_time_start && ` at ${(order as any).scheduled_time_start.slice(0, 5)}`}
+                </p>
+              </div>
             </div>
           )}
 

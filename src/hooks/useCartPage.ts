@@ -97,6 +97,8 @@ export function useCartPage() {
   const [fulfillmentType, setFulfillmentType] = useState<'self_pickup' | 'delivery'>('self_pickup');
   const [orderStep, setOrderStep] = useState<'validating' | 'creating' | 'confirming'>('validating');
   const [selectedDeliveryAddress, setSelectedDeliveryAddress] = useState<any>(null);
+  const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
+  const [scheduledTime, setScheduledTime] = useState<string | null>(null);
   const settings = useSystemSettings();
   const { formatPrice, currencySymbol } = useCurrency();
   const { addresses, defaultAddress, isLoading: addressesLoading } = useDeliveryAddresses();
@@ -214,6 +216,14 @@ export function useCartPage() {
     return pt && pt > max ? pt : max;
   }, 0);
 
+  // Pre-order detection: check if any cart item requires pre-ordering
+  const hasPreorderItems = items.some(item => (item.product as any)?.accepts_preorders === true);
+  const maxLeadTimeHours = items.reduce((max, item) => {
+    const lt = (item.product as any)?.lead_time_hours;
+    return (item.product as any)?.accepts_preorders && lt && lt > max ? lt : max;
+  }, 0);
+  const preorderMissingSchedule = hasPreorderItems && (!scheduledDate || !scheduledTime);
+
   const createOrdersForAllSellers = async (paymentStatus: 'pending' | 'paid', transactionRef?: string) => {
     if (!user || !profile || sellerGroups.length === 0) return [];
 
@@ -241,6 +251,9 @@ export function useCartPage() {
 
     // Bug 2 fix: Use 'card' for Razorpay payments instead of misleading 'upi'
     const effectivePaymentMethod = paymentMode.isRazorpay && paymentMethod === 'upi' ? 'online' : paymentMethod;
+    // Format scheduled date/time for pre-order items
+    const scheduledDateStr = scheduledDate ? scheduledDate.toISOString().split('T')[0] : null;
+    const scheduledTimeStr = scheduledTime ? `${scheduledTime}:00` : null;
     const { data, error } = await supabase.rpc('create_multi_vendor_orders', {
       _buyer_id: user.id, _delivery_address: deliveryAddressText,
       _notes: notes || null, _payment_method: effectivePaymentMethod, _payment_status: paymentStatus,
@@ -251,6 +264,8 @@ export function useCartPage() {
       _delivery_lat: selectedDeliveryAddress?.latitude || null,
       _delivery_lng: selectedDeliveryAddress?.longitude || null,
       _idempotency_key: idempotencyKeyRef.current,
+      _scheduled_date: scheduledDateStr,
+      _scheduled_time_start: scheduledTimeStr,
     } as any);
     if (error) {
       // Do NOT reset idempotency key — retry must use the same key
@@ -653,5 +668,8 @@ export function useCartPage() {
     hasActivePaymentSession, sessionSellerUpiId, sessionSellerName, sessionAmount,
     clearPendingPayment, retryPendingPayment,
     cancelPlacingOrder: () => { setIsPlacingOrder(false); setOrderStep('validating'); },
+    // Pre-order
+    hasPreorderItems, maxLeadTimeHours, preorderMissingSchedule,
+    scheduledDate, setScheduledDate, scheduledTime, setScheduledTime,
   };
 }

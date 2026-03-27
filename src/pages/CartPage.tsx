@@ -11,6 +11,7 @@ import { UpiDeepLinkCheckout } from '@/components/payment/UpiDeepLinkCheckout';
 import { CouponInput } from '@/components/cart/CouponInput';
 import { FulfillmentSelector } from '@/components/delivery/FulfillmentSelector';
 import { OrderProgressOverlay } from '@/components/checkout/OrderProgressOverlay';
+import { PreorderDatePicker } from '@/components/checkout/PreorderDatePicker';
 import { useCartPage } from '@/hooks/useCartPage';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
@@ -226,6 +227,19 @@ export default function CartPage() {
           )}
         </div>
 
+        {/* Pre-order scheduling */}
+        {c.hasPreorderItems && (
+          <div className="mt-5 px-4">
+            <PreorderDatePicker
+              leadTimeHours={c.maxLeadTimeHours}
+              selectedDate={c.scheduledDate}
+              selectedTime={c.scheduledTime}
+              onDateChange={c.setScheduledDate}
+              onTimeChange={c.setScheduledTime}
+            />
+          </div>
+        )}
+
         {/* Coupon */}
         {c.sellerGroups.length === 1 ? (
           <div className="mt-5 px-4">
@@ -335,10 +349,13 @@ export default function CartPage() {
           {c.fulfillmentType === 'delivery' && !c.selectedDeliveryAddress && (
             <p className="text-xs text-destructive font-medium text-center mb-2">Please select a delivery address above</p>
           )}
-          <div className="flex items-center gap-3">
-            <div className="flex-1"><p className="text-xs text-muted-foreground">Total</p><p className="text-lg font-bold tabular-nums">{c.formatPrice(c.finalAmount)}</p></div>
-            <Button className="px-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold" size="lg" onClick={() => c.setShowConfirmDialog(true)} disabled={c.isPlacingOrder || c.hasBelowMinimumOrder || c.noPaymentMethodAvailable || c.hasFulfillmentConflict || (c.fulfillmentType === 'delivery' && !c.selectedDeliveryAddress)}>{c.isPlacingOrder ? 'Placing...' : 'Place Order'}<ChevronRight size={18} className="ml-1" /></Button>
-          </div>
+          {c.preorderMissingSchedule && (
+              <p className="text-xs text-destructive font-medium text-center mb-2">Please select a delivery date & time for pre-order items</p>
+            )}
+            <div className="flex items-center gap-3">
+              <div className="flex-1"><p className="text-xs text-muted-foreground">Total</p><p className="text-lg font-bold tabular-nums">{c.formatPrice(c.finalAmount)}</p></div>
+              <Button className="px-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold" size="lg" onClick={() => c.setShowConfirmDialog(true)} disabled={c.isPlacingOrder || c.hasBelowMinimumOrder || c.noPaymentMethodAvailable || c.hasFulfillmentConflict || (c.fulfillmentType === 'delivery' && !c.selectedDeliveryAddress) || c.preorderMissingSchedule}>{c.isPlacingOrder ? 'Placing...' : 'Place Order'}<ChevronRight size={18} className="ml-1" /></Button>
+            </div>
         </div>
       </div>
 
