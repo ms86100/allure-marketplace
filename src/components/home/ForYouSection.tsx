@@ -1,12 +1,10 @@
 import { SmartSuggestionBanner } from '@/components/home/SmartSuggestionBanner';
 import { ArrivalSuggestionCard } from '@/components/home/ArrivalSuggestionCard';
-import { BuyAgainRow } from '@/components/home/BuyAgainRow';
 import { UpcomingAppointmentBanner } from '@/components/home/UpcomingAppointmentBanner';
 
 /**
- * Gap #18: Simplified ForYouSection — removed MutationObserver.
+ * Perf: Removed duplicate BuyAgainRow — it already renders inside MarketplaceSection.
  * Each child returns null when empty, so we just render them.
- * The outer wrapper uses CSS-only spacing.
  */
 export function ForYouSection() {
   return (
@@ -16,7 +14,6 @@ export function ForYouSection() {
       <div className="px-4">
         <UpcomingAppointmentBanner />
       </div>
-      <BuyAgainRow />
     </div>
   );
 }

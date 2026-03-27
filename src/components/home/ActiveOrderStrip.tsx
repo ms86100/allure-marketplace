@@ -60,17 +60,14 @@ export function ActiveOrderStrip() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [terminalSet, setTerminalSet] = useState<Set<string> | null>(null);
-
-  useEffect(() => {
-    getTerminalStatuses().then(setTerminalSet).catch(() => setTerminalSet(new Set()));
-  }, []);
 
   const { data: activeOrders = [] } = useQuery({
     queryKey: ['active-orders-strip', user?.id],
     queryFn: async (): Promise<ActiveOrder[]> => {
-      if (!user?.id || !terminalSet) return [];
+      if (!user?.id) return [];
 
+      // Perf: fetch terminal statuses inside queryFn to eliminate sequential waterfall
+      const terminalSet = await getTerminalStatuses().catch(() => new Set<string>());
       const terminalArr = [...terminalSet];
       // Also exclude payment_pending — these are unpaid orders not yet visible to sellers
       const excludeStatuses = [...terminalArr, 'payment_pending'];
@@ -132,7 +129,7 @@ export function ActiveOrderStrip() {
         };
       });
     },
-    enabled: !!user?.id && !!terminalSet,
+    enabled: !!user?.id,
     staleTime: jitteredStaleTime(15_000),
     refetchInterval: 30_000,
     refetchOnWindowFocus: true,

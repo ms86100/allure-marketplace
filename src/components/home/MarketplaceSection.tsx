@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -50,7 +50,15 @@ export function MarketplaceSection() {
 
   const allProducts = useMemo(() => localCategories.flatMap(c => c.products), [localCategories]);
   const allProductIds = useMemo(() => allProducts.map(p => p.id), [allProducts]);
-  const { data: socialProofMap } = useSocialProof(allProductIds);
+
+  // Perf: Defer social proof — not above-fold critical, depends on all product IDs
+  const [socialProofReady, setSocialProofReady] = useState(false);
+  useEffect(() => {
+    if (allProductIds.length === 0) return;
+    const timer = setTimeout(() => setSocialProofReady(true), 2000);
+    return () => clearTimeout(timer);
+  }, [allProductIds.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { data: socialProofMap } = useSocialProof(socialProofReady ? allProductIds : []);
 
   const newThisWeekDays = ml.threshold('new_this_week_days');
   const discoveryMinProducts = ml.threshold('discovery_min_products');

@@ -36,7 +36,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const effectiveSocietyId = viewAsSocietyId || profile?.society_id || null;
   const effectiveSociety = viewAsSocietyId ? viewAsSociety : society;
 
-  // Fix #15: Prefetch critical data once auth context is established
+  // Perf: Prefetch critical data once auth context is established
+  // Includes marketplace data using society coords to break the BrowsingLocation waterfall
+  const societyLat = society?.latitude;
+  const societyLng = society?.longitude;
+  const searchRadius = profile?.search_radius_km ?? 50;
+
   useEffect(() => {
     if (!effectiveSocietyId || !profile) return;
     const LONG_STALE = 30 * 60 * 1000; // 30 min for near-static config
@@ -72,7 +77,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       staleTime: 15 * 60 * 1000,
     });
-  }, [effectiveSocietyId, !!profile]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Perf: Prefetch marketplace data using society coords immediately
+    // This runs in parallel with BrowsingLocationContext resolution
+    // The query key matches what useMarketplaceData uses, so it populates the same cache
+    if (societyLat && societyLng) {
+      queryClient.prefetchQuery({
+        queryKey: ['marketplace-data', societyLat, societyLng, searchRadius],
+        queryFn: async () => {
+          const { data, error } = await supabase.rpc('search_sellers_by_location' as any, {
+            _lat: societyLat,
+            _lng: societyLng,
+            _radius_km: searchRadius,
+          });
+          if (error) {
+            console.error('Marketplace prefetch error:', error);
+            return [];
+          }
+          return data || [];
+        },
+        staleTime: 10 * 60 * 1000,
+      });
+    }
+  }, [effectiveSocietyId, !!profile, societyLat, societyLng, searchRadius]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Memoized sub-context values ───────────────────────
   // Perf: use primitive deps to prevent re-renders from object reference changes
