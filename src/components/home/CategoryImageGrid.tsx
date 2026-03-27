@@ -112,7 +112,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                   {images.length >= 2 ? (
                     <div className="grid grid-cols-2 gap-1.5 h-full">
                       {images.slice(0, 2).map((src, i) => (
-                        <div key={i} className="relative w-full h-full overflow-hidden rounded-lg">
+                        <div key={i} className="relative w-full h-full overflow-hidden rounded-xl">
                           <img
                             src={src}
                             alt=""
