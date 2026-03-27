@@ -155,56 +155,22 @@ workflows:
 
       - name: Patch LaunchScreen to match app icon branding
         script: |
-          SPLASH_SRC="$(pwd)/public/splash-screen.png"
-          LAUNCH_DIR="ios/App/App/Assets.xcassets/LaunchImage.imageset"
-          mkdir -p "$LAUNCH_DIR"
-          cp "$SPLASH_SRC" "$LAUNCH_DIR/launch-image.png"
-          cat > "$LAUNCH_DIR/Contents.json" << 'LSJSON'
-          {
-            "images": [
-              {"idiom":"universal","filename":"launch-image.png","scale":"1x"},
-              {"idiom":"universal","scale":"2x"},
-              {"idiom":"universal","scale":"3x"}
-            ],
-            "info":{"version":1,"author":"xcode"}
-          }
-          LSJSON
-
+          # Use sed to patch the existing Capacitor-generated LaunchScreen.storyboard
+          # instead of replacing it entirely (avoids toolsVersion mismatch)
           STORYBOARD="ios/App/App/Base.lproj/LaunchScreen.storyboard"
-          cat > "$STORYBOARD" << 'STORYBOARD_XML'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="32700.99.1234" targetRuntime="AppleSDK" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
-              <scenes>
-                  <scene sceneID="EHf-IW-A2E">
-                      <objects>
-                          <viewController id="01J-lp-oVM" sceneMemberID="viewController">
-                              <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
-                                  <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
-                                  <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                                  <subviews>
-                                      <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="LaunchImage" translatesAutoresizingMaskIntoConstraints="NO" id="YRO-k0-Ew0">
-                                          <rect key="frame" x="96.666666666666657" y="376" width="200" height="100"/>
-                                      </imageView>
-                                  </subviews>
-                                  <color key="backgroundColor" red="0.10196078431372549" green="0.10196078431372549" blue="0.18039215686274512" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                  <constraints>
-                                      <constraint firstItem="YRO-k0-Ew0" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="cX1"/>
-                                      <constraint firstItem="YRO-k0-Ew0" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="cY1"/>
-                                      <constraint firstItem="YRO-k0-Ew0" firstAttribute="width" secondItem="Ze5-6b-2t3" secondAttribute="width" multiplier="0.5" id="w1"/>
-                                      <constraint firstItem="YRO-k0-Ew0" firstAttribute="height" secondItem="YRO-k0-Ew0" secondAttribute="width" multiplier="0.5" id="h1"/>
-                                  </constraints>
-                              </view>
-                          </viewController>
-                          <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
-                      </objects>
-                  </scene>
-              </scenes>
-              <resources>
-                  <image name="LaunchImage" width="200" height="100"/>
-              </resources>
-          </document>
-          STORYBOARD_XML
-          echo "=== LaunchScreen patched with dark navy + SOCIVA branding ==="
+
+          if [ -f "$STORYBOARD" ]; then
+            # Replace the background color to dark navy #1a1a2e (r=0.102, g=0.102, b=0.180)
+            # Capacitor's default storyboard has a white background color element
+            sed -i '' 's|<color key="backgroundColor" systemColor="systemBackgroundColor"/>|<color key="backgroundColor" red="0.10196078431372549" green="0.10196078431372549" blue="0.18039215686274512" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>|g' "$STORYBOARD"
+            # Also handle the cocoaTouchSystemColor variant
+            sed -i '' 's|<color key="backgroundColor" cocoaTouchSystemColor="systemBackgroundColor"/>|<color key="backgroundColor" red="0.10196078431372549" green="0.10196078431372549" blue="0.18039215686274512" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>|g' "$STORYBOARD"
+            # Handle plain white background
+            sed -i '' 's|<color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>|<color key="backgroundColor" red="0.10196078431372549" green="0.10196078431372549" blue="0.18039215686274512" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>|g' "$STORYBOARD"
+            echo "=== LaunchScreen background patched to dark navy #1a1a2e ==="
+          else
+            echo "WARNING: LaunchScreen.storyboard not found at $STORYBOARD"
+          fi
 
       - name: Patch AppDelegate for Firebase + Capacitor + LiveActivity
         script: |
