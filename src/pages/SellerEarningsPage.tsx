@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { SafeHeader } from '@/components/layout/SafeHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -119,12 +120,15 @@ export default function SellerEarningsPage() {
 
   return (
     <AppLayout showHeader={false}>
+      <SafeHeader>
+        <div className="px-4 pb-3 flex items-center gap-3">
+          <Link to="/seller" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0">
+            <ArrowLeft size={18} className="text-foreground" />
+          </Link>
+          <h1 className="text-xl font-bold">Earnings & Payouts</h1>
+        </div>
+      </SafeHeader>
       <div className="p-4">
-        <Link to="/seller" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0 mb-4">
-          <ArrowLeft size={18} className="text-foreground" />
-        </Link>
-
-        <h1 className="text-xl font-bold mb-4">Earnings & Payouts</h1>
 
         {/* Earnings Overview */}
         <div className="bg-gradient-to-r from-success/10 to-success/5 rounded-2xl p-4 mb-6">
