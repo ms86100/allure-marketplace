@@ -110,6 +110,7 @@ export default function SearchPage() {
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </div>
+        </SafeHeader>
 
           {/* Community search suggestions */}
           {!s.isSearchActive && (
