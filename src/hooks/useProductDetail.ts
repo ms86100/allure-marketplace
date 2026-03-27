@@ -68,6 +68,8 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
 
   const cartItem = items.find((item) => item.product_id === product?.product_id);
   const quantity = cartItem?.quantity || 0;
+  const stockLimit = product?.specifications?.stock_quantity ?? (loadedSpecs as any)?.stock_quantity ?? 99;
+  const canIncrement = quantity < stockLimit;
 
   const navigate = useNavigate();
 
@@ -97,7 +99,7 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
     trustSnapshot, contactOpen, setContactOpen, enquiryOpen, setEnquiryOpen,
     showDetails, setShowDetails, reportOpen, setReportOpen,
     similarProducts, loadedSpecs, formatPrice,
-    actionType, config, isCartAction, cartItem, quantity,
+    actionType, config, isCartAction, cartItem, quantity, stockLimit, canIncrement,
     handleAdd, isNewSeller, ActionIcon, viewAllLabel,
     items, updateQuantity,
   };

@@ -293,6 +293,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
       if (availability.status !== 'open') { const msg = formatStoreClosedMessage(availability); toast.error(msg || 'This store is currently closed. Please try again later.', { id: 'cart-store-closed' }); return; }
 
+      // Stock validation — enforce stock ceiling
+      let maxQty = 99;
+      const pStock = (product as any).stock_quantity;
+      if (pStock != null) {
+        maxQty = pStock;
+      } else {
+        const { data: stockCheck } = await supabase.from('products').select('stock_quantity').eq('id', product.id).maybeSingle();
+        if (stockCheck?.stock_quantity != null) maxQty = stockCheck.stock_quantity;
+      }
+      const existingQty = items.find(i => i.product_id === product.id)?.quantity || 0;
+      if (maxQty <= 0) {
+        toast.error('This item is out of stock', { id: 'stock-limit' });
+        return;
+      }
+      if (existingQty >= maxQty) {
+        toast.error(`Only ${maxQty} available`, { id: 'stock-limit' });
+        return;
+      }
+      quantity = Math.min(quantity, maxQty - existingQty);
+
       // Committed to mutation — track it
       setPendingMutations(c => c + 1);
 
@@ -302,7 +322,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       setOptimistic(prev => {
         const existing = prev.find(item => item.product_id === product.id);
-        if (existing) return prev.map(item => item.product_id === product.id ? { ...item, quantity: Math.min(item.quantity + quantity, 99) } : item);
+        if (existing) return prev.map(item => item.product_id === product.id ? { ...item, quantity: Math.min(item.quantity + quantity, maxQty) } : item);
         return [...prev, { id: `temp-${crypto.randomUUID()}`, user_id: user.id, product_id: product.id, quantity, created_at: new Date().toISOString(), product, society_id: null } as CartItem & { product: Product }];
       });
       queryClient.setQueryData(countKey(), (old: number | undefined) => (old || 0) + quantity);
@@ -310,7 +330,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       try {
         const { data: existing } = await supabase.from('cart_items').select('quantity').eq('user_id', user.id).eq('product_id', product.id).maybeSingle();
         if (existing) {
-          const { error } = await supabase.from('cart_items').update({ quantity: Math.min(existing.quantity + quantity, 99) }).eq('user_id', user.id).eq('product_id', product.id);
+          const { error } = await supabase.from('cart_items').update({ quantity: Math.min(existing.quantity + quantity, maxQty) }).eq('user_id', user.id).eq('product_id', product.id);
           if (error) throw error;
         } else {
           const { error } = await supabase.from('cart_items').insert({ user_id: user.id, product_id: product.id, quantity });
@@ -360,7 +380,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const updateQuantity = useCallback(async (productId: string, quantity: number) => {
     if (!user) return;
     if (quantity <= 0) { await removeItem(productId); return; }
-    const cappedQuantity = Math.min(quantity, 99);
+
+    // Stock validation — fetch ceiling
+    let maxQty = 99;
+    const { data: stockCheck } = await supabase.from('products').select('stock_quantity').eq('id', productId).maybeSingle();
+    if (stockCheck?.stock_quantity != null) maxQty = stockCheck.stock_quantity;
+    if (quantity > maxQty) {
+      toast.error(`Only ${maxQty} available`, { id: 'stock-limit' });
+    }
+    const cappedQuantity = Math.min(quantity, maxQty);
     setPendingMutations(c => c + 1);
     await cancelCartQueries();
     const snap = snapshot();

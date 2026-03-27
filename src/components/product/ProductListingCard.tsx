@@ -62,6 +62,8 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
   const isCartAction = actionConfig.isCart;
   const cartItem = isCartAction ? items.find((item) => item.product_id === product.id) : null;
   const quantity = cartItem?.quantity || 0;
+  const stockLimit = product.stock_quantity != null ? product.stock_quantity : 99;
+  const canIncrement = quantity < stockLimit;
 
   const catConfig = useMemo(() => categoryConfigs.find(c => c.category === product.category) || null, [categoryConfigs, product.category]);
   const resolvedLayout = useMemo((): 'ecommerce' | 'food' | 'service' => { if (layout !== 'auto') return layout as any; return catConfig?.layoutType || 'ecommerce'; }, [layout, catConfig]);
@@ -191,7 +193,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
                   <Minus size={13} strokeWidth={3} />
                 </button>
                 <span className="font-bold text-sm text-primary-foreground px-2 tabular-nums">{quantity}</span>
-                <button onClick={handleIncrement} className="px-3.5 py-2 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[42px] min-h-[36px] flex items-center justify-center">
+                <button onClick={handleIncrement} disabled={!canIncrement} className={cn("px-3.5 py-2 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[42px] min-h-[36px] flex items-center justify-center", !canIncrement && "opacity-40 cursor-not-allowed")}>
                   <Plus size={13} strokeWidth={3} />
                 </button>
               </div>
