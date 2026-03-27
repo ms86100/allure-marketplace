@@ -104,18 +104,18 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
             >
               {/* Glassmorphism outer card */}
               <div
-                className="w-full rounded-2xl overflow-hidden relative flex flex-col backdrop-blur-2xl shadow-lg"
+                className="w-full rounded-xl overflow-hidden relative flex flex-col backdrop-blur-2xl shadow-lg"
                 style={{
                   backgroundColor: `${cardBg}B3`,
                 }}
               >
                 {/* Short media strip — thumbnails float inside */}
-                <div className="flex items-center justify-center gap-1.5 px-2.5 pt-2.5 pb-1">
+                <div className="flex items-center justify-center gap-1.5 px-1.5 pt-1.5 pb-0.5">
                   {images.length >= 2 ? (
                     images.slice(0, 2).map((src, i) => (
                       <div
                         key={i}
-                        className="w-12 h-12 rounded-lg overflow-hidden bg-white/30 flex-shrink-0 shadow-sm"
+                        className="w-14 h-14 rounded-lg overflow-hidden bg-white/30 flex-shrink-0 shadow-sm"
                       >
                         <img
                           src={src}
@@ -126,7 +126,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                       </div>
                     ))
                   ) : images.length === 1 ? (
-                    <div className="w-14 h-14 rounded-lg overflow-hidden bg-white/30 shadow-sm">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-white/30 shadow-sm">
                       <img
                         src={images[0]}
                         alt={cat.displayName}
@@ -135,10 +135,10 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                       />
                     </div>
                   ) : (
-                    <div className="w-14 h-14 rounded-lg bg-white/30 flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-lg bg-white/30 flex items-center justify-center">
                       <DynamicIcon
                         name={cat.icon}
-                        size={26}
+                        size={28}
                         className="text-gray-500"
                       />
                     </div>
@@ -146,7 +146,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                 </div>
 
                 {/* Label + count area */}
-                <div className="px-2 pb-2 pt-0.5 text-center">
+                <div className="px-1.5 pb-1.5 pt-0 text-center">
                   <p className={`text-[12px] font-semibold leading-tight line-clamp-2 ${labelColor}`}>
                     {cat.displayName}
                   </p>
