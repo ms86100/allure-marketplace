@@ -151,6 +151,8 @@ async function fetchCartItemCount(userId: string) {
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user, isSessionRestored } = useAuth();
   const queryClient = useQueryClient();
+  // Perf: stable userId string prevents query key churn from object reference changes
+  const userId = user?.id ?? null;
 
   // Global mutation counter — prevents stale reads from overwriting optimistic state
   const mutationSeqRef = useRef(0);
@@ -160,32 +162,32 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: items = [], isLoading, isFetching, isFetched } = useQuery({
-    queryKey: [...CART_QUERY_KEY, user?.id],
+    queryKey: [...CART_QUERY_KEY, userId],
     queryFn: async () => {
-      if (!user) return [];
-      return fetchCartItems(user.id);
+      if (!userId) return [];
+      return fetchCartItems(userId);
     },
-    enabled: isSessionRestored && !!user,
+    enabled: isSessionRestored && !!userId,
     staleTime: 5 * 1000,
     gcTime: 60 * 60 * 1000,
-    refetchOnMount: 'always',
+    refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
 
   const { data: fallbackItemCount = 0 } = useQuery({
-    queryKey: ['cart-count', user?.id],
+    queryKey: ['cart-count', userId],
     queryFn: async () => {
-      if (!user) return 0;
-      return fetchCartItemCount(user.id);
+      if (!userId) return 0;
+      return fetchCartItemCount(userId);
     },
-    enabled: isSessionRestored && !!user,
+    enabled: isSessionRestored && !!userId,
     staleTime: 5 * 1000,
     refetchOnWindowFocus: true,
   });
 
   // ── Mutation helpers ──
-  const cartKey = useCallback(() => [...CART_QUERY_KEY, user?.id], [user?.id]);
-  const countKey = useCallback(() => ['cart-count', user?.id], [user?.id]);
+  const cartKey = useCallback(() => [...CART_QUERY_KEY, userId], [userId]);
+  const countKey = useCallback(() => ['cart-count', userId], [userId]);
 
   /** Cancel in-flight cart queries so stale responses can't overwrite optimistic state */
   const cancelCartQueries = useCallback(async () => {

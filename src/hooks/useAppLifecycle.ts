@@ -50,20 +50,18 @@ export function useAppLifecycle() {
         const { App } = await import('@capacitor/app');
         const listener = await App.addListener('appStateChange', ({ isActive }) => {
           if (isActive) {
-            // Invalidate critical queries so they refetch with fresh data
-            // Only invalidate lightweight queries — skip heavy ones like products-by-category
-            // which has its own staleTime and can be refreshed via pull-to-refresh
-            queryClient.invalidateQueries({ queryKey: ['featured-banners'] });
-            queryClient.invalidateQueries({ queryKey: ['system-settings-raw'] });
-            queryClient.invalidateQueries({ queryKey: ['system-settings-core'] });
-            queryClient.invalidateQueries({ queryKey: ['cart-count'] });
-            queryClient.invalidateQueries({ queryKey: ['cart-items'] });
-            queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
-            queryClient.invalidateQueries({ queryKey: ['notifications'] });
-            queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
-            queryClient.invalidateQueries({ queryKey: ['seller-orders'] });
-            queryClient.invalidateQueries({ queryKey: ['seller-dashboard-stats'] });
-            queryClient.invalidateQueries({ queryKey: ['orders'] });
+            // Perf: batch-invalidate lightweight queries in a single pass
+            const resumeKeys = new Set([
+              'featured-banners', 'system-settings-raw', 'system-settings-core',
+              'cart-count', 'cart-items', 'unread-notifications', 'notifications',
+              'latest-action-notification', 'seller-orders', 'seller-dashboard-stats', 'orders',
+            ]);
+            queryClient.invalidateQueries({
+              predicate: (query) => {
+                const key = query.queryKey[0];
+                return typeof key === 'string' && resumeKeys.has(key);
+              },
+            });
 
             // Dispatch custom event so useOrderDetail re-fetches on resume
             window.dispatchEvent(new Event('order-detail-refetch'));
