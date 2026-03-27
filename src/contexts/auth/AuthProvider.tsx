@@ -82,14 +82,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // This runs in parallel with BrowsingLocationContext resolution
     // The query key matches what useMarketplaceSellers uses, so it populates the same cache
     if (societyLat && societyLng) {
-      queryClient.prefetchQuery({
+      queryClient.prefetchInfiniteQuery({
         queryKey: ['marketplace-sellers', societyLat, societyLng, searchRadius],
         queryFn: async () => {
           const { data, error } = await supabase.rpc('search_sellers_paginated' as any, {
             _lat: societyLat,
             _lng: societyLng,
             _radius_km: searchRadius,
-            _limit: 200,
+            _limit: 50,
             _offset: 0,
           });
           if (error) {
@@ -98,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           return data || [];
         },
+        initialPageParam: 0,
         staleTime: 10 * 60 * 1000,
       });
     }
