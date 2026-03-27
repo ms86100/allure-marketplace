@@ -375,6 +375,26 @@ export function useLiveActivityOrchestrator(): void {
     /** Last-known statuses to avoid redundant processing */
     const lastKnownRef = new Map<string, string>();
 
+    // Bug 5 fix: seed lastKnownRef from current active orders to prevent redundant first-tick sync
+    const seedLastKnown = async () => {
+      try {
+        const terminalArr = [...terminalStatusesCache];
+        const { data } = await supabase
+          .from('orders')
+          .select('id, status')
+          .eq('buyer_id', userId)
+          .not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`);
+        if (data) {
+          for (const order of data) {
+            lastKnownRef.set(order.id, order.status);
+          }
+        }
+      } catch { /* best-effort */ }
+    };
+
+    // Seed before starting interval
+    seedLastKnown();
+
     const poll = async () => {
       if (!mountedRef.current) return;
       const terminalArr = [...terminalStatusesCache];

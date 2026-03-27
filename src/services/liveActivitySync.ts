@@ -159,7 +159,12 @@ export async function syncActiveOrders(userId: string): Promise<number> {
 
     // Serialize push() calls to prevent hydration race conditions
     for (const order of orders) {
-      const delivery = deliveryMap.get(order.id) ?? null;
+      const rawDelivery = deliveryMap.get(order.id) ?? null;
+      // Enrich delivery with vehicle_type from rider pool
+      const delivery = rawDelivery ? {
+        ...rawDelivery,
+        vehicle_type: rawDelivery.rider_id ? (riderVehicleMap.get(rawDelivery.rider_id) ?? null) : null,
+      } : null;
       const sellerInfo = sellerMap.get(order.seller_id) as { name: string; logo: string | null } | null;
       const sellerName = sellerInfo?.name ?? null;
       const sellerLogo = sellerInfo?.logo ?? null;
