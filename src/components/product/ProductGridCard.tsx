@@ -87,7 +87,7 @@ export function ProductGridCard({ product, behavior, onTap, className, viewOnly 
               <div className="flex items-center bg-primary rounded-lg overflow-hidden shadow-cta animate-stepper-pop">
                 <button onClick={handleDecrement} className="px-3 py-2 text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"><Minus size={14} strokeWidth={3} /></button>
                 <span className="font-bold text-sm text-primary-foreground min-w-[24px] text-center">{quantity}</span>
-                <button onClick={handleIncrement} className="px-3 py-2 text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center"><Plus size={14} strokeWidth={3} /></button>
+                <button onClick={handleIncrement} disabled={!canIncrement} className={cn("px-3 py-2 text-primary-foreground min-w-[44px] min-h-[44px] flex items-center justify-center", !canIncrement && "opacity-40")}><Plus size={14} strokeWidth={3} /></button>
               </div>
             ) : (
               <button onClick={handleAdd} className="bg-card/80 backdrop-blur-md backdrop-saturate-150 text-primary font-bold text-xs px-6 py-2 rounded-lg border border-primary/15 shadow-elevated hover:bg-primary hover:text-primary-foreground transition-all uppercase tracking-wide active:scale-95 min-h-[44px]">{actionConfig.shortLabel}</button>
