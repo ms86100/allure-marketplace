@@ -422,56 +422,15 @@ export function useCartPage() {
     }
 
     setIsPlacingOrder(true);
-    setOrderStep('validating');
     hapticImpact('medium');
-    try {
-      const productIds = items.map(i => i.product_id);
-      const { data: freshProducts, error: freshError } = await supabase.from('products').select('id, is_available, approval_status, seller_id').in('id', productIds);
-      if (freshError) throw freshError;
 
-      const unavailable = items.filter(item => { const fresh = freshProducts?.find(p => p.id === item.product_id); return !fresh || !fresh.is_available || fresh.approval_status !== 'approved'; });
-      if (unavailable.length > 0) { toast.error(`Some items are no longer available: ${unavailable.map(i => i.product?.name || 'Unknown').join(', ')}. Please remove them and try again.`, { id: 'checkout-unavailable' }); await refresh(); setIsPlacingOrder(false); return; }
-
-      const closedSellers: string[] = [];
-      for (const group of sellerGroups) {
-        const seller = group.items[0]?.product?.seller as any;
-        if (seller) {
-          const availability = computeStoreStatus(seller.availability_start, seller.availability_end, seller.operating_days, seller.is_available ?? true);
-          if (availability.status !== 'open') closedSellers.push(`${group.sellerName} (${formatStoreClosedMessage(availability) || 'closed'})`);
-        }
-      }
-      if (closedSellers.length > 0) { toast.error(`Cannot place order — ${closedSellers.join(', ')} ${closedSellers.length === 1 ? 'is' : 'are'} currently closed. Please remove those items or try again later.`, { id: 'checkout-closed' }); setIsPlacingOrder(false); return; }
-
-      // Bug 5 fix: Validate delivery distance before proceeding
-      if (fulfillmentType === 'delivery' && selectedDeliveryAddress?.latitude && selectedDeliveryAddress?.longitude) {
-        const outOfRangeSellers: string[] = [];
-        for (const group of sellerGroups) {
-          const seller = group.items[0]?.product?.seller as any;
-          if (!seller?.latitude || !seller?.longitude) continue;
-          const radiusKm = seller.delivery_radius_km;
-          if (!radiusKm) continue; // No radius set = unlimited delivery
-          const toRad = (d: number) => (d * Math.PI) / 180;
-          const dLat = toRad(selectedDeliveryAddress.latitude - seller.latitude);
-          const dLng = toRad(selectedDeliveryAddress.longitude - seller.longitude);
-          const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(seller.latitude)) * Math.cos(toRad(selectedDeliveryAddress.latitude)) * Math.sin(dLng / 2) ** 2;
-          const dist = 6371 * 2 * Math.asin(Math.sqrt(a));
-          if (dist > radiusKm + 0.5) { // +0.5km buffer to avoid false rejects
-            outOfRangeSellers.push(group.sellerName);
-          }
-        }
-        if (outOfRangeSellers.length > 0) {
-          toast.error(`Delivery address is out of range for: ${outOfRangeSellers.join(', ')}. Please select a closer address or switch to self-pickup.`, { id: 'checkout-out-of-range' });
-          setIsPlacingOrder(false);
-          return;
-        }
-      }
-    } catch (err) { console.error('Pre-checkout validation failed:', err); toast.error('Could not verify item availability. Please try again.', { id: 'checkout-validation' }); setIsPlacingOrder(false); return; }
+    // All product availability, price, store status, and delivery range checks
+    // are now handled server-side in the RPC for atomicity and speed.
 
     if (paymentMethod === 'cod' && !acceptsCod) { toast.error('This seller does not accept Cash on Delivery. Please select UPI.', { id: 'checkout-no-cod' }); setIsPlacingOrder(false); return; }
 
     if (paymentMethod === 'upi') {
       if (!acceptsUpi) { toast.error('Online payment not available', { id: 'upi-unavailable' }); setIsPlacingOrder(false); return; }
-      // Pre-validate seller UPI ID only for direct UPI mode (not Razorpay)
       if (!paymentMode.isRazorpay) {
         const firstSeller = sellerGroups[0]?.items[0]?.product?.seller as any;
         if (!firstSeller?.upi_id) { toast.error('This seller is not accepting UPI payments right now', { id: 'upi-no-id' }); setIsPlacingOrder(false); return; }
