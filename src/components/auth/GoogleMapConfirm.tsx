@@ -43,7 +43,9 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
   const [displayName, setDisplayName] = useState(name);
   const [formattedAddress, setFormattedAddress] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
-  const [isPanning, setIsPanning] = useState(false);
+  const isPanningRef = useRef(false);
+  const pinRef = useRef<HTMLDivElement>(null);
+  const panningTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const displayNameRef = useRef(name);
   const formattedAddressRef = useRef('');
