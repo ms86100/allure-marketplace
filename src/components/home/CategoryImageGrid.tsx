@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import { optimizedImageUrl } from '@/utils/imageHelpers';
+import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { Link } from 'react-router-dom';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
