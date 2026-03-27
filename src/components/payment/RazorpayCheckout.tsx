@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Drawer,
@@ -10,7 +10,6 @@ import {
 import { Loader2, CreditCard, CheckCircle, XCircle, RefreshCw, WifiOff, Clock, ExternalLink } from 'lucide-react';
 import { useRazorpay } from '@/hooks/useRazorpay';
 import { useCurrency } from '@/hooks/useCurrency';
-import { supabase } from '@/integrations/supabase/client';
 
 interface RazorpayCheckoutProps {
   isOpen: boolean;
