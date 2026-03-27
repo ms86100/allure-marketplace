@@ -1,24 +1,38 @@
 
 
-# Fix Search Autocomplete Category Click Navigation
+# Fix Splash / Launch Screen to Match New SOCIVA App Icon
 
 ## Problem
 
-When you type "bakery" in the search bar, the autocomplete dropdown shows a "Categories → Bakery — Browse all bakery" suggestion. Clicking it navigates to `/search?category=bakery`, but SearchPage never reads the `category` query param — so nothing happens.
+Three things are inconsistent:
 
-Meanwhile, `CategoryBrowseGrid` correctly links to `/category/:parentGroup?sub=:category`, which is the actual route that loads a filtered category page.
+1. **Capacitor splash config** in `capacitor.config.ts` has `backgroundColor: '#ffffff'` (white) — should be dark navy `#1a1a2e`
+2. **`public/splash-screen.png`** is an old asset — never regenerated when the icon changed
+3. **iOS LaunchScreen.storyboard** is never patched in `codemagic.yaml` — it uses Capacitor's default white screen with no icon, which is what users see during app cold start before the WebView loads
 
-## Fix
+Apple requires visual consistency between app icon and launch screen. The current white splash vs dark navy icon will trigger rejection.
 
-One change in `SearchAutocomplete.tsx`:
+## Fix (3 changes)
 
-1. Add `parentGroup` to the `CategoryMatch` interface
-2. Populate it from `useCategoryConfigs` (which already has `c.parentGroup`)
-3. Change the `onClick` from `navigate('/search?category=${cat.slug}')` to `navigate('/category/${cat.parentGroup}?sub=${cat.slug}')` — matching the existing pattern used everywhere else
+### 1. Update `capacitor.config.ts` splash background
+Change `backgroundColor: '#ffffff'` → `backgroundColor: '#1a1a2e'` to match the icon's dark navy.
+
+### 2. Regenerate `public/splash-screen.png`
+Create a 2732×2732 PNG (largest iPad splash dimension, works for all devices) with:
+- Solid `#1a1a2e` background (no alpha)
+- Centered SOCIVA wordmark from the SVG, rendered at ~40% width
+
+### 3. Add LaunchScreen storyboard patch in `codemagic.yaml`
+After the "Generate App Icon from source" step, add a new step that:
+- Copies `splash-screen.png` into the iOS asset catalog as `LaunchImage`
+- Patches `LaunchScreen.storyboard` to use the dark navy background color and display the centered SOCIVA image
+- This replaces Capacitor's default white LaunchScreen
 
 ## Files
 
 | File | Change |
 |------|--------|
-| `src/components/search/SearchAutocomplete.tsx` | Add `parentGroup` to `CategoryMatch`, populate it, fix navigation URL |
+| `capacitor.config.ts` | Change splash `backgroundColor` to `#1a1a2e` |
+| `public/splash-screen.png` | Regenerate with dark navy + SOCIVA wordmark |
+| `codemagic.yaml` | Add step after icon generation to patch LaunchScreen storyboard |
 
