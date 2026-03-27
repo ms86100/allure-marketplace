@@ -707,5 +707,6 @@ export function useCartPage() {
     hasPreorderItems, maxLeadTimeHours, preorderMissingSchedule,
     scheduledDate, setScheduledDate, scheduledTime, setScheduledTime,
     preorderCutoffTime, preorderSellerIds,
+    wantsScheduledDelivery, setWantsScheduledDelivery,
   };
 }
