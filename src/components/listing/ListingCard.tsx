@@ -29,6 +29,8 @@ export interface Listing {
   deposit_amount?: number;
   rental_period_type?: RentalPeriodType;
   condition?: ItemCondition;
+  accepts_preorders?: boolean;
+  lead_time_hours?: number;
   is_negotiable?: boolean;
   action_type?: string;
   seller?: {
@@ -265,6 +267,13 @@ export function ListingCard({
             alt={listing.name}
             className="w-full h-full object-cover"
           />
+        )}
+        {listing.accepts_preorders && (
+          <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-accent/90 backdrop-blur-sm">
+            <span className="text-[9px] font-semibold text-accent-foreground flex items-center gap-0.5">
+              <Clock size={8} /> Pre-order
+            </span>
+          </div>
         )}
         {listing.seller?.latitude && listing.seller?.longitude && (
           <button
