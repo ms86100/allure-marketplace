@@ -1,121 +1,67 @@
 
+Root cause is confirmed: the stock fix was only partially applied.
 
-# Replace Seller Alert Sound with Persistent gate_bell.mp3
+What is happening now:
+- `useCart.tsx` does enforce stock, but only if the incoming product object already has `stock_quantity`, otherwise it fetches once from `products`.
+- Some buyer flows still pass incomplete product objects into `addItem(...)`.
+- The clearest broken path is `src/hooks/useProductDetail.ts`:
+  - it calculates stock from `product.specifications?.stock_quantity` / `loadedSpecs.stock_quantity`
+  - but when calling `addItem(...)`, it sends a synthetic product object without `stock_quantity`
+- Since seller stock is actually saved in `products.stock_quantity` (`useSellerProducts.ts`, `SellerProductsPage.tsx`), this mismatch means the buyer flow can behave as if stock is unlimited in certain paths.
 
-## What Changes
+Evidence from code:
+- Seller saves stock to `products.stock_quantity`
+- Cart enforcement reads `product.stock_quantity` first, else DB
+- Product detail sheet never passes `stock_quantity`
+- Product detail sheet also reads stock from `specifications`, which is no longer the canonical source
 
-Two sound systems exist for sellers:
+Implementation plan
 
-1. **`useNewOrderAlert.ts`** — `startBuzzing()` / `stopBuzzing()` using Web Audio API oscillators (square wave beeps every 3s). This drives the full-screen `NewOrderAlertOverlay`.
-2. **`useUrgentOrderSound.ts`** — `playBeep()` using Web Audio API sine wave, repeating every 5s. Used in `useOrderDetail.ts` when a seller views an urgent order.
+1. Fix the source of truth
+- Treat `products.stock_quantity` as the only canonical buyer-facing stock field.
+- Stop relying on `specifications.stock_quantity` in buyer flows.
 
-Both use synthesized beeps. The plan replaces them with the uploaded `gate_bell.mp3` played via an `<audio>` element configured to behave as an alarm, not media.
+2. Fix product detail flow
+- Update `useProductDetail.ts` to fetch/select real `stock_quantity` from `products`.
+- Pass `stock_quantity` into the object sent to `addItem(...)`.
+- Compute `stockLimit` from the fetched product row, not `specifications`.
 
-## Implementation
+3. Audit all add-to-cart entry points
+- Review every component/hook that calls `addItem(...)` or `updateQuantity(...)`.
+- Ensure each passes a product shape containing `stock_quantity`, or that the path explicitly loads canonical product data first.
+- Prioritize:
+  - product detail sheet
+  - listing cards
+  - reorder/cart replacement flow
+  - any quick-add or suggested/similar product flows
 
-### Step 1: Copy the sound file
-Copy `user-uploads://gate_bell.mp3` → `public/sounds/gate_bell.mp3`
+4. Harden cart logic
+- In `useCart.tsx`, make stock lookup always resolve from the canonical product row when stock is missing from the incoming object.
+- Keep the DB-side guard, but remove any reliance on stale UI-only stock assumptions.
+- Ensure quantity updates and optimistic state use the resolved ceiling consistently.
 
-Using `public/` ensures it's served as a static asset and can be loaded by `new Audio()` without bundler interference.
+5. Verify checkout protection
+- Reconfirm checkout remains protected by the server-side stock validation already added in `create_multi_vendor_orders`.
+- Ensure buyer-facing error handling is ready for insufficient stock responses if cart state becomes stale.
 
-### Step 2: Rewrite `useNewOrderAlert.ts` buzzing logic
+6. Prevent this regression from returning
+- Add focused tests for:
+  - add from product card with stock 2
+  - add from product detail with stock 2
+  - increment from cart beyond stock
+  - reorder of item whose stock is lower than previous quantity
+  - checkout failure when stock changed concurrently
+- This closes the gap that allowed one path to remain broken while others were “fixed”.
 
-Replace `createAlarmSound()` + `AudioContext` with an `Audio` element approach:
+Expected result
+- Buyers will never be able to add more than available stock from any entry point.
+- Product detail, listing, cart, reorder, and checkout will all enforce the same stock number.
+- No negative or oversold inventory states will be possible through normal buyer flows.
 
-```typescript
-const audioRef = useRef<HTMLAudioElement | null>(null);
-
-const startBuzzing = useCallback(() => {
-  if (intervalRef.current) return;
-  hapticNotification('warning');
-  try {
-    if (!audioRef.current) {
-      audioRef.current = new Audio('/sounds/gate_bell.mp3');
-    }
-    const audio = audioRef.current;
-    audio.loop = true;
-    audio.volume = 1.0;
-    // Prevent media session controls from pausing it
-    audio.play().catch(() => {});
-  } catch (e) {
-    console.warn('[OrderAlert] Sound failed:', e);
-  }
-  // Haptic fallback every 3s
-  intervalRef.current = setInterval(() => {
-    hapticVibrate(500);
-  }, 3000);
-}, []);
-
-const stopBuzzing = useCallback(() => {
-  if (intervalRef.current) {
-    clearInterval(intervalRef.current);
-    intervalRef.current = null;
-  }
-  try {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current.loop = false;
-    }
-  } catch {}
-}, []);
-```
-
-Key behaviors:
-- `loop = true` — sound rings continuously until stopped
-- No `AudioContext` — uses `HTMLAudioElement` which is simpler and more reliable across browsers
-- Sound stops only when `stopBuzzing()` is called (dismiss, dismissAll, or snooze)
-- Haptic vibration continues as a parallel attention channel
-
-Remove the `audioCtxRef`, `createAlarmSound` function, and all `AudioContext` references.
-
-### Step 3: Rewrite `useUrgentOrderSound.ts`
-
-Same approach — replace Web Audio oscillator with `gate_bell.mp3`:
-
-```typescript
-const audioRef = useRef<HTMLAudioElement | null>(null);
-
-const playBeep = useCallback(() => {
-  try {
-    if (!audioRef.current) {
-      audioRef.current = new Audio('/sounds/gate_bell.mp3');
-    }
-    audioRef.current.loop = true;
-    audioRef.current.volume = 1.0;
-    audioRef.current.play().catch(() => {});
-  } catch {}
-}, []);
-
-const stopRinging = useCallback(() => {
-  if (audioRef.current) {
-    audioRef.current.pause();
-    audioRef.current.currentTime = 0;
-    audioRef.current.loop = false;
-  }
-  // clear interval too
-}, []);
-```
-
-### Step 4: Prevent media session hijack
-
-Add `navigator.mediaSession` metadata so the OS doesn't show a "pause" button for regular media:
-
-```typescript
-if ('mediaSession' in navigator) {
-  navigator.mediaSession.metadata = new MediaMetadata({ title: 'New Order Alert' });
-  navigator.mediaSession.setActionHandler('pause', null);
-  navigator.mediaSession.setActionHandler('stop', null);
-}
-```
-
-This is added inside `startBuzzing` after `audio.play()` succeeds.
-
-## Files Changed
-
-| File | Change |
-|------|--------|
-| `public/sounds/gate_bell.mp3` | Copy uploaded file |
-| `src/hooks/useNewOrderAlert.ts` | Replace `AudioContext`/oscillator buzzing with `Audio` element playing `gate_bell.mp3` on loop; nullify media session controls |
-| `src/hooks/useUrgentOrderSound.ts` | Replace Web Audio beep with `gate_bell.mp3` on loop; stop only on explicit `stopRinging()` |
-
+Technical notes
+- Files to update:
+  - `src/hooks/useProductDetail.ts`
+  - `src/hooks/useCart.tsx`
+  - possibly `src/components/product/ProductDetailSheet.tsx` if it depends on old stock props
+  - any reorder/quick-add callers discovered in the audit
+- No schema redesign is needed for this fix; the canonical field already exists in `products.stock_quantity`.
