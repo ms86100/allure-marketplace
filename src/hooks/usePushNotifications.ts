@@ -252,6 +252,25 @@ export function usePushNotificationsInternal() {
         return;
       }
 
+      // Create high-importance notification channel for order alerts (Android 8+)
+      if (platform === 'android') {
+        try {
+          await PushNotifications.createChannel({
+            id: 'orders_alert',
+            name: 'Order Alerts',
+            description: 'High-priority alerts for new orders',
+            importance: 5, // MAX importance — plays sound even in DND
+            visibility: 1, // public on lock screen
+            sound: 'gate_bell', // maps to res/raw/gate_bell.mp3
+            vibration: true,
+            lights: true,
+          });
+          pushLog('info', 'ANDROID_CHANNEL_CREATED', { channelId: 'orders_alert' });
+        } catch (chErr) {
+          pushLog('warn', 'ANDROID_CHANNEL_CREATE_FAILED', { error: String(chErr) });
+        }
+      }
+
       if (instanceId !== activeInstanceId) return;
 
       const platform = Capacitor.getPlatform();
