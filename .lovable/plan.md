@@ -1,102 +1,76 @@
 
+Fix this as a backend-authority + UI-state bug, not another partial patch.
 
-# Investigation Report: Order #71ab515b — Payment Confirmed But Stuck + Seller Gets Cancel
+What I confirmed
+- The live stuck order is `ab6b3840-...` and is still `status=payment_pending`, `payment_status=pending`, `razorpay_payment_id=NULL`.
+- Its `payment_records` row also remains `pending` with no Razorpay payment ID.
+- `create-razorpay-order` did run successfully for this order.
+- `razorpay-webhook` shows no logs for the capture, so the backend never received/applied the success event for this payment attempt.
+- The contradictory buyer screen is also a real frontend bug:
+  - `UrgentOrderTimer` is shown for any non-terminal order with `auto_cancel_at`, so it incorrectly says “Waiting for seller to respond” during `payment_pending`.
+  - The payment card maps `payment_type='online'` to “UPI Payment”, which is wrong.
 
-## Root Cause Chain (3 cascading failures)
+Root cause
+1. Payment success still depends too heavily on the webhook arriving.
+2. When the webhook does not arrive or is delayed, the order stays in `payment_pending`.
+3. The order-detail UI then mixes two unrelated states:
+   - payment confirmation state
+   - seller response countdown state
+4. If left alone, auto-cancel will eventually cancel a genuinely paid order.
 
-### Bug 1: Wrong RPC overload was patched
+Bulletproof implementation plan
 
-There are **3 overloads** of `create_multi_vendor_orders` in the database:
+1. Add an immediate backend payment-confirm step after Razorpay success
+- Create a backend function that receives `razorpay_payment_id`, `razorpay_order_id`, and `order_ids`.
+- Inside that function:
+  - verify the payment directly with Razorpay API
+  - confirm it is captured/authorized for the expected order + amount
+  - idempotently upsert `payment_records`
+  - update `orders` from `payment_pending/pending` to `placed/paid`
+  - write `razorpay_payment_id`
+  - clear `auto_cancel_at`
+  - enqueue seller notification only if rows actually changed
+- Keep the existing webhook as fallback, but stop making it the only success path.
 
-```text
-OID 45062 — 11 params (_payment_mode)        ← unused
-OID 45102 — 20 params (_payment_method)       ← THE ONE THE CLIENT CALLS
-OID 45718 — 13 params (_payment_mode)         ← the one our migration created/fixed
-```
+2. Change buyer success flow to call backend confirmation, not just navigate away
+- In the Razorpay success handler, call the new backend confirmation immediately.
+- If confirmation succeeds, route to the order page in confirmed state.
+- If confirmation is still processing, route to order page with a short-lived “confirming” state and polling/retry.
+- Never leave the order in indefinite `payment_pending` just because the webhook was missed.
 
-The previous migration added the `payment_records` INSERT to a **new 13-param overload** (OID 45718). But the client (`useCartPage.ts` line 327) calls with 20 parameters including `_payment_method`, `_delivery_address`, `_notes`, etc. — matching OID 45102. That overload has **zero payment_records logic**. So no payment record is ever created.
+3. Reconcile stale paid-but-pending orders
+- Add a backend recovery path for orders stuck in `payment_pending` with a `razorpay_order_id`.
+- For stale online orders, verify with Razorpay before auto-cancelling.
+- This prevents future repeats when:
+  - webhook delivery fails
+  - buyer closes app after payment success
+  - provider callback is delayed
 
-### Bug 2: Webhook upsert missing NOT NULL fields
+4. Fix the contradictory buyer UI
+- Only show “Waiting for seller to respond” timer for the true first seller-response state (`placed`/first flow step), not for `payment_pending`.
+- For `payment_pending`, show only the payment-confirmation banner/state.
+- Clear the timer once payment is confirmed.
 
-The webhook does:
-```js
-.upsert({ order_id, razorpay_payment_id, payment_status: 'paid', ... })
-```
-But `payment_records.buyer_id` (NOT NULL) and `payment_records.amount` (NOT NULL) are not provided. When no existing record exists to update, the INSERT part fails silently with a NOT NULL violation. The order stays `payment_pending`.
+5. Fix payment method labeling
+- Treat `payment_type='online'` as “Online Payment”.
+- Do not render it as “UPI Payment”.
 
-### Bug 3: Auto-cancel kills the order
+6. Harden auto-cancel logic
+- Before cancelling online `payment_pending` orders, add a verification/reconciliation guard.
+- Paid orders must never be auto-cancelled solely because local DB state is stale.
 
-The order has `auto_cancel_at` set to 3 minutes (from the active RPC, line 180). The `auto-cancel-orders` edge function finds it past expiry with `payment_status != 'paid'` → cancels it → DB trigger fires `enqueue_order_status_notification` → seller gets "❌ Order Cancelled" notification.
+Files to update
+- `src/hooks/useCartPage.ts`
+- `src/pages/OrderDetailPage.tsx`
+- `src/components/order/UrgentOrderTimer.tsx` or the order-detail gating around it
+- `supabase/functions/razorpay-webhook/index.ts`
+- new backend function for direct Razorpay payment confirmation
+- `supabase/functions/auto-cancel-orders/index.ts`
+- possibly a small migration only if needed for stronger reconciliation metadata
 
-**Full chain**: No payment_record → webhook can't upsert → order stays payment_pending → auto-cancel fires → seller notified of cancellation.
-
-## Fix (3 changes)
-
-### 1. Database Migration: Add payment_records INSERT to the CORRECT overload + drop broken ones
-
-**A.** Replace the active 20-param overload to add payment_records INSERT after order_items loop:
-
-```sql
--- After the order_items insert loop (line ~287 of the active function):
-IF _payment_method NOT IN ('cod') AND _payment_status = 'pending' THEN
-  INSERT INTO public.payment_records (
-    order_id, buyer_id, seller_id, amount,
-    payment_method, payment_status, platform_fee, net_amount,
-    payment_collection, payment_mode, society_id
-  ) VALUES (
-    _order_id, _buyer_id, _seller_id, _total,
-    'online', 'pending', 0, _total,
-    'direct', 'online', _society_id
-  );
-END IF;
-```
-
-**B.** Drop the two unused/broken overloads (OID 45062 and 45718) to prevent future confusion.
-
-**C.** Data repair: insert missing payment_record for order `71ab515b` and update its status if it hasn't been auto-cancelled yet.
-
-### 2. Webhook fix: Fetch order data before upsert
-
-The webhook must look up `buyer_id`, `seller_id`, and `total_amount` from the orders table before upserting into payment_records, so the INSERT path has all required NOT NULL fields:
-
-```js
-// Before upsert, fetch order details
-const { data: orderData } = await supabase
-  .from('orders')
-  .select('buyer_id, seller_id, total_amount')
-  .eq('id', orderId)
-  .single();
-
-if (!orderData) { console.error('Order not found'); continue; }
-
-const { error: upsertError } = await supabase
-  .from('payment_records')
-  .upsert({
-    order_id: orderId,
-    buyer_id: orderData.buyer_id,
-    seller_id: orderData.seller_id,
-    amount: orderData.total_amount,
-    net_amount: orderData.total_amount,
-    razorpay_payment_id: razorpayPaymentId,
-    payment_status: 'paid',
-    payment_method: 'online',
-    transaction_reference: razorpayPaymentId,
-    payment_collection: 'direct',
-    payment_mode: 'online',
-  }, { onConflict: 'order_id', ignoreDuplicates: false });
-```
-
-### 3. Files changed
-
-| File | Change |
-|------|--------|
-| Database migration | Replace 20-param RPC with payment_records INSERT + drop 2 broken overloads + data repair |
-| `supabase/functions/razorpay-webhook/index.ts` | Fetch order data before upsert to satisfy NOT NULL constraints |
-
-### Why this is now actually bulletproof
-
-- **Correct overload**: the function the client calls now creates payment_records
-- **Webhook resilience**: even if the RPC record is somehow missing, webhook can create one (all NOT NULL fields provided)
-- **No orphan overloads**: dropping unused functions prevents future "wrong function" bugs
-- **State guards**: existing `.in('payment_status', ['pending'])` on order update prevents regression
-
+Expected outcome
+- Paid orders move to `placed/paid` even if webhook is delayed or missing.
+- Seller gets the correct new-order notification exactly once.
+- Buyer never sees “Waiting for seller to respond” during payment confirmation.
+- “Online Payment” displays correctly.
+- Auto-cancel cannot kill a genuinely paid order because of stale backend state.
