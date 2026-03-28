@@ -1,15 +1,11 @@
-import { Hono } from "https://deno.land/x/hono@v4.3.11/mod.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-const app = new Hono();
-
-app.options("*", (c) => c.json({}, 200, corsHeaders));
 
 /** Fetch Razorpay credentials from admin_settings → env fallback */
 async function getRazorpayCredentials(supabase: any) {
@@ -29,32 +25,52 @@ async function getRazorpayCredentials(supabase: any) {
   };
 }
 
-app.post("/", async (c) => {
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body = await c.req.json().catch(() => null);
+    const body = await req.json().catch(() => null);
     if (!body) {
-      return c.json({ error: "Invalid JSON body" }, 400, corsHeaders);
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const { razorpay_payment_id, razorpay_order_id, order_ids } = body;
     const source = body.source || "client_confirm";
 
-    console.log(`[confirm-razorpay-payment][${source}] received: order_ids=${JSON.stringify(order_ids)}, razorpay_payment_id=${razorpay_payment_id}, razorpay_order_id=${razorpay_order_id}`);
+    console.log(
+      `[confirm-razorpay-payment][${source}] received: order_ids=${JSON.stringify(order_ids)}, razorpay_payment_id=${razorpay_payment_id}, razorpay_order_id=${razorpay_order_id}`
+    );
 
-    if ((!razorpay_payment_id && !razorpay_order_id) || !order_ids || !Array.isArray(order_ids) || order_ids.length === 0) {
+    if (
+      (!razorpay_payment_id && !razorpay_order_id) ||
+      !order_ids ||
+      !Array.isArray(order_ids) ||
+      order_ids.length === 0
+    ) {
       console.log(`[confirm-razorpay-payment][${source}] result=rejected_bad_input`);
-      return c.json({ error: "Missing razorpay_payment_id/razorpay_order_id or order_ids" }, 400, corsHeaders);
+      return new Response(
+        JSON.stringify({ error: "Missing razorpay_payment_id/razorpay_order_id or order_ids" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Step 1: Verify payment with Razorpay API
     const creds = await getRazorpayCredentials(supabase);
     if (!creds.keyId || !creds.keySecret) {
       console.error("Razorpay credentials not configured");
-      return c.json({ error: "Payment gateway not configured" }, 503, corsHeaders);
+      return new Response(JSON.stringify({ error: "Payment gateway not configured" }), {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const authHeader = "Basic " + btoa(`${creds.keyId}:${creds.keySecret}`);
@@ -68,15 +84,22 @@ app.post("/", async (c) => {
       );
 
       if (!rzpResponse.ok) {
-        console.error("Razorpay API error:", rzpResponse.status, await rzpResponse.text());
-        return c.json({ error: "Payment verification failed" }, 502, corsHeaders);
+        const errText = await rzpResponse.text();
+        console.error("Razorpay API error:", rzpResponse.status, errText);
+        return new Response(JSON.stringify({ error: "Payment verification failed" }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       const payment = await rzpResponse.json();
       console.log("Razorpay payment status:", payment.status, "amount:", payment.amount);
 
       if (payment.status !== "captured" && payment.status !== "authorized") {
-        return c.json({ error: "Payment not confirmed", status: payment.status }, 409, corsHeaders);
+        return new Response(
+          JSON.stringify({ error: "Payment not confirmed", status: payment.status }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
     } else if (razorpay_order_id) {
       // Reconciliation path: look up payments by Razorpay order ID
@@ -86,20 +109,32 @@ app.post("/", async (c) => {
       );
 
       if (!rzpResponse.ok) {
-        console.error("Razorpay order payments API error:", rzpResponse.status);
-        return c.json({ error: "Payment verification failed" }, 502, corsHeaders);
+        const errText = await rzpResponse.text();
+        console.error("Razorpay order payments API error:", rzpResponse.status, errText);
+        return new Response(JSON.stringify({ error: "Payment verification failed" }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       const data = await rzpResponse.json();
       const items = data.items || data;
-      const captured = Array.isArray(items) ? items.find((p: any) => p.status === "captured" || p.status === "authorized") : null;
+      const captured = Array.isArray(items)
+        ? items.find((p: any) => p.status === "captured" || p.status === "authorized")
+        : null;
       if (!captured) {
-        return c.json({ error: "No captured payment found for this order" }, 409, corsHeaders);
+        return new Response(
+          JSON.stringify({ error: "No captured payment found for this order" }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
       verifiedPaymentId = captured.id;
       console.log("Reconciled payment ID:", verifiedPaymentId);
     } else {
-      return c.json({ error: "Cannot verify payment without ID" }, 400, corsHeaders);
+      return new Response(JSON.stringify({ error: "Cannot verify payment without ID" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Step 2: Process each order
@@ -204,7 +239,9 @@ app.post("/", async (c) => {
         });
       }
 
-      console.log(`[confirm-razorpay-payment][${source}] ✅ order=${orderId} result=advanced razorpay_payment_id=${verifiedPaymentId}`);
+      console.log(
+        `[confirm-razorpay-payment][${source}] ✅ order=${orderId} result=advanced razorpay_payment_id=${verifiedPaymentId}`
+      );
       results.push({ id: orderId, success: true });
     }
 
@@ -221,15 +258,15 @@ app.post("/", async (c) => {
       }).catch((e) => console.warn("Notification trigger failed:", e));
     }
 
-    return c.json(
-      { success: true, confirmed: successCount, results },
-      200,
-      corsHeaders
+    return new Response(
+      JSON.stringify({ success: true, confirmed: successCount, results }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("confirm-razorpay-payment error:", error);
-    return c.json({ error: String(error) }, 500, corsHeaders);
+    return new Response(JSON.stringify({ error: String(error) }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
-
-Deno.serve(app.fetch);
