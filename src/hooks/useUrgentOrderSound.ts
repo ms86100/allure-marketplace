@@ -1,32 +1,70 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 export function useUrgentOrderSound(isActive: boolean) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isPlayingRef = useRef(false);
 
-  const playBeep = useCallback(() => {
+  // Load and decode the audio file once
+  const loadAudio = useCallback(async () => {
     try {
-      if (!audioRef.current) {
-        audioRef.current = new Audio('/sounds/gate_bell.mp3');
+      if (audioBufferRef.current) return;
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = ctx;
+      const response = await fetch('/sounds/gate_bell.mp3');
+      const arrayBuffer = await response.arrayBuffer();
+      audioBufferRef.current = await ctx.decodeAudioData(arrayBuffer);
+    } catch {
+      console.log('Could not load notification sound');
+    }
+  }, []);
+
+  const playOnce = useCallback(() => {
+    const ctx = audioContextRef.current;
+    const buffer = audioBufferRef.current;
+    if (!ctx || !buffer || !isPlayingRef.current) return;
+
+    try {
+      // Resume context if suspended (required by browsers after user gesture)
+      if (ctx.state === 'suspended') {
+        ctx.resume();
       }
-      audioRef.current.loop = true;
-      audioRef.current.volume = 1.0;
-      audioRef.current.play().catch(() => {});
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+      sourceNodeRef.current = source;
+
+      // Schedule next play after this buffer finishes
+      timeoutRef.current = setTimeout(() => {
+        if (isPlayingRef.current) {
+          playOnce();
+        }
+      }, buffer.duration * 1000 + 500); // small gap between loops
     } catch {
       console.log('Could not play notification sound');
     }
   }, []);
 
+  const playBeep = useCallback(async () => {
+    isPlayingRef.current = true;
+    await loadAudio();
+    playOnce();
+  }, [loadAudio, playOnce]);
+
   const stopRinging = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    isPlayingRef.current = false;
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
     try {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        audioRef.current.loop = false;
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.stop();
+        sourceNodeRef.current = null;
       }
     } catch {}
   }, []);
@@ -42,6 +80,15 @@ export function useUrgentOrderSound(isActive: boolean) {
       stopRinging();
     };
   }, [isActive, playBeep, stopRinging]);
+
+  // Cleanup AudioContext on unmount
+  useEffect(() => {
+    return () => {
+      try {
+        audioContextRef.current?.close();
+      } catch {}
+    };
+  }, []);
 
   return { playBeep, stopRinging };
 }
