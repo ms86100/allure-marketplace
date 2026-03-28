@@ -1760,6 +1760,42 @@ PYEOF
       - name: Set Android SDK
         script: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
+      - name: Inject release signing config (release-all)
+        script: |
+          GRADLE_FILE="android/app/build.gradle"
+          if [ -n "$CM_KEYSTORE" ] && [ -f "$CM_KEYSTORE" ]; then
+            echo "=== Injecting signing config into build.gradle ==="
+            python3 - "$GRADLE_FILE" <<'PYEOF'
+import sys
+f = sys.argv[1]
+with open(f) as fh:
+    content = fh.read()
+
+signing_block = '''    signingConfigs {
+        release {
+            storeFile file(System.getenv("CM_KEYSTORE"))
+            storePassword System.getenv("CM_KEYSTORE_PASSWORD")
+            keyAlias System.getenv("CM_KEY_ALIAS")
+            keyPassword System.getenv("CM_KEY_PASSWORD")
+        }
+    }
+'''
+
+content = content.replace('    buildTypes {', signing_block + '    buildTypes {')
+content = content.replace(
+    '            minifyEnabled false',
+    '            signingConfig signingConfigs.release\n            minifyEnabled false'
+)
+
+with open(f, 'w') as fh:
+    fh.write(content)
+print("=== Signing config injected successfully ===")
+PYEOF
+            head -40 "$GRADLE_FILE"
+          else
+            echo "WARNING: CM_KEYSTORE not set or file not found. Build will be unsigned."
+          fi
+
       - name: Build Android AAB
         script: cd android && ./gradlew clean bundleRelease --warning-mode all
 
