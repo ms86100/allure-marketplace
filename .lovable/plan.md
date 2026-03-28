@@ -1,117 +1,131 @@
 
 
-# System-Level Safe-Area Header Fix — Bulletproof for iOS + Android
+# Fix: Razorpay Payment Never Confirms Order — Bulletproof Implementation
 
-## Problem
-15+ pages use `showHeader={false}` and render custom `sticky top-0` headers that sit behind the device status bar. The current `#root::before` pseudo-element only paints a color over the status bar zone — it doesn't structurally push content below it. Only CartPage has a manual `pt-[max(env(safe-area-inset-top))]` fix; all others are broken.
+## Root Cause (Confirmed)
 
-## Architecture Decision
+Order `a8549579` is stuck at `payment_pending` / `pending` with no `razorpay_payment_id`. The `payment_records` table has **zero rows** for this order.
 
-The user is right that padding `<main>` alone is fragile. The correct fix is:
+**Bug 1**: The consolidated `create_multi_vendor_orders` RPC (migration `20260327144437`) dropped the `payment_records` INSERT entirely. No payment record is ever created for online orders.
 
-1. **Create a shared `SafeHeader` component** that all custom headers use
-2. **Update `AppLayout`** to provide a safe-area spacer when header is hidden
-3. **Fix sticky positioning** to account for the safe-area inset
-4. **Keep the `#root::before`** — it serves a real purpose (painting the status bar background color), but stop relying on it as the only protection
+**Bug 2**: The webhook's duplicate guard (`claimedRows.length === 0 → continue`) treats "no record found" identically to "already processed" — skipping the order update completely.
 
-## Changes
+## Fix (3 parts)
 
-### 1. New: `src/components/layout/SafeHeader.tsx`
+### 1. Database Migration
 
-A reusable wrapper for all custom sticky headers that:
-- Applies `pt-[max(env(safe-area-inset-top,0px),0.75rem)]` to its own container
-- Uses `sticky top-0 z-30` positioning
-- Provides the standard background/border styling
-- Accepts `className` for per-page customization
+**A. Restore payment_records INSERT in RPC**
 
-```tsx
-// Simplified API:
-<SafeHeader>
-  <BackButton />
-  <h1>Page Title</h1>
-</SafeHeader>
+After the order_items loop (line 338 of the RPC), add:
+
+```sql
+-- Insert payment record for online payments
+IF _payment_method NOT IN ('cod') THEN
+  INSERT INTO public.payment_records (
+    order_id, buyer_id, seller_id, amount,
+    payment_method, payment_status, platform_fee, net_amount,
+    payment_collection, payment_mode, society_id
+  )
+  VALUES (
+    _order_id, _buyer_id, _seller_id, _total,
+    _payment_method, _payment_status, 0, _total,
+    'direct', 'online', _society_id
+  );
+END IF;
 ```
 
-This replaces every inline `<div className="sticky top-0 z-30 bg-background ...">` across all pages with a single component that handles safe-area correctly.
+**B. Add UNIQUE constraint on `razorpay_payment_id`** (hard idempotency — DB-level duplicate protection)
 
-### 2. Update: `src/components/layout/AppLayout.tsx`
-
-Add a safe-area spacer `<div>` when `showHeader={false}`:
-
-```tsx
-{!showHeader && (
-  <div 
-    className="sticky top-0 z-30 bg-background" 
-    style={{ height: 'env(safe-area-inset-top, 0px)', minHeight: 0 }} 
-  />
-)}
+```sql
+CREATE UNIQUE INDEX unique_razorpay_payment_id
+  ON payment_records (razorpay_payment_id)
+  WHERE razorpay_payment_id IS NOT NULL;
 ```
 
-This ensures even pages that DON'T use `SafeHeader` still have the inset reserved. But ideally all pages migrate to `SafeHeader`.
+Partial unique index — allows multiple NULLs (unpaid records) but prevents duplicate Razorpay IDs.
 
-### 3. Update all 13 affected pages
+**C. Add UNIQUE constraint on `order_id`** (one payment record per order)
 
-Replace each inline sticky header div with `<SafeHeader>`:
-
-| Page | Current Pattern | Fix |
-|------|----------------|-----|
-| FavoritesPage | `sticky top-0 z-30 ... py-3.5` | `<SafeHeader>` |
-| NotificationsPage | `sticky top-0 z-30 ... py-3.5` | `<SafeHeader>` |
-| OrderDetailPage | `sticky top-0 z-30 ... py-3.5` | `<SafeHeader>` |
-| HelpPage | `sticky top-0 z-30 ... py-3.5` | `<SafeHeader>` |
-| SearchPage | `sticky top-0 z-40 ...` | `<SafeHeader>` |
-| CategoriesPage | `sticky top-0 z-40 ...` | `<SafeHeader>` |
-| CategoryGroupPage | `sticky top-0 z-30 ...` | `<SafeHeader>` |
-| SocietyDashboardPage | `sticky top-0 z-40 ...` | `<SafeHeader>` |
-| AdminPage | `sticky top-0 z-30 ...` | `<SafeHeader>` |
-| SellerSettingsPage | inline back button, no sticky header | Wrap in `<SafeHeader>` |
-| SellerEarningsPage | inline back button | Wrap in `<SafeHeader>` |
-| BecomeSellerPage | inline back button | Wrap in `<SafeHeader>` |
-| TestResultsPage | `sticky top-0 z-10 ...` | `<SafeHeader>` |
-| CartPage | Already has safe-area `pt-[max(...)]` | Migrate to `<SafeHeader>` for consistency |
-
-### 4. Keep `#root::before` but make it non-structural
-
-The pseudo-element stays — it paints the status bar zone with the correct theme color. But it is NOT the layout mechanism. `SafeHeader`'s padding is the structural fix. The pseudo-element is purely cosmetic insurance.
-
-### 5. Android fallback
-
-`SafeHeader` uses `pt-[max(env(safe-area-inset-top,0px),0.75rem)]` — the `0.75rem` minimum ensures Android devices that return `0` for `env()` still get usable spacing. This is the same pattern the built-in `Header` already uses successfully.
-
-## Why this is bulletproof
-
-- **Single component** — new pages automatically get safe-area handling by using `<SafeHeader>`
-- **No page-level padding hacks** — the header itself owns its positioning
-- **Sticky works correctly** — header sticks to viewport top, safe-area padding is inside it
-- **iOS + Android** — `max(env(), fallback)` handles both platforms
-- **No regression on home page** — home uses `showHeader={true}` → existing `Header` component, untouched
-- **Pseudo-element kept** — cosmetic layer for status bar color, not structural
-
-## Technical Detail
-
-```text
-Before (broken on 13+ pages):
-┌──────────────────┐
-│   STATUS BAR     │  ← #root::before paints color
-│← Back  Title     │  ← hidden behind status bar (sticky top-0)
-│   Page content   │
-└──────────────────┘
-
-After (SafeHeader):
-┌──────────────────┐
-│   STATUS BAR     │  ← #root::before paints color
-│  ┌────────────┐  │  ← SafeHeader padding pushes content below
-│  │← Back Title│  │  ← always visible
-│  └────────────┘  │
-│   Page content   │
-└──────────────────┘
+```sql
+CREATE UNIQUE INDEX unique_order_payment_record
+  ON payment_records (order_id);
 ```
 
-## Files Summary
+**D. Data repair for order `a8549579`**
 
-| File | Action |
+```sql
+INSERT INTO payment_records (order_id, buyer_id, seller_id, amount, payment_method, payment_status, platform_fee, net_amount, payment_collection, payment_mode)
+SELECT id, buyer_id, seller_id, total_amount, payment_type, payment_status, 0, total_amount, 'direct', 'online'
+FROM orders WHERE id = 'a8549579-2db0-4e45-9bd9-520932f52cc5';
+```
+
+### 2. Webhook Rewrite: `supabase/functions/razorpay-webhook/index.ts`
+
+Replace the claim-based guard in `payment.captured` with an idempotent upsert pattern:
+
+```js
+for (const orderId of allOrderIds) {
+  // STEP 1: Idempotent upsert — handles missing records (legacy) + retries
+  const { error: upsertError } = await supabase
+    .from('payment_records')
+    .upsert({
+      order_id: orderId,
+      razorpay_payment_id: razorpayPaymentId,
+      payment_status: 'paid',
+      payment_method: 'online',
+      transaction_reference: razorpayPaymentId,
+      payment_collection: 'direct',
+      payment_mode: 'online',
+    }, { onConflict: 'order_id', ignoreDuplicates: false });
+
+  if (upsertError) {
+    // If razorpay_payment_id unique constraint fires → true duplicate
+    if (upsertError.code === '23505') {
+      console.log(`Duplicate webhook for payment ${razorpayPaymentId}, skipping`);
+      continue;
+    }
+    console.error(`Payment record upsert error for order ${orderId}:`, upsertError);
+  }
+
+  // STEP 2: State-guarded order update
+  const { data: updatedOrder, error: orderError } = await supabase
+    .from('orders')
+    .update({
+      status: 'placed',
+      payment_status: 'paid',
+      razorpay_payment_id: razorpayPaymentId,
+    })
+    .eq('id', orderId)
+    .in('status', ['payment_pending', 'placed'])
+    .in('payment_status', ['pending'])
+    .select('id, seller_id, buyer_id');
+
+  // STEP 3: Notification ONLY if DB actually changed
+  if (updatedOrder && updatedOrder.length > 0) {
+    // ... existing seller notification logic (unchanged)
+  }
+}
+```
+
+Key improvements over current code:
+- **Upsert on `order_id`**: works whether record exists or not
+- **`23505` catch on `razorpay_payment_id`**: true duplicate detection at DB level
+- **Double state guard**: `.in('status', [...])` AND `.in('payment_status', ['pending'])` prevents overwriting cancelled/advanced orders
+- **Full upsert payload**: includes `payment_method`, `transaction_reference`, `payment_mode` — no partial state drift
+
+### 3. Files Changed
+
+| File | Change |
 |------|--------|
-| `src/components/layout/SafeHeader.tsx` | **New** — shared safe-area header component |
-| `src/components/layout/AppLayout.tsx` | Add fallback spacer for pages without any header |
-| 13 page files | Replace inline sticky headers with `<SafeHeader>` |
+| Database migration | Restore payment_records INSERT in RPC + 2 unique indexes + data repair |
+| `supabase/functions/razorpay-webhook/index.ts` | Replace claim guard with idempotent upsert + state-guarded update |
+
+### Why This Is Bulletproof
+
+- **RPC fix**: every online order creates a payment_record at checkout
+- **`UNIQUE(razorpay_payment_id)` index**: DB-level protection against Razorpay retries/duplicates
+- **`UNIQUE(order_id)` index**: one payment record per order, no accidental duplicates
+- **Upsert pattern**: handles both missing records (legacy) and normal flow
+- **State guards**: order status can only advance forward, never regress
+- **Notification tied to DB change**: fires exactly once per successful transition
 
