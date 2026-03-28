@@ -131,18 +131,34 @@ serve(async (req) => {
       console.log(`Payment ${razorpayPaymentId} captured for ${allOrderIds.length} order(s):`, allOrderIds);
 
       for (const orderId of allOrderIds) {
-        // STEP 1: Idempotent upsert on payment_records
-        // Uses UNIQUE(order_id) for upsert, UNIQUE(razorpay_payment_id) for duplicate detection
+        // STEP 0: Fetch order details for payment_records NOT NULL fields
+        const { data: orderData, error: orderFetchError } = await supabase
+          .from('orders')
+          .select('buyer_id, seller_id, total_amount, society_id')
+          .eq('id', orderId)
+          .single();
+
+        if (orderFetchError || !orderData) {
+          console.error(`Order ${orderId} not found in DB, skipping:`, orderFetchError);
+          continue;
+        }
+
+        // STEP 1: Idempotent upsert on payment_records with ALL required fields
         const { error: upsertError } = await supabase
           .from('payment_records')
           .upsert({
             order_id: orderId,
+            buyer_id: orderData.buyer_id,
+            seller_id: orderData.seller_id,
+            amount: orderData.total_amount,
+            net_amount: orderData.total_amount,
             razorpay_payment_id: razorpayPaymentId,
             payment_status: 'paid',
             payment_method: 'online',
             transaction_reference: razorpayPaymentId,
             payment_collection: 'direct',
             payment_mode: 'online',
+            society_id: orderData.society_id,
           }, { onConflict: 'order_id', ignoreDuplicates: false });
 
         if (upsertError) {
@@ -156,7 +172,6 @@ serve(async (req) => {
         }
 
         // STEP 2: State-guarded order update
-        // Only advance orders that are still pending payment — never overwrite cancelled/advanced
         const { error: orderError, data: updatedOrder } = await supabase
           .from('orders')
           .update({
