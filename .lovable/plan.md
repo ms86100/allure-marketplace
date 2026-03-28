@@ -1,49 +1,44 @@
 
 
-# Fix: Android AAB Not Signed
+# Fix all migration return-type conflicts
 
 ## Problem
+PostgreSQL does not allow `CREATE OR REPLACE FUNCTION` to change a function's `RETURNS TABLE` column list. Two migrations hit this exact error during `supabase start` / `supabase db reset`.
 
-Google Play Console rejects the `.aab` because it's **unsigned**. Codemagic's `android_signing` block sets environment variables (`CM_KEYSTORE`, `CM_KEYSTORE_PASSWORD`, `CM_KEY_ALIAS`, `CM_KEY_PASSWORD`) — but the `android/app/build.gradle` never references them. Gradle produces an unsigned bundle.
+## Confirmed conflicts (2 files to edit)
 
-## Fix — One file change
+### 1. `get_effective_society_features(uuid)` — 4 cols → 7 cols
+- **Original**: migration `20260214090333` defines it with 4 return columns
+- **Breaks at**: migration `20260222123058` tries to redefine it with 7 return columns (adds `display_name`, `description`, `icon_name`) — no `DROP` first
+- **Fix**: Add one line before the `CREATE OR REPLACE` in `20260222123058`:
+  ```sql
+  DROP FUNCTION IF EXISTS public.get_effective_society_features(UUID);
+  ```
 
-**File:** `android/app/build.gradle`
+### 2. `get_seller_trust_snapshot(uuid)` — 5 cols (integer) → 6 cols (bigint)
+- **Original**: migration `20260215080825` defines it with 5 integer columns
+- **Breaks at**: migration `20260313110346` redefines it with 6 bigint columns (adds `cancelled_orders`, changes types) — no `DROP` first
+- **Fix**: Add one line before the `CREATE OR REPLACE` in `20260313110346`:
+  ```sql
+  DROP FUNCTION IF EXISTS public.get_seller_trust_snapshot(UUID);
+  ```
 
-Add a `signingConfigs` block that reads Codemagic's environment variables, and wire it into the `release` build type:
+## Why only these two?
+I traced every `RETURNS TABLE` function across all 416 migration files. Every other redefinition either:
+- Already has a `DROP FUNCTION IF EXISTS` before the change (e.g. `search_sellers_by_location`, `search_marketplace`, `search_nearby_sellers`, `confirm_upi_payment`, `create_multi_vendor_orders`)
+- Keeps the same return column list (just changes the body)
+- Uses a different argument signature (creates a separate overload, not a conflict)
 
-```text
-android {
-    ...
+## Safety
+- These `DROP FUNCTION IF EXISTS` statements only affect local bootstrap (running all migrations from scratch)
+- They have zero impact on your live production database, which already has the final function versions applied incrementally
+- No application code changes needed
 
-    signingConfigs {
-        release {
-            storeFile file(System.getenv("CM_KEYSTORE") ?: "/dev/null")
-            storePassword System.getenv("CM_KEYSTORE_PASSWORD") ?: ""
-            keyAlias System.getenv("CM_KEY_ALIAS") ?: ""
-            keyPassword System.getenv("CM_KEY_PASSWORD") ?: ""
-        }
-    }
-
-    buildTypes {
-        release {
-            signingConfig signingConfigs.release    ← THIS IS THE KEY LINE
-            minifyEnabled false
-            proguardFiles ...
-        }
-    }
-}
+## After the fix
+```powershell
+supabase stop
+supabase db reset   # or: supabase start
+supabase status
 ```
-
-The `?: "/dev/null"` / `?: ""` fallbacks prevent local dev builds from crashing when the env vars aren't set — the build just won't sign (which is fine for local debug).
-
-## Why this is the only fix needed
-
-- Codemagic already has the keystore uploaded as `sociva_keystore` (referenced at line 874 of `codemagic.yaml`)
-- Codemagic automatically sets `CM_KEYSTORE`, `CM_KEYSTORE_PASSWORD`, `CM_KEY_ALIAS`, `CM_KEY_PASSWORD` from that keystore
-- The only missing piece is Gradle reading those variables
-
-## After rebuild
-
-The `.aab` artifact will be signed and Google Play Console will accept the upload.
+All migrations will apply cleanly.
 
