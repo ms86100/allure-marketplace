@@ -890,6 +890,32 @@ workflows:
           npx cap add android || true
           npx cap sync android
 
+      - name: Patch Android Maven repositories for native plugins
+        script: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          repo_snippet = '''
+                  maven { url("${project(':transistorsoft-capacitor-background-geolocation').projectDir}/libs") }
+          '''
+
+          build_gradle = Path('android/build.gradle')
+          if build_gradle.exists():
+              text = build_gradle.read_text()
+              if "transistorsoft-capacitor-background-geolocation').projectDir}/libs" not in text:
+                  marker = '        mavenCentral()\n'
+                  if marker in text:
+                      text = text.replace(marker, marker + repo_snippet, 1)
+                      build_gradle.write_text(text)
+                      print('=== Added Transistorsoft Maven repo to android/build.gradle ===')
+                  else:
+                      raise SystemExit('Could not find repository insertion point in android/build.gradle')
+              else:
+                  print('=== Transistorsoft Maven repo already present in android/build.gradle ===')
+          else:
+              raise SystemExit('android/build.gradle not found after capacitor sync')
+          PY
+
       - name: Copy custom notification sound (Android)
         script: |
           mkdir -p android/app/src/main/res/raw
@@ -1651,6 +1677,32 @@ workflows:
         script: |
           npx cap add android || true
           npx cap sync android
+
+      - name: Patch Android Maven repositories for native plugins
+        script: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          repo_snippet = '''
+                  maven { url("${project(':transistorsoft-capacitor-background-geolocation').projectDir}/libs") }
+          '''
+
+          build_gradle = Path('android/build.gradle')
+          if build_gradle.exists():
+              text = build_gradle.read_text()
+              if "transistorsoft-capacitor-background-geolocation').projectDir}/libs" not in text:
+                  marker = '        mavenCentral()\n'
+                  if marker in text:
+                      text = text.replace(marker, marker + repo_snippet, 1)
+                      build_gradle.write_text(text)
+                      print('=== Added Transistorsoft Maven repo to android/build.gradle ===')
+                  else:
+                      raise SystemExit('Could not find repository insertion point in android/build.gradle')
+              else:
+                  print('=== Transistorsoft Maven repo already present in android/build.gradle ===')
+          else:
+              raise SystemExit('android/build.gradle not found after capacitor sync')
+          PY
 
       - name: Copy custom notification sound (Android)
         script: |
