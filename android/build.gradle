@@ -24,18 +24,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("${project(':transistorsoft-capacitor-background-geolocation').projectDir}/libs") }
         maven { url = uri('https://maven.transistorsoft.com') }
-    }
-
-    configurations.all {
-        resolutionStrategy.eachDependency { details ->
-            if (details.requested.group == 'com.transistorsoft') {
-                if (details.requested.name == 'tslocationmanager' || details.requested.name == 'tslocationmanager-v21') {
-                    details.useVersion '4.0.21'
-                    details.because 'Transistorsoft Maven only serves 4.x artifacts; 3.+ no longer resolves in CI'
-                }
-            }
-        }
     }
 }
 

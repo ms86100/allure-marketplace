@@ -892,10 +892,15 @@ workflows:
         script: |
           npx cap add android || true
           npx cap sync android
+          node scripts/patch-android-builds.cjs
 
       - name: Verify native Android dependency patch
         script: |
           node scripts/patch-android-builds.cjs --verify
+          if ! grep -q "project(':transistorsoft-capacitor-background-geolocation').projectDir}/libs" android/build.gradle; then
+            echo "ERROR: Root Android Gradle config is missing the Transistorsoft local Maven repo"
+            exit 1
+          fi
           if ! grep -q "transistorsoft-capacitor-background-geolocation" android/capacitor.settings.gradle; then
             echo "ERROR: Capacitor sync did not register the background geolocation plugin"
             exit 1
@@ -1665,10 +1670,15 @@ workflows:
         script: |
           npx cap add android || true
           npx cap sync android
+          node scripts/patch-android-builds.cjs
 
       - name: Verify native Android dependency patch
         script: |
           node scripts/patch-android-builds.cjs --verify
+          if ! grep -q "project(':transistorsoft-capacitor-background-geolocation').projectDir}/libs" android/build.gradle; then
+            echo "ERROR: Root Android Gradle config is missing the Transistorsoft local Maven repo"
+            exit 1
+          fi
           if ! grep -q "transistorsoft-capacitor-background-geolocation" android/capacitor.settings.gradle; then
             echo "ERROR: Capacitor sync did not register the background geolocation plugin"
             exit 1

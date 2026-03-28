@@ -4,6 +4,39 @@ const path = require('path');
 const root = process.cwd();
 const verifyOnly = process.argv.includes('--verify');
 
+function getBundledTransistorsoftVersion(moduleName) {
+  const metadataPath = path.join(
+    root,
+    'node_modules',
+    '@transistorsoft',
+    'capacitor-background-geolocation',
+    'android',
+    'libs',
+    'com',
+    'transistorsoft',
+    moduleName,
+    'maven-metadata.xml',
+  );
+
+  if (!fs.existsSync(metadataPath)) {
+    throw new Error(`Bundled Transistorsoft metadata not found: ${path.relative(root, metadataPath)}`);
+  }
+
+  const metadata = read(metadataPath);
+  const releaseMatch = metadata.match(/<release>([^<]+)<\/release>/);
+  const latestMatch = metadata.match(/<latest>([^<]+)<\/latest>/);
+  const version = releaseMatch?.[1] ?? latestMatch?.[1];
+
+  if (!version) {
+    throw new Error(`Unable to determine bundled version for ${moduleName}`);
+  }
+
+  return version;
+}
+
+const bundledTsLocationManagerVersion = getBundledTransistorsoftVersion('tslocationmanager');
+const bundledTsLocationManagerV21Version = getBundledTransistorsoftVersion('tslocationmanager-v21');
+
 function read(filePath) {
   return fs.readFileSync(filePath, 'utf8');
 }
@@ -40,15 +73,22 @@ for (const filePath of [pluginGradlePath, geolocationGradlePath, calendarGradleP
 const pluginGradle = patchFile(pluginGradlePath, (text) => {
   let next = text;
 
-  if (!next.includes('https://maven.transistorsoft.com')) {
-    const originalBlock = `repositories {\n    google()\n    mavenCentral()\n}\n`;
-    const replacementBlock = `repositories {\n    google()\n    mavenCentral()\n    maven { url = uri('https://maven.transistorsoft.com') }\n}\n`;
+  if (!next.includes("maven { url = uri('./libs') }")) {
+    const originalBlock = `repositories {\n    google()\n    mavenCentral()\n`;
+    const replacementBlock = `repositories {\n    google()\n    mavenCentral()\n    maven { url = uri('./libs') }\n`;
     ensureContains(next, originalBlock, 'Transistorsoft repositories block');
     next = next.replace(originalBlock, replacementBlock);
   }
 
-  next = next.replace("name:'tslocationmanager-v21', version: '3.+'", "name:'tslocationmanager-v21', version: '4.0.21'");
-  next = next.replace("name:'tslocationmanager', version: '3.+'", "name:'tslocationmanager', version: '4.0.21'");
+  if (!next.includes('https://maven.transistorsoft.com')) {
+    next = next.replace(
+      "maven { url = uri('./libs') }",
+      "maven { url = uri('./libs') }\n    maven { url = uri('https://maven.transistorsoft.com') }",
+    );
+  }
+
+  next = next.replace(/name:'tslocationmanager-v21', version: '\d+\.\d+\.\d+'|name:'tslocationmanager-v21', version: '3\.\+'|name:'tslocationmanager-v21', version: '\+'/g, `name:'tslocationmanager-v21', version: '${bundledTsLocationManagerV21Version}'`);
+  next = next.replace(/name:'tslocationmanager', version: '\d+\.\d+\.\d+'|name:'tslocationmanager', version: '3\.\+'|name:'tslocationmanager', version: '\+'/g, `name:'tslocationmanager', version: '${bundledTsLocationManagerVersion}'`);
   next = next.replace("maven { url 'https://maven.transistorsoft.com' }", "maven { url = uri('https://maven.transistorsoft.com') }");
 
   return next;
@@ -58,10 +98,10 @@ for (const filePath of [geolocationGradlePath, calendarGradlePath]) {
   patchFile(filePath, (text) => text.replace('        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"\n', ''));
 }
 
-ensureContains(pluginGradle, 'https://maven.transistorsoft.com', 'Transistorsoft Maven repository');
+ensureContains(pluginGradle, "maven { url = uri('./libs') }", 'Transistorsoft local Maven repository');
 
-if (!pluginGradle.includes("name:'tslocationmanager-v21', version: '4.0.21'") && !pluginGradle.includes("name:'tslocationmanager', version: '4.0.21'")) {
-  throw new Error('Transistorsoft dependency override to 4.0.21 was not applied');
+if (!pluginGradle.includes(`name:'tslocationmanager-v21', version: '${bundledTsLocationManagerV21Version}'`) || !pluginGradle.includes(`name:'tslocationmanager', version: '${bundledTsLocationManagerVersion}'`)) {
+  throw new Error('Transistorsoft dependency alignment to bundled local artifacts was not applied');
 }
 
 for (const filePath of [geolocationGradlePath, calendarGradlePath]) {
