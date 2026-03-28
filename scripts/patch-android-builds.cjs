@@ -81,7 +81,14 @@ for (const filePath of [pluginGradlePath, geolocationGradlePath, calendarGradleP
 const pluginGradle = patchFile(pluginGradlePath, (text) => {
   let next = text;
 
-  next = next.replace(/repositories \{[\s\S]*?\n\}/, `repositories {\n    google()\n    mavenCentral()\n    maven { url = uri('./libs') }\n    maven { url = uri('https://maven.transistorsoft.com') }\n}`);
+  const runtimeRepositoriesBlock = `repositories {\n    google()\n    mavenCentral()\n    maven { url = uri('https://maven.transistorsoft.com') }\n}`;
+  const patchedRuntimeRepositoriesBlock = `repositories {\n    google()\n    mavenCentral()\n    maven { url = uri('./libs') }\n    maven { url = uri('https://maven.transistorsoft.com') }\n}`;
+
+  if (next.includes(runtimeRepositoriesBlock)) {
+    next = next.replace(runtimeRepositoriesBlock, patchedRuntimeRepositoriesBlock);
+  } else {
+    ensureContains(next, patchedRuntimeRepositoriesBlock, 'Transistorsoft runtime repositories block');
+  }
 
   next = next.replace(/name:'tslocationmanager-v21', version: '\d+\.\d+\.\d+'|name:'tslocationmanager-v21', version: '3\.\+'|name:'tslocationmanager-v21', version: '\+'/g, `name:'tslocationmanager-v21', version: '${bundledTsLocationManagerV21Version}'`);
   next = next.replace(/name:'tslocationmanager', version: '\d+\.\d+\.\d+'|name:'tslocationmanager', version: '3\.\+'|name:'tslocationmanager', version: '\+'/g, `name:'tslocationmanager', version: '${bundledTsLocationManagerVersion}'`);
