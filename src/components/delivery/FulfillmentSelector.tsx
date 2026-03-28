@@ -20,7 +20,7 @@ interface FulfillmentSelectorProps {
  */
 export function FulfillmentSelector({ value, onChange, deliveryFee, freeDeliveryThreshold, orderValue = 0, sellerFulfillmentMode }: FulfillmentSelectorProps) {
   const { formatPrice } = useCurrency();
-  const isFreeDelivery = orderValue >= freeDeliveryThreshold;
+  const isFreeDelivery = deliveryFee === 0 || orderValue >= freeDeliveryThreshold;
 
   // Determine what options to show based on seller's fulfillment mode
   const mode = sellerFulfillmentMode || 'self_pickup';
