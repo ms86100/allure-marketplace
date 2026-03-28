@@ -89,7 +89,7 @@ app.post("/", async (c) => {
     // Query 1: Urgent orders past auto_cancel_at (skip if buyer already confirmed/paid)
     const { data: urgentExpired, error: urgentErr } = await supabase
       .from("orders")
-      .select("id, buyer_id, seller_id, total_amount")
+      .select("id, buyer_id, seller_id, total_amount, razorpay_order_id")
       .in("status", cancellableStatuses)
       .not("auto_cancel_at", "is", null)
       .lt("auto_cancel_at", now)
@@ -98,7 +98,7 @@ app.post("/", async (c) => {
     // Query 2: Orphaned UPI/online orders — payment_status=pending, non-COD, older than 30 min
     const { data: orphanedUpi, error: orphanErr } = await supabase
       .from("orders")
-      .select("id, buyer_id, seller_id, total_amount")
+      .select("id, buyer_id, seller_id, total_amount, razorpay_order_id")
       .in("status", cancellableStatuses)
       .eq("payment_status", "pending")
       .neq("payment_type", "cod")
@@ -159,10 +159,66 @@ app.post("/", async (c) => {
       })
     );
 
+    // --- Razorpay verification helper: check if payment was actually captured ---
+    async function isRazorpayPaid(razorpayOrderId: string): Promise<boolean> {
+      try {
+        const { data: credRows } = await supabase
+          .from("admin_settings")
+          .select("key, value, is_active")
+          .in("key", ["razorpay_key_id", "razorpay_key_secret"]);
+        const credMap: Record<string, string> = {};
+        for (const r of credRows || []) {
+          if (r.value && r.is_active) credMap[r.key] = r.value;
+        }
+        const keyId = credMap.razorpay_key_id || Deno.env.get("RAZORPAY_KEY_ID") || "";
+        const keySecret = credMap.razorpay_key_secret || Deno.env.get("RAZORPAY_KEY_SECRET") || "";
+        if (!keyId || !keySecret) return false;
+
+        // Fetch payments for this Razorpay order
+        const res = await fetch(`https://api.razorpay.com/v1/orders/${razorpayOrderId}/payments`, {
+          headers: { Authorization: "Basic " + btoa(`${keyId}:${keySecret}`) },
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        const items = data.items || data;
+        return Array.isArray(items) && items.some((p: any) => p.status === "captured" || p.status === "authorized");
+      } catch (e) {
+        console.warn("Razorpay verification failed, proceeding with cancel:", e);
+        return false;
+      }
+    }
+
     // --- Cancel expired orders ---
     // Bug 1 fix: Add status guard to prevent cancelling orders that were accepted between SELECT and UPDATE
     const cancelResults = await Promise.allSettled(
       (expiredOrders || []).map(async (order) => {
+        // GUARD: For online orders with a razorpay_order_id, verify with Razorpay before cancelling
+        if ((order as any).razorpay_order_id) {
+          const actuallyPaid = await isRazorpayPaid((order as any).razorpay_order_id);
+          if (actuallyPaid) {
+            console.log(`Order ${order.id} is actually paid on Razorpay — triggering confirmation instead of cancel`);
+            // Trigger the confirm function to fix the state
+            try {
+              const fnUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/confirm-razorpay-payment`;
+              await fetch(fnUrl, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  razorpay_payment_id: "reconciled",
+                  razorpay_order_id: (order as any).razorpay_order_id,
+                  order_ids: [order.id],
+                }),
+              });
+            } catch (e) {
+              console.warn("Reconciliation trigger failed:", e);
+            }
+            return { id: order.id, success: false, skipped: true, reason: "razorpay_paid" };
+          }
+        }
+
         // Dynamic rejection reason based on WHY the order is being cancelled
         const reason = orphanIds.has(order.id) && !urgentIds.has(order.id)
           ? "Order was cancelled as payment was not completed in time"

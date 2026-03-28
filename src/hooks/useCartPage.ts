@@ -553,6 +553,25 @@ export function useCartPage() {
     setIsPlacingOrder(true);
     setOrderStep('confirming');
 
+    // CRITICAL: Call backend to verify payment with Razorpay API and advance order state
+    // This is the PRIMARY confirmation path — webhook is now just a fallback
+    try {
+      const { error: confirmErr } = await supabase.functions.invoke('confirm-razorpay-payment', {
+        body: {
+          razorpay_payment_id: paymentId,
+          razorpay_order_id: null, // not always available from success handler
+          order_ids: orderIds,
+        },
+      });
+      if (confirmErr) {
+        console.warn('[Payment] Backend confirmation failed, webhook will handle:', confirmErr);
+      } else {
+        console.log('[Payment] Backend confirmation succeeded for', orderIds);
+      }
+    } catch (err) {
+      console.warn('[Payment] Backend confirmation call failed, webhook fallback:', err);
+    }
+
     // Navigate on next animation frame (deterministic, no magic delays)
     const dest = orderIds.length === 1 ? `/orders/${orderIds[0]}` : '/orders';
     await new Promise(r => requestAnimationFrame(r));
@@ -560,12 +579,11 @@ export function useCartPage() {
 
     // Cleanup AFTER navigation — never lose context before route change
     setTimeout(() => {
-      toast.success('Payment successful! Confirming your order.', { id: 'razorpay-success' });
+      toast.success('Payment successful! Your order is confirmed.', { id: 'razorpay-success' });
       clearPaymentSession();
       setPendingOrderIds([]);
       setIsPlacingOrder(false);
       clearCartAndCache().catch(() => {});
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
     }, 0);
   };
 

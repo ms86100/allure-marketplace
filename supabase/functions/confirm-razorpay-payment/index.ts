@@ -1,0 +1,231 @@
+import { Hono } from "https://deno.land/x/hono@v4.3.11/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+const app = new Hono();
+
+app.options("*", (c) => c.json({}, 200, corsHeaders));
+
+/** Fetch Razorpay credentials from admin_settings → env fallback */
+async function getRazorpayCredentials(supabase: any) {
+  const { data: rows } = await supabase
+    .from("admin_settings")
+    .select("key, value, is_active")
+    .in("key", ["razorpay_key_id", "razorpay_key_secret"]);
+
+  const map: Record<string, string> = {};
+  for (const r of rows || []) {
+    if (r.value && r.is_active) map[r.key] = r.value;
+  }
+
+  return {
+    keyId: map.razorpay_key_id || Deno.env.get("RAZORPAY_KEY_ID") || "",
+    keySecret: map.razorpay_key_secret || Deno.env.get("RAZORPAY_KEY_SECRET") || "",
+  };
+}
+
+app.post("/", async (c) => {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const body = await c.req.json().catch(() => null);
+    if (!body) {
+      return c.json({ error: "Invalid JSON body" }, 400, corsHeaders);
+    }
+
+    const { razorpay_payment_id, razorpay_order_id, order_ids } = body;
+
+    if ((!razorpay_payment_id && !razorpay_order_id) || !order_ids || !Array.isArray(order_ids) || order_ids.length === 0) {
+      return c.json({ error: "Missing razorpay_payment_id/razorpay_order_id or order_ids" }, 400, corsHeaders);
+    }
+
+    // Step 1: Verify payment with Razorpay API
+    const creds = await getRazorpayCredentials(supabase);
+    if (!creds.keyId || !creds.keySecret) {
+      console.error("Razorpay credentials not configured");
+      return c.json({ error: "Payment gateway not configured" }, 503, corsHeaders);
+    }
+
+    const authHeader = "Basic " + btoa(`${creds.keyId}:${creds.keySecret}`);
+    let verifiedPaymentId = razorpay_payment_id;
+
+    // If we have a payment ID, verify it directly
+    if (razorpay_payment_id && razorpay_payment_id !== "reconciled") {
+      const rzpResponse = await fetch(
+        `https://api.razorpay.com/v1/payments/${razorpay_payment_id}`,
+        { headers: { Authorization: authHeader } }
+      );
+
+      if (!rzpResponse.ok) {
+        console.error("Razorpay API error:", rzpResponse.status, await rzpResponse.text());
+        return c.json({ error: "Payment verification failed" }, 502, corsHeaders);
+      }
+
+      const payment = await rzpResponse.json();
+      console.log("Razorpay payment status:", payment.status, "amount:", payment.amount);
+
+      if (payment.status !== "captured" && payment.status !== "authorized") {
+        return c.json({ error: "Payment not confirmed", status: payment.status }, 409, corsHeaders);
+      }
+    } else if (razorpay_order_id) {
+      // Reconciliation path: look up payments by Razorpay order ID
+      const rzpResponse = await fetch(
+        `https://api.razorpay.com/v1/orders/${razorpay_order_id}/payments`,
+        { headers: { Authorization: authHeader } }
+      );
+
+      if (!rzpResponse.ok) {
+        console.error("Razorpay order payments API error:", rzpResponse.status);
+        return c.json({ error: "Payment verification failed" }, 502, corsHeaders);
+      }
+
+      const data = await rzpResponse.json();
+      const items = data.items || data;
+      const captured = Array.isArray(items) ? items.find((p: any) => p.status === "captured" || p.status === "authorized") : null;
+      if (!captured) {
+        return c.json({ error: "No captured payment found for this order" }, 409, corsHeaders);
+      }
+      verifiedPaymentId = captured.id;
+      console.log("Reconciled payment ID:", verifiedPaymentId);
+    } else {
+      return c.json({ error: "Cannot verify payment without ID" }, 400, corsHeaders);
+    }
+
+    // Step 2: Process each order
+    const results: { id: string; success: boolean; skipped?: boolean }[] = [];
+    const now = new Date().toISOString();
+
+    for (const orderId of order_ids) {
+      // Fetch order data for payment_records NOT NULL fields
+      const { data: orderData, error: orderErr } = await supabase
+        .from("orders")
+        .select("buyer_id, seller_id, total_amount, society_id, status, payment_status")
+        .eq("id", orderId)
+        .single();
+
+      if (orderErr || !orderData) {
+        console.error(`Order ${orderId} not found:`, orderErr);
+        results.push({ id: orderId, success: false });
+        continue;
+      }
+
+      // Skip if already paid
+      if (orderData.payment_status === "paid") {
+        console.log(`Order ${orderId} already paid — skipping`);
+        results.push({ id: orderId, success: true, skipped: true });
+        continue;
+      }
+
+      // Upsert payment record
+      const { error: upsertErr } = await supabase
+        .from("payment_records")
+        .upsert(
+          {
+            order_id: orderId,
+            buyer_id: orderData.buyer_id,
+            seller_id: orderData.seller_id,
+            amount: orderData.total_amount,
+            net_amount: orderData.total_amount,
+            razorpay_payment_id: verifiedPaymentId,
+            payment_status: "paid",
+            payment_method: "online",
+            transaction_reference: verifiedPaymentId,
+            payment_collection: "direct",
+            payment_mode: "online",
+            society_id: orderData.society_id,
+          },
+          { onConflict: "order_id", ignoreDuplicates: false }
+        );
+
+      if (upsertErr && upsertErr.code !== "23505") {
+        console.error(`Payment record upsert failed for ${orderId}:`, upsertErr);
+      }
+
+      // State-guarded order update: payment_pending/placed → placed + paid
+      const { data: updated, error: updateErr } = await supabase
+        .from("orders")
+        .update({
+          status: "placed",
+          payment_status: "paid",
+          razorpay_payment_id: verifiedPaymentId,
+          auto_cancel_at: null,
+          updated_at: now,
+        })
+        .eq("id", orderId)
+        .in("status", ["payment_pending", "placed"])
+        .in("payment_status", ["pending"])
+        .select("id, seller_id, buyer_id");
+
+      if (updateErr) {
+        console.error(`Order update failed for ${orderId}:`, updateErr);
+        results.push({ id: orderId, success: false });
+        continue;
+      }
+
+      if (!updated || updated.length === 0) {
+        console.log(`Order ${orderId} already advanced — no notification needed`);
+        results.push({ id: orderId, success: true, skipped: true });
+        continue;
+      }
+
+      // Enqueue seller notification (only fires when DB rows actually changed)
+      const order = updated[0];
+      const { data: sellerProfile } = await supabase
+        .from("seller_profiles")
+        .select("user_id")
+        .eq("id", order.seller_id)
+        .single();
+
+      const { data: buyerProfile } = await supabase
+        .from("profiles")
+        .select("name")
+        .eq("id", order.buyer_id)
+        .single();
+
+      if (sellerProfile?.user_id) {
+        await supabase.from("notification_queue").insert({
+          user_id: sellerProfile.user_id,
+          type: "order",
+          title: "🆕 New Order Received!",
+          body: `${buyerProfile?.name || "A buyer"} placed an order. Tap to view and accept.`,
+          reference_path: `/orders/${orderId}`,
+          payload: { orderId, status: "placed", type: "order" },
+        });
+      }
+
+      console.log(`✅ Order ${orderId} confirmed: placed + paid`);
+      results.push({ id: orderId, success: true });
+    }
+
+    // Trigger notification processing
+    const successCount = results.filter((r) => r.success && !r.skipped).length;
+    if (successCount > 0) {
+      fetch(`${supabaseUrl}/functions/v1/process-notification-queue`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${supabaseServiceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+      }).catch((e) => console.warn("Notification trigger failed:", e));
+    }
+
+    return c.json(
+      { success: true, confirmed: successCount, results },
+      200,
+      corsHeaders
+    );
+  } catch (error) {
+    console.error("confirm-razorpay-payment error:", error);
+    return c.json({ error: String(error) }, 500, corsHeaders);
+  }
+});
+
+Deno.serve(app.fetch);
