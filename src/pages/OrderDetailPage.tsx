@@ -137,6 +137,37 @@ export default function OrderDetailPage() {
     }
   }, [orderId, order?.status]);
 
+  // RECONCILIATION: If buyer opens a payment_pending online order, trigger backend verification
+  const reconcileAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (!orderId || !order || reconcileAttemptedRef.current) return;
+    if (order.status !== 'payment_pending') return;
+    if (!o.isBuyerView) return;
+    const razorpayOrderId = (order as any).razorpay_order_id;
+    if (!razorpayOrderId) return;
+
+    reconcileAttemptedRef.current = true;
+    console.log(`[Payment][reconcile] Triggering reconciliation for order=${orderId} razorpay_order_id=${razorpayOrderId}`);
+    
+    supabase.functions.invoke('confirm-razorpay-payment', {
+      body: {
+        razorpay_payment_id: null,
+        razorpay_order_id: razorpayOrderId,
+        order_ids: [orderId],
+        source: 'order_detail_reconcile',
+      },
+    }).then(({ error }) => {
+      if (error) {
+        console.warn('[Payment][reconcile] result=failed', error);
+      } else {
+        console.log('[Payment][reconcile] result=success, refetching order');
+        o.refetch?.();
+      }
+    }).catch(err => {
+      console.warn('[Payment][reconcile] result=call_failed', err);
+    });
+  }, [orderId, order?.status]);
+
   // Gap A: Fetch delivery OTP for buyer display
   // Resilient assignment hydration: fetch + subscribe to INSERT & UPDATE + retry on missing
   const [assignmentRetryCount, setAssignmentRetryCount] = useState(0);
