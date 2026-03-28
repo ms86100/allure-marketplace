@@ -32,37 +32,6 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
-          python3 - <<'PY'
-          from pathlib import Path
-
-          plugin_gradle = Path('node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle')
-          if not plugin_gradle.exists():
-              raise SystemExit('Missing Transistorsoft Android Gradle file after npm install')
-
-          text = plugin_gradle.read_text()
-          repo_block = """repositories {
-    google()
-    mavenCentral()
-    maven {
-        url './libs'
-    }
-}
-"""
-
-          if "url './libs'" not in text:
-              old_block = """repositories {
-    google()
-    mavenCentral()
-}
-"""
-              if old_block not in text:
-                  raise SystemExit('Unexpected repositories block in Transistorsoft Android Gradle file')
-              text = text.replace(old_block, repo_block, 1)
-              plugin_gradle.write_text(text)
-              print('=== Patched Transistorsoft Android Gradle repositories ===')
-          else:
-              print('=== Transistorsoft Android Gradle repositories already patched ===')
-          PY
 
       - name: Pin CocoaPods for linker stability
         script: |
@@ -912,7 +881,15 @@ workflows:
 
     scripts:
       - name: Install dependencies
-        script: npm install --legacy-peer-deps
+        script: |
+          npm install --legacy-peer-deps
+          PLUGIN_GRADLE="node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle"
+          if [ -f "$PLUGIN_GRADLE" ] && ! grep -q "url './libs'" "$PLUGIN_GRADLE"; then
+            sed -i.bak '/^repositories {/,/^}/{/mavenCentral()/a\    maven {\n        url '"'"'./libs'"'"'\n    }' '}' "$PLUGIN_GRADLE"
+            echo "=== Patched Transistorsoft Android Gradle repositories ==="
+          else
+            echo "=== Transistorsoft Android Gradle repositories already patched or not found ==="
+          fi
 
       - name: Build web app
         script: npm run build
@@ -997,37 +974,13 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
-          python3 - <<'PY'
-          from pathlib import Path
-
-          plugin_gradle = Path('node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle')
-          if not plugin_gradle.exists():
-              raise SystemExit('Missing Transistorsoft Android Gradle file after npm install')
-
-          text = plugin_gradle.read_text()
-          repo_block = """repositories {
-    google()
-    mavenCentral()
-    maven {
-        url './libs'
-    }
-}
-"""
-
-          if "url './libs'" not in text:
-              old_block = """repositories {
-    google()
-    mavenCentral()
-}
-"""
-              if old_block not in text:
-                  raise SystemExit('Unexpected repositories block in Transistorsoft Android Gradle file')
-              text = text.replace(old_block, repo_block, 1)
-              plugin_gradle.write_text(text)
-              print('=== Patched Transistorsoft Android Gradle repositories ===')
-          else:
-              print('=== Transistorsoft Android Gradle repositories already patched ===')
-          PY
+          PLUGIN_GRADLE="node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle"
+          if [ -f "$PLUGIN_GRADLE" ] && ! grep -q "url './libs'" "$PLUGIN_GRADLE"; then
+            sed -i.bak '/^repositories {/,/^}/{/mavenCentral()/a\    maven {\n        url '"'"'./libs'"'"'\n    }' '}' "$PLUGIN_GRADLE"
+            echo "=== Patched Transistorsoft Android Gradle repositories ==="
+          else
+            echo "=== Transistorsoft Android Gradle repositories already patched or not found ==="
+          fi
 
       - name: Pin CocoaPods for linker stability
         script: |
