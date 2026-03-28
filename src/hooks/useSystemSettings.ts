@@ -69,9 +69,9 @@ const DEFAULTS: SystemSettings = {
 
 function buildSettingsFromMap(map: Record<string, string>): SystemSettings {
   return {
-    baseDeliveryFee: parseInt(map.base_delivery_fee || '20', 10) || 20,
-    freeDeliveryThreshold: parseInt(map.free_delivery_threshold || '500', 10) || 500,
-    platformFeePercent: parseFloat(map.platform_fee_percent || '0') || 0,
+    baseDeliveryFee: map.base_delivery_fee != null ? parseInt(map.base_delivery_fee, 10) : 20,
+    freeDeliveryThreshold: map.free_delivery_threshold != null ? parseInt(map.free_delivery_threshold, 10) : 500,
+    platformFeePercent: map.platform_fee_percent != null ? parseFloat(map.platform_fee_percent) : 0,
     supportEmail: map.support_email || DEFAULTS.supportEmail,
     grievanceEmail: map.grievance_email || DEFAULTS.grievanceEmail,
     dpoEmail: map.dpo_email || DEFAULTS.dpoEmail,
