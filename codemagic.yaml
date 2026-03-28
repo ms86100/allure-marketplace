@@ -883,13 +883,39 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
-          PLUGIN_GRADLE="node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle"
-          if [ -f "$PLUGIN_GRADLE" ] && ! grep -Eq "url ['\"]\./libs['\"]" "$PLUGIN_GRADLE"; then
-            python3 -c "p='$PLUGIN_GRADLE';t=open(p).read();t=t.replace('mavenCentral()\n}','mavenCentral()\n    maven {\n        url \"./libs\"\n    }\n}',1);open(p,'w').write(t)"
-            echo "=== Patched Transistorsoft Android Gradle repositories ==="
-          else
-            echo "=== Transistorsoft Android Gradle repositories already patched or not found ==="
-          fi
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              if old not in text:
+                  raise SystemExit(f"Missing expected snippet for {label}")
+              return text.replace(old, new, 1)
+
+          plugin_gradle = Path('node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle')
+          text = plugin_gradle.read_text()
+
+          if "https://maven.transistorsoft.com" not in text:
+              text = replace_once(
+                  text,
+                  "repositories {\n    google()\n    mavenCentral()\n}\n",
+                  "repositories {\n    google()\n    mavenCentral()\n    maven { url 'https://maven.transistorsoft.com' }\n}\n",
+                  "transistorsoft repositories",
+              )
+
+          text = text.replace("name:'tslocationmanager-v21', version: '3.+'", "name:'tslocationmanager-v21', version: '4.0.21'")
+          text = text.replace("name:'tslocationmanager', version: '3.+'", "name:'tslocationmanager', version: '4.0.21'")
+          plugin_gradle.write_text(text)
+
+          for relative in [
+              'node_modules/@capacitor/geolocation/android/build.gradle',
+              'node_modules/@ebarooni/capacitor-calendar/android/build.gradle',
+          ]:
+              path = Path(relative)
+              sub = path.read_text()
+              sub = sub.replace('        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"\n', '')
+              path.write_text(sub)
+          PY
+          echo "=== Patched Android plugin dependency versions and Kotlin duplication ==="
 
       - name: Build web app
         script: npm run build
@@ -901,15 +927,28 @@ workflows:
 
       - name: Verify native Android dependency patch
         script: |
-          if ! grep -Eq "url ['\"]\./libs['\"]" node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle; then
-            echo "ERROR: Transistorsoft Android Gradle patch missing"
+          PLUGIN_GRADLE="node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle"
+          if ! grep -q "https://maven.transistorsoft.com" "$PLUGIN_GRADLE"; then
+            echo "ERROR: Transistorsoft Maven repository patch missing"
+            exit 1
+          fi
+          if ! grep -q "tslocationmanager-v21', version: '4.0.21'" "$PLUGIN_GRADLE" && ! grep -q "tslocationmanager', version: '4.0.21'" "$PLUGIN_GRADLE"; then
+            echo "ERROR: Transistorsoft dependency version patch missing"
+            exit 1
+          fi
+          if grep -q 'classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:\$kotlin_version"' node_modules/@capacitor/geolocation/android/build.gradle; then
+            echo "ERROR: Kotlin plugin classpath still duplicated in capacitor-geolocation"
+            exit 1
+          fi
+          if grep -q 'classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:\$kotlin_version"' node_modules/@ebarooni/capacitor-calendar/android/build.gradle; then
+            echo "ERROR: Kotlin plugin classpath still duplicated in capacitor-calendar"
             exit 1
           fi
           if ! grep -q "transistorsoft-capacitor-background-geolocation" android/capacitor.settings.gradle; then
             echo "ERROR: Capacitor sync did not register the background geolocation plugin"
             exit 1
           fi
-          echo "=== Native Android dependency patch verified ==="
+          echo "=== Android dependency and Kotlin patches verified ==="
 
       - name: Copy custom notification sound (Android)
         script: |
@@ -932,7 +971,7 @@ workflows:
         script: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
       - name: Build Android release bundle
-        script: cd android && ./gradlew bundleRelease
+        script: cd android && ./gradlew clean bundleRelease --warning-mode all
 
     artifacts:
       - android/app/build/outputs/**/*.aab
@@ -974,13 +1013,39 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
-          PLUGIN_GRADLE="node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle"
-          if [ -f "$PLUGIN_GRADLE" ] && ! grep -Eq "url ['\"]\./libs['\"]" "$PLUGIN_GRADLE"; then
-            python3 -c "p='$PLUGIN_GRADLE';t=open(p).read();t=t.replace('mavenCentral()\n}','mavenCentral()\n    maven {\n        url \"./libs\"\n    }\n}',1);open(p,'w').write(t)"
-            echo "=== Patched Transistorsoft Android Gradle repositories ==="
-          else
-            echo "=== Transistorsoft Android Gradle repositories already patched or not found ==="
-          fi
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              if old not in text:
+                  raise SystemExit(f"Missing expected snippet for {label}")
+              return text.replace(old, new, 1)
+
+          plugin_gradle = Path('node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle')
+          text = plugin_gradle.read_text()
+
+          if "https://maven.transistorsoft.com" not in text:
+              text = replace_once(
+                  text,
+                  "repositories {\n    google()\n    mavenCentral()\n}\n",
+                  "repositories {\n    google()\n    mavenCentral()\n    maven { url 'https://maven.transistorsoft.com' }\n}\n",
+                  "transistorsoft repositories",
+              )
+
+          text = text.replace("name:'tslocationmanager-v21', version: '3.+'", "name:'tslocationmanager-v21', version: '4.0.21'")
+          text = text.replace("name:'tslocationmanager', version: '3.+'", "name:'tslocationmanager', version: '4.0.21'")
+          plugin_gradle.write_text(text)
+
+          for relative in [
+              'node_modules/@capacitor/geolocation/android/build.gradle',
+              'node_modules/@ebarooni/capacitor-calendar/android/build.gradle',
+          ]:
+              path = Path(relative)
+              sub = path.read_text()
+              sub = sub.replace('        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"\n', '')
+              path.write_text(sub)
+          PY
+          echo "=== Patched Android plugin dependency versions and Kotlin duplication ==="
 
       - name: Pin CocoaPods for linker stability
         script: |
