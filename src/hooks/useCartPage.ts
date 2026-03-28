@@ -555,21 +555,34 @@ export function useCartPage() {
 
     // CRITICAL: Call backend to verify payment with Razorpay API and advance order state
     // This is the PRIMARY confirmation path — webhook is now just a fallback
+    // Retrieve razorpay_order_id from orders for reconciliation
+    let razorpayOrderId: string | null = null;
+    try {
+      const { data: orderRow } = await supabase
+        .from('orders')
+        .select('razorpay_order_id')
+        .eq('id', orderIds[0])
+        .single();
+      razorpayOrderId = orderRow?.razorpay_order_id || null;
+    } catch { /* best effort */ }
+
+    console.log(`[Payment][client_confirm] order_ids=${orderIds.join(',')}, razorpay_payment_id=${paymentId}, razorpay_order_id=${razorpayOrderId}`);
+
     try {
       const { error: confirmErr } = await supabase.functions.invoke('confirm-razorpay-payment', {
         body: {
           razorpay_payment_id: paymentId,
-          razorpay_order_id: null, // not always available from success handler
+          razorpay_order_id: razorpayOrderId,
           order_ids: orderIds,
         },
       });
       if (confirmErr) {
-        console.warn('[Payment] Backend confirmation failed, webhook will handle:', confirmErr);
+        console.warn('[Payment][client_confirm] result=failed', confirmErr);
       } else {
-        console.log('[Payment] Backend confirmation succeeded for', orderIds);
+        console.log('[Payment][client_confirm] result=success');
       }
     } catch (err) {
-      console.warn('[Payment] Backend confirmation call failed, webhook fallback:', err);
+      console.warn('[Payment][client_confirm] result=call_failed, webhook fallback:', err);
     }
 
     // Navigate on next animation frame (deterministic, no magic delays)
