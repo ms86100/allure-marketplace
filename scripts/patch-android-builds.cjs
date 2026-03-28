@@ -54,10 +54,18 @@ function ensureContains(text, needle, label) {
 function patchFile(filePath, transform) {
   const current = read(filePath);
   const next = transform(current);
-  if (!verifyOnly && next !== current) {
+  if (verifyOnly) {
+    if (next !== current) {
+      throw new Error(`Patch not applied for ${path.relative(root, filePath)}`);
+    }
+    return current;
+  }
+
+  if (next !== current) {
     write(filePath, next);
   }
-  return verifyOnly ? current : next;
+
+  return next;
 }
 
 const pluginGradlePath = path.join(root, 'node_modules', '@transistorsoft', 'capacitor-background-geolocation', 'android', 'build.gradle');
@@ -73,19 +81,7 @@ for (const filePath of [pluginGradlePath, geolocationGradlePath, calendarGradleP
 const pluginGradle = patchFile(pluginGradlePath, (text) => {
   let next = text;
 
-  if (!next.includes("maven { url = uri('./libs') }")) {
-    const originalBlock = `repositories {\n    google()\n    mavenCentral()\n`;
-    const replacementBlock = `repositories {\n    google()\n    mavenCentral()\n    maven { url = uri('./libs') }\n`;
-    ensureContains(next, originalBlock, 'Transistorsoft repositories block');
-    next = next.replace(originalBlock, replacementBlock);
-  }
-
-  if (!next.includes('https://maven.transistorsoft.com')) {
-    next = next.replace(
-      "maven { url = uri('./libs') }",
-      "maven { url = uri('./libs') }\n    maven { url = uri('https://maven.transistorsoft.com') }",
-    );
-  }
+  next = next.replace(/repositories \{[\s\S]*?\n\}/, `repositories {\n    google()\n    mavenCentral()\n    maven { url = uri('./libs') }\n    maven { url = uri('https://maven.transistorsoft.com') }\n}`);
 
   next = next.replace(/name:'tslocationmanager-v21', version: '\d+\.\d+\.\d+'|name:'tslocationmanager-v21', version: '3\.\+'|name:'tslocationmanager-v21', version: '\+'/g, `name:'tslocationmanager-v21', version: '${bundledTsLocationManagerV21Version}'`);
   next = next.replace(/name:'tslocationmanager', version: '\d+\.\d+\.\d+'|name:'tslocationmanager', version: '3\.\+'|name:'tslocationmanager', version: '\+'/g, `name:'tslocationmanager', version: '${bundledTsLocationManagerVersion}'`);
