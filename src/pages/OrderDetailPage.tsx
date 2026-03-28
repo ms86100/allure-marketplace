@@ -286,7 +286,7 @@ export default function OrderDetailPage() {
 
   return (
     <AppLayout showHeader={false} showNav={!hasSellerActionBar || !o.isSellerView}>
-      <div className="pb-56">
+      <div className={`${(hasSellerActionBar || hasBuyerActionBar) ? 'pb-40' : 'pb-56'}`}>
         {/* Header */}
         <SafeHeader>
         <div className="px-4 pb-3.5 flex items-center gap-3">
