@@ -1,40 +1,25 @@
 
 
-# Add `google-services.json` Copy Step to Android Release Workflow
+# Remove Google Play Auto-Upload from Codemagic
 
-## What's needed
+## What changes
 
-The `android-release` workflow (line 866-917) is missing a step to copy `google-services.json` into the Android project. Without it, Firebase/FCM won't initialize and push notifications won't work on Android.
+Two spots in `codemagic.yaml` where `google_play` publishing is configured need to be updated:
 
-## Changes
+### 1. `android-release` workflow (lines 922-926)
+- Remove the entire `publishing:` block with `google_play` credentials
+- Add an `email` publishing block instead (so you get notified when build completes with artifact link)
 
-### 1. Create `android-config/` directory with a README placeholder
-Since the directory doesn't exist yet, create `android-config/README.md` explaining that `google-services.json` should be placed here.
+### 2. `release-all` workflow (lines 1688-1691)
+- Remove the `google_play:` section from its `publishing:` block
+- Keep the `app_store_connect` publishing intact
 
-### 2. Add copy step to `android-release` workflow
-Insert after "Copy custom notification sound (Android)" (line 901) and before "Set Android SDK location" (line 903):
+### 3. Clean up `google_play` group reference
+- Remove `- google_play` from `environment.groups` in both workflows since the credentials are no longer needed
 
-```yaml
-- name: Copy google-services.json
-  script: |
-    if [ -f "android-config/google-services.json" ]; then
-      cp android-config/google-services.json android/app/google-services.json
-      echo "=== google-services.json copied from android-config/ ==="
-    else
-      echo "WARNING: android-config/google-services.json not found — Firebase will not work"
-    fi
-```
-
-### 3. Add same step to `release-all` workflow
-The `release-all` workflow also builds Android — add the same copy step there after the Android platform is added.
-
-## Files changed
-
-| File | Change |
-|------|--------|
-| `android-config/README.md` | New — instructions to place `google-services.json` here |
-| `codemagic.yaml` | Add copy step to `android-release` and `release-all` workflows |
-
-## After this change
-You'll need to download `google-services.json` from Firebase Console (for package `app.sociva.community`) and commit it to `android-config/google-services.json` in your repo. Once that file is present, Codemagic will automatically copy it during Android builds.
+## After the change
+- Codemagic will still build and sign the `.aab` using your keystore
+- The signed `.aab` will appear in the **Artifacts** tab of each build
+- You download it and manually upload to Google Play Console
+- No more "service account credentials" errors
 
