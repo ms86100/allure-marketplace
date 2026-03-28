@@ -1,131 +1,65 @@
 
 
-# Fix: Razorpay Payment Never Confirms Order — Bulletproof Implementation
+# Fix: Delivery Fee Ignores Admin-Set ₹0 — Falsy-Zero Bug
 
-## Root Cause (Confirmed)
+## Root Cause
 
-Order `a8549579` is stuck at `payment_pending` / `pending` with no `razorpay_payment_id`. The `payment_records` table has **zero rows** for this order.
-
-**Bug 1**: The consolidated `create_multi_vendor_orders` RPC (migration `20260327144437`) dropped the `payment_records` INSERT entirely. No payment record is ever created for online orders.
-
-**Bug 2**: The webhook's duplicate guard (`claimedRows.length === 0 → continue`) treats "no record found" identically to "already processed" — skipping the order update completely.
-
-## Fix (3 parts)
-
-### 1. Database Migration
-
-**A. Restore payment_records INSERT in RPC**
-
-After the order_items loop (line 338 of the RPC), add:
-
-```sql
--- Insert payment record for online payments
-IF _payment_method NOT IN ('cod') THEN
-  INSERT INTO public.payment_records (
-    order_id, buyer_id, seller_id, amount,
-    payment_method, payment_status, platform_fee, net_amount,
-    payment_collection, payment_mode, society_id
-  )
-  VALUES (
-    _order_id, _buyer_id, _seller_id, _total,
-    _payment_method, _payment_status, 0, _total,
-    'direct', 'online', _society_id
-  );
-END IF;
-```
-
-**B. Add UNIQUE constraint on `razorpay_payment_id`** (hard idempotency — DB-level duplicate protection)
-
-```sql
-CREATE UNIQUE INDEX unique_razorpay_payment_id
-  ON payment_records (razorpay_payment_id)
-  WHERE razorpay_payment_id IS NOT NULL;
-```
-
-Partial unique index — allows multiple NULLs (unpaid records) but prevents duplicate Razorpay IDs.
-
-**C. Add UNIQUE constraint on `order_id`** (one payment record per order)
-
-```sql
-CREATE UNIQUE INDEX unique_order_payment_record
-  ON payment_records (order_id);
-```
-
-**D. Data repair for order `a8549579`**
-
-```sql
-INSERT INTO payment_records (order_id, buyer_id, seller_id, amount, payment_method, payment_status, platform_fee, net_amount, payment_collection, payment_mode)
-SELECT id, buyer_id, seller_id, total_amount, payment_type, payment_status, 0, total_amount, 'direct', 'online'
-FROM orders WHERE id = 'a8549579-2db0-4e45-9bd9-520932f52cc5';
-```
-
-### 2. Webhook Rewrite: `supabase/functions/razorpay-webhook/index.ts`
-
-Replace the claim-based guard in `payment.captured` with an idempotent upsert pattern:
+The bug is a classic JavaScript falsy-zero problem. When the admin sets `base_delivery_fee` to `0`, the parsing logic does this:
 
 ```js
-for (const orderId of allOrderIds) {
-  // STEP 1: Idempotent upsert — handles missing records (legacy) + retries
-  const { error: upsertError } = await supabase
-    .from('payment_records')
-    .upsert({
-      order_id: orderId,
-      razorpay_payment_id: razorpayPaymentId,
-      payment_status: 'paid',
-      payment_method: 'online',
-      transaction_reference: razorpayPaymentId,
-      payment_collection: 'direct',
-      payment_mode: 'online',
-    }, { onConflict: 'order_id', ignoreDuplicates: false });
-
-  if (upsertError) {
-    // If razorpay_payment_id unique constraint fires → true duplicate
-    if (upsertError.code === '23505') {
-      console.log(`Duplicate webhook for payment ${razorpayPaymentId}, skipping`);
-      continue;
-    }
-    console.error(`Payment record upsert error for order ${orderId}:`, upsertError);
-  }
-
-  // STEP 2: State-guarded order update
-  const { data: updatedOrder, error: orderError } = await supabase
-    .from('orders')
-    .update({
-      status: 'placed',
-      payment_status: 'paid',
-      razorpay_payment_id: razorpayPaymentId,
-    })
-    .eq('id', orderId)
-    .in('status', ['payment_pending', 'placed'])
-    .in('payment_status', ['pending'])
-    .select('id, seller_id, buyer_id');
-
-  // STEP 3: Notification ONLY if DB actually changed
-  if (updatedOrder && updatedOrder.length > 0) {
-    // ... existing seller notification logic (unchanged)
-  }
-}
+parseInt(map.base_delivery_fee || '20', 10) || 20
+//       ↑ '0' is truthy, passes      ↑ parseInt('0') = 0, which is FALSY → falls back to 20!
 ```
 
-Key improvements over current code:
-- **Upsert on `order_id`**: works whether record exists or not
-- **`23505` catch on `razorpay_payment_id`**: true duplicate detection at DB level
-- **Double state guard**: `.in('status', [...])` AND `.in('payment_status', ['pending'])` prevents overwriting cancelled/advanced orders
-- **Full upsert payload**: includes `payment_method`, `transaction_reference`, `payment_mode` — no partial state drift
+`parseInt('0')` returns `0`. In JavaScript, `0 || 20` evaluates to `20` because `0` is falsy. So the admin's configured value of `0` is **always overridden** by the hardcoded fallback `20`.
 
-### 3. Files Changed
+This same bug affects **every numeric setting** that uses the `|| default` pattern — delivery fee, thresholds, filters, etc.
+
+## Fix
+
+Replace `||` (logical OR) with `??` (nullish coalescing) for all numeric parsing. `??` only falls back when the value is `null` or `undefined`, not when it's `0`.
+
+### 1. `src/hooks/useSystemSettings.ts` — `buildSettingsFromMap()`
+
+```ts
+// Before (broken):
+baseDeliveryFee: parseInt(map.base_delivery_fee || '20', 10) || 20,
+
+// After (correct):
+baseDeliveryFee: map.base_delivery_fee != null ? parseInt(map.base_delivery_fee, 10) : 20,
+```
+
+Apply to all numeric fields: `baseDeliveryFee`, `freeDeliveryThreshold`, `platformFeePercent`, `budgetFilterThreshold`, `maxPriceFilter`, `refundSlaHours`.
+
+### 2. `src/hooks/useMarketplaceConfig.ts` — `buildConfig()`
+
+Same fix for `lowStockThreshold` and `maxBadgesPerCard`.
+
+### 3. `supabase/functions/manage-delivery/index.ts` — delivery fee lookup
+
+```ts
+// Before:
+const baseFee = parseInt(settingsMap.base_delivery_fee || '20', 10) || 20;
+
+// After:
+const baseFee = settingsMap.base_delivery_fee != null
+  ? parseInt(settingsMap.base_delivery_fee, 10)
+  : 20;
+```
+
+Same fix for `freeThreshold`.
+
+## Files Changed
 
 | File | Change |
 |------|--------|
-| Database migration | Restore payment_records INSERT in RPC + 2 unique indexes + data repair |
-| `supabase/functions/razorpay-webhook/index.ts` | Replace claim guard with idempotent upsert + state-guarded update |
+| `src/hooks/useSystemSettings.ts` | Fix 6 numeric fields to use null-check instead of `\|\|` |
+| `src/hooks/useMarketplaceConfig.ts` | Fix 2 numeric fields |
+| `supabase/functions/manage-delivery/index.ts` | Fix 2 numeric fields |
 
-### Why This Is Bulletproof
+## Why This Is Bulletproof
 
-- **RPC fix**: every online order creates a payment_record at checkout
-- **`UNIQUE(razorpay_payment_id)` index**: DB-level protection against Razorpay retries/duplicates
-- **`UNIQUE(order_id)` index**: one payment record per order, no accidental duplicates
-- **Upsert pattern**: handles both missing records (legacy) and normal flow
-- **State guards**: order status can only advance forward, never regress
-- **Notification tied to DB change**: fires exactly once per successful transition
+- `0` is now a valid admin-configured value
+- Only falls back to defaults when the key is genuinely missing from the database
+- No other code changes needed — the consuming code (`useCartPage.ts`, `FulfillmentSelector`, etc.) already works correctly with `0`
 
