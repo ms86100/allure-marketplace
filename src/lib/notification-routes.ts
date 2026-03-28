@@ -18,6 +18,7 @@ export function resolveNotificationRoute(
       return '/seller';
 
     // Order lifecycle
+    case 'order':
     case 'order_created':
     case 'order_status':
     case 'order_update': {

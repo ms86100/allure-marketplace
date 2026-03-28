@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -169,6 +169,9 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
 
 export default function OrdersPage() {
   const { user, isSeller, currentSellerId } = useAuth();
+  const location = useLocation();
+  const fromSellerNotification = (location.state as any)?.tab === 'selling';
+  const defaultTab = isSeller && fromSellerNotification ? 'selling' : 'buying';
 
   if (!user) return null;
 
@@ -177,7 +180,7 @@ export default function OrdersPage() {
       <div className="pb-4">
         <div className="px-4 pt-3">
           {isSeller ? (
-            <Tabs defaultValue="buying" className="w-full">
+            <Tabs defaultValue={defaultTab} className="w-full">
               <TabsList className="w-full mb-3 h-10">
                 <TabsTrigger value="buying" className="flex-1 text-xs">My Orders</TabsTrigger>
                 <TabsTrigger value="selling" className="flex-1 text-xs">Received</TabsTrigger>

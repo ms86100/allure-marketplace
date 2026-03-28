@@ -421,11 +421,18 @@ export function usePushNotificationsInternal() {
           } catch {}
         }
 
+        const route = data?.route || resolveNotificationRoute(data?.type, data);
         const toastOptions: Record<string, any> = {
           description: notification?.body,
         };
         if (orderId && data?.status) {
           toastOptions.id = `order-${orderId}-${data.status}`;
+        }
+        if (route && route !== '/notifications') {
+          toastOptions.action = {
+            label: 'View',
+            onClick: () => navigateRef.current(route),
+          };
         }
 
         toast(notification?.title ?? 'New Notification', toastOptions);
