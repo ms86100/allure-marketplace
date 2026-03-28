@@ -1,82 +1,65 @@
 
-Goal: prepare one patch-only ZIP with full-file SQL replacements so your local migration run can restart cleanly without touching live app behavior.
 
-What I found
-- The repo has 416 migration files, so the “89 remaining” number is not a reliable signal by itself because the run stops at the first failure.
-- Your current blocker is still around `payment_settlements`:
-  - the table is missing from the early migration history
-  - later migrations create triggers and insert/delete against it
-  - the settlement-trigger migration needs a full-file replacement, not another partial patch
-- I also confirmed the earlier bootstrap-only problems are still present in the repo:
-  - repeated `get_effective_society_features(...)` return-shape redefinitions
-  - unsafe `cron.unschedule(...)`
-  - duplicate FK additions on `warnings` / `reports`
-  - references to missing `service_availability_schedules` / `service_slots`
+# Fix All Remaining Migration Failures in One Pass
 
-ZIP contents
-- Only changed SQL files, as requested.
-- Each file will be a full replacement so you can overwrite locally without merging snippets.
+## Problem Summary
 
-Files I will include in the bundle
-1. `20260130081941_fffa90cf-c93f-4958-90d0-479767f9722c.sql`
-   - Backfill `payment_settlements` table so later settlement migrations have a real base object.
-2. `20260222123058_abfa1818-1a58-4bb0-bffa-4ec2f9deb342.sql`
-   - Make the first 7-column `get_effective_society_features` rewrite safe.
-3. `20260222142119_994b325b-fbcb-48df-99a6-88bd4e7915b4.sql`
-   - Same return-type conflict fix.
-4. `20260225115817_195ef151-aa8a-4222-b6cc-331aa8ebe166.sql`
-   - Same return-type conflict fix again.
-5. `20260302181927_ccd77a4e-dd9c-4885-8ea3-23fe16e342b6.sql`
-   - Guard `cron.unschedule('process-notification-queue')`.
-6. `20260309183040_6f53fb4f-3ed8-43ae-9931-111af1f60348.sql`
-   - Make warning/report foreign keys idempotent.
-7. `20260309194058_6e60faa1-a3a7-4aac-82f8-382364d60842.sql`
-   - Guard missing `service_availability_schedules` / `service_slots`.
-8. `20260309194138_ca17f2ba-dcbc-418b-8100-4befacf34188.sql`
-   - Guard duplicate cleanup/index creation for missing schedule table.
-9. `20260311145232_4f901813-8b70-4d2a-b947-1eca07086f01.sql`
-   - Full replacement of the settlement notification migration so the function and trigger are created safely together.
-10. `20260318101405_e90d1c80-6aa6-418c-83b1-293c9f49a584.sql`
-   - Guard the later cron cleanup.
+You have ~189 migration files remaining from `20260321090813` onwards. They keep failing one at a time because of:
+1. **Missing tables** referenced before they're created (service_bookings, phone_otp_verifications, etc.)
+2. **Duplicate policies/triggers/constraints** created without idempotency guards
+3. **Function return type conflicts** from `CREATE OR REPLACE` on functions whose signature changed
 
-How the settlement-trigger file will be fixed
-- Not a partial tail edit.
-- Full-file replacement.
-- The trigger creation will be wrapped safely and executed dynamically only after the function definition is in place.
-- This avoids the exact `enqueue_settlement_notification()` dependency failure you’re seeing.
+I've audited every remaining migration file. Here are the **7 files** that need patching. Every other file should pass cleanly.
 
-Safety
-- These changes are for migration bootstrap stability only.
-- They do not change frontend code.
-- They are designed to be safe for fresh local reset and safe to keep in version control.
-- They avoid impacting the live application because they mainly:
-  - backfill missing historical objects
-  - add existence checks
-  - make duplicate DDL idempotent
+---
 
-What happens after approval
-1. Prepare the ZIP with only those changed SQL files.
-2. Include a tiny README with exact overwrite instructions.
-3. Give you one clean bundle to extract over `supabase/migrations/`.
-4. Then your local flow becomes:
-   ```text
-   supabase stop
-   supabase db reset
-   ```
-5. If anything else appears after that, it should be a new later-file blocker rather than the current known set.
+## Files That Need Full Replacement
 
-Technical details
-```text
-Root issue class:
-- migration history drift between live backend and local bootstrap
+### 1. `20260321090813_f4cf7f02-4650-4b2a-a144-7503fb9254e2.sql`
+**Error**: `service_bookings` table does not exist
+**Fix**: Prepend `CREATE TABLE IF NOT EXISTS` for all 7 missing service tables (service_listings, service_addons, service_staff, service_bookings, service_booking_addons, service_recurring_configs, session_feedback) with RLS, then wrap the trigger in `DROP TRIGGER IF EXISTS` before `CREATE TRIGGER`, and wrap the UPDATE in a DO block checking the table exists.
 
-Confirmed drift examples:
-- payment_settlements exists in later logic but has no early CREATE TABLE migration
-- service_availability_schedules/service_slots are referenced but absent in local history
-- get_effective_society_features is redefined multiple times with incompatible RETURN TABLE shape
-- cron cleanup assumes jobs already exist
+### 2. `20260321093401_83bd51e4-2bd7-42eb-963f-54eeff281f69.sql`
+**Error**: `trg_decrement_stock_on_order_item` / `trg_restore_stock_on_order_cancel` triggers may already exist (from earlier migration `20260301082135`)
+**Fix**: Add `DROP TRIGGER IF EXISTS` before each `CREATE TRIGGER`.
 
-Reason your current error persisted:
-- the repository copy of 20260311145232 still has a plain static trigger at the end
-- your local edited version likely diverged, so the safest fix is a full-file replacement in the bundle
+### 3. `20260322105521_b1f9006c-1f9f-4e79-bde4-b334258c0c51.sql`
+**Error**: `order_status_config_status_key_key` constraint already exists (table was created with `UNIQUE` on `status_key` in `20260215115217`)
+**Fix**: Wrap in `DO $$ ... IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'order_status_config_status_key_key') ...`
+
+### 4. `20260322112817_63314156-87bd-4dd3-b73d-3d208b5e3938.sql`
+**Error**: Storage policies "Users can update own payment proofs" / "Users can delete own payment proofs" may already exist
+**Fix**: Wrap each `CREATE POLICY` in a `DO` block with `pg_policies` existence check.
+
+### 5. `20260323152138_654fc212-6c6b-461e-8fdf-08e950baf2fb.sql`
+**Error**: Policies "admins_insert_flows", "admins_delete_flows", "admins_update_flows" on `category_status_flows` — bare `CREATE POLICY` will fail if they exist
+**Fix**: Wrap all three in `DO` blocks with `pg_policies` existence checks, matching the pattern already used for the transitions table in the same file.
+
+### 6. `20260324143906_69cf5139-63de-4151-9821-6f25a3efd67d.sql`
+**Error**: `enforce_delivery_otp_gate` trigger referenced in `DROP TRIGGER IF EXISTS` is fine, but `order_otp_codes` table and `enforce_otp_gate` trigger use bare CREATE — could fail if re-run
+**Fix**: Add `CREATE TABLE IF NOT EXISTS` wrapper and `DROP TRIGGER IF EXISTS enforce_otp_gate` before re-creation. Also add `ALTER PUBLICATION ... ADD TABLE` in a safe DO block.
+
+### 7. `20260327152946_94ff4760-8c7a-43a8-afdf-dfaf111a3a57.sql`
+**Error**: `trg_products_search_vector` trigger — bare `CREATE TRIGGER` will fail if it exists
+**Fix**: Add `DROP TRIGGER IF EXISTS trg_products_search_vector ON public.products` before `CREATE TRIGGER`.
+
+---
+
+## What I'll Provide
+
+Once you approve, I will give you the **complete replacement content** for each of these 7 files — full copy-paste ready. No partial patches, no instructions to "find and replace line X". Just 7 blocks of SQL, one per file.
+
+## Steps After You Get the Files
+
+1. Replace each file's content entirely
+2. Run:
+```powershell
+supabase stop
+supabase db reset
 ```
+3. All 416 migrations should complete without errors
+
+## Why This Should Be the Last Fix
+
+Every other migration file in the remaining ~189 uses safe patterns (`CREATE OR REPLACE FUNCTION`, `ADD COLUMN IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, `ON CONFLICT DO NOTHING`). The 7 files above are the only ones with unsafe `CREATE TRIGGER`, `CREATE POLICY`, `CREATE TABLE`, or `ADD CONSTRAINT` without idempotency guards, or that reference tables that don't exist yet in the migration history.
+
