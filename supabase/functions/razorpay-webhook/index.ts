@@ -114,7 +114,7 @@ serve(async (req) => {
     const paymentEntity = payload.payload?.payment?.entity;
 
     console.log('Webhook event:', event);
-    console.log('Payment entity:', paymentEntity);
+    console.log('Payment entity:', JSON.stringify({ id: paymentEntity?.id, notes: paymentEntity?.notes }));
 
     if (event === 'payment.captured') {
       const razorpayPaymentId = paymentEntity.id;
@@ -128,34 +128,35 @@ serve(async (req) => {
         );
       }
 
-      console.log(`Payment captured for ${allOrderIds.length} order(s):`, allOrderIds);
+      console.log(`Payment ${razorpayPaymentId} captured for ${allOrderIds.length} order(s):`, allOrderIds);
 
-      // Process each order — atomic duplicate guard per order
       for (const orderId of allOrderIds) {
-        // C5: Atomic duplicate guard — claim the payment record in a single UPDATE
-        const { data: claimedRows, error: claimError } = await supabase
+        // STEP 1: Idempotent upsert on payment_records
+        // Uses UNIQUE(order_id) for upsert, UNIQUE(razorpay_payment_id) for duplicate detection
+        const { error: upsertError } = await supabase
           .from('payment_records')
-          .update({
-            payment_status: 'paid',
-            transaction_reference: razorpayPaymentId,
+          .upsert({
+            order_id: orderId,
             razorpay_payment_id: razorpayPaymentId,
-          })
-          .eq('order_id', orderId)
-          .is('razorpay_payment_id', null)
-          .select('id');
+            payment_status: 'paid',
+            payment_method: 'online',
+            transaction_reference: razorpayPaymentId,
+            payment_collection: 'direct',
+            payment_mode: 'online',
+          }, { onConflict: 'order_id', ignoreDuplicates: false });
 
-        if (claimError) {
-          console.error(`Error claiming payment record for order ${orderId}:`, claimError);
-          continue; // Don't fail entire webhook — process remaining orders
+        if (upsertError) {
+          // 23505 = unique_violation on razorpay_payment_id → true duplicate webhook
+          if (upsertError.code === '23505') {
+            console.log(`Duplicate webhook: payment ${razorpayPaymentId} already recorded for order ${orderId}, skipping`);
+            continue;
+          }
+          console.error(`Payment record upsert error for order ${orderId}:`, upsertError);
+          // Don't skip — still try to update the order
         }
 
-        if (!claimedRows || claimedRows.length === 0) {
-          console.log(`Duplicate webhook for payment ${razorpayPaymentId} on order ${orderId}, skipping`);
-          continue;
-        }
-
-        // Update order status — C1: never resurrect a cancelled order as paid
-        // P0 FIX: Also transition payment_pending → placed so seller gets notified
+        // STEP 2: State-guarded order update
+        // Only advance orders that are still pending payment — never overwrite cancelled/advanced
         const { error: orderError, data: updatedOrder } = await supabase
           .from('orders')
           .update({
@@ -165,48 +166,47 @@ serve(async (req) => {
           })
           .eq('id', orderId)
           .in('status', ['payment_pending', 'placed'])
+          .in('payment_status', ['pending'])
           .select('id, seller_id, buyer_id');
-
-        if (!updatedOrder || updatedOrder.length === 0) {
-          console.warn(`Order ${orderId} is cancelled or already advanced — skipping payment.captured update`);
-        }
 
         if (orderError) {
           console.error(`Error updating order ${orderId}:`, orderError);
         }
 
-        // P0 FIX: Queue seller notification now that payment is confirmed
-        if (updatedOrder && updatedOrder.length > 0) {
-          const order = updatedOrder[0];
-          // Look up seller user_id and buyer name for notification
-          const { data: sellerProfile } = await supabase
-            .from('seller_profiles')
-            .select('user_id')
-            .eq('id', order.seller_id)
-            .single();
-
-          const { data: buyerProfile } = await supabase
-            .from('profiles')
-            .select('name')
-            .eq('id', order.buyer_id)
-            .single();
-
-          if (sellerProfile?.user_id) {
-            const buyerName = buyerProfile?.name || 'A buyer';
-            await supabase
-              .from('notification_queue')
-              .insert({
-                user_id: sellerProfile.user_id,
-                type: 'order',
-                title: '🆕 New Order Received!',
-                body: `${buyerName} placed an order. Tap to view and accept.`,
-                reference_path: `/orders/${orderId}`,
-                payload: { orderId, status: 'placed', type: 'order' },
-              });
-          }
+        if (!updatedOrder || updatedOrder.length === 0) {
+          console.warn(`Order ${orderId} already advanced or cancelled — skipping notification`);
+          continue;
         }
 
-        console.log(`Order ${orderId} marked as paid and placed`);
+        // STEP 3: Notification ONLY if DB actually changed rows
+        const order = updatedOrder[0];
+        const { data: sellerProfile } = await supabase
+          .from('seller_profiles')
+          .select('user_id')
+          .eq('id', order.seller_id)
+          .single();
+
+        const { data: buyerProfile } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', order.buyer_id)
+          .single();
+
+        if (sellerProfile?.user_id) {
+          const buyerName = buyerProfile?.name || 'A buyer';
+          await supabase
+            .from('notification_queue')
+            .insert({
+              user_id: sellerProfile.user_id,
+              type: 'order',
+              title: '🆕 New Order Received!',
+              body: `${buyerName} placed an order. Tap to view and accept.`,
+              reference_path: `/orders/${orderId}`,
+              payload: { orderId, status: 'placed', type: 'order' },
+            });
+        }
+
+        console.log(`✅ Order ${orderId} → paid + placed, seller notified`);
       }
     } else if (event === 'payment.failed') {
       const allOrderIds = resolveOrderIds(paymentEntity.notes);
@@ -214,7 +214,7 @@ serve(async (req) => {
       for (const orderId of allOrderIds) {
         console.log(`Payment failed for order ${orderId}`);
         
-        // C1: Guard — never overwrite a 'paid' status with 'failed'
+        // Guard: never overwrite a 'paid' status with 'failed'
         await supabase
           .from('orders')
           .update({ payment_status: 'failed' })
@@ -233,7 +233,7 @@ serve(async (req) => {
       for (const orderId of allOrderIds) {
         console.log(`Refund created for order ${orderId}`);
         
-        // C1: Guard — only refund orders that were actually paid
+        // Guard: only refund orders that were actually paid
         await supabase
           .from('orders')
           .update({ payment_status: 'refunded' })
