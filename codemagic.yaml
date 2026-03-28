@@ -877,7 +877,7 @@ workflows:
         APP_NAME: "Sociva"
         CAPACITOR_ENV: "production"
       node: 22
-      java: 17
+      java: 21
 
     scripts:
       - name: Install dependencies
@@ -959,7 +959,7 @@ workflows:
       node: 22
       xcode: latest
       cocoapods: 1.16.2
-      java: 17
+      java: 21
 
     scripts:
       - name: Install dependencies
