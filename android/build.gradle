@@ -6,7 +6,7 @@ buildscript {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://maven.transistorsoft.com' }
+        maven { url = uri('https://maven.transistorsoft.com') }
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.13.0'
@@ -24,7 +24,7 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://maven.transistorsoft.com' }
+        maven { url = uri('https://maven.transistorsoft.com') }
     }
 
     configurations.all {
