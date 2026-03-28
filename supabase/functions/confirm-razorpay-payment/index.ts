@@ -133,10 +133,10 @@ app.post("/", async (c) => {
             seller_id: orderData.seller_id,
             amount: orderData.total_amount,
             net_amount: orderData.total_amount,
-            razorpay_payment_id,
+            razorpay_payment_id: verifiedPaymentId,
             payment_status: "paid",
             payment_method: "online",
-            transaction_reference: razorpay_payment_id,
+            transaction_reference: verifiedPaymentId,
             payment_collection: "direct",
             payment_mode: "online",
             society_id: orderData.society_id,
@@ -154,7 +154,7 @@ app.post("/", async (c) => {
         .update({
           status: "placed",
           payment_status: "paid",
-          razorpay_payment_id,
+          razorpay_payment_id: verifiedPaymentId,
           auto_cancel_at: null,
           updated_at: now,
         })
