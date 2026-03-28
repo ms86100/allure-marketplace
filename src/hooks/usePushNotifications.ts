@@ -252,6 +252,10 @@ export function usePushNotificationsInternal() {
         return;
       }
 
+      if (instanceId !== activeInstanceId) return;
+
+      const platform = Capacitor.getPlatform();
+
       // Create high-importance notification channel for order alerts (Android 8+)
       if (platform === 'android') {
         try {
@@ -259,9 +263,9 @@ export function usePushNotificationsInternal() {
             id: 'orders_alert',
             name: 'Order Alerts',
             description: 'High-priority alerts for new orders',
-            importance: 5, // MAX importance — plays sound even in DND
-            visibility: 1, // public on lock screen
-            sound: 'gate_bell', // maps to res/raw/gate_bell.mp3
+            importance: 5,
+            visibility: 1,
+            sound: 'gate_bell',
             vibration: true,
             lights: true,
           });
@@ -270,10 +274,6 @@ export function usePushNotificationsInternal() {
           pushLog('warn', 'ANDROID_CHANNEL_CREATE_FAILED', { error: String(chErr) });
         }
       }
-
-      if (instanceId !== activeInstanceId) return;
-
-      const platform = Capacitor.getPlatform();
 
       // Listen for registration success — gives raw APNs token on iOS, FCM token on Android
       const regListener = await PushNotifications.addListener('registration', async (regToken: { value: string }) => {

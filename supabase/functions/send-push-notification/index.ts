@@ -233,6 +233,8 @@ async function sendFCMNotification(
     sound: "gate_bell",
     channel_id: "orders_alert",
   };
+  if (threadId) androidNotification.tag = threadId;
+  if (imageUrl) androidNotification.image = imageUrl;
 
   const fcmNotification: Record<string, unknown> = { title, body };
   if (imageUrl) fcmNotification.image = imageUrl;
