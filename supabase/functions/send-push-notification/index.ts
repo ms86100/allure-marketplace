@@ -99,7 +99,7 @@ async function sendApnsDirectNotification(
     const apnsPayload: Record<string, unknown> = {
       aps: {
         alert: { title, body },
-        sound: "default",
+        sound: "gate_bell.caf",
         badge: 1,
         "mutable-content": imageUrl ? 1 : 0,
         ...(threadId ? { "thread-id": threadId } : {}),
@@ -229,7 +229,10 @@ async function sendFCMNotification(
 ): Promise<{ success: boolean; error?: string }> {
   const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
 
-  const androidNotification: Record<string, unknown> = { sound: "default" };
+  const androidNotification: Record<string, unknown> = {
+    sound: "gate_bell",
+    channel_id: "orders_alert",
+  };
   if (threadId) androidNotification.tag = threadId;
   if (imageUrl) androidNotification.image = imageUrl;
 
@@ -238,7 +241,7 @@ async function sendFCMNotification(
 
   const apnsAps: Record<string, unknown> = {
     alert: { title, body },
-    sound: "default",
+    sound: "gate_bell.caf",
     badge: 1,
   };
   if (imageUrl) apnsAps["mutable-content"] = 1;

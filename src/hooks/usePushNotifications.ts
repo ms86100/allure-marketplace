@@ -256,6 +256,25 @@ export function usePushNotificationsInternal() {
 
       const platform = Capacitor.getPlatform();
 
+      // Create high-importance notification channel for order alerts (Android 8+)
+      if (platform === 'android') {
+        try {
+          await PushNotifications.createChannel({
+            id: 'orders_alert',
+            name: 'Order Alerts',
+            description: 'High-priority alerts for new orders',
+            importance: 5,
+            visibility: 1,
+            sound: 'gate_bell',
+            vibration: true,
+            lights: true,
+          });
+          pushLog('info', 'ANDROID_CHANNEL_CREATED', { channelId: 'orders_alert' });
+        } catch (chErr) {
+          pushLog('warn', 'ANDROID_CHANNEL_CREATE_FAILED', { error: String(chErr) });
+        }
+      }
+
       // Listen for registration success — gives raw APNs token on iOS, FCM token on Android
       const regListener = await PushNotifications.addListener('registration', async (regToken: { value: string }) => {
         if (instanceId !== activeInstanceId) return;
