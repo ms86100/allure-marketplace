@@ -663,8 +663,8 @@ async function handleCalculateFee(req: Request, db: any, userId: string) {
     if (row.key && row.value) settingsMap[row.key] = row.value;
   }
 
-  const baseFee = parseInt(settingsMap.base_delivery_fee || '20', 10) || 20;
-  const freeThreshold = parseInt(settingsMap.free_delivery_threshold || '500', 10) || 500;
+  const baseFee = settingsMap.base_delivery_fee != null ? parseInt(settingsMap.base_delivery_fee, 10) : 20;
+  const freeThreshold = settingsMap.free_delivery_threshold != null ? parseInt(settingsMap.free_delivery_threshold, 10) : 500;
 
   // Check if caller is a seller or admin (allowed to see margins)
   const { data: sellerRow } = await db.from('seller_profiles').select('id').eq('user_id', userId).maybeSingle();

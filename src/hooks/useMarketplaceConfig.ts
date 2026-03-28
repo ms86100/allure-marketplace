@@ -109,10 +109,10 @@ function buildConfig(sysMap: Record<string, string>, adminMap: Record<string, st
   try { if (sysMap.rental_period_labels) rentalPeriodLabels = JSON.parse(sysMap.rental_period_labels); } catch {}
 
   return {
-    lowStockThreshold: parseInt(sysMap.low_stock_threshold || '5', 10) || 5,
+    lowStockThreshold: sysMap.low_stock_threshold != null ? parseInt(sysMap.low_stock_threshold, 10) : 5,
     currencySymbol: sysMap.currency_symbol || '₹',
     defaultCurrency: sysMap.default_currency || 'INR',
-    maxBadgesPerCard: parseInt(sysMap.max_badges_per_card || '2', 10) || 2,
+    maxBadgesPerCard: sysMap.max_badges_per_card != null ? parseInt(sysMap.max_badges_per_card, 10) : 2,
     enableScarcity: sysMap.enable_scarcity !== 'false',
     enablePulseAnimation: sysMap.enable_pulse_animation !== 'false',
     fulfillmentLabels,
