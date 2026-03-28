@@ -871,8 +871,6 @@ workflows:
     environment:
       android_signing:
         - sociva_keystore
-      groups:
-        - google_play
       vars:
         BUNDLE_ID: "app.sociva.community"
         APP_NAME: "Sociva"
@@ -920,10 +918,12 @@ workflows:
       - android/app/build/outputs/**/*.apk
 
     publishing:
-      google_play:
-        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
-        track: internal
-        submit_as_draft: true
+      email:
+        recipients:
+          - support@sociva.in
+        notify:
+          success: true
+          failure: true
 
   release-all:
     name: Release All Platforms
@@ -939,8 +939,6 @@ workflows:
         bundle_identifier: app.sociva.community
       android_signing:
         - sociva_keystore
-      groups:
-        - google_play
       vars:
         BUNDLE_ID: "app.sociva.community"
         WIDGET_BUNDLE_ID: "app.sociva.community.LiveDeliveryWidget"
@@ -1685,7 +1683,9 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
-      google_play:
-        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
-        track: internal
-        submit_as_draft: true
+      email:
+        recipients:
+          - support@sociva.in
+        notify:
+          success: true
+          failure: true
