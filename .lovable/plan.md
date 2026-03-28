@@ -1,79 +1,55 @@
 
 
-# Fix Plan: False Cancellation Notification + Notification Hierarchy + Button Overlap
+# Fix: Broken Step Icon on Accepted + Lock Screen Media Controls for Order Sound
 
-## Root Cause Analysis
+## Issue 1: Accepted step icon looks "broken" on buyer's order timeline
 
-### Issue 1: "Order Cancelled" appears alongside new order notifications
+**Root cause**: In `OrderDetailPage.tsx` line 429, the current step gets `ring-2 ring-accent ring-offset-1 ring-offset-background`. On dark backgrounds, `ring-offset-background` creates a visible dark gap between the green circle and the ring, making it look cracked/broken compared to the plain completed circles.
 
-**This is NOT a bug in the new order flow.** The DB proves:
-- Order `612abee5` (previous attempt) was legitimately cancelled at 07:04:58 — buyer abandoned UPI payment
-- Order `4c8909fa` (new order) correctly triggered "New Order Received" at 07:05:30
+**Fix** in `src/pages/OrderDetailPage.tsx` (line 429):
 
-The problem: when the buyer's previous order attempt fails and gets cancelled via `buyer_cancel_pending_orders`, the seller receives a cancellation notification for that abandoned order. Seconds later, the buyer retries and places a new order. Both notifications arrive on the lock screen simultaneously, making it look like the new order was cancelled.
-
-**Fix**: Suppress seller cancellation notifications for orders that were **never seen by the seller** — i.e., orders cancelled while still in `payment_pending` status. If the seller never received a "New Order" notification (because the order never reached `placed`), they should not receive a cancellation notification either.
-
-### Issue 2: Notification hierarchy wrong
-
-The current order is correct — "New Order Received" at 07:05:30, then "Payment Confirmation Needed" at 07:05:33. But the **cancelled notification from the old order** (07:04:58) arrives first and gets displayed on top in iOS notification shade (newest-on-top). This creates the visual impression of: cancel → payment needed, instead of: new order → payment needed.
-
-**Fix**: Same as Issue 1 — suppressing the phantom cancellation eliminates the wrong hierarchy.
-
-### Issue 3: Reject/Mark Accepted buttons overlap on scroll
-
-The action bar uses `fixed bottom-[calc(4rem+env(safe-area-inset-bottom))]` positioning (line 746), which should work. But the page content scrolls underneath without enough bottom padding, causing the buttons to visually overlap the last content items (Total section).
-
-**Fix**: Add bottom padding to the scrollable content area equal to the action bar height to prevent overlap.
-
-## Implementation
-
-### Step 1: Suppress seller notifications for never-placed cancellations
-**File**: DB migration — update `fn_enqueue_order_status_notification()`
-
-Add a guard at the top of the cancellation notification path: if `NEW.status = 'cancelled'` AND `OLD.status = 'payment_pending'`, skip the seller notification. The order never reached `placed`, so the seller was never told about it and should not receive a cancellation alert.
-
-```sql
--- Inside fn_enqueue_order_status_notification, before the seller notification block:
--- If order is being cancelled from payment_pending, seller never knew about it — skip seller notif
-IF NEW.status = 'cancelled' AND OLD.status = 'payment_pending' THEN
-  v_notify_seller := false;
-END IF;
+Replace:
+```
+ring-2 ring-accent ring-offset-1 ring-offset-background
+```
+With:
+```
+ring-2 ring-accent/50
 ```
 
-### Step 2: Also suppress buyer "cancelled" notification for payment_pending → cancelled
-The buyer already sees "Payment was not completed" toast on their screen. Sending a separate push notification saying "Your order has been cancelled" is redundant and confusing.
+This removes the offset entirely and uses a semi-transparent ring that looks clean on both light and dark themes. The current step still gets a distinct highlight ring without the visual gap.
 
-Same guard applied to buyer notifications:
-```sql
-IF NEW.status = 'cancelled' AND OLD.status = 'payment_pending' THEN
-  v_notify_buyer := false;
-  v_notify_seller := false;
-END IF;
-```
+## Issue 2: Order alert sound appears in iOS media controls (lock screen Now Playing)
 
-### Step 3: Fix button overlap with content
-**File**: `src/pages/OrderDetailPage.tsx`
+**Root cause**: `useUrgentOrderSound.ts` uses `new Audio('/sounds/gate_bell.mp3')` — an `HTMLAudioElement`. On iOS, any HTMLAudioElement playback registers with the system's media session, which means:
+- It shows "New Order Alert" in the lock screen Now Playing widget
+- The user can pause/skip it from the notification shade
+- It behaves like music, not an alert
 
-Add bottom padding to the scrollable content container when the action bar is visible, so the Total/Instructions section doesn't get hidden behind the fixed buttons.
+**Fix** in `src/hooks/useUrgentOrderSound.ts`:
 
-```tsx
-{/* Add padding when action bar is shown */}
-<div className={cn(
-  "...",
-  (hasSellerActionBar || hasBuyerActionBar) && "pb-24"
-)}>
-```
+Replace `HTMLAudioElement` with **Web Audio API** (`AudioContext`). Web Audio API does NOT register with `navigator.mediaSession`, so:
+- No lock screen media controls appear
+- Sound plays as a short-lived audio context, not media playback
+- Loop is implemented via a repeating `setTimeout` that creates new audio buffers
 
-## Files Changed
+The approach:
+1. Fetch `/sounds/gate_bell.mp3` once and decode into an `AudioBuffer`
+2. On `playBeep()`, create an `AudioBufferSourceNode`, play it, and schedule the next play via `setTimeout` after the buffer duration
+3. On `stopRinging()`, stop the source node and clear the timeout
+4. The `AudioContext` is closed when the component unmounts
+
+This is the same technique already used successfully for the foreground push notification beep (lines 422-440 of `usePushNotifications.ts`).
+
+## Files changed
 
 | File | Change |
 |------|--------|
-| Migration SQL | Suppress notifications for `payment_pending → cancelled` transitions |
-| `src/pages/OrderDetailPage.tsx` | Add bottom padding when action bar is visible |
+| `src/pages/OrderDetailPage.tsx` | Remove `ring-offset-1 ring-offset-background`, use `ring-2 ring-accent/50` for current step |
+| `src/hooks/useUrgentOrderSound.ts` | Replace `HTMLAudioElement` with `AudioContext` + `AudioBuffer` loop to avoid media session |
 
-## Expected Result
-- Seller no longer receives "Order Cancelled" for orders that never reached them
-- New order notification is the first and only notification seller sees for a fresh order
-- Reject/Mark Accepted buttons no longer overlap with page content on scroll
+## Expected result
+- Order timeline: current step shows a clean highlighted ring without the dark gap artifact
+- Lock screen: no more "New Order Alert" media widget — sound plays as a system-level audio burst
+- Sound still loops continuously until the seller dismisses the notification
 
