@@ -89,7 +89,7 @@ app.post("/", async (c) => {
     // Query 1: Urgent orders past auto_cancel_at (skip if buyer already confirmed/paid)
     const { data: urgentExpired, error: urgentErr } = await supabase
       .from("orders")
-      .select("id, buyer_id, seller_id, total_amount")
+      .select("id, buyer_id, seller_id, total_amount, razorpay_order_id")
       .in("status", cancellableStatuses)
       .not("auto_cancel_at", "is", null)
       .lt("auto_cancel_at", now)
