@@ -161,7 +161,7 @@ export default function OrderDetailPage() {
         console.warn('[Payment][reconcile] result=failed', error);
       } else {
         console.log('[Payment][reconcile] result=success, refetching order');
-        o.refetch?.();
+        o.fetchOrder?.();
       }
     }).catch(err => {
       console.warn('[Payment][reconcile] result=call_failed', err);
