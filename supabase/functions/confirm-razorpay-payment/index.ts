@@ -42,8 +42,8 @@ app.post("/", async (c) => {
 
     const { razorpay_payment_id, razorpay_order_id, order_ids } = body;
 
-    if (!razorpay_payment_id || !order_ids || !Array.isArray(order_ids) || order_ids.length === 0) {
-      return c.json({ error: "Missing razorpay_payment_id or order_ids" }, 400, corsHeaders);
+    if ((!razorpay_payment_id && !razorpay_order_id) || !order_ids || !Array.isArray(order_ids) || order_ids.length === 0) {
+      return c.json({ error: "Missing razorpay_payment_id/razorpay_order_id or order_ids" }, 400, corsHeaders);
     }
 
     // Step 1: Verify payment with Razorpay API
@@ -54,27 +54,48 @@ app.post("/", async (c) => {
     }
 
     const authHeader = "Basic " + btoa(`${creds.keyId}:${creds.keySecret}`);
-    const rzpResponse = await fetch(
-      `https://api.razorpay.com/v1/payments/${razorpay_payment_id}`,
-      { headers: { Authorization: authHeader } }
-    );
+    let verifiedPaymentId = razorpay_payment_id;
 
-    if (!rzpResponse.ok) {
-      console.error("Razorpay API error:", rzpResponse.status, await rzpResponse.text());
-      return c.json({ error: "Payment verification failed" }, 502, corsHeaders);
-    }
-
-    const payment = await rzpResponse.json();
-    console.log("Razorpay payment status:", payment.status, "amount:", payment.amount);
-
-    // Only accept captured payments
-    if (payment.status !== "captured" && payment.status !== "authorized") {
-      console.warn(`Payment ${razorpay_payment_id} status is ${payment.status}, not captured/authorized`);
-      return c.json(
-        { error: "Payment not confirmed", status: payment.status },
-        409,
-        corsHeaders
+    // If we have a payment ID, verify it directly
+    if (razorpay_payment_id && razorpay_payment_id !== "reconciled") {
+      const rzpResponse = await fetch(
+        `https://api.razorpay.com/v1/payments/${razorpay_payment_id}`,
+        { headers: { Authorization: authHeader } }
       );
+
+      if (!rzpResponse.ok) {
+        console.error("Razorpay API error:", rzpResponse.status, await rzpResponse.text());
+        return c.json({ error: "Payment verification failed" }, 502, corsHeaders);
+      }
+
+      const payment = await rzpResponse.json();
+      console.log("Razorpay payment status:", payment.status, "amount:", payment.amount);
+
+      if (payment.status !== "captured" && payment.status !== "authorized") {
+        return c.json({ error: "Payment not confirmed", status: payment.status }, 409, corsHeaders);
+      }
+    } else if (razorpay_order_id) {
+      // Reconciliation path: look up payments by Razorpay order ID
+      const rzpResponse = await fetch(
+        `https://api.razorpay.com/v1/orders/${razorpay_order_id}/payments`,
+        { headers: { Authorization: authHeader } }
+      );
+
+      if (!rzpResponse.ok) {
+        console.error("Razorpay order payments API error:", rzpResponse.status);
+        return c.json({ error: "Payment verification failed" }, 502, corsHeaders);
+      }
+
+      const data = await rzpResponse.json();
+      const items = data.items || data;
+      const captured = Array.isArray(items) ? items.find((p: any) => p.status === "captured" || p.status === "authorized") : null;
+      if (!captured) {
+        return c.json({ error: "No captured payment found for this order" }, 409, corsHeaders);
+      }
+      verifiedPaymentId = captured.id;
+      console.log("Reconciled payment ID:", verifiedPaymentId);
+    } else {
+      return c.json({ error: "Cannot verify payment without ID" }, 400, corsHeaders);
     }
 
     // Step 2: Process each order
