@@ -884,7 +884,7 @@ workflows:
         script: |
           npm install --legacy-peer-deps
           PLUGIN_GRADLE="node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle"
-          if [ -f "$PLUGIN_GRADLE" ] && ! grep -q "url './libs'" "$PLUGIN_GRADLE"; then
+          if [ -f "$PLUGIN_GRADLE" ] && ! grep -Eq "url ['\"]\./libs['\"]" "$PLUGIN_GRADLE"; then
             python3 -c "p='$PLUGIN_GRADLE';t=open(p).read();t=t.replace('mavenCentral()\n}','mavenCentral()\n    maven {\n        url \"./libs\"\n    }\n}',1);open(p,'w').write(t)"
             echo "=== Patched Transistorsoft Android Gradle repositories ==="
           else
@@ -901,7 +901,7 @@ workflows:
 
       - name: Verify native Android dependency patch
         script: |
-          if ! grep -q "url './libs'" node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle; then
+          if ! grep -Eq "url ['\"]\./libs['\"]" node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle; then
             echo "ERROR: Transistorsoft Android Gradle patch missing"
             exit 1
           fi
@@ -975,7 +975,7 @@ workflows:
         script: |
           npm install --legacy-peer-deps
           PLUGIN_GRADLE="node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle"
-          if [ -f "$PLUGIN_GRADLE" ] && ! grep -q "url './libs'" "$PLUGIN_GRADLE"; then
+          if [ -f "$PLUGIN_GRADLE" ] && ! grep -Eq "url ['\"]\./libs['\"]" "$PLUGIN_GRADLE"; then
             python3 -c "p='$PLUGIN_GRADLE';t=open(p).read();t=t.replace('mavenCentral()\n}','mavenCentral()\n    maven {\n        url \"./libs\"\n    }\n}',1);open(p,'w').write(t)"
             echo "=== Patched Transistorsoft Android Gradle repositories ==="
           else
@@ -1683,7 +1683,7 @@ workflows:
 
       - name: Verify native Android dependency patch
         script: |
-          if ! grep -q "url './libs'" node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle; then
+          if ! grep -Eq "url ['\"]\./libs['\"]" node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle; then
             echo "ERROR: Transistorsoft Android Gradle patch missing"
             exit 1
           fi
