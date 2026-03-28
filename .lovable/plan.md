@@ -1,25 +1,26 @@
 
 
-# Remove Google Play Auto-Upload from Codemagic
+# Combined Fix: Java 21 + Dependency Patches for Android Build
 
-## What changes
+## Root Cause
 
-Two spots in `codemagic.yaml` where `google_play` publishing is configured need to be updated:
+The build fails at `:capacitor-android:compileReleaseJavaWithJavac` with `error: invalid source release: 21` because Capacitor's auto-generated `capacitor.build.gradle` requires Java 21, but Codemagic is provisioning JDK 17.
 
-### 1. `android-release` workflow (lines 922-926)
-- Remove the entire `publishing:` block with `google_play` credentials
-- Add an `email` publishing block instead (so you get notified when build completes with artifact link)
+## Changes
 
-### 2. `release-all` workflow (lines 1688-1691)
-- Remove the `google_play:` section from its `publishing:` block
-- Keep the `app_store_connect` publishing intact
+### 1. Update `codemagic.yaml` — two lines
 
-### 3. Clean up `google_play` group reference
-- Remove `- google_play` from `environment.groups` in both workflows since the credentials are no longer needed
+| Location | Line | Current | New |
+|---|---|---|---|
+| `android-release` workflow | 880 | `java: 17` | `java: 21` |
+| `release-all` workflow | 962 | `java: 17` | `java: 21` |
 
-## After the change
-- Codemagic will still build and sign the `.aab` using your keystore
-- The signed `.aab` will appear in the **Artifacts** tab of each build
-- You download it and manually upload to Google Play Console
-- No more "service account credentials" errors
+No other file changes needed. The deprecation warnings from `capacitor-rate-app` (Groovy space-assignment syntax) are non-fatal warnings and do not affect the build.
+
+## What this fixes
+
+- JDK 21 will be provisioned on the Codemagic build machine
+- `capacitor.build.gradle`'s `JavaVersion.VERSION_21` source/target will compile successfully
+- The existing `scripts/patch-android-builds.cjs` (Transistorsoft Maven repo, version pinning, Kotlin dedup) continues to run as before
+- The signed `.aab` artifact will be generated for manual Play Console upload
 
