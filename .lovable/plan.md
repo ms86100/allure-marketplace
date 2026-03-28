@@ -1,26 +1,49 @@
 
 
-# Combined Fix: Java 21 + Dependency Patches for Android Build
+# Fix: Android AAB Not Signed
 
-## Root Cause
+## Problem
 
-The build fails at `:capacitor-android:compileReleaseJavaWithJavac` with `error: invalid source release: 21` because Capacitor's auto-generated `capacitor.build.gradle` requires Java 21, but Codemagic is provisioning JDK 17.
+Google Play Console rejects the `.aab` because it's **unsigned**. Codemagic's `android_signing` block sets environment variables (`CM_KEYSTORE`, `CM_KEYSTORE_PASSWORD`, `CM_KEY_ALIAS`, `CM_KEY_PASSWORD`) — but the `android/app/build.gradle` never references them. Gradle produces an unsigned bundle.
 
-## Changes
+## Fix — One file change
 
-### 1. Update `codemagic.yaml` — two lines
+**File:** `android/app/build.gradle`
 
-| Location | Line | Current | New |
-|---|---|---|---|
-| `android-release` workflow | 880 | `java: 17` | `java: 21` |
-| `release-all` workflow | 962 | `java: 17` | `java: 21` |
+Add a `signingConfigs` block that reads Codemagic's environment variables, and wire it into the `release` build type:
 
-No other file changes needed. The deprecation warnings from `capacitor-rate-app` (Groovy space-assignment syntax) are non-fatal warnings and do not affect the build.
+```text
+android {
+    ...
 
-## What this fixes
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("CM_KEYSTORE") ?: "/dev/null")
+            storePassword System.getenv("CM_KEYSTORE_PASSWORD") ?: ""
+            keyAlias System.getenv("CM_KEY_ALIAS") ?: ""
+            keyPassword System.getenv("CM_KEY_PASSWORD") ?: ""
+        }
+    }
 
-- JDK 21 will be provisioned on the Codemagic build machine
-- `capacitor.build.gradle`'s `JavaVersion.VERSION_21` source/target will compile successfully
-- The existing `scripts/patch-android-builds.cjs` (Transistorsoft Maven repo, version pinning, Kotlin dedup) continues to run as before
-- The signed `.aab` artifact will be generated for manual Play Console upload
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release    ← THIS IS THE KEY LINE
+            minifyEnabled false
+            proguardFiles ...
+        }
+    }
+}
+```
+
+The `?: "/dev/null"` / `?: ""` fallbacks prevent local dev builds from crashing when the env vars aren't set — the build just won't sign (which is fine for local debug).
+
+## Why this is the only fix needed
+
+- Codemagic already has the keystore uploaded as `sociva_keystore` (referenced at line 874 of `codemagic.yaml`)
+- Codemagic automatically sets `CM_KEYSTORE`, `CM_KEYSTORE_PASSWORD`, `CM_KEY_ALIAS`, `CM_KEY_PASSWORD` from that keystore
+- The only missing piece is Gradle reading those variables
+
+## After rebuild
+
+The `.aab` artifact will be signed and Google Play Console will accept the upload.
 
