@@ -86,12 +86,12 @@ function buildSettingsFromMap(map: Record<string, string>): SystemSettings {
     termsContentMd: map.terms_content_md || DEFAULTS.termsContentMd,
     privacyContentMd: map.privacy_content_md || DEFAULTS.privacyContentMd,
     currencySymbol: map.currency_symbol || DEFAULTS.currencySymbol,
-    budgetFilterThreshold: parseInt(map.budget_filter_threshold || '150', 10) || 150,
+    budgetFilterThreshold: map.budget_filter_threshold != null ? parseInt(map.budget_filter_threshold, 10) : 150,
     platformName: map.platform_name || DEFAULTS.platformName,
     violationPolicyJson: map.violation_policy_json || DEFAULTS.violationPolicyJson,
     sellerEmptyStateCopy: map.seller_empty_state_copy || DEFAULTS.sellerEmptyStateCopy,
     landingSlidesJson: map.landing_slides_json || DEFAULTS.landingSlidesJson,
-    maxPriceFilter: parseInt(map.max_price_filter || '50000', 10) || 50000,
+    maxPriceFilter: map.max_price_filter != null ? parseInt(map.max_price_filter, 10) : 50000,
     locale: map.locale || DEFAULTS.locale,
     upiProviderLabel: map.upi_provider_label || DEFAULTS.upiProviderLabel,
     defaultCountryCode: map.default_country_code || DEFAULTS.defaultCountryCode,
@@ -99,7 +99,7 @@ function buildSettingsFromMap(map: Record<string, string>): SystemSettings {
       ? map.supported_country_codes.split(',').map(c => c.trim())
       : DEFAULTS.supportedCountryCodes,
     refundPromiseText: map.refund_promise_text || DEFAULTS.refundPromiseText,
-    refundSlaHours: parseInt(map.refund_sla_hours || '24', 10) || 24,
+    refundSlaHours: map.refund_sla_hours != null ? parseInt(map.refund_sla_hours, 10) : 24,
   };
 }
 
