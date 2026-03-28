@@ -885,7 +885,7 @@ workflows:
           npm install --legacy-peer-deps
           PLUGIN_GRADLE="node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle"
           if [ -f "$PLUGIN_GRADLE" ] && ! grep -q "url './libs'" "$PLUGIN_GRADLE"; then
-            sed -i.bak '/^repositories {/,/^}/{/mavenCentral()/a\    maven {\n        url '"'"'./libs'"'"'\n    }' '}' "$PLUGIN_GRADLE"
+            python3 -c "p='$PLUGIN_GRADLE';t=open(p).read();t=t.replace('mavenCentral()\n}','mavenCentral()\n    maven {\n        url \"./libs\"\n    }\n}',1);open(p,'w').write(t)"
             echo "=== Patched Transistorsoft Android Gradle repositories ==="
           else
             echo "=== Transistorsoft Android Gradle repositories already patched or not found ==="
@@ -976,7 +976,7 @@ workflows:
           npm install --legacy-peer-deps
           PLUGIN_GRADLE="node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle"
           if [ -f "$PLUGIN_GRADLE" ] && ! grep -q "url './libs'" "$PLUGIN_GRADLE"; then
-            sed -i.bak '/^repositories {/,/^}/{/mavenCentral()/a\    maven {\n        url '"'"'./libs'"'"'\n    }' '}' "$PLUGIN_GRADLE"
+            python3 -c "p='$PLUGIN_GRADLE';t=open(p).read();t=t.replace('mavenCentral()\n}','mavenCentral()\n    maven {\n        url \"./libs\"\n    }\n}',1);open(p,'w').write(t)"
             echo "=== Patched Transistorsoft Android Gradle repositories ==="
           else
             echo "=== Transistorsoft Android Gradle repositories already patched or not found ==="
