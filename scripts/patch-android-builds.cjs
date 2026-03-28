@@ -55,42 +55,31 @@ function normalizeLineEndings(text) {
   return text.replace(/\r\n/g, '\n');
 }
 
-function patchRepositoryBlock(block) {
-  const lines = block.split('\n');
-  if (lines.length < 2) {
-    return block;
-  }
+function normalizeTransistorsoftRepositoryLines(text) {
+  const lines = text.split('\n');
+  const nextLines = [];
+  let sawLocalRepo = false;
+  let sawRemoteRepo = false;
 
-  const closingLine = lines[lines.length - 1];
-  const existingEntryLine = lines.slice(1, -1).find((line) => line.trim().length > 0);
-  const entryIndent = existingEntryLine?.match(/^\s*/)?.[0] ?? `${closingLine.match(/^\s*/)?.[0] ?? ''}    `;
-  const hasTransistorsoftReference = lines.some((line) => /maven\.transistorsoft\.com|['"]\.\/libs['"]/.test(line));
+  for (const line of lines) {
+    const indent = line.match(/^\s*/)?.[0] ?? '';
 
-  if (!hasTransistorsoftReference) {
-    return block;
-  }
-
-  let hasLocalRepo = false;
-  let hasRemoteRepo = false;
-  const nextLines = [lines[0]];
-
-  for (const line of lines.slice(1, -1)) {
-    if (/['"]\.\/libs['"]/.test(line)) {
-      if (!hasLocalRepo) {
-        nextLines.push(`${entryIndent}maven { url = uri('./libs') }`);
-        hasLocalRepo = true;
+    if (/maven\s*\{\s*url\s*(?:=\s*uri\()?['"]\.\/libs['"]\)?\s*\}/.test(line)) {
+      if (!sawLocalRepo) {
+        nextLines.push(`${indent}maven { url = uri('./libs') }`);
+        sawLocalRepo = true;
       }
       continue;
     }
 
-    if (/maven\.transistorsoft\.com/.test(line)) {
-      if (!hasLocalRepo) {
-        nextLines.push(`${entryIndent}maven { url = uri('./libs') }`);
-        hasLocalRepo = true;
+    if (/maven\s*\{\s*url\s*(?:=\s*uri\()?['"]https:\/\/maven\.transistorsoft\.com['"]\)?\s*\}/.test(line)) {
+      if (!sawLocalRepo) {
+        nextLines.push(`${indent}maven { url = uri('./libs') }`);
+        sawLocalRepo = true;
       }
-      if (!hasRemoteRepo) {
-        nextLines.push(`${entryIndent}maven { url = uri('https://maven.transistorsoft.com') }`);
-        hasRemoteRepo = true;
+      if (!sawRemoteRepo) {
+        nextLines.push(`${indent}maven { url = uri('https://maven.transistorsoft.com') }`);
+        sawRemoteRepo = true;
       }
       continue;
     }
@@ -98,12 +87,27 @@ function patchRepositoryBlock(block) {
     nextLines.push(line);
   }
 
-  nextLines.push(closingLine);
-  return nextLines.join('\n');
-}
+  let next = nextLines.join('\n');
 
-function patchTransistorsoftRepositoryBlocks(text) {
-  return text.replace(/repositories\s*\{[\s\S]*?\n\s*\}/g, (block) => patchRepositoryBlock(block));
+  if (!sawLocalRepo) {
+    const fallbackRepositoriesBlock = [
+      'repositories {',
+      "    maven { url = uri('./libs') }",
+      "    maven { url = uri('https://maven.transistorsoft.com') }",
+      '}',
+      '',
+    ].join('\n');
+
+    if (/\ndependencies\s*\{/.test(next)) {
+      next = next.replace(/\ndependencies\s*\{/, `\n${fallbackRepositoriesBlock}dependencies {`);
+    } else if (/dependencies\s*\{/.test(next)) {
+      next = next.replace(/dependencies\s*\{/, `${fallbackRepositoriesBlock}dependencies {`);
+    } else {
+      next = `${next.trimEnd()}\n\n${fallbackRepositoriesBlock}`;
+    }
+  }
+
+  return next;
 }
 
 function patchFile(filePath, transform) {
@@ -136,7 +140,7 @@ for (const filePath of [pluginGradlePath, geolocationGradlePath, calendarGradleP
 const pluginGradle = patchFile(pluginGradlePath, (text) => {
   let next = normalizeLineEndings(text);
 
-  next = patchTransistorsoftRepositoryBlocks(next);
+  next = normalizeTransistorsoftRepositoryLines(next);
 
   next = next.replace(/name:'tslocationmanager-v21', version: '\d+\.\d+\.\d+'|name:'tslocationmanager-v21', version: '3\.\+'|name:'tslocationmanager-v21', version: '\+'/g, `name:'tslocationmanager-v21', version: '${bundledTsLocationManagerV21Version}'`);
   next = next.replace(/name:'tslocationmanager', version: '\d+\.\d+\.\d+'|name:'tslocationmanager', version: '3\.\+'|name:'tslocationmanager', version: '\+'/g, `name:'tslocationmanager', version: '${bundledTsLocationManagerVersion}'`);
