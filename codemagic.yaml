@@ -30,7 +30,39 @@ workflows:
 
     scripts:
       - name: Install dependencies
-        script: npm install --legacy-peer-deps
+        script: |
+          npm install --legacy-peer-deps
+          python3 - <<'PY'
+          from pathlib import Path
+
+          plugin_gradle = Path('node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle')
+          if not plugin_gradle.exists():
+              raise SystemExit('Missing Transistorsoft Android Gradle file after npm install')
+
+          text = plugin_gradle.read_text()
+          repo_block = """repositories {
+    google()
+    mavenCentral()
+    maven {
+        url './libs'
+    }
+}
+"""
+
+          if "url './libs'" not in text:
+              old_block = """repositories {
+    google()
+    mavenCentral()
+}
+"""
+              if old_block not in text:
+                  raise SystemExit('Unexpected repositories block in Transistorsoft Android Gradle file')
+              text = text.replace(old_block, repo_block, 1)
+              plugin_gradle.write_text(text)
+              print('=== Patched Transistorsoft Android Gradle repositories ===')
+          else:
+              print('=== Transistorsoft Android Gradle repositories already patched ===')
+          PY
 
       - name: Pin CocoaPods for linker stability
         script: |
@@ -890,31 +922,17 @@ workflows:
           npx cap add android || true
           npx cap sync android
 
-      - name: Patch Android Maven repositories for native plugins
+      - name: Verify native Android dependency patch
         script: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          repo_snippet = '''
-                  maven { url("${project(':transistorsoft-capacitor-background-geolocation').projectDir}/libs") }
-          '''
-
-          build_gradle = Path('android/build.gradle')
-          if build_gradle.exists():
-              text = build_gradle.read_text()
-              if "transistorsoft-capacitor-background-geolocation').projectDir}/libs" not in text:
-                  marker = '        mavenCentral()\n'
-                  if marker in text:
-                      text = text.replace(marker, marker + repo_snippet, 1)
-                      build_gradle.write_text(text)
-                      print('=== Added Transistorsoft Maven repo to android/build.gradle ===')
-                  else:
-                      raise SystemExit('Could not find repository insertion point in android/build.gradle')
-              else:
-                  print('=== Transistorsoft Maven repo already present in android/build.gradle ===')
-          else:
-              raise SystemExit('android/build.gradle not found after capacitor sync')
-          PY
+          if ! grep -q "url './libs'" node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle; then
+            echo "ERROR: Transistorsoft Android Gradle patch missing"
+            exit 1
+          fi
+          if ! grep -q "transistorsoft-capacitor-background-geolocation" android/capacitor.settings.gradle; then
+            echo "ERROR: Capacitor sync did not register the background geolocation plugin"
+            exit 1
+          fi
+          echo "=== Native Android dependency patch verified ==="
 
       - name: Copy custom notification sound (Android)
         script: |
@@ -977,7 +995,39 @@ workflows:
 
     scripts:
       - name: Install dependencies
-        script: npm install --legacy-peer-deps
+        script: |
+          npm install --legacy-peer-deps
+          python3 - <<'PY'
+          from pathlib import Path
+
+          plugin_gradle = Path('node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle')
+          if not plugin_gradle.exists():
+              raise SystemExit('Missing Transistorsoft Android Gradle file after npm install')
+
+          text = plugin_gradle.read_text()
+          repo_block = """repositories {
+    google()
+    mavenCentral()
+    maven {
+        url './libs'
+    }
+}
+"""
+
+          if "url './libs'" not in text:
+              old_block = """repositories {
+    google()
+    mavenCentral()
+}
+"""
+              if old_block not in text:
+                  raise SystemExit('Unexpected repositories block in Transistorsoft Android Gradle file')
+              text = text.replace(old_block, repo_block, 1)
+              plugin_gradle.write_text(text)
+              print('=== Patched Transistorsoft Android Gradle repositories ===')
+          else:
+              print('=== Transistorsoft Android Gradle repositories already patched ===')
+          PY
 
       - name: Pin CocoaPods for linker stability
         script: |
@@ -1678,31 +1728,17 @@ workflows:
           npx cap add android || true
           npx cap sync android
 
-      - name: Patch Android Maven repositories for native plugins
+      - name: Verify native Android dependency patch
         script: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          repo_snippet = '''
-                  maven { url("${project(':transistorsoft-capacitor-background-geolocation').projectDir}/libs") }
-          '''
-
-          build_gradle = Path('android/build.gradle')
-          if build_gradle.exists():
-              text = build_gradle.read_text()
-              if "transistorsoft-capacitor-background-geolocation').projectDir}/libs" not in text:
-                  marker = '        mavenCentral()\n'
-                  if marker in text:
-                      text = text.replace(marker, marker + repo_snippet, 1)
-                      build_gradle.write_text(text)
-                      print('=== Added Transistorsoft Maven repo to android/build.gradle ===')
-                  else:
-                      raise SystemExit('Could not find repository insertion point in android/build.gradle')
-              else:
-                  print('=== Transistorsoft Maven repo already present in android/build.gradle ===')
-          else:
-              raise SystemExit('android/build.gradle not found after capacitor sync')
-          PY
+          if ! grep -q "url './libs'" node_modules/@transistorsoft/capacitor-background-geolocation/android/build.gradle; then
+            echo "ERROR: Transistorsoft Android Gradle patch missing"
+            exit 1
+          fi
+          if ! grep -q "transistorsoft-capacitor-background-geolocation" android/capacitor.settings.gradle; then
+            echo "ERROR: Capacitor sync did not register the background geolocation plugin"
+            exit 1
+          fi
+          echo "=== Native Android dependency patch verified ==="
 
       - name: Copy custom notification sound (Android)
         script: |
