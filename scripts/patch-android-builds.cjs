@@ -51,6 +51,61 @@ function ensureContains(text, needle, label) {
   }
 }
 
+function normalizeLineEndings(text) {
+  return text.replace(/\r\n/g, '\n');
+}
+
+function patchRepositoryBlock(block) {
+  const lines = block.split('\n');
+  if (lines.length < 2) {
+    return block;
+  }
+
+  const closingLine = lines[lines.length - 1];
+  const existingEntryLine = lines.slice(1, -1).find((line) => line.trim().length > 0);
+  const entryIndent = existingEntryLine?.match(/^\s*/)?.[0] ?? `${closingLine.match(/^\s*/)?.[0] ?? ''}    `;
+  const hasTransistorsoftReference = lines.some((line) => /maven\.transistorsoft\.com|['"]\.\/libs['"]/.test(line));
+
+  if (!hasTransistorsoftReference) {
+    return block;
+  }
+
+  let hasLocalRepo = false;
+  let hasRemoteRepo = false;
+  const nextLines = [lines[0]];
+
+  for (const line of lines.slice(1, -1)) {
+    if (/['"]\.\/libs['"]/.test(line)) {
+      if (!hasLocalRepo) {
+        nextLines.push(`${entryIndent}maven { url = uri('./libs') }`);
+        hasLocalRepo = true;
+      }
+      continue;
+    }
+
+    if (/maven\.transistorsoft\.com/.test(line)) {
+      if (!hasLocalRepo) {
+        nextLines.push(`${entryIndent}maven { url = uri('./libs') }`);
+        hasLocalRepo = true;
+      }
+      if (!hasRemoteRepo) {
+        nextLines.push(`${entryIndent}maven { url = uri('https://maven.transistorsoft.com') }`);
+        hasRemoteRepo = true;
+      }
+      continue;
+    }
+
+    nextLines.push(line);
+  }
+
+  nextLines.push(closingLine);
+  return nextLines.join('\n');
+}
+
+function patchTransistorsoftRepositoryBlocks(text) {
+  return text.replace(/repositories\s*\{[\s\S]*?\n\s*\}/g, (block) => patchRepositoryBlock(block));
+}
+
 function patchFile(filePath, transform) {
   const current = read(filePath);
   const next = transform(current);
@@ -79,16 +134,9 @@ for (const filePath of [pluginGradlePath, geolocationGradlePath, calendarGradleP
 }
 
 const pluginGradle = patchFile(pluginGradlePath, (text) => {
-  let next = text;
+  let next = normalizeLineEndings(text);
 
-  const runtimeRepositoriesBlock = `repositories {\n    google()\n    mavenCentral()\n    maven { url = uri('https://maven.transistorsoft.com') }\n}`;
-  const patchedRuntimeRepositoriesBlock = `repositories {\n    google()\n    mavenCentral()\n    maven { url = uri('./libs') }\n    maven { url = uri('https://maven.transistorsoft.com') }\n}`;
-
-  if (next.includes(runtimeRepositoriesBlock)) {
-    next = next.replace(runtimeRepositoriesBlock, patchedRuntimeRepositoriesBlock);
-  } else {
-    ensureContains(next, patchedRuntimeRepositoriesBlock, 'Transistorsoft runtime repositories block');
-  }
+  next = patchTransistorsoftRepositoryBlocks(next);
 
   next = next.replace(/name:'tslocationmanager-v21', version: '\d+\.\d+\.\d+'|name:'tslocationmanager-v21', version: '3\.\+'|name:'tslocationmanager-v21', version: '\+'/g, `name:'tslocationmanager-v21', version: '${bundledTsLocationManagerV21Version}'`);
   next = next.replace(/name:'tslocationmanager', version: '\d+\.\d+\.\d+'|name:'tslocationmanager', version: '3\.\+'|name:'tslocationmanager', version: '\+'/g, `name:'tslocationmanager', version: '${bundledTsLocationManagerVersion}'`);
