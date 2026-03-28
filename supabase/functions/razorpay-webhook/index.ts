@@ -113,8 +113,8 @@ serve(async (req) => {
     const event = payload.event;
     const paymentEntity = payload.payload?.payment?.entity;
 
-    console.log('Webhook event:', event);
-    console.log('Payment entity:', JSON.stringify({ id: paymentEntity?.id, notes: paymentEntity?.notes }));
+    const webhookOrderIds = resolveOrderIds(paymentEntity?.notes);
+    console.log(`[razorpay-webhook] event=${event}, razorpay_payment_id=${paymentEntity?.id}, order_ids=${JSON.stringify(webhookOrderIds)}, razorpay_order_id=${paymentEntity?.order_id || 'none'}`);
 
     if (event === 'payment.captured') {
       const razorpayPaymentId = paymentEntity.id;
@@ -221,7 +221,7 @@ serve(async (req) => {
             });
         }
 
-        console.log(`✅ Order ${orderId} → paid + placed, seller notified`);
+        console.log(`[razorpay-webhook] ✅ order=${orderId} result=advanced razorpay_payment_id=${razorpayPaymentId}`);
       }
     } else if (event === 'payment.failed') {
       const allOrderIds = resolveOrderIds(paymentEntity.notes);

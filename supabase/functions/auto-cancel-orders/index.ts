@@ -196,7 +196,7 @@ app.post("/", async (c) => {
         if ((order as any).razorpay_order_id) {
           const actuallyPaid = await isRazorpayPaid((order as any).razorpay_order_id);
           if (actuallyPaid) {
-            console.log(`Order ${order.id} is actually paid on Razorpay — triggering confirmation instead of cancel`);
+            console.log(`[auto-cancel][reconcile] order=${order.id} razorpay_order_id=${(order as any).razorpay_order_id} result=actually_paid — triggering confirmation`);
             // Trigger the confirm function to fix the state
             try {
               const fnUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/confirm-razorpay-payment`;
@@ -244,7 +244,7 @@ app.post("/", async (c) => {
           console.log(`Order ${order.id} already transitioned — skipping cancel`);
           return { id: order.id, success: false, skipped: true };
         }
-        console.log(`Order ${order.id} auto-cancelled: ${reason}`);
+        console.log(`[auto-cancel] order=${order.id} result=cancelled reason="${reason}"`);
         return { id: order.id, success: true };
       })
     );

@@ -137,6 +137,37 @@ export default function OrderDetailPage() {
     }
   }, [orderId, order?.status]);
 
+  // RECONCILIATION: If buyer opens a payment_pending online order, trigger backend verification
+  const reconcileAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (!orderId || !order || reconcileAttemptedRef.current) return;
+    if (order.status !== 'payment_pending') return;
+    if (!o.isBuyerView) return;
+    const razorpayOrderId = (order as any).razorpay_order_id;
+    if (!razorpayOrderId) return;
+
+    reconcileAttemptedRef.current = true;
+    console.log(`[Payment][reconcile] Triggering reconciliation for order=${orderId} razorpay_order_id=${razorpayOrderId}`);
+    
+    supabase.functions.invoke('confirm-razorpay-payment', {
+      body: {
+        razorpay_payment_id: null,
+        razorpay_order_id: razorpayOrderId,
+        order_ids: [orderId],
+        source: 'order_detail_reconcile',
+      },
+    }).then(({ error }) => {
+      if (error) {
+        console.warn('[Payment][reconcile] result=failed', error);
+      } else {
+        console.log('[Payment][reconcile] result=success, refetching order');
+        o.fetchOrder?.();
+      }
+    }).catch(err => {
+      console.warn('[Payment][reconcile] result=call_failed', err);
+    });
+  }, [orderId, order?.status]);
+
   // Gap A: Fetch delivery OTP for buyer display
   // Resilient assignment hydration: fetch + subscribe to INSERT & UPDATE + retry on missing
   const [assignmentRetryCount, setAssignmentRetryCount] = useState(0);
@@ -284,8 +315,8 @@ export default function OrderDetailPage() {
           {/* Delivery completion celebration — shown once for delivered/completed orders */}
           <CelebrationBanner order={order} isBuyerView={o.isBuyerView} flow={o.flow} />
 
-          {/* Gap 11: Order placed celebration banner — shown for newly placed orders */}
-          {o.isBuyerView && isFirstFlowStep(o.flow, order.status) && (Date.now() - new Date(order.created_at).getTime() < 60000) && (
+          {/* Gap 11: Order placed celebration banner — shown for newly placed orders, NOT payment_pending */}
+          {o.isBuyerView && isFirstFlowStep(o.flow, order.status) && order.status !== 'payment_pending' && (Date.now() - new Date(order.created_at).getTime() < 60000) && (
             <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
               <span className="text-3xl">🎉</span>
               <p className="text-sm font-bold text-primary mt-1.5">Order Placed Successfully!</p>
@@ -317,8 +348,8 @@ export default function OrderDetailPage() {
             <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} variant="buyer" />
           )}
 
-          {/* #5: Seller response time expectation for buyers — only when NOT urgent */}
-          {o.isBuyerView && isFirstFlowStep(o.flow, order.status) && !o.isUrgentOrder && (
+          {/* #5: Seller response time expectation for buyers — only when NOT urgent and NOT payment_pending */}
+          {o.isBuyerView && isFirstFlowStep(o.flow, order.status) && order.status !== 'payment_pending' && !o.isUrgentOrder && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50">
               <Loader2 size={14} className="animate-spin text-primary" />
               <p className="text-xs text-muted-foreground">

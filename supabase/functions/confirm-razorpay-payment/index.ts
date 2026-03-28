@@ -41,8 +41,12 @@ app.post("/", async (c) => {
     }
 
     const { razorpay_payment_id, razorpay_order_id, order_ids } = body;
+    const source = body.source || "client_confirm";
+
+    console.log(`[confirm-razorpay-payment][${source}] received: order_ids=${JSON.stringify(order_ids)}, razorpay_payment_id=${razorpay_payment_id}, razorpay_order_id=${razorpay_order_id}`);
 
     if ((!razorpay_payment_id && !razorpay_order_id) || !order_ids || !Array.isArray(order_ids) || order_ids.length === 0) {
+      console.log(`[confirm-razorpay-payment][${source}] result=rejected_bad_input`);
       return c.json({ error: "Missing razorpay_payment_id/razorpay_order_id or order_ids" }, 400, corsHeaders);
     }
 
@@ -200,7 +204,7 @@ app.post("/", async (c) => {
         });
       }
 
-      console.log(`✅ Order ${orderId} confirmed: placed + paid`);
+      console.log(`[confirm-razorpay-payment][${source}] ✅ order=${orderId} result=advanced razorpay_payment_id=${verifiedPaymentId}`);
       results.push({ id: orderId, success: true });
     }
 
