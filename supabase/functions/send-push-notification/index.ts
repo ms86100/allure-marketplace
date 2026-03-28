@@ -99,7 +99,7 @@ async function sendApnsDirectNotification(
     const apnsPayload: Record<string, unknown> = {
       aps: {
         alert: { title, body },
-        sound: "default",
+        sound: "gate_bell.caf",
         badge: 1,
         "mutable-content": imageUrl ? 1 : 0,
         ...(threadId ? { "thread-id": threadId } : {}),
