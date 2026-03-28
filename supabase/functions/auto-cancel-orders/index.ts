@@ -98,7 +98,7 @@ app.post("/", async (c) => {
     // Query 2: Orphaned UPI/online orders — payment_status=pending, non-COD, older than 30 min
     const { data: orphanedUpi, error: orphanErr } = await supabase
       .from("orders")
-      .select("id, buyer_id, seller_id, total_amount")
+      .select("id, buyer_id, seller_id, total_amount, razorpay_order_id")
       .in("status", cancellableStatuses)
       .eq("payment_status", "pending")
       .neq("payment_type", "cod")

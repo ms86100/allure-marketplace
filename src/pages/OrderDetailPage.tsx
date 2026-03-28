@@ -312,9 +312,8 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* Buyer-side urgent countdown timer — BULLETPROOF: show whenever auto_cancel_at is set
-              and buyer is viewing a non-terminal order. Does NOT depend on flow loading. */}
-          {o.isBuyerView && order.auto_cancel_at && !isTerminalStatus(o.flow, order.status) && (
+          {/* Buyer-side urgent countdown timer — only for placed/active orders, NOT payment_pending */}
+          {o.isBuyerView && order.auto_cancel_at && order.status !== 'payment_pending' && !isTerminalStatus(o.flow, order.status) && (
             <UrgentOrderTimer autoCancelAt={order.auto_cancel_at} onTimeout={o.handleTimeout} variant="buyer" />
           )}
 
@@ -469,7 +468,7 @@ export default function OrderDetailPage() {
           {/* Payment */}
           <div className="bg-card border border-border rounded-xl px-4 py-3">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5"><CreditCard size={16} className="text-muted-foreground" /><p className="text-sm font-medium">{(() => { const pt = (order as any).payment_type || (order as any).payment_method; if (pt === 'cod') return 'Cash on Delivery'; if (pt === 'card') return 'Online Payment'; return 'UPI Payment'; })()}</p></div>
+              <div className="flex items-center gap-2.5"><CreditCard size={16} className="text-muted-foreground" /><p className="text-sm font-medium">{(() => { const pt = (order as any).payment_type || (order as any).payment_method; if (pt === 'cod') return 'Cash on Delivery'; if (pt === 'upi' || pt === 'online' || pt === 'card') return 'Online Payment'; return 'Online Payment'; })()}</p></div>
               <span className={`text-[11px] px-2 py-0.5 rounded-full ${paymentStatusInfo.color}`}>{paymentStatusInfo.label}</span>
             </div>
             {(order as any).upi_transaction_ref && (
