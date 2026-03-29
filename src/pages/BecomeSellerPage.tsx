@@ -401,7 +401,7 @@ export default function BecomeSellerPage() {
             </div>
             {/* Service Availability — only for service-type categories */}
             {selectedGroupInfo?.layoutType === 'service' && draftSellerId && (
-              <ServiceAvailabilityManager sellerId={draftSellerId} />
+              <ServiceAvailabilityManager sellerId={draftSellerId} onComplete={() => { requestAnimationFrame(() => { document.querySelector('[data-continue-products]')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }); }} />
             )}
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Add at least one product or service to your catalog</p>
             <Button className="w-full" onClick={handleProceedToProducts} disabled={isLoading || formData.operating_days.length === 0}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Add Products<ChevronRight size={16} className="ml-1" /></Button>
