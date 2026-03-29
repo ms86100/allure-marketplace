@@ -491,8 +491,13 @@ export function DraftProductManager({
                   id="prod-name"
                   placeholder={activeConfig?.formHints.namePlaceholder || "e.g., Product Name"}
                   value={newProduct.name}
-                  onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                  onChange={(e) => {
+                    setNewProduct({ ...newProduct, name: e.target.value });
+                    if (fieldErrors.name) setFieldErrors(prev => { const { name, ...rest } = prev; return rest; });
+                  }}
+                  className={fieldErrors.name ? 'border-destructive' : ''}
                 />
+                {fieldErrors.name && <p className="text-xs text-destructive">{fieldErrors.name}</p>}
               </div>
 
               {/* Price + MRP Row */}
@@ -507,8 +512,13 @@ export function DraftProductManager({
                     min={0}
                     placeholder={requiresPrice ? '150' : '0 = On request'}
                     value={newProduct.price || ''}
-                    onChange={(e) => setNewProduct({ ...newProduct, price: Number(e.target.value) })}
+                    onChange={(e) => {
+                      setNewProduct({ ...newProduct, price: Number(e.target.value) });
+                      if (fieldErrors.price) setFieldErrors(prev => { const { price, ...rest } = prev; return rest; });
+                    }}
+                    className={fieldErrors.price ? 'border-destructive' : ''}
                   />
+                  {fieldErrors.price && <p className="text-xs text-destructive">{fieldErrors.price}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="prod-mrp" className="text-xs">MRP ({currencySymbol}) <span className="text-muted-foreground">(optional)</span></Label>
@@ -564,21 +574,27 @@ export function DraftProductManager({
               </div>
 
               {/* Product Image */}
-              <div className="space-y-2">
+              <div className="space-y-2" id="prod-image_url">
                 <Label className="text-xs">Product Image <span className="text-destructive">*</span></Label>
                 {user ? (
-                  <ProductImageUpload
-                    value={newProduct.image_url || null}
-                    onChange={(url) => setNewProduct({ ...newProduct, image_url: url || '' })}
-                    userId={user.id}
-                    productName={newProduct.name}
-                    categoryName={newProduct.category}
-                    description={newProduct.description}
-                    beforePick={beforePick}
-                  />
+                  <div className={fieldErrors.image_url ? 'rounded-md ring-2 ring-destructive' : ''}>
+                    <ProductImageUpload
+                      value={newProduct.image_url || null}
+                      onChange={(url) => {
+                        setNewProduct({ ...newProduct, image_url: url || '' });
+                        if (fieldErrors.image_url) setFieldErrors(prev => { const { image_url, ...rest } = prev; return rest; });
+                      }}
+                      userId={user.id}
+                      productName={newProduct.name}
+                      categoryName={newProduct.category}
+                      description={newProduct.description}
+                      beforePick={beforePick}
+                    />
+                  </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">Sign in to upload images</p>
                 )}
+                {fieldErrors.image_url && <p className="text-xs text-destructive">{fieldErrors.image_url}</p>}
               </div>
 
               {showVegToggle && (
