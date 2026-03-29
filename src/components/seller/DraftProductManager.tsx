@@ -88,6 +88,7 @@ export function DraftProductManager({
   const [isAdding, setIsAdding] = useState(restoredDraft?.isAdding ?? false);
   const [editingIndex, setEditingIndex] = useState<number | null>(restoredDraft?.editingIndex ?? null);
   const [isSaving, setIsSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [attributeBlocks, setAttributeBlocks] = useState<BlockData[]>(restoredDraft?.attributeBlocks ?? []);
   const [serviceFields, setServiceFields] = useState<ServiceFieldsData>(restoredDraft?.serviceFields ?? INITIAL_SERVICE_FIELDS);
   const [availabilitySchedule, setAvailabilitySchedule] = useState<DayScheduleData[]>(restoredDraft?.availabilitySchedule ?? INITIAL_AVAILABILITY_SCHEDULE);
@@ -173,22 +174,21 @@ export function DraftProductManager({
   }), [newProduct]);
 
   const handleAddProduct = async () => {
-    if (!newProduct.name.trim()) {
-      toast.error('Product name is required');
+    const errors: Record<string, string> = {};
+    if (!newProduct.name.trim()) errors.name = 'Product name is required';
+    if (requiresPrice && newProduct.price <= 0) errors.price = 'Price must be greater than 0';
+    if (newProduct.mrp && newProduct.mrp > 0 && newProduct.price > newProduct.mrp) errors.price = 'Price cannot exceed MRP';
+    if (!newProduct.image_url.trim()) errors.image_url = 'Product image is required';
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const count = Object.keys(errors).length;
+      toast.error(`Please fix ${count} field${count > 1 ? 's' : ''} highlighted below`, { id: 'product-validation' });
+      const firstKey = Object.keys(errors)[0];
+      document.getElementById(`prod-${firstKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    if (requiresPrice && newProduct.price <= 0) {
-      toast.error('Price must be greater than 0');
-      return;
-    }
-    if (newProduct.mrp && newProduct.mrp > 0 && newProduct.price > newProduct.mrp) {
-      toast.error('Price cannot be higher than MRP');
-      return;
-    }
-    if (!newProduct.image_url.trim()) {
-      toast.error('Product image is required. Please upload or generate an image.');
-      return;
-    }
+    setFieldErrors({});
 
     setIsSaving(true);
     const isEditing = editingIndex !== null;
@@ -378,6 +378,7 @@ export function DraftProductManager({
       action_type: 'add_to_cart',
     });
     setIsAdding(false);
+    setFieldErrors({});
     setEditingIndex(null);
     setAttributeBlocks([]);
     setServiceFields(INITIAL_SERVICE_FIELDS);
@@ -491,8 +492,13 @@ export function DraftProductManager({
                   id="prod-name"
                   placeholder={activeConfig?.formHints.namePlaceholder || "e.g., Product Name"}
                   value={newProduct.name}
-                  onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                  onChange={(e) => {
+                    setNewProduct({ ...newProduct, name: e.target.value });
+                    if (fieldErrors.name) setFieldErrors(prev => { const { name, ...rest } = prev; return rest; });
+                  }}
+                  className={fieldErrors.name ? 'border-destructive' : ''}
                 />
+                {fieldErrors.name && <p className="text-xs text-destructive">{fieldErrors.name}</p>}
               </div>
 
               {/* Price + MRP Row */}
@@ -507,8 +513,13 @@ export function DraftProductManager({
                     min={0}
                     placeholder={requiresPrice ? '150' : '0 = On request'}
                     value={newProduct.price || ''}
-                    onChange={(e) => setNewProduct({ ...newProduct, price: Number(e.target.value) })}
+                    onChange={(e) => {
+                      setNewProduct({ ...newProduct, price: Number(e.target.value) });
+                      if (fieldErrors.price) setFieldErrors(prev => { const { price, ...rest } = prev; return rest; });
+                    }}
+                    className={fieldErrors.price ? 'border-destructive' : ''}
                   />
+                  {fieldErrors.price && <p className="text-xs text-destructive">{fieldErrors.price}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="prod-mrp" className="text-xs">MRP ({currencySymbol}) <span className="text-muted-foreground">(optional)</span></Label>
@@ -564,21 +575,27 @@ export function DraftProductManager({
               </div>
 
               {/* Product Image */}
-              <div className="space-y-2">
+              <div className="space-y-2" id="prod-image_url">
                 <Label className="text-xs">Product Image <span className="text-destructive">*</span></Label>
                 {user ? (
-                  <ProductImageUpload
-                    value={newProduct.image_url || null}
-                    onChange={(url) => setNewProduct({ ...newProduct, image_url: url || '' })}
-                    userId={user.id}
-                    productName={newProduct.name}
-                    categoryName={newProduct.category}
-                    description={newProduct.description}
-                    beforePick={beforePick}
-                  />
+                  <div className={fieldErrors.image_url ? 'rounded-md ring-2 ring-destructive' : ''}>
+                    <ProductImageUpload
+                      value={newProduct.image_url || null}
+                      onChange={(url) => {
+                        setNewProduct({ ...newProduct, image_url: url || '' });
+                        if (fieldErrors.image_url) setFieldErrors(prev => { const { image_url, ...rest } = prev; return rest; });
+                      }}
+                      userId={user.id}
+                      productName={newProduct.name}
+                      categoryName={newProduct.category}
+                      description={newProduct.description}
+                      beforePick={beforePick}
+                    />
+                  </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">Sign in to upload images</p>
                 )}
+                {fieldErrors.image_url && <p className="text-xs text-destructive">{fieldErrors.image_url}</p>}
               </div>
 
               {showVegToggle && (

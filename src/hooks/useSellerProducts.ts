@@ -68,6 +68,7 @@ export function useSellerProducts() {
   const [serviceFields, setServiceFields] = useState<ServiceFieldsData>(INITIAL_SERVICE_FIELDS);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const activeCategoryConfig = useMemo(() => {
     if (!formData.category) return null;
@@ -156,7 +157,7 @@ export function useSellerProducts() {
   const resetForm = () => {
     const defaultCategory = allowedCategories.length === 1 ? allowedCategories[0].category as ProductCategory : '';
     setFormData({ ...INITIAL_FORM, category: defaultCategory });
-    setEditingProduct(null); setAttributeBlocks([]); setServiceFields(INITIAL_SERVICE_FIELDS);
+    setEditingProduct(null); setAttributeBlocks([]); setServiceFields(INITIAL_SERVICE_FIELDS); setFieldErrors({});
     clearDraftFn();
   };
 
@@ -195,20 +196,33 @@ export function useSellerProducts() {
 
   const handleSave = async () => {
     if (!sellerProfile || !user) return;
-    if (!formData.name.trim() || !formData.category) { toast.error('Please fill in all required fields', { id: 'product-validation' }); return; }
     const price = parseFloat(formData.price);
     const actionNeedsPrice = !['contact_seller', 'request_quote', 'make_offer'].includes(formData.action_type);
-    if (actionNeedsPrice && (isNaN(price) || price <= 0)) { toast.error('Please enter a valid price', { id: 'product-validation' }); return; }
+
+    // Collect all errors at once
+    const errors: Record<string, string> = {};
+    if (!formData.name.trim()) errors.name = 'Product name is required';
+    if (!formData.category) errors.category = 'Category is required';
+    if (actionNeedsPrice && (isNaN(price) || price <= 0)) errors.price = 'Please enter a valid price';
     if (formData.action_type === 'contact_seller' && !formData.contact_phone.trim()) {
-      // Auto-fill from seller profile if available, otherwise show error
       const fallbackPhone = user?.phone || '';
       if (fallbackPhone) {
         formData.contact_phone = fallbackPhone;
       } else {
-        toast.error('Phone number is required for Contact Seller action', { id: 'product-validation' }); return;
+        errors.contact_phone = 'Phone number is required for Contact Seller action';
       }
     }
-    if (formData.contact_phone.trim() && !/^[\d+\-\s()]{7,15}$/.test(formData.contact_phone.trim())) { toast.error('Please enter a valid phone number', { id: 'product-validation' }); return; }
+    if (formData.contact_phone.trim() && !/^[\d+\-\s()]{7,15}$/.test(formData.contact_phone.trim())) errors.contact_phone = 'Please enter a valid phone number';
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const count = Object.keys(errors).length;
+      toast.error(`Please fix ${count} field${count > 1 ? 's' : ''} highlighted below`, { id: 'product-validation' });
+      const firstKey = Object.keys(errors)[0];
+      document.getElementById(`edit-prod-${firstKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    setFieldErrors({});
 
     setIsSaving(true);
     try {
@@ -311,7 +325,7 @@ export function useSellerProducts() {
     configs, sellerProfiles, resetForm, openEditDialog, handleSave, confirmDelete,
     toggleAvailability, fetchData, serviceFields, setServiceFields, isCurrentCategoryService,
     currentCategorySupportsAddons, currentCategorySupportsRecurring, currentCategorySupportsStaffAssignment,
-    draftRestored, clearDraftFn,
+    draftRestored, clearDraftFn, fieldErrors, setFieldErrors,
   };
 }
 
