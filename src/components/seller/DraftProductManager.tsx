@@ -58,6 +58,7 @@ export function DraftProductManager({
   beforePick,
 }: DraftProductManagerProps) {
   const { user } = useAuth();
+  const { data: blockLibrary = [] } = useBlockLibrary();
   const DRAFT_KEY = `draft-product-form-${sellerId}`;
 
   // Restore persisted draft from localStorage on mount
