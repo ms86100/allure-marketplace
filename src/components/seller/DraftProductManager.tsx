@@ -378,6 +378,7 @@ export function DraftProductManager({
       action_type: 'add_to_cart',
     });
     setIsAdding(false);
+    setFieldErrors({});
     setEditingIndex(null);
     setAttributeBlocks([]);
     setServiceFields(INITIAL_SERVICE_FIELDS);
