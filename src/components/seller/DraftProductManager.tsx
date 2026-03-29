@@ -324,11 +324,12 @@ export function DraftProductManager({
           .eq('id', product.id)
           .single();
         const specs = data?.specifications as any;
-        if (specs?.blocks && Array.isArray(specs.blocks)) {
-          setAttributeBlocks(specs.blocks);
-        } else {
-          setAttributeBlocks([]);
+        let blocks: BlockData[] = specs?.blocks && Array.isArray(specs.blocks) ? specs.blocks : [];
+        if (blocks.length === 0 && product.category) {
+          const defaultBlocks = filterByCategory(blockLibrary, product.category);
+          blocks = defaultBlocks.map(b => ({ type: b.block_type, data: {} }));
         }
+        setAttributeBlocks(blocks);
       } catch {
         setAttributeBlocks([]);
       }

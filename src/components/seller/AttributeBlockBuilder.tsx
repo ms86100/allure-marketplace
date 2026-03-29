@@ -41,6 +41,10 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  useEffect(() => {
+    if (value.length > 0 && !isOpen) setIsOpen(true);
+  }, [value.length]);
+
   const activeBlocks = value;
   const activeTypes = new Set(activeBlocks.map(b => b.type));
   const availableBlocks = filterByCategory(library, category)
