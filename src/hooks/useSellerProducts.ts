@@ -5,7 +5,7 @@ import { Product, ProductCategory, SellerProfile, ProductActionType } from '@/ty
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { ParentGroup } from '@/types/categories';
 import { useSubcategories } from '@/hooks/useSubcategories';
-import { type BlockData } from '@/hooks/useAttributeBlocks';
+import { useBlockLibrary, filterByCategory, type BlockData } from '@/hooks/useAttributeBlocks';
 import { INITIAL_SERVICE_FIELDS, type ServiceFieldsData } from '@/components/seller/ServiceFieldsSection';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
@@ -52,6 +52,7 @@ interface SellerProductDraft {
 export function useSellerProducts() {
   const { user, sellerProfiles, currentSellerId } = useAuth();
   const { groupedConfigs, configs } = useCategoryConfigs();
+  const { data: blockLibrary = [] } = useBlockLibrary();
 
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [primaryGroup, setPrimaryGroup] = useState<ParentGroup | null>(null);
@@ -173,7 +174,12 @@ export function useSellerProducts() {
       accepts_preorders: (product as any).accepts_preorders || false,
     });
     const specs = (product as any).specifications;
-    setAttributeBlocks(specs?.blocks && Array.isArray(specs.blocks) ? specs.blocks as BlockData[] : []);
+    let blocks: BlockData[] = specs?.blocks && Array.isArray(specs.blocks) ? specs.blocks as BlockData[] : [];
+    if (blocks.length === 0 && product.category) {
+      const defaultBlocks = filterByCategory(blockLibrary, product.category);
+      blocks = defaultBlocks.map(b => ({ type: b.block_type, data: {} }));
+    }
+    setAttributeBlocks(blocks);
 
     const { data: sl } = await supabase.from('service_listings').select('*').eq('product_id', product.id).maybeSingle();
     if (sl) {
