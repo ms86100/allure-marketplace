@@ -1,95 +1,61 @@
 
 
-# Fix Service Availability: Flow, State Machine & UI Alignment
+# Fix: Product Default Availability & Phone Validation on Edit
 
-## Files to Change
+## Problems
+
+**Problem 1 — `is_available` defaults to `false` on edit**: When opening a product for editing via `openEditDialog` (line 167), it reads `product.is_available` from DB. New products are created with `is_available: true` in the form (line 38), but the DB column likely defaults to `false`. The `productData` sent on save (line 209) uses `formData.is_available`, which is correct. The real issue is that the `is_available` toggle in the edit dialog may not be visible or prominent, so the user doesn't realize it's off.
+
+**However**, looking at `INITIAL_FORM` (line 38): `is_available: true` — new products ARE created with availability on. If it's showing as unavailable after creation, the DB column `is_available` has a default of `false` overriding the insert value, OR the insert payload isn't including it.
+
+Looking at line 209: `is_available: formData.is_available` — it IS included. So this should work. Let me check if there's a DB trigger resetting it.
+
+**Problem 2 — Phone number error on edit**: Line 196 validates `contact_phone` is required when `action_type === 'contact_seller'`. When editing a product, line 169 loads `action_type: (product as any).action_type || 'add_to_cart'`. If the product in DB has `action_type = 'contact_seller'` (possibly set by a category default) but no `contact_phone`, the validation blocks the save.
+
+## Root Cause Analysis
+
+The phone validation (line 196) fires for ANY save when `action_type === 'contact_seller'`, even if the user is just toggling availability. The `action_type` might be set to `contact_seller` by category config defaults without the user realizing it.
+
+## Plan
+
+### 1. Verify DB default for `is_available` column on `products` table
+- Check if the column defaults to `true` or `false`
+- If `false`, create a migration to change default to `true`
+
+### 2. Fix phone validation to not block non-contact edits
+In `src/hooks/useSellerProducts.ts` line 196:
+- Only enforce `contact_phone` requirement when `action_type` is explicitly `contact_seller`
+- When editing and only toggling `is_available`, skip the phone check if `action_type` hasn't changed and was already saved without a phone (grandfathered data)
+
+**Simpler fix**: The validation is correct for `contact_seller` action type. The real fix is to ensure `action_type` defaults properly. Check what category configs set `action_type` to and ensure the form UI clearly shows the action type selector so users can change it from `contact_seller` to `add_to_cart` if they don't want to provide a phone.
+
+### 3. Files to change
 
 | File | Change |
 |------|--------|
-| `src/components/seller/ServiceAvailabilityManager.tsx` | Full rewrite of state management, flow logic, and layout |
-| `src/pages/BecomeSellerPage.tsx` | Wire `onComplete` callback |
+| `src/hooks/useSellerProducts.ts` | Relax phone validation: only require phone when user explicitly chose `contact_seller`, not when it was auto-inherited. Also ensure `is_available: true` is sent for new products. |
+| Migration (if needed) | Set `ALTER TABLE products ALTER COLUMN is_available SET DEFAULT true` if currently false |
 
-## 1. State Machine & Props
+### Specific code changes in `useSellerProducts.ts`:
 
-Replace `isSaving: boolean` with `saveState: 'idle' | 'saving' | 'saved' | 'error'`. Add `useRef(true)` for mounted guard. Add `errorMessage` state.
-
-New props:
+**Line 196** — Change validation to only block when action_type is contact_seller AND this is a new product or user changed the action_type:
 ```typescript
-interface ServiceAvailabilityManagerProps {
-  sellerId: string;
-  onComplete?: () => void;
+// Only require phone for contact_seller action
+if (formData.action_type === 'contact_seller' && !formData.contact_phone.trim()) {
+  toast.error('Phone number is required for Contact Seller action', { id: 'product-validation' });
+  return;
 }
 ```
+This validation is actually correct as-is. The fix should be upstream: ensure the `action_type` loaded on edit reflects what's in DB, and if the category forces `contact_seller`, pre-populate the phone from the seller's profile.
 
-Reset `saveState` to `idle` whenever user edits schedule (in `updateDay`).
+**Better fix — Auto-populate `contact_phone` from seller profile**:
+In `openEditDialog` and in `resetForm`, if `action_type` is or will be `contact_seller`, auto-fill `contact_phone` from `sellerProfile.phone` or the user's profile phone. This prevents the dead-end where the field is empty but required.
 
-## 2. Flow Logic Fix (handleSaveAndGenerate)
+### Final approach (2 changes):
 
-**Idempotency guard**: Early return if `saveState === 'saving'`.
+1. **`useSellerProducts.ts` — `openEditDialog`** (line 170): If `contact_phone` is empty and `action_type` is `contact_seller`, auto-fill from seller profile or user profile phone number.
 
-**After saving schedule rows**, query products with `approval_status`:
-```typescript
-const { data: products } = await supabase
-  .from('products')
-  .select('id, approval_status')
-  .eq('seller_id', sellerId);
+2. **`useSellerProducts.ts` — `resetForm`** (line 155-159): Same auto-fill logic for new products when category defaults to `contact_seller`.
 
-const hasServices = products && products.length > 0;
-const approvedProducts = products?.filter(p => p.approval_status === 'approved') || [];
-const pendingProducts = products?.filter(p => p.approval_status === 'pending') || [];
-```
-
-**Conditional slot generation**: Only generate slots for approved products' service_listings. Skip generation entirely if no approved products exist.
-
-**Slot count reliability**: Track `actualInserted` from upsert `.select('id')` responses. Show count only when > 0, otherwise show generic "Slots generated successfully".
-
-**Inline feedback state** (not toast-only):
-- No services: `saveState = 'saved'`, message = "Schedule saved — add your first service to start generating slots"
-- Pending only: `saveState = 'saved'`, message = "Schedule saved — slots will generate once services are approved"
-- Approved + slots created: `saveState = 'saved'`, message = "Schedule saved — X slots generated"
-- Error: `saveState = 'error'`, message = error text
-
-**Mounted guard**: Check `isMounted.current` before any `setState` calls after async operations.
-
-**onComplete**: Fire on success via `requestAnimationFrame(() => onComplete?.())`.
-
-## 3. UI Layout Fix
-
-Replace flex layout with CSS grid for each day row:
-```
-grid grid-cols-[36px_40px_1fr] items-center gap-x-3
-```
-
-- Col 1: Switch (36px)
-- Col 2: Day label (40px fixed)
-- Col 3: Time inputs or "Closed" text
-- Time inputs: `min-w-[90px] max-w-[120px] flex-1` for mobile safety
-- Inactive days: show "Closed" in muted text in col 3 for alignment
-- Consistent `px-3 py-2.5` padding per row
-
-## 4. Inline Feedback Banner
-
-Below the save button, render based on `saveState`:
-- `saving`: nothing extra (button shows spinner)
-- `saved`: green banner with CheckCircle2 + contextual message, auto-dismiss after 5s
-- `error`: red banner with error message + "Retry" button that calls `handleSaveAndGenerate`
-
-## 5. BecomeSellerPage Wiring
-
-Line 404: Pass `onComplete` that scrolls to the "Continue to Add Products" button:
-```tsx
-<ServiceAvailabilityManager
-  sellerId={draftSellerId}
-  onComplete={() => {
-    requestAnimationFrame(() => {
-      document.querySelector('[data-continue-products]')
-        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
-  }}
-/>
-```
-
-Add `data-continue-products` attribute to the "Continue to Add Products" button on line 407.
-
-## No DB Changes Required
+3. **DB migration** (if needed): `ALTER TABLE products ALTER COLUMN is_available SET DEFAULT true;`
 
