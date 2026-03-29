@@ -173,22 +173,21 @@ export function DraftProductManager({
   }), [newProduct]);
 
   const handleAddProduct = async () => {
-    if (!newProduct.name.trim()) {
-      toast.error('Product name is required');
+    const errors: Record<string, string> = {};
+    if (!newProduct.name.trim()) errors.name = 'Product name is required';
+    if (requiresPrice && newProduct.price <= 0) errors.price = 'Price must be greater than 0';
+    if (newProduct.mrp && newProduct.mrp > 0 && newProduct.price > newProduct.mrp) errors.price = 'Price cannot exceed MRP';
+    if (!newProduct.image_url.trim()) errors.image_url = 'Product image is required';
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const count = Object.keys(errors).length;
+      toast.error(`Please fix ${count} field${count > 1 ? 's' : ''} highlighted below`, { id: 'product-validation' });
+      const firstKey = Object.keys(errors)[0];
+      document.getElementById(`prod-${firstKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    if (requiresPrice && newProduct.price <= 0) {
-      toast.error('Price must be greater than 0');
-      return;
-    }
-    if (newProduct.mrp && newProduct.mrp > 0 && newProduct.price > newProduct.mrp) {
-      toast.error('Price cannot be higher than MRP');
-      return;
-    }
-    if (!newProduct.image_url.trim()) {
-      toast.error('Product image is required. Please upload or generate an image.');
-      return;
-    }
+    setFieldErrors({});
 
     setIsSaving(true);
     const isEditing = editingIndex !== null;
