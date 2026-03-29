@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { friendlyError } from '@/lib/utils';
 import { AttributeBlockBuilder } from '@/components/seller/AttributeBlockBuilder';
-import { type BlockData } from '@/hooks/useAttributeBlocks';
+import { useBlockLibrary, filterByCategory, type BlockData } from '@/hooks/useAttributeBlocks';
 import { useCurrency } from '@/hooks/useCurrency';
 import { ServiceFieldsSection, INITIAL_SERVICE_FIELDS, type ServiceFieldsData } from '@/components/seller/ServiceFieldsSection';
 import { InlineAvailabilitySchedule, INITIAL_AVAILABILITY_SCHEDULE, type DayScheduleData } from '@/components/seller/InlineAvailabilitySchedule';
