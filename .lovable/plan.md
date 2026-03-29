@@ -1,61 +1,59 @@
 
 
-# Fix: Product Default Availability & Phone Validation on Edit
+# Auto-Populate Category Attribute Blocks on Product Edit
 
-## Problems
+## Problem
+When editing a product, the "Extra Details" section shows empty because the product's `specifications` field is null. During onboarding, users manually add blocks via the drawer. The expectation is that category-relevant attribute blocks should appear automatically when editing, matching the creation experience.
 
-**Problem 1 — `is_available` defaults to `false` on edit**: When opening a product for editing via `openEditDialog` (line 167), it reads `product.is_available` from DB. New products are created with `is_available: true` in the form (line 38), but the DB column likely defaults to `false`. The `productData` sent on save (line 209) uses `formData.is_available`, which is correct. The real issue is that the `is_available` toggle in the edit dialog may not be visible or prominent, so the user doesn't realize it's off.
+Most products in DB have `specifications: null` — they were created without filling attribute blocks. When the edit dialog opens, it loads `null` → sets `attributeBlocks = []` → Extra Details shows empty.
 
-**However**, looking at `INITIAL_FORM` (line 38): `is_available: true` — new products ARE created with availability on. If it's showing as unavailable after creation, the DB column `is_available` has a default of `false` overriding the insert value, OR the insert payload isn't including it.
+## Fix
 
-Looking at line 209: `is_available: formData.is_available` — it IS included. So this should work. Let me check if there's a DB trigger resetting it.
+### 1. Auto-populate default blocks in `useSellerProducts.ts` → `openEditDialog`
 
-**Problem 2 — Phone number error on edit**: Line 196 validates `contact_phone` is required when `action_type === 'contact_seller'`. When editing a product, line 169 loads `action_type: (product as any).action_type || 'add_to_cart'`. If the product in DB has `action_type = 'contact_seller'` (possibly set by a category default) but no `contact_phone`, the validation blocks the save.
+After loading specifications on line 175-176, if no blocks exist, auto-populate from the attribute block library filtered by category:
 
-## Root Cause Analysis
+```typescript
+// Line 175-176 area
+const specs = (product as any).specifications;
+let blocks: BlockData[] = specs?.blocks && Array.isArray(specs.blocks) ? specs.blocks : [];
 
-The phone validation (line 196) fires for ANY save when `action_type === 'contact_seller'`, even if the user is just toggling availability. The `action_type` might be set to `contact_seller` by category config defaults without the user realizing it.
+// If no saved blocks, auto-populate defaults for this category
+if (blocks.length === 0 && product.category) {
+  // Get library blocks for this category (from cached query)
+  const defaultBlocks = filterByCategory(library, product.category);
+  blocks = defaultBlocks.map(b => ({ type: b.block_type, data: {} }));
+}
+setAttributeBlocks(blocks);
+```
 
-## Plan
+This requires access to the block library data inside the hook. Two options:
+- **Option A**: Import `useBlockLibrary` into `useSellerProducts` and use its cached data
+- **Option B**: Pass library data as a parameter (less clean)
 
-### 1. Verify DB default for `is_available` column on `products` table
-- Check if the column defaults to `true` or `false`
-- If `false`, create a migration to change default to `true`
+Going with Option A — add `useBlockLibrary()` call in `useSellerProducts.ts`.
 
-### 2. Fix phone validation to not block non-contact edits
-In `src/hooks/useSellerProducts.ts` line 196:
-- Only enforce `contact_phone` requirement when `action_type` is explicitly `contact_seller`
-- When editing and only toggling `is_available`, skip the phone check if `action_type` hasn't changed and was already saved without a phone (grandfathered data)
+### 2. Same auto-populate in `DraftProductManager.tsx` → `handleEditProduct`
 
-**Simpler fix**: The validation is correct for `contact_seller` action type. The real fix is to ensure `action_type` defaults properly. Check what category configs set `action_type` to and ensure the form UI clearly shows the action type selector so users can change it from `contact_seller` to `add_to_cart` if they don't want to provide a phone.
+Apply identical logic at line 326-331 so onboarding edit is consistent too.
 
-### 3. Files to change
+### 3. Auto-expand the Extra Details collapsible when blocks exist
+
+In `AttributeBlockBuilder.tsx`, add an effect to auto-open when blocks are pre-populated:
+
+```typescript
+useEffect(() => {
+  if (value.length > 0 && !isOpen) setIsOpen(true);
+}, [value.length]);
+```
+
+## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/hooks/useSellerProducts.ts` | Relax phone validation: only require phone when user explicitly chose `contact_seller`, not when it was auto-inherited. Also ensure `is_available: true` is sent for new products. |
-| Migration (if needed) | Set `ALTER TABLE products ALTER COLUMN is_available SET DEFAULT true` if currently false |
+| `src/hooks/useSellerProducts.ts` | Import `useBlockLibrary` + `filterByCategory`, auto-populate blocks in `openEditDialog` when specifications is empty |
+| `src/components/seller/DraftProductManager.tsx` | Same auto-populate logic in `handleEditProduct` |
+| `src/components/seller/AttributeBlockBuilder.tsx` | Auto-expand collapsible when blocks are pre-populated |
 
-### Specific code changes in `useSellerProducts.ts`:
-
-**Line 196** — Change validation to only block when action_type is contact_seller AND this is a new product or user changed the action_type:
-```typescript
-// Only require phone for contact_seller action
-if (formData.action_type === 'contact_seller' && !formData.contact_phone.trim()) {
-  toast.error('Phone number is required for Contact Seller action', { id: 'product-validation' });
-  return;
-}
-```
-This validation is actually correct as-is. The fix should be upstream: ensure the `action_type` loaded on edit reflects what's in DB, and if the category forces `contact_seller`, pre-populate the phone from the seller's profile.
-
-**Better fix — Auto-populate `contact_phone` from seller profile**:
-In `openEditDialog` and in `resetForm`, if `action_type` is or will be `contact_seller`, auto-fill `contact_phone` from `sellerProfile.phone` or the user's profile phone. This prevents the dead-end where the field is empty but required.
-
-### Final approach (2 changes):
-
-1. **`useSellerProducts.ts` — `openEditDialog`** (line 170): If `contact_phone` is empty and `action_type` is `contact_seller`, auto-fill from seller profile or user profile phone number.
-
-2. **`useSellerProducts.ts` — `resetForm`** (line 155-159): Same auto-fill logic for new products when category defaults to `contact_seller`.
-
-3. **DB migration** (if needed): `ALTER TABLE products ALTER COLUMN is_available SET DEFAULT true;`
+## No DB changes needed
 
