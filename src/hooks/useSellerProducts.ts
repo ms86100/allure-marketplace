@@ -167,7 +167,7 @@ export function useSellerProducts() {
       category: product.category, is_veg: product.is_veg, is_available: product.is_available,
       is_bestseller: product.is_bestseller, is_recommended: product.is_recommended, is_urgent: product.is_urgent || false,
       image_url: product.image_url, action_type: (product as any).action_type || 'add_to_cart',
-      contact_phone: (product as any).contact_phone || '', stock_quantity: (product as any).stock_quantity?.toString() || '',
+      contact_phone: (product as any).contact_phone || sellerProfile?.contact_phone || user?.phone || '', stock_quantity: (product as any).stock_quantity?.toString() || '',
       low_stock_threshold: (product as any).low_stock_threshold?.toString() || '5',
       subcategory_id: (product as any).subcategory_id || '', lead_time_hours: (product as any).lead_time_hours?.toString() || '',
       accepts_preorders: (product as any).accepts_preorders || false,
@@ -193,7 +193,15 @@ export function useSellerProducts() {
     const price = parseFloat(formData.price);
     const actionNeedsPrice = !['contact_seller', 'request_quote', 'make_offer'].includes(formData.action_type);
     if (actionNeedsPrice && (isNaN(price) || price <= 0)) { toast.error('Please enter a valid price', { id: 'product-validation' }); return; }
-    if (formData.action_type === 'contact_seller' && !formData.contact_phone.trim()) { toast.error('Phone number is required for Contact Seller action', { id: 'product-validation' }); return; }
+    if (formData.action_type === 'contact_seller' && !formData.contact_phone.trim()) {
+      // Auto-fill from seller profile if available, otherwise show error
+      const fallbackPhone = sellerProfile?.contact_phone || user?.phone || '';
+      if (fallbackPhone) {
+        formData.contact_phone = fallbackPhone;
+      } else {
+        toast.error('Phone number is required for Contact Seller action', { id: 'product-validation' }); return;
+      }
+    }
     if (formData.contact_phone.trim() && !/^[\d+\-\s()]{7,15}$/.test(formData.contact_phone.trim())) { toast.error('Please enter a valid phone number', { id: 'product-validation' }); return; }
 
     setIsSaving(true);
