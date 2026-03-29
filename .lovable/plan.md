@@ -1,59 +1,71 @@
 
 
-# Auto-Populate Category Attribute Blocks on Product Edit
+# Fix: Field-Level Validation with Visual Indicators for Product Creation
 
 ## Problem
-When editing a product, the "Extra Details" section shows empty because the product's `specifications` field is null. During onboarding, users manually add blocks via the drawer. The expectation is that category-relevant attribute blocks should appear automatically when editing, matching the creation experience.
+The `handleAddProduct` function validates sequentially with generic toast errors. When the image field (or other fields) is missing, the user sees "Product image is required" as a toast but the form doesn't highlight which field failed. The user scrolls up/down confused.
 
-Most products in DB have `specifications: null` — they were created without filling attribute blocks. When the edit dialog opens, it loads `null` → sets `attributeBlocks = []` → Extra Details shows empty.
+## Root Cause
+- Validation uses sequential `if/return` with `toast.error()` — no field-level error state
+- No visual red border or inline error message on invalid fields
+- No auto-scroll to the first invalid field
 
-## Fix
+## Fix — 2 files
 
-### 1. Auto-populate default blocks in `useSellerProducts.ts` → `openEditDialog`
+### 1. `src/components/seller/DraftProductManager.tsx`
 
-After loading specifications on line 175-176, if no blocks exist, auto-populate from the attribute block library filtered by category:
-
+**Add validation error state:**
 ```typescript
-// Line 175-176 area
-const specs = (product as any).specifications;
-let blocks: BlockData[] = specs?.blocks && Array.isArray(specs.blocks) ? specs.blocks : [];
+const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+```
 
-// If no saved blocks, auto-populate defaults for this category
-if (blocks.length === 0 && product.category) {
-  // Get library blocks for this category (from cached query)
-  const defaultBlocks = filterByCategory(library, product.category);
-  blocks = defaultBlocks.map(b => ({ type: b.block_type, data: {} }));
+**Replace sequential validation in `handleAddProduct`** with a single pass that collects ALL errors:
+```typescript
+const errors: Record<string, string> = {};
+if (!newProduct.name.trim()) errors.name = 'Product name is required';
+if (requiresPrice && newProduct.price <= 0) errors.price = 'Price must be greater than 0';
+if (newProduct.mrp && newProduct.mrp > 0 && newProduct.price > newProduct.mrp) errors.price = 'Price cannot exceed MRP';
+if (!newProduct.image_url.trim()) errors.image_url = 'Product image is required';
+
+if (Object.keys(errors).length > 0) {
+  setFieldErrors(errors);
+  toast.error(`Please fix ${Object.keys(errors).length} field(s) highlighted below`);
+  // Scroll to first error
+  const firstErrorId = `prod-${Object.keys(errors)[0]}`;
+  document.getElementById(firstErrorId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  return;
 }
-setAttributeBlocks(blocks);
+setFieldErrors({});
 ```
 
-This requires access to the block library data inside the hook. Two options:
-- **Option A**: Import `useBlockLibrary` into `useSellerProducts` and use its cached data
-- **Option B**: Pass library data as a parameter (less clean)
+**Add inline error display under each field** — a small `<p className="text-xs text-destructive">` below each input when `fieldErrors[fieldKey]` exists.
 
-Going with Option A — add `useBlockLibrary()` call in `useSellerProducts.ts`.
+**Add red border on invalid inputs** — conditionally apply `border-destructive` class to inputs with errors.
 
-### 2. Same auto-populate in `DraftProductManager.tsx` → `handleEditProduct`
-
-Apply identical logic at line 326-331 so onboarding edit is consistent too.
-
-### 3. Auto-expand the Extra Details collapsible when blocks exist
-
-In `AttributeBlockBuilder.tsx`, add an effect to auto-open when blocks are pre-populated:
-
+**Clear field error on change** — when user types in a field, remove that field's error:
 ```typescript
-useEffect(() => {
-  if (value.length > 0 && !isOpen) setIsOpen(true);
-}, [value.length]);
+onChange={(e) => {
+  setNewProduct({ ...newProduct, name: e.target.value });
+  if (fieldErrors.name) setFieldErrors(prev => { const { name, ...rest } = prev; return rest; });
+}}
 ```
 
-## Files Changed
+### 2. `src/hooks/useSellerProducts.ts` — Same pattern for edit dialog
 
-| File | Change |
-|------|--------|
-| `src/hooks/useSellerProducts.ts` | Import `useBlockLibrary` + `filterByCategory`, auto-populate blocks in `openEditDialog` when specifications is empty |
-| `src/components/seller/DraftProductManager.tsx` | Same auto-populate logic in `handleEditProduct` |
-| `src/components/seller/AttributeBlockBuilder.tsx` | Auto-expand collapsible when blocks are pre-populated |
+Apply identical field-level error state and inline messages to `handleSave` validation. Collect all errors first, then display with field highlighting.
 
-## No DB changes needed
+## Fields to validate with visual indicators:
+| Field | ID | Condition |
+|---|---|---|
+| Name | `prod-name` | empty |
+| Price | `prod-price` | ≤0 when required, or > MRP |
+| Image | `prod-image` | empty URL |
+| Phone | `prod-phone` | empty when action_type = contact_seller |
+
+## UX Behavior:
+- On submit: highlight ALL invalid fields at once (not one at a time)
+- Show count in toast: "Please fix 2 field(s) highlighted below"
+- Auto-scroll to first error field
+- Clear individual field error when user edits that field
+- Red border + inline error text below field
 
