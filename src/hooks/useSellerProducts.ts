@@ -157,7 +157,7 @@ export function useSellerProducts() {
   const resetForm = () => {
     const defaultCategory = allowedCategories.length === 1 ? allowedCategories[0].category as ProductCategory : '';
     setFormData({ ...INITIAL_FORM, category: defaultCategory });
-    setEditingProduct(null); setAttributeBlocks([]); setServiceFields(INITIAL_SERVICE_FIELDS);
+    setEditingProduct(null); setAttributeBlocks([]); setServiceFields(INITIAL_SERVICE_FIELDS); setFieldErrors({});
     clearDraftFn();
   };
 
