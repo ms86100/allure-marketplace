@@ -35,6 +35,10 @@ interface DraftProduct {
   stock_quantity?: number | null;
   low_stock_threshold?: number | null;
   action_type?: string;
+  subcategory_id?: string | null;
+  lead_time_hours?: number | null;
+  accepts_preorders?: boolean;
+  approval_status?: string;
 }
 
 interface DraftProductManagerProps {
@@ -197,6 +201,14 @@ export function DraftProductManager({
     const existingId = isEditing ? products[editingIndex]?.id : undefined;
 
     try {
+      const resolvedApprovalStatus = (() => {
+        if (!isEditing || !existingId) return 'draft';
+        const existing = products[editingIndex!];
+        const currentStatus = (existing as any).approval_status || 'draft';
+        if (['approved', 'rejected'].includes(currentStatus)) return 'pending';
+        return currentStatus;
+      })();
+
       const productPayload = {
         seller_id: sellerId,
         name: newProduct.name.trim(),
@@ -207,12 +219,16 @@ export function DraftProductManager({
         is_veg: newProduct.is_veg,
         image_url: newProduct.image_url.trim() || null,
         is_available: true,
-        approval_status: 'draft',
+        approval_status: resolvedApprovalStatus,
         prep_time_minutes: newProduct.prep_time_minutes || null,
         specifications: attributeBlocks.length > 0 ? { blocks: attributeBlocks } : null,
         stock_quantity: newProduct.stock_quantity && newProduct.stock_quantity > 0 ? newProduct.stock_quantity : null,
         low_stock_threshold: newProduct.low_stock_threshold && newProduct.low_stock_threshold > 0 ? newProduct.low_stock_threshold : null,
         action_type: newProduct.action_type || 'add_to_cart',
+        subcategory_id: newProduct.subcategory_id || null,
+        lead_time_hours: newProduct.lead_time_hours ? parseInt(String(newProduct.lead_time_hours)) : null,
+        accepts_preorders: newProduct.accepts_preorders || false,
+        ...(isEditing ? { rejection_note: null } : {}),
       };
 
       let savedProductId: string;
@@ -674,6 +690,69 @@ export function DraftProductManager({
                     value={newProduct.prep_time_minutes || ''}
                     onChange={(e) => setNewProduct({ ...newProduct, prep_time_minutes: e.target.value ? Number(e.target.value) : null })}
                   />
+                </div>
+              )}
+
+              {/* Stock Tracking */}
+              <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-sm font-medium">Track Stock</span>
+                  <Checkbox
+                    checked={newProduct.stock_quantity != null && newProduct.stock_quantity > 0}
+                    onCheckedChange={(checked) =>
+                      setNewProduct({
+                        ...newProduct,
+                        stock_quantity: checked ? 10 : null,
+                        low_stock_threshold: checked ? 3 : null,
+                      })
+                    }
+                  />
+                </label>
+                {newProduct.stock_quantity != null && newProduct.stock_quantity > 0 && (
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Current Stock</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={newProduct.stock_quantity || ''}
+                        onChange={(e) => setNewProduct({ ...newProduct, stock_quantity: e.target.value ? Number(e.target.value) : null })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Low Stock Alert</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={newProduct.low_stock_threshold || ''}
+                        onChange={(e) => setNewProduct({ ...newProduct, low_stock_threshold: e.target.value ? Number(e.target.value) : null })}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Lead Time & Pre-orders */}
+              {!isService && (
+                <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Lead Time (hours)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      placeholder="e.g., 24"
+                      value={newProduct.lead_time_hours || ''}
+                      onChange={(e) => setNewProduct({ ...newProduct, lead_time_hours: e.target.value ? Number(e.target.value) : null })}
+                    />
+                    <p className="text-[11px] text-muted-foreground">Minimum advance notice for orders</p>
+                  </div>
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm font-medium">Accept Pre-orders</span>
+                    <Checkbox
+                      checked={!!newProduct.accepts_preorders}
+                      onCheckedChange={(checked) => setNewProduct({ ...newProduct, accepts_preorders: !!checked })}
+                    />
+                  </label>
                 </div>
               )}
 
