@@ -246,8 +246,6 @@ export function useOrderDetail(id: string | undefined) {
     if (!order || !user) return;
     setIsUpdating(true);
     try {
-      const previousOrder = order;
-
       if (isSellerView) {
         const { error } = await supabase.rpc('seller_advance_order', {
           _order_id: order.id,
@@ -263,11 +261,14 @@ export function useOrderDetail(id: string | undefined) {
         if (error) throw error;
       }
 
-      // Optimistic update
+      // Optimistic update — immediately reflect in UI
       queryClient.setQueryData(['order-detail', id], (old: any) =>
         old ? { ...old, order: { ...old.order, status: newStatus } } : old
       );
-      invalidateOrder();
+      // Release button BEFORE background refetch
+      setIsUpdating(false);
+      // Background refetch to reconcile with server state
+      queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus, rejection_reason: rejectionReason });
     } catch (error: any) {
@@ -288,7 +289,8 @@ export function useOrderDetail(id: string | undefined) {
         );
       }
       invalidateOrder();
-    } finally { setIsUpdating(false); }
+      setIsUpdating(false);
+    }
   };
 
   const handleReject = async (reason: string) => { await updateOrderStatus('cancelled', reason); };
