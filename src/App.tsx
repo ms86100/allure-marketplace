@@ -342,7 +342,7 @@ class SafeSellerAlert extends React.Component<
 }
 
 function AppRoutes() {
-  const { user, profile } = useAuth();
+  const { user, profile, isLoading, isSessionRestored } = useAuth();
   const deferredNavigate = useNavigate();
   useBuyerOrderAlerts();
   useLiveActivityOrchestrator();
@@ -367,14 +367,17 @@ function AppRoutes() {
     return () => clearTimeout(timer);
   }, [user, profile, deferredNavigate]);
 
+  // Gate public routes on session restoration to prevent flash of login page
+  const sessionPending = isLoading || !isSessionRestored;
+
   return (
     <Suspense fallback={<PageLoadingFallback />}>
       <Routes>
-        <Route path="/welcome" element={user && profile ? <Navigate to="/" replace /> : <WelcomeCarousel />} />
-        <Route path="/landing" element={user && profile ? <Navigate to="/" replace /> : <LandingPage />} />
-        <Route path="/auth" element={user && profile ? <Navigate to="/" replace /> : <RouteErrorBoundary sectionName="Authentication"><AuthPage /></RouteErrorBoundary>} />
+        <Route path="/welcome" element={sessionPending ? <PageLoadingFallback /> : user && profile ? <Navigate to="/" replace /> : <WelcomeCarousel />} />
+        <Route path="/landing" element={sessionPending ? <PageLoadingFallback /> : user && profile ? <Navigate to="/" replace /> : <LandingPage />} />
+        <Route path="/auth" element={sessionPending ? <PageLoadingFallback /> : user && profile ? <Navigate to="/" replace /> : <RouteErrorBoundary sectionName="Authentication"><AuthPage /></RouteErrorBoundary>} />
         <Route path="/reset-password" element={<RouteErrorBoundary sectionName="Reset Password"><ResetPasswordPage /></RouteErrorBoundary>} />
-        <Route path="/" element={user ? <ProtectedRoute><RouteErrorBoundary sectionName="Home"><HomePage /></RouteErrorBoundary></ProtectedRoute> : <Navigate to="/landing" replace />} />
+        <Route path="/" element={sessionPending ? <PageLoadingFallback /> : user ? <ProtectedRoute><RouteErrorBoundary sectionName="Home"><HomePage /></RouteErrorBoundary></ProtectedRoute> : <Navigate to="/landing" replace />} />
         <Route path="/search" element={<ProtectedRoute><RouteErrorBoundary sectionName="Search"><SearchPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/community" element={<ProtectedRoute><RouteErrorBoundary sectionName="Community"><BulletinPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/categories" element={<ProtectedRoute><RouteErrorBoundary sectionName="Categories"><CategoriesPage /></RouteErrorBoundary></ProtectedRoute>} />
