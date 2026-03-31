@@ -1,128 +1,96 @@
 
-Goal: deliver a production-hardening plan for the 3 issues with evidence from the current codebase, prioritizing the payment P0 first.
 
-1. P0: UPI return flow is still not bulletproof
-- Confirmed evidence:
-  - `src/pages/CartPage.tsx:63-83` shows the exact “Pending Payment / incomplete payment” shell when cart is empty but a payment session exists.
-  - `src/hooks/useCartPage.ts:508-529` creates online orders, saves a pending-payment session, and opens UPI.
-  - `supabase/migrations/20260331064103_eff92636-1193-40b0-94d1-2bebe2f3cd47.sql:322-323` still deletes `cart_items` immediately inside `create_multi_vendor_orders`, even for online `payment_pending` orders.
-  - `src/components/payment/UpiDeepLinkCheckout.tsx:109-123` runs a visibility-based DB recheck on app resume and can keep the sheet in `confirm` if backend state is not yet advanced.
-  - `src/components/payment/UpiDeepLinkCheckout.tsx:182-187` only advances the order when `confirm_upi_payment` succeeds.
-- Root cause:
-  - The system still mixes two incompatible models:
-    1) “cart clears only after confirmed payment” in client comments/intent
-    2) “cart clears immediately on order creation” in the live DB RPC.
-  - That makes the fallback UI highly likely after app return.
-  - Separately, the UPI flow has a resume race: returning from the UPI app only checks order state; it does not auto-reconcile or distinguish “payment completed externally but buyer has not yet confirmed” from “truly incomplete”.
-- Production fix plan:
-  - Update `create_multi_vendor_orders` so cart clearing happens only for immediate-confirmation flows, not for `payment_pending` online flows.
-  - Keep cart until UPI confirmation or verified Razorpay confirmation completes.
-  - Harden `UpiDeepLinkCheckout` resume logic:
-    - on app resume, if order is still `payment_pending/pending`, do not immediately imply failure/incomplete state;
-    - show a stronger “Confirm your payment” recovery state, not the empty-cart dead-end shell;
-    - add a backend recheck step before rendering the pending-payment shell.
-  - Tighten `handleUpiDeepLinkSuccess` / `handleUpiDeepLinkFailed` in `src/hooks/useCartPage.ts` so session cleanup, cart cleanup, and navigation are strictly tied to confirmed backend state.
-  - Add a single canonical “pending payment recovery” decision path in `useCartPage` instead of duplicating logic in mount recovery, retry, and sheet visibility handlers.
-- Safeguards:
-  - Preserve idempotency behavior already present in `useCartPage` and `create_multi_vendor_orders`.
-  - Do not change seller-visible order creation timing unless payment is actually confirmed.
-  - Keep `buyer_cancel_pending_orders` behavior intact for explicit cancellation.
-- Validation:
-  - Test matrix: UPI success + immediate return, UPI success + delayed return, UPI abandoned, UPI confirm with screenshot, app killed during payment, multi-order cart, multi-address delivery.
-  - Verify no regression in Razorpay and COD flows.
-  - Verify cart remains intact until confirmed online payment.
+# Fix: Seller Push Notifications for New Orders + iOS Media Control Bug
 
-2. Seller “no order-arrival notification” is not proven fixed
-- Concrete evidence:
-  - iOS sound filename fix is present:
-    - `supabase/functions/send-push-notification/index.ts:102`
-    - `supabase/functions/send-push-notification/index.ts:244`
-    - both use `gate_bell.mp3`
-    - `codemagic.yaml:392-401` copies and links `ios-config/gate_bell.mp3`
-  - But seller notification delivery still depends on device-token + permission readiness:
-    - `src/hooks/usePushNotifications.ts:150-168` skips registration unless OS permission is granted
-    - `src/hooks/usePushNotifications.ts:485-488` auto-registers only if permissions already exist
-    - `src/hooks/useAuthPage.ts:176-182` requests permission after login, but this is timing-sensitive
-  - Seller order-arrival notification sources are inconsistent:
-    - `supabase/functions/confirm-razorpay-payment/index.ts:231-239` manually inserts seller notification payload `{ orderId, status: "placed", type: "order" }`
-    - workflow trigger `fn_enqueue_order_status_notification` now inserts richer payloads with `target_role`, `action`, and workflow-based semantics.
-- Root cause:
-  - The sound bug itself is fixed in code, but “seller gets no notification” can still happen because:
-    - the seller may never have a valid device token if permission/registration did not complete;
-    - Razorpay seller notifications bypass the canonical workflow-trigger payload contract;
-    - there is no proof yet that every placed order path emits one consistent seller-targeted push.
-- Production fix plan:
-  - Standardize seller new-order notification creation:
-    - remove/manual-minimize custom payload divergence in `confirm-razorpay-payment`;
-    - prefer one workflow-driven notification source for order placement whenever possible.
-  - Add explicit diagnostics/fallback checks in push pipeline:
-    - if `device_tokens` missing, keep in-app notification but surface operational visibility in diagnostics/logging.
-  - Audit `process-notification-queue` and `send-push-notification` together to ensure seller-targeted orders always produce:
-    - in-app row
-    - push attempt
-    - correct route/action payload
-  - For the bell-on-locked-phone concern:
-    - code-side filename mismatch is fixed;
-    - remaining validation must focus on whether sellers actually have registered tokens and permissions.
-- Safeguards:
-  - Do not break buyer/seller inbox filtering via `target_role`.
-  - Keep Android channel config unchanged (`orders_alert`, `gate_bell`).
-- Validation:
-  - Test with a real seller account on iOS locked-screen and Android locked-screen:
-    - COD order arrival
-    - Razorpay order arrival
-    - UPI buyer-confirmed seller alert
-  - Verify:
-    - queue row inserted
-    - `user_notifications` row inserted
-    - `device_tokens` row exists
-    - push attempt succeeds
-    - tap opens correct order context.
+## Evidence from Production Database
 
-3. Buyer default address behavior is only partially implemented
-- Confirmed evidence:
-  - `src/hooks/useDeliveryAddresses.ts:82` already resolves `defaultAddress = addresses.find(a => a.is_default) || addresses[0] || null`
-  - `src/hooks/useCartPage.ts:257-262` auto-selects that default address into checkout
-  - `src/components/profile/AddressForm.tsx` supports `is_default`
-  - `src/components/profile/AddressCard.tsx` supports “Set Default”
-  - `src/components/profile/AddressPicker.tsx:37-53` only selects an address for the current checkout; it does not persist that choice as default
-- Root cause:
-  - The system supports default addresses at the profile layer, but checkout selection is transient.
-  - Users expect “the address I just picked” to become their preference, but checkout does not ask or persist that preference.
-- Production fix plan:
-  - Add a lightweight checkout preference flow:
-    - when a buyer selects a non-default address in checkout, allow “Make this my default” at the point of selection or near the address summary.
-  - Wire that action to existing `setDefault` from `useDeliveryAddresses`.
-  - Keep current auto-select behavior, but ensure explicit user choice can persist.
-- Safeguards:
-  - Do not silently overwrite default on every temporary selection unless the user opted in.
-  - Preserve current address book behavior and ordering.
-- Validation:
-  - Test with 0, 1, and multiple addresses.
-  - Test first-time add with `is_default=true`.
-  - Test selecting a non-default address, marking it default, leaving checkout, and returning.
+**Smoking gun**: Every "New Order Received!" seller notification with `type: order_status` (created by the DB trigger) has **status: `failed`** with error `"Edge Function returned a non-2xx status code"`. Meanwhile, the same seller's notifications with `type: order` (created by `confirm-razorpay-payment`) succeed. This pattern is 100% consistent across March 27–31.
 
-Implementation order
-1. Fix payment lifecycle inconsistency first:
-   - `create_multi_vendor_orders`
-   - `useCartPage`
-   - `UpiDeepLinkCheckout`
-   - `CartPage`
-2. Then harden seller notification pipeline:
-   - `confirm-razorpay-payment`
-   - notification queue/push delivery consistency
-   - push registration assumptions
-3. Then add checkout-level default-address persistence:
-   - `AddressPicker`
-   - `useDeliveryAddresses`
-   - `CartPage` / `useCartPage`
+```text
+type: order_status (DB trigger)  → ALWAYS FAILS  (6/6 entries)
+type: order (edge function)      → ALWAYS SUCCEEDS (5/5 entries)
+```
 
-Risk notes
-- Highest regression risk is payment-state handling because it touches cart persistence, recovery, and navigation.
-- Notification fixes risk duplicate seller alerts if both manual insert and workflow-trigger paths remain active.
-- Address fix risk is low if persistence is opt-in.
+## Root Cause Analysis
 
-Definition of done
-- Buyer cannot get stuck in a misleading pending-payment shell after successful UPI confirmation.
-- Seller reliably receives order-arrival notification when a real placed order is created, with push working on locked devices if OS permission/token exists.
-- Buyer checkout remembers preferred delivery address through explicit default selection.
+### Issue 1: Seller push notifications fail due to race condition
+
+The failure chain:
+
+1. `confirm-razorpay-payment` updates order status to `placed`
+2. The DB trigger `fn_enqueue_order_status_notification` fires **synchronously** during the transaction, inserting a `notification_queue` row
+3. The `trigger_process_notification_queue` trigger fires on that INSERT, calling `net.http_post` to invoke `process-notification-queue`
+4. `process-notification-queue` claims the item and calls `send-push-notification`
+5. But `confirm-razorpay-payment` is **still executing** — it hasn't committed yet, and the edge function platform throttles/rejects concurrent invocations of `send-push-notification`
+6. All 3 retry attempts fail within the same execution window (retries at 2s and 5s aren't enough to clear the contention)
+7. The notification is dead-lettered
+
+Then `confirm-razorpay-payment` finishes, inserts its own `type: order` notification, and calls `process-notification-queue` again. This time, the edge function platform is free, and the push succeeds — but this second notification goes to the **same seller** as a duplicate in-app notification, while the first one (the one that should have produced the push) is already dead.
+
+**For COD orders**: The same race exists but is less severe because there's no long-running edge function holding resources.
+
+### Issue 2: iOS media controls appear for the bell sound
+
+`useNewOrderAlert.ts` line 93-97 uses `new Audio()` with `audio.loop = true`. On iOS, any `<audio>` element played via the HTML5 Audio API is treated as **media playback**, which:
+- Shows in the iOS Control Center as a media track
+- Displays play/pause controls on the lock screen
+- Can be paused by the user via AirPods or Control Center
+
+The `mediaSession` workaround (lines 100-104) attempts to prevent this by setting `pause` handler to `null`, but iOS ignores `null` handlers — it still shows the media widget.
+
+## Fix Plan
+
+### Fix 1: Eliminate duplicate seller notification paths + fix delivery reliability
+
+**Problem**: Two sources create seller "New Order" notifications — the DB trigger AND the `confirm-razorpay-payment` edge function. The trigger path always fails due to the race condition.
+
+**Solution**: Remove the manual seller notification insert from `confirm-razorpay-payment` (it's now redundant since the DB trigger handles it). Then fix the timing issue by ensuring `process-notification-queue` doesn't get invoked during a competing edge function's execution.
+
+The reliable fix: Instead of the DB trigger's `net.http_post` firing immediately (racing with the parent transaction), add a small delay via the cron job (already runs every minute). For urgent order notifications, we keep the trigger but make it more resilient:
+
+**File: `supabase/functions/confirm-razorpay-payment/index.ts`**
+- Remove lines 231-247 (the manual seller notification insert). The DB trigger already creates the seller notification with `target_role: 'seller'` when the order status changes to `placed`.
+- Keep the `process-notification-queue` invocation at line 258 but add a 2-second delay so the transaction has time to commit and the trigger-created notification is available.
+
+**File: `supabase/functions/process-notification-queue/index.ts`**
+- Add a safety check: if `send-push-notification` returns a non-2xx error, re-queue the item as `pending` with a `next_retry_at` of 30 seconds in the future instead of dead-lettering immediately. This gives the cron job a chance to retry after the contention clears.
+
+### Fix 2: Replace HTML5 Audio with Web Audio API for in-app bell sound
+
+**File: `src/hooks/useNewOrderAlert.ts`**
+
+Replace the `new Audio()` approach with `AudioContext` (same pattern already used in `useUrgentOrderSound.ts`). The Web Audio API:
+- Does NOT register as media playback on iOS
+- Does NOT show in Control Center
+- Plays as a programmatic sound effect, not a media track
+- Is the correct API for short notification sounds
+
+Changes:
+- Replace `audioRef` (HTMLAudioElement) with `audioContextRef` + `audioBufferRef`
+- Load and decode `gate_bell.mp3` via `fetch` + `AudioContext.decodeAudioData`
+- Play via `AudioBufferSourceNode` (short play, schedule next after duration + gap)
+- Remove `mediaSession` workaround (no longer needed)
+- Keep haptic vibration fallback
+
+### Fix 3: Ensure COD orders also trigger seller push reliably
+
+For COD orders, the flow is: `create_multi_vendor_orders` RPC → order INSERT with `status = 'placed'` → DB trigger fires. The same race condition applies but is mitigated because there's no competing edge function. However, the `trigger_process_notification_queue` still fires via `net.http_post` during the RPC transaction.
+
+**Solution**: The `process-notification-queue` retry fix (Fix 1) handles this. Dead-lettered items get re-queued instead of permanently failed.
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `supabase/functions/confirm-razorpay-payment/index.ts` | Remove duplicate seller notification insert (lines 231-247) |
+| `supabase/functions/process-notification-queue/index.ts` | Change dead-letter to re-queue with delay for transient push failures |
+| `src/hooks/useNewOrderAlert.ts` | Replace HTML5 Audio with Web Audio API to fix iOS media controls |
+
+## Validation
+
+1. Place a new order → seller receives push notification with gate bell sound
+2. Verify `notification_queue` shows `status: processed` for seller notifications
+3. On iOS: verify no media controls appear when the in-app bell sounds
+4. COD and Razorpay order flows both produce seller push notifications
+5. No duplicate in-app notifications for the seller
+
