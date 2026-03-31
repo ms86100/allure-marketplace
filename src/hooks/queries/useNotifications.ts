@@ -162,7 +162,7 @@ export function useLatestActionNotification(userId: string | undefined) {
 
       // Return first valid notification — skip terminal + stale (>24h) orders
       for (const n of notifications) {
-        const linkedOid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
+        const linkedOid = n.payload?.orderId || n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
         if (linkedOid && (terminalOrderIds.has(linkedOid) || staleOrderIds.has(linkedOid))) continue;
         if (n?.payload?.action) return n;
         if (n.reference_path?.startsWith('/orders/')) {
