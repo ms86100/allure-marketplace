@@ -131,7 +131,7 @@ export function useLatestActionNotification(userId: string | undefined) {
       // Collect order-linked notifications for recency gating (read-only check)
       const orderIds = new Set<string>();
       for (const n of notifications) {
-        const oid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
+        const oid = n.payload?.orderId || n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
         if (oid) orderIds.add(oid);
       }
 
