@@ -235,7 +235,14 @@ serve(async (req) => {
           title: "🆕 New Order Received!",
           body: `${buyerProfile?.name || "A buyer"} placed an order. Tap to view and accept.`,
           reference_path: `/orders/${orderId}`,
-          payload: { orderId, status: "placed", type: "order" },
+          payload: {
+            orderId,
+            status: "placed",
+            type: "order",
+            action: "View Order",
+            target_role: "seller",
+            buyer_name: buyerProfile?.name || "Customer",
+          },
         });
       }
 
