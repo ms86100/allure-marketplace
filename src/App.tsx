@@ -225,7 +225,7 @@ function PageLoadingFallback() {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading, isSessionRestored } = useAuth();
+  const { user, profile, isLoading, isSessionRestored } = useAuth();
   // Wait for session restoration before deciding — prevents flash redirect to /auth
   if (isLoading || !isSessionRestored) {
     return (
@@ -239,6 +239,19 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+  // Wait for profile to load before rendering content — prevents "empty data" flash
+  // Profile is fetched asynchronously after session restore; without this gate,
+  // pages like Orders/Profile appear blank for a moment
+  if (!profile) {
+    return (
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background gap-3">
+        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+          <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+        <span className="text-sm text-muted-foreground">Loading your profile...</span>
+      </div>
+    );
   }
   return <>{children}</>;
 }
