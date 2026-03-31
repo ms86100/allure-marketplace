@@ -693,6 +693,69 @@ export function DraftProductManager({
                 </div>
               )}
 
+              {/* Stock Tracking */}
+              <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-sm font-medium">Track Stock</span>
+                  <Checkbox
+                    checked={newProduct.stock_quantity != null && newProduct.stock_quantity > 0}
+                    onCheckedChange={(checked) =>
+                      setNewProduct({
+                        ...newProduct,
+                        stock_quantity: checked ? 10 : null,
+                        low_stock_threshold: checked ? 3 : null,
+                      })
+                    }
+                  />
+                </label>
+                {newProduct.stock_quantity != null && newProduct.stock_quantity > 0 && (
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Current Stock</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={newProduct.stock_quantity || ''}
+                        onChange={(e) => setNewProduct({ ...newProduct, stock_quantity: e.target.value ? Number(e.target.value) : null })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Low Stock Alert</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={newProduct.low_stock_threshold || ''}
+                        onChange={(e) => setNewProduct({ ...newProduct, low_stock_threshold: e.target.value ? Number(e.target.value) : null })}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Lead Time & Pre-orders */}
+              {!isService && (
+                <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Lead Time (hours)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      placeholder="e.g., 24"
+                      value={newProduct.lead_time_hours || ''}
+                      onChange={(e) => setNewProduct({ ...newProduct, lead_time_hours: e.target.value ? Number(e.target.value) : null })}
+                    />
+                    <p className="text-[11px] text-muted-foreground">Minimum advance notice for orders</p>
+                  </div>
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm font-medium">Accept Pre-orders</span>
+                    <Checkbox
+                      checked={!!newProduct.accepts_preorders}
+                      onCheckedChange={(checked) => setNewProduct({ ...newProduct, accepts_preorders: !!checked })}
+                    />
+                  </label>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-1">
                 <Button variant="outline" size="sm" className="flex-1" onClick={resetForm}>Cancel</Button>
                 <Button size="sm" className="flex-1" onClick={handleAddProduct} disabled={isSaving}>
