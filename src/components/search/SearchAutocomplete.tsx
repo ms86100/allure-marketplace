@@ -76,13 +76,20 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
 
   // Seller search (lightweight — no product embedding)
   const { data: sellerSuggestions = [] } = useQuery({
-    queryKey: ['search-autocomplete-sellers', trimmed],
+    queryKey: ['search-autocomplete-sellers', trimmed, lat, lng, radiusKm],
     queryFn: async () => {
+      if (!lat || !lng) return [];
+      const boxDelta = radiusKm * 0.009;
       const { data } = await supabase
         .from('seller_profiles')
         .select('id, business_name, description, profile_image_url, categories')
         .eq('verification_status', 'approved')
+        .eq('is_available', true)
         .ilike('business_name', `%${trimmed}%`)
+        .gte('latitude', lat - boxDelta)
+        .lte('latitude', lat + boxDelta)
+        .gte('longitude', lng - boxDelta)
+        .lte('longitude', lng + boxDelta)
         .limit(3);
       return (data || []).map((d: any) => ({
         id: d.id,
@@ -92,7 +99,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
         categories: d.categories || [],
       }));
     },
-    enabled: trimmed.length >= 2,
+    enabled: trimmed.length >= 2 && !!(lat && lng),
     staleTime: 30_000,
   });
 
