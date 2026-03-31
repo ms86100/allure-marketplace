@@ -89,6 +89,7 @@ export function DraftProductManager({
   const [isAdding, setIsAdding] = useState(restoredDraft?.isAdding ?? false);
   const [editingIndex, setEditingIndex] = useState<number | null>(restoredDraft?.editingIndex ?? null);
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [attributeBlocks, setAttributeBlocks] = useState<BlockData[]>(restoredDraft?.attributeBlocks ?? []);
   const [serviceFields, setServiceFields] = useState<ServiceFieldsData>(restoredDraft?.serviceFields ?? INITIAL_SERVICE_FIELDS);
