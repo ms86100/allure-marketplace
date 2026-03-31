@@ -1,156 +1,107 @@
 
 
-# 5 Critical Silent Seller Bugs — Pre-Production Audit
+# 5 Critical Silent Seller Bugs — Pre-Production Audit (Product CRUD Focus)
 
-## Bug 1: Dashboard Store Toggle Has No Approval Guard
+## Bug 1: Onboarding Products Set `is_available: false` — Contradicts DB Default Fix
 
-**What**: `SellerDashboardPage.tsx` line 103-135 — `toggleAvailability` directly updates `is_available` without checking `verification_status`. The `useSellerSettings.ts` (line 108) correctly blocks non-approved sellers with `verification_status !== 'approved'`, but the dashboard toggle is completely unguarded. A pending/rejected seller can toggle their store "Open" from the dashboard, making them appear live to buyers before admin approval.
+**What**: `DraftProductManager.tsx` line 207 hardcodes `is_available: false` for all new products created during onboarding. Similarly, `useBulkUpload.ts` line 163 does the same. However, the previous fix established that products should default to `is_available: true` (DB default was changed). The SellerProductsPage flow (`useSellerProducts.ts`) correctly uses the form's default which is `true`. This means products created during onboarding are unavailable even after approval, forcing the seller to manually toggle each one.
 
-**Where**: `SellerDashboardPage.tsx`, `toggleAvailability` function.
+**Where**: `DraftProductManager.tsx` line 207, `useBulkUpload.ts` line 163.
 
-**Why critical**: This bypasses the entire admin approval workflow. A rejected seller can mark themselves as open. Buyers see an unapproved store and place orders that the seller may not be equipped to fulfill. This destroys platform trust and creates admin confusion.
-
-**Gap**: Settings page is guarded, dashboard is not — inconsistent enforcement of the same business rule across two surfaces.
+**Why critical**: A seller completes onboarding, adds 5 products, gets approved — but none appear to buyers. They have no idea why. The SellerProductsPage flow works correctly, creating an inconsistency between the two creation paths.
 
 **Impact analysis**:
-- `SellerDashboardPage.tsx` — add `verification_status !== 'approved'` guard
-- `StoreStatusCard.tsx` — already only shows toggle for approved status, but the parent can still call the unguarded function
+- `DraftProductManager.tsx` — change `is_available: false` to `is_available: true`
+- `useBulkUpload.ts` — change `is_available: false` to `is_available: true`
 
 **Risks**:
-1. Sellers who are currently in `pending` state but had `is_available: true` from onboarding won't be affected — the guard only prevents toggling, not existing state.
-2. The `StoreStatusCard` already hides the toggle for non-approved sellers visually, but a programmatic call or race condition could still trigger it — the backend guard is the safety net.
+1. Products become "available" while still in `draft` status — but RLS/buyer queries already filter by `approval_status = 'approved'`, so draft products won't be visible regardless.
+2. No risk to existing products — only affects future inserts.
 
-**Fix**: Add early return at the top of `toggleAvailability`:
-```typescript
-if (sellerProfile.verification_status !== 'approved') {
-  toast.error('Your store must be approved before you can go live');
-  return;
-}
-```
+**Fix**: Line 207 in `DraftProductManager.tsx`: `is_available: true`. Line 163 in `useBulkUpload.ts`: `is_available: true`.
 
 ---
 
-## Bug 2: Seller Order Card Missing Buyer Phone — Can't Call Customer
+## Bug 2: Inconsistent `approval_status` Between Creation Flows
 
-**What**: `useSellerOrdersInfinite` (line 153) selects `buyer:profiles!orders_buyer_id_fkey(name, block, flat_number)` — **phone is missing**. But `SellerOrderCard.tsx` has buyer typed as `{ name: string; block: string; flat_number: string }` (line 29). When the seller navigates to order detail, buyer phone IS available (fetched in `useOrderDetail.ts`). But from the dashboard list, if the seller needs to quickly call a buyer, there's no phone data. The `useOrdersList.ts` for the Orders page DOES include phone (line 42), creating inconsistency.
+**What**: `useSellerProducts.ts` line 260 sets `approval_status: 'pending'` for new products (from SellerProductsPage). `DraftProductManager.tsx` line 208 sets `approval_status: 'draft'`. This means:
+- Products from onboarding → `draft` (needs explicit "Submit for Approval")
+- Products from SellerProductsPage → `pending` (auto-submitted)
 
-**Where**: `useSellerOrders.ts` line 153, `SellerOrderCard.tsx` line 29.
+A seller who adds products post-onboarding never sees the "Submit for Approval" banner because products go straight to `pending`. But products from onboarding sit in `draft` limbo until the seller discovers the Submit button on SellerProductsPage.
 
-**Why critical**: On a busy day, a seller sees a new order on the dashboard and wants to call the buyer to confirm. They have to tap into the order detail page first. For urgent orders, this extra step wastes critical response time (especially with the 3-min auto-cancel timer).
+**Where**: `useSellerProducts.ts` line 260 vs `DraftProductManager.tsx` line 208.
 
-**Gap**: `useOrdersList.ts` (Orders page) includes phone. `useSellerOrdersInfinite` (Dashboard) does not. Two views of the same data with different completeness.
+**Why critical**: Neither behavior is wrong in isolation, but together they create confusion. The seller wonders why some products need manual submission and others don't. The lifecycle documented in memory says "Draft → Pending Review → Approved/Rejected" with explicit submission — so `useSellerProducts.ts` is the one violating the pattern.
 
 **Impact analysis**:
-- `useSellerOrders.ts` — add `phone` to the buyer select
-- `SellerOrderCard.tsx` — add `phone?: string` to buyer interface, optionally render call button
+- `useSellerProducts.ts` line 260 — change `'pending'` to `'draft'`
+- This aligns both flows: all new products start as `draft`, seller explicitly submits
 
 **Risks**:
-1. Adding phone to the select marginally increases payload — negligible for bounded seller order lists.
-2. Exposing phone on the card could be a privacy concern — mitigate by only showing the call icon (not the number text).
+1. Sellers who expect instant submission from the products page will now need an extra click — but the "Submit All for Approval" banner is already visible on SellerProductsPage, making the action discoverable.
+2. No impact on editing existing products — the edit flow's approval_status logic is unchanged.
 
-**Fix**: In `useSellerOrdersInfinite` line 153, change select to include `phone`:
-```
-buyer:profiles!orders_buyer_id_fkey(name, block, flat_number, phone)
-```
-Update `SellerOrderCard` interface to add `phone?: string`.
+**Fix**: `useSellerProducts.ts` line 260: `{ approval_status: 'draft' as const }`.
 
 ---
 
-## Bug 3: Earnings Count Cancelled/Returned Orders
+## Bug 3: Onboarding Delete Has No Confirmation — Instant Data Loss
 
-**What**: `useSellerOrderStats` line 64-97 only counts `completed` and `delivered` statuses for earnings. However, orders with `payment_status === 'refunded'` that still have `status === 'completed'` (completed then refunded) are counted as earnings. The earnings summary on the dashboard shows inflated revenue that includes refunded amounts.
+**What**: `DraftProductManager.tsx` line 300-311 — `handleRemoveProduct` deletes the product from DB immediately with no confirmation dialog. On SellerProductsPage, there IS an `AlertDialog` confirmation (line 176-181). The onboarding flow skips this entirely — one tap on the trash icon permanently deletes a product.
 
-**Where**: `useSellerOrders.ts` lines 64-70, `EarningsSummary.tsx`.
+**Where**: `DraftProductManager.tsx` line 472, `handleRemoveProduct`.
 
-**Why critical**: A seller sees ₹5,000 in earnings but only ₹3,500 was actually receivable because ₹1,500 was refunded. This creates false expectations about payouts and erodes trust when the actual payout is lower.
-
-**Gap**: The query only fetches `status, total_amount, created_at` (line 41) but doesn't fetch `payment_status`. There's no way to exclude refunded orders from earnings calculations.
+**Why critical**: A seller who accidentally taps the small trash icon during onboarding loses their product permanently. There's no undo, no confirmation. This is especially dangerous on mobile where touch targets overlap. The SellerProductsPage has confirmation, creating an inconsistency.
 
 **Impact analysis**:
-- `useSellerOrders.ts` — add `payment_status` to the select, exclude `refunded` from earnings
-- `EarningsSummary.tsx` — no change needed (just receives correct numbers)
+- `DraftProductManager.tsx` — add a `deleteTarget` state + confirmation dialog (matching SellerProductsPage pattern)
 
 **Risks**:
-1. Adding `payment_status` to the select increases payload slightly — negligible.
-2. If `payment_status` is null for older orders (before the field existed), they'll still be counted — this is correct behavior (null = not refunded).
+1. Adding a dialog adds complexity to the onboarding flow — mitigate by using the same lightweight `AlertDialog` pattern from SellerProductsPage.
+2. The dialog import is already available in the project — no new dependencies.
 
-**Fix**: Line 41, add `payment_status` to select:
-```
-.select('status, total_amount, created_at, payment_status')
-```
-Line 65-70, add guard:
-```typescript
-case 'completed':
-case 'delivered':
-  completedOrders++;
-  if (row.payment_status !== 'refunded') {
-    totalEarnings += amt;
-    if (isToday) todayEarnings += amt;
-    if (isWeek) weekEarnings += amt;
-  }
-  break;
-```
+**Fix**: Add `deleteTarget` state, wrap the trash button to set `deleteTarget` instead of calling `handleRemoveProduct` directly, add an `AlertDialog` at the bottom of the component that calls `handleRemoveProduct` on confirm.
 
 ---
 
-## Bug 4: Dashboard "Today" Filter Uses Local Timezone, Stats Use IST
+## Bug 4: SellerProductsPage Missing Image Validation on Save
 
-**What**: `useSellerOrdersInfinite` line 159-160 computes "today" using `new Date()` with `setHours(0,0,0,0)` — this uses the **browser's local timezone**. But `useSellerOrderStats` line 30-31 explicitly computes IST boundaries (`Asia/Kolkata`). A seller in a different timezone (or a browser with wrong locale) sees mismatched counts: the "Today" filter badge shows 3, but clicking it shows 2 orders (or vice versa).
+**What**: `useSellerProducts.ts` `handleSave` (line 197-224) validates name, category, price, and phone — but does NOT validate `image_url`. The onboarding flow (`DraftProductManager.tsx` line 181) correctly validates: `if (!newProduct.image_url.trim()) errors.image_url = 'Product image is required'`. A seller can save a product from SellerProductsPage with no image, resulting in a product card with a generic icon placeholder — looking unprofessional to buyers.
 
-**Where**: `useSellerOrders.ts` line 159-160 vs line 30-31.
+**Where**: `useSellerProducts.ts` line 202-215 (validation block).
 
-**Why critical**: The seller sees "Today: 5" on the stats card but when they tap the "Today" filter, only 3 orders appear. This makes the dashboard feel broken and unreliable. For a multi-timezone deployment, this is guaranteed to manifest.
-
-**Gap**: Stats computation uses IST. Filter query uses browser timezone. Two different definitions of "today" in the same view.
+**Why critical**: Products without images convert significantly worse. The onboarding flow enforces this, but the products page (used for all post-onboarding additions) does not. This creates a quality gap as the seller's catalog grows.
 
 **Impact analysis**:
-- `useSellerOrders.ts` `useSellerOrdersInfinite` — align "today" computation with IST
-- Dashboard stats and filter counts will then be consistent
+- `useSellerProducts.ts` — add image validation to the errors block
+- No other files need changes (the field error rendering for `image_url` already exists in SellerProductsPage line 51)
 
 **Risks**:
-1. Hardcoding IST assumes all sellers are in India — if the platform expands, this needs to be configurable. For now, aligning with the existing IST convention is correct.
-2. Changing the filter boundary could shift which orders appear in "today" for edge-case orders created near midnight — acceptable as it aligns with the stats count.
+1. Existing products without images will show an error when edited — acceptable as it forces quality improvement.
+2. The `edit-prod-image_url` scroll target already exists in the page (line 51).
 
-**Fix**: In `useSellerOrdersInfinite` line 159-160, replace:
-```typescript
-const today = new Date();
-today.setHours(0, 0, 0, 0);
-```
-With IST-aware computation matching the stats query:
-```typescript
-const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-const istDateStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}-${String(nowIST.getDate()).padStart(2, '0')}`;
-const todayISO = new Date(`${istDateStr}T00:00:00+05:30`).toISOString();
-```
+**Fix**: After line 205, add: `if (!formData.image_url) errors.image_url = 'Product image is required';`
 
 ---
 
-## Bug 5: Seller Can't See Delivery Address on Order Detail for Delivery Orders
+## Bug 5: Bulk Upload Skips Image Entirely — Products Created Without Images
 
-**What**: `OrderDetailPage.tsx` line 701-703 — the delivery address display is gated by `!o.isSellerView`:
-```tsx
-{!o.isSellerView && (order as any).delivery_address && ...}
-```
-This means sellers **never** see the delivery address, even for delivery orders they need to fulfill. The seller only sees buyer's profile block/flat (line 694-700), which may differ from the actual delivery destination.
+**What**: `useBulkUpload.ts` creates products via CSV without any image field in the payload (line 156-164). The CSV template doesn't include an `image_url` column. Products are created with `image_url: null`. Combined with Bug 4 (no image validation on edit page), these products can go through the entire lifecycle — draft → pending → approved — without ever having an image.
 
-**Where**: `OrderDetailPage.tsx` line 701.
+**Where**: `useBulkUpload.ts` line 156-164 (product payload), line 84-85 (CSV template).
 
-**Why critical**: For seller-delivery orders, the seller needs the exact delivery address to fulfill the order. They see "Block A, 302" from the buyer's profile, but the buyer may have specified a different address at checkout. The seller delivers to the wrong location.
-
-**Gap**: This was added in the previous round of fixes (Bug 5 — delivery address display) but was incorrectly scoped to buyer-only view. The seller needs this information even more than the buyer.
+**Why critical**: A seller bulk-uploads 20 products, submits them all for approval. Admin approves them. All 20 appear to buyers with generic icon placeholders. The platform looks unprofessional and buyers don't trust products without images.
 
 **Impact analysis**:
-- `OrderDetailPage.tsx` line 701 — remove the `!o.isSellerView` gate, or change to show for both views
+- `useBulkUpload.ts` — add a warning toast after successful save: "Remember to add images to your products by editing them"
+- No structural change needed — bulk upload can't reasonably include images in CSV
 
 **Risks**:
-1. Showing delivery address to both buyer and seller on the same card could create visual clutter — mitigate by keeping it concise (single line).
-2. For self-pickup orders, the delivery_address might be the buyer's home — this is already gated by `fulfillment_type === 'delivery'`, so no risk.
+1. A toast warning might be dismissed/ignored — but it sets the expectation. The real guard should be on the approval side (admin shouldn't approve imageless products).
+2. Adding image_url to the CSV template would be complex (URLs in CSV) — not practical for the bulk flow.
 
-**Fix**: Line 701, change `!o.isSellerView` to remove the view restriction:
-```tsx
-{(order as any).delivery_address && ['delivery', 'seller_delivery'].includes((order as any).fulfillment_type) && (
-```
-This shows the delivery address to both buyer and seller for delivery orders.
+**Fix**: After line 171 (`toast.success`), add: `toast.info('Tip: Edit each product to add images before submitting for approval', { duration: 5000 });`
 
 ---
 
@@ -158,11 +109,11 @@ This shows the delivery address to both buyer and seller for delivery orders.
 
 | # | Bug | File(s) | Severity | Effort |
 |---|-----|---------|----------|--------|
-| 1 | Dashboard toggle has no approval guard | SellerDashboardPage.tsx | High — bypasses admin approval | ~5 min |
-| 2 | Seller order card missing buyer phone | useSellerOrders.ts, SellerOrderCard.tsx | Medium — slows response | ~10 min |
-| 3 | Earnings include refunded orders | useSellerOrders.ts | Medium — financial trust | ~10 min |
-| 4 | Today filter uses wrong timezone | useSellerOrders.ts | Medium — count mismatch | ~5 min |
-| 5 | Seller can't see delivery address | OrderDetailPage.tsx | High — wrong delivery risk | ~2 min |
+| 1 | Onboarding products default to unavailable | DraftProductManager.tsx, useBulkUpload.ts | High — invisible products | ~2 min |
+| 2 | Inconsistent approval_status across flows | useSellerProducts.ts | Medium — confusing lifecycle | ~2 min |
+| 3 | Onboarding delete has no confirmation | DraftProductManager.tsx | High — accidental data loss | ~15 min |
+| 4 | SellerProductsPage missing image validation | useSellerProducts.ts | Medium — quality gap | ~2 min |
+| 5 | Bulk upload creates imageless products silently | useBulkUpload.ts | Low — quality awareness | ~2 min |
 
 All fixes are surgical — no new features, no schema changes, no refactoring.
 
