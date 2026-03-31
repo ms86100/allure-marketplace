@@ -1,165 +1,125 @@
 
 
-# 2 Critical Buyer-Side Notification Bugs — Pre-Production Audit
+# 2 Critical Buyer-Side Notification Bugs — Round 2
 
-## Bug 1: Stale Order Notifications Never Cleaned Up (Type Mismatch)
+## Bug 1: Cold-Start Stale Cleanup Doesn't Invalidate Home Banner Query
 
 ### Root Cause Analysis
 
-The `cleanupStaleDeliveryNotifications` function (in `useNotifications.ts`, line 44-46) defines eligible types for stale cleanup:
+`useAppLifecycle.ts` line 39-40 runs `cleanupStaleDeliveryNotifications` on cold start and marks stale order notifications as read in the DB. After cleanup, it only invalidates `['unread-notifications']`:
 
 ```typescript
-const staleEligibleTypes = new Set([
-  'delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent',
-  'order_status', 'order_update', 'order_placed', 'order_confirmed', 'order_preparing', 'order_ready',
-]);
+cleanupStaleDeliveryNotifications(data as UserNotification[]).then(() => {
+  queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
+});
 ```
 
-It then checks `n.type` (the DB column) against this set (line 51).
+It does **not** invalidate `['latest-action-notification']` or `['notifications']`. Compare with `NotificationInboxPage.tsx` lines 42-44 which correctly invalidates all three after the same cleanup.
 
-However, the DB trigger `fn_enqueue_order_status_notification` (migration `20260318112122`, line 250-252) inserts ALL order status notifications with:
-
-```sql
-INSERT INTO public.notification_queue (user_id, type, title, body, ...)
-VALUES (NEW.buyer_id, 'order', v_title, v_body, ...);
-```
-
-The DB column `type` is always **`'order'`** — never `'order_status'`, `'order_update'`, `'order_placed'`, etc. Those strings exist only inside `payload->>'type'`, not the column. The cleanup function checks `n.type` (the column), so it **never matches any order notification**.
-
-The delivery-specific types (`delivery_en_route`, `delivery_stalled`, etc.) DO use those exact strings as the DB column type (verified in `update-delivery-location/index.ts` line 374). So delivery cleanup works, but order status cleanup is completely broken.
+This was introduced when the cold-start cleanup was added separately from the inbox cleanup — the invalidation set was incomplete (copy-paste omission).
 
 ### Impact Assessment
 
-- **Severity: High** — Every order generates 3-6 status notifications (accepted → preparing → ready → delivered → completed). Once the order reaches a terminal state, all intermediate notifications become stale. They are never auto-marked as read.
-- **Unread badge inflation**: A buyer with 10 completed orders could have 30-50 stale unread notifications permanently inflating their badge count. The badge says "47 unread" but there are zero actionable items.
-- **Trust erosion**: The buyer opens the inbox, sees dozens of old "Order Accepted" and "Being Prepared" notifications for already-delivered orders, all highlighted as unread. The notification system feels broken and unreliable.
-- **Affected flows**: `useAppLifecycle` cold-start cleanup, `NotificationInboxPage` on-mount cleanup, unread badge count (`useUnreadNotificationCount`), home banner (`useLatestActionNotification`).
+- **Severity: Medium-High** — After cold start, `cleanupStaleDeliveryNotifications` marks stale order notifications as read in the DB. The unread badge count updates immediately. But `useLatestActionNotification` (which drives the `HomeNotificationBanner`) still holds cached data showing the now-read notification. The banner displays a stale "Order Accepted" card for a completed order for up to 30 seconds (the `refetchInterval`).
+- **User experience**: Buyer opens app, sees "Order Accepted" banner for an order delivered yesterday. The unread badge says "0" but the banner is still visible — contradictory state. If they tap the banner action, they navigate to a completed order.
+- **Affected flows**: Home screen banner, cold-start resume on native apps.
 
 ### Reproduction Steps
 
-1. Place 3 orders as a buyer
-2. Let all 3 orders progress through accepted → preparing → ready → delivered → completed
-3. Each order generates ~5 notifications, all with `type: 'order'` in the DB
-4. Open the app — `useAppLifecycle` runs `cleanupStaleDeliveryNotifications`
-5. The function iterates notifications, checks `staleEligibleTypes.has(n.type)` where `n.type === 'order'`
-6. `'order'` is NOT in `staleEligibleTypes` → zero notifications match → zero cleanup
-7. All 15 notifications remain unread despite all orders being terminal
-8. Unread badge shows "15" with nothing actionable
+1. Complete 3 orders as a buyer (let them reach `delivered`/`completed`)
+2. Force-close the app completely
+3. Reopen the app (cold start triggers `useAppLifecycle`)
+4. Observe: unread badge drops to 0, but the home banner still shows a stale order notification for ~30 seconds
 
 ### Reverse Engineering Analysis
 
-**Modules affected by fix**:
-- `cleanupStaleDeliveryNotifications` — adding `'order'` to `staleEligibleTypes`
-- `useAppLifecycle` — calls the function; benefits automatically
-- `NotificationInboxPage` — calls the function; benefits automatically
-- `useUnreadNotificationCount` — badge will correctly decrease after cleanup
+**Modules affected**: Only `useAppLifecycle.ts` — adding two more `invalidateQueries` calls.
 
 **Potential risks**:
-1. Adding `'order'` could mark **active** order notifications as read if the linked order hasn't reached terminal state yet. But the function already checks terminal status (`delivered`, `completed`, `cancelled`, `no_show`) before marking as read — so this is safe.
-2. First cleanup after fix may mark dozens of notifications as read in a single batch. The `supabase.update().in('id', staleIds)` handles this fine — no performance concern.
+1. Additional invalidations cause a brief re-fetch burst on cold start. Since `latest-action-notification` has `staleTime: 10_000`, this is negligible.
+2. No risk to other modules — the `NotificationInboxPage` already does this exact pattern.
 
 ### Implementation Plan
 
-**File**: `src/hooks/queries/useNotifications.ts`, line 44-47
+**File**: `src/hooks/useAppLifecycle.ts`, line 40
 
-Add `'order'` to `staleEligibleTypes`:
-
-```typescript
-const staleEligibleTypes = new Set([
-  'delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent',
-  'order_status', 'order_update', 'order_placed', 'order_confirmed', 'order_preparing', 'order_ready',
-  'order',  // DB trigger uses 'order' as the column type for all order status notifications
-]);
-```
-
-Also fix the `orderId` extraction (line 52) to check `orderId` (camelCase) in addition to `order_id`:
+Add missing invalidations after cleanup:
 
 ```typescript
-const oid = (n.payload as any)?.orderId || (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
+cleanupStaleDeliveryNotifications(data as UserNotification[]).then(() => {
+  queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
+  queryClient.invalidateQueries({ queryKey: ['notifications'] });
+  queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
+});
 ```
 
-Same fix on line 71 (the filter lambda).
+### Validation
 
-### Validation & Assurance
-
-- **Pre-fix**: Query `user_notifications` for a buyer with completed orders — confirm unread count includes stale order notifications with `type = 'order'`
-- **Post-fix**: Trigger cleanup, verify those notifications are marked as read
-- **Regression**: Active order notifications (non-terminal) must remain unread — verified by the terminal status check in the function
-- **Edge case**: Buyer with zero orders — cleanup short-circuits at `orderIds.size === 0`
+- Cold-start with stale notifications → banner clears immediately after cleanup, not after 30s delay
+- Regression: inbox cleanup path unchanged; unread badge still updates correctly
 
 ---
 
-## Bug 2: `useLatestActionNotification` Misses `orderId` Key — Terminal Filter Partially Broken
+## Bug 2: `useBuyerOrderAlerts` Fires Haptics for `payment_pending → cancelled` Transitions
 
 ### Root Cause Analysis
 
-`useLatestActionNotification` (line 131-134) extracts order IDs from notification payloads to filter out terminal/stale orders:
+`useBuyerOrderAlerts.ts` line 49 suppresses haptics for `status === 'pending'` transitions:
 
 ```typescript
-for (const n of notifications) {
-  const oid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
-  if (oid) orderIds.add(oid);
-}
+const statusChanged = newStatus && newStatus !== 'pending' && newStatus !== oldStatus;
 ```
 
-The DB trigger stores the order ID as `orderId` (camelCase) in the payload:
+But it does **not** suppress `payment_pending`. When the `auto-cancel-orders` edge function cancels a stale `payment_pending` order (buyer abandoned payment), the realtime channel fires with `oldStatus = 'payment_pending'`, `newStatus = 'cancelled'`. This passes the filter (`'cancelled' !== 'pending'` is true), triggering:
 
-```sql
-jsonb_build_object('orderId', NEW.id::text, 'status', NEW.status::text, 'type', 'order_status', ...)
-```
+1. An **error haptic buzz** — the buyer feels their phone vibrate with an error pattern for an order they already forgot about
+2. A **query invalidation storm** — all order queries, notification queries, and the active orders strip are invalidated simultaneously
 
-So `n.payload?.order_id` is always `undefined` for trigger-generated notifications. The `reference_path` fallback works for most cases, but:
-
-1. **Line 164** has the same issue — the terminal/stale filter check uses `n.payload?.order_id` which misses the camelCase key
-2. Notifications inserted by edge functions (e.g., `confirm-razorpay-payment` line 238) use `payload: { orderId, ... }` — also camelCase
-3. The `reference_path` fallback works IF the path matches `/orders/{id}` — but some notification types use different paths or null `reference_path`
-
-The practical impact: when `reference_path` is present (most order notifications), the fallback works and the terminal filter functions. But any notification with a null `reference_path` and an `orderId` payload key will not be linked to its order, and the terminal filter will fail to exclude it — causing stale notifications to appear on the home banner.
+The DB trigger `fn_enqueue_order_status_notification` explicitly suppresses notifications for `payment_pending → cancelled` (line 38-40 of the trigger). But the client-side realtime listener has no such guard — it was written before the `payment_pending` status existed.
 
 ### Impact Assessment
 
-- **Severity: Medium-High** — The home banner (`HomeNotificationBanner`) shows a stale notification for a completed/cancelled order. The buyer sees "Order Accepted" on their home screen for an order that was delivered yesterday. They tap it, navigate to the order, and see it's already completed — a confusing, trust-eroding experience.
-- **Trigger condition**: Any `order` type notification where `reference_path` is null but `payload.orderId` exists. This can happen when notifications are inserted by edge functions with missing `reference_path`.
-- **Affected flows**: Home screen banner, notification-driven navigation.
+- **Severity: Medium-High** — On cold start, `useAppLifecycle` invokes `auto-cancel-orders` which sweeps all stale `payment_pending` orders. If the buyer has 3 abandoned payment orders, the realtime listener fires 3 error haptics in rapid succession. The buyer feels their phone buzz with error patterns immediately on app open — with no corresponding UI notification or toast (the DB trigger suppressed the notification). This is a phantom alert that erodes trust.
+- **Query storm**: Each cancelled order triggers 5 query invalidations. With 3 orders, that's 15 simultaneous re-fetches on cold start, competing with the app's initial data load.
+- **Affected flows**: App cold start, `auto-cancel-orders` cron, any payment timeout cancellation.
 
 ### Reproduction Steps
 
-1. Receive a notification where `reference_path` is null but `payload: { orderId: '...' }` exists
-2. The order reaches terminal state (delivered/completed)
-3. `useLatestActionNotification` runs — tries `n.payload?.order_id` → undefined
-4. `reference_path?.split('/orders/')` → undefined (no reference_path)
-5. `oid` is undefined → order ID not collected → terminal check skipped
-6. The notification passes the filter and appears on the home banner despite being for a completed order
+1. As a buyer, add items to cart and choose online payment
+2. At the Razorpay/UPI payment screen, close the app without completing payment (creates `payment_pending` order)
+3. Repeat 2-3 times to create multiple abandoned orders
+4. Wait 30+ minutes (past the auto-cancel threshold)
+5. Reopen the app — `auto-cancel-orders` fires, cancelling all `payment_pending` orders
+6. The realtime listener fires error haptics for each cancellation — phone buzzes 3 times with error pattern
+7. No notification appears (DB trigger suppressed it) — the haptic has no corresponding UI feedback
 
 ### Reverse Engineering Analysis
 
-**Modules affected by fix**:
-- `useLatestActionNotification` — lines 133 and 164
-- `cleanupStaleDeliveryNotifications` — lines 52 and 71 (same key mismatch — covered in Bug 1 fix)
+**Modules affected**: Only `useBuyerOrderAlerts.ts` — adding `payment_pending` to the suppression filter.
 
 **Potential risks**:
-1. Adding `orderId` lookup could theoretically extract a non-UUID string if some payload uses `orderId` for a different purpose. However, all notification inserts consistently use `orderId` for the order UUID.
-2. No risk to other query consumers — this is a read-only extraction.
+1. If a `payment_pending` order transitions to a non-cancelled status (e.g., `payment_pending → placed` after successful payment), the haptic would also be suppressed. However, the `confirm-razorpay-payment` edge function handles this transition server-side, and the buyer sees on-screen confirmation — no haptic is needed.
+2. Query invalidation is also suppressed for `payment_pending` transitions. This is correct — the buyer doesn't need order list refreshes for phantom orders.
 
 ### Implementation Plan
 
-**File**: `src/hooks/queries/useNotifications.ts`
+**File**: `src/hooks/useBuyerOrderAlerts.ts`, line 49
 
-**Line 133**: Fix order ID extraction in `useLatestActionNotification`:
+Add `payment_pending` to the suppression filter — suppress when `oldStatus` was `payment_pending`:
+
 ```typescript
-const oid = n.payload?.orderId || n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
+const statusChanged = newStatus && newStatus !== 'pending' && newStatus !== oldStatus;
+const paymentChanged = newPayment && newPayment !== oldPayment;
+// Suppress phantom alerts for payment_pending orders (auto-cancelled, no user-facing notification)
+if (!statusChanged && !paymentChanged) return;
+if (oldStatus === 'payment_pending') return;
 ```
 
-**Line 164**: Same fix in the filter loop:
-```typescript
-const linkedOid = n.payload?.orderId || n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
-```
+### Validation
 
-### Validation & Assurance
-
-- **Test**: Create a notification with `payload: { orderId: 'abc' }` and no `reference_path`, linked to a terminal order. Verify `useLatestActionNotification` excludes it.
-- **Regression**: Notifications with `reference_path` set continue to work via the fallback — the `||` chain preserves backward compatibility.
-- **Edge case**: Non-order notifications (no `orderId`, no `reference_path`) return `undefined` for `oid` and are correctly not filtered by the terminal check.
+- Abandon a payment, wait for auto-cancel, reopen app → no error haptic, no query storm
+- Normal order transitions (placed → accepted → preparing) → haptics still fire correctly
+- Razorpay payment success (`payment_pending → placed`) → no haptic (suppressed, but buyer sees on-screen confirmation already)
 
 ---
 
@@ -167,8 +127,8 @@ const linkedOid = n.payload?.orderId || n.payload?.order_id || n.reference_path?
 
 | # | Bug | File | Confidence | Severity | Effort |
 |---|-----|------|-----------|----------|--------|
-| 1 | Stale order notifications never cleaned — `'order'` type missing from eligible set | `useNotifications.ts` line 44 | 100% | High — permanent badge inflation | ~3 min |
-| 2 | `orderId` camelCase key missed in terminal filter | `useNotifications.ts` lines 52, 71, 133, 164 | 100% | Medium-High — stale home banner | ~3 min |
+| 1 | Cold-start cleanup doesn't invalidate banner query | `useAppLifecycle.ts` line 40 | 100% | Medium-High — stale banner for 30s | ~1 min |
+| 2 | Realtime fires error haptics for `payment_pending` cancellations | `useBuyerOrderAlerts.ts` line 49 | 100% | Medium-High — phantom buzzes on cold start | ~1 min |
 
-Both bugs are in the same file. All fixes are additive string additions — no logic changes, no schema changes, no refactoring.
+Both fixes are 1-2 line additions. No schema changes, no refactoring, no new features.
 
