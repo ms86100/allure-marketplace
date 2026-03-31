@@ -155,6 +155,9 @@ export function useAuthState() {
 
   // Auth state listener
   useEffect(() => {
+    // Track whether the restore-from-native path has completed
+    let restoreCompleted = false;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         const newUserId = session?.user?.id;
@@ -173,9 +176,13 @@ export function useAuthState() {
         }
         prevUserIdRef.current = newUserId;
 
-        setPartial({ session, user: session?.user ?? null, isLoading: false });
-
+        // KEY FIX: When onAuthStateChange fires with a valid session,
+        // immediately mark session as restored. Don't wait for the slower
+        // restoreAuthSession() → getSession() chain to complete.
+        // This eliminates the 3-5s mandatory delay on app reopen.
         if (session?.user) {
+          setPartial({ session, user: session.user, isLoading: false, isSessionRestored: true });
+          hideSplashScreen();
           if (profileFetchedFor.current !== session.user.id) {
             profileFetchedFor.current = session.user.id;
             setTimeout(() => fetchProfile(session.user.id), 0);
@@ -189,12 +196,15 @@ export function useAuthState() {
           isExplicitSignOut.current = false;
           clearAuthState();
         } else {
-          clearAuthState();
+          // No session and not a sign-out: mark restored so UI isn't stuck on spinner
+          setPartial({ isLoading: false, isSessionRestored: true });
+          hideSplashScreen();
         }
       }
     );
 
     // Restore session from native storage before reading — handles iOS localStorage purge
+    // This is a BACKUP path: if onAuthStateChange already fired, it's a no-op.
     // Wrapped in a 3-second timeout to prevent hanging if Preferences is slow/broken
     const restoreWithTimeout = Promise.race([
       restoreAuthSession(),
@@ -205,17 +215,17 @@ export function useAuthState() {
     ]);
 
     restoreWithTimeout.finally(() => {
+      restoreCompleted = true;
       supabase.auth.getSession().then(({ data: { session } }) => {
         const newUserId = session?.user?.id;
         // Perf: skip user/session update if onAuthStateChange already set same user
         if (newUserId && newUserId === prevUserIdRef.current) {
-          // Only mark session as restored (no new user/session refs)
+          // Ensure isSessionRestored is true (idempotent if already set by onAuthStateChange)
           setPartial({ isSessionRestored: true });
         } else {
           prevUserIdRef.current = newUserId;
           setPartial({ session, user: session?.user ?? null, isLoading: false, isSessionRestored: true });
         }
-        // Hide splash screen now that session is resolved
         hideSplashScreen();
         if (session?.user && profileFetchedFor.current !== session.user.id) {
           profileFetchedFor.current = session.user.id;
