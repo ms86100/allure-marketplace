@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
+import { cleanupStaleDeliveryNotifications, type UserNotification } from '@/hooks/queries/useNotifications';
 
 /**
  * Listens for Capacitor appStateChange events and invalidates critical
