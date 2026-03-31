@@ -75,10 +75,13 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
 
   const navigate = useNavigate();
 
+  const isStockEmpty = isCartAction && canonicalStockQty != null && canonicalStockQty <= 0;
+
   const handleAdd = useCallback(() => {
     if (!product) return;
     if (actionType === 'contact_seller') { setContactOpen(true); return; }
     if (!isCartAction) { setEnquiryOpen(true); return; }
+    if (canonicalStockQty != null && canonicalStockQty <= 0) { toast.error('This item is currently out of stock'); return; }
     hapticImpact('medium');
     addItem({
       id: product.product_id, seller_id: product.seller_id,
