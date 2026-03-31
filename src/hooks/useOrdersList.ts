@@ -25,9 +25,11 @@ async function fetchOrdersPage(
       .order('created_at', { ascending: false })
       .limit(PAGE_SIZE);
 
+    // Always hide payment_pending from buyer views — these are transient pre-payment states
+    query = query.neq('status', 'payment_pending');
+
     if (filter === 'active' && terminalSet.size > 0) {
-      const terminalArr = [...terminalSet, 'payment_pending'];
-      query = query.not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`);
+      query = query.not('status', 'in', `(${[...terminalSet].map(s => `"${s}"`).join(',')})`);
     } else if (filter === 'completed' && successSet.size > 0) {
       query = query.in('status', [...successSet] as any);
     } else if (filter === 'cancelled' && terminalSet.size > 0 && successSet.size > 0) {

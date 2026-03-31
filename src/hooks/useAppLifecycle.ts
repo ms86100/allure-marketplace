@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
+import { cleanupStaleDeliveryNotifications, type UserNotification } from '@/hooks/queries/useNotifications';
 
 /**
  * Listens for Capacitor appStateChange events and invalidates critical
@@ -12,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 export function useAppLifecycle() {
   const queryClient = useQueryClient();
   const autoCancelFiredRef = useRef(false);
+  const staleCleanupFiredRef = useRef(false);
 
   // Trigger auto-cancel on cold start to sweep stale payment_pending orders
   useEffect(() => {
@@ -20,6 +22,27 @@ export function useAppLifecycle() {
     supabase.functions.invoke('auto-cancel-orders').catch((e) => {
       console.warn('[AppLifecycle] auto-cancel-orders cold-start sweep failed:', e);
     });
+
+    // One-time stale notification cleanup on cold start
+    if (!staleCleanupFiredRef.current) {
+      staleCleanupFiredRef.current = true;
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) return;
+        supabase
+          .from('user_notifications')
+          .select('id, title, body, type, reference_path, is_read, created_at, payload')
+          .eq('user_id', user.id)
+          .eq('is_read', false)
+          .limit(100)
+          .then(({ data }) => {
+            if (data && data.length > 0) {
+              cleanupStaleDeliveryNotifications(data as UserNotification[]).then(() => {
+                queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
+              });
+            }
+          });
+      });
+    }
   }, []);
 
   // Push-driven sync: invalidate all critical queries on terminal order push

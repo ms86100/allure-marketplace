@@ -81,6 +81,15 @@ export function ReorderButton({
         return;
       }
 
+      // Warn buyer if any prices changed since original order
+      const priceChanged = availableProducts.some(p => {
+        const original = orderItems.find(oi => oi.product_id === p.id);
+        return original?.unit_price != null && p.price !== original.unit_price;
+      });
+      if (priceChanged) {
+        toast.info('Heads up: Some prices may have changed since your last order');
+      }
+
       const cartInserts = orderItems
         .filter(item => 
           item.product_id && 

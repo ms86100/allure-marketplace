@@ -392,9 +392,15 @@ export default function OrderDetailPage() {
             <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 flex items-start gap-2.5">
               <XCircle className="text-destructive shrink-0 mt-0.5" size={16} />
               <div>
-                <p className="text-sm font-semibold text-destructive">{order.rejection_reason?.startsWith('Cancelled by buyer:') ? 'Order Cancelled' : 'Auto-Cancelled'}</p>
+                <p className="text-sm font-semibold text-destructive">{
+                  order.rejection_reason?.startsWith('Cancelled by buyer:')
+                    ? 'You Cancelled This Order'
+                    : /not completed in time|seller didn't respond|payment was not completed/i.test(order.rejection_reason || '')
+                      ? 'Auto-Cancelled'
+                      : 'Cancelled by Seller'
+                }</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{order.rejection_reason?.replace(/^Cancelled by buyer:\s*/i, '')}</p>
-                {o.isSellerView && !order.rejection_reason?.startsWith('Cancelled by buyer:') && (
+                {o.isSellerView && /not completed in time|seller didn't respond/i.test(order.rejection_reason || '') && (
                   <p className="text-[11px] text-primary mt-1.5 font-medium">💡 Tip: Respond within 3 minutes to avoid auto-cancellation</p>
                 )}
               </div>
@@ -685,7 +691,13 @@ export default function OrderDetailPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold">{o.isSellerView ? buyer?.name : seller?.business_name}</p>
-                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5"><MapPin size={11} />Block {o.isSellerView ? buyer?.block : sellerProfile?.block}, {o.isSellerView ? buyer?.flat_number : sellerProfile?.flat_number}</p>
+                {(() => {
+                  const block = o.isSellerView ? buyer?.block : sellerProfile?.block;
+                  const flat = o.isSellerView ? buyer?.flat_number : sellerProfile?.flat_number;
+                  return (block || flat) ? (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5"><MapPin size={11} />{block ? `Block ${block}` : ''}{block && flat ? ', ' : ''}{flat || ''}</p>
+                  ) : null;
+                })()}
               </div>
               {(o.isSellerView ? buyer?.phone : sellerProfile?.phone) && (
                 <a href={`tel:${o.isSellerView ? buyer?.phone : sellerProfile?.phone}`} className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center"><Phone size={16} className="text-accent" /></a>
