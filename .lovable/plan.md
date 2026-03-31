@@ -1,91 +1,75 @@
 
 
-# Fix Plan: 3 Production Issues
+# Fix: Seller Not Receiving Notifications for All Stores
 
-## Issue 1: Inconsistent Seller Notification Delivery
+## Root Cause
 
-### Root Cause (Verified)
+There are **two distinct problems**:
 
-Two separate problems:
+### Problem 1: COD Orders — No Push Notification At All
 
-**A. Duplicate source in `razorpay-webhook/index.ts`**
-`confirm-razorpay-payment` was already cleaned up (line 217: "Seller notification is handled by the DB trigger"). But `razorpay-webhook/index.ts` lines 196-222 still manually insert into `notification_queue` with `type: 'order'`. This creates a DUPLICATE alongside the DB trigger's `type: 'order_status'` entry.
+The INSERT trigger `trg_enqueue_order_placed_notification` was **dropped** in migration `20260301064847` and never replaced. The only remaining trigger is `trg_enqueue_order_status_notification` which fires on **AFTER UPDATE** only.
 
-The DB trigger coverage is verified complete:
-- `trg_enqueue_order_notification` → AFTER UPDATE (Razorpay payment confirmation updates status to `placed`)
-- `trg_enqueue_order_placed_notification` → AFTER INSERT with `status = 'placed'` (COD orders)
-- Both triggers have 30-second dedup guards built in
+- **COD orders** are inserted directly with `status = 'placed'` — no subsequent UPDATE occurs → **trigger never fires** → seller gets zero push notification
+- **Razorpay/UPI orders** are inserted as `payment_pending`, then updated to `placed` on payment confirmation → trigger fires correctly
 
-Removing the webhook's manual insert is safe.
+This explains the "sometimes works, sometimes doesn't" behavior — it's deterministic based on payment method.
 
-**B. State-mismatch guard kills valid "New Order" pushes**
-In `process-notification-queue/index.ts` line 177:
-```
-if ((isStale && isTerminal) || isStateMismatch)
-```
-The `isStateMismatch` check fires independently. If an order auto-cancels within 3 minutes, the "New Order" push has `payload.status = 'placed'` but the DB shows `status = 'cancelled'` → push silently suppressed. The seller never knows the order existed.
+### Problem 2: In-App Alerts Already Work Across All Stores ✅
 
-### Fix
+`GlobalSellerAlert` in `App.tsx` (line 325-327) already passes **all** seller profile IDs to `useNewOrderAlert`. The realtime subscription and polling both check against all seller IDs. This part is correct.
 
-**File: `supabase/functions/razorpay-webhook/index.ts`**
-- Remove lines 196-222 (manual seller notification insert). The DB trigger handles this.
+### Problem 3: Push Notifications Already Work Across All Stores ✅
 
-**File: `supabase/functions/process-notification-queue/index.ts`** (line 177)
-- Exempt `placed` and `enquired` statuses from the state-mismatch guard:
-```typescript
-const isNewOrderNotif = ['placed', 'enquired', 'requested'].includes(item.payload?.status);
-if (((isStale && isTerminal) || isStateMismatch) && !isNewOrderNotif) {
-```
+The DB trigger `fn_enqueue_order_status_notification` resolves `seller_profiles.user_id` from the order's `seller_id`. Since all stores belonging to one seller share the same `user_id`, push goes to the correct person regardless of which store is selected. This part is also correct — but only when the trigger fires (i.e., non-COD orders).
 
-**Idempotency is already guaranteed** by:
-1. DB trigger's 30-second dedup window (checks existing queue entry with same `user_id` + `title` + `orderId`)
-2. `queue_item_id` unique constraint on `user_notifications` (prevents duplicate in-app entries)
+## Fix
 
----
+### Database Migration: Re-add INSERT Trigger for New Orders
 
-## Issue 2: Cancellation Message Says "You Cancelled" to Both Roles
+Add an `AFTER INSERT` trigger on orders that calls the same `fn_enqueue_order_status_notification` function, with a guard so it only fires for actionable statuses (`placed`, `enquired`).
 
-### Root Cause
-`OrderDetailPage.tsx` line 395-401 shows "You Cancelled This Order" for buyer-initiated cancellations regardless of who is viewing. Both buyer and seller see "You Cancelled This Order."
+The existing function already handles all the notification logic correctly — it just needs to also be called on INSERT.
 
-### Fix
-**File: `src/pages/OrderDetailPage.tsx`** (lines 395-401)
-Make the label role-aware:
-```typescript
-order.rejection_reason?.startsWith('Cancelled by buyer:')
-  ? (o.isBuyerView ? 'You Cancelled This Order' : 'Cancelled by Buyer')
-  : /not completed in time|seller didn't respond|payment was not completed/i.test(order.rejection_reason || '')
-    ? 'Auto-Cancelled'
-    : (o.isSellerView ? 'You Cancelled This Order' : 'Cancelled by Seller')
+```sql
+-- Add AFTER INSERT trigger to cover COD orders (inserted directly as 'placed')
+CREATE OR REPLACE TRIGGER trg_enqueue_order_notification_insert
+  AFTER INSERT ON public.orders
+  FOR EACH ROW
+  WHEN (NEW.status IN ('placed', 'enquired'))
+  EXECUTE FUNCTION public.fn_enqueue_order_status_notification();
 ```
 
----
-
-## Issue 3: iOS Background Location Missing `location` Background Mode
-
-### Root Cause
-`codemagic.yaml` lines 347-349 add `UIBackgroundModes` with only `remote-notification` and `fetch`. The `location` mode is missing, causing the Transistorsoft background geolocation plugin to fail with "plugin not implemented on iOS."
-
-### Fix
-**File: `codemagic.yaml`** — After line 349 and line 1240 (both iOS workflows):
-```yaml
-/usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:2 string location" App/Info.plist 2>/dev/null || true
+**One concern**: `fn_enqueue_order_status_notification` has a guard at line 32:
+```sql
+IF OLD.status IS NOT DISTINCT FROM NEW.status THEN RETURN NEW; END IF;
 ```
 
----
+On INSERT, `OLD` is `NULL`, so `NULL IS NOT DISTINCT FROM 'placed'` → `FALSE` → the guard passes correctly. ✅
+
+It also checks `OLD.status = 'payment_pending'` at line 38 — on INSERT, `OLD.status` is `NULL`, so that guard also passes correctly. ✅
+
+### No Code Changes Required
+
+- In-app alerts: already multi-store ✅
+- Push delivery pipeline: already multi-store ✅
+- The only fix is the missing INSERT trigger
 
 ## Summary
 
-| # | Issue | File | Fix | Risk |
-|---|-------|------|-----|------|
-| 1a | Duplicate notification from webhook | `razorpay-webhook/index.ts` | Remove manual insert (lines 196-222) | Low — DB trigger verified for all paths |
-| 1b | State-mismatch guard kills new-order pushes | `process-notification-queue/index.ts` | Exempt `placed`/`enquired`/`requested` from mismatch | Low — existing dedup prevents duplicates |
-| 2 | "You Cancelled" shown to wrong role | `OrderDetailPage.tsx` | Role-aware label using `o.isBuyerView`/`o.isSellerView` | Zero — display only |
-| 3 | Missing iOS `location` background mode | `codemagic.yaml` | Add `UIBackgroundModes:2 string location` | Low — requires rebuild |
+| Component | Status |
+|-----------|--------|
+| In-app bell alerts (all stores) | Already works ✅ |
+| Push notifications (all stores) | Already works ✅ |
+| COD order notifications | **BROKEN** — missing INSERT trigger |
+| Online payment order notifications | Works ✅ |
+
+**Single fix**: One SQL migration to add the INSERT trigger.
 
 ## Validation
-- Place 5 orders (mix COD + Razorpay) → seller receives ALL 5 push notifications
-- Buyer cancels → seller sees "Cancelled by Buyer", buyer sees "You Cancelled This Order"
-- Rapid cancel test: place order → auto-cancel within 3 min → seller still receives "New Order" push
-- iOS rebuild → background location tracking works, no "not implemented" error
+
+1. Place a **COD order** → seller receives push notification immediately
+2. Place a **Razorpay order** → seller receives push notification (no regression)
+3. Multi-store seller: place orders on **Store A and Store B** → seller receives notifications for both without switching stores
+4. Check `notification_queue` has entries for both COD and online orders
 
