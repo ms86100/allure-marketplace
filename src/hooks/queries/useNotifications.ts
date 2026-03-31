@@ -50,7 +50,7 @@ export async function cleanupStaleDeliveryNotifications(notifications: UserNotif
     const orderIds = new Set<string>();
     for (const n of notifications) {
       if (!n.is_read && staleEligibleTypes.has(n.type)) {
-        const oid = (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
+        const oid = (n.payload as any)?.orderId || (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
         if (oid) {
           orderIds.add(oid);
           unreadDeliveryNotifs.push(n);
