@@ -193,34 +193,7 @@ serve(async (req) => {
           continue;
         }
 
-        // STEP 3: Notification ONLY if DB actually changed rows
-        const order = updatedOrder[0];
-        const { data: sellerProfile } = await supabase
-          .from('seller_profiles')
-          .select('user_id')
-          .eq('id', order.seller_id)
-          .single();
-
-        const { data: buyerProfile } = await supabase
-          .from('profiles')
-          .select('name')
-          .eq('id', order.buyer_id)
-          .single();
-
-        if (sellerProfile?.user_id) {
-          const buyerName = buyerProfile?.name || 'A buyer';
-          await supabase
-            .from('notification_queue')
-            .insert({
-              user_id: sellerProfile.user_id,
-              type: 'order',
-              title: '🆕 New Order Received!',
-              body: `${buyerName} placed an order. Tap to view and accept.`,
-              reference_path: `/orders/${orderId}`,
-              payload: { orderId, status: 'placed', type: 'order' },
-            });
-        }
-
+        // Seller notification is handled by the DB trigger (trg_enqueue_order_notification)
         console.log(`[razorpay-webhook] ✅ order=${orderId} result=advanced razorpay_payment_id=${razorpayPaymentId}`);
       }
     } else if (event === 'payment.failed') {

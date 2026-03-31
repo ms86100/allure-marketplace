@@ -394,10 +394,10 @@ export default function OrderDetailPage() {
               <div>
                 <p className="text-sm font-semibold text-destructive">{
                   order.rejection_reason?.startsWith('Cancelled by buyer:')
-                    ? 'You Cancelled This Order'
+                    ? (o.isBuyerView ? 'You Cancelled This Order' : 'Cancelled by Buyer')
                     : /not completed in time|seller didn't respond|payment was not completed/i.test(order.rejection_reason || '')
                       ? 'Auto-Cancelled'
-                      : 'Cancelled by Seller'
+                      : (o.isSellerView ? 'You Cancelled This Order' : 'Cancelled by Seller')
                 }</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{order.rejection_reason?.replace(/^Cancelled by buyer:\s*/i, '')}</p>
                 {o.isSellerView && /not completed in time|seller didn't respond/i.test(order.rejection_reason || '') && (
