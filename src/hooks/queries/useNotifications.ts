@@ -19,6 +19,7 @@ export interface NotificationPayload {
   action?: string;
   reference_path?: string;
   order_id?: string;
+  orderId?: string;
   [key: string]: unknown;
 }
 
@@ -44,12 +45,13 @@ export async function cleanupStaleDeliveryNotifications(notifications: UserNotif
     const staleEligibleTypes = new Set([
       'delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent',
       'order_status', 'order_update', 'order_placed', 'order_confirmed', 'order_preparing', 'order_ready',
+      'order',  // DB trigger uses 'order' as the column type for all order status notifications
     ]);
     const unreadDeliveryNotifs: UserNotification[] = [];
     const orderIds = new Set<string>();
     for (const n of notifications) {
       if (!n.is_read && staleEligibleTypes.has(n.type)) {
-        const oid = (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
+        const oid = (n.payload as any)?.orderId || (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
         if (oid) {
           orderIds.add(oid);
           unreadDeliveryNotifs.push(n);
@@ -68,7 +70,7 @@ export async function cleanupStaleDeliveryNotifications(notifications: UserNotif
     const terminalSet = new Set(terminalOrders.map((o: any) => o.id));
     const staleIds = unreadDeliveryNotifs
       .filter(n => {
-        const oid = (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
+        const oid = (n.payload as any)?.orderId || (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
         return oid && terminalSet.has(oid);
       })
       .map(n => n.id);
@@ -130,7 +132,7 @@ export function useLatestActionNotification(userId: string | undefined) {
       // Collect order-linked notifications for recency gating (read-only check)
       const orderIds = new Set<string>();
       for (const n of notifications) {
-        const oid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
+        const oid = n.payload?.orderId || n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
         if (oid) orderIds.add(oid);
       }
 
@@ -161,7 +163,7 @@ export function useLatestActionNotification(userId: string | undefined) {
 
       // Return first valid notification — skip terminal + stale (>24h) orders
       for (const n of notifications) {
-        const linkedOid = n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
+        const linkedOid = n.payload?.orderId || n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
         if (linkedOid && (terminalOrderIds.has(linkedOid) || staleOrderIds.has(linkedOid))) continue;
         if (n?.payload?.action) return n;
         if (n.reference_path?.startsWith('/orders/')) {
