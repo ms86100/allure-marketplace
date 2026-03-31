@@ -360,6 +360,22 @@ export function DraftProductManager({
         } catch {
           // keep defaults
         }
+
+        // Bug 4: Load availability schedule from DB
+        try {
+          const { data: schedData } = await supabase
+            .from('service_availability_schedules')
+            .select('*')
+            .eq('product_id', product.id);
+          if (schedData && schedData.length > 0) {
+            setAvailabilitySchedule(prev => prev.map(day => {
+              const saved = schedData.find((s: any) => s.day_of_week === day.day_of_week);
+              return saved ? { ...day, start_time: saved.start_time, end_time: saved.end_time, is_active: saved.is_active } : day;
+            }));
+          }
+        } catch {
+          // keep defaults
+        }
       }
     }
   };
