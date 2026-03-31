@@ -179,7 +179,7 @@ export default function SellerProductsPage() {
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <Button size="sm" variant="outline" onClick={() => sp.openEditDialog(product)}><Edit size={14} className="mr-1" />Edit</Button>
                         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => sp.setDeleteTarget(product)}><Trash2 size={14} /></Button>
-                        {approvalStatus === 'draft' && <Button size="sm" variant="secondary" onClick={async () => { const { error } = await supabase.from('products').update({ approval_status: 'pending' } as any).eq('id', product.id); if (error) { toast.error('Failed to submit'); return; } toast.success('Submitted for approval'); if (sp.sellerProfile) sp.fetchData(sp.sellerProfile.id); }}><Send size={14} className="mr-1" />Submit</Button>}
+                        {approvalStatus === 'draft' && <Button size="sm" variant="secondary" onClick={async () => { if (!product.image_url) { toast.error('Add an image before submitting for approval'); return; } const { error } = await supabase.from('products').update({ approval_status: 'pending' } as any).eq('id', product.id); if (error) { toast.error('Failed to submit'); return; } toast.success('Submitted for approval'); if (sp.sellerProfile) sp.fetchData(sp.sellerProfile.id); }}><Send size={14} className="mr-1" />Submit</Button>}
                         {showPendingHint && <span className="text-xs text-muted-foreground italic">Under review — edits are still allowed</span>}
                       </div>
                     </div>

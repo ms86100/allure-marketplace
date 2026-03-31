@@ -468,6 +468,22 @@ export function useCartPage() {
       }
     }
 
+    // Daily order limit enforcement
+    for (const group of sellerGroups) {
+      const dailyLimit = (group.items[0]?.product?.seller as any)?.daily_order_limit;
+      if (dailyLimit && dailyLimit > 0) {
+        const now = new Date();
+        const istOffset = 5.5 * 60 * 60 * 1000;
+        const istNow = new Date(now.getTime() + istOffset);
+        const todayStart = new Date(Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate()) - istOffset).toISOString();
+        const { count } = await supabase.from('orders').select('id', { count: 'exact', head: true }).eq('seller_id', group.sellerId).gte('created_at', todayStart).not('status', 'in', '("cancelled","payment_pending")');
+        if ((count || 0) >= dailyLimit) {
+          toast.error(`${group.sellerName} has reached their daily order limit. Please try again tomorrow.`, { id: 'checkout-daily-limit' });
+          return;
+        }
+      }
+    }
+
     for (const group of sellerGroups) {
       const minOrder = (group.items[0]?.product?.seller as any)?.minimum_order_amount;
       if (minOrder && group.subtotal < minOrder) { toast.error(`${group.sellerName} requires a minimum order of ${formatPrice(minOrder)}. Your current total is ${formatPrice(group.subtotal)}.`, { id: 'checkout-min-order' }); return; }
