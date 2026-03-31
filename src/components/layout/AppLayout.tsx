@@ -41,7 +41,7 @@ export function AppLayout({
       {!showHeader && (
         <div
           className="sticky top-0 z-20 bg-background"
-          style={{ height: 'max(env(safe-area-inset-top, 0px), 0px)' }}
+          style={{ height: 'max(env(safe-area-inset-top, 0px), 0.75rem)' }}
           aria-hidden
         />
       )}
