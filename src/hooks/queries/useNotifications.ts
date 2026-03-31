@@ -69,7 +69,7 @@ export async function cleanupStaleDeliveryNotifications(notifications: UserNotif
     const terminalSet = new Set(terminalOrders.map((o: any) => o.id));
     const staleIds = unreadDeliveryNotifs
       .filter(n => {
-        const oid = (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
+        const oid = (n.payload as any)?.orderId || (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
         return oid && terminalSet.has(oid);
       })
       .map(n => n.id);
