@@ -126,7 +126,7 @@ export function useSellerSettings() {
     if (!formData.business_name.trim()) { toast.error('Please enter a business name', { id: 'settings-validation' }); return; }
     if (formData.categories.length === 0) { toast.error('Please select at least one category', { id: 'settings-validation' }); return; }
     if (formData.accepts_upi && !formData.upi_id.trim()) { toast.error('Please enter your UPI ID', { id: 'settings-validation' }); return; }
-    if (formData.operating_days.length === 0) { toast.warning('No operating days selected — your store may appear closed to buyers', { id: 'settings-days-warn' }); }
+    if (formData.operating_days.length === 0) { toast.error('Select at least one operating day, or use "Pause Shop" to temporarily close', { id: 'settings-days-error' }); return; }
 
     setIsSaving(true);
     try {

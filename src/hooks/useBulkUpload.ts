@@ -130,7 +130,8 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
       if (!row.name.trim()) errors.push('Name required');
       const price = parseFloat(row.price);
       if (isNaN(price) || price <= 0) errors.push('Invalid price');
-      if (row.category && !categorySlugs.includes(row.category)) errors.push('Invalid category');
+      if (!row.category) errors.push('Category required');
+      else if (!categorySlugs.includes(row.category)) errors.push('Invalid category');
 
       const config = getCategoryConfig(row.category, allowedCategories);
       if (config && !config.formHints.showVegToggle && !row.is_veg) errors.push('Veg toggle not applicable');
