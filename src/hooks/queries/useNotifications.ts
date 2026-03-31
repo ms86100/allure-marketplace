@@ -44,6 +44,7 @@ export async function cleanupStaleDeliveryNotifications(notifications: UserNotif
     const staleEligibleTypes = new Set([
       'delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent',
       'order_status', 'order_update', 'order_placed', 'order_confirmed', 'order_preparing', 'order_ready',
+      'order',  // DB trigger uses 'order' as the column type for all order status notifications
     ]);
     const unreadDeliveryNotifs: UserNotification[] = [];
     const orderIds = new Set<string>();
