@@ -157,6 +157,45 @@ Deno.serve(async (req) => {
           }
         }
 
+        // Guards: staleness + terminal-state + state-mismatch for order notifications
+        const isOrderNotif = ['order_status', 'order', 'order_update'].includes(item.type);
+        if (isOrderNotif && item.payload?.orderId) {
+          const ageMs = Date.now() - new Date(item.created_at).getTime();
+          const isStale = ageMs > 5 * 60 * 1000;
+
+          const { data: orderCheck } = await supabase
+            .from("orders")
+            .select("status")
+            .eq("id", item.payload.orderId)
+            .single();
+
+          if (orderCheck) {
+            const terminalStatuses = ['delivered', 'completed', 'cancelled', 'no_show'];
+            const isTerminal = terminalStatuses.includes(orderCheck.status);
+            const isStateMismatch = item.payload?.status && item.payload.status !== orderCheck.status;
+
+            if ((isStale && isTerminal) || isStateMismatch) {
+              await supabase.from("user_notifications").insert({
+                user_id: item.user_id,
+                title: item.title,
+                body: item.body,
+                type: item.type,
+                reference_path: item.reference_path,
+                queue_item_id: item.id,
+                payload: item.payload,
+                is_read: true,
+              });
+              await supabase
+                .from("notification_queue")
+                .update({ status: "processed", processed_at: new Date().toISOString() })
+                .eq("id", item.id);
+              processed++;
+              console.log(`[Queue][${item.id}] Skipped push: stale=${isStale}, terminal=${isTerminal}, mismatch=${isStateMismatch}`);
+              continue;
+            }
+          }
+        }
+
         // C5: Insert into user_notifications with queue_item_id to deduplicate on retry
         const { error: insertError } = await supabase
           .from("user_notifications")
