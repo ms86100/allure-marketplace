@@ -155,7 +155,8 @@ export function useSellerOrdersInfinite(sellerId: string | null, filter: string 
         .select(`*, buyer:profiles!orders_buyer_id_fkey(name, block, flat_number, phone), items:order_items(id, product_name, quantity, unit_price, status)`)
         .eq('seller_id', sellerId!)
         .order('created_at', { ascending: false })
-        .limit(PAGE_SIZE);
+        .limit(PAGE_SIZE)
+        .neq('status', 'payment_pending');
 
       // Apply filter
       const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
