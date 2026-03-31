@@ -19,6 +19,7 @@ export interface NotificationPayload {
   action?: string;
   reference_path?: string;
   order_id?: string;
+  orderId?: string;
   [key: string]: unknown;
 }
 
