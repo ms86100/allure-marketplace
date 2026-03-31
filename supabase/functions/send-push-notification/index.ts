@@ -99,7 +99,7 @@ async function sendApnsDirectNotification(
     const apnsPayload: Record<string, unknown> = {
       aps: {
         alert: { title, body },
-        sound: "gate_bell.caf",
+        sound: "gate_bell.mp3",
         badge: 1,
         "mutable-content": imageUrl ? 1 : 0,
         ...(threadId ? { "thread-id": threadId } : {}),
@@ -241,7 +241,7 @@ async function sendFCMNotification(
 
   const apnsAps: Record<string, unknown> = {
     alert: { title, body },
-    sound: "gate_bell.caf",
+    sound: "gate_bell.mp3",
     badge: 1,
   };
   if (imageUrl) apnsAps["mutable-content"] = 1;

@@ -91,6 +91,7 @@ export function useNotifications(userId: string | undefined) {
         .select('id, title, body, type, reference_path, is_read, created_at, payload')
         .eq('user_id', userId!)
         .not('type', 'in', SELLER_ONLY_FILTER)
+        .not('payload->>target_role', 'eq', 'seller')
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE);
 
@@ -124,6 +125,7 @@ export function useLatestActionNotification(userId: string | undefined) {
         .eq('is_read', false)
         .not('payload', 'is', null)
         .not('type', 'in', SELLER_ONLY_FILTER)
+        .not('payload->>target_role', 'eq', 'seller')
         .order('created_at', { ascending: false })
         .limit(10);
       const notifications = (data as unknown as UserNotification[]) || [];

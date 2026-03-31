@@ -21,7 +21,8 @@ export function useUnreadNotificationCount() {
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('is_read', false)
-        .not('type', 'in', SELLER_ONLY_FILTER);
+        .not('type', 'in', SELLER_ONLY_FILTER)
+        .not('payload->>target_role', 'eq', 'seller');
       return count || 0;
     },
     enabled: !!user,
