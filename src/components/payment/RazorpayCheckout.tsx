@@ -124,7 +124,12 @@ export function RazorpayCheckout({
           console.log('[Payment] onDismiss suppressed — successFinal:', successFinalRef.current, 'status:', statusRef.current);
           return;
         }
+        // Close the drawer entirely instead of resetting to 'pending' (which causes a loop)
+        if (onDismiss) {
+          onDismiss();
+        }
         setStatus('pending');
+        onClose();
       },
     });
   };
