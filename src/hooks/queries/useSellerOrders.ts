@@ -38,7 +38,7 @@ export function useSellerOrderStats(sellerId: string | null) {
       // With 1-2 users this is tiny; even at scale the seller's own orders are bounded
       const { data: orders } = await supabase
         .from('orders')
-        .select('status, total_amount, created_at')
+        .select('status, total_amount, created_at, payment_status')
         .eq('seller_id', sellerId!);
 
       const rows = orders || [];
