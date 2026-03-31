@@ -209,6 +209,42 @@ serve(async (req) => {
       }
 
       if (!updated || updated.length === 0) {
+        // Resurrection: if order was auto-cancelled but payment is genuine, recover it
+        const { data: cancelledOrder } = await supabase
+          .from("orders")
+          .select("id, status, payment_status")
+          .eq("id", orderId)
+          .eq("status", "cancelled")
+          .eq("payment_status", "pending")
+          .single();
+
+        if (cancelledOrder) {
+          const { error: resurrectErr } = await supabase
+            .from("orders")
+            .update({
+              status: "placed",
+              payment_status: "paid",
+              razorpay_payment_id: verifiedPaymentId,
+              rejection_reason: null,
+              auto_cancel_at: null,
+              updated_at: now,
+            })
+            .eq("id", orderId)
+            .eq("status", "cancelled");
+
+          if (resurrectErr) {
+            console.error(`[confirm-razorpay][${source}] Resurrection failed for ${orderId}:`, resurrectErr);
+            results.push({ id: orderId, success: false });
+            continue;
+          }
+
+          console.log(
+            `[confirm-razorpay-payment][${source}] ✅ Resurrected cancelled order=${orderId} razorpay_payment_id=${verifiedPaymentId}`
+          );
+          results.push({ id: orderId, success: true });
+          continue;
+        }
+
         console.log(`Order ${orderId} already advanced — no notification needed`);
         results.push({ id: orderId, success: true, skipped: true });
         continue;

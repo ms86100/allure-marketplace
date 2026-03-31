@@ -85,6 +85,7 @@ app.post("/", async (c) => {
     // Find orders that have passed their auto_cancel_at time and are still in cancellable statuses
     const now = new Date().toISOString();
     const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const fortyFiveMinAgo = new Date(Date.now() - 45 * 60 * 1000).toISOString();
 
     // Query 1: Urgent orders past auto_cancel_at (skip if buyer already confirmed/paid)
     const { data: urgentExpired, error: urgentErr } = await supabase
@@ -95,14 +96,15 @@ app.post("/", async (c) => {
       .lt("auto_cancel_at", now)
       .not("payment_status", "in", "(buyer_confirmed,paid)");
 
-    // Query 2: Orphaned UPI/online orders — payment_status=pending, non-COD, older than 30 min
+    // Query 2: Orphaned UPI/online orders — payment_status=pending, non-COD
+    // Use 45-min grace period (up from 30) to give Razorpay webhook time to confirm
     const { data: orphanedUpi, error: orphanErr } = await supabase
       .from("orders")
       .select("id, buyer_id, seller_id, total_amount, razorpay_order_id")
       .in("status", cancellableStatuses)
       .eq("payment_status", "pending")
       .neq("payment_type", "cod")
-      .lt("created_at", thirtyMinAgo);
+      .lt("created_at", fortyFiveMinAgo);
 
     const fetchError = urgentErr || orphanErr;
 
