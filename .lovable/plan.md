@@ -1,153 +1,156 @@
 
 
-# 5 Critical Silent Buyer Bugs — Pre-Production Audit (Round 2)
+# 5 Critical Silent Seller Bugs — Pre-Production Audit
 
-## Bug 1: Out-of-Stock Products Show Active "Add" Button
+## Bug 1: Dashboard Store Toggle Has No Approval Guard
 
-**What**: `ProductListingCard.tsx` line 80 sets `isOutOfStock = !product.is_available`, and `ProductCard.tsx` line 46 sets `isDisabled = !product.is_available || isStoreClosed`. Neither checks `stock_quantity === 0`. A product with `is_available: true` but `stock_quantity: 0` displays a fully enabled "Add" button. When tapped, `useCart.addItem` eventually catches it (line 309-311) after querying the DB, showing a delayed "This item is out of stock" toast — but the card gives zero visual indication.
+**What**: `SellerDashboardPage.tsx` line 103-135 — `toggleAvailability` directly updates `is_available` without checking `verification_status`. The `useSellerSettings.ts` (line 108) correctly blocks non-approved sellers with `verification_status !== 'approved'`, but the dashboard toggle is completely unguarded. A pending/rejected seller can toggle their store "Open" from the dashboard, making them appear live to buyers before admin approval.
 
-**Where**: `ProductListingCard.tsx` line 80, line 196. `ProductCard.tsx` line 46, line 98/136.
+**Where**: `SellerDashboardPage.tsx`, `toggleAvailability` function.
 
-**Why critical**: Buyer taps "Add", waits for a network round-trip, gets a toast error. This creates a "bait and switch" feeling. At scale, products frequently hit 0 stock before the seller marks them unavailable. Every such interaction erodes trust.
+**Why critical**: This bypasses the entire admin approval workflow. A rejected seller can mark themselves as open. Buyers see an unapproved store and place orders that the seller may not be equipped to fulfill. This destroys platform trust and creates admin confusion.
 
-**Impact analysis**:
-- `ProductListingCard.tsx` — add `stock_quantity === 0` to `isOutOfStock` check
-- `ProductCard.tsx` — add `stockLimit <= 0` to `isDisabled` check
-- `ProductDetailSheet.tsx` — verify stock check on the detail sheet's Add button
-
-**Risks**:
-1. Products with `stock_quantity: null` (unlimited stock) must NOT be treated as out-of-stock — guard with `!= null && === 0` check.
-2. The "low stock" badge logic at line 87 already guards `> 0`, so no conflict.
-
-**Fix plan**:
-- `ProductListingCard.tsx` line 80: `const isOutOfStock = !product.is_available || (product.stock_quantity != null && product.stock_quantity <= 0);`
-- `ProductCard.tsx` line 46: `const isDisabled = !product.is_available || isStoreClosed || stockLimit <= 0;`
-- `ProductCard.tsx`: Add visual "Out of Stock" overlay when `stockLimit <= 0` (same as existing `!product.is_available` overlay)
-
----
-
-## Bug 2: Self-Pickup Orders Get Empty Delivery Address
-
-**What**: `useCartPage.ts` line 312-314 constructs the delivery address text. For self-pickup, it falls back to `[profile.block, profile.flat_number].filter(Boolean).join(', ')`. Marketplace users without a society (null block/flat) get an empty string `''` saved as `delivery_address`. The seller sees a blank address in their order detail.
-
-**Where**: `useCartPage.ts` line 312-314, used in `createOrdersForAllSellers`.
-
-**Why critical**: Seller sees an order with a blank delivery address. For self-pickup, the address is used as a pickup reference (where the buyer is from). Empty address makes the seller question the order's legitimacy.
+**Gap**: Settings page is guarded, dashboard is not — inconsistent enforcement of the same business rule across two surfaces.
 
 **Impact analysis**:
-- `useCartPage.ts` — fix fallback address construction
-- `OrderDetailPage.tsx` — verify it handles empty delivery_address gracefully (already conditional on sellerProfile fields, but the order's own `delivery_address` field may render blank)
+- `SellerDashboardPage.tsx` — add `verification_status !== 'approved'` guard
+- `StoreStatusCard.tsx` — already only shows toggle for approved status, but the parent can still call the unguarded function
 
 **Risks**:
-1. Changing the address format could affect existing orders' display — mitigate by only modifying future order creation, not rendering.
-2. For self_pickup, the address is reference-only (not for navigation) — a fallback like the user's profile name is sufficient.
+1. Sellers who are currently in `pending` state but had `is_available: true` from onboarding won't be affected — the guard only prevents toggling, not existing state.
+2. The `StoreStatusCard` already hides the toggle for non-approved sellers visually, but a programmatic call or race condition could still trigger it — the backend guard is the safety net.
 
-**Fix plan**: In `useCartPage.ts` line 314, add a fallback:
+**Fix**: Add early return at the top of `toggleAvailability`:
 ```typescript
-const deliveryAddressText = fulfillmentType === 'delivery' && selectedDeliveryAddress
-  ? [selectedDeliveryAddress.flat_number && `Flat ${selectedDeliveryAddress.flat_number}`, selectedDeliveryAddress.block && `Block ${selectedDeliveryAddress.block}`, selectedDeliveryAddress.building_name, selectedDeliveryAddress.landmark].filter(Boolean).join(', ')
-  : [profile.block && `Block ${profile.block}`, profile.flat_number].filter(Boolean).join(', ') || profile.name || 'Self Pickup';
+if (sellerProfile.verification_status !== 'approved') {
+  toast.error('Your store must be approved before you can go live');
+  return;
+}
 ```
 
 ---
 
-## Bug 3: Coupon Discount Shown on Confirm Dialog Even When Cart Changed
+## Bug 2: Seller Order Card Missing Buyer Phone — Can't Call Customer
 
-**What**: `CartPage.tsx` line 434 shows the confirm dialog with `c.finalAmount`. The `effectiveCouponDiscount` recalculates dynamically (line 190-199 in useCartPage), but there is no re-validation that the coupon is still valid at confirmation time. The `min_order_amount` auto-removal effect (line 182-188) only triggers on `totalAmount` change, but if the buyer modifies quantities *after* opening the confirm dialog (via the cart stepper), the dialog shows a stale total.
+**What**: `useSellerOrdersInfinite` (line 153) selects `buyer:profiles!orders_buyer_id_fkey(name, block, flat_number)` — **phone is missing**. But `SellerOrderCard.tsx` has buyer typed as `{ name: string; block: string; flat_number: string }` (line 29). When the seller navigates to order detail, buyer phone IS available (fetched in `useOrderDetail.ts`). But from the dashboard list, if the seller needs to quickly call a buyer, there's no phone data. The `useOrdersList.ts` for the Orders page DOES include phone (line 42), creating inconsistency.
 
-After deeper analysis: the confirm dialog reads `c.finalAmount` which recalculates each render, so the amount is correct. However, the available coupons list (`CouponInput`) fetches on mount and doesn't refetch when `totalAmount` changes — meaning a coupon that was ineligible at first load (below min_order_amount) stays ineligible in the UI even after the buyer adds more items. The `canApplyCoupon` check at line 91 uses the `totalAmount` prop correctly, but `availableCoupons` is fetched once on mount (line 53-78) and `userRedemptions` is also static.
+**Where**: `useSellerOrders.ts` line 153, `SellerOrderCard.tsx` line 29.
 
-**Revised finding**: Actually, `canApplyCoupon` rechecks dynamically against `totalAmount` prop. The available coupons list fetch only runs once per seller. If a coupon was added between page load and checkout (seller adds new coupon), it won't appear. This is low-severity.
+**Why critical**: On a busy day, a seller sees a new order on the dashboard and wants to call the buyer to confirm. They have to tap into the order detail page first. For urgent orders, this extra step wastes critical response time (especially with the 3-min auto-cancel timer).
 
-Let me re-examine for a stronger bug.
-
-**Revised Bug 3: ProductDetailSheet Allows Add When Stock is 0**
-
-**What**: `useProductDetail.ts` line 73 sets `stockLimit = canonicalStockQty ?? 99`. Line 74: `canIncrement = quantity < stockLimit`. But the initial "Add" action (line 78-94 `handleAdd`) never checks if `stockLimit <= 0`. It calls `addItem` unconditionally for cart-type products. The useCart `addItem` catches it after a DB query, but the detail sheet shows a fully enabled action button even when canonical stock is 0.
-
-**Where**: `useProductDetail.ts` line 78 (`handleAdd`), `ProductDetailSheet.tsx` action button.
-
-**Why critical**: The detail sheet is the highest-intent surface — buyer has explicitly opened the product. Allowing them to tap "Add to Cart" on a zero-stock item, only to get a delayed error toast, is the worst UX at the highest-intent moment.
+**Gap**: `useOrdersList.ts` (Orders page) includes phone. `useSellerOrdersInfinite` (Dashboard) does not. Two views of the same data with different completeness.
 
 **Impact analysis**:
-- `useProductDetail.ts` — add stock guard to `handleAdd`
-- `ProductDetailSheet.tsx` — show "Out of Stock" state when `stockLimit <= 0` and `canonicalStockQty !== null`
+- `useSellerOrders.ts` — add `phone` to the buyer select
+- `SellerOrderCard.tsx` — add `phone?: string` to buyer interface, optionally render call button
 
 **Risks**:
-1. `canonicalStockQty` is null until the async fetch completes — guard must only apply when `canonicalStockQty !== null && canonicalStockQty <= 0`.
-2. The action button is shared across action types — only apply stock guard for `isCartAction` products.
+1. Adding phone to the select marginally increases payload — negligible for bounded seller order lists.
+2. Exposing phone on the card could be a privacy concern — mitigate by only showing the call icon (not the number text).
 
-**Fix plan**:
-- `useProductDetail.ts` line 78: Add early return: `if (isCartAction && canonicalStockQty != null && canonicalStockQty <= 0) { toast.error('This item is out of stock'); return; }`
-- Export a `isStockEmpty` flag: `const isStockEmpty = canonicalStockQty != null && canonicalStockQty <= 0`
-- `ProductDetailSheet.tsx`: Disable add button and show "Out of Stock" when `d.isStockEmpty`
-
----
-
-## Bug 4: Realtime Order Updates Not Scoped to Buyer's Order
-
-**What**: `OrderDetailPage.tsx` has a realtime subscription for order updates. Looking at `useOrderDetail.ts`:
-
-Let me verify this properly.
-
-Actually, looking more carefully at the code, let me check a different area. Let me look at what happens after a successful order with COD — the cart is cleared asynchronously:
-
-**Revised Bug 4: COD Order Success Navigates Before Cart Clear — Back Button Shows Stale Cart**
-
-**What**: `useCartPage.ts` line 526-531 — on COD success, the code navigates to the order page FIRST, then clears the cart in the background (`clearCartAndCache().catch(() => {})`). If the buyer taps the back button quickly, they return to the cart page and see the same items (cache not yet cleared). Tapping "Place Order" again would create a duplicate order, but the idempotency key was already reset (line 360 — `if (!result.deduplicated) idempotencyKeyRef.current = null`).
-
-**Where**: `useCartPage.ts` line 526-531 (COD flow), line 360 (idempotency reset).
-
-**Why critical**: A buyer who navigates back to cart within ~1 second sees the same items and total. If they instinctively tap "Place Order" again (muscle memory), a second order is created. The idempotency key was reset, so the RPC treats it as a new order.
-
-**Impact analysis**:
-- `useCartPage.ts` — ensure cart is cleared BEFORE navigation for COD
-- Idempotency key reset timing — should only reset after cart clear succeeds
-
-**Risks**:
-1. Clearing cart before navigation adds latency to the success moment (~200ms for DB delete + cache clear) — mitigate by clearing cache optimistically (set to []) before the DB call.
-2. If cart clear fails, user could be stuck with items in cart and no clear feedback — already handled by `clearCartAndCache` which sets cache to empty arrays.
-
-**Fix plan**: In `useCartPage.ts` COD flow (line 519-533):
-```typescript
-// Clear cart BEFORE navigation to prevent back-button duplicate
-queryClient.setQueryData(['cart-items', user.id], []);
-queryClient.setQueryData(['cart-count', user.id], 0);
-navigate(orderIds.length === 1 ? `/orders/${orderIds[0]}` : '/orders');
-clearCartAndCache().catch(() => {}); // DB cleanup in background
+**Fix**: In `useSellerOrdersInfinite` line 153, change select to include `phone`:
 ```
-This optimistically empties the cache so back-button shows empty cart instantly.
+buyer:profiles!orders_buyer_id_fkey(name, block, flat_number, phone)
+```
+Update `SellerOrderCard` interface to add `phone?: string`.
 
 ---
 
-## Bug 5: Delivery Address Card Shows Profile Fallback Instead of Order's Saved Address
+## Bug 3: Earnings Count Cancelled/Returned Orders
 
-**What**: On `OrderDetailPage.tsx` lines 694-700, the address section shows `sellerProfile?.block` / `buyer?.block`. But orders have their own `delivery_address` text field (set at checkout). For delivery orders, the page should show the order's delivery address (which may be a separate saved address, not the buyer's profile block/flat). Currently, the page shows the buyer's profile address, which may differ from where the order is actually being delivered.
+**What**: `useSellerOrderStats` line 64-97 only counts `completed` and `delivered` statuses for earnings. However, orders with `payment_status === 'refunded'` that still have `status === 'completed'` (completed then refunded) are counted as earnings. The earnings summary on the dashboard shows inflated revenue that includes refunded amounts.
 
-**Where**: `OrderDetailPage.tsx` line 688-700 — Seller/Buyer info card.
+**Where**: `useSellerOrders.ts` lines 64-70, `EarningsSummary.tsx`.
 
-**Why critical**: If a buyer has a saved delivery address (different building, friend's place), the order detail page shows their profile block/flat instead of the actual delivery destination. The seller sees the wrong address. For delivery orders, this is a delivery-to-wrong-location risk.
+**Why critical**: A seller sees ₹5,000 in earnings but only ₹3,500 was actually receivable because ₹1,500 was refunded. This creates false expectations about payouts and erodes trust when the actual payout is lower.
+
+**Gap**: The query only fetches `status, total_amount, created_at` (line 41) but doesn't fetch `payment_status`. There's no way to exclude refunded orders from earnings calculations.
 
 **Impact analysis**:
-- `OrderDetailPage.tsx` — add delivery address display from `order.delivery_address`
-- The info card currently shows profile block/flat; for delivery orders, it should show the order's delivery address
+- `useSellerOrders.ts` — add `payment_status` to the select, exclude `refunded` from earnings
+- `EarningsSummary.tsx` — no change needed (just receives correct numbers)
 
 **Risks**:
-1. `order.delivery_address` is a concatenated text string, not structured data — it may look less clean than the block/flat format. Acceptable as it's what the buyer confirmed at checkout.
-2. Self-pickup orders shouldn't show delivery address prominently — gate on `fulfillment_type`.
+1. Adding `payment_status` to the select increases payload slightly — negligible.
+2. If `payment_status` is null for older orders (before the field existed), they'll still be counted — this is correct behavior (null = not refunded).
 
-**Fix plan**: In `OrderDetailPage.tsx` around line 688-700, add a delivery address section for delivery orders:
+**Fix**: Line 41, add `payment_status` to select:
+```
+.select('status, total_amount, created_at, payment_status')
+```
+Line 65-70, add guard:
+```typescript
+case 'completed':
+case 'delivered':
+  completedOrders++;
+  if (row.payment_status !== 'refunded') {
+    totalEarnings += amt;
+    if (isToday) todayEarnings += amt;
+    if (isWeek) weekEarnings += amt;
+  }
+  break;
+```
+
+---
+
+## Bug 4: Dashboard "Today" Filter Uses Local Timezone, Stats Use IST
+
+**What**: `useSellerOrdersInfinite` line 159-160 computes "today" using `new Date()` with `setHours(0,0,0,0)` — this uses the **browser's local timezone**. But `useSellerOrderStats` line 30-31 explicitly computes IST boundaries (`Asia/Kolkata`). A seller in a different timezone (or a browser with wrong locale) sees mismatched counts: the "Today" filter badge shows 3, but clicking it shows 2 orders (or vice versa).
+
+**Where**: `useSellerOrders.ts` line 159-160 vs line 30-31.
+
+**Why critical**: The seller sees "Today: 5" on the stats card but when they tap the "Today" filter, only 3 orders appear. This makes the dashboard feel broken and unreliable. For a multi-timezone deployment, this is guaranteed to manifest.
+
+**Gap**: Stats computation uses IST. Filter query uses browser timezone. Two different definitions of "today" in the same view.
+
+**Impact analysis**:
+- `useSellerOrders.ts` `useSellerOrdersInfinite` — align "today" computation with IST
+- Dashboard stats and filter counts will then be consistent
+
+**Risks**:
+1. Hardcoding IST assumes all sellers are in India — if the platform expands, this needs to be configurable. For now, aligning with the existing IST convention is correct.
+2. Changing the filter boundary could shift which orders appear in "today" for edge-case orders created near midnight — acceptable as it aligns with the stats count.
+
+**Fix**: In `useSellerOrdersInfinite` line 159-160, replace:
+```typescript
+const today = new Date();
+today.setHours(0, 0, 0, 0);
+```
+With IST-aware computation matching the stats query:
+```typescript
+const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+const istDateStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}-${String(nowIST.getDate()).padStart(2, '0')}`;
+const todayISO = new Date(`${istDateStr}T00:00:00+05:30`).toISOString();
+```
+
+---
+
+## Bug 5: Seller Can't See Delivery Address on Order Detail for Delivery Orders
+
+**What**: `OrderDetailPage.tsx` line 701-703 — the delivery address display is gated by `!o.isSellerView`:
 ```tsx
-{/* Delivery Address — only for delivery orders, from the order itself */}
-{isDeliveryOrder && (order as any).delivery_address && (
-  <div className="mt-2 pt-2 border-t border-border">
-    <p className="text-xs text-muted-foreground flex items-center gap-1">
-      <MapPin size={11} /> Delivering to: {(order as any).delivery_address}
-    </p>
-  </div>
-)}
+{!o.isSellerView && (order as any).delivery_address && ...}
 ```
-This renders inside the existing info card, below the seller/buyer name.
+This means sellers **never** see the delivery address, even for delivery orders they need to fulfill. The seller only sees buyer's profile block/flat (line 694-700), which may differ from the actual delivery destination.
+
+**Where**: `OrderDetailPage.tsx` line 701.
+
+**Why critical**: For seller-delivery orders, the seller needs the exact delivery address to fulfill the order. They see "Block A, 302" from the buyer's profile, but the buyer may have specified a different address at checkout. The seller delivers to the wrong location.
+
+**Gap**: This was added in the previous round of fixes (Bug 5 — delivery address display) but was incorrectly scoped to buyer-only view. The seller needs this information even more than the buyer.
+
+**Impact analysis**:
+- `OrderDetailPage.tsx` line 701 — remove the `!o.isSellerView` gate, or change to show for both views
+
+**Risks**:
+1. Showing delivery address to both buyer and seller on the same card could create visual clutter — mitigate by keeping it concise (single line).
+2. For self-pickup orders, the delivery_address might be the buyer's home — this is already gated by `fulfillment_type === 'delivery'`, so no risk.
+
+**Fix**: Line 701, change `!o.isSellerView` to remove the view restriction:
+```tsx
+{(order as any).delivery_address && ['delivery', 'seller_delivery'].includes((order as any).fulfillment_type) && (
+```
+This shows the delivery address to both buyer and seller for delivery orders.
 
 ---
 
@@ -155,11 +158,11 @@ This renders inside the existing info card, below the seller/buyer name.
 
 | # | Bug | File(s) | Severity | Effort |
 |---|-----|---------|----------|--------|
-| 1 | Zero-stock products show active "Add" button | ProductListingCard.tsx, ProductCard.tsx | High — false positive | ~15 min |
-| 2 | Self-pickup orders get blank delivery address | useCartPage.ts | Medium — seller confusion | ~5 min |
-| 3 | ProductDetailSheet allows add on zero-stock | useProductDetail.ts, ProductDetailSheet.tsx | High — highest-intent surface | ~10 min |
-| 4 | COD back-button exposes duplicate order risk | useCartPage.ts | High — financial | ~10 min |
-| 5 | Order detail shows profile address, not delivery address | OrderDetailPage.tsx | Medium — wrong delivery risk | ~10 min |
+| 1 | Dashboard toggle has no approval guard | SellerDashboardPage.tsx | High — bypasses admin approval | ~5 min |
+| 2 | Seller order card missing buyer phone | useSellerOrders.ts, SellerOrderCard.tsx | Medium — slows response | ~10 min |
+| 3 | Earnings include refunded orders | useSellerOrders.ts | Medium — financial trust | ~10 min |
+| 4 | Today filter uses wrong timezone | useSellerOrders.ts | Medium — count mismatch | ~5 min |
+| 5 | Seller can't see delivery address | OrderDetailPage.tsx | High — wrong delivery risk | ~2 min |
 
 All fixes are surgical — no new features, no schema changes, no refactoring.
 
