@@ -50,6 +50,8 @@ export function useBuyerOrderAlerts() {
           const paymentChanged = newPayment && newPayment !== oldPayment;
           // Only react to actual status or payment_status changes
           if (!statusChanged && !paymentChanged) return;
+          // Suppress phantom alerts for payment_pending orders (auto-cancelled, no user-facing notification)
+          if (oldStatus === 'payment_pending') return;
 
           // Native haptic feedback
           const hapticType = statusChanged ? (HAPTIC_MAP[newStatus] ?? 'success') : 'success';

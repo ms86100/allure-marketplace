@@ -38,6 +38,8 @@ export function useAppLifecycle() {
             if (data && data.length > 0) {
               cleanupStaleDeliveryNotifications(data as UserNotification[]).then(() => {
                 queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
+                queryClient.invalidateQueries({ queryKey: ['notifications'] });
+                queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
               });
             }
           });
