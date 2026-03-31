@@ -169,6 +169,7 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
 
       setSaveResult({ success: products.length, errors: 0 });
       toast.success(`${products.length} products added as drafts`);
+      toast.info('Tip: Edit each product to add images before submitting for approval', { duration: 5000 });
       onSuccess();
 
       setTimeout(() => {

@@ -203,6 +203,7 @@ export function useSellerProducts() {
     const errors: Record<string, string> = {};
     if (!formData.name.trim()) errors.name = 'Product name is required';
     if (!formData.category) errors.category = 'Category is required';
+    if (!formData.image_url) errors.image_url = 'Product image is required';
     if (actionNeedsPrice && (isNaN(price) || price <= 0)) errors.price = 'Please enter a valid price';
     if (formData.action_type === 'contact_seller' && !formData.contact_phone.trim()) {
       const fallbackPhone = user?.phone || '';
