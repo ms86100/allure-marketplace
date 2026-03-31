@@ -223,17 +223,20 @@ serve(async (req) => {
       results.push({ id: orderId, success: true });
     }
 
-    // Trigger notification processing
+    // Trigger notification processing with a 2s delay so the transaction commits
+    // and the DB trigger's notification_queue row is visible to the processor
     const successCount = results.filter((r) => r.success && !r.skipped).length;
     if (successCount > 0) {
-      fetch(`${supabaseUrl}/functions/v1/process-notification-queue`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${supabaseServiceKey}`,
-          "Content-Type": "application/json",
-        },
-        body: "{}",
-      }).catch((e) => console.warn("Notification trigger failed:", e));
+      setTimeout(() => {
+        fetch(`${supabaseUrl}/functions/v1/process-notification-queue`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${supabaseServiceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: "{}",
+        }).catch((e) => console.warn("Notification trigger failed:", e));
+      }, 2000);
     }
 
     return new Response(
