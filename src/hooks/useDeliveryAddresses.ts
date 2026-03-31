@@ -75,8 +75,20 @@ export function useDeliveryAddresses() {
       const { error } = await supabase.from('delivery_addresses').update({ is_default: true }).eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); toast.success('Default address updated'); },
-    onError: () => toast.error('Failed to update default'),
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData(key);
+      qc.setQueryData(key, (old: any[]) =>
+        old?.map((a: any) => ({ ...a, is_default: a.id === id })) ?? []
+      );
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) qc.setQueryData(key, context.previous);
+      toast.error('Failed to update default');
+    },
+    onSuccess: () => { toast.success('Default address updated'); },
+    onSettled: () => { qc.invalidateQueries({ queryKey: key }); },
   });
 
   const defaultAddress = addresses.find(a => a.is_default) || addresses[0] || null;
