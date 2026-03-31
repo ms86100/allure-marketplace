@@ -63,7 +63,7 @@ export default function SellerProductsPage() {
                     </div>
                     {sp.subcategories.length > 0 && <div className="space-y-2"><Label>Subcategory</Label><Select value={sp.formData.subcategory_id || 'none'} onValueChange={(v) => sp.setFormData({ ...sp.formData, subcategory_id: v === 'none' ? '' : v })}><SelectTrigger><SelectValue placeholder="Select subcategory (optional)" /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem>{sp.subcategories.map(sub => <SelectItem key={sub.id} value={sub.id}><span className="inline-flex items-center gap-1.5"><DynamicIcon name={sub.icon || 'FolderOpen'} size={14} /> {sub.display_name}</span></SelectItem>)}</SelectContent></Select></div>}
                     {/* Bug 2 & 5: Action type selector + contact phone */}
-                    {sp.activeCategoryConfig && (sp.activeCategoryConfig.enquiryOnly || sp.formData.action_type !== 'add_to_cart') && (
+                    {sp.activeCategoryConfig && (sp.activeCategoryConfig.behavior?.enquiryOnly || sp.formData.action_type !== 'add_to_cart') && (
                       <div className="space-y-2">
                         <Label>Action Type</Label>
                         <Select value={sp.formData.action_type} onValueChange={(v) => sp.setFormData({ ...sp.formData, action_type: v as ProductActionType })}>
