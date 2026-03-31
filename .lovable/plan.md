@@ -15,3 +15,10 @@
 |---|-----|--------|
 | 1 | `payment_pending` orders visible in seller dashboard | ✅ Fixed — `.neq('status', 'payment_pending')` added to infinite query |
 | 2 | Cart retry query missing `daily_order_limit` | ✅ Fixed — retry select string now matches primary |
+
+# Buyer Bugs Round 1 (RPC Integrity) — IMPLEMENTED
+
+| # | Bug | Status |
+|---|-----|--------|
+| 1 | RPC cart clear fails for NULL `society_id` | ✅ Fixed — `IS NOT DISTINCT FROM` in DELETE |
+| 2 | Server-side store check ignores `operating_days` | ✅ Fixed — CASE block with manual_override + day-aware overload, catches `closed_today` and `paused` |
