@@ -311,7 +311,7 @@ export function useCartPage() {
 
     const deliveryAddressText = fulfillmentType === 'delivery' && selectedDeliveryAddress
       ? [selectedDeliveryAddress.flat_number && `Flat ${selectedDeliveryAddress.flat_number}`, selectedDeliveryAddress.block && `Block ${selectedDeliveryAddress.block}`, selectedDeliveryAddress.building_name, selectedDeliveryAddress.landmark].filter(Boolean).join(', ')
-      : [profile.block, profile.flat_number].filter(Boolean).join(', ');
+      : [profile.block && `Block ${profile.block}`, profile.flat_number].filter(Boolean).join(', ') || profile?.name || 'Self Pickup';
 
     // Generate idempotency key if not already set for this attempt
     if (!idempotencyKeyRef.current) {
