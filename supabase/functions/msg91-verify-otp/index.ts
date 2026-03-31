@@ -26,31 +26,14 @@ Deno.serve(async (req) => {
 
   try {
     const { reqId, otp, phone, country_code = "91" } = await req.json();
-
-    // Rate limit: 10 verify attempts per reqId per 10 min (brute-force protection)
-    if (reqId) {
-      const rl = await checkRateLimit(`otp-verify:${reqId}`, 10, 600);
-      if (!rl.allowed) {
-        return new Response(
-          JSON.stringify({ error: "Too many verification attempts. Please request a new OTP." }),
-          { status: 429, headers: jsonHeaders }
-        );
-      }
-    }
-
-    // Also rate limit by IP: 30 verify attempts per 10 min
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-    const ipRl = await checkRateLimit(`otp-verify-ip:${clientIp}`, 30, 600);
-    if (!ipRl.allowed) return rateLimitResponse(corsHeaders);
 
     if (!reqId) {
       return new Response(JSON.stringify({ error: "Please go back and re-enter your phone number." }), { status: 400, headers: jsonHeaders });
     }
-
     if (!otp || !/^\d{4,6}$/.test(otp)) {
       return new Response(JSON.stringify({ error: "Please enter a valid 4-digit OTP." }), { status: 400, headers: jsonHeaders });
     }
-
     if (!phone || !/^\d{10}$/.test(phone)) {
       return new Response(JSON.stringify({ error: "Invalid phone number." }), { status: 400, headers: jsonHeaders });
     }
@@ -60,18 +43,32 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const [authKey, widgetId, tokenAuth] = await Promise.all([
-      getCredential(adminClient, "msg91_auth_key", "MSG91_AUTH_KEY"),
-      getCredential(adminClient, "msg91_widget_id", "MSG91_WIDGET_ID"),
-      getCredential(adminClient, "msg91_token_auth", "MSG91_TOKEN_AUTH"),
+    // Run rate limits AND credential lookups in parallel — saves 200-500ms
+    const [credResults, reqRl, ipRl] = await Promise.all([
+      Promise.all([
+        getCredential(adminClient, "msg91_auth_key", "MSG91_AUTH_KEY"),
+        getCredential(adminClient, "msg91_widget_id", "MSG91_WIDGET_ID"),
+        getCredential(adminClient, "msg91_token_auth", "MSG91_TOKEN_AUTH"),
+      ]),
+      checkRateLimit(`otp-verify:${reqId}`, 10, 600),
+      checkRateLimit(`otp-verify-ip:${clientIp}`, 30, 600),
     ]);
+
+    if (!reqRl.allowed) {
+      return new Response(
+        JSON.stringify({ error: "Too many verification attempts. Please request a new OTP." }),
+        { status: 429, headers: jsonHeaders }
+      );
+    }
+    if (!ipRl.allowed) return rateLimitResponse(corsHeaders);
+
+    const [authKey, widgetId, tokenAuth] = credResults;
 
     if (!authKey || !widgetId || !tokenAuth) {
       return new Response(JSON.stringify({ error: "OTP service is temporarily unavailable. Please try again later." }), { status: 500, headers: jsonHeaders });
     }
 
     // ─── 1. Verify OTP ───
-    // Apple reviewer bypass: demo phone + fixed OTP + bypass reqId
     const isAppleReviewBypass = phone === "0123456789" && reqId === "apple-review-bypass" && otp === "1234";
 
     if (!isAppleReviewBypass) {
@@ -137,14 +134,16 @@ Deno.serve(async (req) => {
         }
       } else if (newUser?.user) {
         const userId = newUser.user.id;
-        const { error: profileError } = await adminClient.from("profiles").upsert(
-          { id: userId, email: syntheticEmail, phone: fullPhone, name: "User", flat_number: "", block: "" },
-          { onConflict: "id" }
-        );
-        if (profileError) console.warn("Profile upsert warning:", profileError.message);
-
-        const { error: roleError } = await adminClient.from("user_roles").insert({ user_id: userId, role: "buyer" });
-        if (roleError && !roleError.message?.includes("duplicate")) console.warn("Role insert warning:", roleError.message);
+        // Run profile + role inserts in parallel
+        const [profileRes, roleRes] = await Promise.all([
+          adminClient.from("profiles").upsert(
+            { id: userId, email: syntheticEmail, phone: fullPhone, name: "User", flat_number: "", block: "" },
+            { onConflict: "id" }
+          ),
+          adminClient.from("user_roles").insert({ user_id: userId, role: "buyer" }),
+        ]);
+        if (profileRes.error) console.warn("Profile upsert warning:", profileRes.error.message);
+        if (roleRes.error && !roleRes.error.message?.includes("duplicate")) console.warn("Role insert warning:", roleRes.error.message);
 
         console.log("Created new user:", userId);
       }
