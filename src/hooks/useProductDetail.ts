@@ -7,6 +7,7 @@ import { ProductActionType } from '@/types/database';
 import { ACTION_CONFIG } from '@/lib/marketplace-constants';
 import { useCurrency } from '@/hooks/useCurrency';
 import { hapticImpact } from '@/lib/haptics';
+import { toast } from 'sonner';
 
 export interface ProductDetail {
   product_id: string;
