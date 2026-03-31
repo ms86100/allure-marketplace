@@ -1,13 +1,21 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 
+// Module-level shared client — created once per isolate lifetime
+let _sharedClient: any = null;
+function getSharedClient() {
+  if (!_sharedClient) {
+    _sharedClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+  }
+  return _sharedClient;
+}
+
 /**
  * Shared rate limiter for edge functions.
  * Uses atomic upsert to prevent race conditions under concurrency.
- *
- * @param key - Unique key for the rate limit (e.g., `user:${userId}:create-order`)
- * @param maxRequests - Maximum requests allowed in the window
- * @param windowSeconds - Time window in seconds
- * @returns { allowed: boolean, remaining: number }
+ * Reuses a module-level Supabase client to avoid cold-start overhead.
  */
 export async function checkRateLimit(
   key: string,
@@ -15,15 +23,10 @@ export async function checkRateLimit(
   windowSeconds: number
 ): Promise<{ allowed: boolean; remaining: number }> {
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
+    const supabase = getSharedClient();
     const now = new Date();
     const windowStart = new Date(now.getTime() - windowSeconds * 1000);
 
-    // Atomic: reset expired windows and increment in one operation
-    // First, try to get the existing entry
     const { data: existing } = await supabase
       .from("rate_limits")
       .select("*")
@@ -34,15 +37,13 @@ export async function checkRateLimit(
       const existingWindowStart = new Date(existing.window_start);
 
       if (existingWindowStart < windowStart) {
-        // Window expired — atomic reset with count=1
         const { error } = await supabase
           .from("rate_limits")
           .update({ count: 1, window_start: now.toISOString() })
           .eq("key", key)
-          .eq("window_start", existing.window_start); // optimistic lock
+          .eq("window_start", existing.window_start);
 
         if (error) {
-          // Another request already reset — re-check
           return checkRateLimitRetry(supabase, key, maxRequests, windowSeconds);
         }
         return { allowed: true, remaining: maxRequests - 1 };
@@ -52,24 +53,21 @@ export async function checkRateLimit(
         return { allowed: false, remaining: 0 };
       }
 
-      // Atomic increment with optimistic lock on current count
       const { data: updated, error } = await supabase
         .from("rate_limits")
         .update({ count: existing.count + 1 })
         .eq("key", key)
-        .eq("count", existing.count) // optimistic lock — prevents race
+        .eq("count", existing.count)
         .select("count")
         .single();
 
       if (error || !updated) {
-        // Race: another request incremented first — re-check
         return checkRateLimitRetry(supabase, key, maxRequests, windowSeconds);
       }
 
       return { allowed: true, remaining: maxRequests - updated.count };
     }
 
-    // No existing entry — atomic upsert
     await supabase
       .from("rate_limits")
       .upsert(
@@ -79,17 +77,11 @@ export async function checkRateLimit(
 
     return { allowed: true, remaining: maxRequests - 1 };
   } catch (error) {
-    // Fallback: if rate_limits table is unreachable, allow the request
-    // rather than blocking all users with a 500 error
     console.error("Rate limiter error (allowing request):", error);
     return { allowed: true, remaining: maxRequests };
   }
 }
 
-/**
- * Retry path: re-read and attempt atomic increment after an optimistic lock failure
- * Bug 15 fix: Also increment on retry to prevent burst bypass
- */
 async function checkRateLimitRetry(
   supabase: any,
   key: string,
@@ -108,7 +100,6 @@ async function checkRateLimitRetry(
     return { allowed: false, remaining: 0 };
   }
 
-  // Attempt atomic increment on retry too
   const { data: updated, error } = await supabase
     .from("rate_limits")
     .update({ count: data.count + 1 })
@@ -118,7 +109,6 @@ async function checkRateLimitRetry(
     .single();
 
   if (error || !updated) {
-    // Second race — just check if still under limit
     const { data: final } = await supabase.from("rate_limits").select("count").eq("key", key).single();
     if (!final || final.count >= maxRequests) return { allowed: false, remaining: 0 };
     return { allowed: true, remaining: maxRequests - final.count };
@@ -127,9 +117,6 @@ async function checkRateLimitRetry(
   return { allowed: true, remaining: maxRequests - updated.count };
 }
 
-/**
- * Returns a 429 Too Many Requests response
- */
 export function rateLimitResponse(corsHeaders: Record<string, string>) {
   return new Response(
     JSON.stringify({ error: "Too many requests. Please try again later." }),
