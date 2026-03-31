@@ -63,9 +63,9 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
           ) : (
             <div className="w-full h-full bg-muted flex items-center justify-center"><span className="text-3xl">🛍️</span></div>
           )}
-          {!product.is_available && (
+          {(!product.is_available || isStockEmpty) && (
             <div className="absolute inset-0 bg-foreground/50 flex items-center justify-center">
-              <span className="text-background text-sm font-medium">Unavailable</span>
+              <span className="text-background text-sm font-medium">{isStockEmpty && product.is_available ? 'Out of Stock' : 'Unavailable'}</span>
             </div>
           )}
           {isStoreClosed && product.is_available && (

@@ -522,10 +522,12 @@ export function useCartPage() {
       if (orderIds.length === 0) throw new Error('Failed to create orders');
       hapticNotification('success');
       prefetchFlowData();
-      // Navigate FIRST — don't block on cart clear or notifications
+      // Optimistically clear cart cache BEFORE navigation to prevent back-button duplicates
+      queryClient.setQueryData(['cart-items', user.id], []);
+      queryClient.setQueryData(['cart-count', user.id], 0);
       if (orderIds.length === 1) { toast.success('Order placed successfully!', { id: 'order-placed' }); navigate(`/orders/${orderIds[0]}`); }
       else { toast.success(`${orderIds.length} orders placed successfully!`, { id: 'order-placed' }); navigate('/orders'); }
-      // Background: clear cart + trigger notifications (non-blocking)
+      // Background: DB cleanup + trigger notifications (non-blocking)
       clearCartAndCache().catch(() => {});
       requestFullPermission().catch(() => {});
       supabase.functions.invoke('process-notification-queue').catch(() => {});

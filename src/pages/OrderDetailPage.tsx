@@ -692,12 +692,15 @@ export default function OrderDetailPage() {
               <div>
                 <p className="text-sm font-semibold">{o.isSellerView ? buyer?.name : seller?.business_name}</p>
                 {(() => {
-                  const block = o.isSellerView ? buyer?.block : sellerProfile?.block;
-                  const flat = o.isSellerView ? buyer?.flat_number : sellerProfile?.flat_number;
-                  return (block || flat) ? (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5"><MapPin size={11} />{block ? `Block ${block}` : ''}{block && flat ? ', ' : ''}{flat || ''}</p>
-                  ) : null;
+                   const block = o.isSellerView ? buyer?.block : sellerProfile?.block;
+                   const flat = o.isSellerView ? buyer?.flat_number : sellerProfile?.flat_number;
+                   return (block || flat) ? (
+                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5"><MapPin size={11} />{block ? `Block ${block}` : ''}{block && flat ? ', ' : ''}{flat || ''}</p>
+                   ) : null;
                 })()}
+                {!o.isSellerView && (order as any).delivery_address && (order as any).fulfillment_type === 'delivery' && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><MapPin size={11} />Delivering to: {(order as any).delivery_address}</p>
+                )}
               </div>
               {(o.isSellerView ? buyer?.phone : sellerProfile?.phone) && (
                 <a href={`tel:${o.isSellerView ? buyer?.phone : sellerProfile?.phone}`} className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center"><Phone size={16} className="text-accent" /></a>

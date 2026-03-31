@@ -221,6 +221,8 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
           <div className="absolute bottom-0 left-0 right-0 bg-background border-t border-border p-4">
             {isStoreClosed ? (
               <div className="w-full h-12 flex items-center justify-center bg-muted rounded-xl"><Clock size={16} className="text-muted-foreground mr-2" /><span className="text-sm font-medium text-muted-foreground">{storeClosedMsg}</span></div>
+            ) : d.isStockEmpty ? (
+              <div className="w-full h-12 flex items-center justify-center bg-muted rounded-xl"><span className="text-sm font-medium text-muted-foreground">Out of Stock</span></div>
             ) : d.isCartAction ? (
               d.quantity === 0 ? (
                 <Button className="w-full h-12 text-base font-bold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl" onClick={() => { d.handleAdd(); }}>{d.actionType === 'buy_now' ? 'Buy Now' : 'Add to cart'} · {d.formatPrice(product.price)}</Button>

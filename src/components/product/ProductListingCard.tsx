@@ -77,7 +77,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
   const handleDecrement = (e: React.MouseEvent) => { e.stopPropagation(); e.preventDefault(); updateQuantity(product.id, quantity - 1); };
   const handleCardClick = () => { selectionChanged(); trackClick(); if (onTap) onTap(product); else onNavigate?.(`/seller/${product.seller_id}`); };
 
-  const isOutOfStock = !product.is_available;
+  const isOutOfStock = !product.is_available || (product.stock_quantity != null && product.stock_quantity <= 0);
   const isSellerInactive = useMemo(() => { if (!(product as any).last_active_at) return false; return Date.now() - new Date((product as any).last_active_at).getTime() > 7 * 24 * 60 * 60 * 1000; }, [(product as any).last_active_at]);
 
   const storeAvailability = useMemo((): StoreAvailability => computeStoreStatus(product.seller_availability_start, product.seller_availability_end, product.seller_operating_days, product.seller_is_available ?? true), [product.seller_availability_start, product.seller_availability_end, product.seller_operating_days, product.seller_is_available]);
