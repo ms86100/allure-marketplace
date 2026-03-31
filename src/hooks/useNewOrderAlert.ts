@@ -20,11 +20,11 @@ const MIN_POLL_MS = 3000;
 const MAX_POLL_MS = 30000;
 const BACKOFF_FACTOR = 1.5;
 const SNOOZE_MS = 60000;
+const BELL_LOOP_GAP_MS = 1500; // gap between bell replays
 
 export function useNewOrderAlert(sellerIds: string[]) {
   const queryClient = useQueryClient();
   const [pendingAlerts, setPendingAlerts] = useState<NewOrder[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSeenAtRef = useRef<string | null>(null);
   const pollDelayRef = useRef(MIN_POLL_MS);
@@ -35,12 +35,39 @@ export function useNewOrderAlert(sellerIds: string[]) {
   const dismissedIdsRef = useRef<Set<string>>(new Set());
   const snoozedUntilRef = useRef<Record<string, number>>({});
 
+  // Web Audio API refs (no iOS media controls)
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const bellLoopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isBuzzingRef = useRef(false);
+
   const sellerIdsRef = useRef<Set<string>>(new Set());
   useMemo(() => {
     sellerIdsRef.current = new Set(sellerIds);
   }, [sellerIds]);
 
   const enabled = sellerIds.length > 0;
+
+  // Load the bell sound via Web Audio API on mount
+  useEffect(() => {
+    let cancelled = false;
+    const loadSound = async () => {
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const response = await fetch('/sounds/gate_bell.mp3');
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = await ctx.decodeAudioData(arrayBuffer);
+        if (!cancelled) {
+          audioContextRef.current = ctx;
+          audioBufferRef.current = buffer;
+        }
+      } catch (e) {
+        console.warn('[OrderAlert] Web Audio load failed:', e);
+      }
+    };
+    loadSound();
+    return () => { cancelled = true; };
+  }, []);
 
   const MAX_SEEN_IDS = 500;
   const handleNewOrder = useCallback((order: NewOrder) => {
@@ -71,46 +98,53 @@ export function useNewOrderAlert(sellerIds: string[]) {
     }
   }, [queryClient]);
 
+  const playBellOnce = useCallback(() => {
+    const ctx = audioContextRef.current;
+    const buffer = audioBufferRef.current;
+    if (!ctx || !buffer) return;
+    try {
+      // Resume context if suspended (iOS requires user gesture first)
+      if (ctx.state === 'suspended') ctx.resume();
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+    } catch (e) {
+      console.warn('[OrderAlert] Web Audio play failed:', e);
+    }
+  }, []);
+
   const stopBuzzing = useCallback(() => {
+    isBuzzingRef.current = false;
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    try {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        audioRef.current.loop = false;
-      }
-    } catch {}
+    if (bellLoopTimerRef.current) {
+      clearTimeout(bellLoopTimerRef.current);
+      bellLoopTimerRef.current = null;
+    }
   }, []);
 
   const startBuzzing = useCallback(() => {
-    if (intervalRef.current) return;
+    if (isBuzzingRef.current) return;
+    isBuzzingRef.current = true;
     hapticNotification('warning');
-    try {
-      if (!audioRef.current) {
-        audioRef.current = new Audio('/sounds/gate_bell.mp3');
-      }
-      const audio = audioRef.current;
-      audio.loop = true;
-      audio.volume = 1.0;
-      audio.play().then(() => {
-        // Prevent OS media controls from pausing the alarm
-        if ('mediaSession' in navigator) {
-          navigator.mediaSession.metadata = new MediaMetadata({ title: 'New Order Alert' });
-          navigator.mediaSession.setActionHandler('pause', null);
-          navigator.mediaSession.setActionHandler('stop', null);
-        }
-      }).catch(() => {});
-    } catch (e) {
-      console.warn('[OrderAlert] Sound failed:', e);
-    }
+
+    // Play bell in a loop using Web Audio API (no iOS media controls)
+    const loopBell = () => {
+      if (!isBuzzingRef.current) return;
+      playBellOnce();
+      const duration = audioBufferRef.current?.duration ?? 2;
+      bellLoopTimerRef.current = setTimeout(loopBell, (duration * 1000) + BELL_LOOP_GAP_MS);
+    };
+    loopBell();
+
     // Haptic fallback every 3s
     intervalRef.current = setInterval(() => {
       hapticVibrate(500);
     }, 3000);
-  }, []);
+  }, [playBellOnce]);
 
   const dismiss = useCallback(() => {
     setPendingAlerts(prev => {

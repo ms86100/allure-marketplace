@@ -254,18 +254,38 @@ Deno.serve(async (req) => {
             .eq("id", item.id);
           processed++;
         } else {
-          // Dead-letter: all inline attempts exhausted
-          await supabase
-            .from("notification_queue")
-            .update({
-              status: "failed",
-              processed_at: new Date().toISOString(),
-              retry_count: PUSH_MAX_ATTEMPTS,
-              last_error: lastPushError,
-            })
-            .eq("id", item.id);
-          deadLettered++;
-          console.error(`[Queue][${item.id}] Dead-lettered after ${PUSH_MAX_ATTEMPTS} inline attempts: ${lastPushError}`);
+          // Re-queue with 30s delay instead of dead-lettering immediately.
+          // This handles transient race conditions (e.g. concurrent edge function
+          // invocations during order confirmation) by giving the cron job a
+          // chance to retry after contention clears.
+          const retryCount = (item.retry_count || 0) + PUSH_MAX_ATTEMPTS;
+          if (retryCount >= PUSH_MAX_ATTEMPTS * 3) {
+            // Permanently dead-letter after 3 full retry cycles (9 total attempts)
+            await supabase
+              .from("notification_queue")
+              .update({
+                status: "failed",
+                processed_at: new Date().toISOString(),
+                retry_count: retryCount,
+                last_error: lastPushError,
+              })
+              .eq("id", item.id);
+            deadLettered++;
+            console.error(`[Queue][${item.id}] Dead-lettered after ${retryCount} total attempts: ${lastPushError}`);
+          } else {
+            // Re-queue as pending with a 30s delay for the next cron/trigger pickup
+            const nextRetryAt = new Date(Date.now() + 30_000).toISOString();
+            await supabase
+              .from("notification_queue")
+              .update({
+                status: "pending",
+                retry_count: retryCount,
+                last_error: lastPushError,
+                created_at: nextRetryAt, // shift created_at so claim_notification_queue picks it up later
+              })
+              .eq("id", item.id);
+            console.warn(`[Queue][${item.id}] Re-queued for retry (attempt ${retryCount}) at ${nextRetryAt}: ${lastPushError}`);
+          }
         }
       } catch (err: any) {
         // Non-push failure (e.g. DB insert error) — dead-letter immediately
