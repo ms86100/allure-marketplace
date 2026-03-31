@@ -35,6 +35,10 @@ interface DraftProduct {
   stock_quantity?: number | null;
   low_stock_threshold?: number | null;
   action_type?: string;
+  subcategory_id?: string | null;
+  lead_time_hours?: number | null;
+  accepts_preorders?: boolean;
+  approval_status?: string;
 }
 
 interface DraftProductManagerProps {
