@@ -347,6 +347,7 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" App/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string remote-notification" App/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:1 string fetch" App/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:2 string location" App/Info.plist 2>/dev/null || true
           # CRITICAL: Disable Firebase method swizzling so our manual APNs token
           # forwarding in AppDelegate.swift doesn't conflict with Firebase's auto-swizzling.
           # Without this, the permission prompt can silently fail to appear.
