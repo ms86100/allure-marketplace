@@ -8,3 +8,10 @@
 | 3 | Bulk upload allows empty category | ✅ Fixed — explicit empty-category check |
 | 4 | Per-product Submit allows imageless product | ✅ Fixed — image guard before submit |
 | 5 | Empty `operating_days` saves without blocking | ✅ Fixed — changed to `toast.error` + `return` |
+
+# Seller Bugs Round 5 (Dashboard & Cart Parity) — IMPLEMENTED
+
+| # | Bug | Status |
+|---|-----|--------|
+| 1 | `payment_pending` orders visible in seller dashboard | ✅ Fixed — `.neq('status', 'payment_pending')` added to infinite query |
+| 2 | Cart retry query missing `daily_order_limit` | ✅ Fixed — retry select string now matches primary |
