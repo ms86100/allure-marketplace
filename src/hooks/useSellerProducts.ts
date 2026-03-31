@@ -257,7 +257,7 @@ export function useSellerProducts() {
                 return contentChanged && ['approved', 'rejected'].includes(ep.approval_status) ? { rejection_note: null } : {};
               })()),
             }
-          : { approval_status: 'pending' as const }),
+          : { approval_status: 'draft' as const }),
       };
 
       let savedProductId: string;
