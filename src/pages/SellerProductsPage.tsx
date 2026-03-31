@@ -24,7 +24,6 @@ import { AttributeBlockBuilder } from '@/components/seller/AttributeBlockBuilder
 import { useSellerProducts } from '@/hooks/useSellerProducts';
 import { ProductFormPreviewPanel, ProductFormPreviewMobile } from '@/components/seller/ProductFormPreview';
 import { ServiceFieldsSection } from '@/components/seller/ServiceFieldsSection';
-import { ProductActionType, ProductCategory } from '@/types/database';
 
 export default function SellerProductsPage() {
   const sp = useSellerProducts();
