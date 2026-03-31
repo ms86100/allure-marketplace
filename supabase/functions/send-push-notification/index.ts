@@ -241,7 +241,7 @@ async function sendFCMNotification(
 
   const apnsAps: Record<string, unknown> = {
     alert: { title, body },
-    sound: "gate_bell.caf",
+    sound: "gate_bell.mp3",
     badge: 1,
   };
   if (imageUrl) apnsAps["mutable-content"] = 1;
