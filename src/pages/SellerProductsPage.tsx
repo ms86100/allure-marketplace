@@ -63,6 +63,28 @@ export default function SellerProductsPage() {
                       {sp.allowedCategories.length > 1 ? <div className="space-y-2"><Label htmlFor="category">Category *</Label><Select value={sp.formData.category} onValueChange={(value) => sp.setFormData({ ...sp.formData, category: value as ProductCategory })}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{sp.allowedCategories.map((config) => <SelectItem key={config.category} value={config.category}><span className="flex items-center gap-1.5"><DynamicIcon name={config.icon} size={14} /> {config.displayName}</span></SelectItem>)}</SelectContent></Select></div> : sp.allowedCategories.length === 1 ? <div className="space-y-2"><Label>Category</Label><div className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm"><DynamicIcon name={sp.allowedCategories[0].icon} size={16} /><span>{sp.allowedCategories[0].displayName}</span></div></div> : null}
                     </div>
                     {sp.subcategories.length > 0 && <div className="space-y-2"><Label>Subcategory</Label><Select value={sp.formData.subcategory_id || 'none'} onValueChange={(v) => sp.setFormData({ ...sp.formData, subcategory_id: v === 'none' ? '' : v })}><SelectTrigger><SelectValue placeholder="Select subcategory (optional)" /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem>{sp.subcategories.map(sub => <SelectItem key={sub.id} value={sub.id}><span className="inline-flex items-center gap-1.5"><DynamicIcon name={sub.icon || 'FolderOpen'} size={14} /> {sub.display_name}</span></SelectItem>)}</SelectContent></Select></div>}
+                    {/* Bug 2 & 5: Action type selector + contact phone */}
+                    {sp.activeCategoryConfig && (sp.activeCategoryConfig.enquiryOnly || sp.formData.action_type !== 'add_to_cart') && (
+                      <div className="space-y-2">
+                        <Label>Action Type</Label>
+                        <Select value={sp.formData.action_type} onValueChange={(v) => sp.setFormData({ ...sp.formData, action_type: v as ProductActionType })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="add_to_cart">Add to Cart</SelectItem>
+                            <SelectItem value="contact_seller">Contact Seller</SelectItem>
+                            <SelectItem value="request_quote">Request Quote</SelectItem>
+                            <SelectItem value="make_offer">Make Offer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    {sp.formData.action_type === 'contact_seller' && (
+                      <div className="space-y-2" id="edit-prod-contact_phone">
+                        <Label>Contact Phone *</Label>
+                        <Input placeholder="e.g., +91 98765 43210" value={sp.formData.contact_phone} onChange={(e) => { sp.setFormData({ ...sp.formData, contact_phone: e.target.value }); if (sp.fieldErrors.contact_phone) sp.setFieldErrors((prev: Record<string, string>) => { const { contact_phone, ...rest } = prev; return rest; }); }} className={sp.fieldErrors.contact_phone ? 'border-destructive' : ''} />
+                        {sp.fieldErrors.contact_phone && <p className="text-xs text-destructive">{sp.fieldErrors.contact_phone}</p>}
+                      </div>
+                    )}
                     <div className="p-3 bg-muted rounded-lg space-y-3"><div className="grid grid-cols-2 gap-3"><div className="space-y-1"><Label className="text-xs">Hours in advance</Label><Input type="number" min="0" placeholder="e.g. 2" value={sp.formData.lead_time_hours} onChange={(e) => sp.setFormData({ ...sp.formData, lead_time_hours: e.target.value })} /></div></div><div className="flex items-center justify-between pt-2 border-t"><div><span className="text-sm font-medium block">Accept Pre-orders</span><span className="text-xs text-muted-foreground">Allow buyers to order for future dates</span></div><Switch checked={sp.formData.accepts_preorders} onCheckedChange={(checked) => sp.setFormData({ ...sp.formData, accepts_preorders: checked })} /></div></div>
                     {sp.showVegToggle && <div className="flex items-center justify-between p-3 bg-muted rounded-lg"><div className="flex items-center gap-2"><VegBadge isVeg={sp.formData.is_veg} /><span className="text-sm font-medium">{sp.formData.is_veg ? 'Vegetarian' : 'Non-Vegetarian'}</span></div><Switch checked={sp.formData.is_veg} onCheckedChange={(checked) => sp.setFormData({ ...sp.formData, is_veg: checked })} /></div>}
                     <div className="flex items-center justify-between p-3 bg-muted rounded-lg"><div className="flex items-center gap-2"><Star size={16} className="text-warning" /><span className="text-sm font-medium">Mark as Bestseller</span></div><Switch checked={sp.formData.is_bestseller} onCheckedChange={(checked) => sp.setFormData({ ...sp.formData, is_bestseller: checked })} /></div>
