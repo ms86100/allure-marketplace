@@ -125,6 +125,7 @@ export function useLatestActionNotification(userId: string | undefined) {
         .eq('is_read', false)
         .not('payload', 'is', null)
         .not('type', 'in', SELLER_ONLY_FILTER)
+        .not('payload->>target_role', 'eq', 'seller')
         .order('created_at', { ascending: false })
         .limit(10);
       const notifications = (data as unknown as UserNotification[]) || [];
