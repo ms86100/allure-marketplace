@@ -551,7 +551,7 @@ export function DraftProductManager({
                   <select
                     className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
                     value={newProduct.category}
-                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                    onChange={(e) => { setNewProduct({ ...newProduct, category: e.target.value }); setAttributeBlocks([]); }}
                   >
                     {categories.map((c) => {
                       const catConfig = configs.find(cfg => cfg.category === c);
