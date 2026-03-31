@@ -65,9 +65,11 @@ export function useSellerOrderStats(sellerId: string | null) {
           case 'completed':
           case 'delivered':
             completedOrders++;
-            totalEarnings += amt;
-            if (isToday) todayEarnings += amt;
-            if (isWeek) weekEarnings += amt;
+            if (row.payment_status !== 'refunded') {
+              totalEarnings += amt;
+              if (isToday) todayEarnings += amt;
+              if (isWeek) weekEarnings += amt;
+            }
             break;
           case 'preparing':
             preparingOrders++;
