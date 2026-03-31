@@ -15,17 +15,7 @@ Deno.serve(async (req) => {
 
   try {
     const { phone, country_code = "91", resend = false, reqId } = await req.json();
-
-    // Rate limit by phone (5 OTPs per phone per 10 min) and by IP (20 per 10 min)
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-    
-    if (!resend && phone) {
-      const phoneRl = await checkRateLimit(`otp-send:${country_code}${phone}`, 5, 600);
-      if (!phoneRl.allowed) return rateLimitResponse(corsHeaders);
-    }
-    
-    const ipRl = await checkRateLimit(`otp-send-ip:${clientIp}`, 20, 600);
-    if (!ipRl.allowed) return rateLimitResponse(corsHeaders);
 
     if (resend && !reqId) {
       return new Response(
@@ -42,7 +32,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Apple reviewer bypass: skip MSG91 for demo phone, return synthetic reqId
+      // Apple reviewer bypass
       if (phone === "0123456789" && country_code === "91") {
         console.log("Apple reviewer demo phone — returning bypass reqId");
         return new Response(
@@ -52,17 +42,35 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Create admin client for DB credential lookup
+    // Create admin client once for credential lookups
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const [authKey, widgetId, tokenAuth] = await Promise.all([
-      getCredential(adminClient, "msg91_auth_key", "MSG91_AUTH_KEY"),
-      getCredential(adminClient, "msg91_widget_id", "MSG91_WIDGET_ID"),
-      getCredential(adminClient, "msg91_token_auth", "MSG91_TOKEN_AUTH"),
+    // Run rate limits AND credential lookups in parallel — saves 200-500ms
+    const rateLimitChecks: Promise<any>[] = [
+      checkRateLimit(`otp-send-ip:${clientIp}`, 20, 600),
+    ];
+    if (!resend && phone) {
+      rateLimitChecks.push(checkRateLimit(`otp-send:${country_code}${phone}`, 5, 600));
+    }
+
+    const [credResults, ...rlResults] = await Promise.all([
+      Promise.all([
+        getCredential(adminClient, "msg91_auth_key", "MSG91_AUTH_KEY"),
+        getCredential(adminClient, "msg91_widget_id", "MSG91_WIDGET_ID"),
+        getCredential(adminClient, "msg91_token_auth", "MSG91_TOKEN_AUTH"),
+      ]),
+      ...rateLimitChecks,
     ]);
+
+    // Check rate limits
+    for (const rl of rlResults) {
+      if (!rl.allowed) return rateLimitResponse(corsHeaders);
+    }
+
+    const [authKey, widgetId, tokenAuth] = credResults;
 
     if (!authKey || !widgetId || !tokenAuth) {
       console.error("MSG91 Widget credentials not configured (checked DB + env)");
