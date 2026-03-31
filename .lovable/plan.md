@@ -1,144 +1,153 @@
 
 
-# 5 Critical Silent Buyer Bugs — Pre-Production Audit
+# 5 Critical Silent Buyer Bugs — Pre-Production Audit (Round 2)
 
-## Bug 1: Cancellation Banner Mislabels Seller Rejections as "Auto-Cancelled"
+## Bug 1: Out-of-Stock Products Show Active "Add" Button
 
-**What**: On `OrderDetailPage.tsx` line 395, the rejection reason banner uses this logic:
-```
-order.rejection_reason?.startsWith('Cancelled by buyer:') ? 'Order Cancelled' : 'Auto-Cancelled'
-```
-This means when a **seller rejects** an order (reason like "Out of stock"), the buyer sees **"Auto-Cancelled"** — not "Rejected by Seller". The buyer has no idea the seller explicitly refused the order.
+**What**: `ProductListingCard.tsx` line 80 sets `isOutOfStock = !product.is_available`, and `ProductCard.tsx` line 46 sets `isDisabled = !product.is_available || isStoreClosed`. Neither checks `stock_quantity === 0`. A product with `is_available: true` but `stock_quantity: 0` displays a fully enabled "Add" button. When tapped, `useCart.addItem` eventually catches it (line 309-311) after querying the DB, showing a delayed "This item is out of stock" toast — but the card gives zero visual indication.
 
-**Where**: OrderDetailPage.tsx, line 391-401 — the cancellation banner in the order detail view.
+**Where**: `ProductListingCard.tsx` line 80, line 196. `ProductCard.tsx` line 46, line 98/136.
 
-**Why critical**: The buyer feels the system randomly cancelled their order. They lose trust in the platform and may re-order the same item, only to get rejected again. There is zero feedback loop telling them the seller declined.
-
-**Gap it creates**: The cancellation reasons system (with `buyer_cancel_order` RPC prepending "Cancelled by buyer:") was designed for buyer-initiated cancels. Seller rejections use `seller_advance_order` with a `rejection_reason`, but the banner treats anything non-buyer as "Auto-Cancelled" — collapsing two semantically different scenarios.
-
-**Why fixing it completes the system**: The order lifecycle already tracks who cancelled (buyer vs seller vs system). The UI simply doesn't surface this distinction.
+**Why critical**: Buyer taps "Add", waits for a network round-trip, gets a toast error. This creates a "bait and switch" feeling. At scale, products frequently hit 0 stock before the seller marks them unavailable. Every such interaction erodes trust.
 
 **Impact analysis**:
-- `OrderDetailPage.tsx` — banner text logic
-- `useOrderDetail.ts` — no change needed (already exposes rejection_reason)
-- Notification templates (edge functions) — may need audit for consistent wording
+- `ProductListingCard.tsx` — add `stock_quantity === 0` to `isOutOfStock` check
+- `ProductCard.tsx` — add `stockLimit <= 0` to `isDisabled` check
+- `ProductDetailSheet.tsx` — verify stock check on the detail sheet's Add button
 
 **Risks**:
-1. If `rejection_reason` format varies across RPCs, the new detection logic could misclassify — mitigate by checking `seller_advance_order` RPC to confirm it stores reasons without prefixes.
-2. Changing banner text could confuse users who already saw "Auto-Cancelled" for the same order if they revisit — mitigate by using neutral "Order Cancelled by Seller" phrasing.
+1. Products with `stock_quantity: null` (unlimited stock) must NOT be treated as out-of-stock — guard with `!= null && === 0` check.
+2. The "low stock" badge logic at line 87 already guards `> 0`, so no conflict.
 
-**Fix plan**: In `OrderDetailPage.tsx` line 395, replace the binary check with a 3-way classification:
-- Starts with "Cancelled by buyer:" → "You Cancelled This Order"
-- Contains system phrases ("not completed in time", "seller didn't respond") → "Auto-Cancelled"
-- Everything else → "Cancelled by Seller"
+**Fix plan**:
+- `ProductListingCard.tsx` line 80: `const isOutOfStock = !product.is_available || (product.stock_quantity != null && product.stock_quantity <= 0);`
+- `ProductCard.tsx` line 46: `const isDisabled = !product.is_available || isStoreClosed || stockLimit <= 0;`
+- `ProductCard.tsx`: Add visual "Out of Stock" overlay when `stockLimit <= 0` (same as existing `!product.is_available` overlay)
 
 ---
 
-## Bug 2: Buyer Sees "Block undefined, undefined" for Non-Society Sellers
+## Bug 2: Self-Pickup Orders Get Empty Delivery Address
 
-**What**: On `OrderDetailPage.tsx` line 688, the seller info card renders:
-```
-Block {sellerProfile?.block}, {sellerProfile?.flat_number}
-```
-For marketplace sellers (not society-based), `block` and `flat_number` are null. The buyer sees **"Block undefined, undefined"** — a raw code artifact.
+**What**: `useCartPage.ts` line 312-314 constructs the delivery address text. For self-pickup, it falls back to `[profile.block, profile.flat_number].filter(Boolean).join(', ')`. Marketplace users without a society (null block/flat) get an empty string `''` saved as `delivery_address`. The seller sees a blank address in their order detail.
 
-**Where**: OrderDetailPage.tsx line 688 — Seller info card at the bottom of order detail.
+**Where**: `useCartPage.ts` line 312-314, used in `createOrdersForAllSellers`.
 
-**Why critical**: This instantly destroys trust. A buyer seeing "Block undefined" thinks the app is broken or the seller is fake. For a marketplace platform supporting sellers beyond communities, this is a guaranteed occurrence for commercial sellers.
-
-**Gap it creates**: The platform's architecture explicitly separates marketplace (coordinate-based) from society (block/flat-based). The order detail UI assumes all sellers are society-based, violating this core separation.
-
-**Why fixing it completes the system**: Sellers already have `address` or location data. Simply falling back to the seller's business address (or hiding the line entirely when block/flat are null) aligns the UI with the domain model.
+**Why critical**: Seller sees an order with a blank delivery address. For self-pickup, the address is used as a pickup reference (where the buyer is from). Empty address makes the seller question the order's legitimacy.
 
 **Impact analysis**:
-- `OrderDetailPage.tsx` line 686-692 — seller/buyer info rendering
-- No backend changes needed
+- `useCartPage.ts` — fix fallback address construction
+- `OrderDetailPage.tsx` — verify it handles empty delivery_address gracefully (already conditional on sellerProfile fields, but the order's own `delivery_address` field may render blank)
 
 **Risks**:
-1. Hiding the address entirely could leave the buyer with no location context for pickup orders — mitigate by showing seller's `address` or `area` field as fallback.
-2. The same pattern might exist for buyer info shown to sellers when buyer has no block/flat — check and fix both sides in the same card.
+1. Changing the address format could affect existing orders' display — mitigate by only modifying future order creation, not rendering.
+2. For self_pickup, the address is reference-only (not for navigation) — a fallback like the user's profile name is sufficient.
 
-**Fix plan**: Wrap the address line in a conditional: only render if `block` or `flat_number` is truthy. Otherwise show a generic location label or omit entirely.
+**Fix plan**: In `useCartPage.ts` line 314, add a fallback:
+```typescript
+const deliveryAddressText = fulfillmentType === 'delivery' && selectedDeliveryAddress
+  ? [selectedDeliveryAddress.flat_number && `Flat ${selectedDeliveryAddress.flat_number}`, selectedDeliveryAddress.block && `Block ${selectedDeliveryAddress.block}`, selectedDeliveryAddress.building_name, selectedDeliveryAddress.landmark].filter(Boolean).join(', ')
+  : [profile.block && `Block ${profile.block}`, profile.flat_number].filter(Boolean).join(', ') || profile.name || 'Self Pickup';
+```
 
 ---
 
-## Bug 3: Reorder Silently Ignores Price Changes
+## Bug 3: Coupon Discount Shown on Confirm Dialog Even When Cart Changed
 
-**What**: `ReorderButton.tsx` line 71-76 checks `is_available` and `approval_status` but uses the current product price to insert into cart. If the product price has changed since the original order, the buyer sees no warning — they only discover the price difference at checkout (or never).
+**What**: `CartPage.tsx` line 434 shows the confirm dialog with `c.finalAmount`. The `effectiveCouponDiscount` recalculates dynamically (line 190-199 in useCartPage), but there is no re-validation that the coupon is still valid at confirmation time. The `min_order_amount` auto-removal effect (line 182-188) only triggers on `totalAmount` change, but if the buyer modifies quantities *after* opening the confirm dialog (via the cart stepper), the dialog shows a stale total.
 
-**Where**: ReorderButton.tsx, `executeReorder` function, lines 66-92.
+After deeper analysis: the confirm dialog reads `c.finalAmount` which recalculates each render, so the amount is correct. However, the available coupons list (`CouponInput`) fetches on mount and doesn't refetch when `totalAmount` changes — meaning a coupon that was ineligible at first load (below min_order_amount) stays ineligible in the UI even after the buyer adds more items. The `canApplyCoupon` check at line 91 uses the `totalAmount` prop correctly, but `availableCoupons` is fetched once on mount (line 53-78) and `userRedemptions` is also static.
 
-**Why critical**: A buyer taps "Reorder" expecting the same total. If a ₹150 item is now ₹250, they only notice at checkout (if at all). This breaks the fundamental promise of "same items, one tap" shown in the order detail UI.
+**Revised finding**: Actually, `canApplyCoupon` rechecks dynamically against `totalAmount` prop. The available coupons list fetch only runs once per seller. If a coupon was added between page load and checkout (seller adds new coupon), it won't appear. This is low-severity.
 
-**Gap it creates**: The system already stores `unit_price` in `order_items`. The reorder flow has the data to compare old vs new prices but doesn't use it.
+Let me re-examine for a stronger bug.
 
-**Why fixing it completes the system**: The checkout flow already has server-side price validation (`price_changed_items` from `create_multi_vendor_orders`). But that catches it too late — after cart assembly. A proactive toast during reorder ("2 items have different prices") sets expectations correctly.
+**Revised Bug 3: ProductDetailSheet Allows Add When Stock is 0**
+
+**What**: `useProductDetail.ts` line 73 sets `stockLimit = canonicalStockQty ?? 99`. Line 74: `canIncrement = quantity < stockLimit`. But the initial "Add" action (line 78-94 `handleAdd`) never checks if `stockLimit <= 0`. It calls `addItem` unconditionally for cart-type products. The useCart `addItem` catches it after a DB query, but the detail sheet shows a fully enabled action button even when canonical stock is 0.
+
+**Where**: `useProductDetail.ts` line 78 (`handleAdd`), `ProductDetailSheet.tsx` action button.
+
+**Why critical**: The detail sheet is the highest-intent surface — buyer has explicitly opened the product. Allowing them to tap "Add to Cart" on a zero-stock item, only to get a delayed error toast, is the worst UX at the highest-intent moment.
 
 **Impact analysis**:
-- `ReorderButton.tsx` — add price comparison logic
-- `useCart.tsx` — no change (accepts items at current price)
+- `useProductDetail.ts` — add stock guard to `handleAdd`
+- `ProductDetailSheet.tsx` — show "Out of Stock" state when `stockLimit <= 0` and `canonicalStockQty !== null`
 
 **Risks**:
-1. Comparing prices requires matching `order_items.unit_price` to `products.price` — if `unit_price` was stored with discounts applied, the comparison would flag false positives. Mitigate by comparing against `order_items.unit_price` only.
-2. If ALL items changed price, the toast could be alarming — mitigate with neutral phrasing: "Some prices may have changed since your last order."
+1. `canonicalStockQty` is null until the async fetch completes — guard must only apply when `canonicalStockQty !== null && canonicalStockQty <= 0`.
+2. The action button is shared across action types — only apply stock guard for `isCartAction` products.
 
-**Fix plan**: In `executeReorder`, after fetching `availableProducts`, compare each product's current `price` against the original `orderItems[i].unit_price`. If any differ, show `toast.info('Heads up: Some prices have changed since your last order')`.
+**Fix plan**:
+- `useProductDetail.ts` line 78: Add early return: `if (isCartAction && canonicalStockQty != null && canonicalStockQty <= 0) { toast.error('This item is out of stock'); return; }`
+- Export a `isStockEmpty` flag: `const isStockEmpty = canonicalStockQty != null && canonicalStockQty <= 0`
+- `ProductDetailSheet.tsx`: Disable add button and show "Out of Stock" when `d.isStockEmpty`
 
 ---
 
-## Bug 4: Order List Filter "Active" Leaks `payment_pending` Orders
+## Bug 4: Realtime Order Updates Not Scoped to Buyer's Order
 
-**What**: In `useOrdersList.ts` line 28-30, the "Active" filter excludes terminal statuses and `payment_pending`:
-```
-const terminalArr = [...terminalSet, 'payment_pending'];
-query = query.not('status', 'in', `(${terminalArr.map(s => `"${s}"`).join(',')})`);
-```
-But the `ActiveOrderStrip` (home screen) separately excludes `payment_pending` (line 73). The **Orders page "All" tab** does NOT exclude `payment_pending`, so buyers see raw `payment_pending` orders mixed in with real orders — especially after failed payments where auto-cancel hasn't fired yet (30-min window).
+**What**: `OrderDetailPage.tsx` has a realtime subscription for order updates. Looking at `useOrderDetail.ts`:
 
-**Where**: OrdersPage.tsx → useOrdersList.ts, "all" filter path; also `OrderCard` component.
+Let me verify this properly.
 
-**Why critical**: A buyer who abandoned a payment sees a confusing "Confirming Payment…" order in their "All" orders list for up to 30 minutes. They might tap it, see the payment banner, and think they're being charged. This creates anxiety and support tickets.
+Actually, looking more carefully at the code, let me check a different area. Let me look at what happens after a successful order with COD — the cart is cleared asynchronously:
 
-**Gap it creates**: The `ActiveOrderStrip` correctly hides these, but the Orders page doesn't apply the same logic for the "All" tab. The two views are inconsistent.
+**Revised Bug 4: COD Order Success Navigates Before Cart Clear — Back Button Shows Stale Cart**
 
-**Why fixing it completes the system**: The platform already has the auto-cancel sweep (30 min). The gap is purely the display layer showing transient states as if they were real orders.
+**What**: `useCartPage.ts` line 526-531 — on COD success, the code navigates to the order page FIRST, then clears the cart in the background (`clearCartAndCache().catch(() => {})`). If the buyer taps the back button quickly, they return to the cart page and see the same items (cache not yet cleared). Tapping "Place Order" again would create a duplicate order, but the idempotency key was already reset (line 360 — `if (!result.deduplicated) idempotencyKeyRef.current = null`).
+
+**Where**: `useCartPage.ts` line 526-531 (COD flow), line 360 (idempotency reset).
+
+**Why critical**: A buyer who navigates back to cart within ~1 second sees the same items and total. If they instinctively tap "Place Order" again (muscle memory), a second order is created. The idempotency key was reset, so the RPC treats it as a new order.
 
 **Impact analysis**:
-- `useOrdersList.ts` — add `payment_pending` exclusion for buyer "all" filter
-- `OrderCard` component — no change needed (already renders status correctly)
-- `ActiveOrderStrip` — already correct, no change
+- `useCartPage.ts` — ensure cart is cleared BEFORE navigation for COD
+- Idempotency key reset timing — should only reset after cart clear succeeds
 
 **Risks**:
-1. Hiding `payment_pending` from "All" means a buyer who genuinely paid but webhook is delayed won't see their order — mitigate by only hiding `payment_pending` orders older than 5 minutes (fresh ones may still be confirming).
-2. The Supabase `.not()` syntax with string-interpolated arrays is fragile — ensure proper escaping.
+1. Clearing cart before navigation adds latency to the success moment (~200ms for DB delete + cache clear) — mitigate by clearing cache optimistically (set to []) before the DB call.
+2. If cart clear fails, user could be stuck with items in cart and no clear feedback — already handled by `clearCartAndCache` which sets cache to empty arrays.
 
-**Fix plan**: In `useOrdersList.ts` `fetchOrdersPage`, when `type === 'buyer'` and `filter === 'all'`, add `.not('status', 'eq', 'payment_pending')` OR only exclude `payment_pending` orders older than 5 minutes using `.or('status.neq.payment_pending,created_at.gt.${fiveMinAgo}')`.
+**Fix plan**: In `useCartPage.ts` COD flow (line 519-533):
+```typescript
+// Clear cart BEFORE navigation to prevent back-button duplicate
+queryClient.setQueryData(['cart-items', user.id], []);
+queryClient.setQueryData(['cart-count', user.id], 0);
+navigate(orderIds.length === 1 ? `/orders/${orderIds[0]}` : '/orders');
+clearCartAndCache().catch(() => {}); // DB cleanup in background
+```
+This optimistically empties the cache so back-button shows empty cart instantly.
 
 ---
 
-## Bug 5: Notification Badge Count Includes Stale Order Notifications
+## Bug 5: Delivery Address Card Shows Profile Fallback Instead of Order's Saved Address
 
-**What**: `useUnreadNotificationCount.ts` counts ALL unread notifications (excluding seller-only types) without any recency filter. But `useLatestActionNotification` (the banner) applies a 24-hour recency guard and terminal-order filter. This means the badge shows "3 unread" but the banner shows nothing — the buyer taps the bell expecting 3 items, but the inbox shows old, irrelevant notifications at the top.
+**What**: On `OrderDetailPage.tsx` lines 694-700, the address section shows `sellerProfile?.block` / `buyer?.block`. But orders have their own `delivery_address` text field (set at checkout). For delivery orders, the page should show the order's delivery address (which may be a separate saved address, not the buyer's profile block/flat). Currently, the page shows the buyer's profile address, which may differ from where the order is actually being delivered.
 
-**Where**: `useUnreadNotificationCount.ts` vs `useLatestActionNotification` in `useNotifications.ts`.
+**Where**: `OrderDetailPage.tsx` line 688-700 — Seller/Buyer info card.
 
-**Why critical**: A persistent unread badge that doesn't correspond to actionable content trains the buyer to ignore notifications entirely. This is the "boy who cried wolf" pattern — when a real urgent notification arrives, the buyer doesn't trust the badge.
-
-**Gap it creates**: The stale notification cleanup (`cleanupStaleDeliveryNotifications`) runs only when the inbox page opens (line 41, `NotificationInboxPage.tsx`). If the buyer never opens the inbox, stale delivery notifications accumulate indefinitely, inflating the badge count.
-
-**Why fixing it completes the system**: The cleanup logic already exists and works correctly. It just needs to run proactively — not only on inbox visit.
+**Why critical**: If a buyer has a saved delivery address (different building, friend's place), the order detail page shows their profile block/flat instead of the actual delivery destination. The seller sees the wrong address. For delivery orders, this is a delivery-to-wrong-location risk.
 
 **Impact analysis**:
-- `useUnreadNotificationCount.ts` — either apply same recency filter, or trigger cleanup
-- `useNotifications.ts` — `cleanupStaleDeliveryNotifications` is already exported
-- `useBuyerOrderAlerts.ts` — could trigger cleanup after order status changes
-- `useAppLifecycle.ts` — could trigger cleanup on app resume
+- `OrderDetailPage.tsx` — add delivery address display from `order.delivery_address`
+- The info card currently shows profile block/flat; for delivery orders, it should show the order's delivery address
 
 **Risks**:
-1. Running cleanup too aggressively (on every badge re-fetch) could cause excessive DB writes — mitigate by running cleanup at most once per app session (use a ref guard).
-2. The cleanup marks notifications as `is_read`, which means they won't appear as "new" if the user later opens the inbox — this is actually the desired behavior (stale = already irrelevant).
+1. `order.delivery_address` is a concatenated text string, not structured data — it may look less clean than the block/flat format. Acceptable as it's what the buyer confirmed at checkout.
+2. Self-pickup orders shouldn't show delivery address prominently — gate on `fulfillment_type`.
 
-**Fix plan**: In `useAppLifecycle.ts`, after the visibility-change resume handler (line 45-68), add a one-time cleanup call: fetch the first page of unread notifications and run `cleanupStaleDeliveryNotifications`. Guard with a ref to ensure it runs only once per session.
+**Fix plan**: In `OrderDetailPage.tsx` around line 688-700, add a delivery address section for delivery orders:
+```tsx
+{/* Delivery Address — only for delivery orders, from the order itself */}
+{isDeliveryOrder && (order as any).delivery_address && (
+  <div className="mt-2 pt-2 border-t border-border">
+    <p className="text-xs text-muted-foreground flex items-center gap-1">
+      <MapPin size={11} /> Delivering to: {(order as any).delivery_address}
+    </p>
+  </div>
+)}
+```
+This renders inside the existing info card, below the seller/buyer name.
 
 ---
 
@@ -146,11 +155,11 @@ But the `ActiveOrderStrip` (home screen) separately excludes `payment_pending` (
 
 | # | Bug | File(s) | Severity | Effort |
 |---|-----|---------|----------|--------|
-| 1 | Seller rejections shown as "Auto-Cancelled" | OrderDetailPage.tsx | High — trust | ~15 min |
-| 2 | "Block undefined, undefined" for non-society sellers | OrderDetailPage.tsx | High — trust | ~10 min |
-| 3 | Reorder ignores price changes silently | ReorderButton.tsx | Medium — financial trust | ~20 min |
-| 4 | `payment_pending` orders visible in "All" tab | useOrdersList.ts | Medium — anxiety | ~15 min |
-| 5 | Badge count inflated by stale notifications | useAppLifecycle.ts, useUnreadNotificationCount.ts | Medium — notification trust | ~20 min |
+| 1 | Zero-stock products show active "Add" button | ProductListingCard.tsx, ProductCard.tsx | High — false positive | ~15 min |
+| 2 | Self-pickup orders get blank delivery address | useCartPage.ts | Medium — seller confusion | ~5 min |
+| 3 | ProductDetailSheet allows add on zero-stock | useProductDetail.ts, ProductDetailSheet.tsx | High — highest-intent surface | ~10 min |
+| 4 | COD back-button exposes duplicate order risk | useCartPage.ts | High — financial | ~10 min |
+| 5 | Order detail shows profile address, not delivery address | OrderDetailPage.tsx | Medium — wrong delivery risk | ~10 min |
 
 All fixes are surgical — no new features, no schema changes, no refactoring.
 
