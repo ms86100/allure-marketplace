@@ -1,105 +1,91 @@
 
 
-# Implementation Plan: Search Geo-Filter + Notification Staleness & State Guards
+# Fix Plan: 3 Production Issues
 
-## Overview
+## Issue 1: Inconsistent Seller Notification Delivery
 
-Two surgical fixes — no architectural changes. The system's realtime, state machine, and push infrastructure are already sound.
+### Root Cause (Verified)
+
+Two separate problems:
+
+**A. Duplicate source in `razorpay-webhook/index.ts`**
+`confirm-razorpay-payment` was already cleaned up (line 217: "Seller notification is handled by the DB trigger"). But `razorpay-webhook/index.ts` lines 196-222 still manually insert into `notification_queue` with `type: 'order'`. This creates a DUPLICATE alongside the DB trigger's `type: 'order_status'` entry.
+
+The DB trigger coverage is verified complete:
+- `trg_enqueue_order_notification` → AFTER UPDATE (Razorpay payment confirmation updates status to `placed`)
+- `trg_enqueue_order_placed_notification` → AFTER INSERT with `status = 'placed'` (COD orders)
+- Both triggers have 30-second dedup guards built in
+
+Removing the webhook's manual insert is safe.
+
+**B. State-mismatch guard kills valid "New Order" pushes**
+In `process-notification-queue/index.ts` line 177:
+```
+if ((isStale && isTerminal) || isStateMismatch)
+```
+The `isStateMismatch` check fires independently. If an order auto-cancels within 3 minutes, the "New Order" push has `payload.status = 'placed'` but the DB shows `status = 'cancelled'` → push silently suppressed. The seller never knows the order existed.
+
+### Fix
+
+**File: `supabase/functions/razorpay-webhook/index.ts`**
+- Remove lines 196-222 (manual seller notification insert). The DB trigger handles this.
+
+**File: `supabase/functions/process-notification-queue/index.ts`** (line 177)
+- Exempt `placed` and `enquired` statuses from the state-mismatch guard:
+```typescript
+const isNewOrderNotif = ['placed', 'enquired', 'requested'].includes(item.payload?.status);
+if (((isStale && isTerminal) || isStateMismatch) && !isNewOrderNotif) {
+```
+
+**Idempotency is already guaranteed** by:
+1. DB trigger's 30-second dedup window (checks existing queue entry with same `user_id` + `title` + `orderId`)
+2. `queue_item_id` unique constraint on `user_notifications` (prevents duplicate in-app entries)
 
 ---
 
-## Fix 1: Search Autocomplete — Add Location Filter to Seller Query
+## Issue 2: Cancellation Message Says "You Cancelled" to Both Roles
 
-**File:** `src/components/search/SearchAutocomplete.tsx` (lines 78-97)
+### Root Cause
+`OrderDetailPage.tsx` line 395-401 shows "You Cancelled This Order" for buyer-initiated cancellations regardless of who is viewing. Both buyer and seller see "You Cancelled This Order."
 
-**Change:** Add bounding-box lat/lng filters and `is_available` check to the seller query. Update `queryKey` to include location params. Disable query when location is unavailable.
-
+### Fix
+**File: `src/pages/OrderDetailPage.tsx`** (lines 395-401)
+Make the label role-aware:
 ```typescript
-queryKey: ['search-autocomplete-sellers', trimmed, lat, lng, radiusKm],
-queryFn: async () => {
-  if (!lat || !lng) return [];
-  const boxDelta = radiusKm * 0.009;
-  const { data } = await supabase
-    .from('seller_profiles')
-    .select('id, business_name, description, profile_image_url, categories')
-    .eq('verification_status', 'approved')
-    .eq('is_available', true)
-    .ilike('business_name', `%${trimmed}%`)
-    .gte('latitude', lat - boxDelta)
-    .lte('latitude', lat + boxDelta)
-    .gte('longitude', lng - boxDelta)
-    .lte('longitude', lng + boxDelta)
-    .limit(3);
-  // ... same map
-},
-enabled: trimmed.length >= 2 && !!(lat && lng),
+order.rejection_reason?.startsWith('Cancelled by buyer:')
+  ? (o.isBuyerView ? 'You Cancelled This Order' : 'Cancelled by Buyer')
+  : /not completed in time|seller didn't respond|payment was not completed/i.test(order.rejection_reason || '')
+    ? 'Auto-Cancelled'
+    : (o.isSellerView ? 'You Cancelled This Order' : 'Cancelled by Seller')
 ```
 
 ---
 
-## Fix 2: Notification Queue — Add Staleness Guard + State Validation Guard
+## Issue 3: iOS Background Location Missing `location` Background Mode
 
-**File:** `supabase/functions/process-notification-queue/index.ts`
+### Root Cause
+`codemagic.yaml` lines 347-349 add `UIBackgroundModes` with only `remote-notification` and `fetch`. The `location` mode is missing, causing the Transistorsoft background geolocation plugin to fail with "plugin not implemented on iOS."
 
-**Where:** After the dedup check (line 158), before the in-app insert (line 160). Add a new block that runs for order-related notification types.
-
-**Three guards combined in one check:**
-
-1. **Staleness guard** — if notification is >5 minutes old
-2. **Terminal state guard** — if the order is already in a terminal state (`delivered`, `completed`, `cancelled`, `no_show`)
-3. **State mismatch guard** (the user's mandatory addition) — if `item.payload.status` exists and differs from the current order status, the notification is outdated even if <5 minutes old
-
-```typescript
-// Guards: staleness + terminal + state-mismatch
-const isOrderNotif = ['order_status', 'order', 'order_update'].includes(item.type);
-if (isOrderNotif && item.payload?.orderId) {
-  const ageMs = Date.now() - new Date(item.created_at).getTime();
-  const isStale = ageMs > 5 * 60 * 1000;
-
-  const { data: orderCheck } = await supabase
-    .from('orders')
-    .select('status')
-    .eq('id', item.payload.orderId)
-    .single();
-
-  if (orderCheck) {
-    const terminalStatuses = ['delivered', 'completed', 'cancelled', 'no_show'];
-    const isTerminal = terminalStatuses.includes(orderCheck.status);
-    const isStateMismatch = item.payload?.status && item.payload.status !== orderCheck.status;
-
-    if ((isStale && isTerminal) || isStateMismatch) {
-      // Save in-app as read, skip push
-      await supabase.from('user_notifications').insert({
-        user_id: item.user_id, title: item.title, body: item.body,
-        type: item.type, reference_path: item.reference_path,
-        queue_item_id: item.id, payload: item.payload, is_read: true,
-      });
-      await supabase.from('notification_queue')
-        .update({ status: 'processed', processed_at: new Date().toISOString() })
-        .eq('id', item.id);
-      processed++;
-      console.log(`[Queue][${item.id}] Skipped push: stale=${isStale}, terminal=${isTerminal}, mismatch=${isStateMismatch}`);
-      continue;
-    }
-  }
-}
+### Fix
+**File: `codemagic.yaml`** — After line 349 and line 1240 (both iOS workflows):
+```yaml
+/usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:2 string location" App/Info.plist 2>/dev/null || true
 ```
-
-**Why the state mismatch guard matters:** Even within 5 minutes, an order can rapidly transition (placed → preparing → delivered). Without this check, a "preparing" notification could arrive after the order is already "delivered" — confusing the user.
 
 ---
 
-## Files Changed
+## Summary
 
-| File | Change |
-|------|--------|
-| `src/components/search/SearchAutocomplete.tsx` | Add lat/lng bounding-box + `is_available` filter to seller query |
-| `supabase/functions/process-notification-queue/index.ts` | Add staleness + terminal + state-mismatch guard before push delivery |
+| # | Issue | File | Fix | Risk |
+|---|-------|------|-----|------|
+| 1a | Duplicate notification from webhook | `razorpay-webhook/index.ts` | Remove manual insert (lines 196-222) | Low — DB trigger verified for all paths |
+| 1b | State-mismatch guard kills new-order pushes | `process-notification-queue/index.ts` | Exempt `placed`/`enquired`/`requested` from mismatch | Low — existing dedup prevents duplicates |
+| 2 | "You Cancelled" shown to wrong role | `OrderDetailPage.tsx` | Role-aware label using `o.isBuyerView`/`o.isSellerView` | Zero — display only |
+| 3 | Missing iOS `location` background mode | `codemagic.yaml` | Add `UIBackgroundModes:2 string location` | Low — requires rebuild |
 
 ## Validation
-
-- Search "Sanjay" from Shriram Greenfield → no stores >50km away
-- Place order → no stale/contradictory notifications arrive
-- Rapid state transitions → outdated pushes are suppressed
-- Fresh, current-state notifications still deliver normally
+- Place 5 orders (mix COD + Razorpay) → seller receives ALL 5 push notifications
+- Buyer cancels → seller sees "Cancelled by Buyer", buyer sees "You Cancelled This Order"
+- Rapid cancel test: place order → auto-cancel within 3 min → seller still receives "New Order" push
+- iOS rebuild → background location tracking works, no "not implemented" error
 
