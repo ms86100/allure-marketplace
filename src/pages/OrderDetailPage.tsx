@@ -392,9 +392,15 @@ export default function OrderDetailPage() {
             <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 flex items-start gap-2.5">
               <XCircle className="text-destructive shrink-0 mt-0.5" size={16} />
               <div>
-                <p className="text-sm font-semibold text-destructive">{order.rejection_reason?.startsWith('Cancelled by buyer:') ? 'Order Cancelled' : 'Auto-Cancelled'}</p>
+                <p className="text-sm font-semibold text-destructive">{
+                  order.rejection_reason?.startsWith('Cancelled by buyer:')
+                    ? 'You Cancelled This Order'
+                    : /not completed in time|seller didn't respond|payment was not completed/i.test(order.rejection_reason || '')
+                      ? 'Auto-Cancelled'
+                      : 'Cancelled by Seller'
+                }</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{order.rejection_reason?.replace(/^Cancelled by buyer:\s*/i, '')}</p>
-                {o.isSellerView && !order.rejection_reason?.startsWith('Cancelled by buyer:') && (
+                {o.isSellerView && /not completed in time|seller didn't respond/i.test(order.rejection_reason || '') && (
                   <p className="text-[11px] text-primary mt-1.5 font-medium">💡 Tip: Respond within 3 minutes to avoid auto-cancellation</p>
                 )}
               </div>
