@@ -214,37 +214,8 @@ serve(async (req) => {
         continue;
       }
 
-      // Enqueue seller notification (only fires when DB rows actually changed)
-      const order = updated[0];
-      const { data: sellerProfile } = await supabase
-        .from("seller_profiles")
-        .select("user_id")
-        .eq("id", order.seller_id)
-        .single();
-
-      const { data: buyerProfile } = await supabase
-        .from("profiles")
-        .select("name")
-        .eq("id", order.buyer_id)
-        .single();
-
-      if (sellerProfile?.user_id) {
-        await supabase.from("notification_queue").insert({
-          user_id: sellerProfile.user_id,
-          type: "order",
-          title: "🆕 New Order Received!",
-          body: `${buyerProfile?.name || "A buyer"} placed an order. Tap to view and accept.`,
-          reference_path: `/orders/${orderId}`,
-          payload: {
-            orderId,
-            status: "placed",
-            type: "order",
-            action: "View Order",
-            target_role: "seller",
-            buyer_name: buyerProfile?.name || "Customer",
-          },
-        });
-      }
+      // Seller notification is handled by the DB trigger fn_enqueue_order_status_notification
+      // which fires on the order status change to 'placed'. No manual insert needed here.
 
       console.log(
         `[confirm-razorpay-payment][${source}] ✅ order=${orderId} result=advanced razorpay_payment_id=${verifiedPaymentId}`
