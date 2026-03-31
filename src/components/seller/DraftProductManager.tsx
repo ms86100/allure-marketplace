@@ -10,6 +10,7 @@ import { VegBadge } from '@/components/ui/veg-badge';
 import { ProductImageUpload } from '@/components/ui/product-image-upload';
 import { useAuth } from '@/contexts/AuthContext';
 import { Plus, Trash2, Loader2, Package, Percent, CheckCircle2, Info, Pencil } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { friendlyError } from '@/lib/utils';
@@ -88,6 +89,7 @@ export function DraftProductManager({
   const [isAdding, setIsAdding] = useState(restoredDraft?.isAdding ?? false);
   const [editingIndex, setEditingIndex] = useState<number | null>(restoredDraft?.editingIndex ?? null);
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [attributeBlocks, setAttributeBlocks] = useState<BlockData[]>(restoredDraft?.attributeBlocks ?? []);
   const [serviceFields, setServiceFields] = useState<ServiceFieldsData>(restoredDraft?.serviceFields ?? INITIAL_SERVICE_FIELDS);
@@ -204,7 +206,7 @@ export function DraftProductManager({
         category: newProduct.category,
         is_veg: newProduct.is_veg,
         image_url: newProduct.image_url.trim() || null,
-        is_available: false,
+        is_available: true,
         approval_status: 'draft',
         prep_time_minutes: newProduct.prep_time_minutes || null,
         specifications: attributeBlocks.length > 0 ? { blocks: attributeBlocks } : null,
@@ -469,7 +471,7 @@ export function DraftProductManager({
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" onClick={() => handleEditProduct(index)}>
                     <Pencil size={14} />
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => handleRemoveProduct(index)}>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(index)}>
                     <Trash2 size={14} />
                   </Button>
                 </div>
@@ -682,6 +684,19 @@ export function DraftProductManager({
           Add Product / Service
         </Button>
       )}
+
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Product?</AlertDialogTitle>
+            <AlertDialogDescription>This will permanently remove this product. This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => { if (deleteTarget !== null) { handleRemoveProduct(deleteTarget); setDeleteTarget(null); } }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

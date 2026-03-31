@@ -160,7 +160,7 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
           category: row.category, description: row.description.trim() || null,
           is_veg: config?.formHints.showVegToggle ? row.is_veg : true,
           prep_time_minutes: config?.formHints.showDurationField && row.prep_time_minutes ? parseInt(row.prep_time_minutes) : null,
-          is_available: false, approval_status: 'draft',
+          is_available: true, approval_status: 'draft',
         };
       });
 
@@ -169,6 +169,7 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
 
       setSaveResult({ success: products.length, errors: 0 });
       toast.success(`${products.length} products added as drafts`);
+      toast.info('Tip: Edit each product to add images before submitting for approval', { duration: 5000 });
       onSuccess();
 
       setTimeout(() => {
