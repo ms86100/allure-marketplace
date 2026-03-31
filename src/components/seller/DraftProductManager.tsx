@@ -204,7 +204,7 @@ export function DraftProductManager({
         category: newProduct.category,
         is_veg: newProduct.is_veg,
         image_url: newProduct.image_url.trim() || null,
-        is_available: false,
+        is_available: true,
         approval_status: 'draft',
         prep_time_minutes: newProduct.prep_time_minutes || null,
         specifications: attributeBlocks.length > 0 ? { blocks: attributeBlocks } : null,
