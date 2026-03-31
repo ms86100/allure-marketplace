@@ -13,6 +13,7 @@ import { cleanupStaleDeliveryNotifications, type UserNotification } from '@/hook
 export function useAppLifecycle() {
   const queryClient = useQueryClient();
   const autoCancelFiredRef = useRef(false);
+  const staleCleanupFiredRef = useRef(false);
 
   // Trigger auto-cancel on cold start to sweep stale payment_pending orders
   useEffect(() => {
