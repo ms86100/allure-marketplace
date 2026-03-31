@@ -22,6 +22,27 @@ export function useAppLifecycle() {
     supabase.functions.invoke('auto-cancel-orders').catch((e) => {
       console.warn('[AppLifecycle] auto-cancel-orders cold-start sweep failed:', e);
     });
+
+    // One-time stale notification cleanup on cold start
+    if (!staleCleanupFiredRef.current) {
+      staleCleanupFiredRef.current = true;
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) return;
+        supabase
+          .from('user_notifications')
+          .select('id, title, body, type, reference_path, is_read, created_at, payload')
+          .eq('user_id', user.id)
+          .eq('is_read', false)
+          .limit(100)
+          .then(({ data }) => {
+            if (data && data.length > 0) {
+              cleanupStaleDeliveryNotifications(data as UserNotification[]).then(() => {
+                queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
+              });
+            }
+          });
+      });
+    }
   }, []);
 
   // Push-driven sync: invalidate all critical queries on terminal order push
