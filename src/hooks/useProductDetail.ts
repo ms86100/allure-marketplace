@@ -7,6 +7,7 @@ import { ProductActionType } from '@/types/database';
 import { ACTION_CONFIG } from '@/lib/marketplace-constants';
 import { useCurrency } from '@/hooks/useCurrency';
 import { hapticImpact } from '@/lib/haptics';
+import { toast } from 'sonner';
 
 export interface ProductDetail {
   product_id: string;
@@ -75,10 +76,13 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
 
   const navigate = useNavigate();
 
+  const isStockEmpty = isCartAction && canonicalStockQty != null && canonicalStockQty <= 0;
+
   const handleAdd = useCallback(() => {
     if (!product) return;
     if (actionType === 'contact_seller') { setContactOpen(true); return; }
     if (!isCartAction) { setEnquiryOpen(true); return; }
+    if (canonicalStockQty != null && canonicalStockQty <= 0) { toast.error('This item is currently out of stock'); return; }
     hapticImpact('medium');
     addItem({
       id: product.product_id, seller_id: product.seller_id,
@@ -103,7 +107,7 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
     showDetails, setShowDetails, reportOpen, setReportOpen,
     similarProducts, loadedSpecs, formatPrice,
     actionType, config, isCartAction, cartItem, quantity, stockLimit, canIncrement,
-    handleAdd, isNewSeller, ActionIcon, viewAllLabel,
+    handleAdd, isNewSeller, ActionIcon, viewAllLabel, isStockEmpty,
     items, updateQuantity,
   };
 }
