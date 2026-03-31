@@ -38,7 +38,7 @@ export function useSellerOrderStats(sellerId: string | null) {
       // With 1-2 users this is tiny; even at scale the seller's own orders are bounded
       const { data: orders } = await supabase
         .from('orders')
-        .select('status, total_amount, created_at')
+        .select('status, total_amount, created_at, payment_status')
         .eq('seller_id', sellerId!);
 
       const rows = orders || [];
@@ -65,9 +65,11 @@ export function useSellerOrderStats(sellerId: string | null) {
           case 'completed':
           case 'delivered':
             completedOrders++;
-            totalEarnings += amt;
-            if (isToday) todayEarnings += amt;
-            if (isWeek) weekEarnings += amt;
+            if (row.payment_status !== 'refunded') {
+              totalEarnings += amt;
+              if (isToday) todayEarnings += amt;
+              if (isWeek) weekEarnings += amt;
+            }
             break;
           case 'preparing':
             preparingOrders++;
@@ -150,17 +152,18 @@ export function useSellerOrdersInfinite(sellerId: string | null, filter: string 
     queryFn: async ({ pageParam }) => {
       let query = supabase
         .from('orders')
-        .select(`*, buyer:profiles!orders_buyer_id_fkey(name, block, flat_number), items:order_items(id, product_name, quantity, unit_price, status)`)
+        .select(`*, buyer:profiles!orders_buyer_id_fkey(name, block, flat_number, phone), items:order_items(id, product_name, quantity, unit_price, status)`)
         .eq('seller_id', sellerId!)
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE);
 
       // Apply filter
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      const istDateStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}-${String(nowIST.getDate()).padStart(2, '0')}`;
+      const todayISO = new Date(`${istDateStr}T00:00:00+05:30`).toISOString();
       switch (filter) {
         case 'today':
-          query = query.gte('created_at', today.toISOString());
+          query = query.gte('created_at', todayISO);
           break;
         case 'enquiries':
           query = query.in('status', ['enquired', 'quoted']);

@@ -102,6 +102,10 @@ export default function SellerDashboardPage() {
 
   const toggleAvailability = async () => {
     if (!sellerProfile) return;
+    if (sellerProfile.verification_status !== 'approved') {
+      toast.error('Your store must be approved before you can go live');
+      return;
+    }
 
     try {
       const newVal = !sellerProfile.is_available;

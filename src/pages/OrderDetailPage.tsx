@@ -698,7 +698,7 @@ export default function OrderDetailPage() {
                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5"><MapPin size={11} />{block ? `Block ${block}` : ''}{block && flat ? ', ' : ''}{flat || ''}</p>
                    ) : null;
                 })()}
-                {!o.isSellerView && (order as any).delivery_address && (order as any).fulfillment_type === 'delivery' && (
+                {(order as any).delivery_address && ['delivery', 'seller_delivery'].includes((order as any).fulfillment_type) && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><MapPin size={11} />Delivering to: {(order as any).delivery_address}</p>
                 )}
               </div>
