@@ -201,6 +201,14 @@ export function DraftProductManager({
     const existingId = isEditing ? products[editingIndex]?.id : undefined;
 
     try {
+      const resolvedApprovalStatus = (() => {
+        if (!isEditing || !existingId) return 'draft';
+        const existing = products[editingIndex!];
+        const currentStatus = (existing as any).approval_status || 'draft';
+        if (['approved', 'rejected'].includes(currentStatus)) return 'pending';
+        return currentStatus;
+      })();
+
       const productPayload = {
         seller_id: sellerId,
         name: newProduct.name.trim(),
@@ -211,12 +219,16 @@ export function DraftProductManager({
         is_veg: newProduct.is_veg,
         image_url: newProduct.image_url.trim() || null,
         is_available: true,
-        approval_status: 'draft',
+        approval_status: resolvedApprovalStatus,
         prep_time_minutes: newProduct.prep_time_minutes || null,
         specifications: attributeBlocks.length > 0 ? { blocks: attributeBlocks } : null,
         stock_quantity: newProduct.stock_quantity && newProduct.stock_quantity > 0 ? newProduct.stock_quantity : null,
         low_stock_threshold: newProduct.low_stock_threshold && newProduct.low_stock_threshold > 0 ? newProduct.low_stock_threshold : null,
         action_type: newProduct.action_type || 'add_to_cart',
+        subcategory_id: newProduct.subcategory_id || null,
+        lead_time_hours: newProduct.lead_time_hours ? parseInt(String(newProduct.lead_time_hours)) : null,
+        accepts_preorders: newProduct.accepts_preorders || false,
+        ...(isEditing ? { rejection_note: null } : {}),
       };
 
       let savedProductId: string;
