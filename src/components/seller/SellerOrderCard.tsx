@@ -26,7 +26,7 @@ interface SellerOrderCardOrder {
   order_type?: string | null;
   scheduled_date?: string | null;
   scheduled_time_start?: string | null;
-  buyer?: { name: string; block: string; flat_number: string };
+  buyer?: { name: string; block: string; flat_number: string; phone?: string };
   items?: OrderItemWithStatus[];
 }
 

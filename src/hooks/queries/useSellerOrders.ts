@@ -158,11 +158,12 @@ export function useSellerOrdersInfinite(sellerId: string | null, filter: string 
         .limit(PAGE_SIZE);
 
       // Apply filter
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      const istDateStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}-${String(nowIST.getDate()).padStart(2, '0')}`;
+      const todayISO = new Date(`${istDateStr}T00:00:00+05:30`).toISOString();
       switch (filter) {
         case 'today':
-          query = query.gte('created_at', today.toISOString());
+          query = query.gte('created_at', todayISO);
           break;
         case 'enquiries':
           query = query.in('status', ['enquired', 'quoted']);
