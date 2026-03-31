@@ -43,7 +43,8 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
 
   const isStoreClosed = storeAvailability.status !== 'open';
   const storeClosedMessage = isStoreClosed ? formatStoreClosedMessage(storeAvailability) : '';
-  const isDisabled = !product.is_available || isStoreClosed;
+  const isStockEmpty = stockLimit <= 0 && (product as any).stock_quantity != null;
+  const isDisabled = !product.is_available || isStoreClosed || isStockEmpty;
   const canIncrement = quantity < stockLimit && !isStoreClosed;
 
   const handleAdd = () => {
