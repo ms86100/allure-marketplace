@@ -1239,6 +1239,7 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" App/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string remote-notification" App/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:1 string fetch" App/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:2 string location" App/Info.plist 2>/dev/null || true
           # CRITICAL: Disable Firebase method swizzling (same as ios-release workflow)
           /usr/libexec/PlistBuddy -c "Add :FirebaseAppDelegateProxyEnabled bool false" App/Info.plist 2>/dev/null || \
             /usr/libexec/PlistBuddy -c "Set :FirebaseAppDelegateProxyEnabled false" App/Info.plist

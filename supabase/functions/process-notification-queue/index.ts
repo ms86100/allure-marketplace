@@ -174,7 +174,9 @@ Deno.serve(async (req) => {
             const isTerminal = terminalStatuses.includes(orderCheck.status);
             const isStateMismatch = item.payload?.status && item.payload.status !== orderCheck.status;
 
-            if ((isStale && isTerminal) || isStateMismatch) {
+            // Never suppress "new order" notifications — seller must always know
+            const isNewOrderNotif = ['placed', 'enquired', 'requested'].includes(item.payload?.status);
+            if (((isStale && isTerminal) || isStateMismatch) && !isNewOrderNotif) {
               await supabase.from("user_notifications").insert({
                 user_id: item.user_id,
                 title: item.title,
