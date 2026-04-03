@@ -268,34 +268,72 @@ export default function AuthPage() {
                                   </button>
                                 ))}
                               </>
-                            )}
-                          </div>
-                        )}
-                        {auth.societySearch.length >= 3 && !auth.showDbResults && !auth.showGoogleResults && !auth.isSearching && !auth.selectedSociety && (
-                          <p className="text-center text-sm text-muted-foreground py-4">No results found for "{auth.societySearch}"</p>
-                        )}
-                        {auth.societySearch.length < 2 && !auth.selectedSociety && (
-                          <div className="text-center py-6 space-y-2">
-                            <div className="mx-auto w-12 h-12 rounded-2xl bg-muted flex items-center justify-center"><Search size={20} className="text-muted-foreground" /></div>
-                            <p className="text-sm text-muted-foreground">Start typing to search for your society</p>
-                            <p className="text-xs text-muted-foreground/70">Search by society name, area, landmark, or pincode</p>
-                          </div>
-                        )}
+                             )}
+                           </div>
+                         )}
 
-                        {/* Invite code if needed */}
-                        {auth.selectedSociety?.invite_code && (
-                          <div className="space-y-2 pt-1">
-                            <Label>Invite Code</Label>
-                            <Input placeholder="Enter society invite code" value={auth.inviteCode} onChange={(e) => auth.setInviteCode(e.target.value)} className="h-12 rounded-xl" />
-                          </div>
-                        )}
+                         {/* Society Match Confirmation UI */}
+                         {auth.potentialMatches.length > 0 && (
+                           <div className="space-y-2 border-2 border-primary/20 rounded-xl p-4 bg-primary/5">
+                             <p className="text-sm font-semibold text-foreground">We found similar communities:</p>
+                             <div className="space-y-1.5">
+                               {auth.potentialMatches.map((m) => (
+                                 <button
+                                   key={m.society_id}
+                                   onClick={() => auth.handleConfirmMatch(m.society_id)}
+                                   className="w-full text-left p-3 rounded-xl border-2 border-border hover:border-primary/50 transition-all bg-background"
+                                 >
+                                   <div className="flex items-center justify-between gap-2">
+                                     <div className="flex items-center gap-3 min-w-0">
+                                       <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                         <Building2 size={16} className="text-primary" />
+                                       </div>
+                                       <span className="font-medium text-sm truncate">{m.society_name}</span>
+                                     </div>
+                                     <span className="text-xs text-muted-foreground shrink-0">{Math.round(m.confidence * 100)}%</span>
+                                   </div>
+                                 </button>
+                               ))}
+                               <button
+                                 onClick={auth.handleRejectMatches}
+                                 className="w-full text-left p-3 rounded-xl border-2 border-dashed border-border hover:border-muted-foreground/40 transition-all"
+                               >
+                                 <div className="flex items-center gap-3">
+                                   <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                                     <Plus size={16} className="text-muted-foreground" />
+                                   </div>
+                                   <span className="text-sm text-muted-foreground">None of these — create new</span>
+                                 </div>
+                               </button>
+                             </div>
+                           </div>
+                         )}
 
-                        {/* Can't find society link */}
-                        <div className="text-center pt-1">
-                          <button type="button" onClick={() => auth.setSocietySubStep('request-form')} className="text-sm text-primary font-medium hover:underline inline-flex items-center gap-1">
-                            <Plus size={14} /> Can't find your society? Request it
-                          </button>
-                        </div>
+                         {auth.societySearch.length >= 3 && !auth.showDbResults && !auth.showGoogleResults && !auth.isSearching && !auth.selectedSociety && auth.potentialMatches.length === 0 && (
+                           <p className="text-center text-sm text-muted-foreground py-4">No results found for "{auth.societySearch}"</p>
+                         )}
+                         {auth.societySearch.length < 2 && !auth.selectedSociety && auth.potentialMatches.length === 0 && (
+                           <div className="text-center py-6 space-y-2">
+                             <div className="mx-auto w-12 h-12 rounded-2xl bg-muted flex items-center justify-center"><Search size={20} className="text-muted-foreground" /></div>
+                             <p className="text-sm text-muted-foreground">Start typing to search for your society</p>
+                             <p className="text-xs text-muted-foreground/70">Search by society name, area, landmark, or pincode</p>
+                           </div>
+                         )}
+
+                         {/* Invite code if needed */}
+                         {auth.selectedSociety?.invite_code && (
+                           <div className="space-y-2 pt-1">
+                             <Label>Invite Code</Label>
+                             <Input placeholder="Enter society invite code" value={auth.inviteCode} onChange={(e) => auth.setInviteCode(e.target.value)} className="h-12 rounded-xl" />
+                           </div>
+                         )}
+
+                         {/* Can't find society link */}
+                         <div className="text-center pt-1">
+                           <button type="button" onClick={() => auth.setSocietySubStep('request-form')} className="text-sm text-primary font-medium hover:underline inline-flex items-center gap-1">
+                             <Plus size={14} /> Can't find your society? Request it
+                           </button>
+                         </div>
 
                         <Button
                           onClick={auth.handleSocietyComplete}

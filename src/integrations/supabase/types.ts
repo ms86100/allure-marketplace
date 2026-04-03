@@ -6687,6 +6687,7 @@ export type Database = {
           max_society_admins: number | null
           member_count: number | null
           name: string
+          normalized_name: string | null
           pincode: string | null
           rules_text: string | null
           security_confirmation_timeout_seconds: number | null
@@ -6716,6 +6717,7 @@ export type Database = {
           max_society_admins?: number | null
           member_count?: number | null
           name: string
+          normalized_name?: string | null
           pincode?: string | null
           rules_text?: string | null
           security_confirmation_timeout_seconds?: number | null
@@ -6745,6 +6747,7 @@ export type Database = {
           max_society_admins?: number | null
           member_count?: number | null
           name?: string
+          normalized_name?: string | null
           pincode?: string | null
           rules_text?: string | null
           security_confirmation_timeout_seconds?: number | null
@@ -6869,6 +6872,41 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      society_aliases: {
+        Row: {
+          alias_name: string
+          created_at: string
+          google_place_id: string | null
+          id: string
+          normalized_alias: string
+          society_id: string
+        }
+        Insert: {
+          alias_name: string
+          created_at?: string
+          google_place_id?: string | null
+          id?: string
+          normalized_alias: string
+          society_id: string
+        }
+        Update: {
+          alias_name?: string
+          created_at?: string
+          google_place_id?: string | null
+          id?: string
+          normalized_alias?: string
+          society_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "society_aliases_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
             referencedColumns: ["id"]
           },
         ]
@@ -9290,6 +9328,20 @@ export type Database = {
           _new_start_time: string
         }
         Returns: Json
+      }
+      resolve_society: {
+        Args: {
+          _google_place_id?: string
+          _input_name: string
+          _lat?: number
+          _lng?: number
+        }
+        Returns: {
+          confidence: number
+          match_type: string
+          society_id: string
+          society_name: string
+        }[]
       }
       search_marketplace: {
         Args: { search_term: string; user_society_id?: string }

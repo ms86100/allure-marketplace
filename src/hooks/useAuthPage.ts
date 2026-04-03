@@ -225,6 +225,10 @@ export function useAuthPage() {
     clearPredictions();
   };
 
+  // Society match candidates for confirmation UI
+  const [potentialMatches, setPotentialMatches] = useState<Array<{ society_id: string; society_name: string; match_type: string; confidence: number }>>([]);
+  const [pendingPlaceDetails, setPendingPlaceDetails] = useState<{ details: PlaceDetails; placeId: string } | null>(null);
+
   const handleSelectGooglePlace = async (placeId: string) => {
     const details = await getPlaceDetails(placeId);
     if (!details) { toast.error('Could not load address details'); return; }
@@ -232,28 +236,71 @@ export function useAuthPage() {
     clearPredictions();
     setSocietySearch(details.name);
 
-    const match = societies.find(s =>
-      s.name.toLowerCase() === details.name.toLowerCase() ||
-      s.name.toLowerCase().includes(details.name.toLowerCase()) ||
-      details.name.toLowerCase().includes(s.name.toLowerCase())
-    );
+    // Use resolve_society RPC for smart matching
+    const { data: matches } = await supabase.rpc('resolve_society', {
+      _input_name: details.name,
+      _lat: details.latitude,
+      _lng: details.longitude,
+      _google_place_id: placeId,
+    });
 
-    if (match) {
-      setSelectedSociety(match);
-      toast.info('Found matching society in our system!');
-    } else {
-      const name = details.name;
-      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now();
-      setPendingNewSociety({
-        name, slug,
-        address: details.formattedAddress,
-        city: details.city, state: details.state,
-        pincode: details.pincode,
-        latitude: details.latitude, longitude: details.longitude,
-      });
-      setSelectedSociety({ id: 'pending', name, slug, is_active: false, is_verified: false, latitude: details.latitude, longitude: details.longitude, created_at: '', updated_at: '' } as Society);
-      toast.success('Location selected! Continue to complete setup.');
+    if (matches && matches.length === 1 && matches[0].confidence >= 0.8) {
+      // High confidence single match — auto-select
+      const existing = societies.find(s => s.id === matches[0].society_id);
+      if (existing) {
+        setSelectedSociety(existing);
+        toast.info(`Found: ${existing.name}`);
+        return;
+      }
     }
+
+    if (matches && matches.length > 0 && matches[0].confidence >= 0.4) {
+      // Medium confidence — show confirmation UI
+      setPotentialMatches(matches);
+      setPendingPlaceDetails({ details, placeId });
+      return;
+    }
+
+    // No match — proceed with new society creation
+    const name = details.name;
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now();
+    setPendingNewSociety({
+      name, slug,
+      address: details.formattedAddress,
+      city: details.city, state: details.state,
+      pincode: details.pincode,
+      latitude: details.latitude, longitude: details.longitude,
+    });
+    setSelectedSociety({ id: 'pending', name, slug, is_active: false, is_verified: false, latitude: details.latitude, longitude: details.longitude, created_at: '', updated_at: '' } as Society);
+    toast.success('Location selected! Continue to complete setup.');
+  };
+
+  const handleConfirmMatch = (societyId: string) => {
+    const existing = societies.find(s => s.id === societyId);
+    if (existing) {
+      setSelectedSociety(existing);
+      setPotentialMatches([]);
+      setPendingPlaceDetails(null);
+      toast.info(`Selected: ${existing.name}`);
+    }
+  };
+
+  const handleRejectMatches = () => {
+    if (!pendingPlaceDetails) return;
+    const { details } = pendingPlaceDetails;
+    const name = details.name;
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now();
+    setPendingNewSociety({
+      name, slug,
+      address: details.formattedAddress,
+      city: details.city, state: details.state,
+      pincode: details.pincode,
+      latitude: details.latitude, longitude: details.longitude,
+    });
+    setSelectedSociety({ id: 'pending', name, slug, is_active: false, is_verified: false, latitude: details.latitude, longitude: details.longitude, created_at: '', updated_at: '' } as Society);
+    setPotentialMatches([]);
+    setPendingPlaceDetails(null);
+    toast.success('Location selected! Continue to complete setup.');
   };
 
   const verifyGpsLocation = async () => {
@@ -381,6 +428,8 @@ export function useAuthPage() {
     predictions, isSearching, mapsLoaded, selectedPlace,
     // New society
     newSocietyData, setNewSocietyData, pendingNewSociety,
+    // Society matching
+    potentialMatches, handleConfirmMatch, handleRejectMatches,
     // Settings
     settings,
     // Computed

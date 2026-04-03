@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
       const rl = await checkRateLimit(`create-society:${userId}`, 3, 3600);
       if (!rl.allowed) return rateLimitResponse(corsHeaders);
 
-      const { name, slug, address, city, state, pincode, latitude, longitude } = new_society;
+      const { name, slug, address, city, state, pincode, latitude, longitude, google_place_id } = new_society;
 
       if (!name || !slug) {
         return new Response(
@@ -52,6 +52,41 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Smart dedup: check resolve_society RPC before creating
+      const { data: matches } = await adminClient.rpc('resolve_society', {
+        _input_name: sanitizedName,
+        _lat: latitude || null,
+        _lng: longitude || null,
+        _google_place_id: google_place_id || null,
+      });
+
+      if (matches && matches.length > 0 && matches[0].confidence >= 0.8) {
+        // Auto-merge: return existing society + save alias
+        const normalized = sanitizedName.toLowerCase()
+          .replace(/\s*(phase|ph|tower|block|wing|sec|sector)\s*[\d\-]*/gi, '')
+          .replace(/\s+/g, ' ').trim();
+        await adminClient.from('society_aliases').upsert({
+          society_id: matches[0].society_id,
+          alias_name: sanitizedName,
+          normalized_alias: normalized,
+          google_place_id: google_place_id || null,
+        }, { onConflict: 'normalized_alias' }).throwOnError().catch(() => {});
+
+        return new Response(
+          JSON.stringify({
+            valid: true,
+            matched: true,
+            society: {
+              id: matches[0].society_id,
+              name: matches[0].society_name,
+              is_active: true,
+              is_verified: true,
+            },
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       // Check for duplicate slug
       const { data: existingSlug } = await adminClient
         .from("societies")
@@ -66,11 +101,17 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Compute normalized_name for the new society
+      const normalizedName = sanitizedName.toLowerCase()
+        .replace(/\s*(phase|ph|tower|block|wing|sec|sector)\s*[\d\-]*/gi, '')
+        .replace(/\s+/g, ' ').trim();
+
       const { data: created, error: createError } = await adminClient
         .from("societies")
         .insert({
           name: sanitizedName,
           slug: sanitizedSlug,
+          normalized_name: normalizedName,
           address: address || null,
           city: city || null,
           state: state || null,
@@ -78,7 +119,7 @@ Deno.serve(async (req) => {
           latitude: latitude || null,
           longitude: longitude || null,
           is_verified: false,
-          is_active: false, // Requires admin approval before activation
+          is_active: false,
         })
         .select("id, name, is_active, is_verified")
         .single();
@@ -90,6 +131,17 @@ Deno.serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      // Auto-create alias for the new society
+      const aliasNormalized = sanitizedName.toLowerCase()
+        .replace(/\s*(phase|ph|tower|block|wing|sec|sector)\s*[\d\-]*/gi, '')
+        .replace(/\s+/g, ' ').trim();
+      await adminClient.from('society_aliases').upsert({
+        society_id: created.id,
+        alias_name: sanitizedName,
+        normalized_alias: aliasNormalized,
+        google_place_id: google_place_id || null,
+      }, { onConflict: 'normalized_alias' }).catch(() => {});
 
       return new Response(
         JSON.stringify({
