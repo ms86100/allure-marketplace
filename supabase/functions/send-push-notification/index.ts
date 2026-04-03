@@ -253,6 +253,7 @@ async function sendFCMNotification(
     badge: 1,
   };
   if (imageUrl) apnsAps["mutable-content"] = 1;
+  if (threadId) apnsAps["thread-id"] = threadId;
 
   const apnsHeaders: Record<string, string> = {
     "apns-push-type": "alert",

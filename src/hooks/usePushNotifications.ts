@@ -435,8 +435,10 @@ export function usePushNotificationsInternal() {
 
         hapticNotification('success');
 
-        // Play a short alert beep via Web Audio API (respect sounds preference)
-        if (soundsEnabledRef.current) {
+        // Play a short alert beep via Web Audio API ONLY for high-priority notifications
+        // Standard notifications rely on the OS-delivered sound from the push payload
+        const isHighPriority = data?.high_priority === 'true';
+        if (soundsEnabledRef.current && isHighPriority) {
           try {
             const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
             const audioNow = ctx.currentTime;
