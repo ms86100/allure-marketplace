@@ -53,8 +53,6 @@ export default function ProductDeepLinkPage() {
           category: data.category,
           description: data.description,
           prep_time_minutes: data.prep_time_minutes,
-          fulfillment_mode: data.fulfillment_mode,
-          delivery_note: data.delivery_note,
           action_type: data.action_type,
           contact_phone: data.contact_phone,
           specifications: data.specifications,
