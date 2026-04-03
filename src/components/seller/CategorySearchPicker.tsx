@@ -96,7 +96,7 @@ const ALIAS_MAP: Record<string, string[]> = {
 };
 
 const POPULAR_SLUGS = [
-  'daily_tiffin', 'cakes', 'yoga', 'maid', 'electrician', 'beauty', 'tuition', 'furniture',
+  'daily_tiffin', 'cakes', 'yoga', 'ayurveda', 'maid', 'electrician', 'beauty', 'tuition',
 ];
 
 interface SearchItem {
