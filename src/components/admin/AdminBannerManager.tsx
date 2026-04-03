@@ -77,6 +77,9 @@ interface BannerForm {
   schedule_end: string;
   fallback_mode: 'hide' | 'popular';
   sections: SectionForm[];
+  // CTA config for classic banners
+  cta_action: 'link' | 'collection' | 'category';
+  cta_target: string;
 }
 
 const emptyForm: BannerForm = {
@@ -87,6 +90,7 @@ const emptyForm: BannerForm = {
   theme_preset: '', theme_config: {}, animation_config: { type: 'none', intensity: 'subtle' },
   badge_text: '', schedule_start: '', schedule_end: '', fallback_mode: 'hide',
   sections: [],
+  cta_action: 'link', cta_target: '',
 };
 
 export function AdminBannerManager() {
