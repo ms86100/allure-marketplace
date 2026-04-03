@@ -5568,6 +5568,7 @@ export type Database = {
           daily_order_limit: number | null
           delivery_handled_by: string | null
           delivery_note: string | null
+          delivery_payment_config: Json
           delivery_radius_km: number
           description: string | null
           food_license_reviewed_at: string | null
@@ -5588,6 +5589,7 @@ export type Database = {
           minimum_order_amount: number | null
           on_time_delivery_pct: number | null
           operating_days: string[] | null
+          pickup_payment_config: Json
           primary_group: string | null
           profile_image_url: string | null
           rating: number | null
@@ -5627,6 +5629,7 @@ export type Database = {
           daily_order_limit?: number | null
           delivery_handled_by?: string | null
           delivery_note?: string | null
+          delivery_payment_config?: Json
           delivery_radius_km?: number
           description?: string | null
           food_license_reviewed_at?: string | null
@@ -5647,6 +5650,7 @@ export type Database = {
           minimum_order_amount?: number | null
           on_time_delivery_pct?: number | null
           operating_days?: string[] | null
+          pickup_payment_config?: Json
           primary_group?: string | null
           profile_image_url?: string | null
           rating?: number | null
@@ -5686,6 +5690,7 @@ export type Database = {
           daily_order_limit?: number | null
           delivery_handled_by?: string | null
           delivery_note?: string | null
+          delivery_payment_config?: Json
           delivery_radius_km?: number
           description?: string | null
           food_license_reviewed_at?: string | null
@@ -5706,6 +5711,7 @@ export type Database = {
           minimum_order_amount?: number | null
           on_time_delivery_pct?: number | null
           operating_days?: string[] | null
+          pickup_payment_config?: Json
           primary_group?: string | null
           profile_image_url?: string | null
           rating?: number | null

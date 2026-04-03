@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PaymentMethod } from '@/types/database';
 import { fetchStatusFlow, fetchStatusTransitions, statusFlowQueryKey, statusTransitionsQueryKey } from '@/hooks/useCategoryStatusFlow';
 import { resolveTransactionType } from '@/lib/resolveTransactionType';
+import { resolvePaymentConfig } from '@/lib/resolvePaymentConfig';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubmitGuard } from '@/hooks/useSubmitGuard';
@@ -205,13 +206,16 @@ export function useCartPage() {
 
   const firstSeller = sellerGroups[0]?.items[0]?.product?.seller;
   const firstSellerFulfillmentMode = (firstSeller as any)?.fulfillment_mode as 'self_pickup' | 'seller_delivery' | 'platform_delivery' | 'pickup_and_seller_delivery' | 'pickup_and_platform_delivery' | undefined;
-  const acceptsCod = sellerGroups.length > 1
-    ? sellerGroups.every(g => g.items[0]?.product?.seller?.accepts_cod ?? false)
-    : (firstSeller?.accepts_cod ?? false);
-  // When Razorpay is enabled, online payment is always available (not dependent on seller UPI config)
-  const acceptsUpi = paymentMode.isRazorpay
-    ? true
-    : (sellerGroups.length <= 1 && !!(firstSeller as any)?.accepts_upi && !!(firstSeller as any)?.upi_id);
+  // Per-seller, per-fulfillment payment resolution
+  const resolvedFulfillment = fulfillmentType === 'delivery' ? 'delivery' : 'self_pickup';
+  const acceptsCod = sellerGroups.every(g => {
+    const s = g.items[0]?.product?.seller as any;
+    return resolvePaymentConfig(s, resolvedFulfillment, paymentMode).acceptsCod;
+  });
+  const acceptsUpi = sellerGroups.every(g => {
+    const s = g.items[0]?.product?.seller as any;
+    return resolvePaymentConfig(s, resolvedFulfillment, paymentMode).acceptsOnline;
+  });
   const hasFulfillmentConflict = sellerGroups.length > 1 && sellerGroups.some(g => {
     const mode = (g.items[0]?.product?.seller as any)?.fulfillment_mode;
     return mode && mode !== 'self_pickup' && !mode.startsWith('pickup_and_') && mode !== fulfillmentType;

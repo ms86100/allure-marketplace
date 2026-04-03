@@ -15,6 +15,11 @@ export interface SubcategoryPreferences {
   data: Record<string, { primary: string | null; others: string[] }>;
 }
 
+export interface PaymentConfigData {
+  accepts_cod: boolean;
+  accepts_online: boolean;
+}
+
 export interface SellerFormData {
   business_name: string;
   description: string;
@@ -34,7 +39,11 @@ export interface SellerFormData {
   latitude: number | null;
   longitude: number | null;
   subcategory_preferences: SubcategoryPreferences;
+  pickup_payment_config: PaymentConfigData;
+  delivery_payment_config: PaymentConfigData;
 }
+
+const DEFAULT_PAYMENT_CONFIG: PaymentConfigData = { accepts_cod: true, accepts_online: true };
 
 const INITIAL_FORM: SellerFormData = {
   business_name: '',
@@ -55,6 +64,8 @@ const INITIAL_FORM: SellerFormData = {
   latitude: null,
   longitude: null,
   subcategory_preferences: { v: 1, data: {} },
+  pickup_payment_config: { ...DEFAULT_PAYMENT_CONFIG },
+  delivery_payment_config: { ...DEFAULT_PAYMENT_CONFIG },
 };
 
 export function useSellerApplication() {
@@ -259,6 +270,8 @@ export function useSellerApplication() {
         latitude: formData.latitude,
         longitude: formData.longitude,
         subcategory_preferences: formData.subcategory_preferences,
+        pickup_payment_config: formData.pickup_payment_config,
+        delivery_payment_config: formData.delivery_payment_config,
       };
       if (draftSellerId) {
         const { error } = await supabase.from('seller_profiles').update(draftPayload as any).eq('id', draftSellerId);

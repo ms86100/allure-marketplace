@@ -10,6 +10,11 @@ import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { logAudit } from '@/lib/audit';
 
+export interface PaymentConfigData {
+  accepts_cod: boolean;
+  accepts_online: boolean;
+}
+
 export interface SellerSettingsFormData {
   business_name: string;
   description: string;
@@ -34,7 +39,11 @@ export interface SellerSettingsFormData {
   daily_order_limit: string;
   vacation_mode: boolean;
   vacation_until: string;
+  pickup_payment_config: PaymentConfigData;
+  delivery_payment_config: PaymentConfigData;
 }
+
+const DEFAULT_PAYMENT_CONFIG: PaymentConfigData = { accepts_cod: true, accepts_online: true };
 
 const DEFAULT_FORM: SellerSettingsFormData = {
   business_name: '', description: '', categories: [],
@@ -45,6 +54,8 @@ const DEFAULT_FORM: SellerSettingsFormData = {
   sell_beyond_community: false, delivery_radius_km: 5, fulfillment_mode: 'self_pickup' as string,
   delivery_note: '', minimum_order_amount: '', daily_order_limit: '',
   vacation_mode: false, vacation_until: '',
+  pickup_payment_config: { ...DEFAULT_PAYMENT_CONFIG },
+  delivery_payment_config: { ...DEFAULT_PAYMENT_CONFIG },
 };
 
 export function useSellerSettings() {
@@ -90,6 +101,8 @@ export function useSellerSettings() {
           daily_order_limit: profile.daily_order_limit?.toString() || '',
           vacation_mode: profile.vacation_mode ?? false,
           vacation_until: profile.vacation_until ? profile.vacation_until.split('T')[0] : '',
+          pickup_payment_config: profile.pickup_payment_config ?? { accepts_cod: profile.accepts_cod ?? true, accepts_online: profile.accepts_upi ?? false },
+          delivery_payment_config: profile.delivery_payment_config ?? { accepts_cod: profile.accepts_cod ?? true, accepts_online: profile.accepts_upi ?? false },
         });
       }
     } catch (error) { console.error('Error fetching profile:', error); }
@@ -137,12 +150,15 @@ export function useSellerSettings() {
     try {
       const minOrder = formData.minimum_order_amount ? parseFloat(formData.minimum_order_amount) : null;
       const dailyLimit = formData.daily_order_limit ? parseInt(formData.daily_order_limit) : null;
+      // Sync legacy fields from the active payment config for backward compat
+      const effectiveCod = formData.pickup_payment_config.accepts_cod || formData.delivery_payment_config.accepts_cod;
+      const effectiveUpi = formData.pickup_payment_config.accepts_online || formData.delivery_payment_config.accepts_online;
       const { error } = await supabase.from('seller_profiles').update({
         business_name: formData.business_name.trim(), description: formData.description.trim() || null,
         categories: formData.categories as any, availability_start: formData.availability_start,
         availability_end: formData.availability_end, operating_days: formData.operating_days,
-        accepts_cod: formData.accepts_cod, accepts_upi: formData.accepts_upi,
-        upi_id: formData.accepts_upi ? formData.upi_id.trim() : null,
+        accepts_cod: effectiveCod, accepts_upi: effectiveUpi,
+        upi_id: formData.upi_id.trim() || null,
         is_available: formData.is_available, cover_image_url: formData.cover_image_url,
         profile_image_url: formData.profile_image_url,
         bank_account_number: formData.bank_account_number.trim() || null,
@@ -155,6 +171,8 @@ export function useSellerSettings() {
         daily_order_limit: (dailyLimit !== null && !isNaN(dailyLimit) && dailyLimit > 0) ? dailyLimit : null,
         vacation_mode: formData.vacation_mode,
         vacation_until: formData.vacation_mode && formData.vacation_until ? formData.vacation_until : null,
+        pickup_payment_config: formData.pickup_payment_config,
+        delivery_payment_config: formData.delivery_payment_config,
       } as any).eq('id', sellerProfile.id);
       if (error) throw error;
       toast.success('Settings saved successfully', { id: 'settings-saved' });

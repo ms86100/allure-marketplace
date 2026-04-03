@@ -236,22 +236,60 @@ export default function SellerSettingsPage() {
             </div>
           </div>
 
-          {/* Payment Methods */}
+          {/* Payment Methods — per fulfillment type */}
           <div className="space-y-3">
             <Label>Payment Methods</Label>
-            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-              <div className="flex items-center gap-3"><Banknote className="text-success" size={20} /><div><p className="font-medium text-sm">Cash on Delivery</p><p className="text-xs text-muted-foreground">Accept cash payments</p></div></div>
-              <Switch checked={formData.accepts_cod} onCheckedChange={(checked) => setFormData({ ...formData, accepts_cod: checked })} />
-            </div>
-            <div className="p-4 bg-muted rounded-lg space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3"><Smartphone className="text-info" size={20} /><div><p className="font-medium text-sm">UPI Payments</p><p className="text-xs text-muted-foreground">Accepts UPI payments</p></div></div>
-                <Switch checked={formData.accepts_upi} onCheckedChange={(checked) => setFormData({ ...formData, accepts_upi: checked })} />
+            {(formData.fulfillment_mode === 'self_pickup' || formData.fulfillment_mode === 'pickup_and_seller_delivery' || formData.fulfillment_mode === 'pickup_and_platform_delivery') && (
+              <div className="p-4 bg-muted rounded-lg space-y-3">
+                <p className="font-medium text-sm">Self Pickup</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3"><Banknote className="text-success" size={18} /><p className="text-sm">Cash Payment</p></div>
+                  <Switch checked={formData.pickup_payment_config.accepts_cod} onCheckedChange={(checked) => {
+                    if (!checked && !formData.pickup_payment_config.accepts_online) return;
+                    setFormData({ ...formData, pickup_payment_config: { ...formData.pickup_payment_config, accepts_cod: checked } });
+                  }} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3"><Smartphone className="text-info" size={18} /><p className="text-sm">Online Payment</p></div>
+                  <Switch checked={formData.pickup_payment_config.accepts_online} onCheckedChange={(checked) => {
+                    if (!checked && !formData.pickup_payment_config.accepts_cod) return;
+                    setFormData({ ...formData, pickup_payment_config: { ...formData.pickup_payment_config, accepts_online: checked } });
+                  }} />
+                </div>
+                {!formData.pickup_payment_config.accepts_cod && !formData.pickup_payment_config.accepts_online && (
+                  <p className="text-xs text-destructive">At least one payment method is required</p>
+                )}
               </div>
-              {formData.accepts_upi && (
-                <div className="space-y-2 pt-2 border-t"><Label htmlFor="upi_id" className="text-xs">Your UPI ID</Label><Input id="upi_id" placeholder="yourname@upi" value={formData.upi_id} onChange={(e) => setFormData({ ...formData, upi_id: e.target.value })} /></div>
-              )}
-            </div>
+            )}
+            {(formData.fulfillment_mode === 'seller_delivery' || formData.fulfillment_mode === 'platform_delivery' || formData.fulfillment_mode === 'pickup_and_seller_delivery' || formData.fulfillment_mode === 'pickup_and_platform_delivery') && (
+              <div className="p-4 bg-muted rounded-lg space-y-3">
+                <p className="font-medium text-sm">Delivery</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3"><Banknote className="text-success" size={18} /><p className="text-sm">Cash on Delivery</p></div>
+                  <Switch checked={formData.delivery_payment_config.accepts_cod} onCheckedChange={(checked) => {
+                    if (!checked && !formData.delivery_payment_config.accepts_online) return;
+                    setFormData({ ...formData, delivery_payment_config: { ...formData.delivery_payment_config, accepts_cod: checked } });
+                  }} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3"><Smartphone className="text-info" size={18} /><p className="text-sm">Online Payment</p></div>
+                  <Switch checked={formData.delivery_payment_config.accepts_online} onCheckedChange={(checked) => {
+                    if (!checked && !formData.delivery_payment_config.accepts_cod) return;
+                    setFormData({ ...formData, delivery_payment_config: { ...formData.delivery_payment_config, accepts_online: checked } });
+                  }} />
+                </div>
+                {!formData.delivery_payment_config.accepts_cod && !formData.delivery_payment_config.accepts_online && (
+                  <p className="text-xs text-destructive">At least one payment method is required</p>
+                )}
+              </div>
+            )}
+            {/* UPI ID — needed when any online payment is enabled */}
+            {(formData.pickup_payment_config.accepts_online || formData.delivery_payment_config.accepts_online) && (
+              <div className="p-4 bg-muted rounded-lg space-y-2">
+                <Label htmlFor="upi_id" className="text-xs">Your UPI ID (for direct UPI payments)</Label>
+                <Input id="upi_id" placeholder="yourname@upi" value={formData.upi_id} onChange={(e) => setFormData({ ...formData, upi_id: e.target.value })} />
+              </div>
+            )}
           </div>
 
           {/* Min Order */}
