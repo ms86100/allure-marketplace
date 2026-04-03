@@ -171,6 +171,12 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
               </div>
               <PriceStabilityBadge productId={product.product_id} />
               <RefundTierBadge amount={product.price} />
+              {d.trustSnapshot && d.trustSnapshot.avg_response_min > 0 && (
+                <div className="flex items-center gap-1.5 bg-accent/10 border border-accent/20 rounded-lg px-2.5 py-1.5">
+                  <Zap size={12} className="text-accent" />
+                  <span className="text-[11px] font-semibold text-accent">Responds in ~{d.trustSnapshot.avg_response_min} min</span>
+                </div>
+              )}
               <button onClick={() => d.setShowDetails(!d.showDetails)} className="flex items-center gap-1 text-xs font-medium text-primary">
                 {d.showDetails ? 'Hide product details' : 'View product details'}
                 <ChevronDown size={14} className={`transition-transform ${d.showDetails ? 'rotate-180' : ''}`} />
