@@ -94,7 +94,7 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
       {/* 3-column tile grid — compact discovery tiles with glassmorphism */}
       <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 stagger-children">
         {categories.slice(0, 9).map((cat) => {
-          const meta = metaMap[cat.category] || { count: 0, images: [] };
+          const meta = metaMap[cat.category] || { count: 0, images: [], newCount: 0 };
           const images = meta.images.length > 0
             ? meta.images
             : cat.imageUrl ? [cat.imageUrl] : [];
