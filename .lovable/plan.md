@@ -1,87 +1,109 @@
 
 
-# Final Bulletproof Fixes — Close Last 2 Gaps + 2 UX Improvements
+# Redesign Onboarding: Break Step 3 into a Guided, Story-like Flow
 
-## Current State (What's Already Done)
-- `action_type_workflow_map` with `requires_availability` column ✅
-- DB triggers validate action_type on INSERT and UPDATE ✅
-- `category_allowed_action_types` table exists with RLS ✅
-- `ActionTypeSelector` component exists ✅
-- Trigger sets default from `category_config.default_action_type` on INSERT if null ✅
+## Problem
+Step 3 ("Configure your store") crams 6 distinct configuration blocks into one scrollable page: fulfillment, payments, operating days, store images, buyer interaction mode, and service availability. This overwhelms sellers.
 
-## What's Missing (4 Items)
+## Solution
+Split the current 5-step flow into a **7-step guided journey** where each step has one clear decision. The experience uses a conversational tone, smooth transitions (already using framer-motion), and contextual hints.
 
-### 🚨 Fix 1: DB-Level Availability Enforcement (Critical)
+### New Step Structure
 
-**Problem**: A product with `action_type = 'book'` can be saved without any availability schedule. This breaks the booking flow silently.
-
-**Fix**: Add a validation trigger on `products` that checks — on INSERT and UPDATE — if the `action_type` has `requires_availability = true` in `action_type_workflow_map`, then at least one row must exist in `service_availability_schedules` for that product's seller. This runs as a **deferred constraint trigger** (fires at end of transaction) so the product and schedule can be inserted in the same transaction.
-
-### 🚨 Fix 2: Safe Fallback for Empty Category Allowlists
-
-**Problem**: If `category_allowed_action_types` has no rows for a category, the `ActionTypeSelector` hook returns `null`, and the existing `useMemo` in `ActionTypeSelector.tsx` already falls back to showing all options. However, there's no warning logged.
-
-**Fix**: In `useCategoryAllowedActions` hook, when the query returns an empty array for a configured category, log a `console.warn`. No UI change needed — the fallback already works correctly in the component's `useMemo`.
-
-### ⚠️ Fix 3: Persist Step 3 Action Type Choice Across Refresh
-
-**Problem**: If seller picks an interaction mode in Step 3 then refreshes, selection is lost.
-
-**Fix**: Use `sessionStorage` to persist `storeActionType` during onboarding. Read on mount, clear on submission. This uses the existing `useProductFormDraft` utilities pattern.
-
-### ⚠️ Fix 4: Multi-Mode Clarity + Always-Visible Selector
-
-**Problem**: `ActionTypeSelector` returns `null` when `options.length <= 1` (line 39). Seller can't see or override the selection. Also no message about mixing modes.
-
-**Fix**: 
-- Remove the `if (options.length <= 1) return null` early return — always render the selector
-- Add helper text below: "You can set different interaction types for each product"
-- In Step 3 of onboarding, add an "Interaction Mode" chooser that reads from `action_type_workflow_map` and uses `requires_availability` to conditionally show `ServiceAvailabilityManager` (replacing the hardcoded `layoutType === 'service'` check on line 682)
-
-## Implementation Details
-
-### DB Migration
-```sql
--- Deferred constraint trigger: ensure availability exists for booking-type products
-CREATE OR REPLACE FUNCTION public.validate_product_availability()
-RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE
-  _requires boolean;
-BEGIN
-  SELECT requires_availability INTO _requires
-  FROM public.action_type_workflow_map
-  WHERE action_type = NEW.action_type;
-
-  IF _requires = true AND NOT EXISTS (
-    SELECT 1 FROM public.service_availability_schedules
-    WHERE seller_id = NEW.seller_id
-  ) THEN
-    RAISE EXCEPTION 'action_type "%" requires availability schedules to be configured', NEW.action_type;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-CREATE CONSTRAINT TRIGGER trg_validate_product_availability
-  AFTER INSERT OR UPDATE ON public.products
-  DEFERRABLE INITIALLY DEFERRED
-  FOR EACH ROW
-  EXECUTE FUNCTION public.validate_product_availability();
+```text
+Step 1: What do you sell?          (unchanged — category search)
+Step 2: Your Store Identity        (unchanged — name, description, hours, location, license, beyond-community)
+Step 3: How do buyers interact?    (NEW — just the interaction mode cards)
+Step 4: Delivery & Payments        (NEW — fulfillment + payment methods combined, as they're related)
+Step 5: Schedule & Availability    (NEW — operating days + service availability if needed)
+Step 6: Store Images               (NEW — profile + cover, framed as "Make it yours")
+Step 7: Add Products               (was step 4)
+Step 8: Review & Submit            (was step 5)
 ```
 
-### Frontend Changes
+Wait — 8 steps feels like too many in the stepper. Better approach: **keep 5 visual steps in the progress bar** but use **sub-steps within Step 3** that feel like a guided carousel rather than a long form.
+
+### Refined Architecture: 5 Steps, Step 3 has Sub-Steps
+
+```text
+Step 1: What do you sell?          (category picker)
+Step 2: Store Details              (name, description, hours, location, license)
+Step 3: Configure (guided)         (4 mini-steps with internal navigation)
+  → 3a: How buyers interact       (interaction mode cards — one decision)
+  → 3b: Delivery & Payments       (fulfillment mode + COD/UPI toggles)
+  → 3c: Schedule                  (operating days + service availability if booking)
+  → 3d: Store Images              (profile + cover — "Make your store shine")
+Step 4: Add Products
+Step 5: Review & Submit
+```
+
+This keeps the top-level progress bar clean (5 steps) while each sub-step shows only 1-2 related decisions.
+
+## UX Design
+
+### Sub-step navigation inside Step 3
+- A small **dot indicator** (4 dots) below the main stepper shows progress within Step 3
+- Each sub-step has a **"Continue" button** at the bottom and a **back arrow** at top
+- Sub-steps use the existing `AnimatePresence` + `motion.div` for smooth slide transitions
+- Each sub-step has a **friendly headline** and **one-line helper**:
+  - 3a: "How will buyers interact?" / "This sets the default — you can customize per product later"
+  - 3b: "Delivery & Payments" / "How do you get products to buyers, and how do they pay?"
+  - 3c: "When are you open?" / "Select your operating days" (+ availability if booking mode)
+  - 3d: "Make your store shine ✨" / "Add photos to build trust — you can skip this for now"
+
+### Sub-step 3d (Images) gets a "Skip" option
+- Images are optional, so this sub-step has a clear "Skip for now" link below the Continue button
+
+### Validation per sub-step
+- 3a: Must select an interaction mode (pre-selected from category default, so always valid)
+- 3b: At least one payment method; if UPI enabled, UPI ID required
+- 3c: At least 1 operating day selected
+- 3d: No validation (optional)
+
+## Technical Implementation
+
+### STEP_META update
+Change from 5 entries to still 5 top-level entries (labels stay the same). Step 3's label changes from "Settings" to "Configure".
+
+### New state: `configSubStep` (1-4)
+- Added alongside existing `step` state
+- Reset to 1 whenever `step` transitions to 3
+- "Continue" in sub-step increments `configSubStep`; at sub-step 4, the main "Continue to Products" button advances to step 4
+
+### Step 3 rendering
+Replace the current single `{step === 3 && (...)}` block with:
+```
+{step === 3 && (
+  <div>
+    {/* Sub-step dots */}
+    <SubStepDots current={configSubStep} total={4} />
+    
+    <AnimatePresence mode="wait">
+      {configSubStep === 1 && <InteractionModeStep ... />}
+      {configSubStep === 2 && <DeliveryPaymentStep ... />}
+      {configSubStep === 3 && <ScheduleStep ... />}
+      {configSubStep === 4 && <StoreImagesStep ... />}
+    </AnimatePresence>
+  </div>
+)}
+```
+
+Each sub-step is extracted as a small inline component within the same file for simplicity (no new files needed).
+
+### SubStepDots component
+A row of 4 small dots (filled = completed/active, empty = upcoming). Rendered just below the main stepper when on step 3.
+
+### Files Changed
 
 | File | Change |
 |---|---|
-| `src/pages/BecomeSellerPage.tsx` | Add interaction mode selector in Step 3 using `useActionTypeMap`; replace `layoutType === 'service'` with `requires_availability` lookup; persist choice in `sessionStorage`; pass `defaultActionType` to `DraftProductManager` |
-| `src/components/seller/ActionTypeSelector.tsx` | Remove `if (options.length <= 1) return null`; add "You can set different interaction types for each product" helper text |
-| `src/components/seller/DraftProductManager.tsx` | Accept `defaultActionType` prop; use it instead of hardcoded `'add_to_cart'` in `resetForm` (line 414) and product payload fallback (line 229) |
-| `src/hooks/useActionTypeMap.ts` | Add `console.warn` in `useCategoryAllowedActions` when result is empty array for a valid config ID |
+| `src/pages/BecomeSellerPage.tsx` | Add `configSubStep` state; split Step 3 into 4 animated sub-steps; add dot indicator; extract each section into its own sub-step render block |
 
-### Seed Data (category_allowed_action_types)
-Insert allowlists for key categories so filtering activates:
-- Food categories → `add_to_cart`, `buy_now`
-- Service categories (yoga, ayurveda, salon) → `book`, `contact_seller`, `request_service`
-- Rental categories → `book`, `request_quote`
-- Professional services → `request_quote`, `contact_seller`
+No database changes. No new files needed. The existing framer-motion dependency handles transitions.
+
+### Key Decisions
+- **No new routes or pages** — sub-steps are purely internal state within the same page
+- **sessionStorage** persists `configSubStep` alongside `storeActionType` to survive refresh
+- **Back navigation**: sub-step 1 goes back to Step 2; sub-steps 2-4 go to previous sub-step
+- **The main progress stepper** still shows 5 dots — Step 3 just takes longer to complete, which feels natural
 
