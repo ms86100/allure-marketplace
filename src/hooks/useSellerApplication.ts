@@ -305,14 +305,13 @@ export function useSellerApplication() {
         const actionConfig = allActionsData.find(a => a.action_type === storeActionType);
         if (actionConfig?.requires_availability) {
           const { count } = await (supabase
-            .from('service_slots') as any)
+            .from('service_availability_schedules') as any)
             .select('id', { count: 'exact', head: true })
             .eq('seller_id', id)
-            .gte('slot_date', new Date().toISOString().split('T')[0])
-            .eq('is_blocked', false);
+            .eq('is_active', true);
 
           if (!count || count === 0) {
-            toast.error('Please generate availability slots before continuing', { id: 'seller-app-validation' });
+            toast.error('Please save your availability schedule before continuing', { id: 'seller-app-validation' });
             return;
           }
         }
