@@ -469,6 +469,7 @@ Deno.serve(async (req) => {
             data,
             threadId,
             imageUrl,
+            highPriority,
           );
         }
 
