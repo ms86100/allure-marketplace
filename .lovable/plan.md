@@ -1,52 +1,74 @@
 
 
-# Fix: "therapy" Search Not Showing Ayurveda Results
+# Make License Requirements Dynamic at Category Level
 
-## Root Cause
+## Problem
 
-The search index in `CategorySearchPicker.tsx` has a structural gap: **when a category has subcategories, only the subcategory items are added to the index — the category itself is skipped** (line 176: `if (configSubs.length === 0)`).
+License configuration currently works only at the **parent group** level (e.g., "Personal Care"). This means if the admin enables licenses for Personal Care, ALL categories under it (Beauty, Salon, Yoga, Ayurveda) require the same license — but Ayurveda needs a practitioner certificate while Beauty may not need one at all.
 
-This means `ALIAS_MAP['ayurveda']` (which contains `'therapy'`) is **never checked**, because no search index item has `slug: 'ayurveda'`. The ayurveda subcategories like "Nasya Therapy" and "Rejuvenation Therapy" should match on name contains, but their individual alias entries don't include the generic term "therapy".
+## Solution
 
-Additionally, the same problem affects **every category with subcategories** — category-level aliases are invisible to search.
+Move license configuration from `parent_groups` to `category_config`, so each category can independently have its own license requirement. The admin License Config tab will show individual categories (grouped by parent) instead of just parent groups.
 
-## Fix (1 file)
+## Implementation
 
-### `src/components/seller/CategorySearchPicker.tsx`
+### Step 1: DB Migration — Add license columns to `category_config`
 
-**Change 1: Always add a category-level item to the search index**, even when subcategories exist. Mark it with `hasSubcategories: true` so tapping it opens the subcategory picker.
+Add 4 columns to `category_config`:
+- `requires_license` (boolean, default false)
+- `license_type_name` (text, nullable) — e.g., "Ayurveda Practitioner Certificate"
+- `license_description` (text, nullable) — instructions for sellers
+- `license_mandatory` (boolean, default false) — blocks selling until approved
 
-Replace the current logic (lines 149-194) that only adds a category item when `configSubs.length === 0`:
+Migrate existing data: copy license settings from `parent_groups` down to all `category_config` rows that belong to groups where `requires_license = true`.
 
-```text
-// BEFORE: category item only added when NO subcategories
-if (configSubs.length === 0) {
-  items.push({ type: 'category', ... });
-}
+### Step 2: Add `category_config_id` to `seller_licenses`
 
-// AFTER: always add category item (for alias matching)
-items.push({
-  type: 'category',
-  slug: config.category,        // e.g. 'ayurveda' → matches ALIAS_MAP
-  name: config.displayName,     // e.g. 'Ayurveda & Wellness'
-  hasSubcategories: configSubs.length > 0,
-  ...
-});
-```
+Add an optional `category_config_id` column (FK to `category_config`) to `seller_licenses`. Keep `group_id` for backward compatibility. New licenses will reference the specific category.
 
-This ensures that typing "therapy" will match `ALIAS_MAP['ayurveda']` → score 2 (exact alias match) → Ayurveda appears in results.
+Update the product publish trigger to check licenses at the category level first, falling back to group level.
 
-**Change 2: Deduplicate results** — when both a category AND its subcategories match, show the category result (which opens the subcategory picker) and suppress individual subcategory results below a score threshold to avoid clutter. If a subcategory scores higher than its parent category, show the subcategory instead.
+### Step 3: Update `LicenseConfigSection.tsx`
 
-**Change 3: Add "therapy" to more subcategory aliases** as a safety net:
-- `nasya_therapy`: add `'therapy'`
-- `panchakarma_rejuvenation`: add `'therapy'`, `'rejuvenation'`
-- `basti_therapy`: add `'therapy'`
+Replace the flat parent-group list with a **grouped view**:
+- Show parent group as a section header
+- Under each parent, show its categories from `category_config`
+- Each category row gets its own `requires_license` toggle, Edit button, and Mandatory switch
+- Admin can configure license requirements per-category independently
 
-## Result
+Data source: fetch from `category_config` (with license columns) + `parent_groups` (for grouping/headers), instead of just `parent_groups`.
 
-Typing "therapy" will show:
-1. **Ayurveda & Wellness** (Personal Care) — score 2 via alias exact match
-2. **Nasya Therapy**, **Rejuvenation Therapy**, etc. — score 1 via name contains
-3. **Yoga** — score 1 via alias "yoga therapy" contains
+### Step 4: Update `LicenseUpload.tsx` (Seller Side)
+
+Change the seller's license upload component to:
+- Accept `categoryConfigId` instead of (or in addition to) `groupId`
+- Fetch license requirements from `category_config` instead of `parent_groups`
+- When a seller selects categories during onboarding, show license upload prompts for each category that has `requires_license = true`
+
+### Step 5: Update Seller Onboarding Flow
+
+When sellers pick categories in `CategorySearchPicker`, check which selected categories require licenses. Show the `LicenseUpload` component for each one, so the seller sees exactly what's needed per category (e.g., "Ayurveda requires: Practitioner Certificate").
+
+### Step 6: Update `useSellerApplicationReview.ts`
+
+- Fetch `category_config` license data alongside parent groups
+- License review in the admin panel should show which specific category the license is for
+- Keep backward compatibility with existing `group_id`-based licenses
+
+## Files Summary
+
+| File | Action |
+|---|---|
+| Migration SQL | **Create** — add columns to `category_config`, add `category_config_id` to `seller_licenses`, update trigger |
+| `src/components/admin/LicenseConfigSection.tsx` | **Modify** — grouped category-level view |
+| `src/components/seller/LicenseUpload.tsx` | **Modify** — support `categoryConfigId` |
+| `src/hooks/useSellerApplicationReview.ts` | **Modify** — fetch category-level license configs |
+| Seller onboarding (BecomeSellerPage) | **Modify** — show per-category license prompts |
+
+## What This Achieves
+
+- Admin toggles license for "Ayurveda" independently of "Beauty" — even though both are under "Personal Care"
+- When a new category is added to `category_config`, it automatically appears in the admin license tab (no hardcoding)
+- Sellers see exactly which of their selected categories need a license
+- Fully dynamic — everything driven by DB config
 
