@@ -6,7 +6,7 @@ import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
-import { ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronRight, Sparkles, ArrowRight } from 'lucide-react';
 import { getCategoryPastel } from '@/lib/category-pastels';
 import { motion } from 'framer-motion';
 
@@ -66,11 +66,9 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
     return (
       <div className="px-4 mb-6">
         <Skeleton className="h-5 w-40 mb-3" />
-        <div className="grid grid-cols-3 gap-3">
+        <div className="flex gap-3 overflow-x-auto scrollbar-hide">
           {[1, 2, 3].map(i => (
-            <div key={i} className="flex flex-col items-center gap-2">
-              <Skeleton className="w-full rounded-2xl h-28" />
-            </div>
+            <Skeleton key={i} className="w-32 h-40 rounded-2xl shrink-0" />
           ))}
         </div>
       </div>
@@ -79,13 +77,16 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
 
   if (categories.length === 0) return null;
 
+  // Use horizontal scroll for ≤5 categories, grid for more
+  const useScrollLayout = categories.length <= 5;
+
   return (
-    <div className="mb-8 px-4">
-      {/* Section header with glassmorphic accent */}
-      <div className="flex items-center justify-between mb-4">
+    <div className="mb-6">
+      {/* Section header */}
+      <div className="flex items-center justify-between mb-3 px-4">
         <div className="flex items-center gap-2">
           <div className="w-1 h-5 rounded-full bg-primary" />
-          <h3 className="font-extrabold text-base text-foreground tracking-tight">{title}</h3>
+          <h3 className="font-extrabold text-[15px] text-foreground tracking-tight">{title}</h3>
         </div>
         <Link
           to={`/category/${parentGroup}`}
@@ -95,92 +96,145 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
         </Link>
       </div>
 
-      {/* Category tiles — glassmorphic cards */}
-      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
-        {categories.slice(0, 9).map((cat, index) => {
-          const meta = metaMap[cat.category] || { count: 0, images: [], newCount: 0 };
-          const images = meta.images.length > 0
-            ? meta.images
-            : cat.imageUrl ? [cat.imageUrl] : [];
-
-          return (
-            <motion.div
+      {/* Horizontal scrollable cards */}
+      {useScrollLayout ? (
+        <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1">
+          {categories.map((cat, index) => (
+            <CategoryCard
               key={cat.category}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: index * 0.04, duration: 0.3 }}
-            >
-              <Link
-                to={`/category/${cat.parentGroup}?sub=${cat.category}`}
-                className="flex flex-col group active:scale-[0.96] transition-transform duration-150"
-              >
-                {/* Glassmorphic card */}
-                <div className="w-full rounded-2xl overflow-hidden relative flex flex-col border border-border/30 backdrop-blur-xl bg-card/50 shadow-sm hover:shadow-md hover:border-border/50 transition-all duration-300">
-                  {/* Image area */}
-                  <div className="flex items-center justify-center gap-1 px-2 pt-2 pb-1">
-                    {images.length >= 2 ? (
-                      images.slice(0, 2).map((src, i) => (
-                        <div
-                          key={i}
-                          className="w-[45%] aspect-square rounded-xl overflow-hidden bg-muted/30 flex-shrink-0 ring-1 ring-border/20"
-                        >
-                          <img
-                            src={optimizedImageUrl(src, { width: 120, quality: 70 })}
-                            alt=""
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            loading="lazy"
-                            decoding="async"
-                            onError={handleImageError}
-                          />
-                        </div>
-                      ))
-                    ) : images.length === 1 ? (
-                      <div className="w-[60%] aspect-square rounded-xl overflow-hidden bg-muted/30 ring-1 ring-border/20">
-                        <img
-                          src={optimizedImageUrl(images[0], { width: 120, quality: 70 })}
-                          alt={cat.displayName}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          loading="lazy"
-                          decoding="async"
-                          onError={handleImageError}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-[60%] aspect-square rounded-xl bg-muted/30 flex items-center justify-center ring-1 ring-border/20">
-                        <DynamicIcon
-                          name={cat.icon}
-                          size={28}
-                          className="text-muted-foreground"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Label + count */}
-                  <div className="px-2 pb-2 pt-0.5 text-center relative">
-                    {meta.newCount > 0 && (
-                      <span className="absolute -top-3 right-1.5 bg-primary text-primary-foreground text-[7px] font-bold px-1.5 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
-                        <Sparkles size={7} />
-                        {meta.newCount} new
-                      </span>
-                    )}
-                    <p className="text-[11px] font-semibold leading-tight line-clamp-2 text-foreground">
-                      {cat.displayName}
-                    </p>
-                    {meta.count > 0 && (
-                      <p className="text-[9px] mt-0.5 text-muted-foreground font-medium">
-                        {meta.count} {meta.count === 1 ? 'item' : 'items'} →
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            </motion.div>
-          );
-        })}
-      </div>
+              cat={cat}
+              meta={metaMap[cat.category] || { count: 0, images: [], newCount: 0 }}
+              index={index}
+              variant="wide"
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 px-4">
+          {categories.slice(0, 9).map((cat, index) => (
+            <CategoryCard
+              key={cat.category}
+              cat={cat}
+              meta={metaMap[cat.category] || { count: 0, images: [], newCount: 0 }}
+              index={index}
+              variant="compact"
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
+}
+
+function CategoryCard({
+  cat,
+  meta,
+  index,
+  variant,
+}: {
+  cat: any;
+  meta: CategoryMeta;
+  index: number;
+  variant: 'wide' | 'compact';
+}) {
+  const images = meta.images.length > 0
+    ? meta.images
+    : cat.imageUrl ? [cat.imageUrl] : [];
+
+  const isWide = variant === 'wide';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05, duration: 0.35, ease: 'easeOut' }}
+      className={isWide ? 'shrink-0' : ''}
+    >
+      <Link
+        to={`/category/${cat.parentGroup}?sub=${cat.category}`}
+        className="block group active:scale-[0.97] transition-transform duration-150"
+      >
+        <div className={cn(
+          'relative overflow-hidden rounded-2xl border border-border/25 backdrop-blur-xl transition-all duration-300',
+          'bg-card/60 hover:bg-card/80 hover:border-border/40 hover:shadow-lg',
+          isWide ? 'w-36' : 'w-full'
+        )}>
+          {/* Hero image section */}
+          <div className={cn(
+            'relative overflow-hidden',
+            isWide ? 'h-24' : 'aspect-[4/3]'
+          )}>
+            {images.length > 0 ? (
+              <>
+                {/* Primary image fills the space */}
+                <img
+                  src={optimizedImageUrl(images[0], { width: 240, quality: 75 })}
+                  alt={cat.displayName}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  loading="lazy"
+                  decoding="async"
+                  onError={handleImageError}
+                />
+                {/* Soft gradient overlay for text readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+
+                {/* Secondary thumbnail overlay (if 2+ images) */}
+                {images.length >= 2 && (
+                  <div className="absolute bottom-1.5 right-1.5 w-8 h-8 rounded-lg overflow-hidden ring-2 ring-white/30 shadow-md">
+                    <img
+                      src={optimizedImageUrl(images[1], { width: 64, quality: 60 })}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      decoding="async"
+                      onError={handleImageError}
+                    />
+                  </div>
+                )}
+
+                {/* Count overlay on image */}
+                {meta.count > 0 && (
+                  <div className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-sm">
+                    <span className="text-[9px] font-bold text-white">
+                      {meta.count} {meta.count === 1 ? 'item' : 'items'}
+                    </span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="w-full h-full bg-muted/30 flex items-center justify-center">
+                <DynamicIcon
+                  name={cat.icon}
+                  size={32}
+                  className="text-muted-foreground/60"
+                />
+              </div>
+            )}
+
+            {/* New badge */}
+            {meta.newCount > 0 && (
+              <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-primary text-primary-foreground flex items-center gap-0.5 shadow-md">
+                <Sparkles size={8} />
+                <span className="text-[8px] font-bold">{meta.newCount} new</span>
+              </div>
+            )}
+          </div>
+
+          {/* Label bar */}
+          <div className="px-2.5 py-2 flex items-center justify-between gap-1">
+            <p className="text-[11px] font-semibold leading-tight line-clamp-1 text-foreground flex-1">
+              {cat.displayName}
+            </p>
+            <ArrowRight size={12} className="shrink-0 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-300" />
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
+}
+
+function cn(...classes: (string | boolean | undefined)[]) {
+  return classes.filter(Boolean).join(' ');
 }
 
 export const CategoryImageGrid = memo(CategoryImageGridInner);
