@@ -629,6 +629,11 @@ export default function BecomeSellerPage() {
               longitude={formData.longitude}
               onLocationSet={(lat, lng) => setFormData({ ...formData, latitude: lat, longitude: lng })}
               hasSociety={!!profile?.society_id}
+              existingStoreLocations={
+                (sellerProfiles || [])
+                  .filter((sp: any) => sp.latitude && sp.longitude && sp.id !== draftSellerId)
+                  .map((sp: any) => ({ id: sp.id, business_name: sp.business_name || 'Store', latitude: sp.latitude, longitude: sp.longitude }))
+              }
             />
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Configure delivery, payments, and schedule</p>
             <Button className="w-full" onClick={handleProceedToSettings} disabled={isLoading || !formData.business_name.trim() || ((selectedGroupRow as any)?.license_mandatory && (!licenseStatus || licenseStatus === 'rejected'))}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Store Settings<ChevronRight size={16} className="ml-1" /></Button>
