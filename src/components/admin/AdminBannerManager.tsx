@@ -690,7 +690,7 @@ export function AdminBannerManager() {
                 </div>
                 <div className="space-y-2">
                   {form.sections.map((section, idx) => (
-                    <div key={idx} className="p-3 rounded-xl border border-border bg-card space-y-2">
+                    <div key={idx} className="p-3 rounded-xl border border-border bg-muted/50 space-y-2">
                       <div className="flex items-center gap-2">
                         <Input
                           value={section.icon_emoji}
