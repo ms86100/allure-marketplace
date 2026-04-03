@@ -2765,6 +2765,7 @@ export type Database = {
           schedule_start: string | null
           society_id: string | null
           subtitle: string | null
+          target_society_ids: string[]
           template: string | null
           theme_config: Json
           theme_preset: string | null
@@ -2792,6 +2793,7 @@ export type Database = {
           schedule_start?: string | null
           society_id?: string | null
           subtitle?: string | null
+          target_society_ids?: string[]
           template?: string | null
           theme_config?: Json
           theme_preset?: string | null
@@ -2819,6 +2821,7 @@ export type Database = {
           schedule_start?: string | null
           society_id?: string | null
           subtitle?: string | null
+          target_society_ids?: string[]
           template?: string | null
           theme_config?: Json
           theme_preset?: string | null
@@ -9528,6 +9531,30 @@ export type Database = {
           _new_start_time: string
         }
         Returns: Json
+      }
+      resolve_banner_products: {
+        Args: {
+          p_buyer_lat?: number
+          p_buyer_lng?: number
+          p_limit?: number
+          p_mode: string
+          p_society_id: string
+          p_value: string
+        }
+        Returns: {
+          category: string
+          id: string
+          image_url: string
+          is_available: boolean
+          is_bestseller: boolean
+          is_veg: boolean
+          low_stock_threshold: number
+          mrp: number
+          name: string
+          price: number
+          seller_id: string
+          stock_quantity: number
+        }[]
       }
       resolve_society: {
         Args: {
