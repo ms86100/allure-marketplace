@@ -1,213 +1,120 @@
 
 
-# Product Owner Evaluation: Sociva Marketplace — High-Impact Gaps & Recommendations
+# Honest Gap Analysis: What's Still Not Robust
 
-## Executive Summary
+## What Was Already Implemented (Done)
+- Product sharing (navigator.share) on ProductDetailSheet ✅
+- Orders in BottomNav ✅
+- "New" badge on CategoryImageGrid ✅
+- Sort by distance in marketplace-constants ✅
+- BuyAgainRow in empty cart state ✅
+- Open/Closed status already shown on ProductListingCard via `computeStoreStatus` ✅
 
-Sociva has a strong marketplace foundation: geo-aware discovery, multi-category support (products + services), cross-society browsing, coupon system, reviews, and a rich seller dashboard. Below are **small, high-impact improvements** that address real user psychology gaps — things buyers and sellers intuitively expect but currently cannot do or find.
+## What's Still Missing (Real Gaps)
 
----
+### BUG 1: Shared Product Links Are Dead Links (CRITICAL)
 
-## A. Buyer Experience Gaps
+The share button generates URLs like `/#/product/{product_id}`, but **there is no `/product/:id` route in App.tsx**. Every shared link lands on the 404 NotFound page.
 
-### 1. No Product-Level Favorites (Only Seller Favorites)
+This completely defeats the purpose of the share feature. A user shares a product to WhatsApp, their neighbor clicks it, and sees "Page not found."
 
-**Gap:** Favorites page (`FavoritesPage.tsx`) only saves *sellers*, not individual products. When a buyer sees a product they like but aren't ready to buy, there's no "Save for Later" or heart button on product cards/detail sheets.
+**Fix:** Create a `/product/:id` route and a lightweight `ProductDeepLinkPage` that fetches the product by ID and opens the `ProductDetailSheet` (or redirects to the seller page with the product pre-selected).
 
-**Psychology:** Every major marketplace trains users to heart/save items. Without it, users lose track of things they wanted and don't return.
-
-**Fix:** Add a heart/bookmark icon to `ProductDetailSheet` and `ProductListingCard`. Store in a `product_favorites` table. Surface saved products in a tab on FavoritesPage alongside saved sellers.
-
-**Effort:** Small — 1 new table, 2 UI touchpoints.
-
----
-
-### 2. No Product Sharing
-
-**Gap:** Search for "share product" returns zero results. Users cannot share a specific product with a neighbor via WhatsApp/link. Only the general "Invite neighbors" share exists.
-
-**Psychology:** Word-of-mouth is the #1 growth driver in housing societies. A buyer who finds great homemade cake wants to tell their WhatsApp group. Currently impossible.
-
-**Fix:** Add a share icon on `ProductDetailSheet` using `navigator.share()` with a deep link (`/product/{id}`). Include product name, price, seller name, and image in the share payload.
-
-**Effort:** Very small — 1 button, no backend changes.
+**Effort:** Small — 1 new page, 1 route entry.
 
 ---
 
-### 3. No "Orders" in Bottom Navigation
+### GAP 2: No "Preview My Store" Button for Sellers
 
-**Gap:** Bottom nav has: Home, Society, Browse, Cart, Account. Orders are buried inside Account. For a marketplace app, order tracking is a top-3 action.
+The seller dashboard (`SellerDashboardPage.tsx`) has QuickActions, StoreStatusCard, analytics — but zero way for a seller to see their public-facing store page. The `/seller/{sellerId}` buyer view exists, but there's no link to it from the dashboard.
 
-**Psychology:** After placing an order, users compulsively check status. Swiggy/Zomato/Amazon all have orders prominently accessible. Currently requires 2+ taps.
+**Fix:** Add a "Preview Store" button/link in the seller dashboard that navigates to `/seller/{activeSellerId}`.
 
-**Fix:** Either replace "Society" (which is non-marketplace) with "Orders" icon, or add an "Orders" tab. Since the brief says "marketplace only", consider swapping Browse ↔ Orders since Browse duplicates the home page categories.
-
-**Effort:** Very small — BottomNav config change.
+**Effort:** Trivial — 1 button.
 
 ---
 
-### 4. Missing "Seller Response Time" Indicator
+### GAP 3: Product-Level Favorites Still Missing
 
-**Gap:** Seller detail page shows reviews and availability but not how fast the seller typically responds or accepts orders.
+`FavoritesPage.tsx` only queries the `favorites` table which stores `seller_id`. There is no `product_favorites` table and no heart icon on product cards. Users can only favorite sellers, not individual products.
 
-**Psychology:** In a community marketplace, trust = speed. If a buyer sees "Usually accepts in 5 min", they feel confident ordering. Without this, there's anxiety especially for new sellers.
+**Fix:**
+1. Create `product_favorites` table (user_id, product_id, created_at) with RLS
+2. Add heart icon to `ProductDetailSheet` and `ProductListingCard`
+3. Add "Saved Products" tab on FavoritesPage
 
-**Fix:** Compute average time from `order placed → first status change` per seller. Show as a badge: "Responds in ~X min" on `SellerDetailPage` and `ProductDetailSheet`.
-
-**Effort:** Small — 1 DB query, 2 UI badges.
-
----
-
-### 5. No Visual Indication of "Open Now" vs "Opens at X" on Home Page
-
-**Gap:** Store availability (`computeStoreStatus`) is used in `RecentlyViewedRow` to show "Closed" overlay, but the main `MarketplaceSection` product cards don't show whether the seller is currently open. A buyer browses, adds to cart, then discovers at checkout the store is closed.
-
-**Psychology:** Wasted effort creates frustration. Users expect marketplace apps to surface availability upfront (like Swiggy's "Opens at 11 AM").
-
-**Fix:** Add a small "Closed · Opens at X" or green dot for "Open" on `ProductListingCard` when displayed in discovery rows. The data is already available via `seller_profiles.availability_start/end`.
-
-**Effort:** Small — UI-only, data already fetched.
+**Effort:** Small — 1 migration, 3 UI touchpoints.
 
 ---
 
-### 6. Empty Cart Has No Cross-Sell
+### GAP 4: Seller Response Time Not Shown
 
-**Gap:** Empty cart state shows "Explore Marketplace" button. No suggestion of what to explore.
+The `trustSnapshot` in ProductDetailSheet shows `avg_response_min` when > 0, but this data is buried inside the "View product details" collapsible section. Most users won't see it. It's also not shown on the seller detail page header or on product cards in discovery.
 
-**Psychology:** This is a missed re-engagement moment. Users who emptied their cart or just completed an order see a dead-end.
+**Fix:** Surface `avg_response_min` as a visible badge near the seller name (not hidden behind a toggle).
 
-**Fix:** Show "Popular in your society" or "Your frequently bought items" in the empty cart state. The `BuyAgainRow` component already exists — render a compact version here.
-
-**Effort:** Very small — reuse existing component.
+**Effort:** Trivial — move existing data to a more visible position.
 
 ---
 
-## B. Seller Experience Gaps
+### GAP 5: No Vacation Mode for Sellers
 
-### 7. No "Preview My Store" for Sellers
+Sellers can toggle `is_available` (which hides their store entirely), but there's no "vacation mode" with a return date. Buyers just see the store disappear with no context.
 
-**Gap:** Sellers manage products from `SellerDashboardPage` and `SellerProductsPage`, but there's no one-tap way to see their store as a buyer would see it.
+**Fix:**
+1. Add `vacation_until` column to `seller_profiles`
+2. Add toggle in seller settings
+3. Show "On break · Back [date]" banner on seller page instead of hiding the store
 
-**Psychology:** Sellers (especially home bakers, tutors) obsess over how their store looks. They want to check their cover image, product photos, and descriptions from the buyer's perspective.
-
-**Fix:** Add a "Preview Store" button on the seller dashboard that links to `/seller/{sellerId}` (the public buyer-facing view).
-
-**Effort:** Trivial — 1 button linking to existing page.
-
----
-
-### 8. No Quick "Mark All as Out of Stock" / Vacation Mode
-
-**Gap:** If a seller goes on vacation or runs out of ingredients, they must either toggle store availability (which hides everything) or edit each product individually.
-
-**Psychology:** Home sellers often have unpredictable availability (festivals, travel). A quick "pause" that shows "Back on [date]" is more trust-building than disappearing.
-
-**Fix:** Add a "Vacation Mode" toggle on seller settings with an optional return date. Show a banner on the store page: "On break · Back Dec 25". Different from just marking store unavailable because it sets buyer expectations.
-
-**Effort:** Small — 1 column on `seller_profiles`, 1 UI toggle, 1 banner.
+**Effort:** Small — 1 migration, 2 UI changes.
 
 ---
 
-### 9. Seller Has No Visibility Into "Who Viewed My Products"
+### GAP 6: No Product View Tracking for Sellers
 
-**Gap:** Sellers have analytics (orders, earnings) but no awareness of traffic/interest. A tutor who listed yoga classes doesn't know if 50 people viewed it but none booked, vs. nobody saw it.
+Sellers see order stats but have zero visibility into product traffic. The `recently_viewed` data is localStorage-only (client-side, per-device). No server-side view tracking exists.
 
-**Psychology:** View counts create motivation. "42 people viewed your Chocolate Cake this week" encourages sellers to stay active, improve photos, or adjust pricing.
+**Fix:**
+1. Create `product_views` table (product_id, viewer_id, viewed_at)
+2. Insert on ProductDetailSheet open
+3. Show weekly view counts on SellerProductsPage
 
-**Fix:** Use the existing `recently_viewed` localStorage data — but also log views server-side (a lightweight `product_views` table with product_id + timestamp). Show view counts on the seller dashboard product list.
-
-**Effort:** Small — 1 table, 1 insert on product detail open, 1 count query on seller products page.
-
----
-
-## C. Discovery & Navigation Gaps
-
-### 10. No "Filter by Availability" on Category/Search Pages
-
-**Gap:** `CategoryGroupPage` has sort options and search, but no filter for "Available Now" or "Delivery Available" or "Veg Only". Search page has `SearchFilters` but these may not cover availability.
-
-**Psychology:** Users browsing "Homemade Food" at 7 PM want to see only what they can order *right now*. Scrolling past closed stores is friction.
-
-**Fix:** Add toggle filters at top of category page: "Open Now", "Delivery", "Veg". Data is already present in the product/seller join.
-
-**Effort:** Small — filter UI + client-side filtering on existing data.
+**Effort:** Small — 1 migration, 2 code changes.
 
 ---
 
-### 11. No "Sort by Distance" in Category View
+### GAP 7: No "Filter by Availability" on Category Pages
 
-**Gap:** `SORT_OPTIONS` in `marketplace-constants.ts` likely includes price and relevance, but distance-based sorting is critical for a geo-aware marketplace.
+`CategoryGroupPage` has sort options but no toggle filters for "Open Now", "Veg Only", or "Delivery Available." Users browsing categories at 7 PM see closed stores mixed with open ones.
 
-**Psychology:** A buyer looking for a yoga class cares most about proximity. "Nearest first" is the most intuitive sort for services.
+**Fix:** Add chip-style toggle filters at the top of the category page, filtering client-side on already-fetched data.
 
-**Fix:** Add "Nearest" to sort options. Products already have `distance_km` from the marketplace query.
-
-**Effort:** Trivial — 1 sort option, client-side sort.
+**Effort:** Small — UI-only.
 
 ---
 
-### 12. Category Tiles Don't Show "New" Badge
+### GAP 8: No Notification When Favorited Seller Adds New Product
 
-**Gap:** Home page has a "New This Week" discovery row, but category tiles in `CategoryImageGrid` don't indicate which categories have new additions.
+The `favorites` table exists, but there's no DB trigger that creates a `notification_queue` entry when a favorited seller inserts a new product. This is the key re-engagement mechanism that's completely absent.
 
-**Psychology:** A small "2 new" badge on a category tile creates curiosity and drives exploration. It answers "Has anything changed since I last checked?"
+**Fix:** Add a Postgres trigger on `products` INSERT that checks `favorites` for matching `seller_id` and inserts notification entries.
 
-**Fix:** Compare product `created_at` against 7-day cutoff (already computed for `newThisWeek`). Show a small "N new" badge on category tiles that have recent additions.
-
-**Effort:** Trivial — data already available in `metaMap`.
+**Effort:** Small — 1 trigger, reuses existing notification pipeline.
 
 ---
 
-## D. Habit-Forming Micro-Features
+## Priority (What to Fix First)
 
-### 13. No "Order Again" One-Tap from Home Page
+| # | Gap | Risk Level | Effort |
+|---|-----|-----------|--------|
+| 1 | Dead shared links (no /product route) | **CRITICAL** — feature is broken | Small |
+| 2 | Seller "Preview Store" button | High — missing basic UX | Trivial |
+| 3 | Product-level favorites | High — retention gap | Small |
+| 4 | Response time badge visibility | Medium — data exists, poorly placed | Trivial |
+| 5 | Vacation mode | Medium — seller trust gap | Small |
+| 6 | Product view tracking | Medium — seller motivation | Small |
+| 7 | Category filters | Medium — discovery friction | Small |
+| 8 | Favorited seller notifications | Medium — re-engagement | Small |
 
-**Gap:** `BuyAgainRow` exists but requires tapping each product individually. There's a `ReorderButton` on order detail, but no way to re-order a complete past order from the home page.
-
-**Psychology:** The most habit-forming action is "repeat what I did last time." One tap to reorder last Tuesday's lunch is the Swiggy/Zomato behavior that drives daily usage.
-
-**Fix:** In `WelcomeBackStrip`, add a "Reorder" button next to the last order info. Use existing `ReorderButton` component logic.
-
-**Effort:** Small — compose existing components.
-
----
-
-### 14. No Notification When Favorite Seller Adds New Product
-
-**Gap:** Users can favorite sellers, but there's no trigger when a favorited seller adds a new product or runs a promotion.
-
-**Psychology:** This is the pull-back mechanism. "Your favorite baker just added Mango Cheesecake" brings users back to the app without push marketing.
-
-**Fix:** Add a DB trigger on `products` insert that checks `favorites` for that seller and creates `notification_queue` entries. Use existing notification infrastructure.
-
-**Effort:** Small — 1 trigger, reuse notification pipeline.
-
----
-
-## Priority Matrix
-
-| # | Improvement | Impact | Effort | Priority |
-|---|------------|--------|--------|----------|
-| 2 | Product sharing | Very High | Very Low | P0 |
-| 3 | Orders in bottom nav | High | Very Low | P0 |
-| 5 | Open/Closed on product cards | High | Low | P0 |
-| 7 | Seller "Preview My Store" | High | Trivial | P0 |
-| 11 | Sort by distance | Medium | Trivial | P0 |
-| 12 | "New" badge on category tiles | Medium | Trivial | P0 |
-| 1 | Product-level favorites | High | Small | P1 |
-| 6 | Cross-sell in empty cart | Medium | Very Low | P1 |
-| 13 | One-tap reorder from home | High | Small | P1 |
-| 10 | Filter by availability | High | Small | P1 |
-| 4 | Seller response time | Medium | Small | P2 |
-| 8 | Seller vacation mode | Medium | Small | P2 |
-| 9 | Product view counts for sellers | Medium | Small | P2 |
-| 14 | New product notifications | High | Small | P2 |
-
-## Implementation Approach
-
-All P0 items are UI-only or trivial config changes — zero database migrations, zero new tables, zero risk of breaking existing flows. They can be shipped in a single iteration.
-
-P1 items need 1-2 small tables but reuse existing components and patterns.
-
-P2 items involve backend triggers and new data flows but follow established patterns (notification queue, analytics queries).
+**Gap #1 is a real bug** — the share button was added but the route it links to doesn't exist. This should be fixed immediately before any new features.
 
