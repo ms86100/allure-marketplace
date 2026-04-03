@@ -25,6 +25,7 @@ interface FestivalBannerProps {
 
 export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const impressionTracked = useRef(false);
 
   const themeConfig = banner.theme_config || {};
