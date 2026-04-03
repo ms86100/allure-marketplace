@@ -54,8 +54,9 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
   const ml = useMarketplaceLabels();
   const [bookingOpen, setBookingOpen] = useState(false);
   const isServiceBookingAction = d.actionType === 'book' || d.actionType === 'request_service';
+  const { data: favoriteIds = [] } = useProductFavorites();
 
-  // Track recently viewed
+  // Track recently viewed + server-side view tracking
   useEffect(() => {
     if (open && product?.product_id) {
       try {
@@ -64,8 +65,12 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
         const next = [product.product_id, ...prev.filter(id => id !== product.product_id)].slice(0, 10);
         localStorage.setItem(key, JSON.stringify(next));
       } catch {}
+      // Server-side view tracking
+      if (user) {
+        supabase.from('product_views' as any).insert({ product_id: product.product_id, viewer_id: user.id } as any).then(() => {});
+      }
     }
-  }, [open, product?.product_id]);
+  }, [open, product?.product_id, user]);
 
   const inlineAvailability = useMemo(() => {
     const p = product as any;
