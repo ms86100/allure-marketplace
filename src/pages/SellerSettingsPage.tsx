@@ -374,8 +374,8 @@ export default function SellerSettingsPage() {
             </div>
           </div>
 
-          {/* Service Availability — shown for service-type sellers */}
-          {sellerProfile && primaryGroup && getGroupBySlug(primaryGroup)?.layoutType === 'service' && (
+          {/* Service Availability — shown when seller has bookable products */}
+          {sellerProfile && hasBookableProducts && (
             <ServiceAvailabilityManager sellerId={sellerProfile.id} />
           )}
 
