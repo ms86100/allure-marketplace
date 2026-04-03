@@ -66,6 +66,8 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
   const [rows, setRows] = useState<BulkRow[]>([{ ...EMPTY_ROW, category: allowedCategories[0]?.category || '' }]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<{ success: number; errors: number } | null>(null);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [savedCount, setSavedCount] = useState(0);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
 
   // Fetch all subcategories for allowed categories
