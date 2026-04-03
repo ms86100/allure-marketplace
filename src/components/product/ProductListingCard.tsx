@@ -247,6 +247,10 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
 
         <h4 className="font-semibold leading-snug text-foreground text-[12px] line-clamp-2 mt-1 min-h-[2lh]">{product.name}</h4>
 
+        {product.description && !compact && (
+          <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
+        )}
+
         {product.seller_name && !compact && (
           <div className="flex items-center gap-1 mt-1 overflow-hidden">
             <span className={cn("text-[10px] truncate", product.distance_km && product.distance_km > 0 ? "text-foreground font-medium" : "text-muted-foreground")}>{product.seller_name}</span>
