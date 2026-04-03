@@ -778,7 +778,7 @@ export function useCartPage() {
   }, [paymentMode, navigate]);
 
   return {
-    user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations,
+    user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations, cartVerified,
     notes, setNotes, paymentMethod, setPaymentMethod,
     isPlacingOrder, showRazorpayCheckout, showUpiDeepLink, setShowUpiDeepLink, pendingOrderIds, paymentMode,
     appliedCoupon, setAppliedCoupon, showConfirmDialog, setShowConfirmDialog,
