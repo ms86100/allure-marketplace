@@ -345,6 +345,7 @@ function GuidedStep2({
 export default function BecomeSellerPage() {
   const { profile } = useAuth();
   const app = useSellerApplication();
+  const { configs } = useCategoryConfigs();
   const {
     user, isLoading, isCheckingExisting, groupsLoading, existingSeller, draftSellerId,
     step, setStep, selectedGroup, setSelectedGroup, formData, setFormData,
