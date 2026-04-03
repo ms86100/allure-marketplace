@@ -230,7 +230,13 @@ export function DraftProductManager({
         specifications: attributeBlocks.length > 0 ? { blocks: attributeBlocks } : null,
         stock_quantity: newProduct.stock_quantity && newProduct.stock_quantity > 0 ? newProduct.stock_quantity : null,
         low_stock_threshold: newProduct.low_stock_threshold && newProduct.low_stock_threshold > 0 ? newProduct.low_stock_threshold : null,
-        action_type: newProduct.action_type || defaultActionType || 'add_to_cart',
+        action_type: (() => {
+          const resolvedActionType = defaultActionType || newProduct.action_type || 'add_to_cart';
+          if (defaultActionType && newProduct.action_type && newProduct.action_type !== defaultActionType) {
+            console.warn(`[Onboarding] action_type mismatch: form=${newProduct.action_type}, default=${defaultActionType}. Using default.`);
+          }
+          return resolvedActionType;
+        })(),
         subcategory_id: newProduct.subcategory_id || null,
         lead_time_hours: newProduct.lead_time_hours ? parseInt(String(newProduct.lead_time_hours)) : null,
         accepts_preorders: newProduct.accepts_preorders || false,
@@ -603,13 +609,15 @@ export function DraftProductManager({
                 </div>
               )}
 
-              {/* Action Type Selector */}
-              <ActionTypeSelector
-                category={newProduct.category}
-                value={newProduct.action_type || 'add_to_cart'}
-                onChange={(v) => setNewProduct({ ...newProduct, action_type: v })}
-                configs={configs}
-              />
+              {/* Action Type Selector — hidden during onboarding when default is already set */}
+              {!defaultActionType && (
+                <ActionTypeSelector
+                  category={newProduct.category}
+                  value={newProduct.action_type || 'add_to_cart'}
+                  onChange={(v) => setNewProduct({ ...newProduct, action_type: v })}
+                  configs={configs}
+                />
+              )}
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">

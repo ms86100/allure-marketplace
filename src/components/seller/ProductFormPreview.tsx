@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useCurrency } from '@/hooks/useCurrency';
+import { deriveActionType, ACTION_CONFIG } from '@/lib/marketplace-constants';
 import type { ProductFormData } from '@/hooks/useSellerProducts';
 import type { SellerProfile } from '@/types/database';
 import type { BlockData } from '@/hooks/useAttributeBlocks';
@@ -148,9 +149,18 @@ function ProductDetailPreview({
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 bg-background border-t border-border p-4">
-          <Button className="w-full h-12 text-base font-bold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl" disabled>
-            Add to cart · {formatPrice(price)}
-          </Button>
+          {(() => {
+            if (!formData.action_type) {
+              console.warn('[Preview] Missing action_type in form data');
+            }
+            const effectiveAction = deriveActionType(formData.action_type, null);
+            const ctaConfig = ACTION_CONFIG[effectiveAction];
+            return (
+              <Button className="w-full h-12 text-base font-bold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl" disabled>
+                {ctaConfig.label} · {formatPrice(price)}
+              </Button>
+            );
+          })()}
         </div>
       </DrawerContent>
     </Drawer>
