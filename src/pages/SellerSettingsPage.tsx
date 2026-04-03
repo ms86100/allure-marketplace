@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
 import { ServiceAvailabilityManager } from '@/components/seller/ServiceAvailabilityManager';
 import { useSellerSettings } from '@/hooks/useSellerSettings';
+import { useActionTypeMap } from '@/hooks/useActionTypeMap';
 
 function LicenseUploadSection({ sellerId, primaryGroup }: { sellerId: string; primaryGroup: string }) {
   const [groupId, setGroupId] = useState<string | null>(null);
