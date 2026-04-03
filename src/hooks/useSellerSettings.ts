@@ -101,6 +101,8 @@ export function useSellerSettings() {
           daily_order_limit: profile.daily_order_limit?.toString() || '',
           vacation_mode: profile.vacation_mode ?? false,
           vacation_until: profile.vacation_until ? profile.vacation_until.split('T')[0] : '',
+          pickup_payment_config: profile.pickup_payment_config ?? { accepts_cod: profile.accepts_cod ?? true, accepts_online: profile.accepts_upi ?? false },
+          delivery_payment_config: profile.delivery_payment_config ?? { accepts_cod: profile.accepts_cod ?? true, accepts_online: profile.accepts_upi ?? false },
         });
       }
     } catch (error) { console.error('Error fetching profile:', error); }
