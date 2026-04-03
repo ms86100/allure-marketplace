@@ -443,8 +443,6 @@ function DiscoveryRow({
   );
 }
 
-// ── Category Product Grid (Blinkit-style themed category cards) ──
-function ProductListings({
   categories, isLoading, onProductTap, onNavigate, categoryConfigs, marketplaceConfig, badgeConfigs, socialProofMap,
 }: {
   categories: { category: string; parentGroup: string; displayName: string; icon: string; products: ProductWithSeller[] }[];
