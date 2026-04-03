@@ -74,6 +74,7 @@ export function useSellerApplication() {
   const { user, profile, refreshProfile } = useAuth();
   const { parentGroupInfos, groups, isLoading: groupsLoading } = useParentGroups();
   const { groupedConfigs } = useCategoryConfigs();
+  const { data: allActionsData = [] } = useActionTypeMap();
 
   const [isLoading, setIsLoading] = useState(false);
   const [submissionComplete, setSubmissionComplete] = useState(false);
