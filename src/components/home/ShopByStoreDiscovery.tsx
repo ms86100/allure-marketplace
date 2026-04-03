@@ -127,6 +127,7 @@ export function ShopByStoreDiscovery({ sectionTitle }: { sectionTitle?: string }
           )}
         </section>
       )}
+      </div>
     </div>
   );
 }
