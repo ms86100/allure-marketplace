@@ -19,7 +19,8 @@ import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { DAYS_OF_WEEK } from '@/types/database';
-import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe, LayoutGrid, Tags, FileText, Package, CheckCircle2, ArrowRight, Truck, Smartphone, Banknote, Clock, ImageIcon, MapPin, Navigation, CheckCircle, Star, X, Search } from 'lucide-react';
+import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe, LayoutGrid, Tags, FileText, Package, CheckCircle2, ArrowRight, Truck, Smartphone, Banknote, Clock, ImageIcon, MapPin, Navigation, CheckCircle, Star, X, Search, ShoppingCart, Calendar, MessageCircle, Phone } from 'lucide-react';
+import { useActionTypeMap, useCategoryAllowedActions } from '@/hooks/useActionTypeMap';
 import { OnboardingLocationSheet } from '@/components/seller/OnboardingLocationSheet';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -417,6 +418,16 @@ export default function BecomeSellerPage() {
   const { profile, sellerProfiles } = useAuth();
   const app = useSellerApplication();
   const { configs } = useCategoryConfigs();
+  const { data: allActions = [] } = useActionTypeMap();
+
+  // ─── Interaction mode state (persisted in sessionStorage) ─────────────
+  const [storeActionType, setStoreActionType] = useState<string>(() => {
+    try { return sessionStorage.getItem('onboarding_store_action_type') || ''; } catch { return ''; }
+  });
+  const handleSetStoreActionType = useCallback((val: string) => {
+    setStoreActionType(val);
+    try { sessionStorage.setItem('onboarding_store_action_type', val); } catch { /* */ }
+  }, []);
   const {
     user, isLoading, isCheckingExisting, groupsLoading, existingSeller, draftSellerId,
     step, setStep, selectedGroup, setSelectedGroup, formData, setFormData,
@@ -678,9 +689,68 @@ export default function BecomeSellerPage() {
               <p className="text-xs text-muted-foreground">Add a profile photo and cover image to make your store stand out</p>
               {user && <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Profile Photo</Label><CroppableImageUpload value={formData.profile_image_url} onChange={(url) => setFormData({ ...formData, profile_image_url: url })} folder="sellers" userId={user.id} aspectRatio="square" placeholder="Profile" cropAspect={1} beforePick={beforeImagePick} /></div><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Cover Image</Label><CroppableImageUpload value={formData.cover_image_url} onChange={(url) => setFormData({ ...formData, cover_image_url: url })} folder="sellers" userId={user.id} aspectRatio="video" placeholder="Cover" cropAspect={16 / 9} beforePick={beforeImagePick} /></div></div>}
             </div>
-            {/* Service Availability — only for service-type categories */}
-            {selectedGroupInfo?.layoutType === 'service' && draftSellerId && (
-              <ServiceAvailabilityManager sellerId={draftSellerId} onComplete={() => { requestAnimationFrame(() => { document.querySelector('[data-continue-products]')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }); }} />
+            {/* Buyer Interaction Mode */}
+            {(() => {
+              const INTERACTION_ICONS: Record<string, typeof ShoppingCart> = { cart: ShoppingCart, booking: Calendar, inquiry: MessageCircle, contact: Phone };
+              const INTERACTION_DESCRIPTIONS: Record<string, string> = {
+                cart: 'Buyers purchase products directly with quantity',
+                booking: 'Buyers select date & time slots to book',
+                inquiry: 'Buyers send a request, you respond with details',
+                contact: 'Buyers contact you directly — no transaction',
+              };
+              // Get allowed action types for the primary category
+              const primaryCat = formData.categories[0];
+              const primaryConfig = configs.find((c: any) => c.category === primaryCat);
+              // Filter actions by what's allowed for the category (or show all)
+              const filteredActions = primaryConfig
+                ? allActions.filter(a => {
+                    // If we have the category allowlist data, it's handled by ActionTypeSelector
+                    // Here just show unique checkout_modes
+                    return true;
+                  })
+                : allActions;
+              const uniqueModes = Array.from(new Set(filteredActions.map(a => a.checkout_mode)));
+              // Auto-set default from category if not yet chosen
+              const effectiveDefault = storeActionType || (primaryConfig as any)?.default_action_type || allActions.find(a => a.checkout_mode === 'cart')?.action_type || '';
+              return (
+                <div className="border rounded-lg p-4 space-y-3">
+                  <div className="flex items-center gap-2"><LayoutGrid size={16} className="text-primary" /><h3 className="font-semibold text-sm">How do buyers interact?</h3></div>
+                  <p className="text-xs text-muted-foreground">Choose the primary way buyers will interact with your store</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {uniqueModes.map(mode => {
+                      const Icon = INTERACTION_ICONS[mode] || ShoppingCart;
+                      const modeActions = filteredActions.filter(a => a.checkout_mode === mode);
+                      const isSelected = modeActions.some(a => a.action_type === (storeActionType || effectiveDefault));
+                      return (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => handleSetStoreActionType(modeActions[0]?.action_type || '')}
+                          className={cn(
+                            'flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center',
+                            isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30'
+                          )}
+                        >
+                          <Icon size={20} className={isSelected ? 'text-primary' : 'text-muted-foreground'} />
+                          <span className="text-xs font-medium">{modeActions[0]?.cta_label || mode}</span>
+                          <span className="text-[10px] text-muted-foreground leading-tight">{INTERACTION_DESCRIPTIONS[mode]}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {primaryConfig && (
+                    <p className="text-[10px] text-muted-foreground">💡 Suggested for {primaryConfig.displayName}. You can set different types per product later.</p>
+                  )}
+                </div>
+              );
+            })()}
+            {/* Service Availability — only when interaction requires it */}
+            {(() => {
+              const effectiveAction = storeActionType || (configs.find((c: any) => c.category === formData.categories[0]) as any)?.default_action_type || '';
+              const actionConfig = allActions.find(a => a.action_type === effectiveAction);
+              return actionConfig?.requires_availability && draftSellerId;
+            })() && (
+              <ServiceAvailabilityManager sellerId={draftSellerId!} onComplete={() => { requestAnimationFrame(() => { document.querySelector('[data-continue-products]')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }); }} />
             )}
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Add at least one product or service to your catalog</p>
             <Button data-continue-products className="w-full" onClick={handleProceedToProducts} disabled={isLoading || formData.operating_days.length === 0}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Add Products<ChevronRight size={16} className="ml-1" /></Button>
@@ -699,7 +769,7 @@ export default function BecomeSellerPage() {
         {step === 4 && draftSellerId && (
           <div className="space-y-5">
             <button onClick={() => handleStepBack(3)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store settings</button>
-            <DraftProductManager sellerId={draftSellerId} categories={formData.categories} products={draftProducts} onProductsChange={setDraftProducts} beforePick={beforeImagePick} />
+            <DraftProductManager sellerId={draftSellerId} categories={formData.categories} products={draftProducts} onProductsChange={setDraftProducts} beforePick={beforeImagePick} defaultActionType={storeActionType || undefined} />
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Review everything and submit for approval</p>
             <Button className="w-full" onClick={() => setStep(5)} disabled={draftProducts.length === 0}>Review & Submit<ChevronRight size={16} className="ml-1" /></Button>
           </div>

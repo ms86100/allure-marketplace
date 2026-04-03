@@ -49,6 +49,7 @@ interface DraftProductManagerProps {
   products: DraftProduct[];
   onProductsChange: (products: DraftProduct[]) => void;
   beforePick?: () => void | Promise<void>;
+  defaultActionType?: string;
 }
 
 function isServiceCategory(category: string, configs: any[]): boolean {
@@ -63,6 +64,7 @@ export function DraftProductManager({
   products,
   onProductsChange,
   beforePick,
+  defaultActionType,
 }: DraftProductManagerProps) {
   const { user } = useAuth();
   const { data: blockLibrary = [] } = useBlockLibrary();
@@ -226,7 +228,7 @@ export function DraftProductManager({
         specifications: attributeBlocks.length > 0 ? { blocks: attributeBlocks } : null,
         stock_quantity: newProduct.stock_quantity && newProduct.stock_quantity > 0 ? newProduct.stock_quantity : null,
         low_stock_threshold: newProduct.low_stock_threshold && newProduct.low_stock_threshold > 0 ? newProduct.low_stock_threshold : null,
-        action_type: newProduct.action_type || 'add_to_cart',
+        action_type: newProduct.action_type || defaultActionType || 'add_to_cart',
         subcategory_id: newProduct.subcategory_id || null,
         lead_time_hours: newProduct.lead_time_hours ? parseInt(String(newProduct.lead_time_hours)) : null,
         accepts_preorders: newProduct.accepts_preorders || false,
@@ -411,7 +413,7 @@ export function DraftProductManager({
       prep_time_minutes: null,
       stock_quantity: null,
       low_stock_threshold: null,
-      action_type: 'add_to_cart',
+      action_type: defaultActionType || 'add_to_cart',
     });
     setIsAdding(false);
     setFieldErrors({});

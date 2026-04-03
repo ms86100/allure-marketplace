@@ -46,7 +46,11 @@ export function useCategoryAllowedActions(categoryConfigId: string | null) {
         .select('action_type')
         .eq('category_config_id', categoryConfigId);
       if (error) throw error;
-      return (data || []).map((d: any) => d.action_type as string);
+      const list = (data || []).map((d: any) => d.action_type as string);
+      if (list.length === 0) {
+        console.warn(`[useActionTypeMap] No allowed action types found for category_config_id: ${categoryConfigId} — falling back to all`);
+      }
+      return list;
     },
     enabled: !!categoryConfigId,
     staleTime: 1000 * 60 * 30,
