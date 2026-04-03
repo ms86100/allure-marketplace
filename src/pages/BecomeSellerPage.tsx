@@ -589,8 +589,12 @@ export default function BecomeSellerPage() {
 
         {/* Step Header */}
         <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold">{STEP_META[step - 1].title}</h1>
-          <p className="text-muted-foreground text-sm mt-1">{STEP_META[step - 1].helper}</p>
+          <h1 className="text-2xl font-bold">
+            {step === 3 ? CONFIG_SUB_STEPS[configSubStep - 1].title : STEP_META[step - 1].title}
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {step === 3 ? CONFIG_SUB_STEPS[configSubStep - 1].helper : STEP_META[step - 1].helper}
+          </p>
         </div>
 
         {/* Progress Stepper */}
