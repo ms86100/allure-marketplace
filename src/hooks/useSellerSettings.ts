@@ -153,6 +153,8 @@ export function useSellerSettings() {
         fulfillment_mode: formData.fulfillment_mode, delivery_note: formData.delivery_note.trim() || null,
         minimum_order_amount: (minOrder !== null && !isNaN(minOrder) && minOrder > 0) ? minOrder : null,
         daily_order_limit: (dailyLimit !== null && !isNaN(dailyLimit) && dailyLimit > 0) ? dailyLimit : null,
+        vacation_mode: formData.vacation_mode,
+        vacation_until: formData.vacation_mode && formData.vacation_until ? formData.vacation_until : null,
       } as any).eq('id', sellerProfile.id);
       if (error) throw error;
       toast.success('Settings saved successfully', { id: 'settings-saved' });
