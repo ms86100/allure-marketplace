@@ -793,7 +793,7 @@ export function AdminBannerManager() {
             )}
 
             {/* Visibility & Config */}
-            <div className="space-y-3 p-3 bg-muted/40 rounded-xl">
+            <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {form.is_global ? <Globe size={14} className="text-primary" /> : <Building2 size={14} className="text-muted-foreground" />}
