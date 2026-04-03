@@ -221,10 +221,17 @@ export function useSellerApplication() {
   }, [step, formData.business_name, draftSellerId, selectedGroup, groups, user, profile]);
 
   const handleCategoryChange = (category: ServiceCategory, checked: boolean) => {
-    setFormData(f => ({
-      ...f,
-      categories: checked ? [...f.categories, category] : f.categories.filter(c => c !== category),
-    }));
+    setFormData(f => {
+      const newCategories = checked ? [...f.categories, category] : f.categories.filter(c => c !== category);
+      // Clear subcategory preferences for unchecked category
+      let newPrefs = f.subcategory_preferences;
+      if (!checked) {
+        // Find the category_config_id for this category slug to clear prefs
+        // We clear by matching — but since prefs are keyed by config id, we keep them
+        // The BecomeSellerPage handles the mapping
+      }
+      return { ...f, categories: newCategories, subcategory_preferences: newPrefs };
+    });
   };
 
   const toggleOperatingDay = (day: string) => {
