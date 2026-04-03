@@ -45,6 +45,7 @@ import { RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { LiveActivityManager } from '@/services/LiveActivityManager';
 import { Capacitor } from '@capacitor/core';
+import { useNewOrderAlertContext } from '@/contexts/NewOrderAlertContext';
 
 // Gap 10: Lazy-load map to avoid bundling Leaflet for non-delivery orders
 const DeliveryMapView = lazy(() => import('@/components/delivery/DeliveryMapView').then(m => ({ default: m.DeliveryMapView })));
