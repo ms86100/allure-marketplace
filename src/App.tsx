@@ -118,6 +118,7 @@ const MaintenancePage = lazyWithRetry(() => import("./pages/MaintenancePage"));
 const SocietyReportPage = lazyWithRetry(() => import("./pages/SocietyReportPage"));
 const SocietyAdminPage = lazyWithRetry(() => import("./pages/SocietyAdminPage"));
 const BuilderDashboardPage = lazyWithRetry(() => import("./pages/BuilderDashboardPage"));
+const FestivalCollectionPage = lazyWithRetry(() => import("./pages/FestivalCollectionPage"));
 const BuilderAnalyticsPage = lazyWithRetry(() => import("./pages/BuilderAnalyticsPage"));
 const VehicleParkingPage = lazyWithRetry(() => import("./pages/VehicleParkingPage"));
 const VisitorManagementPage = lazyWithRetry(() => import("./pages/VisitorManagementPage"));
