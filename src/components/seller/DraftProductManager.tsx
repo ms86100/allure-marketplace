@@ -711,14 +711,21 @@ export function DraftProductManager({
                   />
                 </label>
                 {newProduct.stock_quantity != null && newProduct.stock_quantity > 0 && (
-                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
+                   <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
                     <div className="space-y-1">
                       <Label className="text-xs">Current Stock</Label>
                       <Input
                         type="number"
                         min={0}
                         value={newProduct.stock_quantity || ''}
-                        onChange={(e) => setNewProduct({ ...newProduct, stock_quantity: e.target.value ? Number(e.target.value) : null })}
+                        onChange={(e) => {
+                          const val = e.target.value ? Number(e.target.value) : null;
+                          const updates: any = { ...newProduct, stock_quantity: val };
+                          if (val !== null && newProduct.low_stock_threshold !== null && newProduct.low_stock_threshold >= val) {
+                            updates.low_stock_threshold = Math.max(1, val - 1);
+                          }
+                          setNewProduct(updates);
+                        }}
                       />
                     </div>
                     <div className="space-y-1">
@@ -726,9 +733,19 @@ export function DraftProductManager({
                       <Input
                         type="number"
                         min={1}
+                        max={newProduct.stock_quantity ? newProduct.stock_quantity - 1 : undefined}
                         value={newProduct.low_stock_threshold || ''}
-                        onChange={(e) => setNewProduct({ ...newProduct, low_stock_threshold: e.target.value ? Number(e.target.value) : null })}
+                        onChange={(e) => {
+                          let val = e.target.value ? Number(e.target.value) : null;
+                          if (val !== null && newProduct.stock_quantity && val >= newProduct.stock_quantity) {
+                            val = newProduct.stock_quantity - 1;
+                          }
+                          setNewProduct({ ...newProduct, low_stock_threshold: val && val > 0 ? val : null });
+                        }}
                       />
+                      {newProduct.stock_quantity && newProduct.low_stock_threshold !== null && newProduct.low_stock_threshold >= newProduct.stock_quantity && (
+                        <p className="text-xs text-destructive">Must be less than current stock</p>
+                      )}
                     </div>
                   </div>
                 )}
