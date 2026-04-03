@@ -9329,6 +9329,20 @@ export type Database = {
         }
         Returns: Json
       }
+      resolve_society: {
+        Args: {
+          _google_place_id?: string
+          _input_name: string
+          _lat?: number
+          _lng?: number
+        }
+        Returns: {
+          confidence: number
+          match_type: string
+          society_id: string
+          society_name: string
+        }[]
+      }
       search_marketplace: {
         Args: { search_term: string; user_society_id?: string }
         Returns: {
