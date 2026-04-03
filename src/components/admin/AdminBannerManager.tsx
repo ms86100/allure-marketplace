@@ -343,7 +343,7 @@ export function AdminBannerManager() {
       // Async product validation for festival sections
       setIsValidating(true);
       try {
-        let allEmpty = true;
+        let emptyCount = 0;
         for (const section of form.sections) {
           const products = await resolveProducts({
             sourceType: section.product_source_type,
@@ -351,16 +351,15 @@ export function AdminBannerManager() {
             fallbackMode: form.fallback_mode,
             limit: 1,
           });
-          if (products.length > 0) {
-            allEmpty = false;
-          } else {
-            toast.warning(`Section "${section.title}" has no matching products`);
+          if (products.length === 0) {
+            emptyCount++;
+            toast.warning(`Section "${section.title}" has no matching products yet`);
           }
         }
-        if (allEmpty) {
-          toast.error('All sections are empty — cannot save. Add products or change source.');
-          setIsValidating(false);
-          return;
+        if (emptyCount > 0 && emptyCount < form.sections.length) {
+          toast.info('Some sections are empty — they will be hidden on the buyer side');
+        } else if (emptyCount === form.sections.length) {
+          toast.warning('All sections are currently empty — banner will be hidden until products are added');
         }
       } catch {
         // Non-blocking: proceed if validation fails
