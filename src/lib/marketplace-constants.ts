@@ -32,13 +32,20 @@ export const SORT_OPTIONS = [
 
 export type SortKey = (typeof SORT_OPTIONS)[number]['key'];
 
+/**
+ * TX_TO_ACTION — maps category transaction_type → product action_type.
+ * Used ONLY as a frontend fallback when product.action_type is not set.
+ * Canonical source of truth is the DB table `action_type_workflow_map`.
+ */
 const TX_TO_ACTION: Record<string, ProductActionType> = {
   cart_purchase: 'add_to_cart',
   buy_now: 'buy_now',
   book_slot: 'book',
+  service_booking: 'book',
   request_service: 'request_service',
   request_quote: 'request_quote',
   contact_seller: 'contact_seller',
+  contact_enquiry: 'contact_seller',
   schedule_visit: 'schedule_visit',
   make_offer: 'make_offer',
 };
