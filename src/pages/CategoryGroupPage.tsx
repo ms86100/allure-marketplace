@@ -37,6 +37,8 @@ export default function CategoryGroupPage() {
   const [sortBy, setSortBy] = useState<SortKey>('relevance');
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [filterOpenNow, setFilterOpenNow] = useState(false);
+  const [filterVeg, setFilterVeg] = useState(false);
   const { configs: categoryConfigs } = useCategoryConfigs();
 
   const handleProductTap = useCallback((product: ProductWithSeller) => {
