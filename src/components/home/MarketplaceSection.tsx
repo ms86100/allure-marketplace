@@ -256,8 +256,13 @@ export function MarketplaceSection() {
             </button>
             <button
               onClick={() => {
+                const shareData = { title: 'Join our community marketplace', url: window.location.origin };
                 if (navigator.share) {
-                  navigator.share({ title: 'Join our community marketplace', url: window.location.origin });
+                  navigator.share(shareData).catch(() => {});
+                } else {
+                  navigator.clipboard.writeText(shareData.url).then(() => {
+                    toast.success('Link copied!', { description: 'Share it with your neighbor to get them selling' });
+                  });
                 }
               }}
               className="w-full px-4 py-3 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium active:scale-[0.98] transition-transform"
