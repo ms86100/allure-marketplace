@@ -52,10 +52,11 @@ interface DraftProductManagerProps {
   defaultActionType?: string;
 }
 
-function isServiceCategory(category: string, configs: any[]): boolean {
-  if (!category) return false;
-  const config = configs.find((c: any) => c.category === category);
-  return config?.layoutType === 'service';
+// Action-type-driven check: does this product's action_type require availability?
+function doesActionRequireAvailability(actionType: string | undefined, allActions: { action_type: string; requires_availability: boolean }[]): boolean {
+  if (!actionType) return false;
+  const config = allActions.find(a => a.action_type === actionType);
+  return config?.requires_availability ?? false;
 }
 
 export function DraftProductManager({

@@ -295,22 +295,26 @@ export function useSellerApplication() {
   };
 
   const handleProceedToSettings = async () => { const id = await saveDraft(); if (id) setStep(3); };
-  const handleProceedToProducts = async () => {
+  const handleProceedToProducts = async (storeActionType?: string) => {
     const id = await saveDraft();
     if (id) {
-      // Service sellers must generate availability slots before proceeding
-      const groupInfo = parentGroupInfos.find(g => g.value === selectedGroup);
-      if (groupInfo?.layoutType === 'service') {
-        const { count } = await (supabase
-          .from('service_slots') as any)
-          .select('id', { count: 'exact', head: true })
-          .eq('seller_id', id)
-          .gte('slot_date', new Date().toISOString().split('T')[0])
-          .eq('is_blocked', false);
+      // Only block if the seller's chosen action_type requires availability
+      // Source of truth: action_type_workflow_map.requires_availability
+      // Safe default: if no action_type provided, do NOT block (DB trigger enforces at save)
+      if (storeActionType) {
+        const actionConfig = allActionsData.find(a => a.action_type === storeActionType);
+        if (actionConfig?.requires_availability) {
+          const { count } = await (supabase
+            .from('service_slots') as any)
+            .select('id', { count: 'exact', head: true })
+            .eq('seller_id', id)
+            .gte('slot_date', new Date().toISOString().split('T')[0])
+            .eq('is_blocked', false);
 
-        if (!count || count === 0) {
-          toast.error('Please generate availability slots before continuing', { id: 'seller-app-validation' });
-          return;
+          if (!count || count === 0) {
+            toast.error('Please generate availability slots before continuing', { id: 'seller-app-validation' });
+            return;
+          }
         }
       }
 
