@@ -814,6 +814,11 @@ body.razorpay-active iframe[src*="checkout.razorpay"] {
 .banner-intensity-rich { animation-duration: 1.8s !important; }
 
 /* Respect reduced motion */
+/* Fix Vaul drawer dark overlay */
+[data-vaul-drawer][data-vaul-drawer-direction="bottom"]::after {
+  height: 0 !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .banner-anim-sparkle::after,
   .banner-anim-glow,
