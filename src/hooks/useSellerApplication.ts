@@ -209,7 +209,7 @@ export function useSellerApplication() {
 
   // Auto-save draft for license upload
   useEffect(() => {
-    if (step !== 3 || draftSellerId || isCheckingExisting || !formData.business_name.trim() || !selectedGroup) return;
+    if (step !== 2 || draftSellerId || isCheckingExisting || !formData.business_name.trim() || !selectedGroup) return;
     const groupRow = groups.find(g => g.slug === selectedGroup);
     if (!groupRow || !(groupRow as any).requires_license) return;
 
