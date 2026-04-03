@@ -478,13 +478,38 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // ── PRIORITY DETECTION ──
+        const rawPayload = item.payload || {};
+        const targetRole = rawPayload.target_role || '';
+        const notifStatus = rawPayload.status || '';
+
+        const SELLER_HIGH_PRIORITY_STATUSES = ['placed', 'enquired', 'requested', 'quoted'];
+        const BUYER_HIGH_PRIORITY_STATUSES = ['payment_failed', 'refund_failed', 'otp'];
+
+        const isHighPriority =
+          (targetRole === 'seller' && SELLER_HIGH_PRIORITY_STATUSES.includes(notifStatus)) ||
+          (targetRole === 'buyer' && BUYER_HIGH_PRIORITY_STATUSES.includes(notifStatus));
+
+        console.log(JSON.stringify({
+          event: "push_priority",
+          notification_id: item.id,
+          user_id: item.user_id,
+          target_role: targetRole || 'unknown',
+          status: notifStatus || 'unknown',
+          isHighPriority,
+          sound: isHighPriority ? 'gate_bell' : 'default',
+        }));
+
         // ── INLINE PUSH DELIVERY (no function-to-function call) ──
         const pushData: Record<string, string> = {};
-        const rawPayload = item.payload || {};
         if (rawPayload.action) pushData.action = String(rawPayload.action);
         if (rawPayload.reference_path) pushData.reference_path = String(rawPayload.reference_path);
         else if (item.reference_path) pushData.reference_path = item.reference_path;
         if (!pushData.route && item.reference_path) pushData.route = item.reference_path;
+        // Pass priority info to client for foreground sound decision
+        pushData.high_priority = isHighPriority ? 'true' : 'false';
+        if (targetRole) pushData.target_role = targetRole;
+        if (notifStatus) pushData.status = notifStatus;
 
         const threadId = rawPayload.orderId ? String(rawPayload.orderId) : undefined;
         const imageUrl = rawPayload.image_url ? String(rawPayload.image_url) : undefined;
@@ -492,7 +517,7 @@ Deno.serve(async (req) => {
         const { successCount, failCount } = await deliverPushToUser(
           supabase, creds, item.user_id,
           item.title, item.body, pushData,
-          threadId, imageUrl, item.id,
+          threadId, imageUrl, item.id, isHighPriority,
         );
 
         if (successCount > 0 || failCount === 0) {
