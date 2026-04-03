@@ -19,7 +19,7 @@ import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { DAYS_OF_WEEK } from '@/types/database';
-import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe, LayoutGrid, Tags, FileText, Package, CheckCircle2, ArrowRight, Truck, Smartphone, Banknote, Clock, ImageIcon, MapPin, Navigation, CheckCircle, Star, X } from 'lucide-react';
+import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe, LayoutGrid, Tags, FileText, Package, CheckCircle2, ArrowRight, Truck, Smartphone, Banknote, Clock, ImageIcon, MapPin, Navigation, CheckCircle, Star, X, Search } from 'lucide-react';
 import { OnboardingLocationSheet } from '@/components/seller/OnboardingLocationSheet';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -27,6 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSellerApplication } from '@/hooks/useSellerApplication';
 import { useSubcategories } from '@/hooks/useSubcategories';
 import { SubcategoryPickerDialog, SubcategorySelection } from '@/components/seller/SubcategoryPickerDialog';
+import { CategorySearchPicker } from '@/components/seller/CategorySearchPicker';
 
 // ─── Store Location Picker ──────────────────────────────────────────────────
 function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }: {
@@ -84,10 +85,9 @@ function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }:
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 5;
 const STEP_META = [
-  { label: 'Category', icon: LayoutGrid, title: 'What will you offer?', helper: 'This determines your store type and the tools available to you.' },
-  { label: 'Specialize', icon: Tags, title: 'Specialize your store', helper: 'Select the specific categories you\'ll serve. You can add more later.' },
+  { label: 'What to Sell', icon: Search, title: 'What do you want to sell?', helper: 'Search or browse to find the right category for your business.' },
   { label: 'Store Details', icon: FileText, title: 'Set up your store', helper: 'These details help buyers find and trust your business.' },
   { label: 'Settings', icon: Settings, title: 'Configure your store', helper: 'Set up how you operate — delivery, payments, and schedule.' },
   { label: 'Products', icon: Package, title: 'Add your first products', helper: 'Buyers will see these once your store is approved. Start with 1-2 items.' },
@@ -345,6 +345,7 @@ function GuidedStep2({
 export default function BecomeSellerPage() {
   const { profile } = useAuth();
   const app = useSellerApplication();
+  const { configs } = useCategoryConfigs();
   const {
     user, isLoading, isCheckingExisting, groupsLoading, existingSeller, draftSellerId,
     step, setStep, selectedGroup, setSelectedGroup, formData, setFormData,
@@ -430,7 +431,7 @@ export default function BecomeSellerPage() {
                     }
                     setExistingSeller(null);
                     setDraftSellerId((existingSeller as any).id);
-                    setStep(3);
+                    setStep(2);
                   }}>Update & Resubmit</Button>
                   <Button variant="outline" className="w-full" onClick={() => { setSelectedGroup(null); setExistingSeller(null); setStep(1); }}>Choose Different Category</Button>
                 </div>
@@ -469,7 +470,7 @@ export default function BecomeSellerPage() {
         {/* Top Bar */}
         <div className="flex items-center justify-between mb-6">
           <Link to="/" className="flex items-center gap-2 text-muted-foreground"><span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0"><ArrowLeft size={18} /></span><span>Back</span></Link>
-          {step >= 3 && <Button variant="ghost" size="sm" onClick={handleSaveDraftAndExit} disabled={isLoading}><Save size={14} className="mr-1" />Save Draft</Button>}
+          {step >= 2 && <Button variant="ghost" size="sm" onClick={handleSaveDraftAndExit} disabled={isLoading}><Save size={14} className="mr-1" />Save Draft</Button>}
         </div>
 
         {/* Step Header */}
@@ -497,54 +498,37 @@ export default function BecomeSellerPage() {
         </div>
 
         {/* Context Breadcrumb */}
-        {step >= 3 && selectedGroupInfo && (
+        {step >= 2 && selectedGroupInfo && (
           <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-muted/60 text-xs">
             <div className={cn('w-6 h-6 rounded flex items-center justify-center', selectedGroupInfo.color)}><DynamicIcon name={selectedGroupInfo.icon} size={14} /></div>
             <span className="font-medium">{selectedGroupInfo.label}</span>
             {formData.categories.length > 0 && (
-              <><ChevronRight size={12} className="text-muted-foreground" /><span className="text-muted-foreground truncate">{formData.categories.map(cat => { const config = (groupedConfigs[selectedGroup as keyof typeof groupedConfigs] || []).find(c => c.category === cat); return config?.displayName || cat; }).join(', ')}</span></>
+              <><ChevronRight size={12} className="text-muted-foreground" /><span className="text-muted-foreground truncate">{formData.categories.map(cat => { const config = configs.find(c => c.category === cat); return config?.displayName || cat; }).join(', ')}</span></>
             )}
-            {formData.business_name.trim() && step >= 4 && <><span className="text-muted-foreground">|</span><span className="font-medium truncate">"{formData.business_name}"</span></>}
+            {formData.business_name.trim() && step >= 3 && <><span className="text-muted-foreground">|</span><span className="font-medium truncate">"{formData.business_name}"</span></>}
           </div>
         )}
 
-        {/* Step 1: Choose Category Group */}
+        {/* Step 1: What do you want to sell? (Unified search + browse) */}
         {step === 1 && (
-          <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-3">
-              <AnimatePresence>
-                {parentGroupInfos.map(({ value, label, icon, color }) => (
-                  <motion.button key={value} layout whileTap={{ scale: 0.97 }} onClick={() => handleGroupSelect(value)}
-                    className={cn('flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center', selectedGroup === value ? 'border-primary bg-primary/5 scale-[1.03]' : 'hover:border-primary/50 hover:bg-muted/50')}>
-                    <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', color)}><DynamicIcon name={icon} size={24} /></div>
-                    <span className="font-medium text-sm">{label}</span>
-                    {selectedGroup === value && <motion.span initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-primary font-medium">Great choice! ✨</motion.span>}
-                  </motion.button>
-                ))}
-              </AnimatePresence>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Select Sub-categories (Guided Picker) */}
-        {step === 2 && selectedGroup && (
-          <GuidedStep2
-            selectedGroup={selectedGroup}
-            selectedGroupInfo={selectedGroupInfo}
+          <CategorySearchPicker
             formData={formData}
             setFormData={setFormData}
             groupedConfigs={groupedConfigs}
+            configs={configs}
             handleCategoryChange={handleCategoryChange}
-            onBack={() => handleStepBack(1)}
-            onContinue={() => setStep(3)}
-            onSkip={() => setStep(3)}
+            onContinue={() => setStep(2)}
+            onGroupResolved={(group) => {
+              if (!selectedGroup) setSelectedGroup(group);
+            }}
+            parentGroupInfos={parentGroupInfos}
           />
         )}
 
-        {/* Step 3: Business Details */}
-        {step === 3 && (
+        {/* Step 2: Business Details */}
+        {step === 2 && (
           <div className="space-y-5">
-            <button onClick={() => handleStepBack(2)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change categories</button>
+            <button onClick={() => handleStepBack(1)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change categories</button>
             {rejectionFeedback && (
               <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-left">
                 <p className="text-xs font-semibold text-destructive mb-1">⚠️ Admin Feedback — Please address before resubmitting:</p>
@@ -578,10 +562,10 @@ export default function BecomeSellerPage() {
           </div>
         )}
 
-        {/* Step 4: Store Settings */}
-        {step === 4 && (
+        {/* Step 3: Store Settings */}
+        {step === 3 && (
           <div className="space-y-5">
-            <button onClick={() => handleStepBack(3)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store details</button>
+            <button onClick={() => handleStepBack(2)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store details</button>
             <div className="border rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-2"><Truck size={16} className="text-primary" /><h3 className="font-semibold text-sm">Fulfillment Mode</h3></div>
               <RadioGroup value={formData.fulfillment_mode} onValueChange={(value) => setFormData({ ...formData, fulfillment_mode: value })} className="space-y-2">
@@ -625,28 +609,28 @@ export default function BecomeSellerPage() {
           </div>
         )}
 
-        {/* Step 5: Add Products */}
-        {step === 5 && !draftSellerId && (
+        {/* Step 4: Add Products */}
+        {step === 4 && !draftSellerId && (
           <div className="space-y-5 text-center py-8">
             <div className="w-16 h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center"><Package size={24} className="text-destructive" /></div>
             <h3 className="text-lg font-semibold">Unable to load your store</h3>
             <p className="text-sm text-muted-foreground">Your store draft could not be found. Please go back and try again.</p>
-            <Button variant="outline" onClick={() => setStep(3)}><ArrowLeft size={16} className="mr-1" />Go Back</Button>
+            <Button variant="outline" onClick={() => setStep(2)}><ArrowLeft size={16} className="mr-1" />Go Back</Button>
           </div>
         )}
-        {step === 5 && draftSellerId && (
+        {step === 4 && draftSellerId && (
           <div className="space-y-5">
-            <button onClick={() => handleStepBack(4)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store settings</button>
+            <button onClick={() => handleStepBack(3)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store settings</button>
             <DraftProductManager sellerId={draftSellerId} categories={formData.categories} products={draftProducts} onProductsChange={setDraftProducts} beforePick={beforeImagePick} />
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Review everything and submit for approval</p>
-            <Button className="w-full" onClick={() => setStep(6)} disabled={draftProducts.length === 0}>Review & Submit<ChevronRight size={16} className="ml-1" /></Button>
+            <Button className="w-full" onClick={() => setStep(5)} disabled={draftProducts.length === 0}>Review & Submit<ChevronRight size={16} className="ml-1" /></Button>
           </div>
         )}
 
-        {/* Step 6: Review & Submit */}
-        {step === 6 && (
+        {/* Step 5: Review & Submit */}
+        {step === 5 && (
           <div className="space-y-5">
-            <button onClick={() => handleStepBack(5)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit products</button>
+            <button onClick={() => handleStepBack(4)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit products</button>
             <div className="bg-muted rounded-lg p-4 space-y-3">
               <h4 className="font-semibold">Application Summary</h4>
               <div className="space-y-2 text-sm">

@@ -86,7 +86,7 @@ export function useSellerApplication() {
   const setStep = useCallback((s: number | ((prev: number) => number)) => {
     _setStep(prev => {
       const next = typeof s === 'function' ? s(prev) : s;
-      if (next >= 3) {
+      if (next >= 2) {
         localStorage.setItem('seller_onboarding_step', String(next));
       }
       return next;
@@ -123,8 +123,8 @@ export function useSellerApplication() {
             loadSellerDataIntoForm(draft);
             await reloadProducts(draft.id);
             // Restore persisted step (survives WebView reload during image picker)
-            const savedStep = parseInt(localStorage.getItem('seller_onboarding_step') || '3', 10);
-            const restoredStep = Math.max(3, Math.min(savedStep, 6));
+            const savedStep = parseInt(localStorage.getItem('seller_onboarding_step') || '2', 10);
+            const restoredStep = Math.max(2, Math.min(savedStep, 5));
             setStep(restoredStep);
           } else {
             // For rejected profiles, set existingSeller so the rejection screen shows first
@@ -209,7 +209,7 @@ export function useSellerApplication() {
 
   // Auto-save draft for license upload
   useEffect(() => {
-    if (step !== 3 || draftSellerId || isCheckingExisting || !formData.business_name.trim() || !selectedGroup) return;
+    if (step !== 2 || draftSellerId || isCheckingExisting || !formData.business_name.trim() || !selectedGroup) return;
     const groupRow = groups.find(g => g.slug === selectedGroup);
     if (!groupRow || !(groupRow as any).requires_license) return;
 
@@ -292,7 +292,7 @@ export function useSellerApplication() {
     } finally { setIsLoading(false); }
   };
 
-  const handleProceedToSettings = async () => { const id = await saveDraft(); if (id) setStep(4); };
+  const handleProceedToSettings = async () => { const id = await saveDraft(); if (id) setStep(3); };
   const handleProceedToProducts = async () => {
     const id = await saveDraft();
     if (id) {
@@ -314,14 +314,14 @@ export function useSellerApplication() {
 
       // Always reload products from DB when entering step 5
       await reloadProducts(id);
-      setStep(5);
+      setStep(4);
     }
   };
 
   // Navigate back with auto-save when a draft exists (Bug 2: always save before step change)
   const handleStepBack = async (targetStep: number) => {
     // Auto-save draft if going back from steps where data may have changed
-    if (draftSellerId && step >= 3) {
+    if (draftSellerId && step >= 2) {
       const savedId = await saveDraft();
       // Bug 2: After saving, reload form data from DB to ensure consistency on re-mount
       if (savedId) {
@@ -339,7 +339,7 @@ export function useSellerApplication() {
   };
 
   const handleSaveDraftAndExit = async () => {
-    if (step >= 3) await saveDraft();
+    if (step >= 2) await saveDraft();
     localStorage.removeItem('seller_onboarding_step');
     toast.success('Draft saved! You can resume later.', { id: 'seller-app-draft-saved' });
     navigate('/profile');
