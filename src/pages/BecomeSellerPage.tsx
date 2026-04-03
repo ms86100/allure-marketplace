@@ -848,11 +848,11 @@ export default function BecomeSellerPage() {
                     {user && <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Profile Photo</Label><CroppableImageUpload value={formData.profile_image_url} onChange={(url) => setFormData({ ...formData, profile_image_url: url })} folder="sellers" userId={user.id} aspectRatio="square" placeholder="Profile" cropAspect={1} beforePick={beforeImagePick} /></div><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Cover Image</Label><CroppableImageUpload value={formData.cover_image_url} onChange={(url) => setFormData({ ...formData, cover_image_url: url })} folder="sellers" userId={user.id} aspectRatio="video" placeholder="Cover" cropAspect={16 / 9} beforePick={beforeImagePick} /></div></div>}
                   </div>
                   <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Add at least one product or service to your catalog</p>
-                  <Button data-continue-products className="w-full" onClick={() => { handleSetConfigSubStep(1); handleProceedToProducts(); }} disabled={isLoading}>
+                  <Button data-continue-products className="w-full" onClick={() => { handleSetConfigSubStep(1); handleProceedToProducts(storeActionType || undefined); }} disabled={isLoading}>
                     {isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Add Products<ChevronRight size={16} className="ml-1" />
                   </Button>
                   <button
-                    onClick={() => { handleSetConfigSubStep(1); handleProceedToProducts(); }}
+                    onClick={() => { handleSetConfigSubStep(1); handleProceedToProducts(storeActionType || undefined); }}
                     className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
                   >
                     Skip for now
