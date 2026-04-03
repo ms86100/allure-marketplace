@@ -124,7 +124,7 @@ export default function FestivalCollectionPage() {
                 </p>
                 <div className="grid grid-cols-2 gap-3 opacity-50">
                   {outOfStock.map(product => (
-                    <ProductCard key={product.id} product={product} navigate={navigate} bannerId={bannerId!} sectionId={sectionId!} outOfStock />
+                    <ProductCard key={product.id} product={product} navigate={navigate} bannerId={bannerId!} sectionId={sectionId!} userId={user?.id} outOfStock />
                   ))}
                 </div>
               </>
