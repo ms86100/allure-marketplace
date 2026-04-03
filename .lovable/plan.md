@@ -1,83 +1,134 @@
 
 
-# Real Category & Subcategory Activation — Production Plan
+# Search-First Seller Category Selection — Bulletproof MVP
 
-## Current State (From DB Audit)
+## What Changes
 
-**11 parent groups** exist, but only **Food & Beverages is active** (8 active subcategories).
-The other 10 groups (59 subcategories) are all `is_active: false`.
+Replace the 2-step onboarding (Step 1: pick parent group → Step 2: pick subcategories) with a single unified "What do you want to sell?" step. Sellers search across ALL categories/subcategories in one place, with smart suggestion, alias matching, and guaranteed fallback.
 
-**Critical gap**: 5 of the 9 `transaction_type` values used in `category_config` have **NO workflow defined** in `category_status_flows` or `category_status_transitions`:
+---
 
-| Orphan transaction_type | Used by categories | Must map to |
-|---|---|---|
-| `book_slot` | yoga, dance, music, coaching, pest_control, beauty, mehendi, salon | `service_booking` (identical flow) |
-| `buy_now` | furniture | `cart_purchase` (same buy flow) |
-| `contact_only` | maid, cook, driver, nanny, ac_service, appliance_repair | `contact_enquiry` (same contact flow) |
-| `request_quote` | carpenter, tailoring, catering, decoration | `request_service` (enquire→quote→accept) |
-| `schedule_visit` | flat_rent, roommate, parking | `contact_enquiry` (contact→respond→done) |
-
-If admin toggles any of these ON today, orders would fail because the workflow engine cannot resolve their status flows.
-
-## Plan (3 Steps)
-
-### Step 1: Fix Transaction Type Alignment (Data Update)
-
-UPDATE all 27 orphan-type categories to use existing valid workflows:
+## Architecture
 
 ```text
-book_slot      → service_booking   (13 categories)
-buy_now        → cart_purchase     (1 category)  
-contact_only   → contact_enquiry   (6 categories)
-request_quote  → request_service   (4 categories)
-schedule_visit → contact_enquiry   (3 categories)
+┌─────────────────────────────────────────┐
+│  🔍 What do you want to sell?           │
+│  [ yoga classes                       ] │
+├─────────────────────────────────────────┤
+│  ✨ Suggested for you                   │
+│  🧘 Yoga Classes · Education & Learning │
+│  [Use this]                             │
+├─────────────────────────────────────────┤
+│  Other matches                          │
+│  💆 Yoga Therapy · Personal Care        │
+│  🧘 Power Yoga · Education & Learning   │
+├─────────────────────────────────────────┤
+│  Or browse by category:                 │
+│  [🍽 Food] [📚 Education] [🔧 Home]...  │
+└─────────────────────────────────────────┘
 ```
 
-This is a data-only change — no schema migration needed. After this, every category maps to a real workflow with flows + transitions.
+---
 
-### Step 2: Activate Parent Groups + Subcategories (Data Update)
+## Implementation (3 Changes)
 
-Activate the most relevant parent groups (6 of 11) and their subcategories in a single batch. This gives ~80% real-world coverage:
+### 1. Create `src/components/seller/CategorySearchPicker.tsx`
 
-**Groups to activate (set `is_active = true` in `parent_groups`):**
+Unified search + browse + auto-suggest component.
 
-| Group | Subcategories to activate | Workflow |
-|---|---|---|
-| `education_learning` | yoga, dance, music, fitness, art_craft, language, coaching, tuition | `service_booking` |
-| `home_services` | electrician, plumber, carpenter, pest_control, appliance_repair | `request_service` / `service_booking` |
-| `personal_care` | beauty, salon, mehendi, tailoring, laundry | `service_booking` / `request_service` / `cart_purchase` |
-| `domestic_help` | maid, cook, nanny, driver | `contact_enquiry` |
-| `shopping` | clothing, electronics, books, toys, kitchen, furniture | `cart_purchase` |
-| `events` | catering, decoration, photography, dj_music | `request_service` |
+**Data sources** (existing hooks, no new queries):
+- `useCategoryConfigs()` → all category_config entries with parent groups
+- `useSubcategories()` → all active subcategories (no filter)
+- `parentGroupInfos` from `useSellerApplication` → group labels/icons
 
-**Groups to keep inactive** (niche, activate later): `pets`, `rentals`, `real_estate`, `professional`
+**Search logic** (client-side, no API):
+- Builds flat index: every subcategory + every category_config across ALL groups
+- Each item tagged with its parent group label/icon for context display
+- Debounce 200ms, minimum 2 characters
 
-### Step 3: Enrich Subcategory Metadata (Data Update)
+**3-layer matching:**
+1. Subcategory `display_name` match (exact=3, startsWith=2, contains=1)
+2. Category `displayName` match (same scoring)
+3. **Alias keywords** (inline map, no DB): covers ~50 common natural-language terms
 
-Update form hints, placeholders, and behavior flags for activated categories so sellers get proper guidance:
+```typescript
+const ALIAS_MAP: Record<string, string[]> = {
+  tiffin: ["home food", "dabba", "meal service", "lunch delivery"],
+  yoga: ["meditation", "wellness", "mindfulness"],
+  electrician: ["wiring", "repair", "electrical"],
+  beauty: ["parlour", "parlor", "makeup", "facial"],
+  maid: ["cleaning", "house cleaning", "home cleaning"],
+  resume_writing: ["resume editing", "cv writing", "resume help"],
+  // ~50 entries covering all active categories
+};
+```
+Alias match scores 1.5 (between contains and startsWith).
 
-- **Service categories**: Set `show_duration_field = true`, `duration_label`, `price_label = "Price per session"`, `primary_button_label = "Book Now"`
-- **Shopping categories**: Set `has_quantity = true`, `is_physical_product = true`, `requires_delivery = true`, `supports_cart = true`, `primary_button_label = "Add to Cart"`
-- **Contact/enquiry categories**: Set `enquiry_only = true`, `primary_button_label = "Contact Seller"`
-- **Food categories**: Already correctly configured (no changes)
+**Auto-suggestion rules (bulletproof):**
+- Show "Suggested for you" card ONLY when:
+  - Top result score ≥ 2
+  - AND `(topScore - secondScore) >= 1` (dominance check)
+- If multiple results share the top score → show "Top matches" list (no single suggestion)
+- Never bias toward wrong category
 
-### No Code Changes Needed
+**UI states:**
+- **Empty search**: "Popular" quick-picks (hardcoded top 8 subcategory slugs) + horizontal-scroll parent group pills + full browse grid (always visible, not collapsed)
+- **Results found**: Ranked list with icon + name + parent group badge pill
+- **No results**: Reassuring copy ("We couldn't find an exact match, but you can still list your service") + browse grid prominently shown
+- **Selections**: Removable chips below search bar showing picks across groups with group label
 
-The entire frontend already reads from `category_config` and `parent_groups` dynamically. The `ParentGroupTabs`, `CategoryImageGrid`, `CategoryBrowseGrid`, seller registration, product forms — all are DB-driven. Activating rows in the database instantly surfaces them in the UI.
+**Multi-group warning:**
+When seller selects across 2+ different parent groups, show a soft confirmation: "You're selecting services across different categories. Continue?"
 
-### Safety Checks
+**Selection behavior:**
+- Tapping a subcategory result → opens existing `SubcategoryPickerDialog` scoped to that category with the item pre-selected
+- Tapping a category with no subcategories → direct toggle
+- Auto-resolves `selectedGroup` from first selection
+- Reuses existing `SubcategorySelection` type and `subcategory_preferences` JSONB structure
 
-1. Every activated category will have a valid `transaction_type` that exists in `category_status_flows`
-2. `category_status_transitions` already cover all mapped workflow types
-3. No enum changes needed — `category` column is TEXT
-4. Existing food_beverages data is untouched
-5. Admin can deactivate any category with a single `is_active = false` toggle
+### 2. Modify `src/pages/BecomeSellerPage.tsx`
 
-### Execution Order
+- Replace Step 1 (parent group grid) + Step 2 (`GuidedStep2`) with `CategorySearchPicker`
+- `TOTAL_STEPS`: 6 → 5
+- Updated `STEP_META`:
+  - Step 1: "What to Sell" (Search icon) — `CategorySearchPicker`
+  - Step 2: "Store Details" (was Step 3)
+  - Step 3: "Settings" (was Step 4)
+  - Step 4: "Products" (was Step 5)
+  - Step 5: "Review" (was Step 6)
+- `selectedGroup` auto-set from picker's first selection (no manual group picking needed)
+- All downstream step references shift by -1
+- Context breadcrumb shows from Step 2+ instead of Step 3+
+- Back button on Step 2 goes to Step 1 (picker)
+- `GuidedStep2` function remains in file but is no longer rendered (can be removed in cleanup)
 
-1. Fix transaction_type alignment (UPDATE 27 rows in `category_config`)
-2. Activate parent groups (UPDATE 6 rows in `parent_groups`)
-3. Activate subcategories + enrich metadata (UPDATE ~35 rows in `category_config`)
+### 3. No Backend Changes
 
-All three steps are data UPDATEs — no migrations, no schema changes, no code changes.
+- No new database tables
+- No new RPC functions
+- No schema migrations
+- All search runs client-side against pre-fetched cached data
+- Existing `SubcategoryPickerDialog` reused as-is
+
+---
+
+## Edge Cases Handled
+
+| Scenario | Behavior |
+|---|---|
+| Seller types "meditation" (not in subcategories) | Alias map resolves to "Yoga" results |
+| Multiple equal-score results | "Top matches" list, no single suggestion |
+| No results at all | Reassuring message + browse grid always visible |
+| Cross-group selections (yoga + beauty) | Soft warning, allowed to continue |
+| Seller doesn't type, just browses | Parent group pills + grid always visible |
+| Single active parent group | Works same — search still covers all subcategories |
+
+---
+
+## Files Summary
+
+| File | Action |
+|---|---|
+| `src/components/seller/CategorySearchPicker.tsx` | **Create** |
+| `src/pages/BecomeSellerPage.tsx` | **Modify** — merge steps, update constants |
 
