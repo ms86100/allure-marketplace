@@ -44,6 +44,7 @@ const DEFAULT_FORM: SellerSettingsFormData = {
   bank_account_number: '', bank_ifsc_code: '', bank_account_holder: '',
   sell_beyond_community: false, delivery_radius_km: 5, fulfillment_mode: 'self_pickup' as string,
   delivery_note: '', minimum_order_amount: '', daily_order_limit: '',
+  vacation_mode: false, vacation_until: '',
 };
 
 export function useSellerSettings() {
