@@ -255,7 +255,7 @@ async function deliverPushToUser(
         if (!result.success && result.error !== "INVALID_TOKEN" && !isApnsOnlyToken) {
           console.log(`[Push] APNs failed for ${notificationId}, falling back to FCM`);
           result = await withTimeout(
-            sendFcmDirect(creds.fcmAccessToken, creds.serviceAccount.project_id, tokenRecord.token, title, body, pushData, threadId, imageUrl),
+            sendFcmDirect(creds.fcmAccessToken, creds.serviceAccount.project_id, tokenRecord.token, title, body, pushData, threadId, imageUrl, highPriority),
             PUSH_TIMEOUT_MS,
           );
         }
