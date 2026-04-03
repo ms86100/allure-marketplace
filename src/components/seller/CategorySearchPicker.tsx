@@ -366,7 +366,7 @@ export function CategorySearchPicker({
         <Input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search... e.g. yoga, tiffin, electrician"
+          placeholder={search ? '' : typewriterPlaceholder}
           className="pl-10 h-12 text-base rounded-2xl bg-muted/50 border-border/50 focus:bg-background"
           autoComplete="off"
         />
