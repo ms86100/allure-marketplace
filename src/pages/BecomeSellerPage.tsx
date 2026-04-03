@@ -632,7 +632,7 @@ export default function BecomeSellerPage() {
               existingStoreLocations={
                 (sellerProfiles || [])
                   .filter((sp: any) => sp.latitude && sp.longitude && sp.id !== draftSellerId)
-                  .map((sp: any) => ({ id: sp.id, business_name: sp.business_name || 'Store', latitude: sp.latitude, longitude: sp.longitude }))
+                  .map((sp: any) => ({ id: sp.id, business_name: sp.business_name || 'Store', latitude: sp.latitude, longitude: sp.longitude, store_location_label: sp.store_location_label || null }))
               }
             />
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Configure delivery, payments, and schedule</p>
