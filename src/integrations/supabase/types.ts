@@ -9915,6 +9915,7 @@ export type Database = {
         | "party_bulk_orders"
         | "specialty_food"
         | "free_sharing"
+        | "ayurveda"
       user_role: "buyer" | "seller" | "admin" | "security_officer"
       verification_status:
         | "pending"
@@ -10137,6 +10138,7 @@ export const Constants = {
         "party_bulk_orders",
         "specialty_food",
         "free_sharing",
+        "ayurveda",
       ],
       user_role: ["buyer", "seller", "admin", "security_officer"],
       verification_status: [

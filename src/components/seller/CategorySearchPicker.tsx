@@ -38,7 +38,19 @@ const ALIAS_MAP: Record<string, string[]> = {
   jams_preserves: ['jam', 'preserve', 'marmalade'],
   masala_spices: ['masala', 'spice', 'spices', 'garam masala'],
   papad_fryums: ['papad', 'fryums', 'appalam'],
-  yoga: ['meditation', 'wellness', 'mindfulness', 'pranayama', 'fitness class', 'therapy', 'yoga therapy', 'ayurvedic therapy', 'ayurveda', 'naturopathy', 'holistic healing', 'mind body', 'stress relief'],
+  yoga: ['meditation', 'wellness', 'mindfulness', 'pranayama', 'fitness class', 'yoga therapy', 'mind body', 'stress relief', 'hatha', 'power yoga', 'prenatal yoga'],
+  ayurveda: ['panchakarma', 'ayurvedic therapy', 'ayurveda treatment', 'detox therapy', 'oil massage', 'shirodhara', 'naturopathy', 'holistic healing', 'body detox', 'wellness retreat', 'ayurvedic massage', 'herbal therapy', 'stress relief therapy', 'therapy', 'ayurveda', 'rejuvenation therapy', 'steam therapy'],
+  panchakarma_detox: ['panchakarma', 'detox program', 'body detox', 'cleansing therapy', 'detox'],
+  abhyanga: ['oil massage', 'body massage', 'ayurvedic massage', 'full body massage'],
+  shirodhara: ['head oil therapy', 'forehead oil', 'stress therapy', 'oil pouring'],
+  nasya_therapy: ['nasal therapy', 'sinus treatment', 'nasya'],
+  swedana: ['steam therapy', 'steam bath', 'herbal steam'],
+  facial: ['face treatment', 'face cleanup', 'glow facial', 'gold facial'],
+  bridal_makeup: ['wedding makeup', 'bridal', 'dulhan makeup', 'party makeup'],
+  haircut: ['hair cut', 'hair cutting', 'trim', 'hair trim'],
+  hatha_yoga: ['hatha', 'basic yoga', 'beginner yoga'],
+  power_yoga: ['intense yoga', 'fitness yoga', 'hot yoga'],
+  meditation_class: ['meditation', 'guided meditation', 'mindfulness class'],
   dance: ['dance class', 'dancing', 'zumba', 'bharatnatyam', 'salsa'],
   music: ['music class', 'guitar', 'piano', 'singing', 'vocal training'],
   art_craft: ['art class', 'craft', 'painting', 'drawing', 'pottery'],
@@ -84,7 +96,7 @@ const ALIAS_MAP: Record<string, string[]> = {
 };
 
 const POPULAR_SLUGS = [
-  'daily_tiffin', 'cakes', 'yoga', 'maid', 'electrician', 'beauty', 'tuition', 'furniture',
+  'daily_tiffin', 'cakes', 'yoga', 'ayurveda', 'maid', 'electrician', 'beauty', 'tuition',
 ];
 
 interface SearchItem {
@@ -127,7 +139,7 @@ export function CategorySearchPicker({
   const [browseGroup, setBrowseGroup] = useState<string | null>(null);
 
   const typewriterPlaceholder = useTypewriterPlaceholder(
-    ['Tiffin Service', 'Yoga Classes', 'Electrician', 'T-Shirts', 'Ayurvedic Therapy', 'Home Cleaning', 'Birthday Cakes', 'Tuition', 'Beauty Services', 'Plumber'],
+    ['Tiffin Service', 'Yoga Classes', 'Electrician', 'T-Shirts', 'Panchakarma Therapy', 'Ayurveda', 'Home Cleaning', 'Birthday Cakes', 'Tuition', 'Beauty Services', 'Plumber', 'Bridal Makeup', 'Haircut'],
     { prefix: 'Search "', suffix: '"', typeSpeed: 70, eraseSpeed: 35, pauseAfterType: 2000 },
   );
 
