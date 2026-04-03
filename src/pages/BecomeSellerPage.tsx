@@ -84,7 +84,47 @@ function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }:
   );
 }
 
-// ─── Constants ──────────────────────────────────────────────────────────────
+// ─── Category License Prompt (checks DB for requires_license) ───────────────
+function CategoryLicensePrompt({ categoryConfigId, categoryName, draftSellerId, isOnboarding, onStatusChange }: {
+  categoryConfigId: string;
+  categoryName: string;
+  draftSellerId: string | null;
+  isOnboarding: boolean;
+  onStatusChange: (status: string | null) => void;
+}) {
+  const [requiresLicense, setRequiresLicense] = useState<boolean | null>(null);
+  const [licenseConfig, setLicenseConfig] = useState<{ license_type_name: string | null; license_mandatory: boolean } | null>(null);
+
+  useEffect(() => {
+    supabase.from('category_config')
+      .select('requires_license, license_type_name, license_mandatory')
+      .eq('id', categoryConfigId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setRequiresLicense((data as any).requires_license);
+          setLicenseConfig(data as any);
+        } else {
+          setRequiresLicense(false);
+        }
+      });
+  }, [categoryConfigId]);
+
+  if (requiresLicense === null || requiresLicense === false) return null;
+
+  return (
+    <div className="border rounded-lg p-4 space-y-3">
+      <div className="flex items-center gap-2"><Shield size={16} className="text-primary" /><h3 className="font-semibold text-sm">License Required: {categoryName}</h3></div>
+      <p className="text-xs text-muted-foreground">This category requires a verified license before you can sell.</p>
+      {draftSellerId ? (
+        <LicenseUpload sellerId={draftSellerId} categoryConfigId={categoryConfigId} isOnboarding={isOnboarding} onStatusChange={onStatusChange} />
+      ) : (
+        <p className="text-xs text-muted-foreground italic">Fill in your business name above — license upload will appear once your draft is saved.</p>
+      )}
+    </div>
+  );
+}
+
 const TOTAL_STEPS = 5;
 const STEP_META = [
   { label: 'What to Sell', icon: Search, title: 'What do you want to sell?', helper: 'Search or browse to find the right category for your business.' },
