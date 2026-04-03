@@ -276,6 +276,10 @@ export function CategorySearchPicker({
     if (item.type === 'subcategory') {
       setPickerCategoryId(item.categoryConfigId);
       setPickerOpen(true);
+    } else if (item.hasSubcategories) {
+      // Category with subcategories → open subcategory picker
+      setPickerCategoryId(item.categoryConfigId);
+      setPickerOpen(true);
     } else {
       const isSelected = formData.categories.includes(item.slug);
       handleCategoryChange(item.slug, !isSelected);
