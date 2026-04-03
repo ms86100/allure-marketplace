@@ -49,6 +49,7 @@ interface DraftProductManagerProps {
   products: DraftProduct[];
   onProductsChange: (products: DraftProduct[]) => void;
   beforePick?: () => void | Promise<void>;
+  defaultActionType?: string;
 }
 
 function isServiceCategory(category: string, configs: any[]): boolean {
