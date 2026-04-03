@@ -24,6 +24,7 @@ export function WelcomeBackStrip() {
         .from('orders')
         .select('id, status, created_at, seller:seller_profiles!orders_seller_id_fkey(business_name)')
         .eq('buyer_id', user!.id)
+        .in('status', ['completed', 'delivered'])
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
