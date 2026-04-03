@@ -4,8 +4,6 @@ import { cn } from '@/lib/utils';
 import { hapticSelection } from '@/lib/haptics';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { motion } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 interface ParentGroupTabsProps {
   activeGroup: string | null;
