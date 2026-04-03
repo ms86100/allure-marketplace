@@ -136,7 +136,8 @@ async function sendFcmDirect(
   if (imageUrl) androidNotif.image = imageUrl;
   const fcmNotif: Record<string, unknown> = { title, body };
   if (imageUrl) fcmNotif.image = imageUrl;
-  const apnsAps: Record<string, unknown> = { alert: { title, body }, sound: "gate_bell.mp3", badge: 1 };
+  const fcmApnsSound = highPriority ? "gate_bell.mp3" : "default";
+  const apnsAps: Record<string, unknown> = { alert: { title, body }, sound: fcmApnsSound, badge: 1 };
   if (imageUrl) apnsAps["mutable-content"] = 1;
   if (threadId) apnsAps["thread-id"] = threadId;
   const apnsHeaders: Record<string, string> = { "apns-push-type": "alert", "apns-priority": "10" };
