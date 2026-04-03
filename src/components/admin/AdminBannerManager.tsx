@@ -326,7 +326,9 @@ export function AdminBannerManager() {
     });
   };
 
-  const handleSave = () => {
+  const [isValidating, setIsValidating] = useState(false);
+
+  const handleSave = async () => {
     if (form.banner_type === 'festival' && form.sections.length === 0) {
       toast.error('Festival banners need at least one section');
       return;
@@ -336,6 +338,34 @@ export function AdminBannerManager() {
       if (empty.length > 0) {
         toast.error('All sections need a title');
         return;
+      }
+
+      // Async product validation for festival sections
+      setIsValidating(true);
+      try {
+        let allEmpty = true;
+        for (const section of form.sections) {
+          const products = await resolveProducts({
+            sourceType: section.product_source_type,
+            sourceValue: section.product_source_value || null,
+            fallbackMode: form.fallback_mode,
+            limit: 1,
+          });
+          if (products.length > 0) {
+            allEmpty = false;
+          } else {
+            toast.warning(`Section "${section.title}" has no matching products`);
+          }
+        }
+        if (allEmpty) {
+          toast.error('All sections are empty — cannot save. Add products or change source.');
+          setIsValidating(false);
+          return;
+        }
+      } catch {
+        // Non-blocking: proceed if validation fails
+      } finally {
+        setIsValidating(false);
       }
     }
     saveMutation.mutate(form);
