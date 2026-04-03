@@ -51,18 +51,12 @@ export function ReviewForm({ orderId, sellerId, sellerName, category, onSuccess,
 
     setIsSubmitting(true);
     try {
-      // Build metadata with dimension ratings
-      const metadata = reviewDimensions.length > 0
-        ? { dimension_ratings: dimensionRatings }
-        : undefined;
-
       const { error } = await supabase.from('reviews').insert({
         order_id: orderId,
         buyer_id: user.id,
         seller_id: sellerId,
         rating,
         comment: comment.trim() || null,
-        ...(metadata ? { metadata } : {}),
       } as any);
 
       if (error) throw error;

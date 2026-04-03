@@ -450,15 +450,7 @@ export default function OrderDetailPage() {
             })()}
             {/* Cancellation handled in bottom action bar — removed inline duplicate */}
 
-            {/* Admin/Seller debug chip: shows workflow resolution + OTP state */}
-            {o.isSellerView && !o.isFlowLoading && o.nextStatus && (
-              <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-mono text-muted-foreground/50">
-                <span className="bg-muted px-1.5 py-0.5 rounded">flow: {o.resolvedParentGroup}/{o.resolvedTxnType}</span>
-                <span className="bg-muted px-1.5 py-0.5 rounded">next: {o.nextStatus}</span>
-                <span className="bg-muted px-1.5 py-0.5 rounded">otp: {getStepOtpType(o.flow, o.nextStatus) || 'none'}</span>
-                {deliveryAssignmentId && <span className="bg-muted px-1.5 py-0.5 rounded">📦 assignment</span>}
-              </div>
-            )}
+            {/* Debug chips removed — internal workflow info not shown to sellers */}
           </div>
 
           {/* Fulfillment Method Card */}
