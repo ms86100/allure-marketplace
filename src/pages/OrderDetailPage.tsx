@@ -130,7 +130,18 @@ export default function OrderDetailPage() {
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId, o.isInTransit);
   const trackingConfig = useTrackingConfig();
 
-  // Defensive guard: end any lingering Live Activity if order is terminal
+  // Dismiss bell sound when this order is opened
+  useEffect(() => {
+    if (id) dismissById(id);
+  }, [id, dismissById]);
+
+  // Also dismiss when order status changes to non-actionable
+  useEffect(() => {
+    if (id && order?.status && !['placed', 'enquired', 'quoted'].includes(order.status)) {
+      dismissById(id);
+    }
+  }, [id, order?.status, dismissById]);
+
   useEffect(() => {
     if (!orderId || !order?.status) return;
     if (!Capacitor.isNativePlatform()) return;
