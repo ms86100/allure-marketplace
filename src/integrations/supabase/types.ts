@@ -1049,6 +1049,7 @@ export type Database = {
       category_status_flows: {
         Row: {
           actor: string
+          buyer_display_label: string | null
           buyer_hint: string | null
           color: string | null
           created_at: string | null
@@ -1069,6 +1070,7 @@ export type Database = {
           otp_type: string | null
           parent_group: string
           requires_otp: boolean
+          seller_display_label: string | null
           seller_hint: string | null
           seller_notification_body: string | null
           seller_notification_title: string | null
@@ -1080,6 +1082,7 @@ export type Database = {
         }
         Insert: {
           actor?: string
+          buyer_display_label?: string | null
           buyer_hint?: string | null
           color?: string | null
           created_at?: string | null
@@ -1100,6 +1103,7 @@ export type Database = {
           otp_type?: string | null
           parent_group: string
           requires_otp?: boolean
+          seller_display_label?: string | null
           seller_hint?: string | null
           seller_notification_body?: string | null
           seller_notification_title?: string | null
@@ -1111,6 +1115,7 @@ export type Database = {
         }
         Update: {
           actor?: string
+          buyer_display_label?: string | null
           buyer_hint?: string | null
           color?: string | null
           created_at?: string | null
@@ -1131,6 +1136,7 @@ export type Database = {
           otp_type?: string | null
           parent_group?: string
           requires_otp?: boolean
+          seller_display_label?: string | null
           seller_hint?: string | null
           seller_notification_body?: string | null
           seller_notification_title?: string | null
