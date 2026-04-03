@@ -270,6 +270,8 @@ export function useSellerApplication() {
         latitude: formData.latitude,
         longitude: formData.longitude,
         subcategory_preferences: formData.subcategory_preferences,
+        pickup_payment_config: formData.pickup_payment_config,
+        delivery_payment_config: formData.delivery_payment_config,
       };
       if (draftSellerId) {
         const { error } = await supabase.from('seller_profiles').update(draftPayload as any).eq('id', draftSellerId);
