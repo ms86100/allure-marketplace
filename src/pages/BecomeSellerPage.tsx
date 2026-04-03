@@ -711,7 +711,7 @@ export default function BecomeSellerPage() {
                 : allActions;
               const uniqueModes = Array.from(new Set(filteredActions.map(a => a.checkout_mode)));
               // Auto-set default from category if not yet chosen
-              const effectiveDefault = storeActionType || primaryConfig?.defaultActionType || allActions.find(a => a.checkout_mode === 'cart')?.action_type || '';
+              const effectiveDefault = storeActionType || (primaryConfig as any)?.default_action_type || allActions.find(a => a.checkout_mode === 'cart')?.action_type || '';
               return (
                 <div className="border rounded-lg p-4 space-y-3">
                   <div className="flex items-center gap-2"><LayoutGrid size={16} className="text-primary" /><h3 className="font-semibold text-sm">How do buyers interact?</h3></div>
