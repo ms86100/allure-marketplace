@@ -64,6 +64,7 @@ export function DraftProductManager({
   products,
   onProductsChange,
   beforePick,
+  defaultActionType,
 }: DraftProductManagerProps) {
   const { user } = useAuth();
   const { data: blockLibrary = [] } = useBlockLibrary();

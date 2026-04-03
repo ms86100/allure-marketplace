@@ -64,6 +64,7 @@ export function ActionTypeSelector({ category, value, onChange, configs }: Actio
           <Badge variant="outline" className="ml-auto text-[10px] h-5">{selected.cta_short_label}</Badge>
         </div>
       )}
+      <p className="text-[10px] text-muted-foreground">You can set different interaction types for each product</p>
     </div>
   );
 }
