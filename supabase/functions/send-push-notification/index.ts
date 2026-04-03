@@ -435,6 +435,7 @@ Deno.serve(async (req) => {
             apnsBundleId!,
             threadId,
             imageUrl,
+            highPriority,
           );
 
           // If APNs fails and we have a real FCM token, fall back to FCM
