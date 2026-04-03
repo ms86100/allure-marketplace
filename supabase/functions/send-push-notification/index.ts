@@ -367,6 +367,19 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Priority detection: use explicit flag if provided, otherwise derive from data
+    const SELLER_HP = ['placed', 'enquired', 'requested', 'quoted'];
+    const BUYER_HP = ['payment_failed', 'refund_failed', 'otp'];
+    const highPriority = reqHighPriority ??
+      ((data?.target_role === 'seller' && SELLER_HP.includes(data?.status || '')) ||
+       (data?.target_role === 'buyer' && BUYER_HP.includes(data?.status || '')));
+
+    console.log(JSON.stringify({
+      event: "push_priority", userId, isHighPriority: highPriority,
+      target_role: data?.target_role || 'unknown', status: data?.status || 'unknown',
+      sound: highPriority ? 'gate_bell' : 'default',
+    }));
+
     // Fetch device tokens for user
     const { data: tokens, error: tokensError } = await supabase
       .from("device_tokens")
