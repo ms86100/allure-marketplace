@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useParentGroups } from '@/hooks/useParentGroups';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
+import { useActionTypeMap } from '@/hooks/useActionTypeMap';
 import { ServiceCategory } from '@/types/categories';
 import { DAYS_OF_WEEK } from '@/types/database';
 import { toast } from 'sonner';
