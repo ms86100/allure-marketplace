@@ -18,6 +18,7 @@ interface CategoryImageGridProps {
 interface CategoryMeta {
   count: number;
   images: string[];
+  newCount: number;
 }
 
 function buildCategoryMeta(
