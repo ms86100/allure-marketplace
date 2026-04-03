@@ -173,22 +173,21 @@ export function CategorySearchPicker({
         });
       }
 
-      if (configSubs.length === 0) {
-        items.push({
-          type: 'category',
-          id: config.id,
-          name: config.displayName,
-          slug: config.category,
-          icon: config.icon,
-          parentGroupSlug: config.parentGroup,
-          parentGroupLabel: group.label,
-          parentGroupIcon: group.icon,
-          parentGroupColor: group.color,
-          categoryConfigId: config.id,
-          categoryName: config.displayName,
-          hasSubcategories: false,
-        });
-      }
+      // Always add category-level item for alias matching (even when subcategories exist)
+      items.push({
+        type: 'category',
+        id: config.id,
+        name: config.displayName,
+        slug: config.category,
+        icon: config.icon,
+        parentGroupSlug: config.parentGroup,
+        parentGroupLabel: group.label,
+        parentGroupIcon: group.icon,
+        parentGroupColor: group.color,
+        categoryConfigId: config.id,
+        categoryName: config.displayName,
+        hasSubcategories: configSubs.length > 0,
+      });
     }
     return items;
   }, [configs, allSubs, parentGroupInfos]);
