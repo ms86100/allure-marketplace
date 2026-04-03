@@ -10,6 +10,11 @@ import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { notifyAdminsNewStoreApplication } from '@/lib/admin-notifications';
 
+export interface SubcategoryPreferences {
+  v: number;
+  data: Record<string, { primary: string | null; others: string[] }>;
+}
+
 export interface SellerFormData {
   business_name: string;
   description: string;
@@ -28,6 +33,7 @@ export interface SellerFormData {
   cover_image_url: string | null;
   latitude: number | null;
   longitude: number | null;
+  subcategory_preferences: SubcategoryPreferences;
 }
 
 const INITIAL_FORM: SellerFormData = {
