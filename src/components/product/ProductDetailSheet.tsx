@@ -213,8 +213,30 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
                 </div>
               </div>
             )}
-            <div className="px-6 pb-3">
-              <button onClick={() => { onOpenChange(false); d.setReportOpen(true); }} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"><Flag size={12} />Report this product</button>
+            <div className="px-6 pb-3 flex items-center gap-4">
+              <button
+                onClick={async () => {
+                  const shareUrl = `${window.location.origin}/#/product/${product.product_id}`;
+                  const shareData = {
+                    title: product.product_name,
+                    text: `${product.product_name} by ${product.seller_name} — ${d.formatPrice(product.price)}`,
+                    url: shareUrl,
+                  };
+                  try {
+                    if (navigator.share) {
+                      await navigator.share(shareData);
+                    } else {
+                      await navigator.clipboard.writeText(shareUrl);
+                      const { toast } = await import('sonner');
+                      toast.success('Link copied to clipboard');
+                    }
+                  } catch {}
+                }}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Share2 size={12} />Share
+              </button>
+              <button onClick={() => { onOpenChange(false); d.setReportOpen(true); }} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"><Flag size={12} />Report</button>
             </div>
             <div className="h-20" />
           </div>

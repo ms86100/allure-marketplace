@@ -10,9 +10,9 @@ import type { FeatureKey } from '@/hooks/useEffectiveFeatures';
 
 const residentNavItems: { to: string; icon: typeof Home; label: string; featureKey?: FeatureKey; badge?: string }[] = [
   { to: '/', icon: Home, label: 'Home' },
-  { to: '/society', icon: Building2, label: 'Society' },
-  { to: '/categories', icon: LayoutGrid, label: 'Browse' },
+  { to: '/orders', icon: PackageSearch, label: 'Orders' },
   { to: '/cart', icon: ShoppingCart, label: 'Cart', badge: 'cart' },
+  { to: '/society', icon: Building2, label: 'Society' },
   { to: '/profile', icon: User, label: 'Account' },
 ];
 

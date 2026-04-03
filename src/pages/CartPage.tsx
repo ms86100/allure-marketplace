@@ -14,6 +14,7 @@ import { FulfillmentSelector } from '@/components/delivery/FulfillmentSelector';
 import { OrderProgressOverlay } from '@/components/checkout/OrderProgressOverlay';
 import { PreorderDatePicker } from '@/components/checkout/PreorderDatePicker';
 import { useCartPage } from '@/hooks/useCartPage';
+import { BuyAgainRow } from '@/components/home/BuyAgainRow';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { AlertCircle } from 'lucide-react';

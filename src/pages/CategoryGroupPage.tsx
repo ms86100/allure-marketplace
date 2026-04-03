@@ -142,6 +142,9 @@ export default function CategoryGroupPage() {
       case 'price_low': sorted.sort((a, b) => a.price - b.price); break;
       case 'price_high': sorted.sort((a, b) => b.price - a.price); break;
       case 'popular': sorted.sort((a, b) => (b.is_bestseller ? 1 : 0) - (a.is_bestseller ? 1 : 0)); break;
+      case 'nearest': sorted.sort((a, b) => (a.distance_km ?? 999) - (b.distance_km ?? 999)); break;
+      case 'newest': sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); break;
+      case 'rating': sorted.sort((a, b) => (b.seller_rating ?? 0) - (a.seller_rating ?? 0)); break;
     }
     return sorted;
   }, [allProducts, activeSubCategory, searchQuery, sortBy]);

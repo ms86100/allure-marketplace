@@ -157,7 +157,12 @@ function CategoryImageGridInner({ parentGroup, title, activeCategories }: Catego
                 </div>
 
                 {/* Label + count area */}
-                <div className="px-1.5 pb-1.5 pt-0 text-center">
+                <div className="px-1.5 pb-1.5 pt-0 text-center relative">
+                  {meta.newCount > 0 && (
+                    <span className="absolute -top-3 right-1 bg-primary text-primary-foreground text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                      {meta.newCount} new
+                    </span>
+                  )}
                   <p className={`text-[12px] font-semibold leading-tight line-clamp-2 ${labelColor}`}>
                     {cat.displayName}
                   </p>
