@@ -241,8 +241,8 @@ describe('Marketplace Constants', () => {
   it('contact_seller is NOT cart action', () => {
     expect(ACTION_CONFIG.contact_seller.isCart).toBe(false);
   });
-  it('SORT_OPTIONS has 6 options', () => {
-    expect(SORT_OPTIONS).toHaveLength(6);
+  it('SORT_OPTIONS has 7 options', () => {
+    expect(SORT_OPTIONS).toHaveLength(7);
   });
   it('all sort options have key and label', () => {
     SORT_OPTIONS.forEach(opt => {

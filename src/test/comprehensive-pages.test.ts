@@ -221,12 +221,12 @@ describe('Marketplace & Shopping', () => {
     it('TC-SRCH-006: active when price range changed', () => {
       expect(hasActiveFilters({ minRating: 0, isVeg: null, categories: [], sortBy: null, priceRange: [100, 10000] }, 10000)).toBe(true);
     });
-    it('TC-SRCH-007: 6 sort options available', () => {
-      expect(SORT_OPTIONS).toHaveLength(6);
+    it('TC-SRCH-007: 7 sort options available', () => {
+      expect(SORT_OPTIONS).toHaveLength(7);
     });
     it('TC-SRCH-008: sort keys include all expected', () => {
       const keys = SORT_OPTIONS.map(o => o.key);
-      expect(keys).toEqual(['relevance', 'price_low', 'price_high', 'popular', 'rating', 'newest']);
+      expect(keys).toEqual(['relevance', 'nearest', 'price_low', 'price_high', 'popular', 'rating', 'newest']);
     });
     it('TC-SRCH-009: haversine same point is 0', () => {
       expect(haversineDistance(0, 0, 0, 0)).toBe(0);
