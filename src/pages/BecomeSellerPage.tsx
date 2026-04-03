@@ -76,7 +76,7 @@ function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety, e
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{store.business_name}</p>
-                      <p className="text-[10px] text-muted-foreground">{store.latitude.toFixed(4)}, {store.longitude.toFixed(4)}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{store.store_location_label || `${store.latitude.toFixed(4)}, ${store.longitude.toFixed(4)}`}</p>
                     </div>
                   </button>
                 ))}
