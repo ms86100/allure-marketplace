@@ -39,6 +39,7 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
   const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [reportOpen, setReportOpen] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
   const [loadedSpecs, setLoadedSpecs] = useState<Record<string, any> | null>(null);
   const [canonicalStockQty, setCanonicalStockQty] = useState<number | null>(null);
@@ -104,7 +105,7 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
 
   return {
     trustSnapshot, contactOpen, setContactOpen, enquiryOpen, setEnquiryOpen,
-    showDetails, setShowDetails, reportOpen, setReportOpen,
+    showDetails, setShowDetails, reportOpen, setReportOpen, descExpanded, setDescExpanded,
     similarProducts, loadedSpecs, formatPrice,
     actionType, config, isCartAction, cartItem, quantity, stockLimit, canIncrement,
     handleAdd, isNewSeller, ActionIcon, viewAllLabel, isStockEmpty,

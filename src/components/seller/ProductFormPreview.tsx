@@ -125,7 +125,7 @@ function ProductDetailPreview({
             {formData.description && (
               <div>
                 <h4 className="text-xs font-bold text-foreground mb-1">Highlights</h4>
-                <p className="text-xs text-muted-foreground leading-relaxed">{formData.description}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{formData.description}</p>
               </div>
             )}
 
