@@ -1,121 +1,97 @@
 
 
-# Bulletproof Cart: Eliminate False Empty State Forever
+# Seller-Controlled Payment Configuration Per Fulfillment Type
 
-## Root Cause (confirmed)
+## What We're Building
 
-Line 522: `refresh` calls `reconcile()`, which is called on cart page mount (line 74-76 of useCartPage.ts). The `reconcile` function at line 210-244 can still overwrite valid state with empty in edge cases where `currentItems` is undefined/empty during hydration.
+Sellers currently have a single "Cash on Delivery" and "UPI Payments" toggle that applies globally. We need per-fulfillment-type payment controls so a seller can, for example, require advance payment for self-pickup while allowing COD for delivery orders.
 
-Additionally, line 514-518 syncs count from items — so if items briefly becomes `[]`, count gets set to `0`, blinding the recovery system.
+## Architecture
 
-## Plan (6 changes across 2 files)
-
-### 1. Replace destructive `refresh()` on cart page mount
-
-**File**: `src/hooks/useCartPage.ts` lines 73-76
-
-Replace `refresh()` with a safe `invalidateQueries` that lets React Query refetch without overwriting cache mid-hydration:
-
-```ts
-useEffect(() => {
-  queryClient.invalidateQueries({ queryKey: ['cart-items'] });
-  queryClient.invalidateQueries({ queryKey: ['cart-count'] });
-}, []);
+```text
+seller_profiles
+├── pickup_payment_config   jsonb  NOT NULL DEFAULT '{"accepts_cod":true,"accepts_online":true}'
+├── delivery_payment_config jsonb  NOT NULL DEFAULT '{"accepts_cod":true,"accepts_online":true}'
+├── accepts_cod             bool   (kept as fallback)
+└── accepts_upi             bool   (kept as fallback)
 ```
 
-### 2. Never trust empty without server count verification in `reconcile()`
+A shared resolver function `resolvePaymentConfig(seller, fulfillmentType)` used everywhere.
 
-**File**: `src/hooks/useCart.tsx` lines 210-244
+## Implementation Steps
 
-Change the reconcile guard: when `freshItems` is empty, **always** verify with a count query before accepting — regardless of whether `currentItems` exists or not:
+### 1. Database Migration
+- Add `pickup_payment_config` and `delivery_payment_config` JSONB columns with NOT NULL + sensible defaults
+- Backfill ALL existing sellers from their current `accepts_cod`/`accepts_upi` values
+- Add a CHECK constraint: at least one of `accepts_cod` or `accepts_online` must be true in each config
 
+### 2. Shared Payment Resolution Utility (`src/lib/resolvePaymentConfig.ts`)
+Single canonical function used by cart, checkout, settings, and admin:
 ```ts
-if (freshItems.length === 0) {
-  const verifyCount = await fetchCartItemCount(user.id);
-  if (verifyCount > 0) {
-    // Server has items — don't trust empty result
-    queryClient.refetchQueries({ queryKey: cartKey(), exact: true });
-    queryClient.refetchQueries({ queryKey: countKey(), exact: true });
-    return;
-  }
-  // Genuinely empty — safe to write
-  queryClient.setQueryData(cartKey(), []);
-  queryClient.setQueryData(countKey(), 0);
-  return;
-}
+export function resolvePaymentConfig(
+  seller: any,
+  fulfillmentType: 'self_pickup' | 'delivery',
+  paymentMode: { isRazorpay: boolean }
+): { acceptsCod: boolean; acceptsOnline: boolean }
 ```
+- Reads `pickup_payment_config` or `delivery_payment_config` based on fulfillment type
+- Falls back to legacy `accepts_cod`/`accepts_upi` if JSONB is null
+- For online: if Razorpay mode, always true regardless of seller UPI config; if UPI deep link mode, requires `accepts_upi && upi_id`
 
-This removes the conditional guard that only worked when `currentItems` was non-empty.
+### 3. Cart Fetch (`src/hooks/useCart.tsx`)
+- Add `pickup_payment_config, delivery_payment_config` to the seller profile select in `fetchCartItems` (line 112)
 
-### 3. Never downgrade count from item sync during uncertain states
+### 4. Checkout Logic (`src/hooks/useCartPage.ts`)
+- Replace flat `acceptsCod`/`acceptsUpi` derivation (lines 208-214) with per-seller, per-fulfillment resolution using `resolvePaymentConfig`
+- For multi-vendor carts: `acceptsCod = sellerGroups.every(g => resolve(g.seller, fulfillmentType).acceptsCod)`
+- For `acceptsOnline`: same per-seller AND logic
+- Validation: at least one method must be available; block checkout if not
 
-**File**: `src/hooks/useCart.tsx` lines 513-518
+### 5. Seller Settings UI (`src/pages/SellerSettingsPage.tsx`)
+Replace the current flat "Payment Methods" section (lines 239-255) with fulfillment-aware config:
+- When `fulfillment_mode = self_pickup`: show one payment config block ("Self Pickup Payment")
+- When `fulfillment_mode = seller_delivery`: show one payment config block ("Delivery Payment")
+- When `fulfillment_mode = pickup_and_seller_delivery`: show TWO blocks side by side
+- Each block: "Allow Cash Payment" toggle + "Allow Online Payment" toggle
+- Validation: at least one must be ON per block
+- Keep legacy `accepts_cod`/`accepts_upi` synced from the active config for backward compat
 
-Add a guard: don't sync count to 0 from items if we haven't verified it server-side:
+### 6. Seller Settings Hook (`src/hooks/useSellerSettings.ts`)
+- Add `pickup_payment_config` and `delivery_payment_config` to `SellerSettingsFormData`
+- Load from DB profile, initialize from legacy fields if null
+- Save both configs + sync legacy fields on save
 
-```ts
-useEffect(() => {
-  if (hasHydrated && user && !hasCartCountMismatch) {
-    // Never downgrade count to 0 from item sync — only server verification can do that
-    if (itemCount === 0 && fallbackItemCount > 0) return;
-    queryClient.setQueryData(['cart-count', user.id], itemCount);
-  }
-}, [hasHydrated, user, itemCount, queryClient, hasCartCountMismatch, fallbackItemCount]);
-```
+### 7. Seller Onboarding (`src/hooks/useSellerApplication.ts`)
+- Add payment config per fulfillment type to `SellerFormData`
+- Default: both COD and online enabled for all types
+- Save to DB on draft save and final submit
 
-### 4. Add `isVerified` state to prevent premature empty rendering
+### 8. Backend Enforcement — Update `create_multi_vendor_orders` RPC
+- Inside the per-seller loop (not just firstSeller), read the seller's payment config for the chosen `_fulfillment_type`
+- Reject with structured error `payment_method_not_allowed` if the payment method doesn't match the seller's config
+- Fallback to legacy fields if JSONB is null
 
-**File**: `src/hooks/useCart.tsx`
-
-Add a `cartVerified` flag that only becomes `true` after the first successful non-transient fetch or after server count confirms 0:
-
-- New state: `const [cartVerified, setCartVerified] = useState(false)`
-- Set `true` when items arrive (`items.length > 0`) or when reconcile confirms genuine empty
-- Expose via context
-
-### 5. Gate empty state on verification
-
-**File**: `src/pages/CartPage.tsx` line 50
-
-Add `c.cartVerified` (or equivalent) to the empty state condition:
-
-```ts
-if (c.items.length === 0 && !c.hasActivePaymentSession && c.pendingMutations === 0 
-    && !c.isFetching && !c.isRecoveringCart && c.cartVerified) {
-```
-
-Until verified, the loading state shows instead.
-
-### 6. Expose `refresh` as safe invalidation (not reconcile)
-
-**File**: `src/hooks/useCart.tsx` line 522
-
-Change `refresh` from calling `reconcile()` to safe invalidation:
-
-```ts
-refresh: async () => {
-  if (user) {
-    await queryClient.invalidateQueries({ queryKey: cartKey() });
-    await queryClient.invalidateQueries({ queryKey: countKey() });
-  }
-},
-```
-
-This ensures no external caller can trigger a destructive reconcile. Reconcile remains internal, used only after successful mutations where we know the state is fresh.
+### 9. PaymentMethodSelector — No structural changes
+Already receives `acceptsCod`/`acceptsUpi` as props. Resolution happens upstream.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/hooks/useCart.tsx` | Harden reconcile (always verify before accepting empty), add `cartVerified` flag, protect count sync from blind downgrade, make `refresh` non-destructive |
-| `src/hooks/useCartPage.ts` | Replace mount `refresh()` with safe `invalidateQueries` |
-| `src/pages/CartPage.tsx` | Gate empty state on `cartVerified` |
+| New migration | Add JSONB columns + backfill + constraint |
+| `src/lib/resolvePaymentConfig.ts` | New shared resolver |
+| `src/hooks/useCart.tsx` | Fetch new columns in seller join |
+| `src/hooks/useCartPage.ts` | Per-seller, per-fulfillment payment resolution |
+| `src/hooks/useSellerSettings.ts` | Add new fields to form, load/save |
+| `src/pages/SellerSettingsPage.tsx` | Fulfillment-aware payment config UI |
+| `src/hooks/useSellerApplication.ts` | Payment config in onboarding |
+| RPC migration | Per-seller payment method validation |
 
-## Why This Is Actually Bulletproof
+## Edge Cases Handled
 
-- **Rule 1**: Empty is never written without server count confirmation — no transient glitch can cause false empty
-- **Rule 2**: Count can never be downgraded to 0 except by server verification — recovery system stays alive
-- **Rule 3**: No route navigation can trigger destructive state mutation — mount is safe
-- **Rule 4**: UI never shows "empty" until the system has positively confirmed emptiness — loading state covers all uncertainty
-- **Rule 5**: `reconcile` is internal-only, triggered after known-good mutations — not exposed to timing-sensitive mount effects
+- **Mutual exclusivity safety**: UI prevents both toggles being OFF; DB constraint as backstop
+- **Multi-vendor carts**: validated per-seller in loop, not just firstSeller
+- **Missing UPI/Razorpay infra**: `acceptsOnline` is gated on payment infra availability
+- **Null JSONB (old sellers)**: always falls back to legacy `accepts_cod`/`accepts_upi`
+- **NOT NULL + DEFAULT**: no seller can ever have null config after migration
 
