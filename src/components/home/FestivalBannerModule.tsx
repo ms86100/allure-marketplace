@@ -24,7 +24,7 @@ interface FestivalBannerProps {
 
 export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, effectiveSocietyId } = useAuth();
   const impressionTracked = useRef(false);
   const [isVisible, setIsVisible] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
