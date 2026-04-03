@@ -1,120 +1,141 @@
 
 
-# Honest Gap Analysis: What's Still Not Robust
+# Round 2: Product Owner Evaluation — Remaining Gaps
 
-## What Was Already Implemented (Done)
-- Product sharing (navigator.share) on ProductDetailSheet ✅
-- Orders in BottomNav ✅
-- "New" badge on CategoryImageGrid ✅
-- Sort by distance in marketplace-constants ✅
-- BuyAgainRow in empty cart state ✅
-- Open/Closed status already shown on ProductListingCard via `computeStoreStatus` ✅
+## Status of Round 1 Items
 
-## What's Still Missing (Real Gaps)
-
-### BUG 1: Shared Product Links Are Dead Links (CRITICAL)
-
-The share button generates URLs like `/#/product/{product_id}`, but **there is no `/product/:id` route in App.tsx**. Every shared link lands on the 404 NotFound page.
-
-This completely defeats the purpose of the share feature. A user shares a product to WhatsApp, their neighbor clicks it, and sees "Page not found."
-
-**Fix:** Create a `/product/:id` route and a lightweight `ProductDeepLinkPage` that fetches the product by ID and opens the `ProductDetailSheet` (or redirects to the seller page with the product pre-selected).
-
-**Effort:** Small — 1 new page, 1 route entry.
-
----
-
-### GAP 2: No "Preview My Store" Button for Sellers
-
-The seller dashboard (`SellerDashboardPage.tsx`) has QuickActions, StoreStatusCard, analytics — but zero way for a seller to see their public-facing store page. The `/seller/{sellerId}` buyer view exists, but there's no link to it from the dashboard.
-
-**Fix:** Add a "Preview Store" button/link in the seller dashboard that navigates to `/seller/{activeSellerId}`.
-
-**Effort:** Trivial — 1 button.
+| Item | Status | Notes |
+|------|--------|-------|
+| Product sharing | ✅ Done | Share button + deep link route working |
+| Orders in bottom nav | ✅ Done | Replaces Browse |
+| Open/Closed on cards | ✅ Already existed | via `computeStoreStatus` |
+| Preview My Store | ✅ Done | On seller dashboard |
+| Sort by distance | ✅ Done | Added to sort options |
+| New badge on categories | ✅ Done | 7-day cutoff |
+| Product-level favorites | ✅ Done | Table + button on detail sheet + favorites page tabs |
+| Empty cart cross-sell | ✅ Done | BuyAgainRow in empty cart |
+| One-tap reorder | ✅ Done | WelcomeBackStrip + SmartSuggestionBanner |
+| Response time badge | ✅ Done | Surfaced prominently in ProductDetailSheet + SellerDetailPage |
+| Product deep link route | ✅ Done | `/product/:productId` registered |
+| Vacation mode buyer banner | ✅ Done | Shows on SellerDetailPage |
+| Product view tracking (insert) | ✅ Done | Inserts on ProductDetailSheet open |
+| Favorited seller notification trigger | ✅ Done | DB trigger exists |
 
 ---
 
-### GAP 3: Product-Level Favorites Still Missing
+## What's Still Missing (Round 2 Gaps)
 
-`FavoritesPage.tsx` only queries the `favorites` table which stores `seller_id`. There is no `product_favorites` table and no heart icon on product cards. Users can only favorite sellers, not individual products.
+### GAP 1: Vacation Mode Has No Seller Toggle (CRITICAL)
 
-**Fix:**
-1. Create `product_favorites` table (user_id, product_id, created_at) with RLS
-2. Add heart icon to `ProductDetailSheet` and `ProductListingCard`
-3. Add "Saved Products" tab on FavoritesPage
+The buyer-facing banner exists on `SellerDetailPage.tsx` (lines 341-354) showing "On a break · Back on [date]". The `vacation_mode` and `vacation_until` columns exist in the DB.
 
-**Effort:** Small — 1 migration, 3 UI touchpoints.
+But `SellerSettingsPage.tsx` has **zero references** to `vacation_mode` or `vacation_until`. Sellers have no way to enable vacation mode. The feature is half-built — display side done, control side missing.
 
----
-
-### GAP 4: Seller Response Time Not Shown
-
-The `trustSnapshot` in ProductDetailSheet shows `avg_response_min` when > 0, but this data is buried inside the "View product details" collapsible section. Most users won't see it. It's also not shown on the seller detail page header or on product cards in discovery.
-
-**Fix:** Surface `avg_response_min` as a visible badge near the seller name (not hidden behind a toggle).
-
-**Effort:** Trivial — move existing data to a more visible position.
+**Fix:** Add a "Vacation Mode" toggle card in `SellerSettingsPage.tsx` with:
+- Switch to enable/disable
+- Optional date picker for `vacation_until`
+- Save to `seller_profiles`
 
 ---
 
-### GAP 5: No Vacation Mode for Sellers
+### GAP 2: Product View Counts Not Shown to Sellers
 
-Sellers can toggle `is_available` (which hides their store entirely), but there's no "vacation mode" with a return date. Buyers just see the store disappear with no context.
+Server-side view tracking inserts into `product_views` table (ProductDetailSheet line 70). But `SellerProductsPage.tsx` has **zero references** to `product_views`. Sellers insert data but never see it.
 
-**Fix:**
-1. Add `vacation_until` column to `seller_profiles`
-2. Add toggle in seller settings
-3. Show "On break · Back [date]" banner on seller page instead of hiding the store
-
-**Effort:** Small — 1 migration, 2 UI changes.
+**Fix:** Query `product_views` count (last 7 days) per product and show a small "👁 42 views" label on each product row in `SellerProductsPage`. Use a single aggregation query grouped by `product_id`.
 
 ---
 
-### GAP 6: No Product View Tracking for Sellers
+### GAP 3: No Heart/Favorite on Product Discovery Cards
 
-Sellers see order stats but have zero visibility into product traffic. The `recently_viewed` data is localStorage-only (client-side, per-device). No server-side view tracking exists.
+`ProductFavoriteButton` is used in `ProductDetailSheet` (on the image) and `FavoritesPage` (for removing). But `ProductListingCard.tsx` — the primary discovery card shown on home page, search, and category pages — has **no favorite button**. Users must open the product detail sheet to save a product.
 
-**Fix:**
-1. Create `product_views` table (product_id, viewer_id, viewed_at)
-2. Insert on ProductDetailSheet open
-3. Show weekly view counts on SellerProductsPage
+**Psychology:** Long-press or heart-on-card is standard in every marketplace. Forcing users through a tap → sheet → heart flow creates friction that kills casual saving behavior.
 
-**Effort:** Small — 1 migration, 2 code changes.
+**Fix:** Add `ProductFavoriteButton` to the top-right of `ProductListingCard` image area (where the discount badge goes on the left). Show only for logged-in users. Size `sm` with a semi-transparent background circle.
 
 ---
 
-### GAP 7: No "Filter by Availability" on Category Pages
+### GAP 4: No "Search Within Store" Persistence
 
-`CategoryGroupPage` has sort options but no toggle filters for "Open Now", "Veg Only", or "Delivery Available." Users browsing categories at 7 PM see closed stores mixed with open ones.
+On `SellerDetailPage.tsx`, the in-store search (`menuSearch`) works but resets on every page load. If a buyer leaves and returns, their search context is lost. More importantly, if the store has 20+ products, there's no category quick-jump.
 
-**Fix:** Add chip-style toggle filters at the top of the category page, filtering client-side on already-fetched data.
+The category pills exist (line 564-582) but only show when `categories.length > 2`. For stores with many products in the same category, scrolling is the only option.
 
-**Effort:** Small — UI-only.
-
----
-
-### GAP 8: No Notification When Favorited Seller Adds New Product
-
-The `favorites` table exists, but there's no DB trigger that creates a `notification_queue` entry when a favorited seller inserts a new product. This is the key re-engagement mechanism that's completely absent.
-
-**Fix:** Add a Postgres trigger on `products` INSERT that checks `favorites` for matching `seller_id` and inserts notification entries.
-
-**Effort:** Small — 1 trigger, reuses existing notification pipeline.
+**Fix:** Add a sticky category bar that auto-scrolls to the relevant section (anchor-based), similar to restaurant menus. This is client-side only using `scrollIntoView`.
 
 ---
 
-## Priority (What to Fix First)
+### GAP 5: ProductListingCard Has No Seller Name for Cross-Society Browsing
 
-| # | Gap | Risk Level | Effort |
-|---|-----|-----------|--------|
-| 1 | Dead shared links (no /product route) | **CRITICAL** — feature is broken | Small |
-| 2 | Seller "Preview Store" button | High — missing basic UX | Trivial |
-| 3 | Product-level favorites | High — retention gap | Small |
-| 4 | Response time badge visibility | Medium — data exists, poorly placed | Trivial |
-| 5 | Vacation mode | Medium — seller trust gap | Small |
-| 6 | Product view tracking | Medium — seller motivation | Small |
-| 7 | Category filters | Medium — discovery friction | Small |
-| 8 | Favorited seller notifications | Medium — re-engagement | Small |
+When `browseBeyond` is enabled (searching nearby societies), `ProductListingCard` shows `locationLabel` (society name + distance) but the **seller name is buried** at the bottom in tiny text (line ~250). For cross-society browsing, the seller identity is critical because buyers don't recognize stores from other societies.
 
-**Gap #1 is a real bug** — the share button was added but the route it links to doesn't exist. This should be fixed immediately before any new features.
+**Fix:** Make `seller_name` more prominent when `distance_km > 0` or `society_name` differs from the user's society. Move it above the product name or make it bolder.
+
+---
+
+### GAP 6: No Quick Way to Contact Seller from Order Detail
+
+`OrderDetailPage.tsx` shows order info, status timeline, chat, and delivery tracking. But for "contact seller" action-type orders (tutoring, yoga, etc.), there's no direct phone/WhatsApp link on the order detail page after the order is placed. The buyer has to go back to the seller's profile to find contact info.
+
+**Fix:** Show seller's phone number (already available in order data) as a tappable call/WhatsApp button on `OrderDetailPage` for `contact_seller` and service-type orders.
+
+---
+
+### GAP 7: Favorites Page Doesn't Show Store Open/Closed Status
+
+`FavoritesPage.tsx` shows saved sellers and saved products. But saved sellers don't indicate whether they're currently open or closed. A user checks their favorites at dinner time to order — they have to tap into each store to see availability.
+
+**Fix:** Use `computeStoreStatus` on each seller in the favorites list and show a green/red dot or "Closed · Opens 9 AM" label. Data is already available in the seller profile query.
+
+---
+
+### GAP 8: Search Page Missing "Nearest" Sort Option
+
+`SearchPage.tsx` has sort options: "Top Rated", "Price ↑", "Price ↓" (line 107). But no "Nearest" option despite `distance_km` being available on search results. The category page now has "Nearest" sort (from Round 1), but the search page doesn't.
+
+**Fix:** Add a "Nearest" sort chip to the search filter bar, sorting by `distance_km`.
+
+---
+
+### GAP 9: No "Similar Products" or "Others Also Bought" on Product Detail
+
+`ProductDetailSheet` shows the product, seller info, trust signals, and a link to the seller's store. But no cross-sell recommendations. When a buyer views a product, there's no prompt to discover related items.
+
+**Psychology:** "Customers who viewed this also bought" is one of the highest-converting elements in marketplace UIs. It increases session depth and average order value.
+
+**Fix:** Below the seller link in `ProductDetailSheet`, query 4-6 products from the same category (excluding current product), prioritizing same seller → same society → nearby. Render as a horizontal scroll row using existing `ProductListingCard` in compact mode.
+
+---
+
+### GAP 10: No "Total Savings" Feedback After Checkout
+
+When a buyer completes an order with discounted products (MRP vs price), there's no summary showing "You saved ₹150 on this order!" This positive reinforcement is standard in Swiggy/Amazon and creates dopamine-driven repeat behavior.
+
+**Fix:** In `OrderProgressOverlay` or `OrderDetailPage`, calculate `sum(mrp - price)` for discounted items and show a small celebratory banner: "🎉 You saved ₹X on this order!"
+
+---
+
+## Priority Matrix
+
+| # | Gap | Impact | Effort | Risk |
+|---|-----|--------|--------|------|
+| 1 | Vacation mode seller toggle | High — feature is half-built | Small | None |
+| 3 | Heart on ProductListingCard | High — habit-forming | Trivial | None |
+| 7 | Favorites open/closed status | Medium — reduces friction | Trivial | None |
+| 8 | Search "Nearest" sort | Medium — consistency | Trivial | None |
+| 2 | Seller product view counts | Medium — seller motivation | Small | None |
+| 6 | Seller contact on order detail | Medium — service orders | Small | None |
+| 10 | Total savings feedback | Medium — retention | Trivial | None |
+| 5 | Seller name prominence | Low-Medium | Trivial | None |
+| 9 | Similar products on detail | High — conversion | Small | None |
+| 4 | Sticky category bar in store | Medium — large stores | Small | Low |
+
+## Implementation Notes
+
+- Gaps 3, 7, 8, 10 are purely UI changes — no migrations, no new tables
+- Gap 1 needs only a UI toggle (DB columns already exist)
+- Gap 2 needs only a SELECT query (table already exists, inserts already happening)
+- Gap 9 needs a simple same-category query, no new infrastructure
+- All changes use existing components and patterns — no new architectural concepts
 
