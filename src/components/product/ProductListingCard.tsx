@@ -17,6 +17,8 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { computeStoreStatus, formatStoreClosedMessage, type StoreAvailability } from '@/lib/store-availability';
 import { SellerTrustBadge } from '@/components/trust/SellerTrustBadge';
+import { ProductFavoriteButton } from '@/components/favorite/ProductFavoriteButton';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface ProductWithSeller {
   id: string; seller_id: string; name: string; price: number; image_url: string | null; category: string;
