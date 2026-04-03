@@ -156,6 +156,9 @@ export function AdminBannerManager() {
         schedule_start: f.schedule_start || null,
         schedule_end: f.schedule_end || null,
         fallback_mode: f.fallback_mode,
+        cta_config: f.banner_type === 'classic'
+          ? { action: f.cta_action || 'link', target: f.cta_target || f.link_url || '' }
+          : { action: 'link' },
       };
 
       let bannerId: string;
