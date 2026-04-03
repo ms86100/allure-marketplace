@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { useActionTypeMap, useCategoryAllowedActions, getCheckoutModeDescription } from '@/hooks/useActionTypeMap';
+import { ActionTypeSelector } from '@/components/seller/ActionTypeSelector';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -596,6 +598,14 @@ export function DraftProductManager({
                   </select>
                 </div>
               )}
+
+              {/* Action Type Selector */}
+              <ActionTypeSelector
+                category={newProduct.category}
+                value={newProduct.action_type || 'add_to_cart'}
+                onChange={(v) => setNewProduct({ ...newProduct, action_type: v })}
+                configs={configs}
+              />
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">

@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      action_type_workflow_map: {
+        Row: {
+          action_type: string
+          checkout_mode: string
+          creates_order: boolean
+          cta_label: string
+          cta_short_label: string
+          is_active: boolean
+          requires_availability: boolean
+          requires_price: boolean
+          transaction_type: string
+        }
+        Insert: {
+          action_type: string
+          checkout_mode?: string
+          creates_order?: boolean
+          cta_label?: string
+          cta_short_label?: string
+          is_active?: boolean
+          requires_availability?: boolean
+          requires_price?: boolean
+          transaction_type: string
+        }
+        Update: {
+          action_type?: string
+          checkout_mode?: string
+          creates_order?: boolean
+          cta_label?: string
+          cta_short_label?: string
+          is_active?: boolean
+          requires_availability?: boolean
+          requires_price?: boolean
+          transaction_type?: string
+        }
+        Relationships: []
+      }
       admin_settings: {
         Row: {
           created_at: string | null
@@ -1052,12 +1088,46 @@ export type Database = {
           },
         ]
       }
+      category_allowed_action_types: {
+        Row: {
+          action_type: string
+          category_config_id: string
+          id: string
+        }
+        Insert: {
+          action_type: string
+          category_config_id: string
+          id?: string
+        }
+        Update: {
+          action_type?: string
+          category_config_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_allowed_action_types_action_type_fkey"
+            columns: ["action_type"]
+            isOneToOne: false
+            referencedRelation: "action_type_workflow_map"
+            referencedColumns: ["action_type"]
+          },
+          {
+            foreignKeyName: "category_allowed_action_types_category_config_id_fkey"
+            columns: ["category_config_id"]
+            isOneToOne: false
+            referencedRelation: "category_config"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       category_config: {
         Row: {
           accepts_preorders: boolean
           category: Database["public"]["Enums"]["service_category"]
           color: string
           created_at: string | null
+          default_action_type: string | null
           default_sort: string
           description_placeholder: string | null
           display_name: string
@@ -1110,6 +1180,7 @@ export type Database = {
           category: Database["public"]["Enums"]["service_category"]
           color: string
           created_at?: string | null
+          default_action_type?: string | null
           default_sort?: string
           description_placeholder?: string | null
           display_name: string
@@ -1162,6 +1233,7 @@ export type Database = {
           category?: Database["public"]["Enums"]["service_category"]
           color?: string
           created_at?: string | null
+          default_action_type?: string | null
           default_sort?: string
           description_placeholder?: string | null
           display_name?: string
@@ -9170,31 +9242,54 @@ export type Database = {
         }
         Returns: undefined
       }
-      create_multi_vendor_orders: {
-        Args: {
-          _buyer_id: string
-          _cart_total?: number
-          _coupon_code?: string
-          _coupon_discount?: number
-          _coupon_id?: string
-          _delivery_address?: string
-          _delivery_address_id?: string
-          _delivery_fee?: number
-          _delivery_lat?: number
-          _delivery_lng?: number
-          _fulfillment_type?: string
-          _has_urgent?: boolean
-          _idempotency_key?: string
-          _notes?: string
-          _payment_method?: string
-          _payment_status?: string
-          _preorder_seller_ids?: string[]
-          _scheduled_date?: string
-          _scheduled_time_start?: string
-          _seller_groups: Json
-        }
-        Returns: Json
-      }
+      create_multi_vendor_orders:
+        | {
+            Args: {
+              _buyer_id: string
+              _cart_total?: number
+              _coupon_code?: string
+              _coupon_discount?: number
+              _coupon_id?: string
+              _delivery_address?: string
+              _delivery_address_id?: string
+              _delivery_fee?: number
+              _delivery_lat?: number
+              _delivery_lng?: number
+              _fulfillment_type?: string
+              _has_urgent?: boolean
+              _idempotency_key?: string
+              _notes?: string
+              _payment_method?: string
+              _payment_status?: string
+              _preorder_seller_ids?: string[]
+              _scheduled_date?: string
+              _scheduled_time_start?: string
+              _seller_groups: Json
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _buyer_id: string
+              _coupon_discount?: number
+              _coupon_id?: string
+              _delivery_address?: string
+              _delivery_address_id?: string
+              _delivery_fee?: number
+              _delivery_lat?: number
+              _delivery_lng?: number
+              _fulfillment_type?: string
+              _idempotency_key?: string
+              _notes?: string
+              _payment_method?: string
+              _payment_status?: string
+              _preorder_seller_ids?: string[]
+              _scheduled_date?: string
+              _scheduled_time_start?: string
+              _seller_groups: Json
+            }
+            Returns: Json
+          }
       disable_cron_job: { Args: { p_jobid: number }; Returns: undefined }
       enable_cron_job: { Args: { p_jobid: number }; Returns: undefined }
       generate_generic_otp: {
