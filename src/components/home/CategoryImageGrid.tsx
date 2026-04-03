@@ -25,15 +25,20 @@ function buildCategoryMeta(
   productCategories: { category: string; products: any[] }[],
 ): Record<string, CategoryMeta> {
   const map: Record<string, CategoryMeta> = {};
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   for (const pc of productCategories) {
     const products = pc.products ?? [];
     const images: string[] = [];
+    let newCount = 0;
     for (const p of products) {
       if (p.image_url && images.length < 4) {
         images.push(p.image_url);
       }
+      if (p.created_at && new Date(p.created_at).getTime() > sevenDaysAgo) {
+        newCount++;
+      }
     }
-    map[pc.category] = { count: products.length, images };
+    map[pc.category] = { count: products.length, images, newCount };
   }
   return map;
 }
