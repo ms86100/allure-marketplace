@@ -185,5 +185,53 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
         </div>
       </DrawerContent>
     </Drawer>
+
+    <Dialog open={b.showSuccessDialog} onOpenChange={(open) => !open && b.dismissSuccessDialog()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+            <CheckCircle2 className="h-7 w-7 text-primary" />
+          </div>
+          <DialogTitle className="text-center">{b.savedCount} Product{b.savedCount !== 1 ? 's' : ''} Created!</DialogTitle>
+          <DialogDescription className="text-center">
+            Your products have been saved as drafts. Complete these steps to make them live:
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 mt-2">
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/50">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary text-sm font-bold">1</div>
+            <div>
+              <p className="text-sm font-medium">Add Images</p>
+              <p className="text-xs text-muted-foreground">Products with images get significantly more views and orders</p>
+            </div>
+            <ImagePlus size={18} className="shrink-0 text-muted-foreground mt-0.5" />
+          </div>
+
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/50">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary text-sm font-bold">2</div>
+            <div>
+              <p className="text-sm font-medium">Review Extra Details</p>
+              <p className="text-xs text-muted-foreground">Add specifications, service settings, and any missing information</p>
+            </div>
+            <Settings size={18} className="shrink-0 text-muted-foreground mt-0.5" />
+          </div>
+
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/50">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary text-sm font-bold">3</div>
+            <div>
+              <p className="text-sm font-medium">Submit for Approval</p>
+              <p className="text-xs text-muted-foreground">Once everything looks good, submit your products for review</p>
+            </div>
+            <Send size={18} className="shrink-0 text-muted-foreground mt-0.5" />
+          </div>
+        </div>
+
+        <Button className="w-full mt-4" onClick={b.dismissSuccessDialog}>
+          Got it — Go to Products
+        </Button>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }
