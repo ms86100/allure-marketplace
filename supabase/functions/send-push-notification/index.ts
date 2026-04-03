@@ -15,6 +15,7 @@ interface PushPayload {
   data?: Record<string, string>;
   threadId?: string;
   imageUrl?: string;
+  isHighPriority?: boolean;
 }
 
 interface FirebaseServiceAccount {
@@ -91,15 +92,17 @@ async function sendApnsDirectNotification(
   bundleId: string,
   threadId?: string,
   imageUrl?: string,
+  highPriority = true,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const cryptoKey = await importP8Key(p8Key);
     const jwt = await createApnsJwt(cryptoKey, keyId, teamId);
 
+    const apnsSound = highPriority ? "gate_bell.mp3" : "default";
     const apnsPayload: Record<string, unknown> = {
       aps: {
         alert: { title, body },
-        sound: "gate_bell.mp3",
+        sound: apnsSound,
         badge: 1,
         "mutable-content": imageUrl ? 1 : 0,
         ...(threadId ? { "thread-id": threadId } : {}),
@@ -226,12 +229,16 @@ async function sendFCMNotification(
   data?: Record<string, string>,
   threadId?: string,
   imageUrl?: string,
+  highPriority = true,
 ): Promise<{ success: boolean; error?: string }> {
   const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
 
+  const androidSound = highPriority ? "gate_bell" : "default";
+  const androidChannel = highPriority ? "orders_alert" : "general";
   const androidNotification: Record<string, unknown> = {
-    sound: "gate_bell",
-    channel_id: "orders_alert",
+    sound: androidSound,
+    channel_id: androidChannel,
+    icon: "ic_stat_sociva",
   };
   if (threadId) androidNotification.tag = threadId;
   if (imageUrl) androidNotification.image = imageUrl;
@@ -239,9 +246,10 @@ async function sendFCMNotification(
   const fcmNotification: Record<string, unknown> = { title, body };
   if (imageUrl) fcmNotification.image = imageUrl;
 
+  const fcmApnsSound = highPriority ? "gate_bell.mp3" : "default";
   const apnsAps: Record<string, unknown> = {
     alert: { title, body },
-    sound: "gate_bell.mp3",
+    sound: fcmApnsSound,
     badge: 1,
   };
   if (imageUrl) apnsAps["mutable-content"] = 1;
@@ -351,7 +359,7 @@ Deno.serve(async (req) => {
     ]);
     const apnsConfigured = !!(apnsP8Key && apnsKeyId && apnsTeamId && apnsBundleId);
 
-    const { userId, title, body, data, threadId, imageUrl }: PushPayload = await req.json();
+    const { userId, title, body, data, threadId, imageUrl, isHighPriority: reqHighPriority }: PushPayload = await req.json();
 
     if (!userId || !title || !body) {
       return new Response(
@@ -359,6 +367,19 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Priority detection: use explicit flag if provided, otherwise derive from data
+    const SELLER_HP = ['placed', 'enquired', 'requested', 'quoted'];
+    const BUYER_HP = ['payment_failed', 'refund_failed', 'otp'];
+    const highPriority = reqHighPriority ??
+      ((data?.target_role === 'seller' && SELLER_HP.includes(data?.status || '')) ||
+       (data?.target_role === 'buyer' && BUYER_HP.includes(data?.status || '')));
+
+    console.log(JSON.stringify({
+      event: "push_priority", userId, isHighPriority: highPriority,
+      target_role: data?.target_role || 'unknown', status: data?.status || 'unknown',
+      sound: highPriority ? 'gate_bell' : 'default',
+    }));
 
     // Fetch device tokens for user
     const { data: tokens, error: tokensError } = await supabase
@@ -415,6 +436,7 @@ Deno.serve(async (req) => {
             apnsBundleId!,
             threadId,
             imageUrl,
+            highPriority,
           );
 
           // If APNs fails and we have a real FCM token, fall back to FCM
@@ -429,6 +451,7 @@ Deno.serve(async (req) => {
               data,
               threadId,
               imageUrl,
+              highPriority,
             );
           }
         } else if (isApnsOnlyToken) {
@@ -447,6 +470,7 @@ Deno.serve(async (req) => {
             data,
             threadId,
             imageUrl,
+            highPriority,
           );
         }
 

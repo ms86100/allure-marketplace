@@ -55,15 +55,16 @@ async function sendApnsDirect(
   apnsToken: string, title: string, body: string,
   data: Record<string, string> | undefined,
   p8Key: string, keyId: string, teamId: string, bundleId: string,
-  threadId?: string, imageUrl?: string,
+  threadId?: string, imageUrl?: string, highPriority = true,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const cryptoKey = await importP8Key(p8Key);
     const jwt = await createApnsJwt(cryptoKey, keyId, teamId);
+    const apnsSound = highPriority ? "gate_bell.mp3" : "default";
     const apnsPayload: Record<string, unknown> = {
       aps: {
         alert: { title, body },
-        sound: "gate_bell.mp3",
+        sound: apnsSound,
         badge: 1,
         "mutable-content": imageUrl ? 1 : 0,
         ...(threadId ? { "thread-id": threadId } : {}),
@@ -126,14 +127,17 @@ async function generateFcmAccessToken(sa: FirebaseServiceAccount): Promise<strin
 async function sendFcmDirect(
   accessToken: string, projectId: string, deviceToken: string,
   title: string, body: string, data?: Record<string, string>,
-  threadId?: string, imageUrl?: string,
+  threadId?: string, imageUrl?: string, highPriority = true,
 ): Promise<{ success: boolean; error?: string }> {
-  const androidNotif: Record<string, unknown> = { sound: "gate_bell", channel_id: "orders_alert" };
+  const androidSound = highPriority ? "gate_bell" : "default";
+  const androidChannel = highPriority ? "orders_alert" : "general";
+  const androidNotif: Record<string, unknown> = { sound: androidSound, channel_id: androidChannel, icon: "ic_stat_sociva" };
   if (threadId) androidNotif.tag = threadId;
   if (imageUrl) androidNotif.image = imageUrl;
   const fcmNotif: Record<string, unknown> = { title, body };
   if (imageUrl) fcmNotif.image = imageUrl;
-  const apnsAps: Record<string, unknown> = { alert: { title, body }, sound: "gate_bell.mp3", badge: 1 };
+  const fcmApnsSound = highPriority ? "gate_bell.mp3" : "default";
+  const apnsAps: Record<string, unknown> = { alert: { title, body }, sound: fcmApnsSound, badge: 1 };
   if (imageUrl) apnsAps["mutable-content"] = 1;
   if (threadId) apnsAps["thread-id"] = threadId;
   const apnsHeaders: Record<string, string> = { "apns-push-type": "alert", "apns-priority": "10" };
@@ -207,6 +211,7 @@ async function deliverPushToUser(
   supabase: any, creds: CachedCredentials, userId: string,
   title: string, body: string, pushData: Record<string, string>,
   threadId?: string, imageUrl?: string, notificationId?: string,
+  highPriority = false,
 ): Promise<{ successCount: number; failCount: number }> {
   const startMs = Date.now();
 
@@ -243,14 +248,14 @@ async function deliverPushToUser(
       // iOS with APNs token → direct APNs (primary), FCM fallback
       if (tokenRecord.platform === "ios" && tokenRecord.apns_token && creds.apnsConfigured) {
         result = await withTimeout(
-          sendApnsDirect(tokenRecord.apns_token, title, body, pushData, creds.apnsP8Key!, creds.apnsKeyId!, creds.apnsTeamId!, creds.apnsBundleId!, threadId, imageUrl),
+          sendApnsDirect(tokenRecord.apns_token, title, body, pushData, creds.apnsP8Key!, creds.apnsKeyId!, creds.apnsTeamId!, creds.apnsBundleId!, threadId, imageUrl, highPriority),
           PUSH_TIMEOUT_MS,
         );
         // FCM fallback if APNs fails (non-invalid) and we have a real FCM token
         if (!result.success && result.error !== "INVALID_TOKEN" && !isApnsOnlyToken) {
           console.log(`[Push] APNs failed for ${notificationId}, falling back to FCM`);
           result = await withTimeout(
-            sendFcmDirect(creds.fcmAccessToken, creds.serviceAccount.project_id, tokenRecord.token, title, body, pushData, threadId, imageUrl),
+            sendFcmDirect(creds.fcmAccessToken, creds.serviceAccount.project_id, tokenRecord.token, title, body, pushData, threadId, imageUrl, highPriority),
             PUSH_TIMEOUT_MS,
           );
         }
@@ -260,7 +265,7 @@ async function deliverPushToUser(
       } else {
         // Android or iOS without APNs → FCM
         result = await withTimeout(
-          sendFcmDirect(creds.fcmAccessToken, creds.serviceAccount.project_id, tokenRecord.token, title, body, pushData, threadId, imageUrl),
+          sendFcmDirect(creds.fcmAccessToken, creds.serviceAccount.project_id, tokenRecord.token, title, body, pushData, threadId, imageUrl, highPriority),
           PUSH_TIMEOUT_MS,
         );
       }
@@ -473,13 +478,38 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // ── PRIORITY DETECTION ──
+        const rawPayload = item.payload || {};
+        const targetRole = rawPayload.target_role || '';
+        const notifStatus = rawPayload.status || '';
+
+        const SELLER_HIGH_PRIORITY_STATUSES = ['placed', 'enquired', 'requested', 'quoted'];
+        const BUYER_HIGH_PRIORITY_STATUSES = ['payment_failed', 'refund_failed', 'otp'];
+
+        const isHighPriority =
+          (targetRole === 'seller' && SELLER_HIGH_PRIORITY_STATUSES.includes(notifStatus)) ||
+          (targetRole === 'buyer' && BUYER_HIGH_PRIORITY_STATUSES.includes(notifStatus));
+
+        console.log(JSON.stringify({
+          event: "push_priority",
+          notification_id: item.id,
+          user_id: item.user_id,
+          target_role: targetRole || 'unknown',
+          status: notifStatus || 'unknown',
+          isHighPriority,
+          sound: isHighPriority ? 'gate_bell' : 'default',
+        }));
+
         // ── INLINE PUSH DELIVERY (no function-to-function call) ──
         const pushData: Record<string, string> = {};
-        const rawPayload = item.payload || {};
         if (rawPayload.action) pushData.action = String(rawPayload.action);
         if (rawPayload.reference_path) pushData.reference_path = String(rawPayload.reference_path);
         else if (item.reference_path) pushData.reference_path = item.reference_path;
         if (!pushData.route && item.reference_path) pushData.route = item.reference_path;
+        // Pass priority info to client for foreground sound decision
+        pushData.high_priority = isHighPriority ? 'true' : 'false';
+        if (targetRole) pushData.target_role = targetRole;
+        if (notifStatus) pushData.status = notifStatus;
 
         const threadId = rawPayload.orderId ? String(rawPayload.orderId) : undefined;
         const imageUrl = rawPayload.image_url ? String(rawPayload.image_url) : undefined;
@@ -487,7 +517,7 @@ Deno.serve(async (req) => {
         const { successCount, failCount } = await deliverPushToUser(
           supabase, creds, item.user_id,
           item.title, item.body, pushData,
-          threadId, imageUrl, item.id,
+          threadId, imageUrl, item.id, isHighPriority,
         );
 
         if (successCount > 0 || failCount === 0) {
