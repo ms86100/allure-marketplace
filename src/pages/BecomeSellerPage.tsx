@@ -85,10 +85,9 @@ function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }:
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 5;
 const STEP_META = [
-  { label: 'Category', icon: LayoutGrid, title: 'What will you offer?', helper: 'This determines your store type and the tools available to you.' },
-  { label: 'Specialize', icon: Tags, title: 'Specialize your store', helper: 'Select the specific categories you\'ll serve. You can add more later.' },
+  { label: 'What to Sell', icon: Search, title: 'What do you want to sell?', helper: 'Search or browse to find the right category for your business.' },
   { label: 'Store Details', icon: FileText, title: 'Set up your store', helper: 'These details help buyers find and trust your business.' },
   { label: 'Settings', icon: Settings, title: 'Configure your store', helper: 'Set up how you operate — delivery, payments, and schedule.' },
   { label: 'Products', icon: Package, title: 'Add your first products', helper: 'Buyers will see these once your store is approved. Start with 1-2 items.' },
