@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { computeStoreStatus } from '@/lib/store-availability';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SafeHeader } from '@/components/layout/SafeHeader';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
