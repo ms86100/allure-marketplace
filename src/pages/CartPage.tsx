@@ -48,12 +48,13 @@ export default function CartPage() {
       <AppLayout showHeader={false} showCart={false}>
          <div className="p-4">
           <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted mb-6"><ArrowLeft size={18} /></button>
-          <div className="text-center py-16">
+          <div className="text-center py-10">
             <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center"><span className="text-4xl">🛒</span></div>
             <h2 className="text-lg font-bold mb-1">Your cart is empty</h2>
             <p className="text-sm text-muted-foreground mb-6">Discover products from sellers in your community</p>
             <Link to="/search"><Button size="sm">Explore Marketplace</Button></Link>
           </div>
+          <BuyAgainRow />
         </div>
       </AppLayout>
     );
