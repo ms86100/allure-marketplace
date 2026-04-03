@@ -690,11 +690,13 @@ export function DraftProductManager({
                     value={newProduct.prep_time_minutes || ''}
                     onChange={(e) => setNewProduct({ ...newProduct, prep_time_minutes: e.target.value ? Number(e.target.value) : null })}
                   />
+                  <p className="text-[10px] text-muted-foreground">How long it takes to prepare once ordered</p>
                 </div>
               )}
 
-              {/* Stock Tracking */}
+              {/* Stock Management */}
               <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">📦 Stock Management</p>
                 <label className="flex items-center justify-between cursor-pointer">
                   <span className="text-sm font-medium">Track Stock</span>
                   <Checkbox
@@ -735,16 +737,17 @@ export function DraftProductManager({
               {/* Lead Time & Pre-orders */}
               {!isService && (
                 <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">⏱ Preparation & Ordering</p>
                   <div className="space-y-2">
-                    <Label className="text-xs">Lead Time (hours)</Label>
+                    <Label className="text-xs">Order Lead Time (hours)</Label>
                     <Input
                       type="number"
                       min={0}
-                      placeholder="e.g., 24"
+                      placeholder="e.g., 2"
                       value={newProduct.lead_time_hours || ''}
                       onChange={(e) => setNewProduct({ ...newProduct, lead_time_hours: e.target.value ? Number(e.target.value) : null })}
                     />
-                    <p className="text-[11px] text-muted-foreground">Minimum advance notice for orders</p>
+                    <p className="text-[10px] text-muted-foreground">Minimum advance notice buyers need to place an order</p>
                   </div>
                   <label className="flex items-center justify-between cursor-pointer">
                     <span className="text-sm font-medium">Accept Pre-orders</span>
