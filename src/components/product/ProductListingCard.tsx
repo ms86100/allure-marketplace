@@ -50,6 +50,7 @@ interface ProductListingCardProps {
 }
 
 function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, className, viewOnly = false, categoryConfigs = [], marketplaceConfig, badgeConfigs = [], socialProofCount, onViewClick, compact = false }: ProductListingCardProps) {
+  const { user } = useAuth();
   const { items, addItem, updateQuantity } = useCart();
   const { impact, selectionChanged } = useHaptics();
   const { formatPrice } = useCurrency();
