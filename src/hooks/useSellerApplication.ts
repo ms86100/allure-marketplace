@@ -339,7 +339,7 @@ export function useSellerApplication() {
   };
 
   const handleSaveDraftAndExit = async () => {
-    if (step >= 3) await saveDraft();
+    if (step >= 2) await saveDraft();
     localStorage.removeItem('seller_onboarding_step');
     toast.success('Draft saved! You can resume later.', { id: 'seller-app-draft-saved' });
     navigate('/profile');
