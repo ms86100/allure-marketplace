@@ -38,7 +38,7 @@ const ALIAS_MAP: Record<string, string[]> = {
   jams_preserves: ['jam', 'preserve', 'marmalade'],
   masala_spices: ['masala', 'spice', 'spices', 'garam masala'],
   papad_fryums: ['papad', 'fryums', 'appalam'],
-  yoga: ['meditation', 'wellness', 'mindfulness', 'pranayama', 'fitness class'],
+  yoga: ['meditation', 'wellness', 'mindfulness', 'pranayama', 'fitness class', 'therapy', 'yoga therapy', 'ayurvedic therapy', 'ayurveda', 'naturopathy', 'holistic healing', 'mind body', 'stress relief'],
   dance: ['dance class', 'dancing', 'zumba', 'bharatnatyam', 'salsa'],
   music: ['music class', 'guitar', 'piano', 'singing', 'vocal training'],
   art_craft: ['art class', 'craft', 'painting', 'drawing', 'pottery'],
