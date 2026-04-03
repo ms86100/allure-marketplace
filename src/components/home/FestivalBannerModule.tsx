@@ -41,16 +41,16 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
     ? `banner-anim-${animConfig.type} banner-intensity-${animConfig.intensity || 'subtle'}`
     : '';
 
-  // Track impression once
+  // Track impression once (only if authenticated)
   useEffect(() => {
-    if (impressionTracked.current) return;
+    if (impressionTracked.current || !user) return;
     impressionTracked.current = true;
     supabase.from('banner_analytics').insert({
       banner_id: banner.id,
       event_type: 'impression',
-      user_id: null,
+      user_id: user.id,
     }).then(() => {});
-  }, [banner.id]);
+  }, [banner.id, user]);
 
   const handleSectionClick = (section: BannerSection) => {
     // Fire analytics (fire-and-forget)
