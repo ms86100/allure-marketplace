@@ -413,7 +413,7 @@ export function DraftProductManager({
       prep_time_minutes: null,
       stock_quantity: null,
       low_stock_threshold: null,
-      action_type: 'add_to_cart',
+      action_type: defaultActionType || 'add_to_cart',
     });
     setIsAdding(false);
     setFieldErrors({});
