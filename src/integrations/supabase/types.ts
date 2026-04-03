@@ -9628,6 +9628,11 @@ export type Database = {
         | "flat_rent"
         | "roommate"
         | "parking"
+        | "sweets_desserts"
+        | "homemade_products"
+        | "party_bulk_orders"
+        | "specialty_food"
+        | "free_sharing"
       user_role: "buyer" | "seller" | "admin" | "security_officer"
       verification_status:
         | "pending"
@@ -9845,6 +9850,11 @@ export const Constants = {
         "flat_rent",
         "roommate",
         "parking",
+        "sweets_desserts",
+        "homemade_products",
+        "party_bulk_orders",
+        "specialty_food",
+        "free_sharing",
       ],
       user_role: ["buyer", "seller", "admin", "security_officer"],
       verification_status: [
