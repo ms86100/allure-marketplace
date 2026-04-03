@@ -86,7 +86,7 @@ export function useSellerApplication() {
   const setStep = useCallback((s: number | ((prev: number) => number)) => {
     _setStep(prev => {
       const next = typeof s === 'function' ? s(prev) : s;
-      if (next >= 3) {
+      if (next >= 2) {
         localStorage.setItem('seller_onboarding_step', String(next));
       }
       return next;
