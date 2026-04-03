@@ -292,7 +292,7 @@ export function useSellerApplication() {
     } finally { setIsLoading(false); }
   };
 
-  const handleProceedToSettings = async () => { const id = await saveDraft(); if (id) setStep(4); };
+  const handleProceedToSettings = async () => { const id = await saveDraft(); if (id) setStep(3); };
   const handleProceedToProducts = async () => {
     const id = await saveDraft();
     if (id) {
