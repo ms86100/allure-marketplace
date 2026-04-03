@@ -757,7 +757,7 @@ export function AdminBannerManager() {
 
             {/* Scheduling */}
             {form.banner_type === 'festival' && (
-              <div className="space-y-3 p-3 bg-muted/40 rounded-xl">
+              <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Schedule (Optional)</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
