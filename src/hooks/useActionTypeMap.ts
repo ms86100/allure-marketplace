@@ -41,8 +41,8 @@ export function useCategoryAllowedActions(categoryConfigId: string | null) {
     queryKey: ['category-allowed-actions', categoryConfigId],
     queryFn: async () => {
       if (!categoryConfigId) return null;
-      const { data, error } = await supabase
-        .from('category_allowed_action_types' as any)
+      const { data, error } = await (supabase as any)
+        .from('category_allowed_action_types')
         .select('action_type')
         .eq('category_config_id', categoryConfigId);
       if (error) throw error;
