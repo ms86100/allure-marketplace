@@ -5884,6 +5884,7 @@ export type Database = {
           sell_beyond_community: boolean
           seller_type: Database["public"]["Enums"]["seller_type_enum"]
           society_id: string | null
+          store_location_label: string | null
           store_location_source: string | null
           subcategory_preferences: Json | null
           total_reviews: number | null
@@ -5945,6 +5946,7 @@ export type Database = {
           sell_beyond_community?: boolean
           seller_type?: Database["public"]["Enums"]["seller_type_enum"]
           society_id?: string | null
+          store_location_label?: string | null
           store_location_source?: string | null
           subcategory_preferences?: Json | null
           total_reviews?: number | null
@@ -6006,6 +6008,7 @@ export type Database = {
           sell_beyond_community?: boolean
           seller_type?: Database["public"]["Enums"]["seller_type_enum"]
           society_id?: string | null
+          store_location_label?: string | null
           store_location_source?: string | null
           subcategory_preferences?: Json | null
           total_reviews?: number | null
@@ -9844,10 +9847,20 @@ export type Database = {
         Args: { p_lat: number; p_lng: number }
         Returns: undefined
       }
-      set_my_store_coordinates: {
-        Args: { p_lat: number; p_lng: number; p_source?: string }
-        Returns: undefined
-      }
+      set_my_store_coordinates:
+        | {
+            Args: { p_lat: number; p_lng: number; p_source?: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_label?: string
+              p_lat: number
+              p_lng: number
+              p_source?: string
+            }
+            Returns: undefined
+          }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       update_buyer_delivery_location: {

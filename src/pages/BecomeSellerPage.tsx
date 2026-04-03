@@ -35,7 +35,7 @@ function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety, e
   longitude: number | null;
   onLocationSet: (lat: number, lng: number, name?: string) => void;
   hasSociety: boolean;
-  existingStoreLocations?: { id: string; business_name: string; latitude: number; longitude: number }[];
+  existingStoreLocations?: { id: string; business_name: string; latitude: number; longitude: number; store_location_label?: string | null }[];
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [locationName, setLocationName] = useState<string | null>(null);
@@ -76,7 +76,7 @@ function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety, e
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{store.business_name}</p>
-                      <p className="text-[10px] text-muted-foreground">{store.latitude.toFixed(4)}, {store.longitude.toFixed(4)}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{store.store_location_label || `${store.latitude.toFixed(4)}, ${store.longitude.toFixed(4)}`}</p>
                     </div>
                   </button>
                 ))}
@@ -632,7 +632,7 @@ export default function BecomeSellerPage() {
               existingStoreLocations={
                 (sellerProfiles || [])
                   .filter((sp: any) => sp.latitude && sp.longitude && sp.id !== draftSellerId)
-                  .map((sp: any) => ({ id: sp.id, business_name: sp.business_name || 'Store', latitude: sp.latitude, longitude: sp.longitude }))
+                  .map((sp: any) => ({ id: sp.id, business_name: sp.business_name || 'Store', latitude: sp.latitude, longitude: sp.longitude, store_location_label: sp.store_location_label || null }))
               }
             />
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Configure delivery, payments, and schedule</p>

@@ -34,7 +34,7 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
 
   const existingStoreLocations = (sellerProfiles || [])
     .filter((sp: any) => sp.latitude && sp.longitude && sp.id !== sellerId)
-    .map((sp: any) => ({ id: sp.id, business_name: sp.business_name || 'Store', latitude: sp.latitude as number, longitude: sp.longitude as number }));
+    .map((sp: any) => ({ id: sp.id, business_name: sp.business_name || 'Store', latitude: sp.latitude as number, longitude: sp.longitude as number, store_location_label: sp.store_location_label as string | null }));
 
   // Auto-focus input when pick overlay opens
   useEffect(() => {
@@ -83,13 +83,14 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
     }
   };
 
-  const handleConfirm = async (lat: number, lng: number) => {
+  const handleConfirm = async (lat: number, lng: number, label?: string) => {
     setSaving(true);
     try {
       const { error } = await supabase.rpc('set_my_store_coordinates', {
         p_lat: lat,
         p_lng: lng,
         p_source: 'manual',
+        p_label: label || selectedPlaceName || null,
       } as any);
       if (error) throw error;
       toast.success('Store location set successfully!');
@@ -184,7 +185,7 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{store.business_name}</p>
-                      <p className="text-[10px] text-muted-foreground">{store.latitude.toFixed(4)}, {store.longitude.toFixed(4)}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{store.store_location_label || `${store.latitude.toFixed(4)}, ${store.longitude.toFixed(4)}`}</p>
                     </div>
                   </button>
                 ))}
