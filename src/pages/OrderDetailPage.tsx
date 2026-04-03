@@ -702,9 +702,23 @@ export default function OrderDetailPage() {
                   <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><MapPin size={11} />Delivering to: {(order as any).delivery_address}</p>
                 )}
               </div>
-              {(o.isSellerView ? buyer?.phone : sellerProfile?.phone) && (
-                <a href={`tel:${o.isSellerView ? buyer?.phone : sellerProfile?.phone}`} className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center"><Phone size={16} className="text-accent" /></a>
-              )}
+              <div className="flex items-center gap-2">
+                {/* Gap 6: WhatsApp for service-type contact_seller orders */}
+                {o.isBuyerView && sellerProfile?.phone && ['contact_seller', 'request_service'].includes((order as any).action_type || '') && (
+                  <a
+                    href={`https://wa.me/${sellerProfile.phone.replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-9 h-9 rounded-full bg-green-500/10 flex items-center justify-center shrink-0"
+                    title="WhatsApp seller"
+                  >
+                    <Phone size={16} className="text-green-600" />
+                  </a>
+                )}
+                {(o.isSellerView ? buyer?.phone : sellerProfile?.phone) && (
+                  <a href={`tel:${o.isSellerView ? buyer?.phone : sellerProfile?.phone}`} className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center shrink-0"><Phone size={16} className="text-accent" /></a>
+                )}
+              </div>
             </div>
           </div>
 
