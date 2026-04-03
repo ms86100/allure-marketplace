@@ -428,6 +428,8 @@ export function useAuthPage() {
     predictions, isSearching, mapsLoaded, selectedPlace,
     // New society
     newSocietyData, setNewSocietyData, pendingNewSociety,
+    // Society matching
+    potentialMatches, handleConfirmMatch, handleRejectMatches,
     // Settings
     settings,
     // Computed
