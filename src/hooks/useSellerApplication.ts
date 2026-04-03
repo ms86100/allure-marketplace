@@ -405,7 +405,7 @@ export function useSellerApplication() {
         }
       }
       setSelectedGroup(group);
-      setFormData(f => ({ ...f, categories: [] }));
+      setFormData(f => ({ ...f, categories: [], subcategory_preferences: { v: 1, data: {} } }));
     }
     setTimeout(() => setStep(2), 350);
   };
