@@ -418,6 +418,16 @@ export default function BecomeSellerPage() {
   const { profile, sellerProfiles } = useAuth();
   const app = useSellerApplication();
   const { configs } = useCategoryConfigs();
+  const { data: allActions = [] } = useActionTypeMap();
+
+  // ─── Interaction mode state (persisted in sessionStorage) ─────────────
+  const [storeActionType, setStoreActionType] = useState<string>(() => {
+    try { return sessionStorage.getItem('onboarding_store_action_type') || ''; } catch { return ''; }
+  });
+  const handleSetStoreActionType = useCallback((val: string) => {
+    setStoreActionType(val);
+    try { sessionStorage.setItem('onboarding_store_action_type', val); } catch { /* */ }
+  }, []);
   const {
     user, isLoading, isCheckingExisting, groupsLoading, existingSeller, draftSellerId,
     step, setStep, selectedGroup, setSelectedGroup, formData, setFormData,
