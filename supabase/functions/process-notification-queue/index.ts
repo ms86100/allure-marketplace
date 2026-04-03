@@ -336,6 +336,7 @@ Deno.serve(async (req) => {
     }
 
     if (!pending || pending.length === 0) {
+      console.log("[PNQ] No pending items to process");
       return new Response(JSON.stringify({ processed: 0, retried: 0, dead_lettered: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
