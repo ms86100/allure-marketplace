@@ -28,11 +28,6 @@ export default function HomePage() {
   const scrollKey = 'home-scroll-y';
   const hasRestoredRef = useRef(false);
 
-  // Synchronous redirect for incomplete profile — no flicker
-  if (profile && (!profile.name || profile.name === 'User')) {
-    return <Navigate to="/profile/edit" replace />;
-  }
-
   useEffect(() => {
     if (!hasRestoredRef.current && profile) {
       const saved = sessionStorage.getItem(scrollKey);
@@ -62,6 +57,11 @@ export default function HomePage() {
     sections.forEach(el => observer.observe(el));
     return () => observer.disconnect();
   }, [profile]);
+
+  // Synchronous redirect for incomplete profile — no flicker
+  if (profile && (!profile.name || profile.name === 'User')) {
+    return <Navigate to="/profile/edit" replace />;
+  }
 
   if (hasChecked && showOnboarding && profile) {
     return <OnboardingWalkthrough onComplete={completeOnboarding} />;
