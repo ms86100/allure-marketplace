@@ -305,19 +305,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Allow service-role, anon key (cron), or valid user JWT
-    const authHeader = req.headers.get("Authorization");
-    const token = authHeader?.replace("Bearer ", "") || "";
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    const isAllowed = !authHeader || token === supabaseServiceKey || token === anonKey;
-    if (authHeader && !isAllowed) {
-      const { createClient: cc } = await import("https://esm.sh/@supabase/supabase-js@2.93.3");
-      const authClient = cc(supabaseUrl, anonKey!, { global: { headers: { Authorization: authHeader } } });
-      const { error: authErr } = await authClient.auth.getUser();
-      if (authErr) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-    }
+    // Auth: verify_jwt=false in config.toml — only cron/triggers call this function
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
