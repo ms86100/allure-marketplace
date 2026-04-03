@@ -850,11 +850,12 @@ export function AdminBannerManager() {
                   <p className="text-[10px] text-muted-foreground text-center py-2">No societies found</p>
                 )}
               </div>
-            </div>
+              </div>
 
+            {/* Config */}
+            <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
               {form.banner_type === 'classic' && (
                 <>
-                  <Separator />
                   <div className="flex items-center gap-3">
                     <Timer size={14} className="text-muted-foreground shrink-0" />
                     <div className="flex-1">
@@ -867,10 +868,10 @@ export function AdminBannerManager() {
                       className="w-16 rounded-xl text-center"
                     />
                   </div>
+                  <Separator />
                 </>
               )}
 
-              <Separator />
               <div className="flex items-center gap-4">
                 <div>
                   <Label className="text-xs font-semibold">Display Order</Label>
