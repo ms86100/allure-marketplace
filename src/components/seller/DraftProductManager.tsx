@@ -359,8 +359,8 @@ export function DraftProductManager({
         setAttributeBlocks([]);
       }
 
-      // Load service fields if service category
-      if (isServiceCategory(product.category, configs)) {
+      // Load service fields if product's action_type requires availability
+      if (doesActionRequireAvailability((product as any).action_type, allActions)) {
         try {
           const { data: sl } = await supabase
             .from('service_listings')
