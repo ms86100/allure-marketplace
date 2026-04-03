@@ -682,8 +682,8 @@ export default function BecomeSellerPage() {
                   .map((sp: any) => ({ id: sp.id, business_name: sp.business_name || 'Store', latitude: sp.latitude, longitude: sp.longitude, store_location_label: sp.store_location_label || null }))
               }
             />
-            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Configure delivery, payments, and schedule</p>
-            <Button className="w-full" onClick={handleProceedToSettings} disabled={isLoading || !formData.business_name.trim() || ((selectedGroupRow as any)?.license_mandatory && (!licenseStatus || licenseStatus === 'rejected'))}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Store Settings<ChevronRight size={16} className="ml-1" /></Button>
+            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Choose how buyers will interact with your store</p>
+            <Button className="w-full" onClick={() => { handleSetConfigSubStep(1); handleProceedToSettings(); }} disabled={isLoading || !formData.business_name.trim() || ((selectedGroupRow as any)?.license_mandatory && (!licenseStatus || licenseStatus === 'rejected'))}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue<ChevronRight size={16} className="ml-1" /></Button>
           </div>
         )}
 
