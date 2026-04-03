@@ -276,8 +276,14 @@ export function useSellerProducts() {
         toast.success('Product added', { id: 'product-saved' });
       }
 
-      const isService = isServiceCategory(formData.category, configs);
-      if (isService && savedProductId) {
+      // Action-type-driven: upsert service_listings only when action_type requires availability
+      const actionRequiresAvailability = (() => {
+        const at = formData.action_type;
+        if (!at) return false;
+        const ac = allActions.find(a => a.action_type === at);
+        return ac?.requires_availability ?? false;
+      })();
+      if (actionRequiresAvailability && savedProductId) {
         const { error: slError } = await supabase.from('service_listings').upsert({
           product_id: savedProductId, service_type: serviceFields.service_type, location_type: serviceFields.location_type,
           duration_minutes: parseInt(serviceFields.duration_minutes) || 60, buffer_minutes: parseInt(serviceFields.buffer_minutes) || 0,
