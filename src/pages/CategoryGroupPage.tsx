@@ -140,6 +140,22 @@ export default function CategoryGroupPage() {
       );
     }
 
+    // Apply filters
+    if (filterVeg) {
+      filtered = filtered.filter((p) => p.is_veg === true);
+    }
+    if (filterOpenNow) {
+      filtered = filtered.filter((p) => {
+        const status = computeStoreStatus(
+          (p as any).seller_availability_start ?? null,
+          (p as any).seller_availability_end ?? null,
+          (p as any).seller_operating_days ?? null,
+          (p as any).seller_is_available ?? true
+        );
+        return status.status === 'open';
+      });
+    }
+
     const sorted = [...filtered];
     switch (sortBy) {
       case 'price_low': sorted.sort((a, b) => a.price - b.price); break;
@@ -150,7 +166,7 @@ export default function CategoryGroupPage() {
       case 'rating': sorted.sort((a, b) => (b.seller_rating ?? 0) - (a.seller_rating ?? 0)); break;
     }
     return sorted;
-  }, [allProducts, activeSubCategory, searchQuery, sortBy]);
+  }, [allProducts, activeSubCategory, searchQuery, sortBy, filterVeg, filterOpenNow]);
 
   const handleSubCategorySelect = (cat: ServiceCategory | null) => {
     setActiveSubCategory(cat);
