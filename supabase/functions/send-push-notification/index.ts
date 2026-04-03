@@ -246,13 +246,13 @@ async function sendFCMNotification(
   const fcmNotification: Record<string, unknown> = { title, body };
   if (imageUrl) fcmNotification.image = imageUrl;
 
+  const fcmApnsSound = highPriority ? "gate_bell.mp3" : "default";
   const apnsAps: Record<string, unknown> = {
     alert: { title, body },
-    sound: "gate_bell.mp3",
+    sound: fcmApnsSound,
     badge: 1,
   };
   if (imageUrl) apnsAps["mutable-content"] = 1;
-  if (threadId) apnsAps["thread-id"] = threadId;
 
   const apnsHeaders: Record<string, string> = {
     "apns-push-type": "alert",
