@@ -1,55 +1,126 @@
 
 
-# Final 3 Gaps — Audit & Implementation Plan
+# Society-Aware Banner System — Handling Sellers Without a Society
 
-## Gap 1: Category String Matching — NOT A BUG
+## The Gap
 
-**Finding**: The `products.category` column is a **Postgres enum** (`service_category`), not free-text. All comparisons use `p.category::text = value` consistently across 50+ RPCs and triggers. The admin banner manager populates category values from `category_config` rows — the same source of truth the products table uses. There is zero risk of "Pooja Items" vs "pooja_items" mismatch because the enum enforces exact values.
+The current plan assumes every seller has a `society_id`. But the platform has two seller types:
 
-**Verdict**: No change needed. This is already bulletproof.
+1. **`society_resident`** — tied to a society (`society_id` is set)
+2. **`commercial`** — independent sellers with NO society (`society_id IS NULL`), operating purely on coordinates + `delivery_radius_km`
 
----
+The planned `resolve_banner_products` RPC has this eligibility logic:
 
-## Gap 2: Search Uses ILIKE — CONFIRMED GAP
+```
+sp.society_id = p_society_id
+OR (sp.sell_beyond_community = true AND haversine_km(...) <= sp.delivery_radius_km)
+```
 
-**Finding**: `bannerProductResolver.ts` line 76 uses `ilike('name', '%keyword%')` for search-mode sections. However, the `search_vector` tsvector column and GIN index already exist on the `products` table. An FTS RPC (`search_products_fts`) is already deployed. The banner resolver simply isn't using it.
+**This excludes commercial sellers entirely** because:
+- `sp.society_id IS NULL` → fails the first condition
+- `sp.sell_beyond_community` may be `false` or irrelevant for commercial sellers → fails the second condition
 
-**Fix**: Replace the `fetchBySearch` ILIKE query with a call to the existing `search_products_fts` RPC, or use `search_vector @@ websearch_to_tsquery()` via a lightweight new RPC dedicated to banner resolution.
+A commercial seller 2km away from a society with a 5km delivery radius would be invisible in all banners.
 
-### Changes
-**`src/lib/bannerProductResolver.ts`** — Replace `fetchBySearch`:
-- Instead of `.ilike('name', ...)`, call `supabase.rpc('search_products_fts', { _query: keyword, _limit: limit })`
-- Map the returned fields to `ResolvedProduct` interface
-- This gives ranked results, fuzzy matching, and uses the existing GIN index
+## Architecture Principle
 
----
+Per the domain separation rules:
+- **Marketplace = coordinate-based** (no society gating)
+- **Society = community-gated**
 
-## Gap 3: Stock Race Condition on Click — CONFIRMED GAP
+Banners are a **marketplace feature** — they promote products. The eligibility logic must respect coordinates, not just society membership.
 
-**Finding**: When a buyer taps a section chip, the collection page (`FestivalCollectionPage.tsx`) fetches products via `resolveProducts` with `staleTime` potentially serving cached data. If a product goes out of stock between banner render and collection page load, it still appears.
+## Fix: 3-Way Seller Eligibility
 
-**Fix**: Two layers:
-1. **Collection page**: Set `staleTime: 0` and `refetchOnMount: 'always'` on the products query to force fresh data on every navigation
-2. **Add-to-cart revalidation**: Already handled by the existing `trg_enforce_cart_stock` trigger and `useCart` hook which validates stock before insert — so the DB layer is safe. The UI gap is showing stale "available" products.
-3. **Product cards**: Already show "Out of Stock" overlay when `stock_quantity <= 0` — this works if query returns fresh data.
+Replace the 2-condition check with a 3-way eligibility in the RPC:
 
-### Changes
-**`src/pages/FestivalCollectionPage.tsx`**:
-- Set `staleTime: 0` on the products query
-- Add `refetchOnMount: 'always'`
-- Add `refetchInterval: 30_000` for live stock updates while browsing
+```text
+Seller is eligible for a banner targeting society X if:
 
-**`src/lib/bannerProductResolver.ts`** — Add stock-priority ordering:
-- Append `ORDER BY stock_quantity > 0 DESC` as first sort criterion so out-of-stock items sink to bottom even if cache is slightly stale
+1. sp.society_id = X                                    -- local resident seller
+2. sp.society_id IS NOT NULL AND sp.society_id != X     -- cross-society resident
+   AND sp.sell_beyond_community = true
+   AND haversine_km(seller, society) <= delivery_radius_km
+3. sp.society_id IS NULL                                -- commercial seller (no society)
+   AND sp.latitude IS NOT NULL
+   AND haversine_km(seller, society) <= delivery_radius_km
+```
 
----
+For **global banners** (no target society), buyer-level radius check alone applies:
+```text
+haversine_km(seller, buyer) <= delivery_radius_km
+```
 
-## Summary of Changes
+## Changes Required
+
+### Step 1: Database Migration — Updated RPC
+
+The `resolve_banner_products` RPC's WHERE clause becomes:
+
+```sql
+AND (
+  p_society_id IS NULL  -- global banner: skip society filter
+  OR sp.society_id = p_society_id  -- local seller
+  OR (
+    sp.society_id IS NOT NULL
+    AND sp.sell_beyond_community = true
+    AND _society_lat IS NOT NULL AND sp.latitude IS NOT NULL
+    AND public.haversine_km(sp.latitude, _society_lat, sp.longitude, _society_lng)
+        <= sp.delivery_radius_km
+  )
+  OR (
+    sp.society_id IS NULL  -- commercial seller, no society
+    AND sp.latitude IS NOT NULL
+    AND _society_lat IS NOT NULL
+    AND public.haversine_km(sp.latitude, _society_lat, sp.longitude, _society_lng)
+        <= sp.delivery_radius_km
+  )
+)
+```
+
+This can be simplified (conditions 2 and 3 share the radius check, differ only on `sell_beyond_community`):
+
+```sql
+AND (
+  p_society_id IS NULL
+  OR sp.society_id = p_society_id
+  OR (
+    sp.society_id IS DISTINCT FROM p_society_id
+    AND (sp.society_id IS NULL OR sp.sell_beyond_community = true)
+    AND sp.latitude IS NOT NULL AND _society_lat IS NOT NULL
+    AND public.haversine_km(sp.latitude, _society_lat, sp.longitude, _society_lng)
+        <= sp.delivery_radius_km
+  )
+)
+```
+
+All other steps from the previously approved plan remain unchanged — the only modification is this eligibility clause in the RPC.
+
+### Step 2: Admin UI — No changes needed
+
+The multi-society picker already targets societies. Commercial sellers are automatically included when they fall within radius of any targeted society. The pre-save validation will naturally count their products.
+
+### Step 3: Resolver & Buyer-Side — No changes needed
+
+The resolver calls the RPC with `societyId` and buyer coords. The RPC handles the 3-way logic server-side.
+
+## Files Changed
 
 | File | Change |
 |---|---|
-| `src/lib/bannerProductResolver.ts` | Replace ILIKE with FTS RPC call; add stock-priority ordering |
-| `src/pages/FestivalCollectionPage.tsx` | Force fresh queries with `staleTime: 0`, `refetchOnMount: 'always'`, `refetchInterval: 30s` |
+| Migration SQL (`resolve_banner_products` RPC) | Update seller eligibility WHERE clause to include commercial sellers via radius check |
 
-No database migrations needed — FTS infrastructure already exists.
+Everything else from the approved plan stays identical. This is a single SQL clause fix that closes the gap for society-less sellers.
+
+## Validation Scenarios
+
+| Scenario | Expected |
+|---|---|
+| Commercial seller, 2km from Society A, radius 5km | Visible in Society A banners |
+| Commercial seller, 10km from Society A, radius 5km | NOT visible |
+| Commercial seller, no coordinates | NOT visible (cannot verify radius) |
+| Society resident, same society | Visible |
+| Society resident, different society, `sell_beyond_community=false` | NOT visible |
+| Society resident, different society, `sell_beyond_community=true`, within radius | Visible |
+| Global banner, commercial seller within buyer radius | Visible |
 
