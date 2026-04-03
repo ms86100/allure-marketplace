@@ -15,6 +15,7 @@ import { jitteredStaleTime } from '@/lib/query-utils';
  */
 export function WelcomeBackStrip() {
   const { user } = useAuth();
+  const { addItem } = useCart();
 
   const { data: lastOrder } = useQuery({
     queryKey: ['last-order-context', user?.id],
