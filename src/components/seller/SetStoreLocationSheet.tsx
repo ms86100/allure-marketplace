@@ -83,13 +83,14 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
     }
   };
 
-  const handleConfirm = async (lat: number, lng: number) => {
+  const handleConfirm = async (lat: number, lng: number, label?: string) => {
     setSaving(true);
     try {
       const { error } = await supabase.rpc('set_my_store_coordinates', {
         p_lat: lat,
         p_lng: lng,
         p_source: 'manual',
+        p_label: label || selectedPlaceName || null,
       } as any);
       if (error) throw error;
       toast.success('Store location set successfully!');
