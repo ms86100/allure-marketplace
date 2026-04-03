@@ -690,6 +690,7 @@ export function DraftProductManager({
                     value={newProduct.prep_time_minutes || ''}
                     onChange={(e) => setNewProduct({ ...newProduct, prep_time_minutes: e.target.value ? Number(e.target.value) : null })}
                   />
+                  <p className="text-[10px] text-muted-foreground">How long it takes to prepare once ordered</p>
                 </div>
               )}
 
