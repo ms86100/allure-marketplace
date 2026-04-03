@@ -66,6 +66,8 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
   const [rows, setRows] = useState<BulkRow[]>([{ ...EMPTY_ROW, category: allowedCategories[0]?.category || '' }]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<{ success: number; errors: number } | null>(null);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [savedCount, setSavedCount] = useState(0);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
 
   // Fetch all subcategories for allowed categories
@@ -301,15 +303,10 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
       if (error) throw error;
 
       setSaveResult({ success: products.length, errors: 0 });
+      setSavedCount(products.length);
       toast.success(`${products.length} products added as drafts`);
-      toast.info('Edit each product to add images, extra details, and service settings before submitting for approval', { duration: 6000 });
       onSuccess();
-
-      setTimeout(() => {
-        setRows([{ ...EMPTY_ROW, category: allowedCategories[0]?.category || '' }]);
-        setSaveResult(null);
-        onClose();
-      }, 1500);
+      setShowSuccessDialog(true);
     } catch (error: any) {
       console.error('Bulk save error:', error);
       toast.error(friendlyError(error));
@@ -321,9 +318,17 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
 
   const getRowConfig = useCallback((slug: string) => getCategoryConfig(slug, allowedCategories), [allowedCategories]);
 
+  const dismissSuccessDialog = useCallback(() => {
+    setShowSuccessDialog(false);
+    setRows([{ ...EMPTY_ROW, category: allowedCategories[0]?.category || '' }]);
+    setSaveResult(null);
+    onClose();
+  }, [allowedCategories, onClose]);
+
   return {
     rows, isSaving, saveResult, anyShowVeg, anyShowDuration,
     anyHasSubcategories, hasMultipleCategories,
+    showSuccessDialog, savedCount, dismissSuccessDialog,
     addRow, removeRow, updateRow, generateCSVTemplate, handleCSVUpload,
     handleSave, getRowConfig, allowedCategories, getSubcategoriesForCategory,
   };
