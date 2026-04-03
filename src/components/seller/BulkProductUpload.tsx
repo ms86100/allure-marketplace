@@ -24,9 +24,11 @@ interface BulkProductUploadProps {
 
 const ACTION_TYPE_OPTIONS = [
   { value: 'add_to_cart', label: 'Add to Cart' },
+  { value: 'buy_now', label: 'Buy Now' },
+  { value: 'book', label: 'Book Now' },
   { value: 'contact_seller', label: 'Contact Seller' },
+  { value: 'request_service', label: 'Request Service' },
   { value: 'request_quote', label: 'Request Quote' },
-  { value: 'book', label: 'Book' },
 ];
 
 export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories, onSuccess }: BulkProductUploadProps) {
