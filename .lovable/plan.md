@@ -1,108 +1,52 @@
 
 
-# Add Ayurveda Category with Panchakarma Subcategories
+# Fix: "therapy" Search Not Showing Ayurveda Results
 
-## Current State
+## Root Cause
 
-- **No Ayurveda category exists** in `category_config` — the enum `service_category` has no `ayurveda` value
-- **Zero subcategories** exist for any personal_care or education_learning categories (subcategories only exist for food_beverages)
-- The `service_booking` workflow is fully defined and working — Ayurveda services will use it
-- The `ALIAS_MAP` in `CategorySearchPicker.tsx` currently maps "ayurveda", "therapy" etc. to `yoga` — incorrect once Ayurveda has its own category
-- Adding subcategories to personal_care categories (Beauty, Salon, etc.) is also a gap but out of scope for this change
+The search index in `CategorySearchPicker.tsx` has a structural gap: **when a category has subcategories, only the subcategory items are added to the index — the category itself is skipped** (line 176: `if (configSubs.length === 0)`).
 
-## What This Plan Does
+This means `ALIAS_MAP['ayurveda']` (which contains `'therapy'`) is **never checked**, because no search index item has `slug: 'ayurveda'`. The ayurveda subcategories like "Nasya Therapy" and "Rejuvenation Therapy" should match on name contains, but their individual alias entries don't include the generic term "therapy".
 
-1. Add `ayurveda` to the `service_category` enum
-2. Insert a new `category_config` row for Ayurveda under `personal_care` with `transaction_type = 'service_booking'`
-3. Insert subcategories covering Panchakarma programs, individual therapies, and complementary treatments
-4. Update the search alias map so sellers typing "panchakarma", "ayurveda", "detox therapy" etc. land on the correct category
-5. Add subcategories for existing service categories (Beauty, Salon, Yoga) so they also become searchable and selectable at the subcategory level
+Additionally, the same problem affects **every category with subcategories** — category-level aliases are invisible to search.
 
-## Implementation
+## Fix (1 file)
 
-### Step 1: DB Migration — Add enum value + category_config + subcategories
+### `src/components/seller/CategorySearchPicker.tsx`
 
-**Migration SQL:**
+**Change 1: Always add a category-level item to the search index**, even when subcategories exist. Mark it with `hasSubcategories: true` so tapping it opens the subcategory picker.
 
-```sql
--- 1. Add enum value
-ALTER TYPE service_category ADD VALUE IF NOT EXISTS 'ayurveda';
+Replace the current logic (lines 149-194) that only adds a category item when `configSubs.length === 0`:
 
--- 2. Insert category_config for Ayurveda
-INSERT INTO category_config (
-  category, display_name, icon, color, parent_group, layout_type,
-  is_physical_product, requires_preparation, requires_time_slot, requires_delivery,
-  supports_cart, enquiry_only, has_quantity, has_duration, has_date_range, is_negotiable,
-  display_order, is_active, transaction_type, show_duration_field, show_veg_toggle,
-  name_placeholder, description_placeholder, price_label, duration_label,
-  primary_button_label, requires_availability, supports_addons, supports_staff_assignment
-) VALUES (
-  'ayurveda', 'Ayurveda & Wellness', 'Leaf', '#4CAF50', 'personal_care', 'service',
-  false, false, true, false,
-  false, false, false, true, false, false,
-  15, true, 'service_booking', true, false,
-  'e.g. Panchakarma Detox Program', 'Describe treatment, benefits, and duration',
-  'Session Price', 'Session Duration',
-  'Book Now', true, true, true
-);
+```text
+// BEFORE: category item only added when NO subcategories
+if (configSubs.length === 0) {
+  items.push({ type: 'category', ... });
+}
+
+// AFTER: always add category item (for alias matching)
+items.push({
+  type: 'category',
+  slug: config.category,        // e.g. 'ayurveda' → matches ALIAS_MAP
+  name: config.displayName,     // e.g. 'Ayurveda & Wellness'
+  hasSubcategories: configSubs.length > 0,
+  ...
+});
 ```
 
-**Insert subcategories** (using the new category_config ID):
+This ensures that typing "therapy" will match `ALIAS_MAP['ayurveda']` → score 2 (exact alias match) → Ayurveda appears in results.
 
-| slug | display_name | icon |
-|---|---|---|
-| panchakarma_detox | Panchakarma Detox Program | Sparkles |
-| panchakarma_rejuvenation | Rejuvenation Therapy | Heart |
-| abhyanga | Abhyanga (Oil Massage) | Droplets |
-| shirodhara | Shirodhara | Brain |
-| nasya_therapy | Nasya Therapy | Wind |
-| basti_therapy | Basti Therapy | Pill |
-| swedana | Swedana (Steam Therapy) | CloudRain |
-| udwartana | Udwartana (Powder Massage) | Leaf |
-| ayurvedic_consultation | Ayurvedic Consultation | Stethoscope |
-| diet_lifestyle_plan | Diet & Lifestyle Plan | ClipboardList |
+**Change 2: Deduplicate results** — when both a category AND its subcategories match, show the category result (which opens the subcategory picker) and suppress individual subcategory results below a score threshold to avoid clutter. If a subcategory scores higher than its parent category, show the subcategory instead.
 
-Also insert subcategories for **Beauty** (facial, bridal makeup, skin care, waxing, threading), **Salon** (haircut, hair coloring, beard trim, hair spa, grooming), and **Yoga** (hatha yoga, power yoga, prenatal yoga, meditation, pranayama) to make those categories equally searchable.
+**Change 3: Add "therapy" to more subcategory aliases** as a safety net:
+- `nasya_therapy`: add `'therapy'`
+- `panchakarma_rejuvenation`: add `'therapy'`, `'rejuvenation'`
+- `basti_therapy`: add `'therapy'`
 
-### Step 2: Code — Update `CategorySearchPicker.tsx`
+## Result
 
-- Move ayurveda-related aliases from `yoga` to `ayurveda`:
-  - Remove: `'therapy'`, `'ayurvedic therapy'`, `'ayurveda'`, `'naturopathy'`, `'holistic healing'`
-  - Keep on yoga: `'meditation'`, `'wellness'`, `'mindfulness'`, `'pranayama'`
-
-- Add new `ayurveda` alias entry:
-  ```
-  ayurveda: ['panchakarma', 'ayurvedic therapy', 'ayurveda treatment', 'detox therapy',
-             'oil massage', 'shirodhara', 'naturopathy', 'holistic healing',
-             'body detox', 'wellness retreat', 'ayurvedic massage', 'herbal therapy',
-             'stress relief therapy', 'therapy']
-  ```
-
-- Add alias entries for new subcategory slugs:
-  ```
-  panchakarma_detox: ['panchakarma', 'detox program', 'body detox', 'cleansing therapy']
-  abhyanga: ['oil massage', 'body massage', 'ayurvedic massage', 'full body massage']
-  shirodhara: ['head oil therapy', 'forehead oil', 'stress therapy']
-  ```
-
-- Add `'ayurveda'` to `POPULAR_SLUGS` array
-
-- Add `'Panchakarma Therapy'` and `'Ayurveda'` to the typewriter placeholder rotation
-
-### Step 3: No workflow changes needed
-
-The `service_booking` workflow already supports: Requested → Confirmed → Scheduled → On the Way → Arrived → In Progress → Completed. This fits Ayurveda services perfectly.
-
-## Files Summary
-
-| File | Action |
-|---|---|
-| Migration SQL | **Create** — enum value + category_config row + ~30 subcategory rows |
-| `src/components/seller/CategorySearchPicker.tsx` | **Modify** — update ALIAS_MAP, POPULAR_SLUGS, typewriter list |
-
-## Gaps Identified (For Future)
-
-- **No subcategories for remaining service categories** (Electrician, Plumber, Maid, etc.) — sellers can only select at category level, not specialize
-- **No attribute blocks** for Ayurveda-specific metadata (dosha focus, contraindications) — would require the attribute engine to be extended
-- **No consultation-first workflow** — Panchakarma programs ideally need a "Consult → Plan → Book" flow, but the current `service_booking` covers the booking part adequately for MVP
+Typing "therapy" will show:
+1. **Ayurveda & Wellness** (Personal Care) — score 2 via alias exact match
+2. **Nasya Therapy**, **Rejuvenation Therapy**, etc. — score 1 via name contains
+3. **Yoga** — score 1 via alias "yoga therapy" contains
 
