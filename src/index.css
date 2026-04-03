@@ -782,6 +782,29 @@ body.razorpay-active iframe[src*="checkout.razorpay"] {
   50% { transform: scale(1.01); }
 }
 
+/* Confetti — falling dot overlay (Celebrations, Holi) */
+.banner-anim-confetti {
+  position: relative;
+  overflow: hidden;
+}
+.banner-anim-confetti::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle 2px, rgba(255, 87, 51, 0.5) 2px, transparent 2px),
+    radial-gradient(circle 2px, rgba(255, 215, 0, 0.5) 2px, transparent 2px),
+    radial-gradient(circle 1.5px, rgba(0, 200, 83, 0.5) 1.5px, transparent 1.5px),
+    radial-gradient(circle 2px, rgba(156, 39, 176, 0.5) 2px, transparent 2px);
+  background-size: 40px 40px, 50px 50px, 35px 35px, 45px 45px;
+  background-position: 0 0, 15px 20px, 30px 10px, 5px 35px;
+  animation: confetti-fall 4s linear infinite;
+  pointer-events: none;
+}
+@keyframes confetti-fall {
+  to { background-position: 10px 40px, 25px 60px, 40px 50px, 15px 75px; }
+}
+
 /* Intensity modifiers */
 .banner-intensity-subtle::after,
 .banner-intensity-subtle { animation-duration: 5s !important; }
