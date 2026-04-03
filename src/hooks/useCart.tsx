@@ -514,11 +514,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Keep cart-count cache in sync with items (eliminates split-brain)
+  // RULE 2: Never downgrade count to 0 from item sync — only server verification can do that
   useEffect(() => {
     if (hasHydrated && user && !hasCartCountMismatch) {
+      if (itemCount === 0 && fallbackItemCount > 0) return; // Don't blindly zero the count
       queryClient.setQueryData(['cart-count', user.id], itemCount);
     }
-  }, [hasHydrated, user, itemCount, queryClient, hasCartCountMismatch]);
+  }, [hasHydrated, user, itemCount, queryClient, hasCartCountMismatch, fallbackItemCount]);
+
+  // Mark cart as verified when items arrive or when genuinely empty with count=0
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (items.length > 0) { setCartVerified(true); return; }
+    if (items.length === 0 && fallbackItemCount === 0 && isFetched && !isFetching) {
+      setCartVerified(true);
+    }
+  }, [hasHydrated, items.length, fallbackItemCount, isFetched, isFetching]);
 
   const contextValue = useMemo<CartContextType>(() => ({
     items, itemCount, totalAmount, sellerGroups, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart,
