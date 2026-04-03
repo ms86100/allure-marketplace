@@ -525,10 +525,10 @@ export default function BecomeSellerPage() {
           />
         )}
 
-        {/* Step 3: Business Details */}
-        {step === 3 && (
+        {/* Step 2: Business Details */}
+        {step === 2 && (
           <div className="space-y-5">
-            <button onClick={() => handleStepBack(2)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change categories</button>
+            <button onClick={() => handleStepBack(1)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change categories</button>
             {rejectionFeedback && (
               <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 text-left">
                 <p className="text-xs font-semibold text-destructive mb-1">⚠️ Admin Feedback — Please address before resubmitting:</p>
@@ -562,10 +562,10 @@ export default function BecomeSellerPage() {
           </div>
         )}
 
-        {/* Step 4: Store Settings */}
-        {step === 4 && (
+        {/* Step 3: Store Settings */}
+        {step === 3 && (
           <div className="space-y-5">
-            <button onClick={() => handleStepBack(3)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store details</button>
+            <button onClick={() => handleStepBack(2)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store details</button>
             <div className="border rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-2"><Truck size={16} className="text-primary" /><h3 className="font-semibold text-sm">Fulfillment Mode</h3></div>
               <RadioGroup value={formData.fulfillment_mode} onValueChange={(value) => setFormData({ ...formData, fulfillment_mode: value })} className="space-y-2">
@@ -609,28 +609,28 @@ export default function BecomeSellerPage() {
           </div>
         )}
 
-        {/* Step 5: Add Products */}
-        {step === 5 && !draftSellerId && (
+        {/* Step 4: Add Products */}
+        {step === 4 && !draftSellerId && (
           <div className="space-y-5 text-center py-8">
             <div className="w-16 h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center"><Package size={24} className="text-destructive" /></div>
             <h3 className="text-lg font-semibold">Unable to load your store</h3>
             <p className="text-sm text-muted-foreground">Your store draft could not be found. Please go back and try again.</p>
-            <Button variant="outline" onClick={() => setStep(3)}><ArrowLeft size={16} className="mr-1" />Go Back</Button>
+            <Button variant="outline" onClick={() => setStep(2)}><ArrowLeft size={16} className="mr-1" />Go Back</Button>
           </div>
         )}
-        {step === 5 && draftSellerId && (
+        {step === 4 && draftSellerId && (
           <div className="space-y-5">
-            <button onClick={() => handleStepBack(4)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store settings</button>
+            <button onClick={() => handleStepBack(3)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store settings</button>
             <DraftProductManager sellerId={draftSellerId} categories={formData.categories} products={draftProducts} onProductsChange={setDraftProducts} beforePick={beforeImagePick} />
             <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Review everything and submit for approval</p>
-            <Button className="w-full" onClick={() => setStep(6)} disabled={draftProducts.length === 0}>Review & Submit<ChevronRight size={16} className="ml-1" /></Button>
+            <Button className="w-full" onClick={() => setStep(5)} disabled={draftProducts.length === 0}>Review & Submit<ChevronRight size={16} className="ml-1" /></Button>
           </div>
         )}
 
-        {/* Step 6: Review & Submit */}
-        {step === 6 && (
+        {/* Step 5: Review & Submit */}
+        {step === 5 && (
           <div className="space-y-5">
-            <button onClick={() => handleStepBack(5)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit products</button>
+            <button onClick={() => handleStepBack(4)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit products</button>
             <div className="bg-muted rounded-lg p-4 space-y-3">
               <h4 className="font-semibold">Application Summary</h4>
               <div className="space-y-2 text-sm">
