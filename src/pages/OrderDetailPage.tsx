@@ -292,7 +292,12 @@ export default function OrderDetailPage() {
   // Dynamic action label: workflow-driven with end-state awareness
   const getActionLabel = (status: string, otpRequired: boolean) => {
     const step = o.flow.find(s => s.status_key === status);
-    const label = step?.display_label || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const roleLabel = (viewRole === 'seller' && step?.seller_display_label)
+      ? step.seller_display_label
+      : (viewRole === 'buyer' && step?.buyer_display_label)
+        ? step.buyer_display_label
+        : step?.display_label;
+    const label = roleLabel || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     const isEnd = step?.is_terminal === true;
     if (otpRequired) return isEnd ? 'Verify & Complete' : `Verify & ${label}`;
     return isEnd ? 'Complete Order' : `Mark ${label}`;
