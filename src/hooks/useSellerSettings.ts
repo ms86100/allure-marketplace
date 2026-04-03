@@ -32,6 +32,8 @@ export interface SellerSettingsFormData {
   delivery_note: string;
   minimum_order_amount: string;
   daily_order_limit: string;
+  vacation_mode: boolean;
+  vacation_until: string;
 }
 
 const DEFAULT_FORM: SellerSettingsFormData = {
