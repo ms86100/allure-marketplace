@@ -248,7 +248,7 @@ async function deliverPushToUser(
       // iOS with APNs token → direct APNs (primary), FCM fallback
       if (tokenRecord.platform === "ios" && tokenRecord.apns_token && creds.apnsConfigured) {
         result = await withTimeout(
-          sendApnsDirect(tokenRecord.apns_token, title, body, pushData, creds.apnsP8Key!, creds.apnsKeyId!, creds.apnsTeamId!, creds.apnsBundleId!, threadId, imageUrl),
+          sendApnsDirect(tokenRecord.apns_token, title, body, pushData, creds.apnsP8Key!, creds.apnsKeyId!, creds.apnsTeamId!, creds.apnsBundleId!, threadId, imageUrl, highPriority),
           PUSH_TIMEOUT_MS,
         );
         // FCM fallback if APNs fails (non-invalid) and we have a real FCM token
