@@ -236,6 +236,7 @@ export function AdminBannerManager() {
       }));
     }
 
+    const ctaConfig = banner.cta_config || {};
     setForm({
       banner_type: banner.banner_type || 'classic',
       title: banner.title || '',
@@ -257,6 +258,8 @@ export function AdminBannerManager() {
       schedule_end: banner.schedule_end ? banner.schedule_end.slice(0, 16) : '',
       fallback_mode: banner.fallback_mode || 'hide',
       sections,
+      cta_action: ctaConfig.action || 'link',
+      cta_target: ctaConfig.target || '',
     });
     setSheetOpen(true);
   };
