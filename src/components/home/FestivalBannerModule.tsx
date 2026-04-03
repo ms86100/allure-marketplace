@@ -53,13 +53,15 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
   }, [banner.id, user]);
 
   const handleSectionClick = (section: BannerSection) => {
-    // Fire analytics (fire-and-forget)
-    supabase.from('banner_analytics').insert({
-      banner_id: banner.id,
-      section_id: section.id,
-      event_type: 'section_click',
-      user_id: null,
-    }).then(() => {});
+    // Fire analytics (fire-and-forget, only if authenticated)
+    if (user) {
+      supabase.from('banner_analytics').insert({
+        banner_id: banner.id,
+        section_id: section.id,
+        event_type: 'section_click',
+        user_id: user.id,
+      }).then(() => {});
+    }
 
     navigate(`/festival-collection/${banner.id}/${section.id}`);
   };
