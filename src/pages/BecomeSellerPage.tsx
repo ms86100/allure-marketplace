@@ -498,47 +498,30 @@ export default function BecomeSellerPage() {
         </div>
 
         {/* Context Breadcrumb */}
-        {step >= 3 && selectedGroupInfo && (
+        {step >= 2 && selectedGroupInfo && (
           <div className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-muted/60 text-xs">
             <div className={cn('w-6 h-6 rounded flex items-center justify-center', selectedGroupInfo.color)}><DynamicIcon name={selectedGroupInfo.icon} size={14} /></div>
             <span className="font-medium">{selectedGroupInfo.label}</span>
             {formData.categories.length > 0 && (
-              <><ChevronRight size={12} className="text-muted-foreground" /><span className="text-muted-foreground truncate">{formData.categories.map(cat => { const config = (groupedConfigs[selectedGroup as keyof typeof groupedConfigs] || []).find(c => c.category === cat); return config?.displayName || cat; }).join(', ')}</span></>
+              <><ChevronRight size={12} className="text-muted-foreground" /><span className="text-muted-foreground truncate">{formData.categories.map(cat => { const config = configs.find(c => c.category === cat); return config?.displayName || cat; }).join(', ')}</span></>
             )}
-            {formData.business_name.trim() && step >= 4 && <><span className="text-muted-foreground">|</span><span className="font-medium truncate">"{formData.business_name}"</span></>}
+            {formData.business_name.trim() && step >= 3 && <><span className="text-muted-foreground">|</span><span className="font-medium truncate">"{formData.business_name}"</span></>}
           </div>
         )}
 
-        {/* Step 1: Choose Category Group */}
+        {/* Step 1: What do you want to sell? (Unified search + browse) */}
         {step === 1 && (
-          <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-3">
-              <AnimatePresence>
-                {parentGroupInfos.map(({ value, label, icon, color }) => (
-                  <motion.button key={value} layout whileTap={{ scale: 0.97 }} onClick={() => handleGroupSelect(value)}
-                    className={cn('flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center', selectedGroup === value ? 'border-primary bg-primary/5 scale-[1.03]' : 'hover:border-primary/50 hover:bg-muted/50')}>
-                    <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', color)}><DynamicIcon name={icon} size={24} /></div>
-                    <span className="font-medium text-sm">{label}</span>
-                    {selectedGroup === value && <motion.span initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-primary font-medium">Great choice! ✨</motion.span>}
-                  </motion.button>
-                ))}
-              </AnimatePresence>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Select Sub-categories (Guided Picker) */}
-        {step === 2 && selectedGroup && (
-          <GuidedStep2
-            selectedGroup={selectedGroup}
-            selectedGroupInfo={selectedGroupInfo}
+          <CategorySearchPicker
             formData={formData}
             setFormData={setFormData}
             groupedConfigs={groupedConfigs}
+            configs={configs}
             handleCategoryChange={handleCategoryChange}
-            onBack={() => handleStepBack(1)}
-            onContinue={() => setStep(3)}
-            onSkip={() => setStep(3)}
+            onContinue={() => setStep(2)}
+            onGroupResolved={(group) => {
+              if (!selectedGroup) setSelectedGroup(group);
+            }}
+            parentGroupInfos={parentGroupInfos}
           />
         )}
 
