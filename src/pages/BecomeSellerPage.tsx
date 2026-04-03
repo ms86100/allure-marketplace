@@ -414,7 +414,7 @@ function GuidedStep2({
 
 // ─── Main Page ──────────────────────────────────────────────────────────────
 export default function BecomeSellerPage() {
-  const { profile } = useAuth();
+  const { profile, sellerProfiles } = useAuth();
   const app = useSellerApplication();
   const { configs } = useCategoryConfigs();
   const {
