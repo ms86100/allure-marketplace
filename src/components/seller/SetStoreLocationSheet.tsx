@@ -10,6 +10,7 @@ import { getCurrentPosition } from '@/lib/native-location';
 import { useGoogleMaps, useAutocomplete } from '@/hooks/useGoogleMaps';
 import { MapPin, Navigation, Loader2, Search, ArrowLeft, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SetStoreLocationSheetProps {
   open: boolean;
