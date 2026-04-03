@@ -5592,6 +5592,7 @@ export type Database = {
           seller_type: Database["public"]["Enums"]["seller_type_enum"]
           society_id: string | null
           store_location_source: string | null
+          subcategory_preferences: Json | null
           total_reviews: number | null
           updated_at: string | null
           upi_id: string | null
@@ -5650,6 +5651,7 @@ export type Database = {
           seller_type?: Database["public"]["Enums"]["seller_type_enum"]
           society_id?: string | null
           store_location_source?: string | null
+          subcategory_preferences?: Json | null
           total_reviews?: number | null
           updated_at?: string | null
           upi_id?: string | null
@@ -5708,6 +5710,7 @@ export type Database = {
           seller_type?: Database["public"]["Enums"]["seller_type_enum"]
           society_id?: string | null
           store_location_source?: string | null
+          subcategory_preferences?: Json | null
           total_reviews?: number | null
           updated_at?: string | null
           upi_id?: string | null
