@@ -598,6 +598,14 @@ export function DraftProductManager({
                 </div>
               )}
 
+              {/* Action Type Selector */}
+              <ActionTypeSelector
+                category={newProduct.category}
+                value={newProduct.action_type || 'add_to_cart'}
+                onChange={(v) => setNewProduct({ ...newProduct, action_type: v })}
+                configs={configs}
+              />
+
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="prod-desc" className="text-xs">Description</Label>
