@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 export default function FestivalCollectionPage() {
   const { bannerId, sectionId } = useParams<{ bannerId: string; sectionId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, effectiveSocietyId } = useAuth();
 
   // Fetch banner for theming
   const { data: banner } = useQuery({
