@@ -452,7 +452,7 @@ export function AdminBannerManager() {
 
       {/* Create/Edit Drawer */}
       <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
-        <DrawerContent className="max-h-[90vh] overflow-y-auto">
+        <DrawerContent className="max-h-[90vh] overflow-y-auto bg-background border-border">
           <DrawerHeader>
             <DrawerTitle className="font-bold">{editingId ? 'Edit Banner' : 'Create Banner'}</DrawerTitle>
           </DrawerHeader>
@@ -623,7 +623,7 @@ export function AdminBannerManager() {
 
             {/* Animation Config (Festival) */}
             {form.banner_type === 'festival' && (
-              <div className="space-y-3 p-3 bg-muted/40 rounded-xl">
+              <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Animation</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -690,7 +690,7 @@ export function AdminBannerManager() {
                 </div>
                 <div className="space-y-2">
                   {form.sections.map((section, idx) => (
-                    <div key={idx} className="p-3 rounded-xl border border-border bg-card space-y-2">
+                    <div key={idx} className="p-3 rounded-xl border border-border bg-muted/50 space-y-2">
                       <div className="flex items-center gap-2">
                         <Input
                           value={section.icon_emoji}
@@ -757,7 +757,7 @@ export function AdminBannerManager() {
 
             {/* Scheduling */}
             {form.banner_type === 'festival' && (
-              <div className="space-y-3 p-3 bg-muted/40 rounded-xl">
+              <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Schedule (Optional)</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
@@ -793,7 +793,7 @@ export function AdminBannerManager() {
             )}
 
             {/* Visibility & Config */}
-            <div className="space-y-3 p-3 bg-muted/40 rounded-xl">
+            <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {form.is_global ? <Globe size={14} className="text-primary" /> : <Building2 size={14} className="text-muted-foreground" />}
