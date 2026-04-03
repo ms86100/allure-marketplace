@@ -68,6 +68,7 @@ export function DraftProductManager({
   defaultActionType,
 }: DraftProductManagerProps) {
   const { user } = useAuth();
+  const { data: allActions = [] } = useActionTypeMap();
   const { data: blockLibrary = [] } = useBlockLibrary();
   const DRAFT_KEY = `draft-product-form-${sellerId}`;
 
