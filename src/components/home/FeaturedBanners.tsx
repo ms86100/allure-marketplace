@@ -47,9 +47,11 @@ export function FeaturedBanners() {
         .order('display_order');
 
       if (effectiveSocietyId) {
-        query = query.or(`society_id.eq.${effectiveSocietyId},society_id.is.null`);
+        // Society-aware: show banners targeting this society, global banners, or legacy null society_id
+        query = query.or(`target_society_ids.cs.{${effectiveSocietyId}},target_society_ids.eq.{},society_id.eq.${effectiveSocietyId},society_id.is.null`);
       } else {
-        query = query.is('society_id', null);
+        // No society: show only global banners
+        query = query.or(`target_society_ids.eq.{},society_id.is.null`);
       }
 
       // Schedule filtering

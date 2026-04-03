@@ -196,16 +196,18 @@ function SectionChip({
   section: BannerSection; bannerId: string; fallbackMode: string;
   accentColor: string; index: number; isVisible: boolean; onClick: () => void;
 }) {
+  const { effectiveSocietyId } = useAuth();
   const { data: previews = [] } = useQuery({
-    queryKey: ['banner-section-preview', section.id],
+    queryKey: ['banner-section-preview', section.id, effectiveSocietyId],
     queryFn: () => resolveProducts({
       sourceType: section.product_source_type as any,
       sourceValue: section.product_source_value,
       sectionId: section.id,
       fallbackMode: fallbackMode as any,
       limit: 20,
+      societyId: effectiveSocietyId || undefined,
     }),
-    staleTime: 5 * 60_000,
+    staleTime: 60_000,
   });
 
   if (previews.length === 0) return null;
