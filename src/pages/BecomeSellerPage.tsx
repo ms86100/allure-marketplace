@@ -35,7 +35,7 @@ function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety, e
   longitude: number | null;
   onLocationSet: (lat: number, lng: number, name?: string) => void;
   hasSociety: boolean;
-  existingStoreLocations?: { id: string; business_name: string; latitude: number; longitude: number }[];
+  existingStoreLocations?: { id: string; business_name: string; latitude: number; longitude: number; store_location_label?: string | null }[];
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [locationName, setLocationName] = useState<string | null>(null);
