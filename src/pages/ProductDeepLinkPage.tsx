@@ -25,7 +25,7 @@ export default function ProductDeepLinkPage() {
           .from('products')
           .select(`
             id, name, price, image_url, is_veg, category, description,
-            prep_time_minutes, fulfillment_mode, delivery_note, action_type,
+            prep_time_minutes, delivery_time_text, action_type,
             contact_phone, specifications, seller_id,
             seller:seller_profiles!products_seller_id_fkey(
               id, business_name, rating, total_reviews, society_id,
