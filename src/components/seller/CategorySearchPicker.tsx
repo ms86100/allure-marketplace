@@ -73,7 +73,7 @@ const ALIAS_MAP: Record<string, string[]> = {
   furniture: ['used furniture', 'sofa', 'bed', 'table', 'chair'],
   electronics: ['used phone', 'second hand laptop', 'old electronics'],
   books: ['used books', 'second hand books', 'old books', 'textbooks'],
-  clothing: ['used clothes', 'second hand clothing', 'pre-owned clothes'],
+  clothing: ['used clothes', 'second hand clothing', 'pre-owned clothes', 't-shirt', 'tshirt', 't shirt', 'shirts', 'jeans', 'dress', 'saree', 'kurti', 'fashion', 'garments', 'apparel', 'western wear', 'ethnic wear'],
   decoration: ['event decoration', 'birthday decoration', 'balloon decoration', 'party decoration'],
   photography: ['photographer', 'photo shoot', 'event photography', 'wedding photography'],
   dj_music: ['dj', 'music system', 'event music', 'sound system'],
