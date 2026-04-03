@@ -53,6 +53,7 @@ interface SellerProductDraft {
 export function useSellerProducts() {
   const { user, sellerProfiles, currentSellerId } = useAuth();
   const { groupedConfigs, configs } = useCategoryConfigs();
+  const { data: allActions = [] } = useActionTypeMap();
   const { data: blockLibrary = [] } = useBlockLibrary();
 
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
