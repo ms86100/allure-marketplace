@@ -273,6 +273,23 @@ export function usePushNotificationsInternal() {
         } catch (chErr) {
           pushLog('warn', 'ANDROID_CHANNEL_CREATE_FAILED', { error: String(chErr) });
         }
+
+        // General channel for standard (non-urgent) notifications
+        try {
+          await PushNotifications.createChannel({
+            id: 'general',
+            name: 'General',
+            description: 'Standard notifications',
+            importance: 3,
+            visibility: 1,
+            sound: 'default',
+            vibration: true,
+            lights: false,
+          });
+          pushLog('info', 'ANDROID_CHANNEL_CREATED', { channelId: 'general' });
+        } catch (chErr) {
+          pushLog('warn', 'ANDROID_CHANNEL_CREATE_FAILED', { error: String(chErr) });
+        }
       }
 
       // Listen for registration success — gives raw APNs token on iOS, FCM token on Android
