@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      action_type_workflow_map: {
+        Row: {
+          action_type: string
+          checkout_mode: string
+          creates_order: boolean
+          cta_label: string
+          cta_short_label: string
+          is_active: boolean
+          requires_availability: boolean
+          requires_price: boolean
+          transaction_type: string
+        }
+        Insert: {
+          action_type: string
+          checkout_mode?: string
+          creates_order?: boolean
+          cta_label?: string
+          cta_short_label?: string
+          is_active?: boolean
+          requires_availability?: boolean
+          requires_price?: boolean
+          transaction_type: string
+        }
+        Update: {
+          action_type?: string
+          checkout_mode?: string
+          creates_order?: boolean
+          cta_label?: string
+          cta_short_label?: string
+          is_active?: boolean
+          requires_availability?: boolean
+          requires_price?: boolean
+          transaction_type?: string
+        }
+        Relationships: []
+      }
       admin_settings: {
         Row: {
           created_at: string | null
@@ -1052,12 +1088,46 @@ export type Database = {
           },
         ]
       }
+      category_allowed_action_types: {
+        Row: {
+          action_type: string
+          category_config_id: string
+          id: string
+        }
+        Insert: {
+          action_type: string
+          category_config_id: string
+          id?: string
+        }
+        Update: {
+          action_type?: string
+          category_config_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_allowed_action_types_action_type_fkey"
+            columns: ["action_type"]
+            isOneToOne: false
+            referencedRelation: "action_type_workflow_map"
+            referencedColumns: ["action_type"]
+          },
+          {
+            foreignKeyName: "category_allowed_action_types_category_config_id_fkey"
+            columns: ["category_config_id"]
+            isOneToOne: false
+            referencedRelation: "category_config"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       category_config: {
         Row: {
           accepts_preorders: boolean
           category: Database["public"]["Enums"]["service_category"]
           color: string
           created_at: string | null
+          default_action_type: string | null
           default_sort: string
           description_placeholder: string | null
           display_name: string
@@ -1110,6 +1180,7 @@ export type Database = {
           category: Database["public"]["Enums"]["service_category"]
           color: string
           created_at?: string | null
+          default_action_type?: string | null
           default_sort?: string
           description_placeholder?: string | null
           display_name: string
@@ -1162,6 +1233,7 @@ export type Database = {
           category?: Database["public"]["Enums"]["service_category"]
           color?: string
           created_at?: string | null
+          default_action_type?: string | null
           default_sort?: string
           description_placeholder?: string | null
           display_name?: string
