@@ -46,13 +46,14 @@ export default function FestivalCollectionPage() {
 
   // Resolve products
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ['festival-collection-products', sectionId],
+    queryKey: ['festival-collection-products', sectionId, effectiveSocietyId],
     queryFn: () => resolveProducts({
       sourceType: (section as any)?.product_source_type || 'category',
       sourceValue: (section as any)?.product_source_value,
       sectionId: sectionId!,
       fallbackMode: (banner as any)?.fallback_mode || 'hide',
       limit: 50,
+      societyId: effectiveSocietyId || undefined,
     }),
     enabled: !!section,
     staleTime: 0,
