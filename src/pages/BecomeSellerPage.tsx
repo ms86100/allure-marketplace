@@ -27,6 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSellerApplication } from '@/hooks/useSellerApplication';
 import { useSubcategories } from '@/hooks/useSubcategories';
 import { SubcategoryPickerDialog, SubcategorySelection } from '@/components/seller/SubcategoryPickerDialog';
+import { CategorySearchPicker } from '@/components/seller/CategorySearchPicker';
 
 // ─── Store Location Picker ──────────────────────────────────────────────────
 function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }: {
