@@ -43,7 +43,9 @@ const ALIAS_MAP: Record<string, string[]> = {
   panchakarma_detox: ['panchakarma', 'detox program', 'body detox', 'cleansing therapy', 'detox'],
   abhyanga: ['oil massage', 'body massage', 'ayurvedic massage', 'full body massage'],
   shirodhara: ['head oil therapy', 'forehead oil', 'stress therapy', 'oil pouring'],
-  nasya_therapy: ['nasal therapy', 'sinus treatment', 'nasya'],
+  nasya_therapy: ['nasal therapy', 'sinus treatment', 'nasya', 'therapy'],
+  panchakarma_rejuvenation: ['rejuvenation', 'therapy', 'rejuvenation therapy'],
+  basti_therapy: ['basti', 'enema therapy', 'therapy'],
   swedana: ['steam therapy', 'steam bath', 'herbal steam'],
   facial: ['face treatment', 'face cleanup', 'glow facial', 'gold facial'],
   bridal_makeup: ['wedding makeup', 'bridal', 'dulhan makeup', 'party makeup'],
@@ -173,22 +175,21 @@ export function CategorySearchPicker({
         });
       }
 
-      if (configSubs.length === 0) {
-        items.push({
-          type: 'category',
-          id: config.id,
-          name: config.displayName,
-          slug: config.category,
-          icon: config.icon,
-          parentGroupSlug: config.parentGroup,
-          parentGroupLabel: group.label,
-          parentGroupIcon: group.icon,
-          parentGroupColor: group.color,
-          categoryConfigId: config.id,
-          categoryName: config.displayName,
-          hasSubcategories: false,
-        });
-      }
+      // Always add category-level item for alias matching (even when subcategories exist)
+      items.push({
+        type: 'category',
+        id: config.id,
+        name: config.displayName,
+        slug: config.category,
+        icon: config.icon,
+        parentGroupSlug: config.parentGroup,
+        parentGroupLabel: group.label,
+        parentGroupIcon: group.icon,
+        parentGroupColor: group.color,
+        categoryConfigId: config.id,
+        categoryName: config.displayName,
+        hasSubcategories: configSubs.length > 0,
+      });
     }
     return items;
   }, [configs, allSubs, parentGroupInfos]);
@@ -235,11 +236,27 @@ export function CategorySearchPicker({
     const q = search.trim();
     if (q.length < 2) return [];
 
-    return searchIndex
+    const scored = searchIndex
       .map(item => ({ ...item, score: scoreItem(item, q) }))
       .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 15);
+      .sort((a, b) => b.score - a.score);
+
+    // Deduplicate: if a category item scores >= its subcategory items, suppress subcategories below it
+    const seen = new Set<string>();
+    const deduped: ScoredItem[] = [];
+    for (const item of scored) {
+      if (item.type === 'category' && item.hasSubcategories) {
+        deduped.push(item);
+        seen.add(item.categoryConfigId);
+      } else if (item.type === 'subcategory' && seen.has(item.categoryConfigId)) {
+        // Only include subcategory if it scores higher than 1 (strong direct match)
+        if (item.score > 1) deduped.push(item);
+      } else {
+        deduped.push(item);
+      }
+    }
+
+    return deduped.slice(0, 15);
   }, [search, searchIndex, scoreItem]);
 
   const suggestion = useMemo<ScoredItem | null>(() => {
@@ -273,6 +290,10 @@ export function CategorySearchPicker({
     }
 
     if (item.type === 'subcategory') {
+      setPickerCategoryId(item.categoryConfigId);
+      setPickerOpen(true);
+    } else if (item.hasSubcategories) {
+      // Category with subcategories → open subcategory picker
       setPickerCategoryId(item.categoryConfigId);
       setPickerOpen(true);
     } else {
