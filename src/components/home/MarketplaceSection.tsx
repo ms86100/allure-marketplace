@@ -16,7 +16,7 @@ import { ProductListingCard, ProductWithSeller } from '@/components/product/Prod
 import { getCategoryPastel } from '@/lib/category-pastels';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronRight, ShoppingBag, Sparkles, Clock, TrendingUp, Flame, Store } from 'lucide-react';
+import { ChevronRight, ShoppingBag, Sparkles, Clock, TrendingUp, Flame, Store, UtensilsCrossed, Wrench, Heart, Users } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { motion } from 'framer-motion';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
@@ -219,14 +219,9 @@ export function MarketplaceSection() {
 
       <SectionDivider />
 
-      {/* ── P3: Store Discovery ── */}
+      {/* ── P3: Store Discovery (heading rendered internally) ── */}
       <FadeIn delay={0.4}>
-        <div className="py-6 mt-4">
-          <div className="flex items-center gap-2 px-4 mb-3">
-            <h3 className="font-extrabold text-lg text-foreground tracking-tight">{ml.label('label_section_store_discovery')}</h3>
-          </div>
-          <ShopByStoreDiscovery />
-        </div>
+        <ShopByStoreDiscovery sectionTitle={ml.label('label_section_store_discovery')} />
       </FadeIn>
 
       <ProductDetailSheet
@@ -338,57 +333,122 @@ function ProductListings({
 
   if (categories.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+      <div className="px-4 py-10 space-y-8">
+        {/* Hero visual */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
-          className="relative mb-8"
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+          className="flex flex-col items-center text-center"
         >
-          <div className="w-28 h-28 rounded-3xl bg-primary/10 flex items-center justify-center">
-            <ShoppingBag size={48} className="text-primary" />
-          </div>
-          <div className="absolute -top-3 -right-3">
-            <div className="w-10 h-10 rounded-2xl bg-warning/20 flex items-center justify-center">
-              <Sparkles size={18} className="text-warning" />
+          <div className="relative mb-6">
+            {/* Pulsing rings */}
+            <motion.div
+              animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0, 0.3] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute inset-0 rounded-full bg-primary/20"
+            />
+            <motion.div
+              animate={{ scale: [1, 1.5, 1], opacity: [0.2, 0, 0.2] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
+              className="absolute inset-0 rounded-full bg-primary/10"
+            />
+            <div className="relative w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
+              <ShoppingBag size={40} className="text-primary" />
             </div>
+            {/* Floating mini icons */}
+            <motion.div
+              animate={{ y: [-4, 4, -4] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute -top-2 -right-2 w-8 h-8 rounded-xl bg-warning/20 flex items-center justify-center"
+            >
+              <UtensilsCrossed size={14} className="text-warning" />
+            </motion.div>
+            <motion.div
+              animate={{ y: [4, -4, 4] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut', delay: 0.3 }}
+              className="absolute -bottom-1 -left-3 w-8 h-8 rounded-xl bg-accent/20 flex items-center justify-center"
+            >
+              <Wrench size={14} className="text-accent-foreground" />
+            </motion.div>
           </div>
-        </motion.div>
 
-        <motion.div
-          initial={{ y: 12, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.4 }}
-          className="space-y-3"
-        >
           <h2 className="text-xl font-extrabold text-foreground tracking-tight">{ml.label('label_empty_marketplace_title')}</h2>
-          <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
+          <p className="text-sm text-muted-foreground max-w-xs mt-2 leading-relaxed">
             {ml.label('label_empty_marketplace_desc')}
           </p>
         </motion.div>
 
+        {/* Value proposition cards */}
+        <div className="grid grid-cols-3 gap-2.5">
+          {[
+            { icon: <UtensilsCrossed size={20} className="text-warning" />, bg: 'bg-warning/10', title: 'Home-cooked meals', desc: 'Fresh food from your neighbors' },
+            { icon: <Wrench size={20} className="text-primary" />, bg: 'bg-primary/10', title: 'Local services', desc: 'Trusted help nearby' },
+            { icon: <Heart size={20} className="text-destructive" />, bg: 'bg-destructive/10', title: 'Zero commission', desc: 'Sellers keep 100%' },
+          ].map((card, i) => (
+            <motion.div
+              key={card.title}
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3 + i * 0.12, duration: 0.4 }}
+              className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-card border border-border text-center"
+            >
+              <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', card.bg)}>
+                {card.icon}
+              </div>
+              <p className="text-[11px] font-bold text-foreground leading-tight">{card.title}</p>
+              <p className="text-[9px] text-muted-foreground leading-snug">{card.desc}</p>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* How it works */}
         <motion.div
-          initial={{ y: 12, opacity: 0 }}
+          initial={{ y: 16, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.4, duration: 0.4 }}
-          className="mt-8 flex items-center gap-2 text-xs text-muted-foreground bg-card border border-border rounded-2xl px-5 py-3 shadow-card"
+          transition={{ delay: 0.7, duration: 0.4 }}
+          className="rounded-2xl bg-secondary/50 border border-border p-4 space-y-3"
         >
-          <Clock size={15} />
-          <span>{ml.label('label_empty_marketplace_hint')}</span>
+          <p className="text-xs font-bold text-foreground text-center">How it works</p>
+          <div className="flex items-start gap-3">
+            {[
+              { step: '1', text: 'Sellers list their products & services' },
+              { step: '2', text: 'You browse, compare & order' },
+              { step: '3', text: 'Get it delivered from your neighbor' },
+            ].map((s, i) => (
+              <div key={s.step} className="flex-1 flex flex-col items-center gap-1.5 text-center">
+                <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+                  {s.step}
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-snug">{s.text}</p>
+              </div>
+            ))}
+          </div>
         </motion.div>
 
-        {/* Actionable CTAs for empty marketplace */}
+        {/* Social proof hint */}
         <motion.div
           initial={{ y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.6, duration: 0.4 }}
-          className="mt-4 flex flex-col gap-2 w-full max-w-xs"
+          transition={{ delay: 0.9, duration: 0.4 }}
+          className="flex items-center justify-center gap-2 text-xs text-muted-foreground"
+        >
+          <Users size={14} />
+          <span>Join families already using Sociva in their community</span>
+        </motion.div>
+
+        {/* CTAs */}
+        <motion.div
+          initial={{ y: 12, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 1, duration: 0.4 }}
+          className="flex flex-col gap-2 max-w-xs mx-auto"
         >
           <button
             onClick={() => navigate('/become-seller')}
-            className="w-full px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold active:scale-[0.98] transition-transform"
+            className="w-full px-4 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold active:scale-[0.98] transition-transform"
           >
-            🛍️ Become the first seller
+            🛍️ Start selling to your neighbors
           </button>
           <button
             onClick={() => {
@@ -396,9 +456,9 @@ function ProductListings({
                 navigator.share({ title: 'Join our community marketplace', url: window.location.origin });
               }
             }}
-            className="w-full px-4 py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium active:scale-[0.98] transition-transform"
+            className="w-full px-4 py-3 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium active:scale-[0.98] transition-transform"
           >
-            📨 Invite neighbors
+            📨 Invite a neighbor to sell
           </button>
         </motion.div>
       </div>
