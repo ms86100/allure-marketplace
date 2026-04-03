@@ -211,6 +211,7 @@ async function deliverPushToUser(
   supabase: any, creds: CachedCredentials, userId: string,
   title: string, body: string, pushData: Record<string, string>,
   threadId?: string, imageUrl?: string, notificationId?: string,
+  highPriority = false,
 ): Promise<{ successCount: number; failCount: number }> {
   const startMs = Date.now();
 
