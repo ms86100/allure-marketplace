@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { resolveProducts, ResolvedProduct } from '@/lib/bannerProductResolver';
 import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { cn } from '@/lib/utils';
