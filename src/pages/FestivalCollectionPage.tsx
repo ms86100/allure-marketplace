@@ -141,12 +141,14 @@ function ProductCard({
   navigate,
   bannerId,
   sectionId,
+  userId,
   outOfStock = false,
 }: {
   product: ResolvedProduct;
   navigate: any;
   bannerId: string;
   sectionId: string;
+  userId?: string;
   outOfStock?: boolean;
 }) {
   const lowStock = !outOfStock && product.stock_quantity != null && product.low_stock_threshold != null
@@ -157,14 +159,16 @@ function ProductCard({
     : 0;
 
   const handleClick = () => {
-    // Track product click
-    supabase.from('banner_analytics').insert({
-      banner_id: bannerId,
-      section_id: sectionId,
-      event_type: 'product_click',
-      product_id: product.id,
-      user_id: null,
-    }).then(() => {});
+    // Track product click (only if authenticated)
+    if (userId) {
+      supabase.from('banner_analytics').insert({
+        banner_id: bannerId,
+        section_id: sectionId,
+        event_type: 'product_click',
+        product_id: product.id,
+        user_id: userId,
+      }).then(() => {});
+    }
 
     navigate(`/product/${product.id}`);
   };
