@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
+import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers'; // used by DiscoveryRow via ProductListingCard
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
