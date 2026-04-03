@@ -233,9 +233,12 @@ async function sendFCMNotification(
 ): Promise<{ success: boolean; error?: string }> {
   const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
 
+  const androidSound = highPriority ? "gate_bell" : "default";
+  const androidChannel = highPriority ? "orders_alert" : "general";
   const androidNotification: Record<string, unknown> = {
-    sound: "gate_bell",
-    channel_id: "orders_alert",
+    sound: androidSound,
+    channel_id: androidChannel,
+    icon: "ic_stat_sociva",
   };
   if (threadId) androidNotification.tag = threadId;
   if (imageUrl) androidNotification.image = imageUrl;
