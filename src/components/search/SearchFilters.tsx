@@ -166,6 +166,7 @@ export function SearchFilters({
                 { value: 'newest', label: 'Newest' },
                 { value: 'price_low', label: 'Price: Low to High' },
                 { value: 'price_high', label: 'Price: High to Low' },
+                { value: 'nearest', label: 'Nearest' },
               ].map(({ value, label }) => (
                 <button
                   key={value}

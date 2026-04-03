@@ -589,36 +589,65 @@ export default function SellerDetailPage() {
 
             {filteredProducts.length > 0 ? (
               <div className="space-y-0">
-                {filteredProducts.map((product) => (
-                  <div key={product.id} onClick={() => {
-                    const categoryInfo = allCategoryConfigs.find(c => c.category === product.category);
-                    setSelectedProduct({
-                      product_id: product.id,
-                      product_name: product.name,
-                      price: product.price,
-                      image_url: product.image_url,
-                      is_veg: product.is_veg,
-                      category: product.category,
-                      description: product.description,
-                      prep_time_minutes: product.prep_time_minutes,
-                      fulfillment_mode: (seller as any).fulfillment_mode || null,
-                      delivery_note: (seller as any).delivery_note || null,
-                      action_type: product.action_type || 'add_to_cart',
-                      contact_phone: product.contact_phone || null,
-                      specifications: product.specifications,
-                      seller_id: seller!.id,
-                      seller_name: seller!.business_name,
-                      seller_rating: seller!.rating,
-                      seller_reviews: seller!.total_reviews,
-                      society_name: (seller as any).society?.name || null,
-                      distance_km: distanceKm,
-                      is_same_society: seller!.society_id === effectiveSocietyId,
-                    });
-                    setDetailOpen(true);
-                  }} className="cursor-pointer">
-                    <ProductCard product={product} />
-                  </div>
-                ))}
+                {(() => {
+                  // Group products by category for anchor-based scroll navigation
+                  const uniqueCats = [...new Set(filteredProducts.map(p => p.category))];
+                  const showSections = activeCategory === 'all' && uniqueCats.length > 1;
+                  return showSections ? uniqueCats.map(cat => {
+                    const catProducts = filteredProducts.filter(p => p.category === cat);
+                    const categoryInfo = allCategoryConfigs.find(c => c.category === cat);
+                    return (
+                      <div key={cat} id={`seller-cat-${cat}`}>
+                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide pt-4 pb-2 px-1">
+                          {categoryInfo?.displayName || cat}
+                        </p>
+                        {catProducts.map(product => (
+                          <div key={product.id} onClick={() => {
+                            setSelectedProduct({
+                              product_id: product.id, product_name: product.name, price: product.price,
+                              image_url: product.image_url, is_veg: product.is_veg, category: product.category,
+                              description: product.description, prep_time_minutes: product.prep_time_minutes,
+                              fulfillment_mode: (seller as any).fulfillment_mode || null,
+                              delivery_note: (seller as any).delivery_note || null,
+                              action_type: product.action_type || 'add_to_cart',
+                              contact_phone: product.contact_phone || null,
+                              specifications: product.specifications, seller_id: seller!.id,
+                              seller_name: seller!.business_name, seller_rating: seller!.rating,
+                              seller_reviews: seller!.total_reviews,
+                              society_name: (seller as any).society?.name || null,
+                              distance_km: distanceKm,
+                              is_same_society: seller!.society_id === effectiveSocietyId,
+                            });
+                            setDetailOpen(true);
+                          }} className="cursor-pointer">
+                            <ProductCard product={product} />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }) : filteredProducts.map((product) => (
+                    <div key={product.id} onClick={() => {
+                      setSelectedProduct({
+                        product_id: product.id, product_name: product.name, price: product.price,
+                        image_url: product.image_url, is_veg: product.is_veg, category: product.category,
+                        description: product.description, prep_time_minutes: product.prep_time_minutes,
+                        fulfillment_mode: (seller as any).fulfillment_mode || null,
+                        delivery_note: (seller as any).delivery_note || null,
+                        action_type: product.action_type || 'add_to_cart',
+                        contact_phone: product.contact_phone || null,
+                        specifications: product.specifications, seller_id: seller!.id,
+                        seller_name: seller!.business_name, seller_rating: seller!.rating,
+                        seller_reviews: seller!.total_reviews,
+                        society_name: (seller as any).society?.name || null,
+                        distance_km: distanceKm,
+                        is_same_society: seller!.society_id === effectiveSocietyId,
+                      });
+                      setDetailOpen(true);
+                    }} className="cursor-pointer">
+                      <ProductCard product={product} />
+                    </div>
+                  ));
+                })()}
               </div>
             ) : (
               <div className="text-center py-8 space-y-2">
