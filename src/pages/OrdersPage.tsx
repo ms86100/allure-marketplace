@@ -19,7 +19,7 @@ import { format } from 'date-fns';
 function OrderCard({ order, type, successTerminals }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string> }) {
   const { getFlowLabel } = useFlowStepLabels();
   const { formatPrice } = useCurrency();
-  const statusInfo = getFlowLabel(order.status);
+  const statusInfo = getFlowLabel(order.status, type);
   const seller = (order as any).seller;
   const buyer = (order as any).buyer;
   const items = (order as any).items || [];

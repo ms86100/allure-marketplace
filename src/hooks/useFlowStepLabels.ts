@@ -8,6 +8,13 @@ interface FlowLabel {
   color: string;
 }
 
+interface FlowLabelEntry {
+  label: string;
+  color: string;
+  buyerLabel: string | null;
+  sellerLabel: string | null;
+}
+
 /**
  * Batch-fetches display_label + color from category_status_flows for all distinct status keys.
  * Falls back to useStatusLabels (system_settings / hardcoded) when no workflow label exists.
@@ -19,26 +26,24 @@ export function useFlowStepLabels() {
 
   const { data: flowLabelMap } = useQuery({
     queryKey: ['flow-step-labels-batch'],
-    queryFn: async (): Promise<Record<string, FlowLabel>> => {
-      // Bug 1 fix: Only fetch 'default' parent_group labels to avoid cross-workflow contamination.
-      // Detail page uses per-order flow for accurate labels; list views use this canonical baseline.
+    queryFn: async (): Promise<Record<string, FlowLabelEntry>> => {
       const { data, error } = await supabase
         .from('category_status_flows')
-        .select('status_key, display_label, color')
+        .select('status_key, display_label, color, buyer_display_label, seller_display_label')
         .eq('parent_group', 'default');
 
       if (error || !data) return {};
 
-      // Build lookup: prefer the first non-null display_label found per status_key
-      const map: Record<string, FlowLabel> = {};
+      const map: Record<string, FlowLabelEntry> = {};
       for (const row of data) {
         if (!row.status_key) continue;
-        // Only set if we don't have one yet, or if this row has a display_label and the existing one doesn't
         if (!map[row.status_key] || (!map[row.status_key].label && row.display_label)) {
           if (row.display_label) {
             map[row.status_key] = {
               label: row.display_label,
               color: row.color || 'bg-gray-100 text-gray-600',
+              buyerLabel: row.buyer_display_label || null,
+              sellerLabel: row.seller_display_label || null,
             };
           }
         }
@@ -48,10 +53,16 @@ export function useFlowStepLabels() {
     staleTime: jitteredStaleTime(30 * 60 * 1000),
   });
 
-  const getFlowLabel = (statusKey: string): FlowLabel => {
-    const flowLabel = flowLabelMap?.[statusKey];
-    if (flowLabel) return flowLabel;
-    // Fallback to system_settings / hardcoded labels
+  const getFlowLabel = (statusKey: string, role?: 'buyer' | 'seller'): FlowLabel => {
+    const entry = flowLabelMap?.[statusKey];
+    if (entry) {
+      const label = (role === 'buyer' && entry.buyerLabel)
+        ? entry.buyerLabel
+        : (role === 'seller' && entry.sellerLabel)
+          ? entry.sellerLabel
+          : entry.label;
+      return { label, color: entry.color };
+    }
     return getOrderStatus(statusKey);
   };
 

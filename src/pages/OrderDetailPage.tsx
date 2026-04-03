@@ -274,7 +274,8 @@ export default function OrderDetailPage() {
   const buyer = (order as any).buyer;
   const items: OrderItem[] = (order as any).items || [];
   const hasItemsField = 'items' in (order as any);
-  const statusInfo = o.getFlowStepLabel(order.status);
+  const viewRole: 'buyer' | 'seller' = o.isSellerView ? 'seller' : 'buyer';
+  const statusInfo = o.getFlowStepLabel(order.status, viewRole);
   const paymentStatusInfo = o.getPaymentStatus((order.payment_status as PaymentStatus) || 'pending');
   const displayStatuses = o.displayStatuses;
   const isInTransit = o.isInTransit;
@@ -291,7 +292,12 @@ export default function OrderDetailPage() {
   // Dynamic action label: workflow-driven with end-state awareness
   const getActionLabel = (status: string, otpRequired: boolean) => {
     const step = o.flow.find(s => s.status_key === status);
-    const label = step?.display_label || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const roleLabel = (viewRole === 'seller' && step?.seller_display_label)
+      ? step.seller_display_label
+      : (viewRole === 'buyer' && step?.buyer_display_label)
+        ? step.buyer_display_label
+        : step?.display_label;
+    const label = roleLabel || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     const isEnd = step?.is_terminal === true;
     if (otpRequired) return isEnd ? 'Verify & Complete' : `Verify & ${label}`;
     return isEnd ? 'Complete Order' : `Mark ${label}`;
@@ -448,7 +454,7 @@ export default function OrderDetailPage() {
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${isCompleted ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground'} ${isCurrent ? 'ring-2 ring-accent/50' : ''}`}>
                           {isCompleted ? <Check size={14} /> : index + 1}
                         </div>
-                        <span className="text-[9px] text-center mt-1 text-muted-foreground leading-tight whitespace-nowrap">{o.getFlowStepLabel(status as string).label}</span>
+                        <span className="text-[9px] text-center mt-1 text-muted-foreground leading-tight whitespace-nowrap">{o.getFlowStepLabel(status as string, viewRole).label}</span>
                       </div>
                     );
                   })}
@@ -651,7 +657,7 @@ export default function OrderDetailPage() {
             const isAdvancer = (o.isSellerView && nextStepActors.includes('seller')) || (o.isBuyerView && nextStepActors.includes('buyer'));
             // The non-advancer sees the code; the advancer sees the "Verify" button in action bar
             if (isAdvancer) return null;
-            return <GenericOtpCard orderId={order.id} targetStatus={nextStatus} targetStatusLabel={o.getFlowStepLabel(nextStatus).label} />;
+            return <GenericOtpCard orderId={order.id} targetStatus={nextStatus} targetStatusLabel={o.getFlowStepLabel(nextStatus, viewRole).label} />;
           })()}
           {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} flow={o.flow} />}
 

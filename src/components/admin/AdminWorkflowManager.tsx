@@ -75,7 +75,7 @@ export function AdminWorkflowManager() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('category_status_flows')
-      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint, seller_hint, id, notify_buyer, notification_title, notification_body, notification_action, notify_seller, seller_notification_title, seller_notification_body, is_deprecated, is_transit, requires_otp, otp_type, is_success, creates_tracking_assignment')
+      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint, seller_hint, id, notify_buyer, notification_title, notification_body, notification_action, notify_seller, seller_notification_title, seller_notification_body, is_deprecated, is_transit, requires_otp, otp_type, is_success, creates_tracking_assignment, buyer_display_label, seller_display_label')
       .order('parent_group')
       .order('transaction_type')
       .order('sort_order', { ascending: true });
@@ -289,6 +289,7 @@ export function AdminWorkflowManager() {
         notify_seller: s.notify_seller, seller_notification_title: s.seller_notification_title || null,
         seller_notification_body: s.seller_notification_body || null,
         is_transit: s.is_transit, requires_otp: s.otp_type !== null, otp_type: s.otp_type, is_success: s.is_success, creates_tracking_assignment: s.creates_tracking_assignment,
+        buyer_display_label: (s as any).buyer_display_label || null, seller_display_label: (s as any).seller_display_label || null,
         };
       });
       const { error: insertError } = await supabase.from('category_status_flows').insert(stepsToInsert);
@@ -581,7 +582,7 @@ export function AdminWorkflowManager() {
                       {/* Row 2: Display Label + Badge Color */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <FieldLabel label="Display Name" tooltip="The label shown to buyers and sellers in the app (e.g. 'Picked Up', 'On the Way')." />
+                          <FieldLabel label="Display Name" tooltip="The default label shown in the app (e.g. 'Picked Up', 'On the Way'). Can be overridden per role below." />
                           <Input value={step.display_label} onChange={(e) => updateStep(index, 'display_label', e.target.value)} placeholder="e.g. Picked Up" className="h-7 text-xs rounded-lg" />
                         </div>
                         <div>
@@ -610,6 +611,18 @@ export function AdminWorkflowManager() {
                               ))}
                             </SelectContent>
                           </Select>
+                        </div>
+                      </div>
+
+                      {/* Row 2b: Role-specific label overrides */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <FieldLabel label="Buyer Label Override" tooltip="If set, buyers see this label instead of the Display Name (e.g. 'Ready for Pickup' instead of 'Ready'). Leave empty to use the default." />
+                          <Input value={(step as any).buyer_display_label || ''} onChange={(e) => updateStep(index, 'buyer_display_label' as any, e.target.value || null)} placeholder="e.g. Ready for Pickup" className="h-7 text-xs rounded-lg" />
+                        </div>
+                        <div>
+                          <FieldLabel label="Seller Label Override" tooltip="If set, sellers see this label instead of the Display Name (e.g. 'Handed Over' instead of 'Picked Up'). Leave empty to use the default." />
+                          <Input value={(step as any).seller_display_label || ''} onChange={(e) => updateStep(index, 'seller_display_label' as any, e.target.value || null)} placeholder="e.g. Handed Over" className="h-7 text-xs rounded-lg" />
                         </div>
                       </div>
 
