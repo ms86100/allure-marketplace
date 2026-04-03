@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { useCurrency } from '@/hooks/useCurrency';
+import { deriveActionType, ACTION_CONFIG } from '@/lib/marketplace-constants';
 import type { ProductFormData } from '@/hooks/useSellerProducts';
 import type { SellerProfile } from '@/types/database';
 import type { BlockData } from '@/hooks/useAttributeBlocks';
