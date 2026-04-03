@@ -462,6 +462,15 @@ export default function BecomeSellerPage() {
     loadSellerDataIntoForm, reloadProducts, rejectionFeedback, setRejectionFeedback,
   } = app;
 
+  // ─── Config sub-step state (persisted in sessionStorage) ───────────────
+  const [configSubStep, setConfigSubStep] = useState<number>(() => {
+    try { return parseInt(sessionStorage.getItem('onboarding_config_substep') || '1', 10) || 1; } catch { return 1; }
+  });
+  const handleSetConfigSubStep = useCallback((val: number) => {
+    setConfigSubStep(val);
+    try { sessionStorage.setItem('onboarding_config_substep', String(val)); } catch { /* */ }
+  }, []);
+
   // Auto-save draft before opening native image picker (survives WebView reload)
   const beforeImagePick = useCallback(async () => {
     if (draftSellerId) {
