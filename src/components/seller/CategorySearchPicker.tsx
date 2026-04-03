@@ -10,6 +10,7 @@ import { SubcategoryPickerDialog, SubcategorySelection } from '@/components/sell
 import { Search, Sparkles, X, Star, ChevronRight, ArrowRight, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTypewriterPlaceholder } from '@/hooks/useTypewriterPlaceholder';
 import type { SellerFormData, SubcategoryPreferences } from '@/hooks/useSellerApplication';
 import type { CategoryConfig } from '@/types/categories';
 
@@ -37,7 +38,7 @@ const ALIAS_MAP: Record<string, string[]> = {
   jams_preserves: ['jam', 'preserve', 'marmalade'],
   masala_spices: ['masala', 'spice', 'spices', 'garam masala'],
   papad_fryums: ['papad', 'fryums', 'appalam'],
-  yoga: ['meditation', 'wellness', 'mindfulness', 'pranayama', 'fitness class'],
+  yoga: ['meditation', 'wellness', 'mindfulness', 'pranayama', 'fitness class', 'therapy', 'yoga therapy', 'ayurvedic therapy', 'ayurveda', 'naturopathy', 'holistic healing', 'mind body', 'stress relief'],
   dance: ['dance class', 'dancing', 'zumba', 'bharatnatyam', 'salsa'],
   music: ['music class', 'guitar', 'piano', 'singing', 'vocal training'],
   art_craft: ['art class', 'craft', 'painting', 'drawing', 'pottery'],
@@ -56,9 +57,9 @@ const ALIAS_MAP: Record<string, string[]> = {
   cook: ['cook', 'home cook', 'chef', 'cooking service'],
   driver: ['driver', 'personal driver', 'chauffeur'],
   nanny: ['nanny', 'babysitter', 'child care'],
-  beauty: ['parlour', 'parlor', 'makeup', 'facial', 'beauty service', 'bridal makeup'],
-  salon: ['salon', 'haircut', 'hair styling', 'grooming'],
-  tailoring: ['tailor', 'stitching', 'alteration', 'blouse stitching'],
+  beauty: ['parlour', 'parlor', 'makeup', 'facial', 'beauty service', 'bridal makeup', 'skin care', 'spa', 'massage', 'body massage', 'ayurvedic massage'],
+  salon: ['salon', 'haircut', 'hair styling', 'grooming', 'beard trim', 'hair spa'],
+  tailoring: ['tailor', 'stitching', 'alteration', 'blouse stitching', 'kurta stitching'],
   laundry: ['laundry', 'dry cleaning', 'ironing', 'washing clothes'],
   mehendi: ['mehendi', 'henna', 'mehndi'],
   tax_consultant: ['tax', 'gst', 'income tax', 'tax filing', 'ca service'],
@@ -72,7 +73,7 @@ const ALIAS_MAP: Record<string, string[]> = {
   furniture: ['used furniture', 'sofa', 'bed', 'table', 'chair'],
   electronics: ['used phone', 'second hand laptop', 'old electronics'],
   books: ['used books', 'second hand books', 'old books', 'textbooks'],
-  clothing: ['used clothes', 'second hand clothing', 'pre-owned clothes'],
+  clothing: ['used clothes', 'second hand clothing', 'pre-owned clothes', 't-shirt', 'tshirt', 't shirt', 'shirts', 'jeans', 'dress', 'saree', 'kurti', 'fashion', 'garments', 'apparel', 'western wear', 'ethnic wear'],
   decoration: ['event decoration', 'birthday decoration', 'balloon decoration', 'party decoration'],
   photography: ['photographer', 'photo shoot', 'event photography', 'wedding photography'],
   dj_music: ['dj', 'music system', 'event music', 'sound system'],
@@ -124,6 +125,11 @@ export function CategorySearchPicker({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerCategoryId, setPickerCategoryId] = useState<string | null>(null);
   const [browseGroup, setBrowseGroup] = useState<string | null>(null);
+
+  const typewriterPlaceholder = useTypewriterPlaceholder(
+    ['Tiffin Service', 'Yoga Classes', 'Electrician', 'T-Shirts', 'Ayurvedic Therapy', 'Home Cleaning', 'Birthday Cakes', 'Tuition', 'Beauty Services', 'Plumber'],
+    { prefix: 'Search "', suffix: '"', typeSpeed: 70, eraseSpeed: 35, pauseAfterType: 2000 },
+  );
 
   const allSubsQuery = useSubcategories();
   const allSubs = allSubsQuery.data || [];
@@ -360,7 +366,7 @@ export function CategorySearchPicker({
         <Input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search... e.g. yoga, tiffin, electrician"
+          placeholder={search ? '' : typewriterPlaceholder}
           className="pl-10 h-12 text-base rounded-2xl bg-muted/50 border-border/50 focus:bg-background"
           autoComplete="off"
         />
