@@ -113,7 +113,7 @@ function SectionChip({
   fallbackMode: string;
   onClick: () => void;
 }) {
-  // Fetch first 3 products for thumbnail preview
+  // Fetch products for thumbnail preview + count
   const { data: previews = [] } = useQuery({
     queryKey: ['banner-section-preview', section.id],
     queryFn: () => resolveProducts({
@@ -121,7 +121,7 @@ function SectionChip({
       sourceValue: section.product_source_value,
       sectionId: section.id,
       fallbackMode: fallbackMode as any,
-      limit: 4,
+      limit: 20,
     }),
     staleTime: 5 * 60_000,
   });
