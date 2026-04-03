@@ -314,7 +314,7 @@ export function useSellerApplication() {
 
       // Always reload products from DB when entering step 5
       await reloadProducts(id);
-      setStep(5);
+      setStep(4);
     }
   };
 
