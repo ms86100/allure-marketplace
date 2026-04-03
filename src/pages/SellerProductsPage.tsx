@@ -28,7 +28,25 @@ import { ServiceFieldsSection } from '@/components/seller/ServiceFieldsSection';
 export default function SellerProductsPage() {
   const sp = useSellerProducts();
   const { formatPrice, currencySymbol } = useCurrency();
+  const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
 
+  // Fetch 7-day view counts
+  useEffect(() => {
+    if (!sp.sellerProfile?.id || sp.products.length === 0) return;
+    const productIds = sp.products.map(p => p.id);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    supabase
+      .from('product_views' as any)
+      .select('product_id')
+      .in('product_id', productIds)
+      .gte('viewed_at', sevenDaysAgo)
+      .then(({ data }) => {
+        if (!data) return;
+        const counts: Record<string, number> = {};
+        (data as any[]).forEach(row => { counts[row.product_id] = (counts[row.product_id] || 0) + 1; });
+        setViewCounts(counts);
+      });
+  }, [sp.sellerProfile?.id, sp.products.length]);
   if (sp.isLoading) {
     return <AppLayout showHeader={false}><div className="p-4"><Skeleton className="h-8 w-32 mb-4" /><Skeleton className="h-12 w-full mb-4" />{[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl mb-3" />)}</div></AppLayout>;
   }
