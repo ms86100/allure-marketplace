@@ -3,7 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Package, ChevronRight } from 'lucide-react';
+import { Package, ChevronRight, RotateCcw } from 'lucide-react';
+import { useCart } from '@/hooks/useCart';
+import { toast } from 'sonner';
 import { jitteredStaleTime } from '@/lib/query-utils';
 
 /**
