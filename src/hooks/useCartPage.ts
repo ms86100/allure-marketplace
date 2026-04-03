@@ -70,9 +70,10 @@ export function useCartPage() {
   const { items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, refresh, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations } = useCart();
   const idempotencyKeyRef = useRef<string | null>(null);
 
-  // Ensure fresh cart data every time the cart page is visited
+  // RULE 3: Safe route-entry refresh — invalidate only, never overwrite cache
   useEffect(() => {
-    refresh();
+    queryClient.invalidateQueries({ queryKey: ['cart-items'] });
+    queryClient.invalidateQueries({ queryKey: ['cart-count'] });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hard reset stale payment state when cart is replaced (reorder flow)

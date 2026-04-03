@@ -91,6 +91,8 @@ interface CartContextType {
   isRecoveringCart: boolean;
   /** Number of cart mutations currently in-flight */
   pendingMutations: number;
+  /** True once the cart state has been positively confirmed (items arrived or server verified empty) */
+  cartVerified: boolean;
   addItem: (product: Product, quantity?: number, silent?: boolean) => Promise<void>;
   replaceCart: (inserts: { product_id: string; quantity: number }[]) => Promise<void>;
   updateQuantity: (productId: string, quantity: number) => Promise<void>;
