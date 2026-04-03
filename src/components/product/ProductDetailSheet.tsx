@@ -136,6 +136,16 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
             <div className="relative w-full aspect-[4/3] max-h-[45vh] bg-muted">
               {product.image_url ? (<img src={product.image_url} alt={product.product_name} className="w-full h-full object-contain" />) : (<div className="w-full h-full flex items-center justify-center"><DynamicIcon name={categoryIcon || '🛍️'} size={72} /></div>)}
               <button onClick={() => onOpenChange(false)} className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center shadow-md border border-border/30" aria-label="Close"><X size={18} className="text-foreground" /></button>
+              {product && user && (
+                <div className="absolute top-3 right-14 z-10">
+                  <ProductFavoriteButton
+                    productId={product.product_id}
+                    initialFavorite={favoriteIds.includes(product.product_id)}
+                    size="md"
+                    className="w-8 h-8 bg-background/80 backdrop-blur-sm shadow-md border border-border/30"
+                  />
+                </div>
+              )}
             </div>
             <div className="p-4 space-y-3">
               <div className="flex items-center gap-1.5 flex-wrap">
