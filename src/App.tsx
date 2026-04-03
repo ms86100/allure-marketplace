@@ -524,6 +524,7 @@ function App() {
                 <NavigationHandler />
                 <BrowsingLocationProvider>
                   <CartProvider>
+                    <NewOrderAlertProvider>
                     <PushNotificationProvider>
                       <SafeSellerAlert><GlobalSellerAlert /></SafeSellerAlert>
                       <AppRoutes />
