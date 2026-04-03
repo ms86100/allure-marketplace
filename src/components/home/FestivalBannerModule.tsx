@@ -71,16 +71,17 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
   // Fetch products from first section for header peek
   const firstSection = sections[0];
   const { data: peekProducts = [] } = useQuery({
-    queryKey: ['banner-peek', firstSection?.id],
+    queryKey: ['banner-peek', firstSection?.id, effectiveSocietyId],
     queryFn: () => resolveProducts({
       sourceType: firstSection.product_source_type as any,
       sourceValue: firstSection.product_source_value,
       sectionId: firstSection.id,
       fallbackMode: banner.fallback_mode as any,
       limit: 5,
+      societyId: effectiveSocietyId || undefined,
     }),
     enabled: !!firstSection,
-    staleTime: 5 * 60_000,
+    staleTime: 60_000,
   });
 
   const handleSectionClick = (section: BannerSection) => {
