@@ -1,20 +1,29 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CategoryConfig } from '@/types/categories';
 import { friendlyError } from '@/lib/utils';
+import { Subcategory } from '@/hooks/useSubcategories';
 
 export interface BulkRow {
   name: string;
   price: string;
+  mrp: string;
   category: string;
+  subcategory_id: string;
   description: string;
   is_veg: boolean;
   prep_time_minutes: string;
+  action_type: string;
+  stock_quantity: string;
   error?: string;
 }
 
-const EMPTY_ROW: BulkRow = { name: '', price: '', category: '', description: '', is_veg: true, prep_time_minutes: '' };
+const EMPTY_ROW: BulkRow = {
+  name: '', price: '', mrp: '', category: '', subcategory_id: '',
+  description: '', is_veg: true, prep_time_minutes: '',
+  action_type: 'add_to_cart', stock_quantity: '',
+};
 
 function getCategoryConfig(slug: string, categories: CategoryConfig[]): CategoryConfig | undefined {
   return categories.find(c => c.category === slug);
@@ -57,10 +66,42 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
   const [rows, setRows] = useState<BulkRow[]>([{ ...EMPTY_ROW, category: allowedCategories[0]?.category || '' }]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<{ success: number; errors: number } | null>(null);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+
+  // Fetch all subcategories for allowed categories
+  useEffect(() => {
+    const fetchSubs = async () => {
+      const { data } = await supabase
+        .from('subcategories')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+      if (data) setSubcategories(data as Subcategory[]);
+    };
+    fetchSubs();
+  }, []);
 
   const categorySlugs = useMemo(() => allowedCategories.map(c => c.category), [allowedCategories]);
   const anyShowVeg = useMemo(() => allowedCategories.some(c => c.formHints.showVegToggle), [allowedCategories]);
   const anyShowDuration = useMemo(() => allowedCategories.some(c => c.formHints.showDurationField), [allowedCategories]);
+  const hasMultipleCategories = allowedCategories.length > 1;
+
+  // Check if any category has subcategories
+  const anyHasSubcategories = useMemo(() => {
+    if (subcategories.length === 0) return false;
+    return allowedCategories.some(c => {
+      const catConfigId = (c as any).id;
+      return catConfigId && subcategories.some(s => s.category_config_id === catConfigId);
+    });
+  }, [allowedCategories, subcategories]);
+
+  const getSubcategoriesForCategory = useCallback((categorySlug: string) => {
+    const config = allowedCategories.find(c => c.category === categorySlug);
+    if (!config) return [];
+    const catConfigId = (config as any).id;
+    if (!catConfigId) return [];
+    return subcategories.filter(s => s.category_config_id === catConfigId);
+  }, [allowedCategories, subcategories]);
 
   const addRow = useCallback(() => {
     setRows(prev => [...prev, { ...EMPTY_ROW, category: allowedCategories[0]?.category || '' }]);
@@ -71,12 +112,20 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
   }, []);
 
   const updateRow = useCallback((index: number, field: keyof BulkRow, value: any) => {
-    setRows(prev => prev.map((r, i) => i === index ? { ...r, [field]: value, error: undefined } : r));
+    setRows(prev => prev.map((r, i) => {
+      if (i !== index) return r;
+      const updated = { ...r, [field]: value, error: undefined };
+      // Reset subcategory when category changes
+      if (field === 'category' && value !== r.category) {
+        updated.subcategory_id = '';
+      }
+      return updated;
+    }));
   }, []);
 
   const generateCSVTemplate = useCallback(() => {
-    const headers = 'name,price,category,description,is_veg,prep_time_minutes';
-    const example = `Paneer Butter Masala,250,${allowedCategories[0]?.category || 'home_food'},Rich creamy paneer dish,true,30`;
+    const headers = 'name,price,mrp,category,subcategory,description,is_veg,prep_time_minutes,action_type,stock_quantity';
+    const example = `Paneer Butter Masala,250,300,${allowedCategories[0]?.category || 'home_food'},,Rich creamy paneer dish,true,30,add_to_cart,50`;
     const blob = new Blob([headers + '\n' + example + '\n'], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -97,10 +146,14 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
       const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
       const nameIdx = headers.indexOf('name');
       const priceIdx = headers.indexOf('price');
+      const mrpIdx = headers.indexOf('mrp');
       const categoryIdx = headers.indexOf('category');
+      const subcategoryIdx = headers.indexOf('subcategory');
       const descIdx = headers.indexOf('description');
       const vegIdx = headers.indexOf('is_veg');
       const prepIdx = headers.indexOf('prep_time_minutes');
+      const actionIdx = headers.indexOf('action_type');
+      const stockIdx = headers.indexOf('stock_quantity');
 
       if (nameIdx === -1 || priceIdx === -1) { toast.error('CSV must have "name" and "price" columns'); return; }
 
@@ -108,11 +161,26 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
         const cols = parseCSVLine(line);
         const cat = cols[categoryIdx] || allowedCategories[0]?.category || '';
         const config = getCategoryConfig(cat, allowedCategories);
+
+        // Resolve subcategory slug to ID
+        let subId = '';
+        if (subcategoryIdx >= 0 && cols[subcategoryIdx]) {
+          const subSlug = cols[subcategoryIdx];
+          const matching = subcategories.find(s => s.slug === subSlug || s.display_name.toLowerCase() === subSlug.toLowerCase());
+          if (matching) subId = matching.id;
+        }
+
         return {
-          name: cols[nameIdx] || '', price: cols[priceIdx] || '', category: cat,
+          name: cols[nameIdx] || '',
+          price: cols[priceIdx] || '',
+          mrp: mrpIdx >= 0 ? cols[mrpIdx] || '' : '',
+          category: cat,
+          subcategory_id: subId,
           description: cols[descIdx] || '',
           is_veg: config?.formHints.showVegToggle ? (vegIdx >= 0 ? cols[vegIdx]?.toLowerCase() === 'true' : true) : true,
           prep_time_minutes: config?.formHints.showDurationField ? (prepIdx >= 0 ? cols[prepIdx] || '' : '') : '',
+          action_type: actionIdx >= 0 && cols[actionIdx] ? cols[actionIdx] : 'add_to_cart',
+          stock_quantity: stockIdx >= 0 ? cols[stockIdx] || '' : '',
         };
       });
 
@@ -121,17 +189,33 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
     };
     reader.readAsText(file);
     e.target.value = '';
-  }, [allowedCategories]);
+  }, [allowedCategories, subcategories]);
 
   const validate = useCallback((): boolean => {
     let hasErrors = false;
     const validated = rows.map((row, idx) => {
       const errors: string[] = [];
       if (!row.name.trim()) errors.push('Name required');
+
+      const isEnquiry = ['contact_seller', 'request_quote', 'make_offer'].includes(row.action_type);
       const price = parseFloat(row.price);
-      if (isNaN(price) || price <= 0) errors.push('Invalid price');
+      if (!isEnquiry && (isNaN(price) || price <= 0)) errors.push('Invalid price');
+
       if (!row.category) errors.push('Category required');
       else if (!categorySlugs.includes(row.category)) errors.push('Invalid category');
+
+      // MRP validation
+      if (row.mrp) {
+        const mrp = parseFloat(row.mrp);
+        if (isNaN(mrp) || mrp <= 0) errors.push('Invalid MRP');
+        else if (!isNaN(price) && mrp < price) errors.push('MRP must be ≥ price');
+      }
+
+      // Stock validation
+      if (row.stock_quantity) {
+        const stock = parseInt(row.stock_quantity);
+        if (isNaN(stock) || stock < 0) errors.push('Invalid stock');
+      }
 
       const config = getCategoryConfig(row.category, allowedCategories);
       if (config && !config.formHints.showVegToggle && !row.is_veg) errors.push('Veg toggle not applicable');
@@ -154,14 +238,62 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
     setIsSaving(true);
     setSaveResult(null);
     try {
+      // Fetch attribute block defaults for auto-population
+      const { data: blockLibrary } = await supabase
+        .from('attribute_block_library')
+        .select('*')
+        .eq('is_active', true);
+
       const products = rows.map(row => {
         const config = getCategoryConfig(row.category, allowedCategories);
+        const mrp = row.mrp ? parseFloat(row.mrp) : null;
+        const price = parseFloat(row.price) || 0;
+        const stockQty = row.stock_quantity ? parseInt(row.stock_quantity) : null;
+
+        // Auto-populate specifications from block library
+        let specifications: any = null;
+        if (blockLibrary && blockLibrary.length > 0) {
+          const categoryBlocks = blockLibrary.filter(b =>
+            b.category_hints && (b.category_hints as string[]).includes(row.category)
+          );
+          if (categoryBlocks.length > 0) {
+            specifications = {
+              blocks: categoryBlocks.map(b => ({
+                type: b.block_type,
+                label: b.display_name,
+                fields: {},
+              })),
+            };
+          }
+        }
+
+        // Calculate discount percentage if MRP > price
+        let discountPct: number | null = null;
+        if (mrp && mrp > price && price > 0) {
+          discountPct = Math.round(((mrp - price) / mrp) * 100);
+        }
+
         return {
-          seller_id: sellerId, name: row.name.trim(), price: parseFloat(row.price),
-          category: row.category, description: row.description.trim() || null,
+          seller_id: sellerId,
+          name: row.name.trim(),
+          price,
+          mrp,
+          discount_percentage: discountPct,
+          category: row.category,
+          subcategory_id: row.subcategory_id || null,
+          description: row.description.trim() || null,
           is_veg: config?.formHints.showVegToggle ? row.is_veg : true,
           prep_time_minutes: config?.formHints.showDurationField && row.prep_time_minutes ? parseInt(row.prep_time_minutes) : null,
-          is_available: true, approval_status: 'draft',
+          action_type: row.action_type || 'add_to_cart',
+          stock_quantity: (stockQty !== null && !isNaN(stockQty) && stockQty >= 0) ? stockQty : null,
+          low_stock_threshold: 5,
+          is_available: true,
+          approval_status: 'draft',
+          is_bestseller: false,
+          is_recommended: false,
+          is_urgent: false,
+          accepts_preorders: false,
+          specifications,
         };
       });
 
@@ -170,7 +302,7 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
 
       setSaveResult({ success: products.length, errors: 0 });
       toast.success(`${products.length} products added as drafts`);
-      toast.info('Tip: Edit each product to add images before submitting for approval', { duration: 5000 });
+      toast.info('Edit each product to add images, extra details, and service settings before submitting for approval', { duration: 6000 });
       onSuccess();
 
       setTimeout(() => {
@@ -191,7 +323,8 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
 
   return {
     rows, isSaving, saveResult, anyShowVeg, anyShowDuration,
+    anyHasSubcategories, hasMultipleCategories,
     addRow, removeRow, updateRow, generateCSVTemplate, handleCSVUpload,
-    handleSave, getRowConfig, allowedCategories,
+    handleSave, getRowConfig, allowedCategories, getSubcategoriesForCategory,
   };
 }

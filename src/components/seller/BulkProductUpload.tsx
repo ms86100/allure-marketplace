@@ -21,6 +21,13 @@ interface BulkProductUploadProps {
   onSuccess: () => void;
 }
 
+const ACTION_TYPE_OPTIONS = [
+  { value: 'add_to_cart', label: 'Add to Cart' },
+  { value: 'contact_seller', label: 'Contact Seller' },
+  { value: 'request_quote', label: 'Request Quote' },
+  { value: 'book', label: 'Book' },
+];
+
 export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories, onSuccess }: BulkProductUploadProps) {
   const b = useBulkUpload(sellerId, allowedCategories, onSuccess, onClose);
 
@@ -43,7 +50,7 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
               </Label>
               <input id="csv-upload" type="file" accept=".csv" className="hidden" onChange={b.handleCSVUpload} />
             </div>
-            <p className="text-xs text-muted-foreground">CSV columns: name (required), price (required), category, description, is_veg, prep_time_minutes</p>
+            <p className="text-xs text-muted-foreground">CSV columns: name*, price*, mrp, category, subcategory, description, is_veg, prep_time_minutes, action_type, stock_quantity</p>
             <div className="flex items-start gap-2 p-2.5 rounded-lg bg-warning/10 border border-warning/20">
               <Info size={14} className="text-warning shrink-0 mt-0.5" />
               <p className="text-xs text-warning">Images must be added individually after upload. Products without images get fewer views.</p>
@@ -58,63 +65,98 @@ export function BulkProductUpload({ isOpen, onClose, sellerId, allowedCategories
         </Tabs>
 
         <ScrollArea className="h-[calc(85vh-240px)] mt-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-8">#</TableHead>
-                <TableHead>Name *</TableHead>
-                <TableHead className="w-24">Price *</TableHead>
-                {allowedCategories.length > 1 && <TableHead className="w-32">Category</TableHead>}
-                <TableHead>Description</TableHead>
-                {b.anyShowVeg && <TableHead className="w-16">Veg</TableHead>}
-                {b.anyShowDuration && <TableHead className="w-24">Duration</TableHead>}
-                <TableHead className="w-8"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {b.rows.map((row, idx) => {
-                const rowConfig = b.getRowConfig(row.category);
-                const rowShowVeg = rowConfig?.formHints.showVegToggle ?? false;
-                const rowShowDuration = rowConfig?.formHints.showDurationField ?? false;
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-8 sticky left-0 bg-background z-10">#</TableHead>
+                  <TableHead className="min-w-[140px]">Name *</TableHead>
+                  <TableHead className="w-24">Price *</TableHead>
+                  <TableHead className="w-24">MRP</TableHead>
+                  {b.hasMultipleCategories && <TableHead className="w-32">Category</TableHead>}
+                  {b.anyHasSubcategories && <TableHead className="w-32">Subcategory</TableHead>}
+                  <TableHead className="w-32">Action Type</TableHead>
+                  <TableHead className="min-w-[120px]">Description</TableHead>
+                  {b.anyShowVeg && <TableHead className="w-16">Veg</TableHead>}
+                  {b.anyShowDuration && <TableHead className="w-24">Duration</TableHead>}
+                  <TableHead className="w-24">Stock</TableHead>
+                  <TableHead className="w-8"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {b.rows.map((row, idx) => {
+                  const rowConfig = b.getRowConfig(row.category);
+                  const rowShowVeg = rowConfig?.formHints.showVegToggle ?? false;
+                  const rowShowDuration = rowConfig?.formHints.showDurationField ?? false;
+                  const rowSubs = b.getSubcategoriesForCategory(row.category);
+                  const isEnquiry = ['contact_seller', 'request_quote', 'make_offer'].includes(row.action_type);
 
-                return (
-                  <TableRow key={idx} className={row.error ? 'bg-destructive/5' : ''}>
-                    <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
-                    <TableCell>
-                      <Input value={row.name} onChange={(e) => b.updateRow(idx, 'name', e.target.value)} placeholder={rowConfig?.formHints.namePlaceholder || 'Product name'} className="h-8 text-sm" />
-                    </TableCell>
-                    <TableCell>
-                      <Input type="number" value={row.price} onChange={(e) => b.updateRow(idx, 'price', e.target.value)} placeholder="Price" className="h-8 text-sm" />
-                    </TableCell>
-                    {allowedCategories.length > 1 && (
+                  return (
+                    <TableRow key={idx} className={row.error ? 'bg-destructive/5' : ''}>
+                      <TableCell className="text-xs text-muted-foreground sticky left-0 bg-background z-10">{idx + 1}</TableCell>
                       <TableCell>
-                        <Select value={row.category} onValueChange={(v) => b.updateRow(idx, 'category', v)}>
+                        <Input value={row.name} onChange={(e) => b.updateRow(idx, 'name', e.target.value)} placeholder={rowConfig?.formHints.namePlaceholder || 'Product name'} className="h-8 text-sm" />
+                      </TableCell>
+                      <TableCell>
+                        <Input type="number" value={row.price} onChange={(e) => b.updateRow(idx, 'price', e.target.value)} placeholder={isEnquiry ? 'Optional' : 'Price'} className="h-8 text-sm" />
+                      </TableCell>
+                      <TableCell>
+                        <Input type="number" value={row.mrp} onChange={(e) => b.updateRow(idx, 'mrp', e.target.value)} placeholder="MRP" className="h-8 text-sm" />
+                      </TableCell>
+                      {b.hasMultipleCategories && (
+                        <TableCell>
+                          <Select value={row.category} onValueChange={(v) => b.updateRow(idx, 'category', v)}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>{allowedCategories.map(c => <SelectItem key={c.category} value={c.category}><span className="flex items-center gap-1.5"><DynamicIcon name={c.icon} size={14} /> {c.displayName}</span></SelectItem>)}</SelectContent>
+                          </Select>
+                        </TableCell>
+                      )}
+                      {b.anyHasSubcategories && (
+                        <TableCell>
+                          {rowSubs.length > 0 ? (
+                            <Select value={row.subcategory_id || 'none'} onValueChange={(v) => b.updateRow(idx, 'subcategory_id', v === 'none' ? '' : v)}>
+                              <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="None" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                {rowSubs.map(s => <SelectItem key={s.id} value={s.id}><span className="flex items-center gap-1.5"><DynamicIcon name={s.icon || 'FolderOpen'} size={14} /> {s.display_name}</span></SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          ) : <span className="text-xs text-muted-foreground">—</span>}
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <Select value={row.action_type} onValueChange={(v) => b.updateRow(idx, 'action_type', v)}>
                           <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                          <SelectContent>{allowedCategories.map(c => <SelectItem key={c.category} value={c.category}><span className="flex items-center gap-1.5"><DynamicIcon name={c.icon} size={14} /> {c.displayName}</span></SelectItem>)}</SelectContent>
+                          <SelectContent>
+                            {ACTION_TYPE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                          </SelectContent>
                         </Select>
                       </TableCell>
-                    )}
-                    <TableCell>
-                      <Input value={row.description} onChange={(e) => b.updateRow(idx, 'description', e.target.value)} placeholder="Optional" className="h-8 text-sm" />
-                    </TableCell>
-                    {b.anyShowVeg && (
                       <TableCell>
-                        {rowShowVeg ? <Switch checked={row.is_veg} onCheckedChange={(v) => b.updateRow(idx, 'is_veg', v)} /> : <span className="text-xs text-muted-foreground">—</span>}
+                        <Input value={row.description} onChange={(e) => b.updateRow(idx, 'description', e.target.value)} placeholder="Optional" className="h-8 text-sm" />
                       </TableCell>
-                    )}
-                    {b.anyShowDuration && (
+                      {b.anyShowVeg && (
+                        <TableCell>
+                          {rowShowVeg ? <Switch checked={row.is_veg} onCheckedChange={(v) => b.updateRow(idx, 'is_veg', v)} /> : <span className="text-xs text-muted-foreground">—</span>}
+                        </TableCell>
+                      )}
+                      {b.anyShowDuration && (
+                        <TableCell>
+                          {rowShowDuration ? <Input type="number" value={row.prep_time_minutes} onChange={(e) => b.updateRow(idx, 'prep_time_minutes', e.target.value)} placeholder={rowConfig?.formHints.durationLabel || 'min'} className="h-8 text-sm" /> : <span className="text-xs text-muted-foreground">—</span>}
+                        </TableCell>
+                      )}
                       <TableCell>
-                        {rowShowDuration ? <Input type="number" value={row.prep_time_minutes} onChange={(e) => b.updateRow(idx, 'prep_time_minutes', e.target.value)} placeholder={rowConfig?.formHints.durationLabel || 'min'} className="h-8 text-sm" /> : <span className="text-xs text-muted-foreground">—</span>}
+                        <Input type="number" value={row.stock_quantity} onChange={(e) => b.updateRow(idx, 'stock_quantity', e.target.value)} placeholder="Qty" className="h-8 text-sm" />
                       </TableCell>
-                    )}
-                    <TableCell>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => b.removeRow(idx)} disabled={b.rows.length <= 1}><Trash2 size={14} /></Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => b.removeRow(idx)} disabled={b.rows.length <= 1}><Trash2 size={14} /></Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
 
           {b.rows.some(r => r.error) && (
             <div className="mt-3 space-y-1">
