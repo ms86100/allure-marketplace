@@ -286,18 +286,19 @@ export default function BecomeSellerPage() {
           </div>
         )}
 
-        {/* Step 2: Select Sub-categories */}
+        {/* Step 2: Select Sub-categories (Guided Picker) */}
         {step === 2 && selectedGroup && (
-          <div className="space-y-5">
-            <button onClick={() => handleStepBack(1)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Change category</button>
-            <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-              <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', selectedGroupInfo?.color)}><DynamicIcon name={selectedGroupInfo?.icon || ''} size={24} /></div>
-              <div><h3 className="font-semibold">{selectedGroupInfo?.label}</h3><p className="text-xs text-muted-foreground">{selectedGroupInfo?.description}</p></div>
-            </div>
-            <SubCategorySelector selectedGroup={selectedGroup} selectedCategories={formData.categories as ServiceCategory[]} onCategorySelect={handleCategoryChange} />
-            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: You'll name your store and set operating hours</p>
-            <Button className="w-full" onClick={() => setStep(3)} disabled={formData.categories.length === 0}>Continue<ChevronRight size={16} className="ml-1" /></Button>
-          </div>
+          <GuidedStep2
+            selectedGroup={selectedGroup}
+            selectedGroupInfo={selectedGroupInfo}
+            formData={formData}
+            setFormData={setFormData}
+            groupedConfigs={groupedConfigs}
+            handleCategoryChange={handleCategoryChange}
+            onBack={() => handleStepBack(1)}
+            onContinue={() => setStep(3)}
+            onSkip={() => setStep(3)}
+          />
         )}
 
         {/* Step 3: Business Details */}
