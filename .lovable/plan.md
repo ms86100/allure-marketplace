@@ -1,74 +1,131 @@
 
+# Workflow Decoupling — Final Bulletproof Revision
 
-# Make License Requirements Dynamic at Category Level
+## What I verified in the codebase
+- `src/lib/marketplace-constants.ts` still has a hardcoded `TX_TO_ACTION` map, so frontend workflow logic is still duplicated.
+- Buyer CTA resolution in product cards/details still falls back to `category_config.transaction_type`, which keeps category-driven behavior alive.
+- Seller creation flows (`DraftProductManager.tsx`, `useBulkUpload.ts`) save `action_type`, but there is no robust DB-level category/action allowlist enforcement yet.
+- `create_multi_vendor_orders` has multiple historical SQL versions and still resolves `transaction_type` inside the RPC instead of reading one canonical mapping source.
+- The existing `listing_type_workflow_map` already proves drift is real: one seed maps `contact_only` to `request_service`, while app logic expects `contact_enquiry`.
 
-## Problem
+## Architecture decision
+Keep `product.action_type` as the seller-selected buyer interaction mode, and make the action→workflow translation database-owned.
 
-License configuration currently works only at the **parent group** level (e.g., "Personal Care"). This means if the admin enables licenses for Personal Care, ALL categories under it (Beauty, Salon, Yoga, Ayurveda) require the same license — but Ayurveda needs a practitioner certificate while Beauty may not need one at all.
+Why this is the safest model:
+- `action_type` is needed for UX distinctions like `request_quote` vs `request_service`, `buy_now` vs `add_to_cart`.
+- `transaction_type` is needed for workflow execution on orders.
+- The bug is not “having two concepts”; the bug is duplicating the mapping in multiple places.
 
-## Solution
+So the production model becomes:
 
-Move license configuration from `parent_groups` to `category_config`, so each category can independently have its own license requirement. The admin License Config tab will show individual categories (grouped by parent) instead of just parent groups.
+```text
+product.action_type            = seller intent / buyer CTA mode
+action_type_workflow_map       = single canonical translation source
+order.transaction_type         = immutable workflow snapshot for execution
+```
 
-## Implementation
+## DB changes
+1. Create `public.action_type_workflow_map`
+   - `action_type` PK
+   - `transaction_type`
+   - `checkout_mode` (`cart`, `booking`, `inquiry`, `contact`)
+   - `creates_order`
+   - `requires_price`
+   - `requires_availability`
+   - `is_active`
 
-### Step 1: DB Migration — Add license columns to `category_config`
+2. Add `default_action_type` to `category_config`
 
-Add 4 columns to `category_config`:
-- `requires_license` (boolean, default false)
-- `license_type_name` (text, nullable) — e.g., "Ayurveda Practitioner Certificate"
-- `license_description` (text, nullable) — instructions for sellers
-- `license_mandatory` (boolean, default false) — blocks selling until approved
+3. Create `public.category_allowed_action_types`
+   - `category_config_id`
+   - `action_type`
+   - unique pair
+   - FK to `action_type_workflow_map`
 
-Migrate existing data: copy license settings from `parent_groups` down to all `category_config` rows that belong to groups where `requires_license = true`.
+4. Remove workflow-setting product triggers that overwrite seller choice from category
 
-### Step 2: Add `category_config_id` to `seller_licenses`
+5. Add a validation trigger on `products`
+   - reject unknown `action_type`
+   - reject `action_type` not allowed for that category
+   - validate booking requirements before publish
+   - never auto-rewrite values
 
-Add an optional `category_config_id` column (FK to `category_config`) to `seller_licenses`. Keep `group_id` for backward compatibility. New licenses will reference the specific category.
+6. Keep `listing_type_workflow_map` only for legacy listing-type compatibility, not as the product CTA source; also fix the `contact_only` mapping if still referenced anywhere.
 
-Update the product publish trigger to check licenses at the category level first, falling back to group level.
+## Backend hardening
+1. Replace inline action/workflow CASE logic in `create_multi_vendor_orders` with DB lookup from `action_type_workflow_map`.
 
-### Step 3: Update `LicenseConfigSection.tsx`
+2. Make `create_multi_vendor_orders` explicitly purchase-only:
+   - fetch each product’s `action_type`
+   - join canonical mapping
+   - hard-fail if any item is `booking`, `inquiry`, or `contact`
+   - never coerce non-cart items into purchase orders
 
-Replace the flat parent-group list with a **grouped view**:
-- Show parent group as a section header
-- Under each parent, show its categories from `category_config`
-- Each category row gets its own `requires_license` toggle, Edit button, and Mandatory switch
-- Admin can configure license requirements per-category independently
+3. Enforce seller-group consistency in the RPC:
+   - validate all items in a group belong to the same purchase family after fulfillment resolution
+   - if not, reject with structured error instead of creating an ambiguous order
 
-Data source: fetch from `category_config` (with license columns) + `parent_groups` (for grouping/headers), instead of just `parent_groups`.
+4. Persist `orders.transaction_type` only from the canonical DB mapping + fulfillment context, and treat it as immutable afterward.
 
-### Step 4: Update `LicenseUpload.tsx` (Seller Side)
+5. Audit all downstream workflow consumers so they read `orders.transaction_type` first:
+   - order status transition validation
+   - buyer/seller advance RPCs
+   - delivery sync/OTP completion
+   - notifications
+   - analytics/tracking
 
-Change the seller's license upload component to:
-- Accept `categoryConfigId` instead of (or in addition to) `groupId`
-- Fetch license requirements from `category_config` instead of `parent_groups`
-- When a seller selects categories during onboarding, show license upload prompts for each category that has `requires_license = true`
+## Frontend changes
+1. Remove business mapping from `marketplace-constants.ts`
+   - keep `ACTION_CONFIG` for label/icon/UI only
+   - stop using `TX_TO_ACTION` as workflow logic
 
-### Step 5: Update Seller Onboarding Flow
+2. Update buyer CTA resolution (`ProductGridCard`, `ProductListingCard`, `useProductDetail`)
+   - use `product.action_type` first
+   - use `category_config.default_action_type` only as temporary legacy fallback
 
-When sellers pick categories in `CategorySearchPicker`, check which selected categories require licenses. Show the `LicenseUpload` component for each one, so the seller sees exactly what's needed per category (e.g., "Ayurveda requires: Practitioner Certificate").
+3. Update seller product creation and bulk upload
+   - fetch allowed actions from DB
+   - preselect `default_action_type`
+   - show clear explanations + CTA preview
+   - block `book` if availability is missing
 
-### Step 6: Update `useSellerApplicationReview.ts`
+4. Update admin category/workflow UI
+   - manage default action + allowed actions per category
+   - keep workflow preview DB-driven
 
-- Fetch `category_config` license data alongside parent groups
-- License review in the admin panel should show which specific category the license is for
-- Keep backward compatibility with existing `group_id`-based licenses
+## Safe migration / no-regression rollout
+1. Do not run heuristic backfills on live products.
 
-## Files Summary
+2. Ship schema + validation first.
 
-| File | Action |
-|---|---|
-| Migration SQL | **Create** — add columns to `category_config`, add `category_config_id` to `seller_licenses`, update trigger |
-| `src/components/admin/LicenseConfigSection.tsx` | **Modify** — grouped category-level view |
-| `src/components/seller/LicenseUpload.tsx` | **Modify** — support `categoryConfigId` |
-| `src/hooks/useSellerApplicationReview.ts` | **Modify** — fetch category-level license configs |
-| Seller onboarding (BecomeSellerPage) | **Modify** — show per-category license prompts |
+3. Seed mapping and category allowlists before switching UI.
 
-## What This Achieves
+4. Leave existing `products.action_type` untouched initially.
 
-- Admin toggles license for "Ayurveda" independently of "Beauty" — even though both are under "Personal Care"
-- When a new category is added to `category_config`, it automatically appears in the admin license tab (no hardcoding)
-- Sellers see exactly which of their selected categories need a license
-- Fully dynamic — everything driven by DB config
+5. Add an audit report for suspicious products instead of auto-mutating them:
+   - action not in mapping
+   - action not allowed for category
+   - booking action with no availability
+   - category default/action mismatch
+   - non-cart items somehow reaching cart/order payloads
 
+6. Only perform data correction in an explicit remediation pass, scoped to clearly safe records or admin-reviewed batches.
+
+## Result
+This closes the remaining real gaps:
+- no frontend/backend mapping drift
+- no silent backfill corruption
+- no mixed workflow payloads creating wrong orders
+- no invalid category/action combinations bypassing UI
+- no category change mutating existing seller listings
+
+## Main implementation surface
+- DB migration for `action_type_workflow_map`, `default_action_type`, `category_allowed_action_types`, trigger cleanup, and RPC hardening
+- `src/lib/marketplace-constants.ts`
+- `src/components/product/ProductGridCard.tsx`
+- `src/components/product/ProductListingCard.tsx`
+- `src/hooks/useProductDetail.ts`
+- `src/components/seller/DraftProductManager.tsx`
+- `src/components/seller/BulkProductUpload.tsx`
+- admin category/workflow screens
+- order notification / transition / delivery workflow functions
