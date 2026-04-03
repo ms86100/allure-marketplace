@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { resolveProducts } from '@/lib/bannerProductResolver';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,6 +39,7 @@ const ANIMATION_TYPES = [
   { value: 'glow', label: '🌟 Glow' },
   { value: 'shimmer', label: '💫 Shimmer' },
   { value: 'pulse', label: '💗 Pulse' },
+  { value: 'confetti', label: '🎊 Confetti' },
 ];
 
 const INTENSITY_OPTIONS = [
@@ -76,6 +78,9 @@ interface BannerForm {
   schedule_end: string;
   fallback_mode: 'hide' | 'popular';
   sections: SectionForm[];
+  // CTA config for classic banners
+  cta_action: 'link' | 'collection' | 'category';
+  cta_target: string;
 }
 
 const emptyForm: BannerForm = {
@@ -86,6 +91,7 @@ const emptyForm: BannerForm = {
   theme_preset: '', theme_config: {}, animation_config: { type: 'none', intensity: 'subtle' },
   badge_text: '', schedule_start: '', schedule_end: '', fallback_mode: 'hide',
   sections: [],
+  cta_action: 'link', cta_target: '',
 };
 
 export function AdminBannerManager() {
@@ -151,6 +157,9 @@ export function AdminBannerManager() {
         schedule_start: f.schedule_start || null,
         schedule_end: f.schedule_end || null,
         fallback_mode: f.fallback_mode,
+        cta_config: f.banner_type === 'classic'
+          ? { action: f.cta_action || 'link', target: f.cta_target || f.link_url || '' }
+          : { action: 'link' },
       };
 
       let bannerId: string;
@@ -228,6 +237,7 @@ export function AdminBannerManager() {
       }));
     }
 
+    const ctaConfig = banner.cta_config || {};
     setForm({
       banner_type: banner.banner_type || 'classic',
       title: banner.title || '',
@@ -249,6 +259,8 @@ export function AdminBannerManager() {
       schedule_end: banner.schedule_end ? banner.schedule_end.slice(0, 16) : '',
       fallback_mode: banner.fallback_mode || 'hide',
       sections,
+      cta_action: ctaConfig.action || 'link',
+      cta_target: ctaConfig.target || '',
     });
     setSheetOpen(true);
   };
@@ -314,7 +326,9 @@ export function AdminBannerManager() {
     });
   };
 
-  const handleSave = () => {
+  const [isValidating, setIsValidating] = useState(false);
+
+  const handleSave = async () => {
     if (form.banner_type === 'festival' && form.sections.length === 0) {
       toast.error('Festival banners need at least one section');
       return;
@@ -324,6 +338,34 @@ export function AdminBannerManager() {
       if (empty.length > 0) {
         toast.error('All sections need a title');
         return;
+      }
+
+      // Async product validation for festival sections
+      setIsValidating(true);
+      try {
+        let allEmpty = true;
+        for (const section of form.sections) {
+          const products = await resolveProducts({
+            sourceType: section.product_source_type,
+            sourceValue: section.product_source_value || null,
+            fallbackMode: form.fallback_mode,
+            limit: 1,
+          });
+          if (products.length > 0) {
+            allEmpty = false;
+          } else {
+            toast.warning(`Section "${section.title}" has no matching products`);
+          }
+        }
+        if (allEmpty) {
+          toast.error('All sections are empty — cannot save. Add products or change source.');
+          setIsValidating(false);
+          return;
+        }
+      } catch {
+        // Non-blocking: proceed if validation fails
+      } finally {
+        setIsValidating(false);
       }
     }
     saveMutation.mutate(form);
@@ -539,8 +581,35 @@ export function AdminBannerManager() {
 
               {form.banner_type === 'classic' && (
                 <div>
-                  <Label className="text-xs font-semibold">Link URL (route)</Label>
-                  <Input value={form.link_url} onChange={e => updateField('link_url', e.target.value)} placeholder="/search or /bulletin" className="rounded-xl" />
+                  <Label className="text-xs font-semibold">CTA Action</Label>
+                  <Select value={form.cta_action} onValueChange={v => updateField('cta_action', v as any)}>
+                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="link">Navigate to Link</SelectItem>
+                      <SelectItem value="category">Open Category</SelectItem>
+                      <SelectItem value="collection">Open Collection</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {form.banner_type === 'classic' && (
+                <div>
+                  <Label className="text-xs font-semibold">
+                    {form.cta_action === 'link' ? 'Link URL (route)' : form.cta_action === 'category' ? 'Category Slug' : 'Collection ID'}
+                  </Label>
+                  <Input
+                    value={form.cta_action === 'link' ? form.link_url : form.cta_target}
+                    onChange={e => {
+                      if (form.cta_action === 'link') {
+                        updateField('link_url', e.target.value);
+                      } else {
+                        updateField('cta_target', e.target.value);
+                      }
+                    }}
+                    placeholder={form.cta_action === 'link' ? '/search or /bulletin' : form.cta_action === 'category' ? 'e.g. food_beverages' : 'Collection ID'}
+                    className="rounded-xl"
+                  />
                 </div>
               )}
 
@@ -772,8 +841,8 @@ export function AdminBannerManager() {
             {/* Action Buttons */}
             <div className="flex gap-2 pt-2">
               <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={closeSheet}>Cancel</Button>
-              <Button className="flex-1 rounded-xl h-11 font-semibold" onClick={handleSave} disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? 'Saving...' : editingId ? 'Update' : 'Create'}
+              <Button className="flex-1 rounded-xl h-11 font-semibold" onClick={handleSave} disabled={saveMutation.isPending || isValidating}>
+                {isValidating ? 'Validating...' : saveMutation.isPending ? 'Saving...' : editingId ? 'Update' : 'Create'}
               </Button>
             </div>
           </div>

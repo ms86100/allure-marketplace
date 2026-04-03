@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { resolveProducts, ResolvedProduct } from '@/lib/bannerProductResolver';
 import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { cn } from '@/lib/utils';
@@ -24,6 +25,7 @@ interface FestivalBannerProps {
 
 export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const impressionTracked = useRef(false);
 
   const themeConfig = banner.theme_config || {};
@@ -39,25 +41,27 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
     ? `banner-anim-${animConfig.type} banner-intensity-${animConfig.intensity || 'subtle'}`
     : '';
 
-  // Track impression once
+  // Track impression once (only if authenticated)
   useEffect(() => {
-    if (impressionTracked.current) return;
+    if (impressionTracked.current || !user) return;
     impressionTracked.current = true;
     supabase.from('banner_analytics').insert({
       banner_id: banner.id,
       event_type: 'impression',
-      user_id: null,
+      user_id: user.id,
     }).then(() => {});
-  }, [banner.id]);
+  }, [banner.id, user]);
 
   const handleSectionClick = (section: BannerSection) => {
-    // Fire analytics (fire-and-forget)
-    supabase.from('banner_analytics').insert({
-      banner_id: banner.id,
-      section_id: section.id,
-      event_type: 'section_click',
-      user_id: null,
-    }).then(() => {});
+    // Fire analytics (fire-and-forget, only if authenticated)
+    if (user) {
+      supabase.from('banner_analytics').insert({
+        banner_id: banner.id,
+        section_id: section.id,
+        event_type: 'section_click',
+        user_id: user.id,
+      }).then(() => {});
+    }
 
     navigate(`/festival-collection/${banner.id}/${section.id}`);
   };
@@ -113,7 +117,7 @@ function SectionChip({
   fallbackMode: string;
   onClick: () => void;
 }) {
-  // Fetch first 3 products for thumbnail preview
+  // Fetch products for thumbnail preview + count
   const { data: previews = [] } = useQuery({
     queryKey: ['banner-section-preview', section.id],
     queryFn: () => resolveProducts({
@@ -121,7 +125,7 @@ function SectionChip({
       sourceValue: section.product_source_value,
       sectionId: section.id,
       fallbackMode: fallbackMode as any,
-      limit: 4,
+      limit: 20,
     }),
     staleTime: 5 * 60_000,
   });
@@ -140,10 +144,15 @@ function SectionChip({
       {/* Emoji */}
       <span className="text-2xl">{section.icon_emoji || '📦'}</span>
 
-      {/* Title */}
+      {/* Title + count */}
       <p className="text-[11px] font-bold text-foreground text-center leading-tight line-clamp-2">
         {section.title}
       </p>
+      {previews.length > 0 && (
+        <span className="text-[9px] text-muted-foreground font-medium">
+          {previews.length} item{previews.length !== 1 ? 's' : ''}
+        </span>
+      )}
 
       {/* Product thumbnails */}
       {displayPreviews.length > 0 && (

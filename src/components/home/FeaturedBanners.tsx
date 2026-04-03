@@ -238,13 +238,23 @@ export function FeaturedBanners() {
             {classicBanners.map((banner: any, idx: number) => (
               <div
                 key={banner.id}
-                onClick={() => banner.link_url && navigate(banner.link_url)}
+                onClick={() => {
+                  const ctaConfig = banner.cta_config || {};
+                  const action = ctaConfig.action || 'link';
+                  if (action === 'category' && ctaConfig.target) {
+                    navigate(`/category/${ctaConfig.target}`);
+                  } else if (action === 'collection' && ctaConfig.target) {
+                    navigate(`/festival-collection/${banner.id}/${ctaConfig.target}`);
+                  } else if (banner.link_url) {
+                    navigate(banner.link_url);
+                  }
+                }}
                 className={cn(
                   'shrink-0 w-[85vw] sm:w-[400px] rounded-3xl overflow-hidden snap-center',
                   'border border-border/20 dark:border-transparent',
                   'banner-depth',
                   'transition-all duration-200 active:scale-[0.99]',
-                  banner.link_url && 'cursor-pointer'
+                  (banner.link_url || banner.cta_config?.target) && 'cursor-pointer'
                 )}
                 style={{ animationDelay: `${idx * 0.1}s` }}
               >

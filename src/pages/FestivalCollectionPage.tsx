@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { resolveProducts, ResolvedProduct } from '@/lib/bannerProductResolver';
 import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { ArrowLeft, ShoppingBag } from 'lucide-react';
@@ -11,6 +12,7 @@ import { cn } from '@/lib/utils';
 export default function FestivalCollectionPage() {
   const { bannerId, sectionId } = useParams<{ bannerId: string; sectionId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Fetch banner for theming
   const { data: banner } = useQuery({
@@ -111,7 +113,7 @@ export default function FestivalCollectionPage() {
           <>
             <div className="grid grid-cols-2 gap-3">
               {available.map(product => (
-                <ProductCard key={product.id} product={product} navigate={navigate} bannerId={bannerId!} sectionId={sectionId!} />
+                <ProductCard key={product.id} product={product} navigate={navigate} bannerId={bannerId!} sectionId={sectionId!} userId={user?.id} />
               ))}
             </div>
 
@@ -122,7 +124,7 @@ export default function FestivalCollectionPage() {
                 </p>
                 <div className="grid grid-cols-2 gap-3 opacity-50">
                   {outOfStock.map(product => (
-                    <ProductCard key={product.id} product={product} navigate={navigate} bannerId={bannerId!} sectionId={sectionId!} outOfStock />
+                    <ProductCard key={product.id} product={product} navigate={navigate} bannerId={bannerId!} sectionId={sectionId!} userId={user?.id} outOfStock />
                   ))}
                 </div>
               </>
@@ -139,12 +141,14 @@ function ProductCard({
   navigate,
   bannerId,
   sectionId,
+  userId,
   outOfStock = false,
 }: {
   product: ResolvedProduct;
   navigate: any;
   bannerId: string;
   sectionId: string;
+  userId?: string;
   outOfStock?: boolean;
 }) {
   const lowStock = !outOfStock && product.stock_quantity != null && product.low_stock_threshold != null
@@ -155,14 +159,16 @@ function ProductCard({
     : 0;
 
   const handleClick = () => {
-    // Track product click
-    supabase.from('banner_analytics').insert({
-      banner_id: bannerId,
-      section_id: sectionId,
-      event_type: 'product_click',
-      product_id: product.id,
-      user_id: null,
-    }).then(() => {});
+    // Track product click (only if authenticated)
+    if (userId) {
+      supabase.from('banner_analytics').insert({
+        banner_id: bannerId,
+        section_id: sectionId,
+        event_type: 'product_click',
+        product_id: product.id,
+        user_id: userId,
+      }).then(() => {});
+    }
 
     navigate(`/product/${product.id}`);
   };
