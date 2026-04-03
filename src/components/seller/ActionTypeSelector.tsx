@@ -36,8 +36,6 @@ export function ActionTypeSelector({ category, value, onChange, configs }: Actio
   const selected = allActions.find(a => a.action_type === value);
   const Icon = selected ? CHECKOUT_ICONS[selected.checkout_mode] || ShoppingCart : ShoppingCart;
 
-  if (options.length <= 1) return null;
-
   return (
     <div className="space-y-2">
       <Label className="text-xs">Buyer Interaction</Label>
