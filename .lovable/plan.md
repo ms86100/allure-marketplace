@@ -1,34 +1,48 @@
 
 
-# Reuse Existing Store Location for New Stores
+# Show Location Name Instead of Coordinates
 
 ## Problem
-When a multi-seller creates a new store, they must go through the full location search/GPS flow every time, even if the new store is at the same location as an existing one.
+When a seller has an existing store with a set location, both the "Use from another store" cards and the "Location set" confirmation show raw latitude/longitude (e.g., `26.1708, 91.7475`) instead of a human-readable place name.
+
+## Root Cause
+The `seller_profiles` table has no column to store the location name. When a seller sets their store location (via search or GPS), the place name is used transiently but never persisted.
 
 ## Solution
-Add a "Use from existing store" option in the `StoreLocationPicker` component that appears when the user has other seller profiles with coordinates set. Tapping a store auto-fills the location without opening the map flow.
+Add a `store_location_label` column to `seller_profiles` and persist the place name when setting coordinates. Then display it everywhere instead of raw coordinates.
 
-## Changes
+### DB Migration
+- Add `store_location_label TEXT` to `seller_profiles`
+- Update the `set_my_store_coordinates` RPC to accept an optional `p_label TEXT` parameter and store it
 
-### 1. Modify `StoreLocationPicker` in `src/pages/BecomeSellerPage.tsx`
-- Accept a new prop: `existingStoreLocations` (array of `{ id, business_name, latitude, longitude }`)
-- Before the "Set Store Location" button, show a list of existing stores with coordinates:
-  - Each item shows store name + coordinates
-  - Tapping one calls `onLocationSet(lat, lng, storeName)`
-- Show a divider "or" between existing locations and the manual "Set Store Location" button
-- Only render this section when `existingStoreLocations.length > 0`
+### Backend Changes
+**`set_my_store_coordinates` RPC** — add `p_label text default null` parameter, set `store_location_label = COALESCE(p_label, store_location_label)` alongside lat/lng update.
 
-### 2. Pass existing locations from `BecomeSellerPage`
-- In the step where `StoreLocationPicker` is rendered, use `sellerProfiles` from `useAuth()`
-- Filter to profiles that have `latitude` and `longitude` set and are not the current draft
-- Pass as `existingStoreLocations` prop
+### Frontend Changes
 
-### 3. Also update `SetStoreLocationSheet` (post-onboarding)
-- Add a similar "Use from existing store" section at the top of the pick step
-- Fetch other seller profiles for the user that have coordinates
+**`SetStoreLocationSheet.tsx`**
+- Pass `selectedPlaceName` to `handleConfirm`
+- Include it in the RPC call as `p_label`
+- In the existing store cards, show `store_location_label` instead of coordinates (fall back to coords if label is null)
 
-## UX
-- Section header: "Use location from another store"
-- Each store shown as a tappable card with store name and a MapPin icon
-- After selection, location is set immediately (no map confirm needed since it was already confirmed for the other store)
+**`BecomeSellerPage.tsx` — `StoreLocationPicker`**
+- Expand `existingStoreLocations` type to include `store_location_label`
+- Show `store_location_label || coordinates` in both the existing store buttons and the "Location set" confirmation
+- When the `OnboardingLocationSheet` confirms, persist the place name via the RPC
+
+**`OnboardingLocationSheet.tsx`**
+- Already passes `name` in `onConfirm(lat, lng, updatedName)` — no change needed here
+
+**`BecomeSellerPage.tsx` — onboarding save flow**
+- When saving the seller profile with coordinates, also call `set_my_store_coordinates` with the label so it persists
+
+### Display Priority
+Everywhere a location is shown: `store_location_label > "lat, lng" fallback`
+
+### Files
+| File | Action |
+|---|---|
+| DB migration | **Create** — add column + update RPC |
+| `src/components/seller/SetStoreLocationSheet.tsx` | **Modify** — pass label to RPC, show label in cards |
+| `src/pages/BecomeSellerPage.tsx` | **Modify** — include label in type, display label, persist on save |
 
