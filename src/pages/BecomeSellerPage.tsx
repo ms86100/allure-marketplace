@@ -542,14 +542,16 @@ export default function BecomeSellerPage() {
               <div className="flex items-center justify-between"><div className="flex items-center gap-3"><Globe className="text-primary" size={20} /><div><p className="font-medium text-sm">Sell beyond my community</p><p className="text-xs text-muted-foreground">Allow buyers from nearby societies to order</p></div></div><Switch checked={formData.sell_beyond_community} onCheckedChange={(checked) => setFormData({ ...formData, sell_beyond_community: checked })} /></div>
               {formData.sell_beyond_community && <div className="space-y-2 pt-2 border-t"><div className="flex items-center justify-between"><Label className="text-xs text-muted-foreground">Delivery Radius</Label><span className="text-sm font-medium text-primary">{formData.delivery_radius_km} km</span></div><Slider value={[formData.delivery_radius_km]} onValueChange={([v]) => setFormData({ ...formData, delivery_radius_km: v })} min={1} max={10} step={1} /><p className="text-[10px] text-muted-foreground">Buyers within {formData.delivery_radius_km} km of your society can order</p></div>}
             </div>
-            {selectedGroupRow && (selectedGroupRow as any).requires_license && (
-              <div className="border rounded-lg p-4 space-y-3">
-                <div className="flex items-center gap-2"><Shield size={16} className="text-primary" /><h3 className="font-semibold text-sm">Required License</h3></div>
-                <p className="text-xs text-muted-foreground">Your category requires a verified license before you can proceed.</p>
-                {draftSellerId ? <LicenseUpload sellerId={draftSellerId} groupId={selectedGroupRow.id} isOnboarding={true} onStatusChange={(status) => setLicenseStatus(status)} /> : <p className="text-xs text-muted-foreground italic">Fill in your business name above — license upload will appear once your draft is saved.</p>}
-                {(selectedGroupRow as any).license_mandatory && (!licenseStatus || licenseStatus === 'rejected') && <div className="bg-destructive/10 rounded-lg p-3 text-sm text-destructive flex items-center gap-2"><Shield size={16} />You must upload your {(selectedGroupRow as any).license_type_name || 'Business License'} before continuing.</div>}
-              </div>
-            )}
+            {/* Per-category license requirements */}
+            {(() => {
+              const licenseCats = configs.filter(c => c.behavior && formData.categories.includes(c.category) && (c as any).requiresLicense);
+              // Also check raw DB data via category_config
+              const selectedCatConfigs = configs.filter(c => formData.categories.includes(c.category));
+              return selectedCatConfigs.map(catCfg => {
+                // We need to check requires_license from DB — fetch dynamically
+                return <CategoryLicensePrompt key={catCfg.id} categoryConfigId={catCfg.id} categoryName={catCfg.displayName} draftSellerId={draftSellerId} isOnboarding={true} onStatusChange={setLicenseStatus} />;
+              });
+            })()}
             {/* Store Location */}
             <StoreLocationPicker
               latitude={formData.latitude}
