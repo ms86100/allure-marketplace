@@ -16,7 +16,7 @@ import { CroppableImageUpload } from '@/components/ui/croppable-image-upload';
 import { DAYS_OF_WEEK } from '@/types/database';
 import { Slider } from '@/components/ui/slider';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2, Globe, Truck, Eye, MapPin, Navigation } from 'lucide-react';
+import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2, Globe, Truck, Eye, MapPin, Navigation, Palmtree } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { cn } from '@/lib/utils';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
@@ -290,6 +290,29 @@ export default function SellerSettingsPage() {
               )}
             </div>
           </div>
+
+          {/* Vacation Mode */}
+          <Card className={formData.vacation_mode ? 'border-accent/30 bg-accent/5' : 'border-border'}>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Palmtree className={formData.vacation_mode ? 'text-accent' : 'text-muted-foreground'} size={22} />
+                  <div>
+                    <p className="font-semibold text-sm">Vacation Mode</p>
+                    <p className="text-xs text-muted-foreground">Show "On a break" banner instead of hiding store</p>
+                  </div>
+                </div>
+                <Switch checked={formData.vacation_mode} onCheckedChange={(checked) => setFormData({ ...formData, vacation_mode: checked, vacation_until: checked ? formData.vacation_until : '' })} />
+              </div>
+              {formData.vacation_mode && (
+                <div className="space-y-2 pt-2 border-t">
+                  <Label htmlFor="vacation_until" className="text-xs">Back on (optional)</Label>
+                  <Input id="vacation_until" type="date" value={formData.vacation_until} onChange={(e) => setFormData({ ...formData, vacation_until: e.target.value })} min={new Date().toISOString().split('T')[0]} />
+                  <p className="text-[10px] text-muted-foreground">Buyers will see when you'll be back</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Preview */}
           {sellerProfile && <Link to={`/seller/${sellerProfile.id}`}><Button variant="outline" className="w-full gap-2"><Eye size={16} /> Preview My Store</Button></Link>}

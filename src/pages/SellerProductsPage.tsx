@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -15,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { ProductImageUpload } from '@/components/ui/product-image-upload';
 import { ProductActionType, ProductCategory } from '@/types/database';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
-import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle, Store, ShieldAlert, Upload, Send, CheckCircle2, Clock, XCircle, FileText, X } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle, Store, ShieldAlert, Upload, Send, CheckCircle2, Clock, XCircle, FileText, X, Eye } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { toast } from 'sonner';
 import { BulkProductUpload } from '@/components/seller/BulkProductUpload';
@@ -28,7 +29,25 @@ import { ServiceFieldsSection } from '@/components/seller/ServiceFieldsSection';
 export default function SellerProductsPage() {
   const sp = useSellerProducts();
   const { formatPrice, currencySymbol } = useCurrency();
+  const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
 
+  // Fetch 7-day view counts
+  useEffect(() => {
+    if (!sp.sellerProfile?.id || sp.products.length === 0) return;
+    const productIds = sp.products.map(p => p.id);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    supabase
+      .from('product_views' as any)
+      .select('product_id')
+      .in('product_id', productIds)
+      .gte('viewed_at', sevenDaysAgo)
+      .then(({ data }) => {
+        if (!data) return;
+        const counts: Record<string, number> = {};
+        (data as any[]).forEach(row => { counts[row.product_id] = (counts[row.product_id] || 0) + 1; });
+        setViewCounts(counts);
+      });
+  }, [sp.sellerProfile?.id, sp.products.length]);
   if (sp.isLoading) {
     return <AppLayout showHeader={false}><div className="p-4"><Skeleton className="h-8 w-32 mb-4" /><Skeleton className="h-12 w-full mb-4" />{[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl mb-3" />)}</div></AppLayout>;
   }
@@ -174,6 +193,11 @@ export default function SellerProductsPage() {
                             {product.is_bestseller && <Badge className="bg-warning/20 text-warning-foreground text-[10px] px-1"><Star size={10} className="mr-0.5 fill-warning text-warning" />Bestseller</Badge>}
                           </div>
                           <p className="text-sm font-semibold text-primary">{formatPrice(product.price)}</p>
+                          {viewCounts[product.id] > 0 && (
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 mt-0.5">
+                              <Eye size={10} /> {viewCounts[product.id]} views this week
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">

@@ -14,7 +14,7 @@ export interface FilterState {
   minRating: number;
   isVeg: boolean | null;
   categories: ProductCategory[];
-  sortBy: 'rating' | 'newest' | 'price_low' | 'price_high' | null;
+  sortBy: 'rating' | 'newest' | 'price_low' | 'price_high' | 'nearest' | null;
 }
 
 interface SearchFiltersProps {

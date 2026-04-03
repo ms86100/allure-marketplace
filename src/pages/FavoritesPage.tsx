@@ -13,6 +13,7 @@ import { useProductFavoritesList } from '@/hooks/useProductFavorites';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useCurrency } from '@/hooks/useCurrency';
+import { computeStoreStatus, formatStoreClosedMessage } from '@/lib/store-availability';
 
 export default function FavoritesPage() {
   const { user, profile } = useAuth();
@@ -172,11 +173,18 @@ export default function FavoritesPage() {
 }
 
 function FavoriteSellerCard({ seller, onRemoved }: { seller: any; onRemoved: () => void }) {
-  const isClosed = seller.is_available === false;
+  const storeStatus = computeStoreStatus(
+    seller.availability_start,
+    seller.availability_end,
+    seller.operating_days,
+    seller.is_available !== false
+  );
+  const isOpen = storeStatus.status === 'open';
+  const closedMsg = !isOpen ? formatStoreClosedMessage(storeStatus) : '';
 
   return (
     <Link to={`/seller/${seller.id}`} className="block">
-      <div className={`relative rounded-xl border border-border bg-card overflow-hidden ${isClosed ? 'opacity-60' : ''}`}>
+      <div className={`relative rounded-xl border border-border bg-card overflow-hidden ${!isOpen ? 'opacity-60' : ''}`}>
         <div className="aspect-square bg-muted flex items-center justify-center relative">
           {seller.profile_image_url || seller.cover_image_url ? (
             <img
@@ -187,9 +195,11 @@ function FavoriteSellerCard({ seller, onRemoved }: { seller: any; onRemoved: () 
           ) : (
             <Store size={28} className="text-muted-foreground" />
           )}
-          {isClosed && (
+          {!isOpen && (
             <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
-              <span className="text-[10px] font-semibold text-muted-foreground bg-background/80 px-2 py-0.5 rounded-full">Closed</span>
+              <span className="text-[10px] font-semibold text-muted-foreground bg-background/80 px-2 py-0.5 rounded-full">
+                {closedMsg || 'Closed'}
+              </span>
             </div>
           )}
           <div className="absolute top-1 right-1">
@@ -202,9 +212,12 @@ function FavoriteSellerCard({ seller, onRemoved }: { seller: any; onRemoved: () 
           </div>
         </div>
         <div className="p-1.5">
-          <p className="text-xs font-medium text-foreground truncate leading-tight">
-            {seller.business_name}
-          </p>
+          <div className="flex items-center gap-1">
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isOpen ? 'bg-green-500' : 'bg-muted-foreground'}`} />
+            <p className="text-xs font-medium text-foreground truncate leading-tight">
+              {seller.business_name}
+            </p>
+          </div>
           <div className="flex items-center gap-1 mt-0.5">
             {seller.rating > 0 && (
               <span className="text-[10px] text-warning font-medium flex items-center gap-0.5">★ {seller.rating.toFixed(1)}</span>

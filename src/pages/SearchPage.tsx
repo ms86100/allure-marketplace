@@ -104,7 +104,7 @@ export default function SearchPage() {
                 <button onClick={() => s.setFilters({ ...s.filters, isVeg: s.filters.isVeg === false ? null : false })} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors ${s.filters.isVeg === false ? 'border-destructive bg-destructive/10 text-destructive' : 'border-border bg-background text-foreground'}`}>
                   <div className="w-3 h-3 border-[1.5px] border-destructive rounded-sm flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-destructive" /></div>Non-veg
                 </button>
-                {([{ value: 'rating' as const, label: 'Top Rated' }, { value: 'price_low' as const, label: 'Price ↑' }, { value: 'price_high' as const, label: 'Price ↓' }]).map(({ value, label }) => (
+                {([{ value: 'rating' as const, label: 'Top Rated' }, { value: 'price_low' as const, label: 'Price ↑' }, { value: 'price_high' as const, label: 'Price ↓' }, { value: 'nearest' as const, label: 'Nearest' }]).map(({ value, label }) => (
                   <button key={value} onClick={() => s.setFilters({ ...s.filters, sortBy: s.filters.sortBy === value ? null : value })} className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap border transition-colors ${s.filters.sortBy === value ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background text-foreground'}`}>{label}</button>
                 ))}
               </div>

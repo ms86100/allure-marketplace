@@ -32,6 +32,8 @@ export interface SellerSettingsFormData {
   delivery_note: string;
   minimum_order_amount: string;
   daily_order_limit: string;
+  vacation_mode: boolean;
+  vacation_until: string;
 }
 
 const DEFAULT_FORM: SellerSettingsFormData = {
@@ -42,6 +44,7 @@ const DEFAULT_FORM: SellerSettingsFormData = {
   bank_account_number: '', bank_ifsc_code: '', bank_account_holder: '',
   sell_beyond_community: false, delivery_radius_km: 5, fulfillment_mode: 'self_pickup' as string,
   delivery_note: '', minimum_order_amount: '', daily_order_limit: '',
+  vacation_mode: false, vacation_until: '',
 };
 
 export function useSellerSettings() {
@@ -85,6 +88,8 @@ export function useSellerSettings() {
           delivery_note: profile.delivery_note || '',
           minimum_order_amount: profile.minimum_order_amount?.toString() || '',
           daily_order_limit: profile.daily_order_limit?.toString() || '',
+          vacation_mode: profile.vacation_mode ?? false,
+          vacation_until: profile.vacation_until ? profile.vacation_until.split('T')[0] : '',
         });
       }
     } catch (error) { console.error('Error fetching profile:', error); }
@@ -148,6 +153,8 @@ export function useSellerSettings() {
         fulfillment_mode: formData.fulfillment_mode, delivery_note: formData.delivery_note.trim() || null,
         minimum_order_amount: (minOrder !== null && !isNaN(minOrder) && minOrder > 0) ? minOrder : null,
         daily_order_limit: (dailyLimit !== null && !isNaN(dailyLimit) && dailyLimit > 0) ? dailyLimit : null,
+        vacation_mode: formData.vacation_mode,
+        vacation_until: formData.vacation_mode && formData.vacation_until ? formData.vacation_until : null,
       } as any).eq('id', sellerProfile.id);
       if (error) throw error;
       toast.success('Settings saved successfully', { id: 'settings-saved' });

@@ -17,6 +17,8 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { computeStoreStatus, formatStoreClosedMessage, type StoreAvailability } from '@/lib/store-availability';
 import { SellerTrustBadge } from '@/components/trust/SellerTrustBadge';
+import { ProductFavoriteButton } from '@/components/favorite/ProductFavoriteButton';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface ProductWithSeller {
   id: string; seller_id: string; name: string; price: number; image_url: string | null; category: string;
@@ -48,6 +50,7 @@ interface ProductListingCardProps {
 }
 
 function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, className, viewOnly = false, categoryConfigs = [], marketplaceConfig, badgeConfigs = [], socialProofCount, onViewClick, compact = false }: ProductListingCardProps) {
+  const { user } = useAuth();
   const { items, addItem, updateQuantity } = useCart();
   const { impact, selectionChanged } = useHaptics();
   const { formatPrice } = useCurrency();
@@ -177,6 +180,13 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
             </div>
           )}
 
+          {/* Favorite heart — top right (when no discount) */}
+          {user && !hasDiscount && (
+            <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
+              <ProductFavoriteButton productId={product.id} size="sm" />
+            </div>
+          )}
+
           {showVegBadge && (
             <div className="absolute bottom-2 right-2">
               <VegBadge isVeg={product.is_veg} size="sm" />
@@ -239,7 +249,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
 
         {product.seller_name && !compact && (
           <div className="flex items-center gap-1 mt-1 overflow-hidden">
-            <span className="text-[10px] text-muted-foreground truncate">{product.seller_name}</span>
+            <span className={cn("text-[10px] truncate", product.distance_km && product.distance_km > 0 ? "text-foreground font-medium" : "text-muted-foreground")}>{product.seller_name}</span>
             {product.seller_id && <SellerTrustBadge sellerId={product.seller_id} size="sm" />}
           </div>
         )}

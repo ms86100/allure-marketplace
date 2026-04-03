@@ -562,13 +562,18 @@ export default function SellerDetailPage() {
               )}
             </div>
             {categories.length > 2 && (
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide mb-4 -mx-4 px-4">
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide mb-4 -mx-4 px-4 sticky top-0 z-10 bg-background py-2 border-b border-border/50">
                 {categories.map((cat) => {
                   const categoryInfo = allCategoryConfigs.find((c) => c.category === cat);
                   return (
                     <button
                       key={cat}
-                      onClick={() => setActiveCategory(cat)}
+                      onClick={() => {
+                        setActiveCategory(cat);
+                        // Auto-scroll to section
+                        const el = document.getElementById(`seller-cat-${cat}`);
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }}
                       className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
                         activeCategory === cat
                           ? 'bg-primary text-primary-foreground'
