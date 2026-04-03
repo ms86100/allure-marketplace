@@ -694,8 +694,9 @@ export function DraftProductManager({
                 </div>
               )}
 
-              {/* Stock Tracking */}
+              {/* Stock Management */}
               <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">📦 Stock Management</p>
                 <label className="flex items-center justify-between cursor-pointer">
                   <span className="text-sm font-medium">Track Stock</span>
                   <Checkbox
