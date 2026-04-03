@@ -140,6 +140,10 @@ export function useSellerApplication() {
 
   // Helper to populate formData from an existing seller profile
   const loadSellerDataIntoForm = useCallback((seller: any) => {
+    const rawPrefs = seller.subcategory_preferences;
+    const prefs: SubcategoryPreferences = rawPrefs && typeof rawPrefs === 'object' && rawPrefs.v === 1
+      ? rawPrefs
+      : { v: 1, data: {} };
     setFormData(f => ({
       ...f,
       business_name: seller.business_name || '',
@@ -159,6 +163,7 @@ export function useSellerApplication() {
       cover_image_url: seller.cover_image_url || null,
       latitude: seller.latitude ?? null,
       longitude: seller.longitude ?? null,
+      subcategory_preferences: prefs,
     }));
   }, []);
 
