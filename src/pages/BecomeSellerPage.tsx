@@ -431,7 +431,7 @@ export default function BecomeSellerPage() {
                     }
                     setExistingSeller(null);
                     setDraftSellerId((existingSeller as any).id);
-                    setStep(3);
+                    setStep(2);
                   }}>Update & Resubmit</Button>
                   <Button variant="outline" className="w-full" onClick={() => { setSelectedGroup(null); setExistingSeller(null); setStep(1); }}>Choose Different Category</Button>
                 </div>
