@@ -67,6 +67,7 @@ import { useBuyerOrderAlerts } from "@/hooks/useBuyerOrderAlerts";
 import { useLiveActivityOrchestrator } from "@/hooks/useLiveActivityOrchestrator";
 import { useReorderInterceptor } from "@/hooks/useReorderInterceptor";
 import { useNewOrderAlert } from "@/hooks/useNewOrderAlert";
+import { NewOrderAlertProvider, useNewOrderAlertContext } from "@/contexts/NewOrderAlertContext";
 import { NewOrderAlertOverlay } from "@/components/seller/NewOrderAlertOverlay";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -335,12 +336,19 @@ function NavigationHandler() {
 function GlobalSellerAlert() {
   const identity = React.useContext(IdentityCtx);
   const seller = React.useContext(SellerCtx);
+  const { registerDismissById, registerDismissAll } = useNewOrderAlertContext();
   const isSeller = seller?.isSeller ?? false;
   const sellerIds = React.useMemo(
     () => (isSeller && seller?.sellerProfiles ? seller.sellerProfiles.map(p => p.id) : []),
     [isSeller, seller?.sellerProfiles]
   );
-  const { pendingAlerts, dismiss, dismissAll, snooze } = useNewOrderAlert(sellerIds);
+  const { pendingAlerts, dismiss, dismissById, dismissAll, snooze } = useNewOrderAlert(sellerIds);
+
+  React.useEffect(() => {
+    registerDismissById(dismissById);
+    registerDismissAll(dismissAll);
+  }, [dismissById, dismissAll, registerDismissById, registerDismissAll]);
+
   if (!identity) return null;
   return <NewOrderAlertOverlay orders={pendingAlerts} onDismiss={dismiss} onDismissAll={dismissAll} onSnooze={snooze} />;
 }
@@ -516,10 +524,12 @@ function App() {
                 <NavigationHandler />
                 <BrowsingLocationProvider>
                   <CartProvider>
+                    <NewOrderAlertProvider>
                     <PushNotificationProvider>
                       <SafeSellerAlert><GlobalSellerAlert /></SafeSellerAlert>
                       <AppRoutes />
                     </PushNotificationProvider>
+                    </NewOrderAlertProvider>
                   </CartProvider>
                 </BrowsingLocationProvider>
               </AuthProvider>

@@ -45,6 +45,7 @@ import { RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { LiveActivityManager } from '@/services/LiveActivityManager';
 import { Capacitor } from '@capacitor/core';
+import { useNewOrderAlertContext } from '@/contexts/NewOrderAlertContext';
 
 // Gap 10: Lazy-load map to avoid bundling Leaflet for non-delivery orders
 const DeliveryMapView = lazy(() => import('@/components/delivery/DeliveryMapView').then(m => ({ default: m.DeliveryMapView })));
@@ -107,6 +108,7 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const o = useOrderDetail(id);
+  const { dismissById } = useNewOrderAlertContext();
   const [deliveryAssignmentId, setDeliveryAssignmentId] = useState<string | null>(null);
   const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
   const [isGenericOtpDialogOpen, setIsGenericOtpDialogOpen] = useState(false);
@@ -128,7 +130,18 @@ export default function OrderDetailPage() {
   const deliveryTracking = useDeliveryTracking(deliveryAssignmentId, o.isInTransit);
   const trackingConfig = useTrackingConfig();
 
-  // Defensive guard: end any lingering Live Activity if order is terminal
+  // Dismiss bell sound when this order is opened
+  useEffect(() => {
+    if (id) dismissById(id);
+  }, [id, dismissById]);
+
+  // Also dismiss when order status changes to non-actionable
+  useEffect(() => {
+    if (id && order?.status && !['placed', 'enquired', 'quoted'].includes(order.status)) {
+      dismissById(id);
+    }
+  }, [id, order?.status, dismissById]);
+
   useEffect(() => {
     if (!orderId || !order?.status) return;
     if (!Capacitor.isNativePlatform()) return;
