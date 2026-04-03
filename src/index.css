@@ -941,7 +941,17 @@ body.razorpay-active iframe[src*="checkout.razorpay"] {
   .banner-anim-glow,
   .banner-anim-shimmer::after,
   .banner-anim-pulse,
-  .banner-anim-confetti::after {
+  .banner-anim-confetti::after,
+  .festival-banner-enter,
+  .festival-text-reveal,
+  .festival-badge-pop,
+  .festival-peek-pop,
+  .festival-chip-enter,
+  .festival-emoji-float,
+  .festival-orb,
+  .festival-orb-1,
+  .festival-orb-2,
+  .festival-orb-3 {
     animation: none !important;
   }
 }
