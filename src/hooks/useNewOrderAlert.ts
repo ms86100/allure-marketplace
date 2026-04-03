@@ -156,6 +156,17 @@ export function useNewOrderAlert(sellerIds: string[]) {
     });
   }, [stopBuzzing]);
 
+  const dismissById = useCallback((orderId: string) => {
+    setPendingAlerts(prev => {
+      const idx = prev.findIndex(o => o.id === orderId);
+      if (idx === -1) return prev;
+      dismissedIdsRef.current.add(orderId);
+      const remaining = prev.filter(o => o.id !== orderId);
+      if (remaining.length === 0) stopBuzzing();
+      return remaining;
+    });
+  }, [stopBuzzing]);
+
   const dismissAll = useCallback(() => {
     setPendingAlerts(prev => {
       prev.forEach(o => dismissedIdsRef.current.add(o.id));
