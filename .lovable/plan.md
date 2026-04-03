@@ -1,33 +1,51 @@
 
 
-# Fix: Empty Marketplace State Is Dead Code
+# Fix Onboarding Flow — 3 Issues
 
-## The Real Bug
+## Issue 1: Flicker on Login Redirect
+**Root cause**: When a returning user with incomplete profile logs in, `useAuthPage.ts` line 194 navigates to `/profile/edit`. But `ProtectedRoute` first renders `HomePage`, which has its own `useEffect` redirect to `/profile/edit` (line 33-37). The HomePage content briefly renders before the effect fires — causing a visible flash of the marketplace/society search UI.
 
-The enhanced empty marketplace state (value props, how-it-works, social proof, CTAs) lives inside a `ProductListings` component at line 309 of `MarketplaceSection.tsx` — but **this component is never rendered anywhere**. It's dead code.
+**Fix in `HomePage.tsx`**: Instead of using a `useEffect` for the redirect (which renders one frame first), add an early return **before** the main JSX. If `profile` exists and is incomplete, return `<Navigate to="/profile/edit" replace />` synchronously — no flash.
 
-The main `MarketplaceSection` render (lines 134-254) directly renders `FeaturedBanners`, `AutoHighlightStrip`, `ParentGroupTabs`, `CategoryImageGrid`, discovery rows, and `ShopByStoreDiscovery` inline. When no products exist, all these render empty/null, producing a blank page.
-
-## Fix
-
-### `MarketplaceSection.tsx`
-
-1. **Add an early empty-state check** in the main component body (after loading completes). When `!loadingLocal && localCategories.length === 0`, render the full empty state experience directly — before any of the other sections.
-
-2. **Move the empty state JSX** from the dead `ProductListings` function into this early return block in the main `MarketplaceSection` component.
-
-3. **Delete the unused `ProductListings` component** (lines 308-537) — it's dead code that will never execute.
-
-```text
-MarketplaceSection()
-  ├── if loadingLocal → skeleton
-  ├── if !loadingLocal && localCategories.length === 0
-  │     └── Full empty state (hero, value props, how-it-works, CTAs)
-  └── else → FeaturedBanners, Highlights, ParentGroupTabs, 
-              CategoryImageGrid, DiscoveryRows, StoreDiscovery
+```
+// Replace the useEffect redirect with a synchronous check
+if (profile && (!profile.name || profile.name === 'User')) {
+  return <Navigate to="/profile/edit" replace />;
+}
 ```
 
-### No other file changes needed
+Remove the existing `useEffect` that does the same thing (lines 31-38).
 
-The `ShopByStoreDiscovery` heading fix is already done. This is purely restructuring `MarketplaceSection.tsx` so the empty state actually renders.
+## Issue 2: Cancel Button Creates Infinite Re-open Loop
+**Root cause**: When there are no addresses, `shouldAutoOpen` is `true`, which renders `AddressForm`. Clicking Cancel sets `showAddressForm = false`, but since `addresses.length` is still 0, `shouldAutoOpen` recalculates to `true` and the form immediately re-opens. The Cancel button is effectively broken for first-time users.
+
+**Fix in `ProfileEditPage.tsx`**: Add a `dismissedAutoOpen` state. When Cancel is clicked during auto-open, set this flag to `true`. Include `!dismissedAutoOpen` in the `shouldAutoOpen` condition. When dismissed, show the empty address state with an "Add Address" button instead of the form.
+
+```
+const [dismissedAutoOpen, setDismissedAutoOpen] = useState(false);
+const shouldAutoOpen = !addressesLoading && addresses.length === 0 
+  && !showAddressForm && !dismissedAutoOpen;
+
+// Update the onCancel handler:
+onCancel={() => { 
+  setShowAddressForm(false); 
+  setEditingAddress(null); 
+  setDismissedAutoOpen(true); 
+}}
+```
+
+## Issue 3: Profile Completion Prompt on Home
+**Status**: Already implemented in `HomePage.tsx` lines 87-104. Shows a progress bar with "Profile X% complete" and an "Update" link when name, flat_number, or block are missing. No changes needed.
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/pages/HomePage.tsx` | Replace useEffect redirect with synchronous `<Navigate>` early return |
+| `src/pages/ProfileEditPage.tsx` | Add `dismissedAutoOpen` state to fix Cancel button loop |
+
+## Technical Notes
+- Both fixes are purely UI logic — no DB or backend changes
+- The synchronous redirect in HomePage eliminates the flash entirely since React never renders the page content
+- The `dismissedAutoOpen` flag resets naturally on page reload, so it doesn't persist unnecessarily
 
