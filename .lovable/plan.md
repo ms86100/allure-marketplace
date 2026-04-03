@@ -1,134 +1,108 @@
 
 
-# Search-First Seller Category Selection — Bulletproof MVP
+# Add Ayurveda Category with Panchakarma Subcategories
 
-## What Changes
+## Current State
 
-Replace the 2-step onboarding (Step 1: pick parent group → Step 2: pick subcategories) with a single unified "What do you want to sell?" step. Sellers search across ALL categories/subcategories in one place, with smart suggestion, alias matching, and guaranteed fallback.
+- **No Ayurveda category exists** in `category_config` — the enum `service_category` has no `ayurveda` value
+- **Zero subcategories** exist for any personal_care or education_learning categories (subcategories only exist for food_beverages)
+- The `service_booking` workflow is fully defined and working — Ayurveda services will use it
+- The `ALIAS_MAP` in `CategorySearchPicker.tsx` currently maps "ayurveda", "therapy" etc. to `yoga` — incorrect once Ayurveda has its own category
+- Adding subcategories to personal_care categories (Beauty, Salon, etc.) is also a gap but out of scope for this change
 
----
+## What This Plan Does
 
-## Architecture
+1. Add `ayurveda` to the `service_category` enum
+2. Insert a new `category_config` row for Ayurveda under `personal_care` with `transaction_type = 'service_booking'`
+3. Insert subcategories covering Panchakarma programs, individual therapies, and complementary treatments
+4. Update the search alias map so sellers typing "panchakarma", "ayurveda", "detox therapy" etc. land on the correct category
+5. Add subcategories for existing service categories (Beauty, Salon, Yoga) so they also become searchable and selectable at the subcategory level
 
-```text
-┌─────────────────────────────────────────┐
-│  🔍 What do you want to sell?           │
-│  [ yoga classes                       ] │
-├─────────────────────────────────────────┤
-│  ✨ Suggested for you                   │
-│  🧘 Yoga Classes · Education & Learning │
-│  [Use this]                             │
-├─────────────────────────────────────────┤
-│  Other matches                          │
-│  💆 Yoga Therapy · Personal Care        │
-│  🧘 Power Yoga · Education & Learning   │
-├─────────────────────────────────────────┤
-│  Or browse by category:                 │
-│  [🍽 Food] [📚 Education] [🔧 Home]...  │
-└─────────────────────────────────────────┘
+## Implementation
+
+### Step 1: DB Migration — Add enum value + category_config + subcategories
+
+**Migration SQL:**
+
+```sql
+-- 1. Add enum value
+ALTER TYPE service_category ADD VALUE IF NOT EXISTS 'ayurveda';
+
+-- 2. Insert category_config for Ayurveda
+INSERT INTO category_config (
+  category, display_name, icon, color, parent_group, layout_type,
+  is_physical_product, requires_preparation, requires_time_slot, requires_delivery,
+  supports_cart, enquiry_only, has_quantity, has_duration, has_date_range, is_negotiable,
+  display_order, is_active, transaction_type, show_duration_field, show_veg_toggle,
+  name_placeholder, description_placeholder, price_label, duration_label,
+  primary_button_label, requires_availability, supports_addons, supports_staff_assignment
+) VALUES (
+  'ayurveda', 'Ayurveda & Wellness', 'Leaf', '#4CAF50', 'personal_care', 'service',
+  false, false, true, false,
+  false, false, false, true, false, false,
+  15, true, 'service_booking', true, false,
+  'e.g. Panchakarma Detox Program', 'Describe treatment, benefits, and duration',
+  'Session Price', 'Session Duration',
+  'Book Now', true, true, true
+);
 ```
 
----
+**Insert subcategories** (using the new category_config ID):
 
-## Implementation (3 Changes)
+| slug | display_name | icon |
+|---|---|---|
+| panchakarma_detox | Panchakarma Detox Program | Sparkles |
+| panchakarma_rejuvenation | Rejuvenation Therapy | Heart |
+| abhyanga | Abhyanga (Oil Massage) | Droplets |
+| shirodhara | Shirodhara | Brain |
+| nasya_therapy | Nasya Therapy | Wind |
+| basti_therapy | Basti Therapy | Pill |
+| swedana | Swedana (Steam Therapy) | CloudRain |
+| udwartana | Udwartana (Powder Massage) | Leaf |
+| ayurvedic_consultation | Ayurvedic Consultation | Stethoscope |
+| diet_lifestyle_plan | Diet & Lifestyle Plan | ClipboardList |
 
-### 1. Create `src/components/seller/CategorySearchPicker.tsx`
+Also insert subcategories for **Beauty** (facial, bridal makeup, skin care, waxing, threading), **Salon** (haircut, hair coloring, beard trim, hair spa, grooming), and **Yoga** (hatha yoga, power yoga, prenatal yoga, meditation, pranayama) to make those categories equally searchable.
 
-Unified search + browse + auto-suggest component.
+### Step 2: Code — Update `CategorySearchPicker.tsx`
 
-**Data sources** (existing hooks, no new queries):
-- `useCategoryConfigs()` → all category_config entries with parent groups
-- `useSubcategories()` → all active subcategories (no filter)
-- `parentGroupInfos` from `useSellerApplication` → group labels/icons
+- Move ayurveda-related aliases from `yoga` to `ayurveda`:
+  - Remove: `'therapy'`, `'ayurvedic therapy'`, `'ayurveda'`, `'naturopathy'`, `'holistic healing'`
+  - Keep on yoga: `'meditation'`, `'wellness'`, `'mindfulness'`, `'pranayama'`
 
-**Search logic** (client-side, no API):
-- Builds flat index: every subcategory + every category_config across ALL groups
-- Each item tagged with its parent group label/icon for context display
-- Debounce 200ms, minimum 2 characters
+- Add new `ayurveda` alias entry:
+  ```
+  ayurveda: ['panchakarma', 'ayurvedic therapy', 'ayurveda treatment', 'detox therapy',
+             'oil massage', 'shirodhara', 'naturopathy', 'holistic healing',
+             'body detox', 'wellness retreat', 'ayurvedic massage', 'herbal therapy',
+             'stress relief therapy', 'therapy']
+  ```
 
-**3-layer matching:**
-1. Subcategory `display_name` match (exact=3, startsWith=2, contains=1)
-2. Category `displayName` match (same scoring)
-3. **Alias keywords** (inline map, no DB): covers ~50 common natural-language terms
+- Add alias entries for new subcategory slugs:
+  ```
+  panchakarma_detox: ['panchakarma', 'detox program', 'body detox', 'cleansing therapy']
+  abhyanga: ['oil massage', 'body massage', 'ayurvedic massage', 'full body massage']
+  shirodhara: ['head oil therapy', 'forehead oil', 'stress therapy']
+  ```
 
-```typescript
-const ALIAS_MAP: Record<string, string[]> = {
-  tiffin: ["home food", "dabba", "meal service", "lunch delivery"],
-  yoga: ["meditation", "wellness", "mindfulness"],
-  electrician: ["wiring", "repair", "electrical"],
-  beauty: ["parlour", "parlor", "makeup", "facial"],
-  maid: ["cleaning", "house cleaning", "home cleaning"],
-  resume_writing: ["resume editing", "cv writing", "resume help"],
-  // ~50 entries covering all active categories
-};
-```
-Alias match scores 1.5 (between contains and startsWith).
+- Add `'ayurveda'` to `POPULAR_SLUGS` array
 
-**Auto-suggestion rules (bulletproof):**
-- Show "Suggested for you" card ONLY when:
-  - Top result score ≥ 2
-  - AND `(topScore - secondScore) >= 1` (dominance check)
-- If multiple results share the top score → show "Top matches" list (no single suggestion)
-- Never bias toward wrong category
+- Add `'Panchakarma Therapy'` and `'Ayurveda'` to the typewriter placeholder rotation
 
-**UI states:**
-- **Empty search**: "Popular" quick-picks (hardcoded top 8 subcategory slugs) + horizontal-scroll parent group pills + full browse grid (always visible, not collapsed)
-- **Results found**: Ranked list with icon + name + parent group badge pill
-- **No results**: Reassuring copy ("We couldn't find an exact match, but you can still list your service") + browse grid prominently shown
-- **Selections**: Removable chips below search bar showing picks across groups with group label
+### Step 3: No workflow changes needed
 
-**Multi-group warning:**
-When seller selects across 2+ different parent groups, show a soft confirmation: "You're selecting services across different categories. Continue?"
-
-**Selection behavior:**
-- Tapping a subcategory result → opens existing `SubcategoryPickerDialog` scoped to that category with the item pre-selected
-- Tapping a category with no subcategories → direct toggle
-- Auto-resolves `selectedGroup` from first selection
-- Reuses existing `SubcategorySelection` type and `subcategory_preferences` JSONB structure
-
-### 2. Modify `src/pages/BecomeSellerPage.tsx`
-
-- Replace Step 1 (parent group grid) + Step 2 (`GuidedStep2`) with `CategorySearchPicker`
-- `TOTAL_STEPS`: 6 → 5
-- Updated `STEP_META`:
-  - Step 1: "What to Sell" (Search icon) — `CategorySearchPicker`
-  - Step 2: "Store Details" (was Step 3)
-  - Step 3: "Settings" (was Step 4)
-  - Step 4: "Products" (was Step 5)
-  - Step 5: "Review" (was Step 6)
-- `selectedGroup` auto-set from picker's first selection (no manual group picking needed)
-- All downstream step references shift by -1
-- Context breadcrumb shows from Step 2+ instead of Step 3+
-- Back button on Step 2 goes to Step 1 (picker)
-- `GuidedStep2` function remains in file but is no longer rendered (can be removed in cleanup)
-
-### 3. No Backend Changes
-
-- No new database tables
-- No new RPC functions
-- No schema migrations
-- All search runs client-side against pre-fetched cached data
-- Existing `SubcategoryPickerDialog` reused as-is
-
----
-
-## Edge Cases Handled
-
-| Scenario | Behavior |
-|---|---|
-| Seller types "meditation" (not in subcategories) | Alias map resolves to "Yoga" results |
-| Multiple equal-score results | "Top matches" list, no single suggestion |
-| No results at all | Reassuring message + browse grid always visible |
-| Cross-group selections (yoga + beauty) | Soft warning, allowed to continue |
-| Seller doesn't type, just browses | Parent group pills + grid always visible |
-| Single active parent group | Works same — search still covers all subcategories |
-
----
+The `service_booking` workflow already supports: Requested → Confirmed → Scheduled → On the Way → Arrived → In Progress → Completed. This fits Ayurveda services perfectly.
 
 ## Files Summary
 
 | File | Action |
 |---|---|
-| `src/components/seller/CategorySearchPicker.tsx` | **Create** |
-| `src/pages/BecomeSellerPage.tsx` | **Modify** — merge steps, update constants |
+| Migration SQL | **Create** — enum value + category_config row + ~30 subcategory rows |
+| `src/components/seller/CategorySearchPicker.tsx` | **Modify** — update ALIAS_MAP, POPULAR_SLUGS, typewriter list |
+
+## Gaps Identified (For Future)
+
+- **No subcategories for remaining service categories** (Electrician, Plumber, Maid, etc.) — sellers can only select at category level, not specialize
+- **No attribute blocks** for Ayurveda-specific metadata (dosha focus, contraindications) — would require the attribute engine to be extended
+- **No consultation-first workflow** — Panchakarma programs ideally need a "Consult → Plan → Book" flow, but the current `service_booking` covers the booking part adequately for MVP
 
