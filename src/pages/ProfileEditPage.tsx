@@ -28,10 +28,11 @@ export default function ProfileEditPage() {
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState<any>(null);
   const [step, setStep] = useState<1 | 2>(1);
+  const [dismissedAutoOpen, setDismissedAutoOpen] = useState(false);
   const detailsRef = useRef<HTMLDivElement>(null);
 
-  // Auto-open address form if no addresses exist
-  const shouldAutoOpen = !addressesLoading && addresses.length === 0 && !showAddressForm;
+  // Auto-open address form if no addresses exist (unless user dismissed it)
+  const shouldAutoOpen = !addressesLoading && addresses.length === 0 && !showAddressForm && !dismissedAutoOpen;
 
   const handleSaveProfile = async () => {
     if (!user || !name.trim()) {
@@ -150,7 +151,7 @@ export default function ProfileEditPage() {
               <AddressForm
                 initial={editingAddress || undefined}
                 onSave={handleSaveAddress}
-                onCancel={() => { setShowAddressForm(false); setEditingAddress(null); }}
+                onCancel={() => { setShowAddressForm(false); setEditingAddress(null); setDismissedAutoOpen(true); }}
                 saving={isSaving}
               />
             ) : addressesLoading ? (

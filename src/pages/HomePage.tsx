@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { OnboardingWalkthrough, useOnboarding } from '@/components/onboarding/OnboardingWalkthrough';
 
@@ -27,15 +27,6 @@ export default function HomePage() {
 
   const scrollKey = 'home-scroll-y';
   const hasRestoredRef = useRef(false);
-
-  useEffect(() => {
-    if (profile) {
-      const isIncomplete = !profile.name || profile.name === 'User';
-      if (isIncomplete) {
-        navigate('/profile/edit', { replace: true });
-      }
-    }
-  }, [profile, navigate]);
 
   useEffect(() => {
     if (!hasRestoredRef.current && profile) {
@@ -66,6 +57,11 @@ export default function HomePage() {
     sections.forEach(el => observer.observe(el));
     return () => observer.disconnect();
   }, [profile]);
+
+  // Synchronous redirect for incomplete profile — no flicker
+  if (profile && (!profile.name || profile.name === 'User')) {
+    return <Navigate to="/profile/edit" replace />;
+  }
 
   if (hasChecked && showOnboarding && profile) {
     return <OnboardingWalkthrough onComplete={completeOnboarding} />;
