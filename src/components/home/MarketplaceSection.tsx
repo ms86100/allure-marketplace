@@ -16,7 +16,7 @@ import { ProductListingCard, ProductWithSeller } from '@/components/product/Prod
 import { getCategoryPastel } from '@/lib/category-pastels';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronRight, ShoppingBag, Sparkles, Clock, TrendingUp, Flame, Store } from 'lucide-react';
+import { ChevronRight, ShoppingBag, Sparkles, Clock, TrendingUp, Flame, Store, UtensilsCrossed, Wrench, Heart, Users } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { motion } from 'framer-motion';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
