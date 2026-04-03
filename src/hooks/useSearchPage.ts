@@ -251,7 +251,7 @@ export function useSearchPage() {
   if (filters.isVeg === true) pills.push('Veg');
   if (filters.isVeg === false) pills.push('Non-veg');
   if (filters.categories.length) pills.push(...filters.categories.map((c) => categoryMap[c]?.displayName || c));
-  if (filters.sortBy) { const labels: Record<string, string> = { rating: 'Top Rated', newest: 'Newest', price_low: `${currencySymbol} Low→High`, price_high: `${currencySymbol} High→Low` }; pills.push(labels[filters.sortBy]); }
+  if (filters.sortBy) { const labels: Record<string, string> = { rating: 'Top Rated', newest: 'Newest', price_low: `${currencySymbol} Low→High`, price_high: `${currencySymbol} High→Low`, nearest: 'Nearest' }; pills.push(labels[filters.sortBy]); }
 
   const displayProducts = isSearchActive ? results : popularProducts;
   const showLoading = isSearchActive ? isLoading : isLoadingPopular;
