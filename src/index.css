@@ -818,7 +818,8 @@ body.razorpay-active iframe[src*="checkout.razorpay"] {
   .banner-anim-sparkle::after,
   .banner-anim-glow,
   .banner-anim-shimmer::after,
-  .banner-anim-pulse {
+  .banner-anim-pulse,
+  .banner-anim-confetti::after {
     animation: none !important;
   }
 }

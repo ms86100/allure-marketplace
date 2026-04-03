@@ -38,6 +38,7 @@ const ANIMATION_TYPES = [
   { value: 'glow', label: '🌟 Glow' },
   { value: 'shimmer', label: '💫 Shimmer' },
   { value: 'pulse', label: '💗 Pulse' },
+  { value: 'confetti', label: '🎊 Confetti' },
 ];
 
 const INTENSITY_OPTIONS = [

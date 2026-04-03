@@ -140,10 +140,15 @@ function SectionChip({
       {/* Emoji */}
       <span className="text-2xl">{section.icon_emoji || '📦'}</span>
 
-      {/* Title */}
+      {/* Title + count */}
       <p className="text-[11px] font-bold text-foreground text-center leading-tight line-clamp-2">
         {section.title}
       </p>
+      {previews.length > 0 && (
+        <span className="text-[9px] text-muted-foreground font-medium">
+          {previews.length} item{previews.length !== 1 ? 's' : ''}
+        </span>
+      )}
 
       {/* Product thumbnails */}
       {displayPreviews.length > 0 && (
