@@ -88,6 +88,8 @@ export function useSellerSettings() {
           delivery_note: profile.delivery_note || '',
           minimum_order_amount: profile.minimum_order_amount?.toString() || '',
           daily_order_limit: profile.daily_order_limit?.toString() || '',
+          vacation_mode: profile.vacation_mode ?? false,
+          vacation_until: profile.vacation_until ? profile.vacation_until.split('T')[0] : '',
         });
       }
     } catch (error) { console.error('Error fetching profile:', error); }
