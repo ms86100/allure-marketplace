@@ -10,6 +10,7 @@ import { SubcategoryPickerDialog, SubcategorySelection } from '@/components/sell
 import { Search, Sparkles, X, Star, ChevronRight, ArrowRight, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTypewriterPlaceholder } from '@/hooks/useTypewriterPlaceholder';
 import type { SellerFormData, SubcategoryPreferences } from '@/hooks/useSellerApplication';
 import type { CategoryConfig } from '@/types/categories';
 
