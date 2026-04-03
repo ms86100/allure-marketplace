@@ -108,7 +108,7 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const o = useOrderDetail(id);
-  const [deliveryAssignmentId, setDeliveryAssignmentId] = useState<string | null>(null);
+  const { dismissById } = useNewOrderAlertContext();
   const [isOtpDialogOpen, setIsOtpDialogOpen] = useState(false);
   const [isGenericOtpDialogOpen, setIsGenericOtpDialogOpen] = useState(false);
   const [genericOtpTargetStatus, setGenericOtpTargetStatus] = useState<string | null>(null);
