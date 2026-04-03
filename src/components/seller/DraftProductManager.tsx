@@ -143,7 +143,7 @@ export function DraftProductManager({
 
   const showVegToggle = activeConfig?.formHints.showVegToggle ?? false;
   const showDurationField = activeConfig?.formHints.showDurationField ?? false;
-  const isService = useMemo(() => isServiceCategory(newProduct.category, configs), [newProduct.category, configs]);
+  const isService = useMemo(() => doesActionRequireAvailability(newProduct.action_type || defaultActionType, allActions), [newProduct.action_type, defaultActionType, allActions]);
 
   const supportsAddons = (activeConfig as any)?.supportsAddons ?? false;
   const supportsRecurring = (activeConfig as any)?.supportsRecurring ?? false;
