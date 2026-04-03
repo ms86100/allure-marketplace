@@ -756,7 +756,7 @@ export default function OrderDetailPage() {
               {(() => {
                 const totalSavings = items.reduce((sum: number, item: OrderItem) => {
                   const mrp = (item as any).mrp;
-                  if (mrp && mrp > item.price) return sum + (mrp - item.price) * item.quantity;
+                  if (mrp && mrp > item.unit_price) return sum + (mrp - item.unit_price) * item.quantity;
                   return sum;
                 }, 0);
                 return totalSavings > 0 ? (
