@@ -1,47 +1,66 @@
 
 
-# Show Product Description Across All Views
+# Clarify Product Form Fields — Remove Duplication & Add Helper Text
 
-## Current State
+## Problem
 
-- **Product form** (`SellerProductsPage.tsx` line 73): Description textarea has **no maxLength** and no character counter
-- **Seller preview panel** (`ProductFormPreview.tsx` line 125-129): Shows description under "Highlights" — but with no truncation (can overflow)
-- **Buyer detail sheet** (`ProductDetailSheet.tsx` line 188): Shows description under "Highlights" inside a collapsible "View product details" section — also no truncation
-- **Product listing card** (`ProductListingCard.tsx`): Does **not** show description at all
-- **Product card** (`ProductCard.tsx` line 120): Shows description with `line-clamp-2` — this is only used on the seller detail page
+1. **Duplicate field**: `prep_time_minutes` ("Preparation Time") exists in BOTH the main product form AND the "Food Details" attribute block under "Extra Details" — confusing sellers
+2. **Unclear labels**: "Hours in advance" (lead time) and "Prep Time" lack explanatory context
+3. **No section grouping**: Lead time, pre-orders, stock tracking, and prep time are scattered without clear purpose headers
+
+## What Each Field Actually Means
+
+| Field | Meaning | Example |
+|-------|---------|---------|
+| **Prep Time** | How long to *make* the item once ordered | "30 min to cook biryani" |
+| **Lead Time** | How far *in advance* buyer must order | "Order 2 hours before delivery" |
+| **Stock Quantity** | How many units available right now | "10 plates available today" |
+| **Low Stock Alert** | Notify seller when stock drops below this | "Alert me at 3 remaining" |
 
 ## Changes
 
-### 1. Add character limit to product description input
-**File**: `src/pages/SellerProductsPage.tsx` (line 73)
+### 1. Remove `prep_time_minutes` from `food_details` attribute block (DB update)
+Remove the duplicate field from the `attribute_block_library` schema for `food_details`. The main form already captures this — having it in Extra Details causes double entry.
 
-- Add `maxLength={300}` to the description Textarea
-- Add character counter below: `{formData.description.length}/300`
+**Migration**: Update `attribute_block_library` row for `block_type = 'food_details'` to remove the `prep_time_minutes` field from its JSON schema.
 
-### 2. Add description to ProductListingCard (buyer grid cards)
-**File**: `src/components/product/ProductListingCard.tsx` (line 248, after the product name)
+### 2. Add helper text to main form fields
 
-- Show `product.description` with `line-clamp-1` and `text-[10px] text-muted-foreground` — one line only, below the product name
-- Only render when description exists and `!compact`
+**File**: `src/pages/SellerProductsPage.tsx`
 
-### 3. Truncate description in preview panel
-**File**: `src/components/seller/ProductFormPreview.tsx` (line 128)
+- **Prep Time field** (line 80): Add helper below: `"How long it takes to prepare once ordered"`
+- **Lead Time field** (line 106): Change label from "Hours in advance" → "Order Lead Time (hours)" and add helper: `"Minimum advance notice buyers need to place an order"`
+- **Stock section** (line 111): Add helper to "Track Stock Quantity": already has `"Auto-marks unavailable when stock hits zero"` ✅
+- **Pre-orders toggle**: Already has `"Allow buyers to order for future dates"` ✅
 
-- Add `line-clamp-3` to the description paragraph so it doesn't overflow the preview drawer
+### 3. Same changes in DraftProductManager (onboarding form)
 
-### 4. Truncate description in buyer detail sheet
-**File**: `src/components/product/ProductDetailSheet.tsx` (line 188)
+**File**: `src/components/seller/DraftProductManager.tsx`
 
-- Wrap description in a component with "Read more" toggle: show 3 lines by default (`line-clamp-3`), tap to expand fully
-- Simple local state toggle: `expanded` boolean, toggles between `line-clamp-3` and no clamp
+- **Prep Time** (line 684): Add helper text below the input
+- **Lead Time** (line 739): Change label to "Order Lead Time (hours)", add helper text
+- **Stock section**: Already has labels ✅
 
-### Summary
+### 4. Group related fields with section headers
 
-| Location | Current | After |
-|----------|---------|-------|
-| Product form | No limit | 300 chars max + counter |
-| Seller preview (drawer) | No truncation | `line-clamp-3` |
-| Buyer listing card | Not shown | 1-line truncated |
-| Buyer detail sheet | No truncation | 3-line clamp + "Read more" |
-| ProductCard (seller page) | `line-clamp-2` | No change needed |
+In both forms, add lightweight section labels:
+- **"⏱ Preparation & Ordering"** above prep time + lead time + pre-orders
+- **"📦 Stock Management"** above stock tracking
+
+This visually separates "time-related" fields from "inventory" fields.
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| Migration | Remove `prep_time_minutes` from `food_details` block schema |
+| `src/pages/SellerProductsPage.tsx` | Add helper text, rename labels, add section headers |
+| `src/components/seller/DraftProductManager.tsx` | Same label/helper changes for onboarding form |
+
+## Summary
+
+- **Prep Time** = "How long to make it" (stays in main form only)
+- **Lead Time** = "How early to order" (renamed + helper added)
+- No more duplicate field in Extra Details
+- Clear section grouping prevents confusion
 
