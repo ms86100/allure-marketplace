@@ -24,8 +24,8 @@ export function useActionTypeMap() {
   return useQuery({
     queryKey: ['action-type-workflow-map'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('action_type_workflow_map' as any)
+      const { data, error } = await (supabase as any)
+        .from('action_type_workflow_map')
         .select('*')
         .eq('is_active', true)
         .order('action_type');
