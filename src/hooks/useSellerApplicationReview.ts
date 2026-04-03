@@ -44,6 +44,7 @@ export interface LicenseSubmission {
   submitted_at: string;
   reviewed_at: string | null;
   group?: { name: string; icon: string };
+  category_config?: { display_name: string; icon: string } | null;
 }
 
 export interface ProductSummary {
