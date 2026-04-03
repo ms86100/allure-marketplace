@@ -55,7 +55,7 @@ async function sendApnsDirect(
   apnsToken: string, title: string, body: string,
   data: Record<string, string> | undefined,
   p8Key: string, keyId: string, teamId: string, bundleId: string,
-  threadId?: string, imageUrl?: string,
+  threadId?: string, imageUrl?: string, highPriority = true,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const cryptoKey = await importP8Key(p8Key);
