@@ -93,6 +93,7 @@ const SellerSettingsPage = lazyWithRetry(() => import("./pages/SellerSettingsPag
 const SellerEarningsPage = lazyWithRetry(() => import("./pages/SellerEarningsPage"));
 const AdminPage = lazyWithRetry(() => import("./pages/AdminPage"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
+const ProductDeepLinkPage = lazyWithRetry(() => import("./pages/ProductDeepLinkPage"));
 const PrivacyPolicyPage = lazyWithRetry(() => import("./pages/PrivacyPolicyPage"));
 const TermsPage = lazyWithRetry(() => import("./pages/TermsPage"));
 const CategoryGroupPage = lazyWithRetry(() => import("./pages/CategoryGroupPage"));
