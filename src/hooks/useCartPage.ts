@@ -67,7 +67,7 @@ export function useCartPage() {
   const queryClient = useQueryClient();
   const { user, profile, society } = useAuth();
   const { requestFullPermission } = usePushNotifications();
-  const { items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, refresh, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations } = useCart();
+  const { items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, refresh, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations, cartVerified } = useCart();
   const idempotencyKeyRef = useRef<string | null>(null);
 
   // RULE 3: Safe route-entry refresh — invalidate only, never overwrite cache
