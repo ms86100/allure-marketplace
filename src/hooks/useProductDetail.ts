@@ -39,6 +39,7 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
   const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [reportOpen, setReportOpen] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
   const [loadedSpecs, setLoadedSpecs] = useState<Record<string, any> | null>(null);
   const [canonicalStockQty, setCanonicalStockQty] = useState<number | null>(null);
