@@ -229,6 +229,7 @@ async function sendFCMNotification(
   data?: Record<string, string>,
   threadId?: string,
   imageUrl?: string,
+  highPriority = true,
 ): Promise<{ success: boolean; error?: string }> {
   const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
 
