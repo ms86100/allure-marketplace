@@ -34,7 +34,7 @@ function hashToHue(str: string): number {
 
 /* ── Main Component ── */
 
-export function ShopByStoreDiscovery() {
+export function ShopByStoreDiscovery({ sectionTitle }: { sectionTitle?: string }) {
   const { effectiveSociety, profile } = useAuth();
   const browseBeyond = profile?.browse_beyond_community ?? true;
   const radiusKm = profile?.search_radius_km ?? 10;
@@ -74,7 +74,13 @@ export function ShopByStoreDiscovery() {
   const localSectionLabel = effectiveSociety ? 'In Your Society' : 'Stores Near You';
 
   return (
-    <div className="space-y-5">
+    <div className="py-6 mt-4">
+      {sectionTitle && (
+        <div className="flex items-center gap-2 px-4 mb-3">
+          <h3 className="font-extrabold text-lg text-foreground tracking-tight">{sectionTitle}</h3>
+        </div>
+      )}
+      <div className="space-y-5">
       {/* ━━━ In Your Society / Stores Near You ━━━ */}
       {(loadingLocal || hasLocal) && (
         <section>
