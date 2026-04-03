@@ -39,7 +39,7 @@ export async function fetchStatusFlow(parentGroup: string, transactionType: stri
   if (!error && (!data || data.length === 0) && parentGroup !== 'default') {
     const fallback = await supabase
       .from('category_status_flows')
-      .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, is_transit, otp_type, display_label, color, icon, buyer_hint, is_deprecated')
+      .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, is_transit, otp_type, display_label, color, icon, buyer_hint, is_deprecated, buyer_display_label, seller_display_label')
       .eq('parent_group', 'default')
       .eq('transaction_type', transactionType)
       .order('sort_order', { ascending: true });
