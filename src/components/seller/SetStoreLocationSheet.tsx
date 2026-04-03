@@ -10,6 +10,7 @@ import { getCurrentPosition } from '@/lib/native-location';
 import { useGoogleMaps, useAutocomplete } from '@/hooks/useGoogleMaps';
 import { MapPin, Navigation, Loader2, Search, ArrowLeft, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SetStoreLocationSheetProps {
   open: boolean;
@@ -29,6 +30,11 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
   const queryClient = useQueryClient();
   const { isLoaded: mapsLoaded } = useGoogleMaps();
   const { predictions, isSearching, searchPlaces, getPlaceDetails, clearPredictions } = useAutocomplete();
+  const { sellerProfiles } = useAuth();
+
+  const existingStoreLocations = (sellerProfiles || [])
+    .filter((sp: any) => sp.latitude && sp.longitude && sp.id !== sellerId)
+    .map((sp: any) => ({ id: sp.id, business_name: sp.business_name || 'Store', latitude: sp.latitude as number, longitude: sp.longitude as number }));
 
   // Auto-focus input when pick overlay opens
   useEffect(() => {
@@ -161,6 +167,36 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
 
         {/* Scrollable results area */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-6">
+          {/* Existing store locations */}
+          {existingStoreLocations.length > 0 && predictions.length === 0 && (
+            <div className="mb-4">
+              <p className="text-xs font-medium text-muted-foreground mb-2">Use location from another store</p>
+              <div className="space-y-2">
+                {existingStoreLocations.map((store) => (
+                  <button
+                    key={store.id}
+                    onClick={() => handleConfirm(store.latitude, store.longitude)}
+                    disabled={saving}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 active:bg-accent/70 transition-colors text-left"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <MapPin size={14} className="text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{store.business_name}</p>
+                      <p className="text-[10px] text-muted-foreground">{store.latitude.toFixed(4)}, {store.longitude.toFixed(4)}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-3 mt-3">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">or search</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+            </div>
+          )}
+
           {/* Predictions list */}
           {predictions.length > 0 && (
             <div className="border border-border rounded-xl overflow-hidden divide-y divide-border mb-4">
@@ -182,7 +218,7 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
           )}
 
           {/* Divider + GPS option */}
-          {predictions.length === 0 && (
+          {predictions.length === 0 && existingStoreLocations.length === 0 && (
             <div className="mt-4 space-y-4">
               <p className="text-sm text-muted-foreground text-center">
                 Type an address to search, or use your current location
